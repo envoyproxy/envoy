@@ -575,39 +575,36 @@ resources: []
   EXPECT_NE(nullptr, publishedRoute("foo"));
 }
 
-// A failure to publish a route configuration that was warmed up asynchronously can't be reported to
-// the xDS layer anymore, and the subscription stays unready.
+// A failure to publish a route configuration that was warmed up asynchronously is only logged: it
+// doesn't affect the xDS update, and readiness is still signalled so that nothing stays warming on
+// a subscription that isn't going to publish anything.
 TEST_F(RdsWarmingTest, FailureToPublishAWarmedUpUpdate) {
   createProvider();
 
   init_watcher_.expectReady().Times(0);
   EXPECT_TRUE(pushUpdate(routeConfig("1", "foo")).ok());
   ASSERT_EQ(1, config_traits_.configs_.size());
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
 
+  // Warming completes but publishing fails. Nothing is published, but readiness is signalled all
+  // the same.
+  init_watcher_.expectReady();
   provider().publish_status_ = absl::InvalidArgumentError("publishing failed");
   config_traits_.configs_[0]->ready();
   EXPECT_EQ(nullptr, publishedRoute("foo"));
-
-  // The subscription only signals readiness when it is destroyed.
-  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
-  init_watcher_.expectReady();
 }
 
-// A failure to publish a route configuration that had nothing to warm up is reported back to the
-// xDS layer as a rejection of the update.
+// A failure to publish a route configuration that had nothing to warm up behaves the same way,
+// even though the publishing happens synchronously inside the xDS update: the update is still
+// accepted and readiness is still signalled.
 TEST_F(RdsWarmingTest, FailureToPublishAnUpdateWithNothingToWarmUp) {
   config_traits_.warming_ = false;
   createProvider();
 
-  init_watcher_.expectReady().Times(0);
-  provider().publish_status_ = absl::InvalidArgumentError("publishing failed");
-  EXPECT_EQ("publishing failed", pushUpdate(routeConfig("1", "foo")).message());
-  EXPECT_EQ(nullptr, publishedRoute("foo"));
-
-  // The subscription only signals readiness when it is destroyed. In production the xDS layer
-  // rejects the update and calls onConfigUpdateFailed(), which signals readiness.
-  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
   init_watcher_.expectReady();
+  provider().publish_status_ = absl::InvalidArgumentError("publishing failed");
+  EXPECT_TRUE(pushUpdate(routeConfig("1", "foo")).ok());
+  EXPECT_EQ(nullptr, publishedRoute("foo"));
 }
 
 } // namespace
