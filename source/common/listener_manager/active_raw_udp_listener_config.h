@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/resource.h"
 #include "envoy/network/connection_handler.h"
 
 namespace Envoy {
@@ -7,7 +8,7 @@ namespace Server {
 
 class ActiveRawUdpListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
-  ActiveRawUdpListenerFactory(uint32_t concurrency);
+  ActiveRawUdpListenerFactory(uint32_t concurrency, std::shared_ptr<ResourceLimit> flow_limit);
 
   Network::ConnectionHandler::ActiveUdpListenerPtr
   createActiveUdpListener(Runtime::Loader&, uint32_t worker_index,
@@ -19,6 +20,7 @@ public:
 
 private:
   const uint32_t concurrency_;
+  const std::shared_ptr<ResourceLimit> flow_limit_;
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
 };
 

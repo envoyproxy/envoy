@@ -72,6 +72,7 @@ The following UDP statistics are available for UDP listeners and are rooted at
    :widths: 1, 1, 2
 
    downstream_rx_datagram_dropped, Counter, Number of datagrams dropped due to kernel overflow or truncation
+   downstream_flows_active, Gauge, Number of active flows tracked for hot restart handoff (connectionless UDP listeners only)
 
 .. _config_listener_stats_quic:
 

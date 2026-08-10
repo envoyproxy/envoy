@@ -50,6 +50,8 @@ namespace Server {
 
 namespace {
 
+constexpr uint64_t DefaultUdpFlowLimit = 100000;
+
 bool anyFilterChain(
     const envoy::config::listener::v3::Listener& config,
     std::function<bool(const envoy::config::listener::v3::FilterChain&)> predicate) {
@@ -752,8 +754,11 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
     return absl::InvalidArgumentError("QUIC is configured but not enabled in the build.");
 #endif
   } else {
+    auto flow_limit = std::make_shared<BasicResourceLimitImpl>(
+        DefaultUdpFlowLimit, listener_factory_context_->serverFactoryContext().runtime(),
+        "envoy.resource_limits.listener." + config.name() + ".udp_flow_limit");
     udp_listener_config_->listener_factory_ =
-        std::make_unique<Server::ActiveRawUdpListenerFactory>(concurrency);
+        std::make_unique<Server::ActiveRawUdpListenerFactory>(concurrency, std::move(flow_limit));
   }
   if (udp_listener_config_->writer_factory_ == nullptr) {
     udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();

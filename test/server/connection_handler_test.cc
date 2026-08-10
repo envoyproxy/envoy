@@ -11,6 +11,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/basic_resource_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/listener_manager/active_raw_udp_listener_config.h"
@@ -105,7 +106,8 @@ public:
       envoy::config::listener::v3::UdpListenerConfig udp_config;
       udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(udp_config);
       udp_listener_config_->listener_factory_ =
-          std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
+          std::make_unique<Server::ActiveRawUdpListenerFactory>(
+              1, std::make_shared<BasicResourceLimitImpl>());
       udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
       ON_CALL(*static_cast<Network::MockListenerInfo*>(
                   const_cast<Network::ListenerInfo*>(listener_info_.get())),

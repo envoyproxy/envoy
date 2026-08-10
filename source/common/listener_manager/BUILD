@@ -93,6 +93,7 @@ envoy_cc_library(
     hdrs = ["active_raw_udp_listener_config.h"],
     deps = [
         ":connection_handler_lib",
+        "//envoy/common:resource_interface",
         "//envoy/registry",
     ],
 )

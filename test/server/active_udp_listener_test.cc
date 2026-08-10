@@ -3,6 +3,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 
+#include "source/common/common/basic_resource_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
@@ -43,9 +44,10 @@ public:
   TestActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                            Network::UdpConnectionHandler& parent,
                            Network::SocketSharedPtr listen_socket_ptr,
-                           Event::Dispatcher& dispatcher, Network::ListenerConfig& config)
+                           Event::Dispatcher& dispatcher, Network::ListenerConfig& config,
+                           std::shared_ptr<ResourceLimit> flow_limit)
       : ActiveRawUdpListener(worker_index, concurrency, parent, listen_socket_ptr, dispatcher,
-                             config),
+                             config, std::move(flow_limit)),
         destination_(worker_index) {}
   uint32_t destination(const Network::UdpRecvData&) const override { return destination_; }
 
@@ -102,7 +104,7 @@ public:
     EXPECT_CALL(cb_.udp_listener_, onDestroy());
 
     active_listener_ = std::make_unique<TestActiveRawUdpListener>(
-        0, concurrency, conn_handler_, listen_socket_, dispatcher_, listener_config_);
+        0, concurrency, conn_handler_, listen_socket_, dispatcher_, listener_config_, flow_limit_);
   }
 
   Network::UdpRecvData makeRecvData(uint32_t peer_port) {
@@ -126,6 +128,7 @@ public:
   Network::MockListenerConfig listener_config_;
   std::unique_ptr<TestActiveRawUdpListener> active_listener_;
   NiceMock<Network::MockUdpReadFilterCallbacks> cb_;
+  std::shared_ptr<BasicResourceLimitImpl> flow_limit_{std::make_shared<BasicResourceLimitImpl>()};
 };
 
 INSTANTIATE_TEST_SUITE_P(ActiveUdpListenerTests, ActiveUdpListenerTest,
@@ -267,6 +270,25 @@ TEST_P(ActiveUdpListenerTest, HotRestartShutdownForwardsUnknownFlows) {
   now += std::chrono::hours(1);
   sweep_timer->invokeCallback();
   active_listener_->onData(makeRecvData(1000));
+}
+
+TEST_P(ActiveUdpListenerTest, FlowTrackingLimit) {
+  flow_limit_->setMax(2);
+  setup();
+
+  auto active_flows = [&] {
+    return scope_
+        .gaugeFromString("udp.downstream_flows_active", Stats::Gauge::ImportMode::Accumulate)
+        .value();
+  };
+
+  active_listener_->onData(makeRecvData(1000));
+  active_listener_->onData(makeRecvData(2000));
+  active_listener_->onData(makeRecvData(3000));
+  EXPECT_EQ(2, active_flows());
+
+  active_listener_->onData(makeRecvData(1000));
+  EXPECT_EQ(2, active_flows());
 }
 
 TEST_P(ActiveUdpListenerTest, RegularShutdownDestroysListener) {

@@ -19,7 +19,8 @@ ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t con
     : ActiveListenerImplBase(parent, config), worker_index_(worker_index),
       concurrency_(concurrency), parent_(parent), listen_socket_(listen_socket),
       udp_listener_(std::move(listener)),
-      udp_stats_({ALL_UDP_LISTENER_STATS(POOL_COUNTER_PREFIX(config->listenerScope(), "udp"))}),
+      udp_stats_({ALL_UDP_LISTENER_STATS(POOL_COUNTER_PREFIX(config->listenerScope(), "udp"),
+                                         POOL_GAUGE_PREFIX(config->listenerScope(), "udp"))}),
       udp_listener_worker_router_(config_->udpListenerConfig()->listenerWorkerRouter(
           *listen_socket.connectionInfoProvider().localAddress())) {
   ASSERT(worker_index_ < concurrency_);
@@ -64,32 +65,36 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Network::UdpConnectionHandler& parent,
                                            Network::SocketSharedPtr listen_socket_ptr,
                                            Event::Dispatcher& dispatcher,
-                                           Network::ListenerConfig& config)
+                                           Network::ListenerConfig& config,
+                                           std::shared_ptr<ResourceLimit> flow_limit)
     : ActiveRawUdpListener(worker_index, concurrency, parent, *listen_socket_ptr, listen_socket_ptr,
-                           dispatcher, config) {}
+                           dispatcher, config, std::move(flow_limit)) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                                            Network::UdpConnectionHandler& parent,
                                            Network::Socket& listen_socket,
                                            Network::SocketSharedPtr listen_socket_ptr,
                                            Event::Dispatcher& dispatcher,
-                                           Network::ListenerConfig& config)
+                                           Network::ListenerConfig& config,
+                                           std::shared_ptr<ResourceLimit> flow_limit)
     : ActiveRawUdpListener(worker_index, concurrency, parent, listen_socket,
                            std::make_unique<Network::UdpListenerImpl>(
                                dispatcher, listen_socket_ptr, *this, dispatcher.timeSource(),
                                config.udpListenerConfig()->config().downstream_socket_config()),
-                           config) {}
+                           config, std::move(flow_limit)) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                                            Network::UdpConnectionHandler& parent,
                                            Network::Socket& listen_socket,
                                            Network::UdpListenerPtr&& listener,
-                                           Network::ListenerConfig& config)
+                                           Network::ListenerConfig& config,
+                                           std::shared_ptr<ResourceLimit> flow_limit)
     : ActiveUdpListenerBase(worker_index, concurrency, parent, listen_socket, std::move(listener),
                             &config),
       flow_sweep_timer_(udp_listener_->dispatcher().createTimer([this] { sweepIdleFlows(); })),
       flow_idle_timeout_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
-          config.udpListenerConfig()->config(), flow_idle_timeout, 60000))) {
+          config.udpListenerConfig()->config(), flow_idle_timeout, 60000))),
+      flow_limit_(std::move(flow_limit)) {
   // Create the filter chain on creating a new udp listener.
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
@@ -112,22 +117,19 @@ void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
   }
 
   const MonotonicTime now = udp_listener_->dispatcher().approximateMonotonicTime();
-  if (non_dispatched_udp_packet_handler_.has_value()) {
-    auto flow_it = flow_last_activity_.find(data.addresses_);
-    if (flow_it == flow_last_activity_.end()) {
-      // Draining for hot restart: this flow isn't ours, hand it to the child instance.
-      non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
-      return;
-    }
+  auto flow_it = flow_last_activity_.find(data.addresses_);
+  if (flow_it != flow_last_activity_.end()) {
     flow_it->second = now;
-  } else {
-    auto [flow_it, inserted] = flow_last_activity_.try_emplace(data.addresses_, now);
-    if (inserted) {
-      if (flow_last_activity_.size() == 1) {
-        flow_sweep_timer_->enableTimer(flow_idle_timeout_);
-      }
-    } else {
-      flow_it->second = now;
+  } else if (non_dispatched_udp_packet_handler_.has_value()) {
+    // Draining for hot restart: this flow isn't ours, hand it to the child instance.
+    non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
+    return;
+  } else if (flow_limit_->canCreate()) {
+    flow_last_activity_.emplace(data.addresses_, now);
+    flow_limit_->inc();
+    udp_stats_.downstream_flows_active_.inc();
+    if (flow_last_activity_.size() == 1) {
+      flow_sweep_timer_->enableTimer(flow_idle_timeout_);
     }
   }
 
@@ -142,6 +144,7 @@ void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
 void ActiveRawUdpListener::sweepIdleFlows() {
   const MonotonicTime cutoff =
       udp_listener_->dispatcher().approximateMonotonicTime() - flow_idle_timeout_;
+  const size_t before = flow_last_activity_.size();
   for (auto it = flow_last_activity_.begin(); it != flow_last_activity_.end();) {
     if (it->second < cutoff) {
       flow_last_activity_.erase(it++);
@@ -149,6 +152,9 @@ void ActiveRawUdpListener::sweepIdleFlows() {
       ++it;
     }
   }
+  const uint64_t erased = before - flow_last_activity_.size();
+  flow_limit_->decBy(erased);
+  udp_stats_.downstream_flows_active_.sub(erased);
   if (!flow_last_activity_.empty()) {
     flow_sweep_timer_->enableTimer(flow_idle_timeout_);
   }

@@ -61,8 +61,8 @@ FakeUpstream::FakeListener::FakeListener(FakeUpstream& parent, bool is_quic)
     ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
 #endif
   } else {
-    udp_listener_config_.listener_factory_ =
-        std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
+    udp_listener_config_.listener_factory_ = std::make_unique<Server::ActiveRawUdpListenerFactory>(
+        1, std::make_shared<BasicResourceLimitImpl>());
   }
 }
 

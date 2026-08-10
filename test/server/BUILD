@@ -85,6 +85,7 @@ envoy_cc_test(
     srcs = ["connection_handler_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/common:basic_resource_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/listener_manager:active_raw_udp_listener_config",
@@ -128,6 +129,7 @@ envoy_cc_test(
     srcs = ["active_udp_listener_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/common:basic_resource_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:udp_packet_writer_handler_lib",

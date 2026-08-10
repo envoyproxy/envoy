@@ -15,13 +15,15 @@
 namespace Envoy {
 namespace Server {
 
-#define ALL_UDP_LISTENER_STATS(COUNTER) COUNTER(downstream_rx_datagram_dropped)
+#define ALL_UDP_LISTENER_STATS(COUNTER, GAUGE)                                                     \
+  COUNTER(downstream_rx_datagram_dropped)                                                          \
+  GAUGE(downstream_flows_active, Accumulate)
 
 /**
  * Wrapper struct for UDP listener stats. @see stats_macros.h
  */
 struct UdpListenerStats {
-  ALL_UDP_LISTENER_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_UDP_LISTENER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 class ActiveUdpListenerBase : public ActiveListenerImplBase,
@@ -69,14 +71,15 @@ public:
   ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                        Network::UdpConnectionHandler& parent,
                        Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
-                       Network::ListenerConfig& config);
+                       Network::ListenerConfig& config, std::shared_ptr<ResourceLimit> flow_limit);
   ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                        Network::UdpConnectionHandler& parent, Network::Socket& listen_socket,
                        Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
-                       Network::ListenerConfig& config);
+                       Network::ListenerConfig& config, std::shared_ptr<ResourceLimit> flow_limit);
   ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                        Network::UdpConnectionHandler& parent, Network::Socket& listen_socket,
-                       Network::UdpListenerPtr&& listener, Network::ListenerConfig& config);
+                       Network::UdpListenerPtr&& listener, Network::ListenerConfig& config,
+                       std::shared_ptr<ResourceLimit> flow_limit);
 
   // Network::UdpListenerCallbacks
   void onReadReady() override;
@@ -109,6 +112,8 @@ public:
     // after deletion.
     read_filters_.clear();
     udp_listener_.reset();
+    flow_limit_->decBy(flow_last_activity_.size());
+    udp_stats_.downstream_flows_active_.sub(flow_last_activity_.size());
     flow_last_activity_.clear();
     flow_sweep_timer_.reset();
   }
@@ -142,6 +147,7 @@ private:
   Event::TimerPtr flow_sweep_timer_;
   OptRef<Network::NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
   const std::chrono::milliseconds flow_idle_timeout_;
+  const std::shared_ptr<ResourceLimit> flow_limit_;
 };
 
 } // namespace Server

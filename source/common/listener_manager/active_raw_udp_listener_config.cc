@@ -9,8 +9,9 @@
 namespace Envoy {
 namespace Server {
 
-ActiveRawUdpListenerFactory::ActiveRawUdpListenerFactory(uint32_t concurrency)
-    : concurrency_(concurrency) {}
+ActiveRawUdpListenerFactory::ActiveRawUdpListenerFactory(uint32_t concurrency,
+                                                         std::shared_ptr<ResourceLimit> flow_limit)
+    : concurrency_(concurrency), flow_limit_(std::move(flow_limit)) {}
 
 Network::ConnectionHandler::ActiveUdpListenerPtr
 ActiveRawUdpListenerFactory::createActiveUdpListener(Runtime::Loader&, uint32_t worker_index,
@@ -19,7 +20,8 @@ ActiveRawUdpListenerFactory::createActiveUdpListener(Runtime::Loader&, uint32_t 
                                                      Event::Dispatcher& dispatcher,
                                                      Network::ListenerConfig& config) {
   return std::make_unique<ActiveRawUdpListener>(worker_index, concurrency_, parent,
-                                                std::move(listen_socket_ptr), dispatcher, config);
+                                                std::move(listen_socket_ptr), dispatcher, config,
+                                                flow_limit_);
 }
 
 } // namespace Server
