@@ -9,6 +9,7 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/formatter/http_specific_formatter.h"
+#include "source/common/formatter/serializer.h"
 #include "source/common/formatter/stream_info_formatter.h"
 #include "source/common/formatter/substitution_format_utility.h"
 #include "source/common/formatter/substitution_formatter.h"
@@ -3700,6 +3701,193 @@ TEST(SubstitutionFormatterTest, responseTrailerFormatter) {
     EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("PO")));
   }
+}
+
+// Helper to exercise the FormatterProvider::formatValueTo() sink API. It owns the output buffer,
+// the JSON serializer that writes into it and the single-use value sink itself.
+class ValueSinkHelper {
+public:
+  ValueSink& sink() { return sink_; }
+
+  // True if the formatter added a value to the sink.
+  bool consumed() const { return sink_.consumed(); }
+
+  // The JSON serialized value that the formatter wrote to the sink. Empty if the formatter left
+  // the sink unmodified.
+  const std::string& output() const { return buffer_; }
+
+private:
+  std::string buffer_;
+  JsonStringSerializer serializer_{buffer_};
+  ValueSink sink_{serializer_};
+};
+
+TEST(SubstitutionFormatterTest, HeaderFormatterFormatToAndFormatValueTo) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
+
+  Context formatter_context;
+  formatter_context.setRequestHeaders(request_header);
+
+  // The main header is found.
+  {
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>());
+
+    std::string sink;
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ("GET", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), formatter_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("GET")", helper.output());
+  }
+
+  // The main header is found and the alternative header is not used.
+  {
+    RequestHeaderFormatter formatter(":path", ":method", std::optional<size_t>());
+
+    std::string sink;
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ("/", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), formatter_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("/")", helper.output());
+  }
+
+  // The main header is missing and the alternative header is used.
+  {
+    RequestHeaderFormatter formatter(":TEST", ":METHOD", std::optional<size_t>());
+
+    std::string sink;
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ("GET", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), formatter_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("GET")", helper.output());
+  }
+
+  // Neither header is found. formatTo() reports the failure and leaves the sink untouched and
+  // formatValueTo() leaves the value sink unconsumed.
+  {
+    RequestHeaderFormatter formatter("does_not_exist", "", std::optional<size_t>());
+
+    std::string sink = "existing";
+    EXPECT_FALSE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ("existing", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), formatter_context, stream_info);
+    EXPECT_FALSE(helper.consumed());
+    EXPECT_EQ("", helper.output());
+  }
+
+  // The value is truncated to the max length.
+  {
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(2));
+
+    std::string sink;
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ("GE", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), formatter_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("GE")", helper.output());
+  }
+
+  // formatTo() appends to the sink rather than overwriting it.
+  {
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>());
+
+    std::string sink = "method: ";
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ("method: GETGET", sink);
+  }
+
+  // The header value is JSON sanitized before it is written to the value sink but is written
+  // verbatim to the string sink.
+  {
+    Http::TestRequestHeaderMapImpl special_header{{"x-header", R"(va"lue\)"}};
+    Context special_context;
+    special_context.setRequestHeaders(special_header);
+
+    RequestHeaderFormatter formatter("x-header", "", std::optional<size_t>());
+
+    std::string sink;
+    EXPECT_TRUE(formatter.formatTo(sink, special_context, stream_info));
+    EXPECT_EQ(R"(va"lue\)", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), special_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("va\"lue\\")", helper.output());
+  }
+
+  // A header that is present but empty is still an extracted value.
+  {
+    Http::TestRequestHeaderMapImpl empty_value_header{{"x-header", ""}};
+    Context empty_value_context;
+    empty_value_context.setRequestHeaders(empty_value_header);
+
+    RequestHeaderFormatter formatter("x-header", "", std::optional<size_t>());
+
+    std::string sink = "value: ";
+    EXPECT_TRUE(formatter.formatTo(sink, empty_value_context, stream_info));
+    EXPECT_EQ("value: ", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), empty_value_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("")", helper.output());
+  }
+
+  // There are no request headers in the context at all.
+  {
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>());
+    Context empty_context;
+
+    std::string sink;
+    EXPECT_FALSE(formatter.formatTo(sink, empty_context, stream_info));
+    EXPECT_EQ("", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), empty_context, stream_info);
+    EXPECT_FALSE(helper.consumed());
+    EXPECT_EQ("", helper.output());
+  }
+}
+
+TEST(SubstitutionFormatterTest, HeaderFormattersReadTheirOwnHeaderMap) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{"x-header", "request"}};
+  Http::TestResponseHeaderMapImpl response_header{{"x-header", "response"}};
+  Http::TestResponseTrailerMapImpl response_trailer{{"x-header", "trailer"}};
+
+  Context formatter_context;
+  formatter_context.setRequestHeaders(request_header)
+      .setResponseHeaders(response_header)
+      .setResponseTrailers(response_trailer);
+
+  const auto expect_value = [&](const FormatterProvider& formatter, const std::string& expected) {
+    std::string sink;
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ(expected, sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), formatter_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("\"" + expected + "\"", helper.output());
+  };
+
+  expect_value(RequestHeaderFormatter("x-header", "", std::optional<size_t>()), "request");
+  expect_value(ResponseHeaderFormatter("x-header", "", std::optional<size_t>()), "response");
+  expect_value(ResponseTrailerFormatter("x-header", "", std::optional<size_t>()), "trailer");
 }
 
 TEST(SubstitutionFormatterTest, TraceIDFormatter) {
