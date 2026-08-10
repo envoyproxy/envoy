@@ -139,6 +139,7 @@
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @kbaichoo
 /*/extensions/filters/common/fault @rshriram @kbaichoo
+/*/extensions/filters/common/jwks @wbpcode @kanurag94 @taoxuy @tyxia @yanavlasov
 /*/extensions/filters/http/grpc_json_reverse_transcoder @numanelahi @yanavlasov
 /*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @nezdolik
 /*/extensions/filters/http/router @yanavlasov @mattklein123
@@ -364,6 +365,8 @@
 /*/extensions/filters/http/json_to_metadata @cqi1217 @JuniorHsu @kbaichoo
 # SSE to metadata
 /*/extensions/filters/http/sse_to_metadata @JuniorHsu @PeterL328 @tyxia
+# AWS EventStream parser
+/*/extensions/filters/http/aws_eventstream_parser @JuniorHsu @PeterL328 @cqi1217 @tyxia
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
 # Custom response filter
@@ -440,6 +443,8 @@
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 # AI Protocol Manager filter
 /*/extensions/filters/http/ai_protocol_manager @penguingao @botengyao @tyxia
+# HTTP body size limit filter
+/*/extensions/filters/http/body_size_limit @wbpcode @ivaradi
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov

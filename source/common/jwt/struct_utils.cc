@@ -87,18 +87,16 @@ StructUtils::FindResult StructUtils::GetStringList(const std::string& name,
   return WRONG_TYPE;
 }
 
-StructUtils::FindResult StructUtils::GetValue(const std::string& nested_names,
-                                              const Protobuf::Value*& found) {
-  const std::vector<absl::string_view> name_vector = absl::StrSplit(nested_names, '.');
-
+StructUtils::FindResult StructUtils::GetValueByPath(absl::Span<const absl::string_view> path,
+                                                    const Protobuf::Value*& found) {
   const Protobuf::Struct* current_struct = &struct_pb_;
-  for (size_t i = 0; i < name_vector.size(); ++i) {
+  for (size_t i = 0; i < path.size(); ++i) {
     const auto& fields = current_struct->fields();
-    const auto it = fields.find(std::string(name_vector[i]));
+    const auto it = fields.find(path[i]);
     if (it == fields.end()) {
       return MISSING;
     }
-    if (i == name_vector.size() - 1) {
+    if (i == path.size() - 1) {
       found = &it->second;
       return OK;
     }
@@ -108,6 +106,12 @@ StructUtils::FindResult StructUtils::GetValue(const std::string& nested_names,
     current_struct = &it->second.struct_value();
   }
   return MISSING;
+}
+
+StructUtils::FindResult StructUtils::GetValue(const std::string& nested_names,
+                                              const Protobuf::Value*& found) {
+  const std::vector<absl::string_view> name_vector = absl::StrSplit(nested_names, '.');
+  return GetValueByPath(name_vector, found);
 }
 
 } // namespace JwtVerify

@@ -52,6 +52,8 @@ areas:
     title: circuit_breaker
   composite:
     title: composite
+  compressor:
+    title: compressor
   credential_injector:
     title: credential_injector
   dns_resolver:
@@ -76,6 +78,8 @@ areas:
     title: load_report
   logging:
     title: logging
+  mcp_json_rest_bridge:
+    title: mcp_json_rest_bridge
   mcp_router:
     title: mcp_router
   mysql_proxy:

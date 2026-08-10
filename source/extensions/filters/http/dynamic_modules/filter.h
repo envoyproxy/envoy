@@ -2,6 +2,9 @@
 
 #include <atomic>
 
+#include "envoy/common/optref.h"
+#include "envoy/event/dispatcher.h"
+
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -260,11 +263,12 @@ private:
   void* thisAsVoidPtr() { return static_cast<void*>(this); }
 
   /**
-   * Called when filter is destroyed via onDestroy() or destructor. Forwards the call to the
-   * module via on_http_filter_destroy_ and resets in_module_filter_ to null. Subsequent calls are a
+   * Detaches from the module, cancels the pending callouts and streams, and destroys the in-module
+   * filter. When `dispatcher` is given the destroy hook runs from its deferred deletion list, so
+   * that the in-module filter outlives any module event hook on the stack. Subsequent calls are a
    * no-op.
    */
-  void destroy();
+  void destroy(OptRef<Event::Dispatcher> dispatcher = {});
 
   /**
    * Registers this filter for downstream watermark callbacks once both decoder callbacks have been
