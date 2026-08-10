@@ -1,3 +1,4 @@
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/config.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -75,6 +76,38 @@ TEST(McpJsonRestBridgeFilterConfigTest, InvalidToolListHttpRuleThrowsException) 
   EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, "stats", context),
               HasStatus(absl::StatusCode::kInvalidArgument,
                         HasSubstr("tool_list_http_rule must be a GET request with an empty body")));
+}
+
+TEST(McpJsonRestBridgeFilterConfigTest, IncrementRequestCount) {
+  Stats::IsolatedStoreImpl stats_store;
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+  McpJsonRestBridgeFilterConfig config(proto_config, *stats_store.rootScope());
+
+  config.incrementRequestCount("tools/call", "mcp_json_rest_bridge_ok");
+
+  Stats::CounterSharedPtr counter = TestUtility::findCounter(
+      stats_store,
+      "mcp_json_rest_bridge.request_count.mcp_method.tools/call.status.mcp_json_rest_bridge_ok");
+  ASSERT_NE(counter, nullptr);
+  EXPECT_EQ(counter->value(), 1);
+  EXPECT_THAT(counter->tags(),
+              testing::ElementsAre(Stats::Tag{"mcp_method", "tools/call"},
+                                   Stats::Tag{"status", "mcp_json_rest_bridge_ok"}));
+}
+
+TEST(McpJsonRestBridgeFilterConfigTest, IncrementRequestCountAccumulates) {
+  Stats::IsolatedStoreImpl stats_store;
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+  McpJsonRestBridgeFilterConfig config(proto_config, *stats_store.rootScope());
+
+  config.incrementRequestCount("tools/call", "mcp_json_rest_bridge_ok");
+  config.incrementRequestCount("tools/call", "mcp_json_rest_bridge_ok");
+
+  Stats::CounterSharedPtr counter = TestUtility::findCounter(
+      stats_store,
+      "mcp_json_rest_bridge.request_count.mcp_method.tools/call.status.mcp_json_rest_bridge_ok");
+  ASSERT_NE(counter, nullptr);
+  EXPECT_EQ(counter->value(), 2);
 }
 
 } // namespace

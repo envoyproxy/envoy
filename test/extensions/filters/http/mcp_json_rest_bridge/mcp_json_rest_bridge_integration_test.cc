@@ -2388,5 +2388,70 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsListHeadersOnly204SyntheticServerE
           R"json({"jsonrpc":"2.0","id":9,"error":{"code":-32000,"message":"Server error"}})json"));
 }
 
+TEST_P(McpJsonRestBridgeIntegrationTest, MultipleRequestsAccumulateStats) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  )EOF";
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body_1 = R"({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {}
+    }
+  })";
+
+  auto response1 = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body_1);
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_THAT(response1->headers().getStatusValue(), StrEq("200"));
+
+  const std::string request_body_2 = R"({
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {}
+    }
+  })";
+
+  auto response2 = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body_2);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_THAT(response2->headers().getStatusValue(), StrEq("200"));
+
+  // Verifies that the counter accumulated to 2 across real Envoy HTTP requests sharing the listener
+  // filter config.
+  Stats::CounterSharedPtr counter = TestUtility::findCounter(
+      test_server_->statStore(),
+      "mcp_json_rest_bridge.request_count.mcp_method.initialize.status.mcp_json_rest_bridge_ok");
+  ASSERT_NE(counter, nullptr);
+  EXPECT_EQ(2, counter->value());
+  EXPECT_THAT(counter->tags(),
+              testing::ElementsAre(Stats::Tag{"mcp_method", "initialize"},
+                                   Stats::Tag{"status", "mcp_json_rest_bridge_ok"}));
+}
+
 } // namespace
 } // namespace Envoy

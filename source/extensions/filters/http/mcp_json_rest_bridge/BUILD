@@ -19,6 +19,7 @@ envoy_cc_library(
         "//envoy/common:optref_lib",
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",

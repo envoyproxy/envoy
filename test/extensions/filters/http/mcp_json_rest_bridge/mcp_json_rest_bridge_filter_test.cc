@@ -3,6 +3,7 @@
 #include "envoy/http/filter.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/mcp_json_rest_bridge_filter.h"
 
 #include "test/mocks/http/mocks.h"
@@ -49,7 +50,8 @@ tool_config:
   }
 
   void makeFilter() {
-    config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config_);
+    config_ =
+        std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config_, *stats_store_.rootScope());
     filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -61,6 +63,16 @@ tool_config:
         .WillRepeatedly(Return(Http::ResponseHeaderMapOptRef(response_headers_)));
   }
 
+  void expectCounter(absl::string_view stat_name, uint64_t expected_value,
+                     const std::vector<Stats::Tag>& expected_tags) {
+    Stats::CounterSharedPtr counter =
+        TestUtility::findCounter(stats_store_, std::string(stat_name));
+    ASSERT_NE(counter, nullptr);
+    EXPECT_EQ(counter->value(), expected_value);
+    EXPECT_THAT(counter->tags(), testing::ElementsAreArray(expected_tags));
+  }
+
+  Stats::IsolatedStoreImpl stats_store_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
   McpJsonRestBridgeFilterConfigSharedPtr config_;
   std::unique_ptr<McpJsonRestBridgeFilter> filter_;
@@ -114,6 +126,10 @@ TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestReturnsServerInfoLocalRespo
   Buffer::OwnedImpl response_body("initialize response");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
+
+  expectCounter("mcp_json_rest_bridge.request_count.mcp_method.initialize.status.mcp_json_"
+                "rest_bridge_ok",
+                1, {{"mcp_method", "initialize"}, {"status", "mcp_json_rest_bridge_ok"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, NotMcpRequestResponsePassThrough) {
@@ -177,6 +193,11 @@ TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedMethodReturnsAccepte
   // Simulates how the router filter handles the local response.
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/true),
             Http::FilterHeadersStatus::Continue);
+
+  expectCounter(
+      "mcp_json_rest_bridge.request_count.mcp_method.notifications/"
+      "initialized.status.mcp_json_rest_bridge_ok",
+      1, {{"mcp_method", "notifications/initialized"}, {"status", "mcp_json_rest_bridge_ok"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, PerRouteOnlyNoOpMode) {
@@ -278,6 +299,10 @@ TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
           R"json({"error":{"code":-32600,"message":"Missing method field"},"id":0,"jsonrpc":"2.0"})json"));
+
+  expectCounter("mcp_json_rest_bridge.request_count.status.mcp_json_rest_bridge_request_"
+                "method_not_found",
+                1, {{"status", "mcp_json_rest_bridge_request_method_not_found"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, UnsupportedMethodReturnsError) {
@@ -655,6 +680,10 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallRedirectUrlAndBodyToBackendResponseR
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
           R"json({"jsonrpc":"2.0","id":123,"result":{"content":[{"text":"{\"displayName\":\"display-key\",\"createTime\":\"1970-01-01T00:00:22Z\"}","type":"text"}],"isError":false}})json"));
+
+  expectCounter("mcp_json_rest_bridge.request_count.mcp_method.tools/"
+                "call.status.mcp_json_rest_bridge_ok",
+                1, {{"mcp_method", "tools/call"}, {"status", "mcp_json_rest_bridge_ok"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallWithoutHttpRuleBody) {
@@ -841,6 +870,11 @@ TEST_F(McpJsonRestBridgeFilterTest, UnknownToolReturnsError) {
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
           R"json({"error":{"code":-32602,"message":"Unknown tool"},"id":123,"jsonrpc":"2.0"})json"));
+
+  expectCounter(
+      "mcp_json_rest_bridge.request_count.mcp_method.tools/"
+      "call.status.mcp_json_rest_bridge_request_unknown_tool",
+      1, {{"mcp_method", "tools/call"}, {"status", "mcp_json_rest_bridge_request_unknown_tool"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolParamsNotFoundReturnsError) {
@@ -936,6 +970,12 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolTranscodingFailureReturnsError) {
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
           R"json({"error":{"code":-32602,"message":"Invalid tool arguments"},"id":123,"jsonrpc":"2.0"})json"));
+
+  expectCounter("mcp_json_rest_bridge.request_count.mcp_method.tools/"
+                "call.status.mcp_json_rest_bridge_request_tool_transcoding_failure",
+                1,
+                {{"mcp_method", "tools/call"},
+                 {"status", "mcp_json_rest_bridge_request_tool_transcoding_failure"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {
@@ -987,6 +1027,12 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
           R"json({"error":{"code":-32602,"message":"Tool arguments must be an object"},"id":123,"jsonrpc":"2.0"})json"));
+
+  expectCounter("mcp_json_rest_bridge.request_count.mcp_method.tools/"
+                "call.status.mcp_json_rest_bridge_request_tool_arguments_invalid",
+                1,
+                {{"mcp_method", "tools/call"},
+                 {"status", "mcp_json_rest_bridge_request_tool_arguments_invalid"}});
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, OptionalToolArguments) {
@@ -1301,7 +1347,8 @@ tool_config:
         body: key
 )yaml",
                             proto_config);
-  config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  config_ =
+      std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config, *stats_store_.rootScope());
   filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -2104,7 +2151,8 @@ tool_config:
       text_content_streaming_enabled: true
 )yaml",
                               proto_config);
-    config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+    config_ =
+        std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config, *stats_store_.rootScope());
     filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -2126,6 +2174,7 @@ tool_config:
     ASSERT_EQ(filter_->decodeData(req, /*end_stream=*/true), Http::FilterDataStatus::Continue);
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   McpJsonRestBridgeFilterConfigSharedPtr config_;
   std::unique_ptr<McpJsonRestBridgeFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -2304,7 +2353,8 @@ tool_config:
         body: key
 )yaml",
                               proto_config);
-    config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+    config_ =
+        std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config, *stats_store_.rootScope());
     filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -2316,6 +2366,7 @@ tool_config:
         .WillRepeatedly(Return(Http::ResponseHeaderMapOptRef(response_headers_)));
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   McpJsonRestBridgeFilterConfigSharedPtr config_;
   std::unique_ptr<McpJsonRestBridgeFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -2661,7 +2712,8 @@ public:
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
     proto_config.set_request_storage_mode(envoy::extensions::filters::http::mcp_json_rest_bridge::
                                               v3::McpJsonRestBridge::DYNAMIC_METADATA);
-    config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+    config_ =
+        std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config, *stats_store_.rootScope());
     filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -2673,6 +2725,7 @@ public:
         .WillRepeatedly(Return(Http::ResponseHeaderMapOptRef(response_headers_)));
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   McpJsonRestBridgeFilterConfigSharedPtr config_;
   std::unique_ptr<McpJsonRestBridgeFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -3095,6 +3148,40 @@ TEST_F(McpJsonRestBridgeFilterTest, DisabledClearRouteCacheDoesNotClearForToolsL
 
   EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, MultipleFilterStreamsAccumulateStats) {
+  makeFilter();
+
+  // Stream 1: initialize request processed by filter_
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl body1(
+      R"json({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
+  EXPECT_EQ(filter_->decodeData(body1, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+
+  // Stream 2: a second distinct stream filter instance sharing the same config_
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks2;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks2;
+  auto filter2 = std::make_unique<McpJsonRestBridgeFilter>(config_);
+  filter2->setDecoderFilterCallbacks(decoder_callbacks2);
+  filter2->setEncoderFilterCallbacks(encoder_callbacks2);
+
+  Http::TestRequestHeaderMapImpl request_headers2{
+      {":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  EXPECT_EQ(filter2->decodeHeaders(request_headers2, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl body2(
+      R"json({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
+  EXPECT_EQ(filter2->decodeData(body2, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+
+  // Verifies the counter accumulated to 2 across the two distinct filter stream instances.
+  expectCounter("mcp_json_rest_bridge.request_count.mcp_method.initialize.status.mcp_json_"
+                "rest_bridge_ok",
+                2, {{"mcp_method", "initialize"}, {"status", "mcp_json_rest_bridge_ok"}});
 }
 
 } // namespace
