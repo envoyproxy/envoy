@@ -1716,12 +1716,9 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
-        "//source/extensions/filters/http/set_filter_state:config",
-        "//source/extensions/internal_redirect/filter_state:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/internal_redirect/filter_state/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "//test/integration/filters:pause_filter_for_quic_lib",
     ]),
