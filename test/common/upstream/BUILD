@@ -769,6 +769,23 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "cluster_dns_resolver_cache_test",
+    srcs = ["cluster_dns_resolver_cache_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
+        "//source/common/upstream:cluster_dns_resolver_cache_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/network/dns_resolver/cares/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "cluster_factory_impl_test",
     srcs = ["cluster_factory_impl_test.cc"],
     rbe_pool = "6gig",

@@ -2492,7 +2492,7 @@ ProdClusterManagerFactory::clusterFromProto(const envoy::config::cluster::v3::Cl
                                             Outlier::EventLoggerSharedPtr outlier_event_logger,
                                             bool added_via_api) {
   return ClusterFactoryImplBase::create(cluster, context_, dns_resolver_fn_, outlier_event_logger,
-                                        added_via_api);
+                                        added_via_api, makeOptRef(dns_resolver_cache_));
 }
 
 absl::StatusOr<CdsApiPtr>
