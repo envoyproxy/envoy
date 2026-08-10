@@ -10,6 +10,7 @@ import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "UdpListenerConfigProto";
@@ -54,7 +55,7 @@ message UdpListenerConfig {
   // Should not be set lower than the idle timeout of the proxying filter (e.g. the udp_proxy
   // :ref:`idle_timeout <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.idle_timeout>`),
   // otherwise live sessions may be handed to the child instance mid-drain. Defaults to 1 minute.
-  google.protobuf.Duration flow_idle_timeout = 9;
+  google.protobuf.Duration flow_idle_timeout = 9 [(validate.rules).duration = {gt {}}];
 }
 
 message ActiveRawUdpListenerConfig {
