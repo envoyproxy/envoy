@@ -174,7 +174,7 @@ public:
     const bool treat_missing_as_empty_;
     // Latched value of the `match_headers_individually` runtime feature, read once at
     // construction instead of on every match.
-    const bool match_individually_;
+    const bool match_individually_ = false;
   };
 
   // Corresponds to the exact_match from the HeaderMatchSpecifier proto in the RDS API.

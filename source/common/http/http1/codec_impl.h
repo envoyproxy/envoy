@@ -329,7 +329,7 @@ protected:
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
 #ifndef ENVOY_ENABLE_UHV
-  const bool validate_upstream_headers_;
+  const bool validate_upstream_headers_ = false;
 #endif
 
 private:
