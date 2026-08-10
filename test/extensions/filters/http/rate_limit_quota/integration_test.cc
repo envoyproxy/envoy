@@ -312,7 +312,7 @@ protected:
   // TODO(bsurber): Implement report timing & usage aggregation based on each
   // bucket's reporting_interval field. Currently this is not supported and all
   // usage is reported on a hardcoded interval.
-  int report_interval_sec_ = 5;
+  int report_interval_sec_ = 1;
   RateLimitStrategy deny_all_strategy;
   RateLimitStrategy allow_all_strategy;
   // Prefer initialization around this default matcher if manipulations aren't needed.
