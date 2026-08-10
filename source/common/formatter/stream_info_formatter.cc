@@ -373,6 +373,14 @@ const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointG
          [](const StreamInfo::StreamInfo& stream_info) -> std::optional<MonotonicTime> {
            return stream_info.startTimeMonotonic();
          }},
+        {LastDownstreamHeaderRxByteReceived,
+         [](const StreamInfo::StreamInfo& stream_info) -> std::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->lastDownstreamHeaderRxByteReceived();
+           }
+           return {};
+         }},
         {LastDownstreamRxByteReceived,
          [](const StreamInfo::StreamInfo& stream_info) -> std::optional<MonotonicTime> {
            const auto downstream_timing = stream_info.downstreamTiming();

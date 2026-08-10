@@ -191,6 +191,8 @@ private:
 
   static constexpr absl::string_view FirstDownstreamRxByteReceived =
       "DS_RX_BEG"; // Downstream request receiving begin.
+  static constexpr absl::string_view LastDownstreamHeaderRxByteReceived =
+      "DS_RX_HDR_END"; // Downstream request headers fully received.
   static constexpr absl::string_view LastDownstreamRxByteReceived =
       "DS_RX_END"; // Downstream request receiving end.
   static constexpr absl::string_view DownstreamConnectionBegin =
