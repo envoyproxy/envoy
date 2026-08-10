@@ -7,6 +7,7 @@
 #include "source/common/stats/tag_producer_impl.h"
 
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -48,28 +49,27 @@ protected:
 TEST_F(TagProducerTest, CheckConstructor) {
   // Should pass there were no tag name conflict.
   addSpecifier("test.x", "xxx");
-  EXPECT_TRUE(TagProducerImpl::createTagProducer(stats_config_, {}).status().ok());
-  EXPECT_TRUE(TagProducerImpl::createTagProducer(stats_config_, {{"test.y", "yyy"}}).status().ok());
+  EXPECT_OK(TagProducerImpl::createTagProducer(stats_config_, {}).status());
+  EXPECT_OK(TagProducerImpl::createTagProducer(stats_config_, {{"test.y", "yyy"}}).status());
 
   // Should not raise an error when duplicate tag names between cli and config.
-  EXPECT_TRUE(TagProducerImpl::createTagProducer(stats_config_, {{"test.x", "yyy"}}).status().ok());
+  EXPECT_OK(TagProducerImpl::createTagProducer(stats_config_, {{"test.x", "yyy"}}).status());
 
   // Should not raise an error when duplicate tag names are specified.
   addSpecifier("test.x", "yyy");
-  EXPECT_TRUE(TagProducerImpl::createTagProducer(stats_config_, {{"test.y", "yyy"}}).status().ok());
+  EXPECT_OK(TagProducerImpl::createTagProducer(stats_config_, {{"test.y", "yyy"}}).status());
 
   // Should not raise an error when a cli tag names conflicts with Envoy's default tag names.
-  EXPECT_TRUE(TagProducerImpl::createTagProducer(stats_config_,
-                                                 {{Config::TagNames::get().CLUSTER_NAME, "yyy"}})
-                  .status()
-                  .ok());
+  EXPECT_OK(TagProducerImpl::createTagProducer(stats_config_,
+                                               {{Config::TagNames::get().CLUSTER_NAME, "yyy"}})
+                .status());
 
   // Also should raise an error when user defined tag name conflicts with Envoy's default tag names.
   stats_config_.clear_stats_tags();
   stats_config_.mutable_use_all_default_tags()->set_value(true);
   auto& custom_tag_extractor = *stats_config_.mutable_stats_tags()->Add();
   custom_tag_extractor.set_tag_name(Config::TagNames::get().CLUSTER_NAME);
-  EXPECT_TRUE(TagProducerImpl::createTagProducer(stats_config_, {}).status().ok());
+  EXPECT_OK(TagProducerImpl::createTagProducer(stats_config_, {}).status());
 
   // Non-default custom name without regex should throw
   stats_config_.mutable_use_all_default_tags()->set_value(true);

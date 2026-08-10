@@ -23,6 +23,7 @@
 #include "openssl/pem.h"
 
 using testing::Ge;
+using testing::NiceMock;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

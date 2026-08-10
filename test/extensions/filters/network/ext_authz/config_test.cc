@@ -5,6 +5,7 @@
 
 #include "source/extensions/filters/network/ext_authz/config.h"
 
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
@@ -12,7 +13,10 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::HasSubstr;
 using testing::Invoke;
+using testing::NiceMock;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -57,6 +61,31 @@ TEST(ExtAuthzFilterConfigTest, ValidateFail) {
 }
 
 TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) { expectCorrectProto(); }
+
+TEST(ExtAuthzFilterConfigTest, DeprecatedV2TransportApiVersion) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_authz_server
+      stat_prefix: google
+  failure_mode_allow: false
+  stat_prefix: name
+  transport_api_version: V2
+)EOF";
+
+  ExtAuthzConfigFactory factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  ON_CALL(context, messageValidationVisitor()).WillByDefault(ReturnRef(validation_visitor));
+
+  auto result = factory.createFilterFactoryFromProto(*proto_config, context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(),
+              HasSubstr("V2 xDS transport protocol version is deprecated"));
+}
 
 TEST(ExtAuthzFilterConfigTest, ExtAuthzWithMetadataContextNamespaces) {
   std::string yaml = R"EOF(

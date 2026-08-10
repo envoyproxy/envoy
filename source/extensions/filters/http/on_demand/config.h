@@ -14,14 +14,14 @@ namespace OnDemand {
 /**
  * Config registration for the OnDemand filter. @see NamedHttpFilterConfigFactory.
  */
-class OnDemandFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::on_demand::v3::OnDemand,
-                                 envoy::extensions::filters::http::on_demand::v3::PerRouteConfig> {
+class OnDemandFilterFactory : public Common::ExceptionFreeFactoryBase<
+                                  envoy::extensions::filters::http::on_demand::v3::OnDemand,
+                                  envoy::extensions::filters::http::on_demand::v3::PerRouteConfig> {
 public:
-  OnDemandFilterFactory() : FactoryBase(HttpFilterNames::get().OnDemand) {}
+  OnDemandFilterFactory() : ExceptionFreeFactoryBase(HttpFilterNames::get().OnDemand) {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
       const std::string&, Server::Configuration::FactoryContext& context) override;
 

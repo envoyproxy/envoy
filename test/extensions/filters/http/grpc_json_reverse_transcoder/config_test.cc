@@ -5,12 +5,15 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::NiceMock;
+using ::testing::Not;
 
 namespace Envoy {
 namespace Extensions {
@@ -20,22 +23,20 @@ namespace {
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_FALSE(GrpcJsonReverseTranscoderFactory()
-                   .createFilterFactoryFromProto(
-                       envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
-                           GrpcJsonReverseTranscoder(),
-                       "stats", context)
-                   .ok());
+  EXPECT_THAT(GrpcJsonReverseTranscoderFactory().createFilterFactoryFromProto(
+                  envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
+                      GrpcJsonReverseTranscoder(),
+                  "stats", context),
+              Not(IsOk()));
 }
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFailWithServerContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_FALSE(GrpcJsonReverseTranscoderFactory()
-                   .createHttpFilterFactoryFromProto(
-                       envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
-                           GrpcJsonReverseTranscoder(),
-                       "stats", context)
-                   .ok());
+  EXPECT_THAT(GrpcJsonReverseTranscoderFactory().createHttpFilterFactoryFromProto(
+                  envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
+                      GrpcJsonReverseTranscoder(),
+                  "stats", context),
+              Not(IsOk()));
 }
 
 class GrpcJsonReverseTranscoderFilterFactoryTest : public testing::Test {

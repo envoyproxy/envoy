@@ -27,13 +27,26 @@ TEST(McpJsonRestBridgeFilterConfigFactoryTest, RegisterAndCreateFilterWithEmptyC
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::StatusOr<Http::FilterFactoryCb> cb =
       factory->createFilterFactoryFromProto(proto_config, "stats", context);
-  ASSERT_TRUE(cb.ok());
+  ASSERT_OK(cb);
 
   // TODO(paulhong01): Update the following verification once the proto config is processed
   // properly.
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter);
   (*cb)(filter_callbacks);
+}
+
+TEST(McpJsonRestBridgeFilterConfigFactoryTest, CreateFilterWithServerContext) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  McpJsonRestBridgeFilterConfigFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).value();
+
+  NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter);
+  cb(filter_callbacks);
 }
 
 TEST(McpJsonRestBridgeFilterConfigTest, InvalidToolListHttpRuleThrowsException) {

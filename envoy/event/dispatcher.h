@@ -8,6 +8,7 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher_thread_deletable.h"
+#include "envoy/event/evwatch.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/scaled_timer.h"
 #include "envoy/event/schedulable_cb.h"
@@ -156,6 +157,20 @@ public:
    */
   virtual void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                                 std::chrono::milliseconds min_touch_interval) PURE;
+
+  /**
+   * Registers a non-owning Evwatch observer with this dispatcher.
+   * This should only be called on the dispatcher's thread.
+   * @param observer supplies the observer to register.
+   */
+  virtual void registerEvwatchObserver(Evwatch::Observer& observer) PURE;
+
+  /**
+   * Unregisters an Evwatch observer from this dispatcher and calls observer.onClose().
+   * This should only be called on the dispatcher's thread.
+   * @param observer supplies the observer to unregister.
+   */
+  virtual void unregisterEvwatchObserver(Evwatch::Observer& observer) PURE;
 
   /**
    * Returns a time-source to use with this dispatcher.
