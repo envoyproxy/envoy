@@ -56,8 +56,7 @@ void appendCodePoint(std::string& out, uint32_t code_point) {
 
 } // namespace
 
-WuffsJsonCursor::WuffsJsonCursor(Handler& handler, bool track_paths)
-    : handler_(handler), track_paths_(track_paths) {
+WuffsJsonCursor::WuffsJsonCursor(Handler& handler) : handler_(handler) {
   decoder_ = wuffs_json__decoder::alloc();
   token_buf_ =
       wuffs_base__slice_token__writer(wuffs_base__make_slice_token(token_data_, kTokenBufLen));
@@ -129,10 +128,9 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
   }
   pending_bytes_.clear();
 
-  // body_src_pos_ is a global byte counter across all feed() calls. Token
-  // offsets are expressed in the same global space, so (token_start - chunk_base)
-  // gives the offset into effective_chunk — needed for substr() when extracting
-  // raw bytes for STRING / NUMBER / LITERAL tokens.
+  // body_src_pos_ is a global byte counter across all feed() calls, and token
+  // offsets are expressed in that global byte space; token_start - chunk_base
+  // converts one to an offset into effective_chunk for byte capture.
   const size_t chunk_base = body_src_pos_;
   wuffs_base__io_buffer source_buf = wuffs_base__ptr_u8__reader(
       const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(effective_chunk.data())),
@@ -149,6 +147,7 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
       const uint64_t token_len = wuffs_base__token__length(tok);
       const bool continued = wuffs_base__token__continued(tok);
       const size_t token_start = body_src_pos_;
+      // Advance the total byte counter that wuffs has tokenized so far.
       body_src_pos_ += token_len;
 
       switch (token_category) {
@@ -242,12 +241,6 @@ absl::Status WuffsJsonCursor::handleStructureToken(uint64_t token_detail, size_t
       seen_keys_[depth_].clear();
       is_dict_[depth_] = to_dict;
       expecting_key_[depth_] = to_dict;
-      if (!to_dict) {
-        array_index_[depth_] = 0;
-      }
-    }
-    if (track_paths_ && depth_ <= kMaxTrackedDepth) {
-      push_key_[depth_] = (depth_ > 1 && is_dict_[depth_ - 1]) ? key_stack_[depth_ - 1] : "";
     }
     // key for onContainerOpen is the parent dict key that triggered this container.
     // Empty when the parent is an array or at root (depth 1).
@@ -261,9 +254,6 @@ absl::Status WuffsJsonCursor::handleStructureToken(uint64_t token_detail, size_t
     handler_.onContainerClose(pop_depth, body_src_pos_);
     if (depth_ >= 1 && depth_ < kMaxTrackedDepth && is_dict_[depth_]) {
       expecting_key_[depth_] = true;
-    }
-    if (depth_ >= 1 && depth_ < kMaxTrackedDepth && !is_dict_[depth_]) {
-      ++array_index_[depth_];
     }
   }
   return absl::OkStatus();
@@ -328,12 +318,8 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
                                               ? absl::string_view(key_stack_[depth_])
                                               : absl::string_view();
       handler_.closeStringCapture(value_key, depth_, body_src_pos_);
-      if (depth_ >= 1 && depth_ < kMaxTrackedDepth) {
-        if (is_dict_[depth_]) {
-          expecting_key_[depth_] = true;
-        } else {
-          ++array_index_[depth_];
-        }
+      if (depth_ >= 1 && depth_ < kMaxTrackedDepth && is_dict_[depth_]) {
+        expecting_key_[depth_] = true;
       }
     }
     string_capturing_ = false;
@@ -396,53 +382,41 @@ absl::Status WuffsJsonCursor::handleNumberOrLiteralToken(int64_t token_category,
   } else {
     handler_.onNull(value_key, depth_, token_start, body_src_pos_);
   }
-  if (depth_ >= 1 && depth_ < kMaxTrackedDepth) {
-    if (is_dict_[depth_]) {
-      expecting_key_[depth_] = true;
-    } else {
-      ++array_index_[depth_];
-    }
+  if (depth_ >= 1 && depth_ < kMaxTrackedDepth && is_dict_[depth_]) {
+    expecting_key_[depth_] = true;
   }
   return absl::OkStatus();
 }
 
-std::string WuffsJsonCursor::buildIndexedPath(int depth) const {
-  std::string path;
-  for (int d = 1; d <= depth && d < kMaxTrackedDepth; ++d) {
+bool WuffsJsonCursor::matchesPatternPath(absl::Span<const PatternSegment> segments,
+                                         int depth) const {
+  // Compares: segment count must equal depth, and each level must agree
+  // in kind (object vs array) and, for objects, in whole-label equality.
+  //
+  // depth > depth_ is rejected: per-depth state is not cleared on pop, so levels
+  // above the cursor still hold the labels of an already-closed container. Reading
+  // them would match a path the cursor is not on — at {"a":{"b":1},"c":2}'s "c",
+  // key_stack_[2] is still "b", so ["c","b"] at depth 2 would falsely match.
+  if (depth <= 0 || depth > depth_ || depth >= kMaxTrackedDepth ||
+      static_cast<int>(segments.size()) != depth) {
+    return false;
+  }
+  for (int d = 1; d <= depth; ++d) {
+    const PatternSegment& seg = segments[d - 1];
     if (is_dict_[d]) {
-      // At the target depth, key_stack_[d] is the key currently being processed.
-      // At intermediate depths, the label is the key that opened the child container
-      // at d+1, stored in push_key_[d+1] at push time.
-      const std::string& label = (d == depth) ? key_stack_[d] : push_key_[d + 1];
-      if (!path.empty()) {
-        path += '.';
+      if (seg.is_array_element) {
+        return false;
       }
-      path += label;
-    } else {
-      // array_index_[d] is the count of elements completed so far at this depth,
-      // which equals the 0-based index of the element currently being processed.
-      path += '[';
-      path += std::to_string(array_index_[d]);
-      path += ']';
+      // is_dict_[d] means key_stack_[d] names the item at depth d: the leaf key
+      // when d == depth, else the key that opened the container at depth d+1.
+      if (key_stack_[d] != seg.key) {
+        return false;
+      }
+    } else if (!seg.is_array_element) {
+      return false;
     }
   }
-  return path;
-}
-
-std::string WuffsJsonCursor::buildPatternPath(int depth) const {
-  std::string path;
-  for (int d = 1; d <= depth && d < kMaxTrackedDepth; ++d) {
-    if (is_dict_[d]) {
-      const std::string& label = (d == depth) ? key_stack_[d] : push_key_[d + 1];
-      if (!path.empty()) {
-        path += '.';
-      }
-      path += label;
-    } else {
-      path += "[]";
-    }
-  }
-  return path;
+  return true;
 }
 
 } // namespace Wuffs
