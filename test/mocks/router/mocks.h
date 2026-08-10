@@ -21,6 +21,7 @@
 #include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/router/route_config_update_receiver.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 #include "envoy/router/scopes.h"
@@ -679,7 +680,18 @@ public:
   MOCK_METHOD(RouteConfigProviderPtr, createStaticRouteConfigProvider,
               (const envoy::config::route::v3::RouteConfiguration& route_config,
                Server::Configuration::ServerFactoryContext& factory_context,
-               ProtobufMessage::ValidationVisitor& validator));
+               Init::Manager& init_manager, ProtobufMessage::ValidationVisitor& validator));
+};
+
+class MockVhdsConfigUpdateReceiver : public VhdsConfigUpdateReceiver {
+public:
+  MockVhdsConfigUpdateReceiver();
+  ~MockVhdsConfigUpdateReceiver() override;
+
+  MOCK_METHOD(bool, onVhdsUpdate,
+              (const VirtualHostRefVector& added_vhosts, std::set<std::string>&& added_resource_ids,
+               const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+               const std::string& version_info));
 };
 
 class MockScopedConfig : public ScopedConfig {

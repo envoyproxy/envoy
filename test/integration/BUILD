@@ -404,6 +404,7 @@ envoy_cc_test(
     ],
     deps = [
         ":vhds_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )

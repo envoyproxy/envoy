@@ -186,6 +186,7 @@ envoy_cc_library(
     hdrs = ["route_config_update_receiver_impl.h"],
     deps = [
         ":config_lib",
+        ":vhds_lib",
         "//envoy/router:rds_interface",
         "//envoy/router:route_config_update_info_interface",
         "//envoy/server:factory_context_interface",
@@ -204,11 +205,9 @@ envoy_cc_library(
     hdrs = ["vhds.h"],
     deps = [
         ":config_lib",
-        ":route_config_update_impl_lib",
         "//envoy/config:subscription_interface",
         "//envoy/http:codes_interface",
         "//envoy/local_info:local_info_interface",
-        "//envoy/router:rds_interface",
         "//envoy/router:route_config_provider_manager_interface",
         "//envoy/router:route_config_update_info_interface",
         "//envoy/singleton:instance_interface",
