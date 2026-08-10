@@ -10,6 +10,7 @@
 #include "source/extensions/filters/http/jwt_authn/extractor.h"
 #include "source/extensions/filters/http/jwt_authn/matcher.h"
 #include "source/extensions/filters/http/jwt_authn/stats.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/jwt_authn/verifier.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -92,7 +93,12 @@ public:
   bool stripFailureResponse() const override { return proto_config_.strip_failure_response(); }
 
   void sanitizePayloadHeaders(Http::RequestHeaderMap& headers) const override {
-    if (header_sanitizer_ != nullptr) {
+    // Behavior change vs pre-filter-wide sanitization: guard so operators can
+    // disable during rollout if a deployment relied on client-supplied payload
+    // / claim headers on bypass paths.
+    if (header_sanitizer_ != nullptr &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.jwt_authn_sanitize_payload_headers_filter_wide")) {
       header_sanitizer_->sanitizeHeaders(headers);
     }
   }
