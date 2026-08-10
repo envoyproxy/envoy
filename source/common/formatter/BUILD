@@ -9,6 +9,22 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "serializer_lib",
+    srcs = ["serializer.cc"],
+    hdrs = ["serializer.h"],
+    deps = [
+        "//envoy/formatter:substitution_formatter_interface",
+        "//source/common/buffer:buffer_util_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/json:constants_lib",
+        "//source/common/json:json_sanitizer_lib",
+        "//source/common/json:json_streamer_lib",
+        "//source/common/json:json_utility_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "substitution_formatter_lib",
     srcs = [
         "http_formatter_context.cc",
@@ -20,6 +36,7 @@ envoy_cc_library(
     ],
     deps = [
         ":builtin_command_parser_factory_helper_lib",
+        ":serializer_lib",
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/stream_info:stream_info_interface",
@@ -91,6 +108,7 @@ envoy_cc_library(
     hdrs = ["http_specific_formatter.h"],
     deps = [
         ":coalesce_formatter_lib",
+        ":serializer_lib",
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/runtime:runtime_interface",
@@ -114,6 +132,7 @@ envoy_cc_library(
     hdrs = ["stream_info_formatter.h"],
     rbe_pool = "6gig",
     deps = [
+        ":serializer_lib",
         ":substitution_format_utility_lib",
         "//envoy/api:api_interface",
         "//envoy/common:exception_lib",

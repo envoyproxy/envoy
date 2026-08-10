@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/formatter/http_formatter_context.h"
@@ -54,6 +55,69 @@ public:
 using FormatterPtr = std::unique_ptr<Formatter>;
 using FormatterConstSharedPtr = std::shared_ptr<const Formatter>;
 
+class JsonStringSerializer;
+
+/**
+ * A sink for a single value to be serialized to JSON. The value is appended to the output of the
+ * JsonStringSerializer.
+ *
+ * NOTE: Only one of the add*() methods could be called for only one time for a given ValueSink.
+ * By this way the FormatterProvider won't be able to break the JSON format by adding multiple
+ * values to the sink.
+ */
+class ValueSink {
+public:
+  ValueSink(JsonStringSerializer& serializer);
+
+  /**
+   * Add a value to the sink. The value will be serialized to JSON and appended to the output.
+   * @param value supplies the value to add.
+   */
+  void addNumber(uint64_t value);
+  void addNumber(double value);
+  void addNumber(int64_t value);
+  void addString(absl::string_view value);
+  void addBool(bool value);
+
+  /**
+   * Add a null value to the sink explicitly. If this is called, the null value will always be
+   * serialized to JSON and appended to the output.
+   *
+   * NOTE: If provider cannot extract a valid value, you can left the sink unmodified and the
+   * caller will decide whether to add a default value or not. This should only be used when
+   * the provider wants an explicit null value to be serialized.
+   */
+  void addNull();
+
+  /**
+   * Add a proto value or struct to the sink. The value will be serialized to JSON and appended to
+   * the output. If this is called with Protobuf::Value::kNullValue, it will always be serialized
+   * to JSON.
+   *
+   * @param value supplies the proto value to add.
+   *
+   * NOTE: If provider cannot extract a valid value, you can left the sink unmodified and the
+   * caller will decide whether to add a default value or not.
+   */
+  void addValue(const Protobuf::Value& value);
+  void addValue(const Protobuf::Struct& value);
+
+  /**
+   * @return bool true if a value was added to the sink explicitly.
+   */
+  bool consumed() const { return !serializer_.has_value(); }
+
+private:
+  /**
+   * Takes the serializer out of the sink and marks the sink as consumed.
+   * @return the serializer to write the value to, or nullptr if a value was already added to
+   *         this sink.
+   */
+  JsonStringSerializer* consume();
+
+  OptRef<JsonStringSerializer> serializer_;
+};
+
 /**
  * Interface for multiple protocols/modules formatter providers.
  */
@@ -100,6 +164,26 @@ public:
    */
   virtual Protobuf::Value formatValue(const Context& context,
                                       const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * Format the value with the given context and stream info and append it to the given sink.
+   * @param sink supplies the sink to append the formatted value to.
+   * @param context supplies the formatter context.
+   * @param stream_info supplies the stream info.
+   */
+  virtual void formatValueTo(ValueSink& sink, const Context& context,
+                             const StreamInfo::StreamInfo& stream_info) const {
+    Protobuf::Value value = formatValue(context, stream_info);
+    // In previous formatValue implementation, it will always return a Protobuf::Value even
+    // the provider cannot extract a valid value.
+    // For backward compatibility, we will ignore the null value and leave the sink unmodified.
+    // The caller will decide whether to add a default value or not.
+    if (value.kind_case() == Protobuf::Value::kNullValue ||
+        value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+      return;
+    }
+    sink.addValue(value);
+  }
 };
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
