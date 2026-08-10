@@ -500,18 +500,27 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::I
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlice* slices,
                                                uint64_t num_slices, const Address::Ip* local_ip,
                                                const Address::Instance& peer_address) {
+  bool has_payload = false;
+  for (uint64_t i = 0; i < num_slices; ++i) {
+    if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
+      has_payload = true;
+      break;
+    }
+  }
+
+  uint8_t empty_payload = 0;
   Api::IoCallUint64Result send_result(
       /*rc=*/0, /*err=*/Api::IoError::none());
 
   const bool is_connected = handle.wasConnected();
+  const char* operation = is_connected ? (has_payload ? "writev" : "send") : "sendmsg";
   do {
     if (is_connected) {
       // The socket is already connected, so the local and peer addresses should not be specified.
-      // Instead, a writev is called.
-      send_result = handle.writev(slices, num_slices);
+      send_result = has_payload ? handle.writev(slices, num_slices)
+                                : handle.send(&empty_payload, /*length=*/0);
     } else {
-      // For non-connected sockets(), calling sendmsg with the peer address specified ensures the
-      // connection happens first.
+      // For non-connected sockets, calling sendmsg with the peer address specifies the destination.
       send_result = handle.sendmsg(slices, num_slices, 0, local_ip, peer_address);
     }
   } while (!send_result.ok() &&
@@ -519,10 +528,9 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
            send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
 
   if (send_result.ok()) {
-    ENVOY_LOG_MISC(trace, "{} bytes {}", is_connected ? "writev" : "sendmsg",
-                   send_result.return_value_);
+    ENVOY_LOG_MISC(trace, "{} bytes {}", operation, send_result.return_value_);
   } else {
-    ENVOY_LOG_MISC(debug, "{} failed with error code {}: {}", is_connected ? "writev" : "sendmsg",
+    ENVOY_LOG_MISC(debug, "{} failed with error code {}: {}", operation,
                    static_cast<int>(send_result.err_->getErrorCode()),
                    send_result.err_->getErrorDetails());
   }

@@ -164,6 +164,54 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
             total_bytes_sent);
 }
 
+TEST_P(UdpListenerImplBatchWriterTest, SendEmptyDatagramsInOrder) {
+  quic::test::MockQuicSyscallWrapper os_sys_calls;
+  quic::ScopedGlobalSyscallWrapperOverride os_calls(&os_sys_calls);
+  testing::InSequence sequence;
+
+  const std::string payload("payload");
+  EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _)).WillOnce(Invoke([&](int, const msghdr* message, int) {
+    EXPECT_EQ(payload.length(), getPacketLength(message));
+    return payload.length();
+  }));
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
+        .WillOnce(Invoke([](int, const msghdr* message, int) {
+          EXPECT_EQ(1, message->msg_iovlen);
+          EXPECT_NE(nullptr, message->msg_iov);
+          if (message->msg_iov != nullptr && message->msg_iovlen == 1) {
+            EXPECT_NE(nullptr, message->msg_iov[0].iov_base);
+            EXPECT_EQ(0, message->msg_iov[0].iov_len);
+          }
+          return 0;
+        }));
+  }
+
+  Address::InstanceConstSharedPtr send_from_addr = getNonDefaultSourceAddress();
+  Buffer::OwnedImpl payload_buffer(payload);
+  UdpSendData payload_data{send_from_addr->ip(), *client_.localAddress(), payload_buffer};
+  Api::IoCallUint64Result send_result = listener_->send(payload_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(payload.length(), send_result.return_value_);
+
+  Buffer::OwnedImpl first_empty_buffer;
+  UdpSendData first_empty_data{send_from_addr->ip(), *client_.localAddress(), first_empty_buffer};
+  send_result = listener_->send(first_empty_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(0, send_result.return_value_);
+
+  Buffer::OwnedImpl second_empty_buffer;
+  UdpSendData second_empty_data{send_from_addr->ip(), *client_.localAddress(), second_empty_buffer};
+  send_result = listener_->send(second_empty_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(0, send_result.return_value_);
+
+  const Api::IoCallUint64Result flush_result = udp_packet_writer_->flush();
+  ASSERT_TRUE(flush_result.ok()) << flush_result.err_->getErrorDetails();
+  EXPECT_EQ(0, flush_result.return_value_);
+  EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
+}
+
 /**
  * Tests UDP Packet writer behavior when socket is write-blocked.
  * 1. Setup the udp_listener and have a payload buffered in the internal buffer.

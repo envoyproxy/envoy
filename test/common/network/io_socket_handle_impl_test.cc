@@ -278,6 +278,61 @@ TEST(IoSocketHandleImpl, DroppedUdpDatagramsMmsg) {
   EXPECT_EQ(dropped_packets, 5);
 }
 
+TEST(IoSocketHandleImpl, SendEmptyPayloadCallsSend) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  uint8_t empty_payload = 0;
+  EXPECT_CALL(os_sys_calls, send(_, _, 0, 0))
+      .WillOnce(Invoke([&](os_fd_t, void* buffer, size_t, int) -> Api::SysCallSizeResult {
+        EXPECT_EQ(&empty_payload, buffer);
+        return {0, 0};
+      }));
+
+  IoSocketHandleImpl io_handle;
+  const Api::IoCallUint64Result result = io_handle.send(&empty_payload, 0);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(IoSocketHandleImpl, SendmsgEmptyPayloadUsesDummyIovec) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, 0))
+      .WillOnce(Invoke([](os_fd_t, const msghdr* message, int) -> Api::SysCallSizeResult {
+        EXPECT_NE(nullptr, message->msg_name);
+        EXPECT_EQ(1, message->msg_iovlen);
+        EXPECT_NE(nullptr, message->msg_iov);
+        if (message->msg_iov != nullptr && message->msg_iovlen == 1) {
+          EXPECT_NE(nullptr, message->msg_iov[0].iov_base);
+          EXPECT_EQ(0, message->msg_iov[0].iov_len);
+        }
+        return {0, 0};
+      }));
+
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+  IoSocketHandleImpl io_handle;
+  const Api::IoCallUint64Result result = io_handle.sendmsg(nullptr, 0, 0, nullptr, peer_address);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(IoSocketHandleImpl, WritevEmptyPayloadRemainsNoOp) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _)).Times(0);
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).Times(0);
+
+  uint8_t empty_payload = 0;
+  const Buffer::RawSlice slice{&empty_payload, 0};
+  IoSocketHandleImpl io_handle;
+  const Api::IoCallUint64Result result = io_handle.writev(&slice, 1);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
 class IoSocketHandleImplTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, IoSocketHandleImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

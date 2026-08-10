@@ -26,6 +26,7 @@ public:
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  Api::IoCallUint64Result send(const void* buffer, size_t length) override;
   Api::IoCallUint64Result close() override;
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   IoHandlePtr duplicate() override;

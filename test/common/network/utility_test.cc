@@ -42,10 +42,65 @@ using testing::Invoke;
 using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Network {
 namespace {
+
+TEST(NetworkUtility, WriteEmptyDatagramConnected) {
+  StrictMock<MockIoHandle> io_handle;
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+
+  EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle, send(_, 0))
+      .WillOnce(Invoke([](const void* buffer, size_t) -> Api::IoCallUint64Result {
+        EXPECT_NE(nullptr, buffer);
+        return Api::ioCallUint64ResultNoError();
+      }));
+  EXPECT_CALL(io_handle, writev(_, _)).Times(0);
+  EXPECT_CALL(io_handle, sendmsg(_, _, _, _, _)).Times(0);
+
+  Buffer::OwnedImpl buffer;
+  const Api::IoCallUint64Result result =
+      Utility::writeToSocket(io_handle, buffer, nullptr, peer_address);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(NetworkUtility, WriteExplicitEmptySliceConnected) {
+  StrictMock<MockIoHandle> io_handle;
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+
+  EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle, send(_, 0)).WillOnce(Return(Api::ioCallUint64ResultNoError()));
+  EXPECT_CALL(io_handle, writev(_, _)).Times(0);
+  EXPECT_CALL(io_handle, sendmsg(_, _, _, _, _)).Times(0);
+
+  uint8_t empty_payload = 0;
+  Buffer::RawSlice slice{&empty_payload, 0};
+  const Api::IoCallUint64Result result =
+      Utility::writeToSocket(io_handle, &slice, 1, nullptr, peer_address);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(NetworkUtility, WriteEmptyDatagramUnconnected) {
+  StrictMock<MockIoHandle> io_handle;
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+
+  EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(false));
+  EXPECT_CALL(io_handle, send(_, _)).Times(0);
+  EXPECT_CALL(io_handle, writev(_, _)).Times(0);
+  EXPECT_CALL(io_handle, sendmsg(_, 0, 0, nullptr, testing::Ref(peer_address)))
+      .WillOnce(Return(Api::ioCallUint64ResultNoError()));
+
+  Buffer::OwnedImpl buffer;
+  const Api::IoCallUint64Result result =
+      Utility::writeToSocket(io_handle, buffer, nullptr, peer_address);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
 
 struct Interface {
   std::string name;
