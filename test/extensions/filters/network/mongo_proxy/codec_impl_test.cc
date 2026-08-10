@@ -6,6 +6,7 @@
 #include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -110,10 +111,10 @@ TEST_F(MongoCodecImplTest, Query) {
   query2.returnFieldsSelector(Bson::DocumentImpl::create()->addDouble("double2", -2.3));
 
   Json::Factory::loadFromString(query.toString(true)).IgnoreError();
-  EXPECT_TRUE(Json::Factory::loadFromString(query.toString(true)).status().ok());
-  EXPECT_TRUE(Json::Factory::loadFromString(query.toString(false)).status().ok());
-  EXPECT_TRUE(Json::Factory::loadFromString(query2.toString(true)).status().ok());
-  EXPECT_TRUE(Json::Factory::loadFromString(query2.toString(false)).status().ok());
+  EXPECT_OK(Json::Factory::loadFromString(query.toString(true)).status());
+  EXPECT_OK(Json::Factory::loadFromString(query.toString(false)).status());
+  EXPECT_OK(Json::Factory::loadFromString(query2.toString(true)).status());
+  EXPECT_OK(Json::Factory::loadFromString(query2.toString(false)).status());
 
   encoder_.encodeQuery(query);
   encoder_.encodeQuery(query2);
@@ -157,8 +158,8 @@ TEST_F(MongoCodecImplTest, Reply) {
   reply.documents().push_back(Bson::DocumentImpl::create());
   reply.documents().push_back(Bson::DocumentImpl::create());
 
-  EXPECT_TRUE(Json::Factory::loadFromString(reply.toString(true)).status().ok());
-  EXPECT_TRUE(Json::Factory::loadFromString(reply.toString(false)).status().ok());
+  EXPECT_OK(Json::Factory::loadFromString(reply.toString(true)).status());
+  EXPECT_OK(Json::Factory::loadFromString(reply.toString(false)).status());
 
   encoder_.encodeReply(reply);
   EXPECT_CALL(callbacks_, decodeReply_(Pointee(Eq(reply))));
@@ -187,8 +188,8 @@ TEST_F(MongoCodecImplTest, GetMore) {
   get_more.numberToReturn(20);
   get_more.cursorId(20000);
 
-  EXPECT_TRUE(Json::Factory::loadFromString(get_more.toString(true)).status().ok());
-  EXPECT_TRUE(Json::Factory::loadFromString(get_more.toString(false)).status().ok());
+  EXPECT_OK(Json::Factory::loadFromString(get_more.toString(true)).status());
+  EXPECT_OK(Json::Factory::loadFromString(get_more.toString(false)).status());
 
   encoder_.encodeGetMore(get_more);
   EXPECT_CALL(callbacks_, decodeGetMore_(Pointee(Eq(get_more))));
@@ -228,8 +229,8 @@ TEST_F(MongoCodecImplTest, Insert) {
   insert.documents().push_back(Bson::DocumentImpl::create());
   insert.documents().push_back(Bson::DocumentImpl::create());
 
-  EXPECT_TRUE(Json::Factory::loadFromString(insert.toString(true)).status().ok());
-  EXPECT_TRUE(Json::Factory::loadFromString(insert.toString(false)).status().ok());
+  EXPECT_OK(Json::Factory::loadFromString(insert.toString(true)).status());
+  EXPECT_OK(Json::Factory::loadFromString(insert.toString(false)).status());
 
   encoder_.encodeInsert(insert);
   EXPECT_CALL(callbacks_, decodeInsert_(Pointee(Eq(insert))));
@@ -267,8 +268,8 @@ TEST_F(MongoCodecImplTest, KillCursors) {
   kill.numberOfCursorIds(2);
   kill.cursorIds({20000, 40000});
 
-  EXPECT_TRUE(Json::Factory::loadFromString(kill.toString(true)).status().ok());
-  EXPECT_TRUE(Json::Factory::loadFromString(kill.toString(false)).status().ok());
+  EXPECT_OK(Json::Factory::loadFromString(kill.toString(true)).status());
+  EXPECT_OK(Json::Factory::loadFromString(kill.toString(false)).status());
 
   encoder_.encodeKillCursors(kill);
   EXPECT_CALL(callbacks_, decodeKillCursors_(Pointee(Eq(kill))));
@@ -338,8 +339,8 @@ TEST_F(MongoCodecImplTest, QueryToStringWithEscape) {
 
   EXPECT_EQ(query.toString(true), expectedQuery);
 
-  EXPECT_TRUE(Json::Factory::loadFromString(query.toString(true)).status().ok());
-  EXPECT_TRUE(Json::Factory::loadFromString(query.toString(false)).status().ok());
+  EXPECT_OK(Json::Factory::loadFromString(query.toString(true)).status());
+  EXPECT_OK(Json::Factory::loadFromString(query.toString(false)).status());
 }
 
 TEST_F(MongoCodecImplTest, CommandEqual) {
@@ -386,8 +387,8 @@ TEST_F(MongoCodecImplTest, Command) {
   command.commandArgs(Bson::DocumentImpl::create());
   command.inputDocs().push_back(Bson::DocumentImpl::create()->addString("world", "hello"));
 
-  EXPECT_TRUE(Json::Factory::loadFromString(command.toString(true)).status().ok());
-  EXPECT_TRUE(Json::Factory::loadFromString(command.toString(false)).status().ok());
+  EXPECT_OK(Json::Factory::loadFromString(command.toString(true)).status());
+  EXPECT_OK(Json::Factory::loadFromString(command.toString(false)).status());
 
   encoder_.encodeCommand(command);
   EXPECT_CALL(callbacks_, decodeCommand_(Pointee(Eq(command))));
@@ -435,8 +436,8 @@ TEST_F(MongoCodecImplTest, CommandReply) {
   commandReply.commandReply(Bson::DocumentImpl::create());
   commandReply.outputDocs().push_back(Bson::DocumentImpl::create()->addString("world", "hello"));
 
-  EXPECT_TRUE(Json::Factory::loadFromString(commandReply.toString(true)).status().ok());
-  EXPECT_TRUE(Json::Factory::loadFromString(commandReply.toString(false)).status().ok());
+  EXPECT_OK(Json::Factory::loadFromString(commandReply.toString(true)).status());
+  EXPECT_OK(Json::Factory::loadFromString(commandReply.toString(false)).status());
 
   encoder_.encodeCommandReply(commandReply);
   EXPECT_CALL(callbacks_, decodeCommandReply_(Pointee(Eq(commandReply))));

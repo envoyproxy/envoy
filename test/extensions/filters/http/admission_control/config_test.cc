@@ -12,11 +12,13 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -37,7 +39,7 @@ public:
     auto tls = ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(
         context_.server_factory_context_.threadLocal());
     auto evaluator_or = SuccessCriteriaEvaluator::create(proto.success_criteria());
-    EXPECT_TRUE(evaluator_or.ok());
+    EXPECT_OK(evaluator_or);
     auto evaluator = std::move(evaluator_or.value());
     return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, random_, scope_,
                                                           std::move(tls), std::move(evaluator));
@@ -79,8 +81,7 @@ success_criteria:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   auto status_or = admission_control_filter_factory.createFilterFactoryFromProtoTyped(
       proto, "whatever", dual_info_, factory_context.serverFactoryContext());
-  EXPECT_FALSE(status_or.ok());
-  EXPECT_EQ("Success rate threshold cannot be less than 1.0%.", status_or.status().message());
+  EXPECT_THAT(status_or, HasStatusMessage("Success rate threshold cannot be less than 1.0%."));
 }
 
 TEST_F(AdmissionControlConfigTest, SmallSuccessRateThreshold) {
@@ -107,8 +108,7 @@ success_criteria:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   auto status_or = admission_control_filter_factory.createFilterFactoryFromProtoTyped(
       proto, "whatever", dual_info_, factory_context.serverFactoryContext());
-  EXPECT_FALSE(status_or.ok());
-  EXPECT_EQ("Success rate threshold cannot be less than 1.0%.", status_or.status().message());
+  EXPECT_THAT(status_or, HasStatusMessage("Success rate threshold cannot be less than 1.0%."));
 }
 
 // Verify the configuration when all fields are set.

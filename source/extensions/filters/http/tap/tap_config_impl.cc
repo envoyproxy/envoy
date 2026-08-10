@@ -31,7 +31,7 @@ fillHeaderList(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>*
 
 HttpTapConfigImpl::HttpTapConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                                      Common::Tap::Sink* admin_streamer,
-                                     Server::Configuration::FactoryContext& context)
+                                     Server::Configuration::GenericFactoryContext& context)
     : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer, context),
       time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {}
 

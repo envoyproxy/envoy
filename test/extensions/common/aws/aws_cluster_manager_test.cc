@@ -3,10 +3,14 @@
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 namespace Envoy {
 namespace Extensions {
@@ -57,12 +61,9 @@ TEST_F(AwsClusterManagerTest, AddClusters) {
       "cluster_3",
       envoy::config::cluster::v3::Cluster::DiscoveryType::Cluster_DiscoveryType_STRICT_DNS,
       "uri_3");
-  EXPECT_TRUE(aws_cluster_manager->getUriFromClusterName("cluster_1").ok());
-  EXPECT_EQ(aws_cluster_manager->getUriFromClusterName("cluster_1").value(), "uri_1");
-  EXPECT_TRUE(aws_cluster_manager->getUriFromClusterName("cluster_2").ok());
-  EXPECT_EQ(aws_cluster_manager->getUriFromClusterName("cluster_2").value(), "uri_2");
-  EXPECT_TRUE(aws_cluster_manager->getUriFromClusterName("cluster_3").ok());
-  EXPECT_EQ(aws_cluster_manager->getUriFromClusterName("cluster_3").value(), "uri_3");
+  EXPECT_THAT(aws_cluster_manager->getUriFromClusterName("cluster_1"), IsOkAndHolds("uri_1"));
+  EXPECT_THAT(aws_cluster_manager->getUriFromClusterName("cluster_2"), IsOkAndHolds("uri_2"));
+  EXPECT_THAT(aws_cluster_manager->getUriFromClusterName("cluster_3"), IsOkAndHolds("uri_3"));
   // Adding an extra with the same cluster name has no effect
   status = aws_cluster_manager->addManagedCluster(
       "cluster_1",
@@ -158,7 +159,7 @@ TEST_F(AwsClusterManagerTest, CreateQueuedViaInitManagerWithFailedCluster) {
       "new_url");
   // Cluster creation should be queued at this point
   init_target_->initialize(init_watcher_);
-  EXPECT_FALSE(aws_cluster_manager->getUriFromClusterName("cluster_1").ok());
+  EXPECT_THAT(aws_cluster_manager->getUriFromClusterName("cluster_1"), Not(IsOk()));
 }
 
 // Checks that aws cluster manager constructor does not add an init target if the init manager is
@@ -208,7 +209,7 @@ TEST_F(AwsClusterManagerTest, ClusterManagerCannotAdd) {
       envoy::config::cluster::v3::Cluster::DiscoveryType::Cluster_DiscoveryType_STRICT_DNS,
       "new_url");
   EXPECT_EQ(absl::StatusCode::kInternal, status.code());
-  EXPECT_FALSE(aws_cluster_manager->getUriFromClusterName("cluster_1").ok());
+  EXPECT_THAT(aws_cluster_manager->getUriFromClusterName("cluster_1"), Not(IsOk()));
 }
 
 // Noop test for coverage

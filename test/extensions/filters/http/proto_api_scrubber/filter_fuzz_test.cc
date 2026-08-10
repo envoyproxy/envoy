@@ -198,7 +198,8 @@ DEFINE_PROTO_FUZZER(const ProtoApiScrubberFuzzInput& input) {
   ON_CALL(encoder_callbacks, bufferLimit()).WillByDefault(testing::Return(1024 * 1024));
 
   auto config_proto = createFuzzConfig();
-  auto config_or_error = ProtoApiScrubberFilterConfig::create(config_proto, factory_context);
+  auto config_or_error = ProtoApiScrubberFilterConfig::create(
+      config_proto, factory_context.serverFactoryContext(), factory_context.scope());
 
   if (!config_or_error.ok()) {
     return;

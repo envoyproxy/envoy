@@ -361,7 +361,7 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
 }
 
 void GrpcMuxImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
+    ResponseProtoPtr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {
   const std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
@@ -597,6 +597,9 @@ void GrpcMuxImpl::onEstablishmentFailure(bool) {
 }
 
 void GrpcMuxImpl::queueDiscoveryRequest(absl::string_view queue_item) {
+  if (shutdown_) {
+    return;
+  }
   if (!grpc_stream_->grpcStreamAvailable()) {
     ENVOY_LOG(debug, "No stream available to queueDiscoveryRequest for {}", queue_item);
     return; // Drop this request; the reconnect will enqueue a new one.
