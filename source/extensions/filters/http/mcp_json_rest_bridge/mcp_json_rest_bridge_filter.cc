@@ -263,6 +263,7 @@ absl::Status McpJsonRestBridgeFilterConfig::initialize() {
              .try_emplace(tool.name(),
                           ToolEntry{tool.http_rule(), tool.text_content_streaming_enabled(), &tool})
              .second) {
+      // TODO(mkbehr): Allow config for how to handle duplicate tool names.
       return absl::InvalidArgumentError(
           fmt::format("Duplicate tool name: {} (host/path: {}, {})", tool.name(), host, path));
     }
