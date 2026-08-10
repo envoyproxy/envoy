@@ -2365,6 +2365,32 @@ TEST(ABIImpl, BufferedResponseBody) {
             4);
 }
 
+// destroy() clears the stream callbacks before it hands the in-module filter to the dispatcher, so
+// every callback that needs them must be a no-op for the module hooks that still run in between.
+TEST(ABIImpl, StreamCallbacksAfterTeardown) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+
+  for (const auto body_type : {envoy_dynamic_module_type_http_body_type_BufferedRequestBody,
+                               envoy_dynamic_module_type_http_body_type_BufferedResponseBody}) {
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks(&filter, body_type, nullptr));
+    EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(&filter, body_type), 0);
+    EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(&filter, body_type), 0);
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_drain_body(&filter, body_type, 0));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_append_body(&filter, body_type, {nullptr, 0}));
+  }
+
+  // The current body pointers belong to the hook that set them, so they outlive the teardown and
+  // can still be set here.
+  Buffer::OwnedImpl body;
+  filter.current_request_body_ = &body;
+  filter.current_response_body_ = &body;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_request_body(&filter));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_response_body(&filter));
+
+  EXPECT_EQ(envoy_dynamic_module_callback_get_most_specific_route_config(&filter), nullptr);
+}
+
 TEST(ABIImpl, ClearRouteCache) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};

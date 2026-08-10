@@ -1,5 +1,9 @@
 #pragma once
 
+#include <chrono>
+#include <functional>
+#include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -10,6 +14,10 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/protobuf/protobuf.h"
+
+#include "absl/container/flat_hash_set.h"
+#include "absl/status/status.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Config {

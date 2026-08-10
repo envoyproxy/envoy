@@ -1,7 +1,10 @@
+#include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/network/ext_proc/ext_proc.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
@@ -1639,6 +1642,152 @@ TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataNotAllowed) {
   EXPECT_CALL(stream_info_, setDynamicMetadata("other-namespace", _)).Times(0);
 
   filter_->onReceiveMessage(std::move(response));
+}
+
+TEST_F(NetworkExtProcFilterTest, SendRequestWithConnectionAttributes) {
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+  config.set_failure_mode_allow(false);
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  config.add_connection_attributes("connection.mtls");
+  config.add_connection_attributes("connection.id");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  auto builder = Filters::Common::Expr::getBuilder(server_context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<Config>(config, scope_, builder,
+                                                &server_context.local_info_, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  stream_info_.downstream_connection_info_provider_->setConnectionID(12345);
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    EXPECT_TRUE(req.has_read_data());
+    EXPECT_EQ("hello", req.read_data().data());
+    EXPECT_EQ(1, req.attributes().size());
+    auto proto_struct = req.attributes().at("envoy.filters.network.ext_proc");
+    EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false);
+    EXPECT_EQ(proto_struct.fields().at("connection.id").number_value(), 12345);
+  });
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+TEST_F(NetworkExtProcFilterTest, SendRequestWithFilterStateStringAccessor) {
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+  config.set_failure_mode_allow(false);
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  config.add_connection_attributes("filter_state['authority']");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  auto builder = Filters::Common::Expr::getBuilder(server_context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<Config>(config, scope_, builder,
+                                                &server_context.local_info_, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  stream_info_.filter_state_->setData(
+      "authority", std::make_shared<Router::StringAccessorImpl>("example.com:443"),
+      StreamInfo::FilterState::LifeSpan::Connection);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  Buffer::OwnedImpl data("payload");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    EXPECT_TRUE(req.has_read_data());
+    EXPECT_EQ(1, req.attributes().size());
+    auto proto_struct = req.attributes().at("envoy.filters.network.ext_proc");
+    EXPECT_EQ(proto_struct.fields().at("filter_state['authority']").string_value(),
+              "example.com:443");
+  });
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+TEST_F(NetworkExtProcFilterTest, ConnectionAttributesSentOnlyOnce) {
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+  config.set_failure_mode_allow(false);
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  config.add_connection_attributes("filter_state['authority']");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  auto builder = Filters::Common::Expr::getBuilder(server_context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<Config>(config, scope_, builder,
+                                                &server_context.local_info_, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  stream_info_.filter_state_->setData("authority",
+                                      std::make_shared<Router::StringAccessorImpl>("foo.bar.com"),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  Buffer::OwnedImpl data1("chunk1");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    EXPECT_EQ(1, req.attributes().size());
+    auto proto_struct = req.attributes().at("envoy.filters.network.ext_proc");
+    EXPECT_EQ(proto_struct.fields().at("filter_state['authority']").string_value(), "foo.bar.com");
+  });
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data1, false));
+
+  // Receive response for first chunk to resume iteration
+  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  response->mutable_read_data()->set_data("chunk1");
+  response->set_data_processing_status(
+      envoy::service::network_ext_proc::v3::ProcessingResponse::UNMODIFIED);
+  filter_->onReceiveMessage(std::move(response));
+
+  // Send second chunk
+  Buffer::OwnedImpl data2("chunk2");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    // Attributes should NOT be present on subsequent requests
+    EXPECT_EQ(0, req.attributes().size());
+  });
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
 }
 
 } // namespace
