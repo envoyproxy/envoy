@@ -99,6 +99,10 @@ Network::FilterStatus ReverseTunnelUpstreamLifecycleFilter::onNewConnection() {
     maybeSetStringFilterState(*filter_state, kFilterStateClusterId, lifecycle_->cluster_id);
     maybeSetStringFilterState(*filter_state, kFilterStateTenantId, lifecycle_->tenant_id);
     maybeSetStringFilterState(*filter_state, kFilterStateWorker, lifecycle_->worker);
+    maybeSetStringFilterState(*filter_state, kFilterStateInitiatorWorkerId,
+                              lifecycle_->initiator_worker_id);
+    maybeSetStringFilterState(*filter_state, kFilterStateInitiatorConnectionId,
+                              lifecycle_->initiator_connection_id);
     if (lifecycle_->fd >= 0) {
       maybeSetUint64FilterState(*filter_state, kFilterStateFd, lifecycle_->fd);
     }

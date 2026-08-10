@@ -577,10 +577,13 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   EXPECT_NE(new_self_address->asString(), self_addr_->asString());
 
   // Send a STATELESS_RESET packet to the probing socket.
+  quic::StatelessResetToken reset_token =
+      GetQuicReloadableFlag(quic_check_alternate_reset_token)
+          ? frame.stateless_reset_token
+          : quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId());
   std::unique_ptr<quic::QuicEncryptedPacket> stateless_reset_packet =
-      quic::QuicFramer::BuildIetfStatelessResetPacket(
-          frame.connection_id, /*received_packet_length*/ 1200,
-          quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId()));
+      quic::QuicFramer::BuildIetfStatelessResetPacket(frame.connection_id,
+                                                      /*received_packet_length*/ 1200, reset_token);
   Buffer::RawSlice slice;
   slice.mem_ = const_cast<char*>(stateless_reset_packet->data());
   slice.len_ = stateless_reset_packet->length();

@@ -70,6 +70,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/transport_sockets/starttls:config",
         "//test/integration:integration_lib",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:registry_lib",
     ],
 )

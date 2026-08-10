@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/codec.h"
@@ -10,12 +12,14 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
+#include "source/extensions/filters/network/reverse_tunnel/jwt_handshake_validator.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -43,7 +47,10 @@ class ReverseTunnelFilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   static absl::StatusOr<std::shared_ptr<ReverseTunnelFilterConfig>>
   create(const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
-         Server::Configuration::FactoryContext& context);
+         Server::Configuration::FactoryContext& context,
+         JwksFetcherFactory create_fetcher_fn = nullptr);
+
+  ~ReverseTunnelFilterConfig();
 
   std::chrono::milliseconds pingInterval() const { return ping_interval_; }
   bool autoCloseConnections() const { return auto_close_connections_; }
@@ -65,10 +72,26 @@ public:
   bool validateConnectionLimit(absl::string_view node_id, absl::string_view tenant_id) const;
 
   // Validates the extracted node_id, cluster_id, and tenant_id against expected values.
-  // Returns true if validation passes or no validation is configured.
+  // Returns true if validation passes or no validation is configured. The parsed handshake
+  // request headers are passed so validation format strings can reference them via %REQ(...)%.
   bool validateIdentifiers(absl::string_view node_id, absl::string_view cluster_id,
                            absl::string_view tenant_id,
+                           const Http::RequestHeaderMap& request_headers,
                            const StreamInfo::StreamInfo& stream_info) const;
+
+  // Returns true if JWT handshake authentication is configured.
+  bool jwtEnabled() const { return jwt_validator_ != nullptr; }
+
+  // Returns true if a missing/invalid token must reject the handshake (i.e. not audit mode).
+  bool jwtRequired() const { return jwt_validator_ != nullptr && jwt_validator_->required(); }
+
+  // Verifies the handshake's bearer token. Must only be called when jwtEnabled() is true. See
+  // JwtHandshakeValidator::verify.
+  bool verifyHandshakeJwt(const Http::RequestHeaderMap& headers,
+                          StreamInfo::StreamInfo& stream_info) const {
+    ASSERT(jwt_validator_ != nullptr);
+    return jwt_validator_->verify(headers, stream_info);
+  }
 
   // Emits validation results as dynamic metadata if configured.
   void emitValidationMetadata(absl::string_view node_id, absl::string_view cluster_id,
@@ -89,7 +112,8 @@ private:
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
       Formatter::FormatterConstSharedPtr node_id_formatter,
       Formatter::FormatterConstSharedPtr cluster_id_formatter,
-      Formatter::FormatterConstSharedPtr tenant_id_formatter);
+      Formatter::FormatterConstSharedPtr tenant_id_formatter,
+      JwtHandshakeValidatorPtr jwt_validator);
 
   const std::chrono::milliseconds ping_interval_;
   const bool auto_close_connections_;
@@ -114,6 +138,9 @@ private:
   // Whether this filter enforces the per-node concurrent connection cap (owned by the upstream
   // socket interface bootstrap extension) before completing a reverse tunnel handshake.
   const bool enable_connection_limit_{false};
+
+  // JWT handshake authentication (experimental). nullptr when `jwt_validator` is not set.
+  const JwtHandshakeValidatorPtr jwt_validator_;
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;
@@ -149,7 +176,9 @@ private:
   COUNTER(parse_error)                                                                             \
   COUNTER(accepted)                                                                                \
   COUNTER(rejected)                                                                                \
-  COUNTER(validation_failed)
+  COUNTER(validation_failed)                                                                       \
+  COUNTER(jwt_denied)                                                                              \
+  COUNTER(jwt_would_deny)
 
   struct ReverseTunnelStats {
     ALL_REVERSE_TUNNEL_HANDSHAKE_STATS(GENERATE_COUNTER_STRUCT)
@@ -158,7 +187,9 @@ private:
 
   // Process reverse tunnel connection.
   void processAcceptedConnection(absl::string_view node_id, absl::string_view cluster_id,
-                                 absl::string_view tenant_id, int64_t initiation_time_ms);
+                                 absl::string_view tenant_id, int64_t initiation_time_ms,
+                                 absl::string_view initiator_worker_id,
+                                 absl::string_view initiator_connection_id);
 
   ReverseTunnelFilterConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{nullptr};

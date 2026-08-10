@@ -47,6 +47,15 @@ public:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
+  void setupNoopMode() {
+    envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+    proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::NOOP);
+    config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+    filter_ = std::make_unique<McpFilter>(config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
   void setupWithClearRouteCache(bool clear_route_cache) {
     envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
     proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
@@ -235,7 +244,7 @@ TEST_F(McpFilterTest, PerRouteOverride) {
   auto route_config = std::make_shared<McpOverrideConfig>(override_config);
 
   EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
-      .WillOnce(Return(route_config.get()));
+      .WillRepeatedly(Return(route_config.get()));
 
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
 
@@ -243,6 +252,55 @@ TEST_F(McpFilterTest, PerRouteOverride) {
               sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _, _));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+// Test NOOP mode - non-MCP traffic passes through without rejection
+TEST_F(McpFilterTest, NoopModePassesThroughNonMcp) {
+  setupNoopMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+// Test NOOP mode - valid MCP POST is not inspected and no metadata is extracted
+TEST_F(McpFilterTest, NoopModeDoesNotInspectMcpPost) {
+  setupNoopMode();
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  // In NOOP mode the filter continues immediately rather than buffering the body.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  // No attribute extraction should happen.
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test NOOP mode - per-route override disables an otherwise rejecting global config
+TEST_F(McpFilterTest, NoopModePerRouteOverride) {
+  setupRejectMode();
+
+  envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
+  override_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::NOOP);
+  auto route_config = std::make_shared<McpOverrideConfig>(override_config);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(route_config.get()));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
+
+  // Global REJECT_NO_MCP would reject this, but the NOOP override lets it through.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
 // Test dynamic metadata is set for valid JSON-RPC
@@ -400,6 +458,10 @@ TEST_F(McpFilterTest, ConfigurationGetters) {
   setupRejectMode();
   EXPECT_EQ(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP, config_->trafficMode());
   EXPECT_TRUE(config_->shouldRejectNonMcp());
+
+  setupNoopMode();
+  EXPECT_EQ(envoy::extensions::filters::http::mcp::v3::Mcp::NOOP, config_->trafficMode());
+  EXPECT_FALSE(config_->shouldRejectNonMcp());
 }
 
 // Test POST with wrong content-type
@@ -1469,6 +1531,162 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeFallbackToGlobal) {
   // Should fallback to global limit of 512 bytes
   EXPECT_CALL(decoder_callbacks_, setBufferLimit(512));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+// Test per-route clear route cache override
+TEST_F(McpFilterTest, PerRouteClearRouteCache) {
+  // Global config has clear route cache = false
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_clear_route_cache(false);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  // Per-route config overrides clear route cache = true
+  envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
+  override_config.set_clear_route_cache(true);
+  auto route_config = std::make_shared<McpOverrideConfig>(override_config);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(route_config.get()));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Expect dynamic metadata to be set
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
+
+  // Expect route cache to be cleared (since override overrides it to true)
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test per-route reject duplicate keys override
+TEST_F(McpFilterTest, PerRouteRejectDuplicateKeys) {
+  // Global config has reject duplicate keys = false
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_reject_duplicate_keys()->set_value(false);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  // Per-route config overrides reject duplicate keys = true
+  envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
+  override_config.set_reject_duplicate_keys(true);
+  auto route_config = std::make_shared<McpOverrideConfig>(override_config);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(route_config.get()));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "id": 1, "id": 2})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "duplicate JSON keys detected", _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+}
+
+// Test per-route request storage mode override
+TEST_F(McpFilterTest, PerRouteRequestStorageMode) {
+  // Global config has request storage mode = FILTER_STATE
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::FILTER_STATE);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  // Per-route config overrides request storage mode = DYNAMIC_METADATA
+  envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
+  override_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA);
+  auto route_config = std::make_shared<McpOverrideConfig>(override_config);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(route_config.get()));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Expect dynamic metadata to be set because override says DYNAMIC_METADATA
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  // Expect filter state NOT to be set (global said FILTER_STATE, but override says
+  // DYNAMIC_METADATA)
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+  EXPECT_EQ(filter_state_obj, nullptr);
+}
+
+// Test per-route parser config override
+TEST_F(McpFilterTest, PerRouteParserConfig) {
+  // Global config has default parser config (minimal extraction)
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  // Per-route config overrides parser_config
+  envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
+  auto* parser_config = override_config.mutable_parser_config();
+  parser_config->set_group_metadata_key("method_group");
+  auto* method_rule = parser_config->add_methods();
+  method_rule->set_method("custom/override");
+  method_rule->set_group("custom_override_group");
+  method_rule->add_extraction_rules()->set_path("params.custom_val");
+
+  auto route_config = std::make_shared<McpOverrideConfig>(override_config);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(route_config.get()));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "custom/override", "params": {"custom_val": "hello"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Expect dynamic metadata to be set with extracted field custom_val and group method_group
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce(Invoke([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_EQ(
+            "hello",
+            metadata.fields().at("params").struct_value().fields().at("custom_val").string_value());
+        EXPECT_EQ("custom_override_group", metadata.fields().at("method_group").string_value());
+      }));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 // Test method group added to dynamic metadata when configured

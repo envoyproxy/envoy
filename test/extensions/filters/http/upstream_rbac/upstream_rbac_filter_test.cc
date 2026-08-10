@@ -292,6 +292,30 @@ TEST_F(UpstreamRbacFilterTest, OnUpstreamConnectionEstablishedIsNoOp) {
   filter_->onUpstreamConnectionEstablished();
 }
 
+// Router context: root scope with "http.<stat_prefix>." as stats_prefix.
+// RBAC counters must land under that prefix.
+TEST_F(UpstreamRbacFilterTest, RouterContextStatPrefixScopesStats) {
+  auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(
+      envoy::extensions::filters::http::rbac::v3::RBAC{}, "http.ingress.",
+      *stats_store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
+
+  EXPECT_TRUE(stats_store_.findCounterByString("http.ingress.rbac.allowed").has_value());
+  EXPECT_TRUE(stats_store_.findCounterByString("http.ingress.rbac.denied").has_value());
+}
+
+// Cluster context: root scope with "cluster.<name>." as stats_prefix (as passed by
+// upstream_impl.cc). Stats must appear under "cluster.<name>.rbac.*" with no double-prefix.
+TEST_F(UpstreamRbacFilterTest, ClusterContextRootScopeWithClusterPrefix) {
+  auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(
+      envoy::extensions::filters::http::rbac::v3::RBAC{}, "cluster.cluster_0.",
+      *stats_store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
+
+  EXPECT_TRUE(stats_store_.findCounterByString("cluster.cluster_0.rbac.allowed").has_value());
+  EXPECT_TRUE(stats_store_.findCounterByString("cluster.cluster_0.rbac.denied").has_value());
+  EXPECT_FALSE(stats_store_.findCounterByString("cluster.cluster_0.cluster.cluster_0.rbac.allowed")
+                   .has_value());
+}
+
 } // namespace
 } // namespace UpstreamRBACFilter
 } // namespace HttpFilters

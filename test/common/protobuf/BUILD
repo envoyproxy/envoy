@@ -35,6 +35,7 @@ envoy_cc_test(
         "//source/common/protobuf:message_validator_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

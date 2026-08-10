@@ -1,21 +1,5 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "35.1"
-
-# These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
-# and both must match the names from the protobuf releases (see
-# https://github.com/protocolbuffers/protobuf/releases).
-# The names change in upcoming versions.
-# The shas are calculated from the downloads on the releases page.
-PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "01bf9d08808c7f96678b63f4bd8efa559bb4f83d5a7a270d5edaf507f9d5d9cf",
-    linux_x86_64 = "6930ebf62bd4ea607b98fff052596c6ee564b9835b4ce172c75a3f53ae9d91b7",
-    linux_ppcle_64 = "92da6d454ca3c30b0acf9bd3613dde973a179855742b1ca2859f30a4555cd6e5",
-    osx_aarch_64 = "193289af0470c6a1aada357d4fba0bbf8d78bfaac8b5e42ca30af2ef75583de2",
-    osx_x86_64 = "537d73604a344ded6fc94e98e07e529d4fe3e4a0b09e59905353950fafc2a1f7",
-    win64 = "5d3ff218d7d91eea95f7569bcb5a98f3030f8996d44151279d9772edcff76082",
-)
-
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_compdb = dict(
         version = "40864791135333e1446a04553b63cbe744d358d0",
@@ -46,8 +30,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.35",
-        sha256 = "5179bc3f912d9c2dd5a6e5215e98222abe088847f021eba9f0f2e9a006deacaa",
+        version = "0.4.2",
+        sha256 = "3427dc6eaafa83042249125920b3fb03ebc3779bb1aff02c147faedebb6c0475",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -65,12 +49,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "3560f7dd3f08e16b9f84d877a5be21ec62071564783009571af5fcc6fad734d2",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
-    ),
-    aws_lc = dict(
-        version = "1.72.0",
-        sha256 = "f214c0e06e043c4f18b836059ccb5ecbed781173e8eed106839ee2dd4f4cc157",
-        strip_prefix = "aws-lc-{version}",
-        urls = ["https://github.com/aws/aws-lc/archive/v{version}.tar.gz"],
     ),
     openssl = dict(
         version = "3.5.7",
@@ -204,8 +182,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/jemalloc/jemalloc/releases/download/{version}/jemalloc-{version}.tar.bz2"],
     ),
     com_github_grpc_grpc = dict(
-        version = "1.81.1",
-        sha256 = "48ae0d05f87206112d9e9144a923191ee1e482141a70686ec58dc86d0b40fddc",
+        version = "1.83.0",
+        sha256 = "90d453393a9d41215df546103b10b33b9566df79cdf6f49dc67f6c4d044d090d",
         strip_prefix = "grpc-{version}",
         urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
     ),
@@ -288,8 +266,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://codeload.github.com/VectorCamp/vectorscan/tar.gz/refs/tags/vectorscan/{version}"],
     ),
     opentelemetry_cpp = dict(
-        version = "1.27.0",
-        sha256 = "d09c2e8dd95bbc1d6ee493a89f32a4736879948d0eb59ad58c855022d1f55cc1",
+        version = "1.28.0",
+        sha256 = "8c359919175d77c502515f5a783907d031cc6a172e44426dbe9bee3c1532201e",
         strip_prefix = "opentelemetry-cpp-{version}",
         urls = ["https://github.com/open-telemetry/opentelemetry-cpp/archive/refs/tags/v{version}.tar.gz"],
     ),
@@ -416,7 +394,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/googletest/releases/download/v{version}/googletest-{version}.tar.gz"],
     ),
     com_google_protobuf = dict(
-        version = PROTOBUF_VERSION,
+        version = "35.1",
         # When upgrading the protobuf library, please re-run
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
@@ -559,8 +537,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "7a02e774630152a6f67f12458f9545ae3dabfc9b",
-        sha256 = "529c4b61254429e2953a8944ff6fd7583aacafe07a5e7e5b19f74fb17cf26394",
+        version = "89d6d17edc0f0b79f38edf6fac9e5c8bf5f3cfd7",
+        sha256 = "d994da485d3e1821bcf20a0da5f38ee3d28bd8c0f00389a59adb7ce1196dbce7",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -689,8 +667,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/apache/thrift/archive/refs/tags/v{version}.tar.gz"],
     ),
     toolchains_llvm = dict(
-        version = "1.7.0",
-        sha256 = "85c341e957ba58482892a8088e4a34391d15bd98917f0993ecb62f008d6986d6",
+        version = "1.8.0",
+        sha256 = "3b05826f256040f91c24dcaad673eb1c91e4cc93f4043d0205f2512327640205",
         strip_prefix = "toolchains_llvm-v{version}",
         urls = ["https://github.com/bazel-contrib/toolchains_llvm/releases/download/v{version}/toolchains_llvm-v{version}.tar.gz"],
     ),
@@ -737,24 +715,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-arm64.tar.gz"],
     ),
-    fips_clang_ppc64le = dict(
-        version = "14.0.0",
-        sha256 = "2d504c4920885c86b306358846178bc2232dfac83b47c3b1d05861a8162980e6",
-        strip_prefix = "clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04",
-        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04.tar.xz"],
-    ),
-    fips_go_ppc64le = dict(
-        version = "1.26.3",
-        sha256 = "dbd82b50530ead2beb1fd72215117380df3cb16332b51467116dc35b3691dd75",
-        strip_prefix = "go",
-        urls = ["https://dl.google.com/go/go{version}.linux-ppc64le.tar.gz"],
-    ),
-    fips_cmake_src = dict(
-        version = "4.4.0",
-        sha256 = "65757f442fdd242e27f1728fc26dc0cba4164f7a0791a5c788631c00080369bc",
-        strip_prefix = "cmake-{version}",
-        urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}.tar.gz"],
-    ),
     wuffs = dict(
         version = "0.4.0-alpha.9",
         sha256 = "9ca4f5401a76be244362de8b39138f01f2456c444b03584703a9f1db90491ba6",
@@ -765,13 +725,3 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # (declarations) and implementation (when WUFFS_IMPLEMENTATION is defined).
     ),
 )
-
-def _compiled_protoc_deps(locations, versions):
-    for platform, sha in versions.items():
-        locations["com_google_protobuf_protoc_%s" % platform] = dict(
-            version = PROTOBUF_VERSION,
-            sha256 = sha,
-            urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
-        )
-
-_compiled_protoc_deps(REPOSITORY_LOCATIONS_SPEC, PROTOC_VERSIONS)
