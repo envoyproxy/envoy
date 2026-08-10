@@ -17,9 +17,9 @@ envoy_extension_cc_test(
     extension_names = ["envoy.internal_redirect_predicates.filter_state"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:bool_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
-        "//source/common/router:string_accessor_lib",
         "//source/extensions/internal_redirect/filter_state:config",
         "@envoy_api//envoy/extensions/internal_redirect/filter_state/v3:pkg_cc_proto",
     ],
