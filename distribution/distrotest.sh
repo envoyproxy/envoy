@@ -120,8 +120,11 @@ pgrep envoy
 
 run_log proxy-responds "Check proxy responds"
 # The website can be flakey, give it a minute of trying...
+# Assert Envoy proxies successfully (HTTP 2xx) rather than matching
+# frequently-changing homepage copy, which previously broke this test
+# whenever the envoyproxy.io homepage was updated.
 RESPONSE="$(retry 60 curl -s http://localhost:10000/)"
-echo "$RESPONSE" | grep "Envoy is an open source edge and service proxy, designed for cloud-native applications"
+retry 60 curl -sf -o /dev/null http://localhost:10000/
 
 run_log stop-envoy "Stop envoy"
 sudo -u envoy pkill envoy && echo "Envoy stopped"
