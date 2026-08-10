@@ -1344,9 +1344,9 @@ public class CronetUrlRequestContextTest {
   /**
    * Runs {@code r} on {@code engine}'s network thread.
    */
-  private static void postToNetworkThread(final CronetEngine engine, final Runnable r) {
-    // Works by requesting an invalid URL which results in onFailed() being called, which is
-    // done through a direct executor which causes onFailed to be run on the network thread.
+  private void postToNetworkThread(final CronetEngine engine, final Runnable r) {
+    // Works by requesting an URL that returns a 500 status, which results in onFailed() being called,
+    // which is done through a direct executor which causes onFailed to be run on the network thread.
     Executor directExecutor = new Executor() {
       @Override
       public void execute(Runnable runnable) {
@@ -1371,7 +1371,7 @@ public class CronetUrlRequestContextTest {
         r.run();
       }
     };
-    engine.newUrlRequestBuilder("http://invalid", callback, directExecutor).build().start();
+    engine.newUrlRequestBuilder(mUrl500, callback, directExecutor).build().start();
   }
 
   /**
