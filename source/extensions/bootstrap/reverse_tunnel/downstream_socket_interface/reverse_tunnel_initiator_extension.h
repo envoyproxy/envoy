@@ -112,6 +112,11 @@ public:
   uint64_t maxReconnectBackoffMs() const { return max_reconnect_backoff_ms_; }
 
   /**
+   * @return the configured maximum time for tunnels to a host to finish setup, in milliseconds.
+   */
+  uint64_t maxTunnelSetupTimeMs() const { return max_tunnel_setup_time_ms_; }
+
+  /**
    * @return reference to the configured HTTP handshake request path.
    */
   const std::string& handshakeRequestPath() const { return handshake_request_path_; }
@@ -191,11 +196,16 @@ private:
   std::string stat_prefix_; // Reverse connection stats prefix
   bool enable_detailed_stats_{false};
   uint64_t max_reconnect_backoff_ms_{};
+  uint64_t max_tunnel_setup_time_ms_{};
   std::string handshake_request_path_;
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
   bool use_http_upgrade_{false};
   HandshakeHeadersConstSharedPtr handshake_headers_;
   AccessLog::InstanceSharedPtrVector access_logs_;
+
+  // Makes a histogram with the given name and stats store.
+  Stats::Histogram& getHistogram(absl::string_view name, Stats::Scope& stats_store);
+  Stats::Counter& getCounter(absl::string_view name, Stats::Scope& stats_store);
 
   /**
    * Update per-worker connection stats for debugging purposes.
@@ -208,6 +218,11 @@ private:
    */
   void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
                                       const std::string& state_suffix, bool increment);
+
+public:
+  // Keep at the end as it depends on stat prefix.
+  Stats::Histogram& tunnel_setup_time_;
+  Stats::Counter& tunnel_setup_time_exceeded_;
 };
 
 /**

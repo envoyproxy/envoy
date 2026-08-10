@@ -176,6 +176,26 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, MaxReconnectBackoffOverride) {
   EXPECT_EQ(custom_extension->maxReconnectBackoffMs(), 5000);
 }
 
+TEST_F(ReverseTunnelInitiatorExtensionTest, MaxTunnelSetupTimeDefaults) {
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+      DownstreamReverseConnectionSocketInterface empty_config;
+  auto extension_with_default =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, empty_config);
+  EXPECT_EQ(extension_with_default->maxTunnelSetupTimeMs(), 30000);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, MaxTunnelSetupTimeOverride) {
+  auto custom_config = config_;
+  custom_config.mutable_max_tunnel_setup_time()->set_seconds(5);
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  EXPECT_EQ(custom_extension->maxTunnelSetupTimeMs(), 5000);
+  EXPECT_EQ(custom_extension->tunnel_setup_time_.name(),
+            "test_scope.reverse_connections.tunnel_setup_time");
+  EXPECT_EQ(custom_extension->tunnel_setup_time_exceeded_.name(),
+            "test_scope.reverse_connections.tunnel_setup_time_exceeded");
+}
+
 TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersDefaults) {
   EXPECT_TRUE(extension_->handshakeAdditionalHeaders().empty());
 }

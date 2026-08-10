@@ -21,6 +21,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -56,7 +57,7 @@ makeHandshakeHeader(absl::string_view key, absl::string_view value,
                          Formatter::FormatterImpl::create(value, true, command_parsers).value()};
 }
 
-class RCConnectionWrapperTest : public testing::Test {
+class RCConnectionWrapperTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
   void SetUp() override {
     stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
@@ -129,19 +130,9 @@ protected:
 
   void addHostConnectionInfo(const std::string& host_address, const std::string& cluster_name,
                              uint32_t target_count) {
-    io_handle_->host_to_conn_info_map_[host_address] =
-        ReverseConnectionIOHandle::HostConnectionInfo{
-            host_address,
-            cluster_name,
-            {},           // connection_keys - empty set initially
-            target_count, // target_connection_count
-            0,            // failure_count
-            // last_failure_time
-            std::chrono::steady_clock::now(), // NO_CHECK_FORMAT(real_time)
-            // backoff_until
-            std::chrono::steady_clock::now(), // NO_CHECK_FORMAT(real_time)
-            {}                                // connection_states
-        };
+    io_handle_->host_to_conn_info_map_.emplace(
+        host_address, ReverseConnectionIOHandle::HostConnectionInfo(
+                          host_address, cluster_name, target_count, dispatcher_, extension_.get()));
   }
 
   // Helper to create a mock host.

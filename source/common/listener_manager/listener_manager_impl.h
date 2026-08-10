@@ -384,6 +384,8 @@ private:
                                              const ListenerImpl& existing_listener);
 
   ApiListenerPtr api_listener_;
+  // Listeners can hold timers etc. so we need them to die first.
+  std::vector<WorkerPtr> workers_;
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;
   // Warming listeners are listeners that may need further initialization via the listener's init
@@ -397,7 +399,6 @@ private:
   std::list<DrainingListener> draining_listeners_;
   std::list<DrainingFilterChainsManager> draining_filter_chains_manager_;
 
-  std::vector<WorkerPtr> workers_;
   // The per-worker CPU assignment, lazily computed and cached by workerCpus(). worker_cpus_[i] is
   // the CPU that worker i is pinned to; the vector is empty when no worker is pinned.
   std::optional<std::vector<uint32_t>> worker_cpus_;

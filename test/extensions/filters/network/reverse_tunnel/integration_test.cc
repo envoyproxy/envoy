@@ -1,3 +1,4 @@
+#include <optional>
 #include <thread>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -47,18 +48,34 @@ typed_config:
   enable_detailed_stats: true
 )EOF");
 
+    std::string max_tunnel_setup_time_yaml;
+    if (max_tunnel_setup_time_seconds_.has_value()) {
+      // Optional override for setup-latency deadline tests. Unset keeps the 30s default.
+      max_tunnel_setup_time_yaml =
+          fmt::format("\n  max_tunnel_setup_time: {}s", *max_tunnel_setup_time_seconds_);
+    }
     config_helper_.addBootstrapExtension(fmt::format(R"EOF(
 name: envoy.bootstrap.reverse_tunnel.downstream_socket_interface
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
   enable_detailed_stats: true
   http_handshake:
-    request_path: "{}"
+    request_path: "{}"{}
 )EOF",
-                                                     downstream_handshake_request_path_));
+                                                     downstream_handshake_request_path_,
+                                                     max_tunnel_setup_time_yaml));
 
     // Call parent initialize to complete setup.
     BaseIntegrationTest::initialize();
+  }
+
+  // Number of samples currently recorded in the initiator setup-latency histogram.
+  uint64_t tunnelSetupTimeSampleCount() {
+    auto histogram = test_server_->histogram("reverse_tunnel_initiator.tunnel_setup_time");
+    if (histogram == nullptr) {
+      return 0;
+    }
+    return TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
   }
 
 protected:
@@ -230,6 +247,8 @@ typed_config:
   std::string upstream_request_path_ =
       std::string(Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
                       DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+  // When set, overrides DownstreamReverseConnectionSocketInterface.max_tunnel_setup_time.
+  std::optional<uint32_t> max_tunnel_setup_time_seconds_;
 
   // Set log level to debug for this test class.
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::trace);
@@ -452,6 +471,14 @@ void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeSc
   test_server_->waitForGauge("reverse_tunnel_acceptor.clusters.e2e-cluster", Ge(1));
 
   test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
+
+  // Successful full-capacity setup must record a setup-latency sample and must not trip the
+  // deadline counter.
+  test_server_->waitUntilHistogramHasSamples("reverse_tunnel_initiator.tunnel_setup_time",
+                                             std::chrono::milliseconds(5000));
+  EXPECT_EQ(tunnelSetupTimeSampleCount(), 1);
+  EXPECT_EQ(test_server_->counter("reverse_tunnel_initiator.tunnel_setup_time_exceeded")->value(),
+            0);
 
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
@@ -678,6 +705,34 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshakeCus
   downstream_handshake_request_path_ = "/custom/reverse";
   upstream_request_path_ = downstream_handshake_request_path_;
   runEndToEndReverseConnectionHandshakeScenario();
+}
+
+// I2: when the handshake is held past max_tunnel_setup_time, the initiator increments
+// tunnel_setup_time_exceeded and does not record a setup-latency histogram sample even if the
+// handshake later succeeds.
+TEST_P(ReverseTunnelFilterIntegrationTest, TunnelSetupTimeExceededWhenHandshakeDelayed) {
+  max_tunnel_setup_time_seconds_ = 1;
+  addDrainingAwareReverseConnectionHcmListener(/*reverse_connection_count=*/1);
+  initialize();
+
+  FakeRawConnectionPtr reverse_conn;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(reverse_conn));
+
+  // The initiator has dialed and armed the setup deadline, but the handshake response is withheld
+  // until after the deadline fires.
+  test_server_->waitForCounter("reverse_tunnel_initiator.tunnel_setup_time_exceeded", Eq(1),
+                               std::chrono::milliseconds(5000));
+  EXPECT_EQ(tunnelSetupTimeSampleCount(), 0);
+
+  completeReverseTunnelHandshake(*reverse_conn);
+
+  // Late success after the deadline must not become a setup-time sample.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  EXPECT_EQ(tunnelSetupTimeSampleCount(), 0);
+  EXPECT_EQ(test_server_->counter("reverse_tunnel_initiator.tunnel_setup_time_exceeded")->value(),
+            1);
+
+  EXPECT_TRUE(reverse_conn->close());
 }
 
 TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsGoAwayOnReverseConnections) {

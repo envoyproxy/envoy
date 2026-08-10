@@ -19,6 +19,7 @@
 #include "source/common/network/filter_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
+#include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
@@ -249,7 +250,8 @@ public:
    * @return true if connection attempt should be made, false if in backoff.
    */
   bool shouldAttemptConnectionToHost(const std::string& host_address,
-                                     const std::string& cluster_name);
+                                     const std::string& cluster_name,
+                                     const RemoteClusterConnectionConfig& cluster_config);
 
   /**
    * Track a connection failure for a specific host and cluster and trigger backoff logic.
@@ -464,7 +466,8 @@ private:
    * @param hosts the list of hosts in the cluster
    */
   void maybeUpdateHostsMappingsAndConnections(const std::string& cluster_id,
-                                              const std::vector<std::string>& hosts);
+                                              const std::vector<std::string>& hosts,
+                                              const RemoteClusterConnectionConfig& cluster_config);
 
   /**
    * Remove stale host entries and close associated connections.
@@ -479,20 +482,25 @@ private:
   struct HostConnectionInfo {
     std::string host_address;                                // Host address
     std::string cluster_name;                                // Cluster to which host belongs
-    absl::flat_hash_set<std::string> connection_keys;        // Connection keys for stats tracking
+    absl::flat_hash_set<std::string> connection_keys{};      // Connection keys for stats tracking
     uint32_t target_connection_count;                        // Target connection count for the host
     uint32_t failure_count{0};                               // Number of consecutive failures
     std::chrono::steady_clock::time_point last_failure_time; // NO_CHECK_FORMAT(real_time)
     std::chrono::steady_clock::time_point backoff_until;     // NO_CHECK_FORMAT(real_time)
     absl::flat_hash_map<std::string, ReverseConnectionState>
-        connection_states;        // State tracking per connection
+        connection_states{};      // State tracking per connection
     uint32_t connecting_count{0}; // Number of pending connections.
     // Wall-clock epoch millis of the first dial in the current establishment episode. Set on the
-    // first dial made while the host has no live connection, carried unchanged across handshake
-    // retries, and cleared on handshake success. This makes retries during initial establishment
-    // report the original intent time, while a redial after a previously-established connection
-    // drops starts a fresh episode.
-    std::optional<int64_t> episode_initiation_time_ms;
+    // first dial while the host is below target capacity, carried across handshake retries, and
+    // cleared when the host reaches target connection count (or when a new episode starts after
+    // capacity drops). Setup-time span/timer are armed with this stamp.
+    std::optional<int64_t> episode_initiation_time_ms{};
+    std::unique_ptr<Stats::HistogramCompletableTimespanImpl> setup_time_span{};
+    Event::TimerPtr setup_time_timer_;
+
+    HostConnectionInfo(absl::string_view host_address, absl::string_view cluster_name,
+                       uint32_t target_connection_count, Event::Dispatcher& dispatcher,
+                       ReverseTunnelInitiatorExtension* extension);
   };
 
   // Map from host address to connection info.
