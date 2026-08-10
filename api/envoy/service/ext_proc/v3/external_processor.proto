@@ -242,7 +242,7 @@ message ProcessingRequest {
 //   the server must send back exactly one ``ProcessingResponse`` message.
 // * If it is set to ``FULL_DUPLEX_STREAMED``, the server must follow the API defined
 //   for this mode to send the ``ProcessingResponse`` messages.
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message ProcessingResponse {
   // Flow control window update. Values may be positive or negative. The
   // sender must immediately add these values to its flow control window,
@@ -395,7 +395,7 @@ message ProcessingResponse {
   // send a message containing only this field.
   //
   // [#not-implemented-hide:]
-  ServerWindowUpdate server_window_update = 13;
+  ServerWindowUpdate server_window_update = 14;
 }
 
 // The following are messages that are sent to the server.
