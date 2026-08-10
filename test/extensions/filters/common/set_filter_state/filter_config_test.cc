@@ -363,7 +363,7 @@ TEST_F(ConfigTest, SetBoolValueFromHeaderValidFalse) {
   EXPECT_FALSE(value->value());
 }
 
-TEST_F(ConfigTest, SetBoolValueFromHeaderInvalid) {
+TEST_F(ConfigTest, InvalidBoolValueFromHeaderDoesNotCreateFilterState) {
   initialize({R"YAML(
     object_key: my_key
     factory_key: envoy.bool
@@ -373,6 +373,7 @@ TEST_F(ConfigTest, SetBoolValueFromHeaderInvalid) {
   )YAML"});
   header_map_.addCopy("x-redirect-enabled", "garbage");
   update();
+  EXPECT_EQ(nullptr, info_.filterState()->getDataReadOnlyGeneric("my_key"));
   const auto* value = info_.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>("my_key");
   EXPECT_EQ(nullptr, value);
 }

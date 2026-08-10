@@ -1,5 +1,6 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/internal_redirect/filter_state/v3/filter_state_config.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 
@@ -170,6 +171,54 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("302 via_upstream test-header-value"));
   EXPECT_EQ("test-header-value",
             response->headers().get(test_header_key_)[0]->value().getStringView());
+}
+
+// An invalid envoy.bool value does not create filter state, so redirect_if_absent controls the
+// internal redirect decision.
+TEST_P(RedirectIntegrationTest, InvalidBooleanFilterStateUsesAbsentRedirectBehavior) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.set_filter_state
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+      on_request_headers:
+      - object_key: envoy.internal_redirect.gate
+        factory_key: envoy.bool
+        format_string:
+          text_format_source:
+            inline_string: "%REQ(x-redirect-enabled)%"
+  )EOF");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* policy = hcm.mutable_route_config()
+                           ->mutable_virtual_hosts(0)
+                           ->mutable_routes(0)
+                           ->mutable_route()
+                           ->mutable_internal_redirect_policy();
+        auto* predicate = policy->add_predicates();
+        predicate->set_name("envoy.internal_redirect_predicates.filter_state");
+        envoy::extensions::internal_redirect::filter_state::v3::FilterStateConfig config;
+        config.set_redirect_enabled_key("envoy.internal_redirect.gate");
+        config.set_redirect_if_absent(true);
+        std::ignore = predicate->mutable_typed_config()->PackFrom(config);
+      });
+  HttpProtocolIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.addCopy("x-redirect-enabled", "garbage");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(redirect_response_, true);
+
+  waitForNextUpstreamRequest();
+  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {

@@ -2,6 +2,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/router/internal_redirect.h"
 
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/internal_redirect/filter_state/config.h"
@@ -35,6 +36,12 @@ protected:
   void setGate(bool value) {
     filter_state_.setData(std::string(kGateKey),
                           std::make_shared<StreamInfo::BoolAccessorImpl>(value),
+                          StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+
+  void setNonBooleanGate() {
+    filter_state_.setData(std::string(kGateKey),
+                          std::make_shared<Router::StringAccessorImpl>("not-a-boolean"),
                           StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
@@ -83,6 +90,13 @@ TEST_F(FilterStateTest, AbsentRejectsByDefault) {
 TEST_F(FilterStateTest, AbsentFollowsWhenConfigured) {
   auto predicate = makePredicate(/*redirect_if_absent=*/true);
   EXPECT_TRUE(predicate->acceptTargetRoute(filter_state_, "any_route", false, false));
+}
+
+// An object with the wrong type is not an absent gate and must fail closed.
+TEST_F(FilterStateTest, NonBooleanGateRejectsWhenAbsentRedirectsAreAllowed) {
+  setNonBooleanGate();
+  auto predicate = makePredicate(/*redirect_if_absent=*/true);
+  EXPECT_FALSE(predicate->acceptTargetRoute(filter_state_, "any_route", false, false));
 }
 
 } // namespace

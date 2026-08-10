@@ -155,7 +155,8 @@ configuration with a :ref:`factory lookup key
 ``envoy.bool``
   A generic boolean object factory for creating filter state entries with boolean values.
   Accepts the following case-insensitive values: ``true``, ``t``, ``yes``, ``y``, ``1`` for true;
-  ``false``, ``f``, ``no``, ``n``, ``0`` for false. Invalid values default to false.
+  ``false``, ``f``, ``no``, ``n``, ``0`` for false. Invalid values are rejected and do not create
+  a filter state object.
 
   Example configuration:
 
