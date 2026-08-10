@@ -15,7 +15,7 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicForwardProxyFilterFactory::createFi
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
     Server::Configuration::ServerFactoryContext& context) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context, context.messageValidationVisitor());
+      context);
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
       context.singletonManager());
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr cache_manager =

@@ -2,10 +2,12 @@
 
 #include <memory>
 #include <optional>
+#include <type_traits>
+#include <vector>
 
+#include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
-#include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -116,7 +118,7 @@ protected:
    * @return const ConfigProtoVector the config protos corresponding to the Config instantiated by
    *         the provider.
    */
-  virtual ConfigProtoVector getConfigProtos() const { PANIC("not implemented"); }
+  virtual ConfigProtoVector getConfigProtos() const PURE;
 
   /**
    * Returns the config implementation associated with the provider.
