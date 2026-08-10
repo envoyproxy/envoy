@@ -10,10 +10,11 @@ bool SupportedCommands::isSupportedCommand(const std::string& command) {
   return (simpleCommands().contains(command) || evalCommands().contains(command) ||
           objectCommands().contains(command) || hashMultipleSumResultCommands().contains(command) ||
           ClusterScopeCommands().contains(command) || randomShardCommands().contains(command) ||
-          transactionCommands().contains(command) || auth() == command || echo() == command ||
-          mget() == command || mset() == command || ping() == command || time() == command ||
-          quit() == command || scan() == command || infoShard() == command || client() == command ||
-          hello() == command);
+          transactionCommands().contains(command) || subscriptionCommands().contains(command) ||
+          auth() == command || echo() == command || mget() == command || mset() == command ||
+          ping() == command || time() == command || quit() == command || scan() == command ||
+          infoShard() == command || client() == command || hello() == command ||
+          publish() == command || spublish() == command);
 }
 
 bool SupportedCommands::isCommandValidWithoutArgs(const std::string& command_name) {

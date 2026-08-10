@@ -97,6 +97,19 @@ private:
     bool enableCommandStats() const override { return false; }
     bool connectionRateLimitEnabled() const override { return false; }
     uint32_t connectionRateLimitPerSec() const override { return 0; }
+    // The health-check client never drives pub/sub; report the defaults.
+    std::chrono::milliseconds subscribeAckTimeout() const override {
+      return std::chrono::milliseconds(
+          NetworkFilters::Common::Redis::Client::kDefaultSubscribeAckTimeoutMs);
+    }
+    std::chrono::milliseconds resubscribeBackoffBaseInterval() const override {
+      return std::chrono::milliseconds(
+          NetworkFilters::Common::Redis::Client::kDefaultResubscribeBackoffBaseMs);
+    }
+    std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
+      return std::chrono::milliseconds(
+          NetworkFilters::Common::Redis::Client::kDefaultResubscribeBackoffMaxMs);
+    }
 
     const std::chrono::milliseconds parent_timeout_;
     std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;

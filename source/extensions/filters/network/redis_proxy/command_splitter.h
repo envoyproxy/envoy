@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
@@ -12,12 +13,20 @@
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
+#include "source/extensions/filters/network/redis_proxy/subscription_registry.h"
+
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 namespace CommandSplitter {
+
+// Terminal response payload handed to SplitCallbacks::respond(). The overwhelmingly common case is
+// a single reply frame, so an InlinedVector<,1> keeps that frame inline and avoids a per-command
+// heap allocation on ALL traffic (multi-frame pub/sub acks spill to the heap, as a vector would).
+using RespValueFrames = absl::InlinedVector<Common::Redis::RespValuePtr, 1>;
 
 struct ResponseValues {
   const std::string OK = "OK";
@@ -45,6 +54,74 @@ public:
 };
 
 using SplitRequestPtr = std::unique_ptr<SplitRequest>;
+
+/**
+ * Pub/sub session hooks. Split out of SplitCallbacks because only the pub/sub command handlers
+ * touch subscriber/registry state and only the ProxyFilter's PendingRequest implements them —
+ * every other SplitCallbacks (auth flows, speed-test/no-op doubles) carries no subscription
+ * state. Reached via SplitCallbacks::pubsub(), which returns nullptr on connections that never
+ * subscribe.
+ */
+class PubsubSession {
+public:
+  virtual ~PubsubSession() = default;
+
+  /**
+   * Get or create the downstream subscriber for pub/sub.
+   */
+  virtual DownstreamSubscriberPtr downstreamSubscriber() PURE;
+
+  /**
+   * Track a subscription registry for cleanup on disconnect.
+   */
+  virtual void setSubscriptionRegistry(const SubscriptionRegistryPtr& registry) PURE;
+
+  /**
+   * Per-channel registry ownership for THIS connection. A channel a subscriber holds lives in
+   * exactly one SubscriptionRegistry — the one that established its upstream SSUBSCRIBE. Routing a
+   * later duplicate SUBSCRIBE for the same channel to a DIFFERENT registry (a conn-pool / registry
+   * swap on a cluster update) would let two registries each believe they own it, so a failed
+   * reissue or a teardown on one would corrupt the other's view of the subscriber's shared channel
+   * set (over-decrementing the gauge, stranding the real upstream subscription). ``…ForChannel``
+   * binds a channel to its owning registry on first subscribe and returns that owner for every
+   * subsequent SUBSCRIBE / UNSUBSCRIBE so both always act on the establishing registry, never the
+   * current route.
+   *
+   * @return the registry that owns ``channel`` for this connection, or nullptr if none (the caller
+   *         resolves the current route and binds the result). A bound-but-expired weak ref is
+   *         treated as absent and pruned.
+   */
+  virtual SubscriptionRegistryPtr subscriptionRegistryForChannel(const std::string& channel) PURE;
+  virtual void bindSubscriptionRegistryForChannel(const std::string& channel,
+                                                  const SubscriptionRegistryPtr& registry) PURE;
+  virtual void unbindSubscriptionRegistryForChannel(const std::string& channel) PURE;
+
+  /**
+   * Unsubscribe ``subscriber`` from a single ``channel`` across the subscription registries this
+   * connection tracks (routing may have moved the channel since the original SUBSCRIBE). If the
+   * channel's own SUBSCRIBE is still awaiting its upstream ack, that pending ``subscribe`` ack
+   * completes the parked SUBSCRIBE request directly (at its own FIFO slot); only when no such
+   * request is live is the ack buffered into ``preserved_acks`` for the splitter to flush after its
+   * terminal respond(). Owns the cross-registry ownership rule — a channel lives in exactly one
+   * registry, so the common path unsubscribes on the bound owner directly, with a fallback full
+   * sweep of every tracked registry — so the splitter never walks them itself (cross-registry
+   * semantics belong to the session, the splitter only parses the verb).
+   * @return the subscriber's total subscription count after the unsubscribe (the downstream ack
+   *         count; unchanged from before when no tracked registry owned the channel).
+   */
+  virtual uint64_t
+  unsubscribeChannelAcrossRegistries(const std::string& channel,
+                                     const DownstreamSubscriberPtr& subscriber,
+                                     std::vector<Common::Redis::RespValue>& preserved_acks) PURE;
+
+  /**
+   * Report a net pub/sub subscription-count change for the cumulative subscribe/unsubscribe event
+   * COUNTERS (``pubsub_subscribe_total`` / ``pubsub_unsubscribe_total``). The
+   * ``pubsub_active_subscriptions`` GAUGE is NOT touched here — it is owned solely by
+   * DownstreamSubscriber::addChannel/removeChannel and is correct by construction.
+   */
+  virtual void onPubsubSubscriptionChange(int64_t delta) PURE;
+};
 
 /**
  * Split request callbacks.
@@ -78,10 +155,33 @@ public:
   virtual void onAuth(const std::string& username, const std::string& password) PURE;
 
   /**
-   * Called when the response is ready.
+   * Terminal response: hand the pending request its complete, ordered list of downstream frames in
+   * one call. The request buffers all frames and marks itself complete, then flushes when it
+   * reaches the FIFO front. Frame count reflects the command: exactly one for the overwhelmingly
+   * common single-reply case (see the onResponse sugar below); several for a multi-channel
+   * ``SUBSCRIBE`` / ``UNSUBSCRIBE`` whose per-channel acks and inline ``-ERR`` replies share one
+   * FIFO entry; or zero when a request completes with nothing to write (a bare ``UNSUBSCRIBE`` on
+   * an already-gone subscriber). Subscribe / unsubscribe acks flow through here — a fresh
+   * ``SUBSCRIBE`` holds its FIFO entry until its upstream ``SSUBSCRIBE`` ack lands, then respond()s
+   * in command order — so every ack stays ordered against pipelined command replies. MESSAGE push
+   * frames are the exception: they are ordered separately through DownstreamSubscriber's
+   * push-ordering sink, not through respond(). respond() is terminal — it may pop *this from the
+   * FIFO, so callers must not touch the callbacks afterward.
+   * @param frames the ordered response frames, now owned by the callee.
+   */
+  virtual void respond(RespValueFrames&& frames) PURE;
+
+  /**
+   * Sugar for the overwhelmingly common single-frame terminal response: forwards to respond() with
+   * a one-element list. Non-virtual on purpose — respond() is the sole virtual terminal, so the
+   * ~55 single-reply splitter call sites plus the test drivers keep calling onResponse() unchanged.
    * @param value supplies the response which is now owned by the callee.
    */
-  virtual void onResponse(Common::Redis::RespValuePtr&& value) PURE;
+  void onResponse(Common::Redis::RespValuePtr&& value) {
+    RespValueFrames frames;
+    frames.push_back(std::move(value));
+    respond(std::move(frames));
+  }
 
   /**
    * Called to retrieve information about the current Redis transaction.
@@ -110,7 +210,7 @@ public:
    *   HELLO N AUTH <user> <pass> [SETNAME <name>]
    *
    * The HELLO handler must produce a single reply (HELLO Map on success, error on failure),
-   * so it cannot use ``onAuth`` (which emits its own response).
+   * so it cannot use onAuth (which emits its own response).
    *
    * When external auth is configured, the implementation kicks off the async authentication
    * round trip and returns ``ImplOwnsResponse``; when the result arrives the implementation is
@@ -148,9 +248,19 @@ public:
   virtual Common::Redis::RespProtocolVersion protocolVersion() const PURE;
 
   /**
+   * Whether this listener opted into sharded pub/sub publish (``enable_sharded_publish``).
+   * When true, ``PublishRequest`` rewrites a client ``PUBLISH`` to upstream ``SPUBLISH`` so it
+   * reaches the slot-owning shard; when false, classic ``PUBLISH`` is forwarded unchanged.
+   * Defaults to false so non-pub/sub callbacks and test doubles keep classic behavior.
+   */
+  virtual bool shardedPublishEnabled() const { return false; }
+
+  /**
    * Current downstream RESP version negotiated on this connection. The HELLO handler
    * inherits this as the requested version on bare ``HELLO`` (no version arg). The actual
    * version flip on a successful ``HELLO N`` is performed by ``setDownstreamRespVersion``.
+   * Also used by the pub/sub handler to gate SUBSCRIBE acceptance on a RESP3-negotiated
+   * connection.
    */
   virtual uint32_t currentDownstreamRespVersion() const PURE;
 
@@ -163,6 +273,13 @@ public:
    * downcasting the callback to a concrete implementation type.
    */
   virtual std::optional<uint32_t> takePendingHelloAuthVersion() PURE;
+
+  /**
+   * Pub/sub session for this connection, or nullptr on connections that never subscribe (auth
+   * flows, non-pub/sub commands, test/no-op doubles). Only the ProxyFilter's PendingRequest returns
+   * a real session; the pub/sub command handlers reach subscriber/registry state through it.
+   */
+  virtual PubsubSession* pubsub() { return nullptr; }
 };
 
 /**
@@ -180,7 +297,7 @@ public:
    * @param dispatcher supplies dispatcher used for delay fault timer.
    * @param stream_info reference to the stream info used for formatting the key.
    * @return SplitRequestPtr a handle to the active request or nullptr if the request is no
-   *         longer in the splitter's hands. ``nullptr`` covers two cases: (1) the splitter
+   *         longer in the splitter's hands. nullptr covers two cases: (1) the splitter
    *         has already satisfied the request synchronously via ``onResponse()`` (the common
    *         case for HELLO responses, locally-validated AUTH, etc.); (2) the splitter has
    *         deferred the response to an out-of-band path that the implementing

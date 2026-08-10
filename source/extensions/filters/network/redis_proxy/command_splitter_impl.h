@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <optional>
 #include <string>
 #include <vector>
@@ -20,6 +21,7 @@
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "source/extensions/filters/network/redis_proxy/router.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
@@ -115,7 +117,6 @@ protected:
   SplitCallbacks& callbacks_;
   ConnPool::InstanceSharedPtr conn_pool_;
   Common::Redis::Client::PoolRequest* handle_{};
-  Common::Redis::RespValuePtr incoming_request_;
 };
 
 /**
@@ -124,7 +125,7 @@ protected:
 class ErrorFaultRequest : public SingleServerRequest {
 public:
   static SplitRequestPtr create(SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source, bool has_delaydelay_command_latency_fault,
+                                TimeSource& time_source, bool delay_command_latency,
                                 const StreamInfo::StreamInfo& stream_info);
 
 private:
@@ -156,7 +157,10 @@ public:
   void onAuth(const std::string& username, const std::string& password) override {
     callbacks_.onAuth(username, password);
   }
-  void onResponse(Common::Redis::RespValuePtr&& response) override;
+  // Terminal response: buffer the whole frame batch and forward it to the wrapped callbacks in one
+  // respond() call after the configured delay (see onDelayResponse). Delaying the batch as a unit
+  // keeps the multi-frame FIFO contract intact — all frames are handed over together, in order.
+  void respond(RespValueFrames&& frames) override;
   Common::Redis::Client::Transaction& transaction() override { return callbacks_.transaction(); }
   void setDownstreamRespVersion(uint32_t version) override {
     callbacks_.setDownstreamRespVersion(version);
@@ -164,6 +168,7 @@ public:
   Common::Redis::RespProtocolVersion protocolVersion() const override {
     return callbacks_.protocolVersion();
   }
+  bool shardedPublishEnabled() const override { return callbacks_.shardedPublishEnabled(); }
   AuthAttempt attemptDownstreamAuthInline(const std::string& username, const std::string& password,
                                           uint32_t requested_version) override {
     return callbacks_.attemptDownstreamAuthInline(username, password, requested_version);
@@ -179,6 +184,10 @@ public:
   std::optional<uint32_t> takePendingHelloAuthVersion() override {
     return callbacks_.takePendingHelloAuthVersion();
   }
+  // Forward the pub/sub session straight through to the wrapped callbacks so a delay-faulted
+  // SUBSCRIBE reaches the real subscriber/registry state (nullptr when the wrapped callbacks has
+  // no session).
+  PubsubSession* pubsub() override { return callbacks_.pubsub(); }
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
@@ -191,7 +200,7 @@ private:
   SplitCallbacks& callbacks_;
   std::chrono::milliseconds delay_;
   Event::TimerPtr delay_timer_;
-  Common::Redis::RespValuePtr response_;
+  RespValueFrames frames_;
 };
 
 /**
@@ -207,6 +216,29 @@ public:
 private:
   SimpleRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
                 bool delay_command_latency)
+      : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+};
+
+/**
+ * PublishRequest handles both ``PUBLISH`` and ``SPUBLISH`` from the client. When the listener sets
+ * ``enable_sharded_publish`` a client ``PUBLISH`` is rewritten to upstream ``SPUBLISH`` so
+ * publishes reach the slot-owning shard (matching the sharded ``SUBSCRIBE`` → upstream
+ * ``SSUBSCRIBE`` rewrite); otherwise the client's verb is forwarded unchanged as classic
+ * ``PUBLISH``. A client
+ * ``SPUBLISH`` is always forwarded as ``SPUBLISH``. The handler owns its own arity validation so
+ * the wording matches the rest of the splitter regardless of whether the generic ``size() < 2``
+ * guard ran first.
+ */
+class PublishRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  PublishRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                 bool delay_command_latency)
       : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 };
 
@@ -260,6 +292,61 @@ private:
   TransactionRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
                      TimeSource& time_source, bool delay_command_latency)
       : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+};
+
+/**
+ * SubscriptionRequest handles SUBSCRIBE-family commands locally via the
+ * subscription registry while still using the first subscription target for
+ * route selection.
+ */
+class SubscriptionRequest : public SplitRequestBase {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+  // RedisProxy::CommandSplitter::SplitRequest. Detach the ack sink so a deferred upstream ack that
+  // arrives after cancellation (a connection close mid-subscribe) finds an expired weak ref and is
+  // dropped rather than completing a torn-down request.
+  void cancel() override;
+
+private:
+  SubscriptionRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
+                      TimeSource& time_source, bool delay_command_latency)
+      : SplitRequestBase(command_stats, time_source, delay_command_latency), callbacks_(callbacks) {
+  }
+
+  // Adapter the registry's pending-ack bucket weak-refs. Forwards a landed upstream ack to
+  // onChannelAck while the request is alive; the request owns the sole shared_ptr, so cancel() /
+  // completion drops it and any later ack degrades to a no-op on an expired weak ref.
+  struct AckSink : public SubscriptionAckTarget {
+    void onSubscribeAck(const std::string& channel, uint64_t subscription_count) override {
+      if (request_ != nullptr) {
+        request_->onChannelAck(channel, subscription_count);
+      }
+    }
+    SubscriptionRequest* request_{nullptr};
+  };
+
+  // Fill the next command-order placeholder for ``channel`` with its ``subscribe`` ack; when the
+  // last deferred channel's ack lands, flush every frame in one respond() at this request's FIFO
+  // position.
+  void onChannelAck(const std::string& channel, uint64_t subscription_count);
+  void complete();
+
+  SplitCallbacks& callbacks_;
+  // Response frames in command-argument order. A nullptr element is a placeholder for a channel
+  // whose upstream ack has not landed yet; onChannelAck fills it in place, preserving order.
+  RespValueFrames frames_;
+  // channel -> FIFO of placeholder indices in ``frames_`` awaiting that channel's ack (a FIFO so a
+  // duplicate ``SUBSCRIBE ch ch`` fills its two placeholders in arrival order).
+  absl::flat_hash_map<std::string, std::deque<size_t>> pending_slots_;
+  size_t pending_count_{0};
+  bool any_succeeded_{false};
+  bool any_failed_{false};
+  bool completed_{false};
+  std::shared_ptr<AckSink> ack_sink_;
 };
 
 /**
@@ -553,10 +640,18 @@ struct InstanceStats {
 
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
+  // ``enable_sharded_subscribe``: when false (PubsubSettings mode DISABLED), the subscribe
+  // handlers remain registered (registration is unconditional — it preserves the
+  // ``ASSERT(handler != nullptr)`` invariant makeRequest relies on), but makeRequest rejects
+  // SUBSCRIBE/UNSUBSCRIBE as unknown commands ahead of the handler lookup rather than rewriting
+  // them to the sharded verbs — the escape hatch for RESP3 upstreams without SSUBSCRIBE
+  // (Redis 6.x). Defaults to true so existing callers and tests keep the transparent sharded-pubsub
+  // behavior.
   InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                TimeSource& time_source, bool latency_in_micros,
                Common::Redis::FaultManagerPtr&& fault_manager,
-               absl::flat_hash_set<std::string>&& custom_commands);
+               absl::flat_hash_set<std::string>&& custom_commands,
+               bool enable_sharded_subscribe = true);
 
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
@@ -569,13 +664,29 @@ private:
   struct HandlerData {
     CommandStats command_stats_;
     std::reference_wrapper<CommandHandler> handler_;
+    // Per-handler dispatch capabilities, set once at registration (single source of truth) so the
+    // generic dispatcher in makeRequest() needs no pub/sub command-name special-casing:
+    //  owns_arity_check - handler does its own arity validation; skip the generic <2-arg
+    //  guard (PublishRequest and the subscribe family).
+    //  forbidden_in_transaction - reject inside MULTI instead of routing to the transaction
+    //  handler (the subscribe family; Redis forbids pub/sub in MULTI).
+    //  bypasses_fault_injection - dispatch directly, never through DelayFault/ErrorFault (the
+    //  subscribe family; its handler owns downstream delivery and ack ordering).
+    bool owns_arity_check{false};
+    bool forbidden_in_transaction{false};
+    bool bypasses_fault_injection{false};
   };
 
   using HandlerDataPtr = std::shared_ptr<HandlerData>;
 
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
-                  bool latency_in_micros, CommandHandler& handler);
+                  bool latency_in_micros, CommandHandler& handler, bool owns_arity_check = false,
+                  bool forbidden_in_transaction = false, bool bypasses_fault_injection = false);
   void onInvalidRequest(SplitCallbacks& callbacks);
+  // Emit the standard ``ERR unknown command`` reply and bump the unsupported-command stat for a
+  // command the splitter refuses. Shared by the hard-reject of the internal sharded verbs (before
+  // the custom_commands lookup) and the generic unsupported-command gate (after it).
+  void rejectUnknownCommand(SplitCallbacks& callbacks, const Common::Redis::RespValue& request);
   // Handle a downstream ``HELLO`` command: protocol-version exact-match, AUTH/SETNAME option
   // parsing, inline-auth dispatch, and the local HELLO reply. Always terminal (returns nullptr);
   // factored out of ``makeRequest`` to keep that dispatcher readable.
@@ -584,6 +695,7 @@ private:
 
   RouterPtr router_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
+  CommandHandlerFactory<PublishRequest> publish_handler_;
   CommandHandlerFactory<EvalRequest> eval_command_handler_;
   CommandHandlerFactory<ObjectRequest> object_command_handler_;
   CommandHandlerFactory<MGETRequest> mget_handler_;
@@ -595,11 +707,15 @@ private:
   // Initialized before transaction_handler_, which keeps a reference to it.
   absl::flat_hash_set<std::string> custom_commands_;
   TransactionCommandHandlerFactory transaction_handler_;
+  CommandHandlerFactory<SubscriptionRequest> subscription_handler_;
   CommandHandlerFactory<ClusterScopeCmdRequest> cluster_scope_handler_;
   RadixTree<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;
   Common::Redis::FaultManagerPtr fault_manager_;
+  // false (PubsubSettings mode DISABLED) makes makeRequest reject SUBSCRIBE/UNSUBSCRIBE as
+  // unknown commands instead of rewriting them to the sharded verbs — the Redis 6.x escape hatch.
+  const bool enable_sharded_subscribe_;
   // HELLO is answered locally (handleHelloCommand) and does not route through
   // handler_lookup_table_, but the ``command.hello.*`` stats its old cluster-scope registration
   // emitted must survive for operators alarming on them. Latency exists for schema parity and

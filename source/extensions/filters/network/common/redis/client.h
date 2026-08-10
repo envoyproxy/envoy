@@ -1,12 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/singleton/const_singleton.h"
 #include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
 #include "source/extensions/filters/network/common/redis/redis_command_stats.h"
@@ -17,6 +19,20 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 namespace Client {
+
+// The Redis error-code tokens that signal a stale local cluster topology: MOVED/ASK redirects
+// and CLUSTERDOWN. Kept here in the client INTERFACE (not the impl) so both the client — which
+// matches the tokenized first word of a redirect reply (client_impl.cc) — and the subscription
+// registry — which prefix-matches a control-command error line to trigger a slot-map refresh
+// (subscription_registry.cc) — share one definition of the wire constants instead of duplicating
+// the literals.
+struct RedirectionValues {
+  const std::string ASK = "ASK";
+  const std::string MOVED = "MOVED";
+  const std::string CLUSTER_DOWN = "CLUSTERDOWN";
+};
+
+using RedirectionResponse = ConstSingleton<RedirectionValues>;
 
 /**
  * A handle to an outbound request.
@@ -72,6 +88,34 @@ public:
 };
 
 /**
+ * Callbacks for RESP3 Push messages received from upstream Redis.
+ * Push messages are out-of-band server-initiated messages that are not
+ * responses to any pending request (e.g., pub/sub messages).
+ */
+class PushMessageCallbacks {
+public:
+  virtual ~PushMessageCallbacks() = default;
+  // @param value the RESP3 Push frame (pub/sub message, or a subscribe/unsubscribe ack).
+  // @param host the upstream host this subscription connection is pinned to. Lets the registry
+  //  correlate control-command acks to the per-host outstanding-command FIFO (see
+  //  onUpstreamControlError) and match a SUNSUBSCRIBE ack to its exact (host, channel).
+  virtual void onPushMessage(RespValuePtr&& value, const Upstream::HostConstSharedPtr& host) PURE;
+
+  /**
+   * Called when a subscription connection receives an out-of-band, non-Push control reply that has
+   * no outstanding request — typically a normal error to a fire-and-forget SSUBSCRIBE/SUNSUBSCRIBE
+   * (e.g. ACL denial, CLUSTERDOWN, or a MOVED/ASK seen mid-migration). Implementations reconcile
+   * subscription state (e.g. a host-scoped re-subscribe) WITHOUT tearing down the shared upstream
+   * connection, since every other channel multiplexed on it must stay live. Defaults to a no-op so
+   * non-subscription Push consumers need not implement it.
+   * @param value the control reply frame (Error or other non-Push type).
+   * @param host the upstream host this subscription connection is pinned to.
+   */
+  virtual void onUpstreamControlError(RespValuePtr&& /*value*/,
+                                      const Upstream::HostConstSharedPtr& /*host*/) {}
+};
+
+/**
  * A single redis client connection.
  */
 class Client : public Event::DeferredDeletable {
@@ -111,6 +155,25 @@ public:
    * @param auth_password password for upstream host.
    */
   virtual void initialize(const std::string& auth_username, const std::string& auth_password) PURE;
+
+  /**
+   * Send a fire-and-forget command. Unlike makeRequest, no PendingRequest is created and no
+   * ClientCallbacks is invoked — used for subscription commands (``SUBSCRIBE``/``SSUBSCRIBE``/...)
+   * whose acknowledgments and subsequent traffic arrive as RESP3 Push frames routed via
+   * setPushCallbacks. Implementations must defer the request when the connection's init
+   * pipeline (HELLO 3 / AUTH / READONLY / AWS IAM token fetch) is still in flight, replaying
+   * it in original submission order alongside any held user requests once init completes,
+   * and must honor any per-implementation batching/buffering policy active at the time of
+   * dispatch.
+   * @param request the command to send.
+   */
+  virtual void sendCommand(const RespValue& request) PURE;
+
+  /**
+   * Set callbacks for RESP3 Push messages received on this connection.
+   * @param callbacks supplies the push message callback handler, or nullptr to clear.
+   */
+  virtual void setPushCallbacks(PushMessageCallbacks* callbacks) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;
@@ -129,6 +192,17 @@ enum class ReadPolicy {
   // Zone-aware routing: prefer replicas in same zone, then primary in same zone, then any
   LocalZoneAffinityReplicasAndPrimary
 };
+
+// Historical hardcoded defaults for the RESP3 pub/sub tuning knobs (``pubsub_settings``), the
+// SINGLE source of truth for all three consumers so a change here can never drift them apart:
+// the connection-pool config (ConfigImpl) reads them via PROTOBUF_GET_MS_OR_DEFAULT to build the
+// runtime values, the redis_proxy filter config validates the EFFECTIVE durations against the same
+// defaults, and SubscriptionRegistry's ctor default arguments (test/omit-caller convenience) alias
+// them. Each knob falls back to its default when unset, so configs predating ``pubsub_settings``
+// are unaffected.
+constexpr uint32_t kDefaultSubscribeAckTimeoutMs = 10000;
+constexpr uint32_t kDefaultResubscribeBackoffBaseMs = 100;
+constexpr uint32_t kDefaultResubscribeBackoffMaxMs = 30000;
 
 /**
  * Configuration for a redis connection pool.
@@ -201,6 +275,23 @@ public:
 
   virtual bool connectionRateLimitEnabled() const PURE;
   virtual uint32_t connectionRateLimitPerSec() const PURE;
+
+  /**
+   * @return how long to wait for an upstream ``SSUBSCRIBE`` ack before failing the downstream
+   * pub/sub subscribe / re-resolving a re-subscribe generation (RESP3 sharded pub/sub).
+   */
+  virtual std::chrono::milliseconds subscribeAckTimeout() const PURE;
+
+  /**
+   * @return the base (minimum) interval of the jittered exponential backoff used to re-subscribe
+   * pub/sub channels after an upstream subscription connection drop or rejected re-subscribe.
+   */
+  virtual std::chrono::milliseconds resubscribeBackoffBaseInterval() const PURE;
+
+  /**
+   * @return the maximum interval the pub/sub re-subscribe backoff escalates to.
+   */
+  virtual std::chrono::milliseconds resubscribeBackoffMaxInterval() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<const Config>;
@@ -273,23 +364,42 @@ struct Transaction {
   Transaction(Network::ConnectionCallbacks* connection_cb) : connection_cb_(connection_cb) {}
   ~Transaction() { close(); }
 
-  void start() { active_ = true; }
+  void start() {
+    active_ = true;
+    dirty_ = false;
+  }
 
   void close() {
     active_ = false;
     key_.clear();
     if (connection_established_) {
       for (auto& client : clients_) {
-        client->close();
+        // A mirror leg is left null when its RequestMirrorPolicy runtime_fraction did not sample at
+        // MULTI time (makeSingleServerRequest skips the unsampled leg), and the pool refuses to
+        // create it later, so the null persists for the transaction. Guard the dereference — the
+        // main leg (clients_[0]) is established, but clients_[1..] may be null (R9-2).
+        if (client != nullptr) {
+          client->close();
+        }
       }
       connection_established_ = false;
     }
     should_close_ = false;
+    dirty_ = false;
   }
 
   bool active_{false};
   bool connection_established_{false};
   bool should_close_{false};
+  // Set when a command is rejected or short-circuited while queueing inside this MULTI in a way
+  // that would leave the eventual EXEC reply array inconsistent with what the client queued: an
+  // unknown or wrong-arity command, a no-multi command (SUBSCRIBE / UNSUBSCRIBE), or any command
+  // the proxy cannot relay onto the transaction path and so answers or rejects locally (AUTH /
+  // HELLO / CLIENT / PING / ECHO / TIME, a key-less command, or one off the transaction allowlist).
+  // A subsequent EXEC then aborts with ``-EXECABORT`` and discards rather than committing a
+  // partial, non-atomic transaction — matching how a real Redis client treats any queue-time
+  // error. (WATCH inside MULTI is a plain error, not a dirty.) Cleared on transaction start/end.
+  bool dirty_{false};
 
   // The key which represents the transaction hash slot.
   std::string key_;

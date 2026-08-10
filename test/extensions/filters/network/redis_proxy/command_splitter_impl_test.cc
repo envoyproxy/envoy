@@ -12,15 +12,21 @@
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/extensions/filters/network/redis_proxy/pubsub_test_utils.h"
+#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
 
+using Envoy::SaveArgAddress;
 using testing::_;
 using testing::DoAll;
 using testing::InSequence;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
@@ -40,6 +46,13 @@ public:
   RedisCommandSplitterImplTest(bool latency_in_macro, Common::Redis::FaultSharedPtr fault_ptr)
       : latency_in_micros_(latency_in_macro) {
     ON_CALL(*getFaultManager(), getFaultForCommand(_)).WillByDefault(Return(fault_ptr.get()));
+    // The subscription registries these tests build now take a mandatory dispatcher and
+    // lazily create a subscribe-ack timer on subscribe(); hand each createTimer_ a throwaway mock
+    // timer so that scheduling path runs as in production without per-test wiring (none of these
+    // tests fire the timer).
+    ON_CALL(dispatcher_, createTimer_(_)).WillByDefault(Invoke([](Event::TimerCb) -> Event::Timer* {
+      return new NiceMock<Event::MockTimer>();
+    }));
   }
   void makeBulkStringArray(Common::Redis::RespValue& value,
                            const std::vector<std::string>& strings) {
@@ -73,6 +86,8 @@ public:
                         std::move(custom_commands)};
   }
 
+  MockRouter& router() { return *static_cast<MockRouter*>(splitter_.router_.get()); }
+
   const bool latency_in_micros_;
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
   ConnPool::MockInstance* mirror_conn_pool_{new ConnPool::MockInstance()};
@@ -83,6 +98,7 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<MockFaultManager> fault_manager_;
+  NiceMock<Envoy::Random::MockRandomGenerator> random_;
 
   Event::SimulatedTimeSystem time_system_;
   absl::flat_hash_set<std::string> custom_commands_;
@@ -95,6 +111,60 @@ public:
                          std::move(custom_commands_)};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
+};
+
+// MockUpstreamSubscriptionCallbacks now lives in redis_proxy/mocks.h; unqualified uses below
+// resolve to it via nested-namespace lookup.
+
+class TestSubscriptionConnPool : public ConnPool::MockInstance {
+public:
+  explicit TestSubscriptionConnPool(RedisProxy::SubscriptionRegistryPtr registry)
+      : registry_(std::move(registry)) {}
+
+  RedisProxy::SubscriptionRegistryPtr subscriptionRegistryShared() override { return registry_; }
+
+private:
+  RedisProxy::SubscriptionRegistryPtr registry_;
+};
+
+class TestSplitCallbacks : public MockSplitCallbacks {
+public:
+  explicit TestSplitCallbacks(RedisProxy::DownstreamSubscriberPtr subscriber = nullptr)
+      : subscriber_(std::move(subscriber)) {}
+
+  RedisProxy::DownstreamSubscriberPtr downstreamSubscriber() override { return subscriber_; }
+  void setSubscriptionRegistry(const RedisProxy::SubscriptionRegistryPtr& registry) override {
+    subscription_registry_ = registry;
+  }
+  // Real per-channel owner map so the splitter's owner-first routing (a duplicate SUBSCRIBE re-acks
+  // on its establishing registry, never the current route) is exercised, not stubbed away.
+  RedisProxy::SubscriptionRegistryPtr
+  subscriptionRegistryForChannel(const std::string& channel) override {
+    auto it = owner_by_channel_.find(channel);
+    return it == owner_by_channel_.end() ? nullptr : it->second;
+  }
+  void
+  bindSubscriptionRegistryForChannel(const std::string& channel,
+                                     const RedisProxy::SubscriptionRegistryPtr& registry) override {
+    setSubscriptionRegistry(registry);
+    owner_by_channel_[channel] = registry;
+  }
+  void unbindSubscriptionRegistryForChannel(const std::string& channel) override {
+    owner_by_channel_.erase(channel);
+  }
+  void onPubsubSubscriptionChange(int64_t delta) override { subscription_deltas_.push_back(delta); }
+  // respond() is the terminal now; record completion, then forward to the base's size-routing so
+  // the onResponse_ / respond_ expectation surfaces still fire.
+  void respond(CommandSplitter::RespValueFrames&& frames) override {
+    completed_pending_request_ = true;
+    MockSplitCallbacks::respond(std::move(frames));
+  }
+
+  RedisProxy::DownstreamSubscriberPtr subscriber_;
+  RedisProxy::SubscriptionRegistryPtr subscription_registry_;
+  absl::flat_hash_map<std::string, RedisProxy::SubscriptionRegistryPtr> owner_by_channel_;
+  std::vector<int64_t> subscription_deltas_;
+  bool completed_pending_request_{false};
 };
 
 TEST_F(RedisCommandSplitterImplTest, QuitSuccess) {
@@ -206,10 +276,85 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayNotStrings) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.invalid_request").value());
 }
 
+// A malformed frame (not an array of bulk strings) rejected mid-MULTI must flag the transaction
+// dirty so EXEC aborts with -EXECABORT instead of committing the partial transaction. Real Redis
+// treats a protocol error as fatal and closes the connection, so it never commits either; the
+// proxy keeps the connection open but must match the no-commit outcome. Exercises both rejection
+// guards (non-array/empty-array and the all-bulk-strings element check).
+TEST_F(RedisCommandSplitterImplTest, InvalidRequestInTransactionDirtiesExec) {
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = Response::get().InvalidRequest;
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response))).Times(2);
+
+  callbacks_.transaction().start();
+
+  Common::Redis::RespValuePtr empty{new Common::Redis::RespValue()};
+  empty->type(Common::Redis::RespType::Array);
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(empty), callbacks_, dispatcher_, stream_info_));
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+
+  callbacks_.transaction().dirty_ = false;
+  Common::Redis::RespValuePtr non_bulk{new Common::Redis::RespValue()};
+  makeBulkStringArray(*non_bulk, {"incr", ""});
+  non_bulk->asArray()[1].type(Common::Redis::RespType::Null);
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(non_bulk), callbacks_, dispatcher_, stream_info_));
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+
+  EXPECT_EQ(2UL, store_.counter("redis.foo.splitter.invalid_request").value());
+}
+
+// A NOAUTH rejection while a MULTI is queueing is a queue-time failure: the transaction is
+// flagged dirty so a later EXEC (after auth is restored) aborts with -EXECABORT instead of
+// committing a reply array one element short (R8-7).
+TEST_F(RedisCommandSplitterImplTest, NoAuthInsideMultiDirtiesExec) {
+  callbacks_.transaction().start();
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"get", "foo"});
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+  callbacks_.transaction().close();
+}
+
+// CLIENT with no subcommand is malformed: rejected with the generic invalid-request error before
+// any subcommand dispatch.
+TEST_F(RedisCommandSplitterImplTest, ClientWithoutSubcommandIsInvalid) {
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = Response::get().InvalidRequest;
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"client"});
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+}
+
+// A plain MockSplitCallbacks carries the NoOpPubsubSession (a session with no subscriber and no
+// way to create one), so a SUBSCRIBE dispatched through it degrades to the inline
+// "failed to create subscriber" error rather than crashing.
+TEST_F(RedisCommandSplitterImplTest, SubscribeWithoutSubscriberFactoryFails) {
+  callbacks_.setDownstreamRespVersion(3);
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "ERR failed to create subscriber";
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "ch"});
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+}
+
 TEST_F(RedisCommandSplitterImplTest, UnsupportedCommand) {
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
-  response.asString() = "ERR unknown command 'newcommand', with args beginning with: hello";
+  response.asString() = "ERR unknown command 'newcommand', with args beginning with: 'hello' ";
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"newcommand", "hello"});
@@ -614,6 +759,1168 @@ TEST_F(RedisSingleServerRequestTest, HashFieldExpiryReadCommandsClassification) 
     EXPECT_TRUE(Common::Redis::SupportedCommands::isReadCommand(cmd))
         << cmd << " should be classified as a read command";
   }
+}
+
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestSubscribeRoutesUsingFirstChannel) {
+  InSequence s;
+
+  MockUpstreamSubscriptionCallbacks upstream_callbacks;
+  auto registry =
+      std::make_shared<RedisProxy::SubscriptionRegistry>(upstream_callbacks, random_, dispatcher_);
+  auto* subscription_conn_pool = new NiceMock<TestSubscriptionConnPool>(registry);
+  ConnPool::InstanceSharedPtr subscription_conn_pool_shared{subscription_conn_pool};
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "sports"});
+
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _))
+      .WillOnce(Invoke([this](std::string& key, const StreamInfo::StreamInfo&) {
+        EXPECT_EQ("sports", key);
+        return route_;
+      }));
+  // Registry lookup is pinned to the write-side upstream (``spublish()``) so SUBSCRIBE
+  // and PUBLISH share a single conn pool under ``read_command_policy``. Client never
+  // sees this — the verb shows up only in the route's upstream selector.
+  EXPECT_CALL(*route_, pubsubUpstream()).WillOnce(Return(subscription_conn_pool_shared));
+  // The send records this host as the channel's owner; the upstream ack below must arrive FROM that
+  // same host for the registry to treat it as the current attempt (made the ack's source host
+  // mandatory).
+  auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("sports"))
+      .WillOnce(Invoke([pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
+        return pubsub_ack_host;
+      }));
+  // subscribe RESOLVES via chooseUpstreamHostForChannel then SENDS via
+  // sendUpstreamSsubscribeToHost; stub the send success (in InSequence order: resolve then send).
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("sports", _, _))
+      .WillOnce(Return(true));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+
+  // Fresh subscribe: the ``subscribe`` ack is deferred until the upstream SSUBSCRIBE ack lands, so
+  // the request is HELD in the response FIFO (non-null handle) rather than completing synchronously
+  // — this is what keeps the deferred ack ordered against pipelined command replies.
+  EXPECT_NE(nullptr, handle_);
+  EXPECT_FALSE(callbacks.completed_pending_request_);
+
+  // Upstream emits the ``ssubscribe`` ack (the rewritten verb); the request completes and
+  // respond()s the client-facing ``subscribe`` ack THROUGH the FIFO (one frame -> onResponse_), at
+  // the request's position — no longer via an out-of-band connection write.
+  const std::string sports_name = "sports";
+  Common::Redis::RespValue expected_ack =
+      RedisProxy::makeSubscriptionAck("subscribe", &sports_name, 1);
+  EXPECT_CALL(callbacks, onResponse_(PointeesEq(&expected_ack)));
+  registry->onPushMessage(makeSubscribeAckPush("ssubscribe", "sports", 1), pubsub_ack_host);
+
+  EXPECT_TRUE(callbacks.completed_pending_request_);
+  EXPECT_EQ(registry, callbacks.subscription_registry_);
+  ASSERT_EQ(1, callbacks.subscription_deltas_.size());
+  EXPECT_EQ(1, callbacks.subscription_deltas_[0]);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.subscribe.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.subscribe.success").value());
+}
+
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestDuplicateSubscribeRoutesToOwningRegistry) {
+  // Item 3 (single-registry channel ownership): a channel already established on this connection
+  // re-subscribes on its OWNING registry, never the current route. Route resolution (upstreamPool
+  // -> pubsubUpstream) and the upstream SSUBSCRIBE happen exactly ONCE — on the first subscribe;
+  // the duplicate is routed by the owner map straight to the same registry, skipping both, and
+  // deduplicates.
+  MockUpstreamSubscriptionCallbacks upstream_callbacks;
+  auto registry =
+      std::make_shared<RedisProxy::SubscriptionRegistry>(upstream_callbacks, random_, dispatcher_);
+  auto* subscription_conn_pool = new NiceMock<TestSubscriptionConnPool>(registry);
+  ConnPool::InstanceSharedPtr subscription_conn_pool_shared{subscription_conn_pool};
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  // Each of these fires exactly once (first subscribe only); the owner-routed duplicate must not
+  // repeat them, so a second call would fail (WillOnce has no further action).
+  EXPECT_CALL(callbacks, connectionAllowed()).WillRepeatedly(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _)).WillOnce(Return(route_));
+  EXPECT_CALL(*route_, pubsubUpstream()).WillOnce(Return(subscription_conn_pool_shared));
+  auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("sports"))
+      .WillOnce(Invoke([pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
+        return pubsub_ack_host;
+      }));
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("sports", _, _))
+      .WillOnce(Return(true));
+
+  // First SUBSCRIBE sports: routes to `registry`, sends upstream, binds sports -> registry. Its ack
+  // is deferred (fresh subscribe), so the request is held in the FIFO — hold the handle alive.
+  Common::Redis::RespValuePtr req1{new Common::Redis::RespValue()};
+  makeBulkStringArray(*req1, {"subscribe", "sports"});
+  auto sub1_handle = splitter_.makeRequest(std::move(req1), callbacks, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, sub1_handle);
+  EXPECT_EQ(registry, callbacks.subscriptionRegistryForChannel("sports")); // bound to the owner
+
+  // The first subscribe's deferred ack (delivered when the upstream ack lands below) and the
+  // duplicate's immediate ack are both ``subscribe sports 1``, delivered through the FIFO (one
+  // frame
+  // -> onResponse_).
+  const std::string sports_name = "sports";
+  Common::Redis::RespValue expected_ack =
+      RedisProxy::makeSubscriptionAck("subscribe", &sports_name, 1);
+  EXPECT_CALL(callbacks, onResponse_(PointeesEq(&expected_ack))).Times(2);
+
+  // Upstream ack lands -> completes the first subscribe (ack via the FIFO) and marks sports active.
+  registry->onPushMessage(makeSubscribeAckPush("ssubscribe", "sports", 1), pubsub_ack_host);
+
+  // Second SUBSCRIBE sports: owner map returns `registry`, so route resolution and the upstream
+  // send above are NOT repeated. It folds onto the now-active channel and acks immediately (return
+  // nullptr).
+  Common::Redis::RespValuePtr req2{new Common::Redis::RespValue()};
+  makeBulkStringArray(*req2, {"subscribe", "sports"});
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(req2), callbacks, dispatcher_, stream_info_));
+}
+
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestBareUnsubscribeUsesSubscriberChannels) {
+  InSequence s;
+
+  MockUpstreamSubscriptionCallbacks upstream_callbacks;
+  auto registry =
+      std::make_shared<RedisProxy::SubscriptionRegistry>(upstream_callbacks, random_, dispatcher_);
+  auto* subscription_conn_pool = new NiceMock<TestSubscriptionConnPool>(registry);
+  ConnPool::InstanceSharedPtr subscription_conn_pool_shared{subscription_conn_pool};
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+  callbacks.tracked_registries_.push_back(registry);
+
+  // Seed via the sharded path (this is what a client SUBSCRIBE drives after the
+  // splitter rewrite). The eventual downstream ack always reads ``subscribe`` — cluster
+  // sharding is transparent. The mock captures a host so the registry can route the
+  // eventual ``SUNSUBSCRIBE`` to the same shard.
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("alpha"))
+      .WillOnce(Invoke(
+          [&mock_host](const std::string&) -> Upstream::HostConstSharedPtr { return mock_host; }));
+  // subscribe resolves then sends via sendUpstreamSsubscribeToHost — stub the send success.
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("alpha", _, _))
+      .WillOnce(Return(true));
+  EXPECT_EQ(1UL, registry->subscribe({"alpha"}, subscriber).subscription_count);
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"unsubscribe"});
+
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks, onResponse_(_)).Times(0);
+  // Bare ``UNSUBSCRIBE`` enumerates ``subscribedChannels()`` and drives ``sunsubscribe`` on the
+  // registry, which sends ``SUNSUBSCRIBE`` upstream for the now-orphaned channel. ``alpha``'s
+  // SUBSCRIBE is still awaiting its upstream ack, so its preserved ``subscribe alpha 1`` ack is
+  // COLLECTED and, together with the ``unsubscribe alpha 0`` ack, emitted as the request's response
+  // frames — flushed at the request's FIFO position, Redis-compatibly ordered ``subscribe`` before
+  // ``unsubscribe``. Two frames route to the mock's respond_ surface. InSequence: the upstream
+  // SUNSUBSCRIBE precedes the terminal respond().
+  const std::string alpha_name = "alpha";
+  Common::Redis::RespValue expected_sub =
+      RedisProxy::makeSubscriptionAck("subscribe", &alpha_name, 1);
+  Common::Redis::RespValue expected_unsub =
+      RedisProxy::makeSubscriptionAck("unsubscribe", &alpha_name, 0);
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSunsubscribe("alpha", _))
+      .WillOnce(Return(RedisProxy::UpstreamSubscriptionCallbacks::SunsubscribeResult::AckExpected));
+  EXPECT_CALL(callbacks, respond_(testing::ElementsAre(PointeesEq(&expected_sub),
+                                                       PointeesEq(&expected_unsub))));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_TRUE(callbacks.completed_pending_request_);
+  ASSERT_EQ(1, callbacks.subscription_deltas_.size());
+  EXPECT_EQ(-1, callbacks.subscription_deltas_[0]);
+}
+
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestMultiChannelAcks) {
+  MockUpstreamSubscriptionCallbacks upstream_callbacks;
+  auto registry =
+      std::make_shared<RedisProxy::SubscriptionRegistry>(upstream_callbacks, random_, dispatcher_);
+  auto* subscription_conn_pool = new NiceMock<TestSubscriptionConnPool>(registry);
+  ConnPool::InstanceSharedPtr subscription_conn_pool_shared{subscription_conn_pool};
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "one", "two"});
+
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks, onResponse_(_)).Times(0);
+  EXPECT_CALL(router(), upstreamPool(_, _))
+      .WillRepeatedly(
+          Invoke([this](std::string&, const StreamInfo::StreamInfo&) { return route_; }));
+  // Registry lookup is keyed off ``spublish()`` for the SUBSCRIBE rewrite (see
+  // ``SubscriptionRequestSubscribeRoutesUsingFirstChannel``).
+  EXPECT_CALL(*route_, pubsubUpstream()).WillRepeatedly(Return(subscription_conn_pool_shared));
+  // Both channels land on the same owning host; the two acks below arrive FROM it.
+  auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  auto set_ack_host = [pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
+    return pubsub_ack_host;
+  };
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("one"))
+      .WillOnce(Invoke(set_ack_host));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("two"))
+      .WillOnce(Invoke(set_ack_host));
+  // each channel resolves then sends via sendUpstreamSsubscribeToHost — stub both successes.
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("one", _, _)).WillOnce(Return(true));
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("two", _, _)).WillOnce(Return(true));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+  // Fresh multi-channel subscribe: both acks are deferred, so the request is HELD in the FIFO.
+  EXPECT_NE(nullptr, handle_);
+
+  // The first upstream ack fills its command-order slot but does NOT complete the request — the
+  // second channel is still pending, so nothing is emitted yet.
+  registry->onPushMessage(makeSubscribeAckPush("ssubscribe", "one", 1), pubsub_ack_host);
+  EXPECT_FALSE(callbacks.completed_pending_request_);
+
+  // The second upstream ack completes the request: both acks flush TOGETHER, in command order
+  // (``one`` then ``two`` regardless of ack arrival order), through the FIFO (two frames ->
+  // respond_). Each carries the client-facing ``subscribe`` verb and the per-subscriber count at
+  // its subscribe step (1 then 2).
+  const std::string one_name = "one";
+  const std::string two_name = "two";
+  Common::Redis::RespValue expected_one =
+      RedisProxy::makeSubscriptionAck("subscribe", &one_name, 1);
+  Common::Redis::RespValue expected_two =
+      RedisProxy::makeSubscriptionAck("subscribe", &two_name, 2);
+  EXPECT_CALL(callbacks,
+              respond_(testing::ElementsAre(PointeesEq(&expected_one), PointeesEq(&expected_two))));
+  registry->onPushMessage(makeSubscribeAckPush("ssubscribe", "two", 2), pubsub_ack_host);
+
+  EXPECT_TRUE(callbacks.completed_pending_request_);
+  ASSERT_EQ(2, callbacks.subscription_deltas_.size());
+  EXPECT_EQ(1, callbacks.subscription_deltas_[0]);
+  EXPECT_EQ(1, callbacks.subscription_deltas_[1]);
+}
+
+// A multi-channel SUBSCRIBE whose channels hash to DIFFERENT shards issues one SSUBSCRIBE per
+// shard, and those shards ack INDEPENDENTLY — possibly out of order. The placeholder mechanism
+// holds command order regardless: ``two``'s shard acks before ``one``'s, yet the flushed batch is
+// still ``one`` then ``two``, with the per-subscriber snapshot counts (1, 2), not the arbitrary
+// upstream counts echoed here. Complements SubscriptionRequestMultiChannelAcks (single shard,
+// in-order arrival).
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestMultiChannelAcksReverseArrival) {
+  MockUpstreamSubscriptionCallbacks upstream_callbacks;
+  auto registry =
+      std::make_shared<RedisProxy::SubscriptionRegistry>(upstream_callbacks, random_, dispatcher_);
+  auto* subscription_conn_pool = new NiceMock<TestSubscriptionConnPool>(registry);
+  ConnPool::InstanceSharedPtr subscription_conn_pool_shared{subscription_conn_pool};
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "one", "two"});
+
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks, onResponse_(_)).Times(0);
+  EXPECT_CALL(router(), upstreamPool(_, _))
+      .WillRepeatedly(
+          Invoke([this](std::string&, const StreamInfo::StreamInfo&) { return route_; }));
+  EXPECT_CALL(*route_, pubsubUpstream()).WillRepeatedly(Return(subscription_conn_pool_shared));
+  // ``one`` and ``two`` hash to DIFFERENT shards, so each SSUBSCRIBE goes to its own host and its
+  // ack arrives on that host's independent connection FIFO.
+  auto host_one = std::make_shared<NiceMock<Upstream::MockHost>>();
+  auto host_two = std::make_shared<NiceMock<Upstream::MockHost>>();
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("one"))
+      .WillOnce(Invoke(
+          [host_one](const std::string&) -> Upstream::HostConstSharedPtr { return host_one; }));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("two"))
+      .WillOnce(Invoke(
+          [host_two](const std::string&) -> Upstream::HostConstSharedPtr { return host_two; }));
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("one", _, _)).WillOnce(Return(true));
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("two", _, _)).WillOnce(Return(true));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, handle_);
+
+  // ``two``'s shard acks FIRST (upstream count 99) — fills its command-order slot but does NOT
+  // complete the request; ``one`` on the other shard is still pending.
+  registry->onPushMessage(makeSubscribeAckPush("ssubscribe", "two", 99), host_two);
+  EXPECT_FALSE(callbacks.completed_pending_request_);
+
+  // ``one`` acks second and completes: the batch flushes in COMMAND order (``one`` then ``two``),
+  // not arrival order, carrying the per-subscriber snapshot counts (1, 2).
+  const std::string one_name = "one";
+  const std::string two_name = "two";
+  Common::Redis::RespValue expected_one =
+      RedisProxy::makeSubscriptionAck("subscribe", &one_name, 1);
+  Common::Redis::RespValue expected_two =
+      RedisProxy::makeSubscriptionAck("subscribe", &two_name, 2);
+  EXPECT_CALL(callbacks,
+              respond_(testing::ElementsAre(PointeesEq(&expected_one), PointeesEq(&expected_two))));
+  registry->onPushMessage(makeSubscribeAckPush("ssubscribe", "one", 1), host_one);
+
+  EXPECT_TRUE(callbacks.completed_pending_request_);
+}
+
+// SubscriptionRequest::cancel() (driven by a connection close mid-subscribe) detaches the AckSink
+// so a LATE upstream ack cannot complete a torn-down request — a UAF guard. Here the request is
+// cancelled while its ack is still outstanding; delivering the ack afterward must be a no-op (no
+// respond, no crash). The AckSink is still alive (the handle is held), so the registry locks its
+// weak target and routes to it, but the detached back-pointer makes onSubscribeAck do nothing.
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestCancelDetachesFromLateAck) {
+  MockUpstreamSubscriptionCallbacks upstream_callbacks;
+  auto registry =
+      std::make_shared<RedisProxy::SubscriptionRegistry>(upstream_callbacks, random_, dispatcher_);
+  auto* subscription_conn_pool = new NiceMock<TestSubscriptionConnPool>(registry);
+  ConnPool::InstanceSharedPtr subscription_conn_pool_shared{subscription_conn_pool};
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _)).WillOnce(Return(route_));
+  EXPECT_CALL(*route_, pubsubUpstream()).WillOnce(Return(subscription_conn_pool_shared));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("ch"))
+      .WillOnce(Invoke([pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
+        return pubsub_ack_host;
+      }));
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("ch", _, _)).WillOnce(Return(true));
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "ch"});
+  auto handle = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+  ASSERT_NE(nullptr, handle); // deferred, held in the FIFO
+
+  // Connection close mid-subscribe cancels the request (detaches its AckSink).
+  handle->cancel();
+
+  // The upstream ack lands AFTER cancel: the detached AckSink no-ops, so nothing is delivered and
+  // the torn-down request is not completed.
+  EXPECT_CALL(callbacks, onResponse_(_)).Times(0);
+  EXPECT_CALL(callbacks, respond_(_)).Times(0);
+  registry->onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), pubsub_ack_host);
+  EXPECT_FALSE(callbacks.completed_pending_request_);
+}
+
+// The registry's deliverPendingSubscribeAck falls back to an out-of-band deliver() when the parked
+// SUBSCRIBE request's ack target has EXPIRED (the request was torn down after subscribe but before
+// its upstream ack). Here the deferred request is destroyed while its ack is still outstanding; the
+// ack then lands and is delivered straight to the subscriber's connection — no crash on the
+// dangling weak, no lost ack.
+TEST_F(RedisCommandSplitterImplTest, ExpiredAckTargetFallsBackToOutOfBandDeliver) {
+  MockUpstreamSubscriptionCallbacks upstream_callbacks;
+  auto registry =
+      std::make_shared<RedisProxy::SubscriptionRegistry>(upstream_callbacks, random_, dispatcher_);
+  auto* subscription_conn_pool = new NiceMock<TestSubscriptionConnPool>(registry);
+  ConnPool::InstanceSharedPtr subscription_conn_pool_shared{subscription_conn_pool};
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _)).WillOnce(Return(route_));
+  EXPECT_CALL(*route_, pubsubUpstream()).WillOnce(Return(subscription_conn_pool_shared));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("ch"))
+      .WillOnce(Invoke([pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
+        return pubsub_ack_host;
+      }));
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("ch", _, _)).WillOnce(Return(true));
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "ch"});
+  auto handle = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+  ASSERT_NE(nullptr, handle);
+
+  // Tear the deferred request down BEFORE its ack lands: the registry's weak ack target expires.
+  handle.reset();
+
+  // The ack lands with no live request to complete -> the registry delivers it out-of-band straight
+  // to the subscriber's connection (the pre-full-strict fallback), rather than dereferencing the
+  // dangling weak.
+  EXPECT_CALL(connection, write(_, false));
+  registry->onPushMessage(makeSubscribeAckPush("ssubscribe", "ch", 1), pubsub_ack_host);
+}
+
+// Exercises a REAL SubscriptionRequest (not a mock target) completing via the registry's
+// dispatcher.post when an UNSUBSCRIBE arrives before its upstream ack. The registry-level
+// UnsubscribeBeforeAckCompletesLiveTargetViaPost drives that side with a mock target; here the
+// actual splitter-built request runs through the same post, so its real onChannelAck -> complete ->
+// respond() path executes.
+TEST_F(RedisCommandSplitterImplTest, RealRequestCompletedViaPostOnUnsubscribeBeforeAck) {
+  MockUpstreamSubscriptionCallbacks upstream_callbacks;
+  auto registry =
+      std::make_shared<RedisProxy::SubscriptionRegistry>(upstream_callbacks, random_, dispatcher_);
+  auto* subscription_conn_pool = new NiceMock<TestSubscriptionConnPool>(registry);
+  ConnPool::InstanceSharedPtr subscription_conn_pool_shared{subscription_conn_pool};
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(dispatcher_, post(_)).WillRepeatedly([&posted](Event::PostCb cb) {
+    posted.push_back(std::move(cb));
+  });
+
+  auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _)).WillOnce(Return(route_));
+  EXPECT_CALL(*route_, pubsubUpstream()).WillOnce(Return(subscription_conn_pool_shared));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("ch"))
+      .WillOnce(Invoke([pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
+        return pubsub_ack_host;
+      }));
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("ch", _, _)).WillOnce(Return(true));
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSunsubscribe("ch", _))
+      .WillOnce(Return(RedisProxy::UpstreamSubscriptionCallbacks::SunsubscribeResult::AckExpected));
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "ch"});
+  auto handle = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+  ASSERT_NE(nullptr, handle); // real deferred SubscriptionRequest, held in the FIFO
+  EXPECT_TRUE(posted.empty());
+
+  // UNSUBSCRIBE before the ack: drive the registry directly (the command_splitter test double does
+  // not route UNSUBSCRIBE across registries), which posts the parked request's completion instead
+  // of preserving the ack into the buffer.
+  std::vector<Common::Redis::RespValue> preserved;
+  EXPECT_EQ(0, registry->unsubscribe({"ch"}, subscriber, &preserved));
+  EXPECT_TRUE(preserved.empty());
+  ASSERT_EQ(1, posted.size());
+
+  // Running the post completes the REAL request with its ``subscribe ch 1`` ack.
+  const std::string ch_name = "ch";
+  Common::Redis::RespValue expected_ack = RedisProxy::makeSubscriptionAck("subscribe", &ch_name, 1);
+  EXPECT_CALL(callbacks, onResponse_(PointeesEq(&expected_ack)));
+  posted[0]();
+  EXPECT_TRUE(callbacks.completed_pending_request_);
+}
+
+// SSUBSCRIBE is no longer a client-exposed command — the proxy transparently rewrites
+// SUBSCRIBE to upstream SSUBSCRIBE so clients should never invoke the sharded variant
+// directly. The explicit reject runs BEFORE the ``custom_commands_`` lookup so even an
+// operator config of ``custom_commands: [ssubscribe]`` cannot re-enable it.
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestSsubscribeVariant) {
+  InSequence s;
+
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"ssubscribe", "shard-1"});
+
+  EXPECT_CALL(callbacks, onResponse_(_)).WillOnce(Invoke([](Common::Redis::RespValuePtr& response) {
+    EXPECT_EQ(Common::Redis::RespType::Error, response->type());
+    EXPECT_THAT(response->asString(),
+                testing::HasSubstr("ERR unknown command 'ssubscribe', with args beginning with: "
+                                   "'shard-1' "));
+  }));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.unsupported_command").value());
+}
+
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestRejectsResp2Client) {
+  InSequence s;
+
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  // RESP3 listener (so HELLO 3 is achievable), but the client has NOT upgraded yet —
+  // downstream_resp_version_ stays at its default 2 (RESP2 client). On a RESP3 listener the
+  // branch advises the un-upgraded client to send HELLO 3 first; a RESP2 listener would instead
+  // report "not enabled on this listener" (covered by the splitter's Resp2-listener tests).
+  callbacks.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "channel"});
+
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks, onResponse_(_)).WillOnce(Invoke([](Common::Redis::RespValuePtr& response) {
+    EXPECT_EQ(Common::Redis::RespType::Error, response->type());
+    EXPECT_THAT(response->asString(), testing::HasSubstr("HELLO 3"));
+  }));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.subscribe.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.subscribe.error").value());
+}
+
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestSubscribeNoRouteDeliversInlineError) {
+  InSequence s;
+
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "unknown_channel"});
+
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  // Router returns null for this channel — no route available.
+  EXPECT_CALL(router(), upstreamPool(_, _)).WillOnce(Return(nullptr));
+  // Single-channel failure: the -ERR is the request's sole frame, delivered via the terminal
+  // respond({err}), which the mock routes to onResponse_ for a one-frame batch. No
+  // subscriber->deliver and no direct connection.write — both would bypass the FIFO.
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  expected_err.asString() = "ERR no route for pub/sub target 'unknown_channel'";
+  EXPECT_CALL(callbacks, onResponse_(PointeesEq(&expected_err)));
+  EXPECT_CALL(connection, write(_, _)).Times(0);
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_TRUE(callbacks.completed_pending_request_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.subscribe.total").value());
+  // The single channel failed routing; with no successful channels the command counts as
+  // error, not success. (Multi-channel partial-success is exercised in
+  // SubscriptionRequestSubscribeMixedRouteResults.)
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.subscribe.success").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.subscribe.error").value());
+}
+
+// SUBSCRIBE: route resolves to a RESP3-capable conn pool, but the upstream send fails (no
+// healthy host, conn-pool failure, etc.). Registry rolls back local state internally; splitter
+// must surface the failure as an inline error and NOT count the command as success.
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestSubscribeUpstreamSendFailureDeliversError) {
+  InSequence s;
+
+  MockUpstreamSubscriptionCallbacks upstream_callbacks;
+  auto registry =
+      std::make_shared<RedisProxy::SubscriptionRegistry>(upstream_callbacks, random_, dispatcher_);
+  auto* subscription_conn_pool = new NiceMock<TestSubscriptionConnPool>(registry);
+  ConnPool::InstanceSharedPtr subscription_conn_pool_shared{subscription_conn_pool};
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "chan"});
+
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _))
+      .WillOnce(Invoke([this](std::string&, const StreamInfo::StreamInfo&) { return route_; }));
+  // After rewrite the registry lookup goes through ``spublish()`` and the upstream
+  // send is ``sendUpstreamSsubscribeToHost``. Inline-error wording stays in terms of the
+  // client-facing verb (``subscribe``) because that is what the user typed.
+  EXPECT_CALL(*route_, pubsubUpstream()).WillOnce(Return(subscription_conn_pool_shared));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("chan"))
+      .WillOnce(Invoke([](const std::string&) -> Upstream::HostConstSharedPtr { return nullptr; }));
+  // Single-channel failure: the -ERR is the request's sole frame, delivered via respond({err})
+  // (routed to onResponse_ for a one-frame batch; see
+  // SubscriptionRequestSubscribeNoRouteDeliversInlineError for the rationale).
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  expected_err.asString() = "ERR upstream subscribe send failed for 'chan'";
+  EXPECT_CALL(callbacks, onResponse_(PointeesEq(&expected_err)));
+  EXPECT_CALL(connection, write(_, _)).Times(0);
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_TRUE(callbacks.completed_pending_request_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.subscribe.total").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.subscribe.success").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.subscribe.error").value());
+  // Gauge must NOT have moved — the registry rolled back the local subscription, so
+  // subscriber's count stays 0; no onPubsubSubscriptionChange should have fired.
+  EXPECT_TRUE(callbacks.subscription_deltas_.empty());
+}
+
+// SUNSUBSCRIBE is also rejected (companion to SSUBSCRIBE — see
+// ``SubscriptionRequestSsubscribeVariant``). Direct client invocation of either
+// sharded verb returns ``ERR unknown command`` before any route lookup or fault
+// injection runs.
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestSunsubscribeVariant) {
+  InSequence s;
+
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"sunsubscribe", "shard-1"});
+
+  EXPECT_CALL(callbacks, onResponse_(_)).WillOnce(Invoke([](Common::Redis::RespValuePtr& response) {
+    EXPECT_EQ(Common::Redis::RespType::Error, response->type());
+    EXPECT_THAT(response->asString(),
+                testing::HasSubstr("ERR unknown command 'sunsubscribe', with args beginning with: "
+                                   "'shard-1' "));
+  }));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.unsupported_command").value());
+}
+
+// Multi-channel SUBSCRIBE: channel "ok" succeeds upstream, channel "fail" fails. Per-channel
+// outcome — "ok" gets a subscribe ack and the gauge moves, "fail" gets an inline error and the
+// gauge does not move. Command-level stat counts as success because at least one channel made
+// it through (Redis's partial-success semantics for multi-channel subscribe).
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestSubscribeMixedRouteResults) {
+  MockUpstreamSubscriptionCallbacks upstream_callbacks;
+  auto registry =
+      std::make_shared<RedisProxy::SubscriptionRegistry>(upstream_callbacks, random_, dispatcher_);
+  auto* subscription_conn_pool = new NiceMock<TestSubscriptionConnPool>(registry);
+  ConnPool::InstanceSharedPtr subscription_conn_pool_shared{subscription_conn_pool};
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "ok", "fail"});
+
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  // "ok" (channel 1) defers its subscribe ack; "fail" (channel 2) resolves to no host and yields an
+  // inline -ERR immediately. With FIFO-strict ordering the request is HELD until "ok"'s upstream
+  // ack lands, then both frames flush TOGETHER in command order — the "ok" ack, then the "fail"
+  // error — through the FIFO (two frames -> respond_). Neither races the other (the error no longer
+  // goes in-band while the ack is out-of-band).
+  const std::string ok_name = "ok";
+  Common::Redis::RespValue expected_ok_ack =
+      RedisProxy::makeSubscriptionAck("subscribe", &ok_name, 1);
+  Common::Redis::RespValue expected_fail_err;
+  expected_fail_err.type(Common::Redis::RespType::Error);
+  expected_fail_err.asString() = "ERR upstream subscribe send failed for 'fail'";
+  EXPECT_CALL(router(), upstreamPool(_, _))
+      .WillRepeatedly(
+          Invoke([this](std::string&, const StreamInfo::StreamInfo&) { return route_; }));
+  // After rewrite the registry lookup keys off ``spublish()`` and upstream sends use
+  // ``sendUpstreamSsubscribeToHost`` (one per channel). Inline-error wording stays in terms
+  // of the client-facing ``subscribe`` verb.
+  EXPECT_CALL(*route_, pubsubUpstream()).WillRepeatedly(Return(subscription_conn_pool_shared));
+  // "ok" lands on this host; its ack below arrives FROM it. "fail" never sends, so it needs
+  // no owner.
+  auto pubsub_ack_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("ok"))
+      .WillOnce(Invoke([pubsub_ack_host](const std::string&) -> Upstream::HostConstSharedPtr {
+        return pubsub_ack_host;
+      }));
+  // "ok" resolves to a host and SENDs OK. "fail" resolves to null (no host for the slot),
+  // which short-circuits before the send — the source of its "subscribe send failed" -ERR.
+  EXPECT_CALL(upstream_callbacks, sendUpstreamSsubscribeToHost("ok", _, _)).WillOnce(Return(true));
+  EXPECT_CALL(upstream_callbacks, chooseUpstreamHostForChannel("fail"))
+      .WillOnce(Invoke([](const std::string&) -> Upstream::HostConstSharedPtr { return nullptr; }));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+  // Held in the FIFO: "ok"'s ack is still pending, so the "fail" error has not flushed yet either.
+  EXPECT_NE(nullptr, handle_);
+  EXPECT_FALSE(callbacks.completed_pending_request_);
+
+  // "ok"'s upstream ack completes the request: the ok ack and the fail error flush together, in
+  // command order, through the FIFO (two frames -> respond_). Upstream verb is ``ssubscribe``; the
+  // downstream wire shows ``subscribe``.
+  EXPECT_CALL(callbacks, respond_(testing::ElementsAre(PointeesEq(&expected_ok_ack),
+                                                       PointeesEq(&expected_fail_err))));
+  registry->onPushMessage(makeSubscribeAckPush("ssubscribe", "ok", 1), pubsub_ack_host);
+
+  EXPECT_TRUE(callbacks.completed_pending_request_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.subscribe.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.subscribe.success").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.subscribe.error").value());
+  // Gauge moved exactly once — for "ok". "fail" rolled back inside the registry.
+  ASSERT_EQ(1, callbacks.subscription_deltas_.size());
+  EXPECT_EQ(1, callbacks.subscription_deltas_[0]);
+}
+
+// Pin that pub/sub subscribe-family commands BYPASS the fault manager entirely. A delay/error fault
+// only makes sense when the whole reply flows synchronously through the fault wrapper, but a
+// subscribe command completes ASYNCHRONOUSLY — a fresh SUBSCRIBE defers its ack through the
+// response FIFO until the upstream confirms, and its handler owns that completion — so a
+// DelayFault/ErrorFault has no single synchronous reply to delay or replace. makeRequest must
+// short-circuit the subscribe-family path before getFaultForCommand is even consulted.
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestBypassesFaultManager) {
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  // Strict: the fault manager must NOT be consulted for any subscribe-family command. If a
+  // future change accidentally routes pub/sub through the fault manager, this fires. The
+  // sharded variants (ssubscribe / sunsubscribe) are rejected even earlier, so they too
+  // bypass the fault manager — that path is exercised separately by
+  // ``SubscriptionRequestSsubscribeVariant`` and
+  // ``SubscriptionRequestSunsubscribeVariant``.
+  EXPECT_CALL(*getFaultManager(), getFaultForCommand(_)).Times(0);
+
+  // Both SUBSCRIBE and UNSUBSCRIBE carry bypasses_fault_injection, so exercise both (R8-N6): they
+  // resolve locally here — SUBSCRIBE with an unroutable channel delivers an inline -ERR, while
+  // UNSUBSCRIBE of an unheld channel delivers its ``[unsubscribe, x, 0]`` ack without needing an
+  // upstream pool — and neither may consult the fault manager. The route/response surfaces differ
+  // per verb, so accept any count on them; the strict assertion is the Times(0) above.
+  EXPECT_CALL(router(), upstreamPool(_, _))
+      .Times(testing::AnyNumber())
+      .WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(callbacks, onResponse_(_)).Times(testing::AnyNumber());
+
+  for (const std::string cmd : {"subscribe", "unsubscribe"}) {
+    Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+    makeBulkStringArray(*request, {cmd, "x"});
+    EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+    handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+    EXPECT_EQ(nullptr, handle_);
+  }
+}
+
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestBareUnsubscribeNoActiveSubscriptions) {
+  InSequence s;
+
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"unsubscribe"});
+
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  // A bare UNSUBSCRIBE with no active subscriptions emits its ``[unsubscribe, nil, 0]`` ack as the
+  // request's single response frame, so it flushes at the request's FIFO position — never ahead of
+  // an earlier pipelined command's reply. One frame routes to the mock's onResponse_ surface; the
+  // real ProxyFilter encodes it as a RESP3 Push (``>3\r\n$11\r\nunsubscribe\r\n_\r\n:0\r\n``) at
+  // flush time.
+  Common::Redis::RespValue expected_ack =
+      RedisProxy::makeSubscriptionAck("unsubscribe", nullptr, 0);
+  EXPECT_CALL(callbacks, onResponse_(PointeesEq(&expected_ack)));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_TRUE(callbacks.completed_pending_request_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.unsubscribe.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.unsubscribe.success").value());
+}
+
+TEST_F(RedisCommandSplitterImplTest, SubscriptionRequestSubscribeWithNoArgsReturnsError) {
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.downstream_resp_version_ = 3;
+
+  // "subscribe" with no channel args.
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe"});
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "wrong number of arguments for 'subscribe' command";
+
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks, onResponse_(PointeesEq(&expected_response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.subscribe.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.subscribe.error").value());
+}
+
+// Helper: pull the upstream command/args out of a captured ``ConnPool::RespVariant``.
+// PublishRequest builds the wire request as a shared RespValue (variant index 1) so
+// asserting via the existing ``RespVariantEq`` matcher (index 0) does not apply here.
+namespace {
+std::vector<std::string> upstreamArrayStrings(const ConnPool::RespVariant& v) {
+  std::vector<std::string> out;
+  if (v.index() == 0) {
+    const auto& req = absl::get<const Common::Redis::RespValue>(v);
+    for (const auto& elem : req.asArray()) {
+      out.push_back(elem.asString());
+    }
+  } else {
+    const auto& req = *absl::get<Common::Redis::RespValueConstSharedPtr>(v);
+    for (const auto& elem : req.asArray()) {
+      out.push_back(elem.asString());
+    }
+  }
+  return out;
+}
+} // namespace
+
+// With ``enable_sharded_publish`` on, client ``PUBLISH foo bar`` reaches the upstream as
+// ``SPUBLISH foo bar`` — the channel is the hash key so consistent hashing routes to the
+// slot-owning shard. Stats remain under the client-facing verb so operators can tell what
+// the client typed.
+TEST_F(RedisCommandSplitterImplTest, PublishTransformsToSpublishOnWire) {
+  InSequence s;
+  // Opt into sharded publish so PUBLISH is rewritten to SPUBLISH on the wire.
+  callbacks_.sharded_publish_enabled_ = true;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"publish", "foo", "bar"});
+
+  Common::Redis::Client::MockPoolRequest pool_request;
+  ConnPool::PoolCallbacks* publish_callbacks = nullptr;
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _))
+      .WillOnce(Invoke([this](std::string& key, const StreamInfo::StreamInfo&) {
+        EXPECT_EQ("foo", key);
+        return route_;
+      }));
+  // The rewritten ``spublish`` verb is write-classified, so the same upstream is selected as
+  // the SUBSCRIBE rewrite path's registry lookup (``route->pubsubUpstream()``, the write-side pool)
+  // — keeping published messages and their sharded subscribers on one conn pool under
+  // ``read_command_policy``.
+  EXPECT_CALL(*route_, upstream("spublish"));
+  // Capture the pool callbacks so the response is delivered through the same lifecycle
+  // path the upstream client would use, rather than reaching through the
+  // SingleServerRequest cast. Matches the pattern in RedisSingleServerRequestTest.
+  EXPECT_CALL(*conn_pool_, makeRequest_("foo", _, _))
+      .WillOnce(
+          Invoke([&pool_request, &publish_callbacks](const std::string&, ConnPool::RespVariant& req,
+                                                     ConnPool::PoolCallbacks& callbacks) {
+            const auto upstream_args = upstreamArrayStrings(req);
+            EXPECT_THAT(upstream_args, testing::ElementsAre("spublish", "foo", "bar"));
+            publish_callbacks = &callbacks;
+            return &pool_request;
+          }));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, handle_);
+  ASSERT_NE(nullptr, publish_callbacks);
+
+  // Integer reply passes through unchanged.
+  Common::Redis::RespValuePtr response(new Common::Redis::RespValue());
+  response->type(Common::Redis::RespType::Integer);
+  response->asInteger() = 2;
+  Common::Redis::RespValue* response_ptr = response.get();
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(response_ptr)));
+  publish_callbacks->onResponse(std::move(response));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.publish.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.publish.success").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.spublish.total").value());
+}
+
+// Client ``SPUBLISH foo bar`` reaches the same handler and produces the same wire shape
+// as ``PUBLISH foo bar``. Per-verb stats stay isolated so operators can tell which verb
+// the client used.
+TEST_F(RedisCommandSplitterImplTest, SpublishAlsoTransformsToSpublishOnWire) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"spublish", "channel-a", "payload"});
+
+  Common::Redis::Client::MockPoolRequest pool_request;
+  ConnPool::PoolCallbacks* spublish_callbacks = nullptr;
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _))
+      .WillOnce(Invoke([this](std::string& key, const StreamInfo::StreamInfo&) {
+        EXPECT_EQ("channel-a", key);
+        return route_;
+      }));
+  EXPECT_CALL(*route_, upstream("spublish"));
+  EXPECT_CALL(*conn_pool_, makeRequest_("channel-a", _, _))
+      .WillOnce(Invoke([&pool_request, &spublish_callbacks](const std::string&,
+                                                            ConnPool::RespVariant& req,
+                                                            ConnPool::PoolCallbacks& callbacks) {
+        const auto upstream_args = upstreamArrayStrings(req);
+        EXPECT_THAT(upstream_args, testing::ElementsAre("spublish", "channel-a", "payload"));
+        spublish_callbacks = &callbacks;
+        return &pool_request;
+      }));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, handle_);
+  ASSERT_NE(nullptr, spublish_callbacks);
+
+  Common::Redis::RespValuePtr response(new Common::Redis::RespValue());
+  response->type(Common::Redis::RespType::Integer);
+  response->asInteger() = 1;
+  Common::Redis::RespValue* response_ptr = response.get();
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(response_ptr)));
+  spublish_callbacks->onResponse(std::move(response));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.spublish.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.spublish.success").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.publish.total").value());
+}
+
+// With ``enable_sharded_publish`` off (the default), a client ``PUBLISH`` is forwarded
+// unchanged as classic ``PUBLISH`` — no SPUBLISH rewrite — so existing RESP2 / Redis < 7
+// deployments keep working after upgrade. The upstream verb also stays read/mirror-classified
+// (``publish`` is not in ``writeCommands``), preserving pre-sharded-pubsub routing: the route's
+// upstream selector is keyed off the original ``publish`` verb, not ``spublish``.
+TEST_F(RedisCommandSplitterImplTest, PublishStaysClassicWhenShardedPublishDisabled) {
+  InSequence s;
+  // sharded_publish_enabled_ defaults to false — assert we do NOT rewrite to SPUBLISH.
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"publish", "foo", "bar"});
+
+  Common::Redis::Client::MockPoolRequest pool_request;
+  ConnPool::PoolCallbacks* publish_callbacks = nullptr;
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _))
+      .WillOnce(Invoke([this](std::string& key, const StreamInfo::StreamInfo&) {
+        EXPECT_EQ("foo", key);
+        return route_;
+      }));
+  // Classic publish: the upstream lookup keys off the unmodified client verb, not ``spublish``.
+  EXPECT_CALL(*route_, upstream("publish"));
+  EXPECT_CALL(*conn_pool_, makeRequest_("foo", _, _))
+      .WillOnce(
+          Invoke([&pool_request, &publish_callbacks](const std::string&, ConnPool::RespVariant& req,
+                                                     ConnPool::PoolCallbacks& callbacks) {
+            const auto upstream_args = upstreamArrayStrings(req);
+            EXPECT_THAT(upstream_args, testing::ElementsAre("publish", "foo", "bar"));
+            publish_callbacks = &callbacks;
+            return &pool_request;
+          }));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, handle_);
+  ASSERT_NE(nullptr, publish_callbacks);
+
+  Common::Redis::RespValuePtr response(new Common::Redis::RespValue());
+  response->type(Common::Redis::RespType::Integer);
+  response->asInteger() = 2;
+  Common::Redis::RespValue* response_ptr = response.get();
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(response_ptr)));
+  publish_callbacks->onResponse(std::move(response));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.publish.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.publish.success").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.spublish.total").value());
+}
+
+// Correctness regression: an EXPLICIT client ``SPUBLISH`` is a shard command by definition, so it
+// MUST take the sharded wire path (route on a COPY, preserve the channel) even when
+// ``enable_sharded_publish`` is off. Otherwise it falls to the classic ``PUBLISH`` branch, where a
+// ``remove_prefix`` / ``key_formatter`` route rewrites the channel in place and silently ships the
+// message to the wrong shard — breaking the shard-channel contract. Here the route mutates its key;
+// the fix routes on a copy so the ORIGINAL channel reaches both the shard-hashing lookup and the
+// SPUBLISH wire request.
+TEST_F(RedisCommandSplitterImplTest, ExplicitSpublishUsesShardedWireWhenShardedPublishDisabled) {
+  InSequence s;
+  // sharded_publish_enabled_ defaults to false — the explicit SPUBLISH must still route sharded.
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"spublish", "foo", "bar"});
+
+  Common::Redis::Client::MockPoolRequest pool_request;
+  ConnPool::PoolCallbacks* spublish_callbacks = nullptr;
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _))
+      .WillOnce(Invoke([this](std::string& key, const StreamInfo::StreamInfo&) {
+        // The sharded path hands the route a COPY of the channel; mutating it (as a
+        // ``remove_prefix`` / ``key_formatter`` route would) must NOT reach the wire or the
+        // shard-hashing key.
+        EXPECT_EQ("foo", key);
+        key = "prefix-stripped";
+        return route_;
+      }));
+  EXPECT_CALL(*route_, upstream("spublish"));
+  // Both the shard-hashing key and the wire channel are the ORIGINAL "foo", not the route-mutated
+  // "prefix-stripped".
+  EXPECT_CALL(*conn_pool_, makeRequest_("foo", _, _))
+      .WillOnce(Invoke([&pool_request, &spublish_callbacks](const std::string&,
+                                                            ConnPool::RespVariant& req,
+                                                            ConnPool::PoolCallbacks& callbacks) {
+        const auto upstream_args = upstreamArrayStrings(req);
+        EXPECT_THAT(upstream_args, testing::ElementsAre("spublish", "foo", "bar"));
+        spublish_callbacks = &callbacks;
+        return &pool_request;
+      }));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, handle_);
+  ASSERT_NE(nullptr, spublish_callbacks);
+
+  Common::Redis::RespValuePtr response(new Common::Redis::RespValue());
+  response->type(Common::Redis::RespType::Integer);
+  response->asInteger() = 1;
+  Common::Redis::RespValue* response_ptr = response.get();
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(response_ptr)));
+  spublish_callbacks->onResponse(std::move(response));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.spublish.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.spublish.success").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.publish.total").value());
+}
+
+// Arity check is owned by PublishRequest::create() (publish/spublish are exempted from
+// the splitter's generic ``size() < 2`` guard). Both bare ``PUBLISH`` and ``PUBLISH foo``
+// (missing the value) emit the unified ``wrong number of arguments for '<cmd>' command``
+// wording from ``SplitRequestBase::onWrongNumberOfArguments``.
+TEST_F(RedisCommandSplitterImplTest, PublishArityRejectedWithUnifiedWording) {
+  // Bare PUBLISH.
+  {
+    Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+    makeBulkStringArray(*request, {"publish"});
+    Common::Redis::RespValue expected;
+    expected.type(Common::Redis::RespType::Error);
+    expected.asString() = "wrong number of arguments for 'publish' command";
+    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+    EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected)));
+    handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+    EXPECT_EQ(nullptr, handle_);
+  }
+  // PUBLISH with only channel (missing value).
+  {
+    Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+    makeBulkStringArray(*request, {"publish", "channel-only"});
+    Common::Redis::RespValue expected;
+    expected.type(Common::Redis::RespType::Error);
+    expected.asString() = "wrong number of arguments for 'publish' command";
+    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+    EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected)));
+    handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+    EXPECT_EQ(nullptr, handle_);
+  }
+  // SPUBLISH with wrong arity uses its own verb in the error wording.
+  {
+    Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+    makeBulkStringArray(*request, {"spublish"});
+    Common::Redis::RespValue expected;
+    expected.type(Common::Redis::RespType::Error);
+    expected.asString() = "wrong number of arguments for 'spublish' command";
+    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+    EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected)));
+    handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+    EXPECT_EQ(nullptr, handle_);
+  }
+
+  EXPECT_EQ(2UL, store_.counter("redis.foo.command.publish.total").value());
+  EXPECT_EQ(2UL, store_.counter("redis.foo.command.publish.error").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.spublish.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.spublish.error").value());
+}
+
+// PUBLISH/SPUBLISH inside an active MULTI route through TransactionRequest rather than
+// PublishRequest — the documented out-of-scope behavior keeps the upstream wire unchanged
+// (plain ``publish`` / ``spublish``, not ``spublish`` rewritten from PUBLISH). The
+// TransactionRequest allowlist must include both verbs so they are not rejected with "command is
+// not supported within transaction". The transaction layer emits a MULTI wire first when the
+// transaction key is still empty, then the actual command.
+TEST_F(RedisCommandSplitterImplTest, PublishInsideMultiAcceptedAndUntransformed) {
+  callbacks_.transaction().start();
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"publish", "foo", "bar"});
+
+  Common::Redis::Client::MockPoolRequest multi_request;
+  Common::Redis::Client::MockPoolRequest publish_request;
+  ConnPool::PoolCallbacks* publish_callbacks = nullptr;
+  bool saw_multi_wire = false;
+  bool saw_publish_wire = false;
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _))
+      .WillOnce(Invoke([this](std::string& key, const StreamInfo::StreamInfo&) {
+        EXPECT_EQ("foo", key);
+        return route_;
+      }));
+  // TransactionRequest first dispatches MULTI on the route's MULTI-keyed upstream,
+  // then the actual command on the route's publish-keyed upstream. The publish-keyed
+  // lookup is the lever that proves the wire verb is the original client verb
+  // (unchanged) — if the rewrite were active inside MULTI it would key off
+  // ``spublish`` instead and this expectation would never fire.
+  EXPECT_CALL(*route_, upstream("MULTI"));
+  EXPECT_CALL(*route_, upstream("publish"));
+  EXPECT_CALL(*conn_pool_, makeRequest_("foo", _, _))
+      .Times(2)
+      .WillRepeatedly(
+          Invoke([&](const std::string&, ConnPool::RespVariant& req,
+                     ConnPool::PoolCallbacks& callbacks) -> Common::Redis::Client::PoolRequest* {
+            const auto upstream_args = upstreamArrayStrings(req);
+            if (upstream_args.size() == 1 && upstream_args[0] == "MULTI") {
+              saw_multi_wire = true;
+              return &multi_request;
+            }
+            // Critical assertion: PUBLISH inside MULTI is sent on the wire as
+            // ``publish foo bar`` — NOT rewritten to ``spublish foo bar``. The
+            // release note promises this stays unchanged via the transaction handler.
+            EXPECT_THAT(upstream_args, testing::ElementsAre("publish", "foo", "bar"));
+            saw_publish_wire = true;
+            publish_callbacks = &callbacks;
+            return &publish_request;
+          }));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, handle_);
+  EXPECT_TRUE(saw_multi_wire);
+  EXPECT_TRUE(saw_publish_wire);
+  ASSERT_NE(nullptr, publish_callbacks);
+
+  // Drive the QUEUED reply through the captured pool callbacks so the request
+  // lifecycle completes cleanly.
+  Common::Redis::RespValuePtr response(new Common::Redis::RespValue());
+  response->type(Common::Redis::RespType::SimpleString);
+  response->asString() = "QUEUED";
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  publish_callbacks->onResponse(std::move(response));
+
+  // Stats land under ``command.multi.*`` (the splitter forwards in-transaction
+  // requests to the MULTI handler) and NOT under ``command.publish.*`` /
+  // ``command.spublish.*``.
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.multi.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.multi.success").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.publish.total").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.spublish.total").value());
+
+  // TransactionRequest::create flipped ``connection_established_=true`` after
+  // dispatching MULTI, but the in-test ``NoOpTransaction`` has no real
+  // ``ClientPtr`` entries populated in ``clients_`` — the destructor's
+  // ``Transaction::close()`` would walk those nulls and segfault. Clear the
+  // bookkeeping so close() short-circuits cleanly.
+  callbacks_.transaction().clients_.clear();
+  callbacks_.transaction().connection_established_ = false;
+}
+
+// Bare ``PUBLISH`` inside MULTI must return ``wrong number of arguments`` — not a crash and
+// not the generic "command is not supported within transaction" wording. publish/spublish are
+// exempted from the splitter's pre-handler ``size() < 2`` guard so the arity check has to
+// live inside TransactionRequest::create itself for the in-transaction path.
+TEST_F(RedisCommandSplitterImplTest, BarePublishInsideMultiReturnsWrongArity) {
+  callbacks_.transaction().start();
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"publish"});
+
+  Common::Redis::RespValue expected;
+  expected.type(Common::Redis::RespType::Error);
+  expected.asString() = "wrong number of arguments for 'publish' command";
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected)));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.multi.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.multi.error").value());
 }
 
 TEST_F(RedisSingleServerRequestTest, PingSuccess) {
@@ -1084,10 +2391,10 @@ TEST_F(RedisSingleServerRequestTest, HelloWithUnsupportedProtocolVersion) {
 // version negotiation is exact-matched against the listener's ``protocol_version``.
 //
 // Covers:
-//   - Bare HELLO inherits ``currentDownstreamRespVersion()`` and exact-matches.
-//   - Explicit HELLO N is rejected ``-NOPROTO`` when N != listener required version.
-//   - Bare HELLO on a fresh RESP3 listener is rejected (default 2 != 3).
-//   - Shape of the reply (Map of 14 entries when stored).
+//  - Bare HELLO inherits ``currentDownstreamRespVersion()`` and exact-matches.
+//  - Explicit HELLO N is rejected ``-NOPROTO`` when N != listener required version.
+//  - Bare HELLO on a fresh RESP3 listener is rejected (default 2 != 3).
+//  - Shape of the reply (Map of 14 entries when stored).
 // =============================================================================
 
 TEST_F(RedisSingleServerRequestTest, HelloLocalBarePreservesVersion) {
@@ -1156,7 +2463,7 @@ TEST_F(RedisSingleServerRequestTest, HelloLocalExplicit3FlipsEncoder) {
   // Pin the HELLO Map's ``mode`` field at ``standalone`` per the RESP3 spec
   // (https://redis.io/docs/latest/develop/reference/protocol-spec/). The proxy presents one
   // logical Redis endpoint and hides Redis Cluster routing, so any other value (notably the
-  // earlier "proxy" placeholder) would be unspec'd and risk strict-client rejection.
+  // earlier "proxy" placeholder) would be unspecified and risk strict-client rejection.
   ASSERT_EQ(Common::Redis::RespType::Map, captured->type());
   const auto& kv = captured->asArray();
   bool saw_mode_standalone = false;
@@ -1292,9 +2599,9 @@ TEST_F(RedisSingleServerRequestTest, Resp2ListenerRejectsHello3) {
 // HELLO 3 AUTH <user> <pass>: client authenticates inline as part of the
 // HELLO handshake (the lettuce / node-redis v4+ / redis-py protocol=3
 // pattern). The mock returns AuthAttempt::Allowed, so the splitter must:
-//   - parse the AUTH option (3 tokens after protover);
-//   - call attemptDownstreamAuthInline with the supplied credentials;
-//   - emit a single Map reply (not an extra +OK from a separate AUTH).
+//  - parse the AUTH option (3 tokens after protover);
+//  - call attemptDownstreamAuthInline with the supplied credentials;
+//  - emit a single Map reply (not an extra +OK from a separate AUTH).
 TEST_F(RedisSingleServerRequestTest, HelloAuthInlineAllowed) {
   InSequence s;
   callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3;
@@ -1566,6 +2873,34 @@ TEST_F(RedisSingleServerRequestTest, ClientInCustomCommandsProxiesUpstream) {
   handle_->cancel();
 }
 
+// E-1: a no-mandatory-arg command (INFO) admitted onto the transaction path via custom_commands has
+// no key, so it reaches the shared first-key extraction with a size-1 array. The guard rejects it
+// (and dirties the transaction) rather than reading asArray()[1] out of bounds — round-6 R-0
+// guarded only the WATCH verb, leaving this general-key extraction exposed.
+TEST_F(RedisSingleServerRequestTest, KeylessCustomCommandInsideMultiRejectedNotOob) {
+  InstanceImpl splitter = getSplitter({"info"});
+  callbacks_.transaction().start();
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillRepeatedly(Return(true));
+
+  Common::Redis::RespValue info_err;
+  info_err.type(Common::Redis::RespType::Error);
+  info_err.asString() = "'info' command is not supported within transaction";
+  Common::Redis::RespValuePtr info{new Common::Redis::RespValue()};
+  makeBulkStringArray(*info, {"info"}); // bare INFO: no key -> OOB read at [1] without the guard
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&info_err)));
+  EXPECT_EQ(nullptr, splitter.makeRequest(std::move(info), callbacks_, dispatcher_, stream_info_));
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+
+  Common::Redis::RespValue execabort;
+  execabort.type(Common::Redis::RespType::Error);
+  execabort.asString() = "EXECABORT Transaction discarded because of previous errors.";
+  Common::Redis::RespValuePtr exec{new Common::Redis::RespValue()};
+  makeBulkStringArray(*exec, {"exec"});
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&execabort)));
+  EXPECT_EQ(nullptr, splitter.makeRequest(std::move(exec), callbacks_, dispatcher_, stream_info_));
+  EXPECT_FALSE(callbacks_.transaction().active_);
+}
+
 // Bare HELLO on a RESP2 auth-required listener still requires prior auth — the
 // HELLO + connectionAllowed reorder must NOT have removed the gate for
 // non-AUTH HELLO calls.
@@ -1604,10 +2939,12 @@ TEST_F(RedisSingleServerRequestTest, Resp2ListenerAcceptsHello2) {
   EXPECT_EQ(2U, callbacks_.downstream_resp_version_);
 }
 
-// HELLO inside an active MULTI is rejected with the transaction allowlist's error shape (real
-// Redis refuses HELLO in a transaction too). Answering it locally would flip the protocol
-// mid-transaction and emit a reply that EXEC's response array never accounts for. The
-// rejection happens before handleHelloCommand, so no auth gate interaction occurs.
+// HELLO inside an active MULTI is rejected with the transaction allowlist's error shape: answering
+// it locally would flip the protocol mid-transaction and emit a reply that EXEC's response array
+// never accounts for. The rejection happens before handleHelloCommand, so no auth gate interaction
+// occurs. The proxy cannot queue HELLO onto the transaction path, so the rejection flags the
+// transaction dirty and EXEC aborts (uniform with AUTH/CLIENT/PING/ECHO/TIME) rather than returning
+// a reply array one element short of what the client queued.
 TEST_F(RedisSingleServerRequestTest, HelloRejectedInsideTransaction) {
   InSequence s;
   callbacks_.transaction().start();
@@ -1621,10 +2958,259 @@ TEST_F(RedisSingleServerRequestTest, HelloRejectedInsideTransaction) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle_);
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+}
+
+// SUBSCRIBE inside an active MULTI is rejected locally (real Redis forbids pub/sub in a
+// transaction). Regression for the wrong dispatch to the transaction handler: before the fix the
+// subscription fast path reused the multi-reassigned handler, so SUBSCRIBE was sent raw to a
+// shard and its RESP3 Push ack was dropped, hanging the request. The other subscription verbs
+// (``UNSUBSCRIBE``) takes the same guard.
+TEST_F(RedisSingleServerRequestTest, SubscribeRejectedInsideTransaction) {
+  InSequence s;
+  callbacks_.transaction().start();
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "ERR SUBSCRIBE is not allowed in transactions";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "ch"});
+  // A connection in a transaction has already authenticated (MULTI requires it); the generic
+  // auth gate runs before the subscription guard, so allow it.
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
+// A command rejected while queueing inside a MULTI marks the transaction dirty, so the subsequent
+// EXEC aborts with ``-EXECABORT`` and discards (matching Redis's CLIENT_DIRTY_EXEC) rather than
+// running the commands that DID queue.
+TEST_F(RedisSingleServerRequestTest, DirtyTransactionExecAborts) {
+  callbacks_.transaction().start();
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillRepeatedly(Return(true));
+
+  // SUBSCRIBE inside the MULTI is rejected and marks the transaction dirty.
+  Common::Redis::RespValue subscribe_err;
+  subscribe_err.type(Common::Redis::RespType::Error);
+  subscribe_err.asString() = "ERR SUBSCRIBE is not allowed in transactions";
+  Common::Redis::RespValuePtr subscribe{new Common::Redis::RespValue()};
+  makeBulkStringArray(*subscribe, {"subscribe", "ch"});
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&subscribe_err)));
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(subscribe), callbacks_, dispatcher_, stream_info_));
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+
+  // EXEC then aborts with ``-EXECABORT`` and closes the transaction (no upstream EXEC is issued).
+  Common::Redis::RespValue execabort;
+  execabort.type(Common::Redis::RespType::Error);
+  execabort.asString() = "EXECABORT Transaction discarded because of previous errors.";
+  Common::Redis::RespValuePtr exec{new Common::Redis::RespValue()};
+  makeBulkStringArray(*exec, {"exec"});
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&execabort)));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(exec), callbacks_, dispatcher_, stream_info_));
+  EXPECT_FALSE(callbacks_.transaction().active_);
+}
+
+// An unknown command rejected while queueing inside a MULTI marks the transaction dirty (Redis
+// CLIENT_DIRTY_EXEC), so the subsequent EXEC aborts with ``-EXECABORT`` rather than running the
+// commands that DID queue. Regression: before the fix only the forbidden pub/sub verbs set dirty,
+// so ``MULTI; <unknown>; SET k v; EXEC`` wrongly committed the SET.
+TEST_F(RedisSingleServerRequestTest, UnknownCommandInsideMultiDirtiesExecAborts) {
+  callbacks_.transaction().start();
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillRepeatedly(Return(true));
+
+  // The unknown command is rejected before the auth gate and marks the transaction dirty.
+  Common::Redis::RespValue unknown_err;
+  unknown_err.type(Common::Redis::RespType::Error);
+  unknown_err.asString() = "ERR unknown command 'boguscmd', with args beginning with: ";
+  Common::Redis::RespValuePtr unknown{new Common::Redis::RespValue()};
+  makeBulkStringArray(*unknown, {"boguscmd"});
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&unknown_err)));
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(unknown), callbacks_, dispatcher_, stream_info_));
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+
+  // EXEC then aborts with ``-EXECABORT`` and closes the transaction (no upstream EXEC is issued).
+  Common::Redis::RespValue execabort;
+  execabort.type(Common::Redis::RespType::Error);
+  execabort.asString() = "EXECABORT Transaction discarded because of previous errors.";
+  Common::Redis::RespValuePtr exec{new Common::Redis::RespValue()};
+  makeBulkStringArray(*exec, {"exec"});
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&execabort)));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(exec), callbacks_, dispatcher_, stream_info_));
+  EXPECT_FALSE(callbacks_.transaction().active_);
+}
+
+// WATCH inside an active MULTI is rejected as real Redis does ("WATCH inside MULTI is not
+// allowed"). Regression for a remote OOB crash: a bare ``WATCH`` (no key) inside a transaction
+// bypasses the generic arity gate (``isCommandValidWithoutArgs("watch")`` is true) and the
+// outside-transaction WATCH branch, so it reached the transaction key-extraction and read
+// ``asArray()[1]`` out of bounds. WATCH is a plain error in Redis, not a dirty, so it does not
+// abort EXEC.
+TEST_F(RedisSingleServerRequestTest, WatchInsideMultiRejectedNotDirty) {
+  InSequence s;
+  callbacks_.transaction().start();
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "ERR WATCH inside MULTI is not allowed";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"watch"}); // bare WATCH: no key -> OOB read without the guard
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_FALSE(callbacks_.transaction().dirty_);
+}
+
+// A wrong-arity PUBLISH inside a MULTI dirties the transaction so EXEC aborts. PUBLISH owns its
+// arity check (owns_arity_check) and is validated on the transaction path, separate from the
+// generic gate — before the fix this path did not flag dirty, so ``MULTI; PUBLISH ch; SET k v;
+// EXEC`` wrongly committed the SET.
+TEST_F(RedisSingleServerRequestTest, PublishWrongArityInsideMultiDirtiesExecAborts) {
+  callbacks_.transaction().start();
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillRepeatedly(Return(true));
+
+  // PUBLISH needs 3 tokens (``PUBLISH channel message``); two is a wrong-arity error.
+  Common::Redis::RespValuePtr publish{new Common::Redis::RespValue()};
+  makeBulkStringArray(*publish, {"publish", "ch"});
+  EXPECT_CALL(callbacks_, onResponse_(_)); // wrong-number-of-arguments error
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(publish), callbacks_, dispatcher_, stream_info_));
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+
+  Common::Redis::RespValue execabort;
+  execabort.type(Common::Redis::RespType::Error);
+  execabort.asString() = "EXECABORT Transaction discarded because of previous errors.";
+  Common::Redis::RespValuePtr exec{new Common::Redis::RespValue()};
+  makeBulkStringArray(*exec, {"exec"});
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&execabort)));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(exec), callbacks_, dispatcher_, stream_info_));
+  EXPECT_FALSE(callbacks_.transaction().active_);
+}
+
+// A command the proxy cannot relay through the transaction path (not on the transaction allowlist,
+// e.g. EVAL) is rejected inside a MULTI and dirties it, so EXEC aborts rather than committing a
+// partial, non-atomic transaction (``MULTI; EVAL ...; SET k v; EXEC`` previously committed only the
+// SET).
+TEST_F(RedisSingleServerRequestTest, UnsupportedCommandInsideMultiDirtiesExecAborts) {
+  callbacks_.transaction().start();
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillRepeatedly(Return(true));
+
+  Common::Redis::RespValue eval_err;
+  eval_err.type(Common::Redis::RespType::Error);
+  eval_err.asString() = "'eval' command is not supported within transaction";
+  Common::Redis::RespValuePtr eval{new Common::Redis::RespValue()};
+  makeBulkStringArray(*eval, {"eval", "return 1"});
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&eval_err)));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(eval), callbacks_, dispatcher_, stream_info_));
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+
+  Common::Redis::RespValue execabort;
+  execabort.type(Common::Redis::RespType::Error);
+  execabort.asString() = "EXECABORT Transaction discarded because of previous errors.";
+  Common::Redis::RespValuePtr exec{new Common::Redis::RespValue()};
+  makeBulkStringArray(*exec, {"exec"});
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&execabort)));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(exec), callbacks_, dispatcher_, stream_info_));
+  EXPECT_FALSE(callbacks_.transaction().active_);
+}
+
+// AUTH / PING / ECHO / TIME are answered locally outside a transaction, but inside a MULTI
+// answering them out-of-band puts EXEC's reply array out of sync (the client queued the command but
+// EXEC never returns its reply). Each dirties the transaction and is rejected so EXEC aborts
+// cleanly instead. AUTH (E-2) was the one sibling previously missing this guard.
+TEST_F(RedisSingleServerRequestTest, LocallyAnsweredCommandsInsideMultiDirty) {
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillRepeatedly(Return(true));
+  for (const std::string cmd : {"auth", "ping", "echo", "time"}) {
+    callbacks_.transaction().start(); // fresh, clean transaction each iteration
+    const std::string expected_err =
+        fmt::format("'{}' command is not supported within transaction", cmd);
+    Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+    makeBulkStringArray(*request, {cmd});
+    EXPECT_CALL(callbacks_, onResponse_(_)).WillOnce(Invoke([&](Common::Redis::RespValuePtr& resp) {
+      EXPECT_EQ(Common::Redis::RespType::Error, resp->type());
+      EXPECT_EQ(expected_err, resp->asString());
+    }));
+    EXPECT_EQ(nullptr,
+              splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+    EXPECT_TRUE(callbacks_.transaction().dirty_) << cmd << " must dirty the transaction";
+    callbacks_.transaction().close();
+  }
+}
+
+// A bare SCAN (wrong arity) inside a MULTI dirties the transaction so EXEC aborts, matching the
+// generic arity gate — before the fix the dedicated SCAN arity early-return skipped dirty, so
+// ``MULTI; SCAN; SET k v; EXEC`` wrongly committed the SET while ``SCAN 0`` (allowlist-rejected)
+// dirtied.
+TEST_F(RedisSingleServerRequestTest, ScanWrongArityInsideMultiDirtiesExecAborts) {
+  callbacks_.transaction().start();
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillRepeatedly(Return(true));
+
+  Common::Redis::RespValue scan_err;
+  scan_err.type(Common::Redis::RespType::Error);
+  scan_err.asString() = "ERR wrong number of arguments for 'scan' command";
+  Common::Redis::RespValuePtr scan{new Common::Redis::RespValue()};
+  makeBulkStringArray(*scan, {"scan"});
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&scan_err)));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(scan), callbacks_, dispatcher_, stream_info_));
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+
+  Common::Redis::RespValue execabort;
+  execabort.type(Common::Redis::RespType::Error);
+  execabort.asString() = "EXECABORT Transaction discarded because of previous errors.";
+  Common::Redis::RespValuePtr exec{new Common::Redis::RespValue()};
+  makeBulkStringArray(*exec, {"exec"});
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&execabort)));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(exec), callbacks_, dispatcher_, stream_info_));
+  EXPECT_FALSE(callbacks_.transaction().active_);
+}
+
+// R8-2: an error fault injected on a command queued inside an active MULTI is, from the client's
+// view, a queue-time failure — the command errors instead of returning +QUEUED. It must flag the
+// transaction dirty so the subsequent EXEC aborts, rather than committing a reply array one element
+// short. Before the fix ErrorFaultRequest::create left dirty unset, so ``MULTI; SET k v (faulted);
+// EXEC`` wrongly committed the (empty) transaction. The error fault short-circuits before the
+// transaction handler's TransactionRequest::create, so no upstream MULTI is issued for the faulted
+// command — no conn-pool wiring is needed here.
+TEST_F(RedisSingleServerRequestTest, ErrorFaultInsideMultiDirtiesExecAborts) {
+  callbacks_.transaction().start();
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillRepeatedly(Return(true));
+
+  // Error fault (no delay) for SET only, so the transaction's own EXEC path is not itself faulted.
+  // The StrEq("set") default is registered after the ``_`` default so gmock prefers it for SET.
+  Common::Redis::FaultSharedPtr fault = Common::Redis::FaultManagerImpl::makeFaultForTest(
+      Common::Redis::FaultType::Error, std::chrono::milliseconds(0));
+  ON_CALL(*getFaultManager(), getFaultForCommand(_)).WillByDefault(Return(nullptr));
+  ON_CALL(*getFaultManager(), getFaultForCommand(testing::StrEq("set")))
+      .WillByDefault(Return(fault.get()));
+
+  // SET inside the MULTI: reassigned to the transaction handler but still fault-checked; the error
+  // fault replaces the queued command and must dirty the transaction.
+  Common::Redis::RespValuePtr set{new Common::Redis::RespValue()};
+  makeBulkStringArray(*set, {"set", "k", "v"});
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(set), callbacks_, dispatcher_, stream_info_));
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+
+  // EXEC then aborts with -EXECABORT and closes the transaction (no upstream EXEC is issued).
+  Common::Redis::RespValue execabort;
+  execabort.type(Common::Redis::RespType::Error);
+  execabort.asString() = "EXECABORT Transaction discarded because of previous errors.";
+  Common::Redis::RespValuePtr exec{new Common::Redis::RespValue()};
+  makeBulkStringArray(*exec, {"exec"});
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&execabort)));
+  EXPECT_EQ(nullptr, splitter_.makeRequest(std::move(exec), callbacks_, dispatcher_, stream_info_));
+  EXPECT_FALSE(callbacks_.transaction().active_);
 }
 
 // CLIENT SETNAME inside an active MULTI likewise skips the local +OK shortcut and is rejected:
-// an out-of-band +OK would desynchronize EXEC's reply count.
+// an out-of-band +OK would desynchronize EXEC's reply count. The proxy cannot queue CLIENT onto the
+// transaction path, so the rejection flags the transaction dirty and EXEC aborts, uniform with
+// AUTH/HELLO/PING/ECHO/TIME.
 TEST_F(RedisSingleServerRequestTest, ClientSetnameRejectedInsideTransaction) {
   InSequence s;
   callbacks_.transaction().start();
@@ -1637,6 +3223,203 @@ TEST_F(RedisSingleServerRequestTest, ClientSetnameRejectedInsideTransaction) {
   makeBulkStringArray(*request, {"client", "setname", "myapp"});
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+}
+
+// R9-1: after a MULTI could not be established upstream, the transaction stays active but
+// connection_established_ is false. A subsequent in-MULTI command must be short-circuited as a
+// queue-time failure — NOT sent to a freshly created transaction client, which would execute it raw
+// (no preceding MULTI) and commit it upstream despite the eventual EXECABORT.
+TEST_F(RedisSingleServerRequestTest, KeyedCommandAfterFailedMultiEstablishmentShortCircuits) {
+  // Simulate the post-failure state: a prior first-keyed command set the key and attempted MULTI,
+  // but the MULTI send failed so connection_established_ is still false.
+  callbacks_.transaction().start();
+  callbacks_.transaction().key_ = "key";
+  ASSERT_FALSE(callbacks_.transaction().connection_established_);
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  // The route now resolves (host recovered), but the command must never reach the conn pool.
+  EXPECT_CALL(router(), upstreamPool(_, _)).WillOnce(Return(route_));
+  EXPECT_CALL(*conn_pool_, makeRequest_(_, _, _)).Times(0);
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = Response::get().NoUpstreamHost;
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"set", "key", "v"});
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+}
+
+// R9-1 DISCARD variant: DISCARD in this non-established state replies +OK locally and resets the
+// transaction, rather than relaying the upstream's "-ERR DISCARD without MULTI" from a raw-sent
+// DISCARD.
+TEST_F(RedisSingleServerRequestTest, DiscardAfterFailedMultiEstablishmentIsLocalOk) {
+  callbacks_.transaction().start();
+  callbacks_.transaction().key_ = "key";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _)).WillOnce(Return(route_));
+  EXPECT_CALL(*conn_pool_, makeRequest_(_, _, _)).Times(0);
+
+  Common::Redis::RespValue ok;
+  ok.type(Common::Redis::RespType::SimpleString);
+  ok.asString() = "OK";
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&ok)));
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"discard"});
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+  EXPECT_FALSE(callbacks_.transaction().active_);
+}
+
+// on a RESP2 listener (the fixture default — protocol_version_ == Resp2), a client SUBSCRIBE
+// is rejected with "pub/sub is not enabled on this listener", NOT "Send HELLO 3 first". The latter
+// would be unachievable advice: HELLO 3 on a RESP2 listener is answered with -NOPROTO
+// (handleHelloCommand exact-matches the listener's protocol_version), so the client would loop
+// between two errors and never surface the real, operator-actionable condition.
+// A route that resolves but exposes no write-side conn pool (mirror-only / partially configured):
+// the channel gets the per-channel unavailable error instead of a crash or a silent drop.
+TEST_F(RedisSingleServerRequestTest, SubscribeTargetWithoutPubsubUpstreamGetsPerChannelError) {
+  NiceMock<Network::MockConnection> connection;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      connection, testDownstreamSubscriberStats());
+  TestSplitCallbacks callbacks(subscriber);
+  callbacks.setDownstreamRespVersion(3);
+  EXPECT_CALL(callbacks, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(router(), upstreamPool(_, _)).WillOnce(Return(route_));
+  EXPECT_CALL(*route_, pubsubUpstream()).WillOnce(Return(ConnPool::InstanceSharedPtr{}));
+
+  Common::Redis::RespValue expected_err;
+  expected_err.type(Common::Redis::RespType::Error);
+  expected_err.asString() =
+      "ERR pub/sub unavailable on upstream for target 'ch' (RESP3 not enabled)";
+  EXPECT_CALL(callbacks, onResponse_(PointeesEq(&expected_err)));
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "ch"});
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks, dispatcher_, stream_info_));
+}
+
+// A wrong-arity EVAL while a MULTI is queueing flags the transaction dirty (queue-time failure,
+// CLIENT_DIRTY_EXEC) through the shared onWrongNumberOfArguments helper.
+TEST_F(RedisSingleServerRequestTest, EvalWrongArityInsideMultiDirtiesExec) {
+  callbacks_.transaction().start();
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"eval", "script"});
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+  EXPECT_TRUE(callbacks_.transaction().dirty_);
+  callbacks_.transaction().close();
+}
+
+TEST_F(RedisSingleServerRequestTest, SubscribeOnResp2ListenerRejectedAsNotEnabled) {
+  InSequence s;
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "channel1"});
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "ERR pub/sub is not enabled on this listener (RESP3 required)";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
+// On a RESP3 listener, a client that has not yet upgraded (still RESP2) IS
+// told to "Send HELLO 3 first" — here the advice is achievable, because HELLO 3 matches the
+// listener's protocol_version and upgrades the connection.
+TEST_F(RedisSingleServerRequestTest, SubscribeOnResp3ListenerBeforeUpgradeAdvisesHello) {
+  InSequence s;
+  callbacks_.protocol_version_ = Common::Redis::RespProtocolVersion::Resp3; // RESP3 listener
+  // Client is still on RESP2 (downstream_resp_version_ default 2) — it has not sent HELLO 3 yet.
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "channel1"});
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "ERR pub/sub requires RESP3. Send HELLO 3 first.";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
+// PSUBSCRIBE is intentionally unsupported (see SupportedCommands::subscriptionCommands()): the
+// proxy delivers through an exact-channel registry and rewrites every client SUBSCRIBE onto sharded
+// SSUBSCRIBE, which matches only exact channels — never classic patterns — so a pattern subscriber
+// could never receive a proxy-delivered message. The command
+// is rejected as unknown at the unsupported-command gate — ahead of both auth and the RESP3 pub/sub
+// gate — so the rejection is independent of protocol version or auth state. Regression guard
+// against PSUBSCRIBE silently re-entering the subscribe fast path.
+TEST_F(RedisSingleServerRequestTest, PsubscribeRejectedAsUnknownCommand) {
+  InSequence s;
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"psubscribe", "channel.*"});
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "ERR unknown command 'psubscribe', with args beginning with: 'channel.*' ";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.splitter.unsupported_command").value());
+}
+
+// when sharded subscription is DISABLED (PubsubSettings mode DISABLED — a RESP3 upstream
+// without SSUBSCRIBE, e.g. Redis 6.x), makeRequest rejects a client SUBSCRIBE as an unknown command
+// (the pre-sharded-pubsub behavior) — the handlers stay registered, but the reject runs ahead of
+// the handler lookup — instead of rewriting it into an SSUBSCRIBE the upstream would answer with
+// -ERR and churn.
+TEST_F(RedisSingleServerRequestTest, SubscribeRejectedWhenShardedSubscriptionDisabled) {
+  InSequence s;
+  InstanceImpl disabled_splitter{std::make_unique<NiceMock<MockRouter>>(route_),
+                                 *store_.rootScope(),
+                                 "redis.foo.",
+                                 time_system_,
+                                 latency_in_micros_,
+                                 std::make_unique<NiceMock<MockFaultManager>>(fault_manager_),
+                                 {},
+                                 /*enable_sharded_subscribe=*/false};
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"subscribe", "channel"});
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "ERR unknown command 'subscribe', with args beginning with: 'channel' ";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ =
+      disabled_splitter.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
+// same RESP2-listener branch for UNSUBSCRIBE (the fixture default listener is RESP2).
+TEST_F(RedisSingleServerRequestTest, UnsubscribeOnResp2ListenerRejectedAsNotEnabled) {
+  InSequence s;
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"unsubscribe", "channel1"});
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "ERR pub/sub is not enabled on this listener (RESP3 required)";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle_);
 }
@@ -1662,9 +3445,12 @@ TEST_F(RedisSingleServerRequestTest, CustomCommandInTransaction) {
   absl::flat_hash_set<std::string> cmds = {"example"};
   auto splitter = getSplitter(std::move(cmds));
 
-  // Simulate a transaction that was already started by a previous command.
+  // Simulate a transaction that was already started AND established upstream by a previous command
+  // (its MULTI succeeded, so connection_established_ is true). A subsequent command is relayed onto
+  // the transaction connection; the establishment-failure gate (R9-1) does not apply.
   callbacks_.transaction().start();
   callbacks_.transaction().key_ = "test";
+  callbacks_.transaction().connection_established_ = true;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"example", "test"});
@@ -1677,6 +3463,9 @@ TEST_F(RedisSingleServerRequestTest, CustomCommandInTransaction) {
   EXPECT_NE(nullptr, handle_);
 
   respond();
+  // The mocked conn pool does not populate transaction.clients_, so clear the established flag to
+  // keep the transaction destructor from walking an empty/mocked client list.
+  callbacks_.transaction().connection_established_ = false;
 }
 
 TEST_F(RedisSingleServerRequestTest, CustomCommandStartsTransaction) {
@@ -2394,6 +4183,45 @@ TEST_P(RedisSingleServerRequestWithErrorWithDelayFaultTest, Fault) {
             store_.counter(fmt::format("redis.foo.command.{}.error_fault", lower_command)).value());
 };
 
+// The DelayFaultRequest decorator forwards every SplitCallbacks surface to the wrapped
+// callbacks; exercise each forwarder against the wrapped mock so a dropped delegation (e.g. a
+// future surface added to SplitCallbacks but not to the decorator) fails here.
+TEST_P(RedisSingleServerRequestWithErrorWithDelayFaultTest, ForwardsSplitCallbacksToWrapped) {
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {GetParam(), "hello"});
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+    timer_cb_ = timer_cb;
+    return timer_;
+  }));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  ASSERT_NE(nullptr, handle_);
+
+  auto* wrapper = dynamic_cast<CommandSplitter::SplitCallbacks*>(handle_.get());
+  ASSERT_NE(nullptr, wrapper);
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_TRUE(wrapper->connectionAllowed());
+  EXPECT_CALL(callbacks_, onQuit());
+  wrapper->onQuit();
+  EXPECT_CALL(callbacks_, onAuth("pw"));
+  wrapper->onAuth("pw");
+  EXPECT_CALL(callbacks_, onAuth("user", "pw"));
+  wrapper->onAuth("user", "pw");
+  EXPECT_EQ(&callbacks_.transaction(), &wrapper->transaction());
+  wrapper->setDownstreamRespVersion(3);
+  EXPECT_EQ(3U, wrapper->currentDownstreamRespVersion());
+  EXPECT_EQ(callbacks_.protocolVersion(), wrapper->protocolVersion());
+  EXPECT_EQ(callbacks_.shardedPublishEnabled(), wrapper->shardedPublishEnabled());
+  EXPECT_EQ(callbacks_.attemptDownstreamAuthInline("u", "p", 3),
+            wrapper->attemptDownstreamAuthInline("u", "p", 3));
+  EXPECT_EQ(callbacks_.takePendingHelloAuthVersion(), wrapper->takePendingHelloAuthVersion());
+  EXPECT_EQ(callbacks_.pubsub(), wrapper->pubsub());
+
+  // Complete the faulted request so the pending handle does not leak expectations.
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  timer_cb_();
+}
+
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithErrorWithDelayFaultTest,
                          RedisSingleServerRequestWithErrorWithDelayFaultTest,
                          testing::Values("get", "set", "incr", "zadd"));
@@ -2850,7 +4678,7 @@ TEST_F(ClusterScopeRoleTest, RoleNormal) {
   Common::Redis::RespValue expected_response;
   expected_response.type(Common::Redis::RespType::Array);
   std::vector<Common::Redis::RespValue> elements(2);
-  // elements[0] corresponds to pool_callbacks_[0] (master)
+  // elements[0] corresponds to pool_callbacks_[0] (primary)
   elements[0].type(Common::Redis::RespType::Array);
   std::vector<Common::Redis::RespValue> master_elements(3);
   master_elements[0].type(Common::Redis::RespType::BulkString);
