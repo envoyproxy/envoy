@@ -12,6 +12,7 @@
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -30,6 +31,7 @@
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/notification.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_manager_impl.h"
@@ -1069,18 +1071,14 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       return;
     }
 
-    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
-    // Pause RDS to ensure that we don't send any requests until we've
-    // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
-    // so we pause RDS until we've completed all the callbacks.
-    Config::ScopedResume resume_rds = xds_manager.pause(type_url);
+    // Pause all Listener-dependent resource types (RDS, SRDS, VHDS, SDS) to ensure
+    // that no subscription requests are sent until all subscriptions have been registered
+    // in the init callbacks. The pause is lifted when resume goes out of scope.
+    const auto listener_type_url = Config::getTypeUrl<envoy::config::listener::v3::Listener>();
+    Config::ScopedResume resume = xds_manager.pause(Config::dependentTypeUrls(listener_type_url));
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize(init_watcher_);
-
-    // Now that we're execute all the init callbacks we can resume RDS
-    // as we've subscribed to all the statically defined RDS resources.
-    // This is done by tearing down the maybe_resume_rds Cleanup object.
   });
 }
 

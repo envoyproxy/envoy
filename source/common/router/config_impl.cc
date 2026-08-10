@@ -2115,7 +2115,8 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)),
-      uses_vhds_(config.has_vhds()),
+      on_demand_vhds_enabled_(config.has_vhds() &&
+                              config.vhds().default_virtual_host_resource_locator().empty()),
       most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()),
       ignore_path_parameters_in_path_matching_(config.ignore_path_parameters_in_path_matching()) {
   if (!config.request_mirror_policies().empty()) {

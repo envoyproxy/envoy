@@ -1047,5 +1047,131 @@ TEST_P(OnDemandVhdsWithBodyIntegrationTest, VhdsOnDemandUpdateWithBody) {
   cleanupUpstreamAndDownstream();
 }
 
+// Test class for VHDS subscribing to an xdstp default virtual host collection
+// (default_virtual_host_resource_locator). On-demand virtual host discovery is disabled in this
+// mode.
+class VhdsXdstpCollectionIntegrationTest : public HttpIntegrationTest,
+                                           public testing::TestWithParam<VhdsIntegrationTestParam> {
+public:
+  VhdsXdstpCollectionIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
+    use_lds_ = false;
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      isUnified() ? "true" : "false");
+  }
+
+  Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const { return std::get<1>(GetParam()); }
+  bool isUnified() const { return std::get<2>(GetParam()) == Grpc::LegacyOrUnified::Unified; }
+  RouteConfigType routeConfigType() const { return std::get<3>(GetParam()); }
+
+  void TearDown() override { cleanUpXdsConnection(); }
+
+  std::string virtualHostYaml(const std::string& name, const std::string& domain) {
+    return fmt::format(VhostTemplate, name, domain);
+  }
+
+  std::string collectionResourceName(const std::string& domain) {
+    return "xdstp://test/envoy.config.route.v3.VirtualHost/default/" + domain;
+  }
+
+  void initialize() override {
+    config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+
+    if (routeConfigType() == RouteConfigType::Static) {
+      config_helper_.addConfigModifier(
+          [&](envoy::extensions::filters::network::http_connection_manager::v3::
+                  HttpConnectionManager& hcm) -> void {
+            hcm.clear_rds();
+            auto* route_config = hcm.mutable_route_config();
+            route_config->CopyFrom(
+                TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+                    RdsConfigWithXdstpDefaultCollection));
+          });
+    }
+
+    setUpstreamCount(2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+
+    defer_listener_finalization_ = true;
+    HttpIntegrationTest::initialize();
+
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+
+    if (routeConfigType() == RouteConfigType::Rds) {
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                              {"my_route"}, true));
+      sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+          Config::TestTypeUrl::get().RouteConfiguration,
+          {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+              RdsConfigWithXdstpDefaultCollection)},
+          "1");
+    }
+
+    // VHDS opens a delta stream subscribing to the xdstp collection.
+    result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    vhds_stream_->startGrpcStream();
+
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(
+        Config::TestTypeUrl::get().VirtualHost,
+        {"xdstp://test/envoy.config.route.v3.VirtualHost/default/*"}, {}, vhds_stream_.get()));
+
+    // Deliver the initial virtual host via the xdstp collection response.
+    sendDeltaVhdsResponse(vhds_stream_,
+                          {{collectionResourceName("sni.lyft.com"),
+                            TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+                                virtualHostYaml("vhost_0", "sni.lyft.com"))}},
+                          {}, "1");
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+
+    test_server_->waitUntilListenersReady();
+    registerTestServerPorts({"http"});
+  }
+
+  FakeStreamPtr vhds_stream_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsXdstpCollectionIntegrationTest,
+                         VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
+
+// Verify that when default_virtual_host_resource_locator is configured:
+// 1. VHDS subscribes to the xdstp glob collection at startup.
+// 2. Virtual hosts from the initial collection response are routable.
+// 3. On-demand virtual host discovery is disabled: a request to an unknown domain does NOT trigger
+//    an on-demand delta request and is answered with a 404 instead.
+TEST_P(VhdsXdstpCollectionIntegrationTest, OnDemandDisabledWhenUsingDefaultCollection) {
+  // Confirm the virtual host delivered via the initial collection response is reachable.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "sni.lyft.com");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Request to an unknown domain. Because on-demand discovery is disabled while subscribing to a
+  // default collection, no on-demand VHDS request is issued and the request is answered locally.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace
 } // namespace Envoy

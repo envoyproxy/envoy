@@ -623,7 +623,7 @@ TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_OK(rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()));
-  EXPECT_TRUE(rds_->configCast()->usesVhds());
+  EXPECT_TRUE(rds_->configCast()->onDemandVhdsEnabled());
 
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
@@ -676,6 +676,90 @@ rds:
   // valid
   EXPECT_CALL(mock_callback, Call(_)).Times(0);
   EXPECT_NO_THROW(post_cb());
+}
+
+// A plain VHDS configuration (no default collection) keeps on-demand virtual host discovery
+// enabled.
+TEST_F(RdsImplTest, OnDemandVhdsEnabledWithoutDefaultCollection) {
+  setup();
+
+  const std::string response_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "vhds": {
+        "config_source": {
+          "resource_api_version": "V3",
+          "api_config_source": {
+            "api_type": "DELTA_GRPC",
+            "transport_api_version": "V3",
+            "grpc_services": {
+              "envoy_grpc": {
+                "cluster_name": "xds_cluster"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+)EOF";
+  auto response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response);
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()).ok());
+  EXPECT_TRUE(rds_->configCast()->onDemandVhdsEnabled());
+}
+
+// When a default virtual host collection is configured, on-demand virtual host discovery is
+// disabled.
+TEST_F(RdsImplTest, OnDemandVhdsDisabledWithDefaultCollection) {
+  setup();
+
+  const std::string response_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "vhds": {
+        "config_source": {
+          "resource_api_version": "V3",
+          "api_config_source": {
+            "api_type": "DELTA_GRPC",
+            "transport_api_version": "V3",
+            "grpc_services": {
+              "envoy_grpc": {
+                "cluster_name": "xds_cluster"
+              }
+            }
+          }
+        },
+        "default_virtual_host_resource_locator":
+          "xdstp://test/envoy.config.route.v3.VirtualHost/foo_route_config/*"
+      }
+    }
+  ]
+}
+)EOF";
+  auto response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response);
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()).ok());
+  EXPECT_FALSE(rds_->configCast()->onDemandVhdsEnabled());
 }
 
 TEST_F(RdsImplTest, RdsRouteConfigProviderImplSubscriptionSetup) {

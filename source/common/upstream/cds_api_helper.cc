@@ -18,13 +18,6 @@ std::pair<uint32_t, std::vector<std::string>>
 CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                              const std::string& system_version_info) {
-  // A cluster update pauses sending EDS and LEDS requests.
-  const std::vector<std::string> paused_xds_types{
-      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-      Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
-      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
-  Config::ScopedResume resume_eds_leds_sds = xds_manager_.pause(paused_xds_types);
-
   ENVOY_LOG(
       info,
       "{}: response indicates {} added/updated cluster(s), {} removed cluster(s); applying changes",
