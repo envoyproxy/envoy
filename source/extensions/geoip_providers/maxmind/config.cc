@@ -25,7 +25,7 @@ public:
   std::shared_ptr<GeoipProvider> get(std::shared_ptr<DriverSingleton> singleton,
                                      const ConfigProto& proto_config,
                                      const std::string& stat_prefix,
-                                     Server::Configuration::FactoryContext& context) {
+                                     Server::Configuration::ServerFactoryContext& context) {
     std::shared_ptr<GeoipProvider> driver;
     const uint64_t key = MessageUtil::hash(proto_config);
     absl::MutexLock lock(mu_);
@@ -35,9 +35,8 @@ public:
     } else {
       const auto& provider_config =
           std::make_shared<GeoipProviderConfig>(proto_config, stat_prefix, context.scope());
-      driver = std::make_shared<GeoipProvider>(
-          context.serverFactoryContext().mainThreadDispatcher(),
-          context.serverFactoryContext().api(), singleton, provider_config);
+      driver = std::make_shared<GeoipProvider>(context.mainThreadDispatcher(), context.api(),
+                                               singleton, provider_config);
       drivers_[key] = driver;
     }
     return driver;
@@ -58,11 +57,10 @@ MaxmindProviderFactory::MaxmindProviderFactory() : FactoryBase("envoy.geoip_prov
 
 DriverSharedPtr MaxmindProviderFactory::createGeoipProviderDriverTyped(
     const ConfigProto& proto_config, const std::string& stat_prefix,
-    Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<DriverSingleton> drivers =
-      context.serverFactoryContext().singletonManager().getTyped<DriverSingleton>(
-          SINGLETON_MANAGER_REGISTERED_NAME(maxmind_geolocation_provider_singleton),
-          [] { return std::make_shared<DriverSingleton>(); });
+    Server::Configuration::ServerFactoryContext& context) {
+  std::shared_ptr<DriverSingleton> drivers = context.singletonManager().getTyped<DriverSingleton>(
+      SINGLETON_MANAGER_REGISTERED_NAME(maxmind_geolocation_provider_singleton),
+      [] { return std::make_shared<DriverSingleton>(); });
   return drivers->get(drivers, proto_config, stat_prefix, context);
 }
 

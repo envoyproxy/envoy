@@ -57,6 +57,7 @@ envoy_extension_cc_test(
         "//source/extensions/network/dns_resolver/hickory:config",
         "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/dynamic_modules:util",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/network/dns_resolver/hickory/v3:pkg_cc_proto",
     ] + HICKORY_ABI_IMPL_DEPS,

@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message OpenTelemetryConfig {
   // The upstream gRPC cluster that will receive OTLP traces.
   // Note that the tracer drops traces if the server does not read data fast enough.
@@ -76,4 +76,8 @@ message OpenTelemetryConfig {
   // Specifies whether to set the ``service.name`` resource attribute.
   // If not specified, the default is to set this attribute.
   google.protobuf.BoolValue set_service_name_resource_attribute = 8;
+
+  // Specifies whether to set the instrumentation scope name ("envoy") and version on emitted traces.
+  // If not specified, the default is to set the instrumentation scope name and version.
+  google.protobuf.BoolValue set_instrumentation_scope = 9;
 }

@@ -1417,12 +1417,51 @@ WEAK_STUB(StatSinkSnapshotGetGaugeCount,
 WEAK_STUB(StatSinkSnapshotGetGauge,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(nullptr, 0, nullptr, 0,
                                                                      nullptr, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogram,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(nullptr, 0, nullptr, 0,
+                                                                         nullptr, nullptr, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramBucketCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(nullptr, 0))
+WEAK_STUB(StatSinkSnapshotGetHistogramBucket,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(nullptr, 0, 0,
+                                                                                nullptr, nullptr))
 WEAK_STUB(StatSinkSnapshotGetTextReadoutCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(nullptr))
 WEAK_STUB(StatSinkSnapshotGetTextReadout,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(nullptr, 0, nullptr, 0,
                                                                             nullptr, nullptr, 0,
                                                                             nullptr))
+WEAK_STUB(StatSinkSnapshotGetCounterTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+              nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetCounterTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(nullptr, 0,
+                                                                                 nullptr))
+WEAK_STUB(StatSinkSnapshotGetCounterTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(nullptr, 0, 0, nullptr,
+                                                                           0, nullptr, nullptr, 0,
+                                                                           nullptr))
+WEAK_STUB(StatSinkSnapshotGetGaugeTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(nullptr, 0,
+                                                                                        nullptr, 0,
+                                                                                        nullptr))
+WEAK_STUB(StatSinkSnapshotGetGaugeTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetGaugeTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(nullptr, 0, 0, nullptr, 0,
+                                                                         nullptr, nullptr, 0,
+                                                                         nullptr))
+WEAK_STUB(StatSinkSnapshotGetTextReadoutTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+              nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetTextReadoutTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(nullptr, 0,
+                                                                                      nullptr))
+WEAK_STUB(StatSinkSnapshotGetTextReadoutTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+              nullptr, 0, 0, nullptr, 0, nullptr, nullptr, 0, nullptr))
 WEAK_STUB(StatSinkConfigDefineGauge,
           envoy_dynamic_module_callback_stat_sink_config_define_gauge(nullptr, {nullptr, 0},
                                                                       nullptr))
@@ -1531,6 +1570,9 @@ WEAK_STUB(HttpSetDynamicMetadataStringBatch,
           envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(nullptr,
                                                                                {nullptr, 0},
                                                                                nullptr, 0))
+WEAK_STUB(HttpSetDynamicMetadataStruct,
+          envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(nullptr, {nullptr, 0},
+                                                                         {nullptr, 0}))
 WEAK_STUB(HttpGetMetadataString, envoy_dynamic_module_callback_http_get_metadata_string(
                                      nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                      {nullptr, 0}, {nullptr, 0}, nullptr))
@@ -1730,6 +1772,14 @@ WEAK_STUB(ListenerFilterSetFilterState,
 WEAK_STUB(ListenerFilterGetFilterState,
           envoy_dynamic_module_callback_listener_filter_get_filter_state(nullptr, {nullptr, 0},
                                                                          nullptr))
+WEAK_STUB(ListenerFilterSetFilterStateTyped,
+          envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(nullptr,
+                                                                               {nullptr, 0},
+                                                                               {nullptr, 0}))
+WEAK_STUB(ListenerFilterGetFilterStateTyped,
+          envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(nullptr,
+                                                                               {nullptr, 0},
+                                                                               nullptr))
 
 WEAK_STUB(FormatterGetAccessLogType,
           envoy_dynamic_module_callback_formatter_get_access_log_type(nullptr))

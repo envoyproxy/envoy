@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.body_size_limit.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.body_size_limit.v3";
+option java_outer_classname = "BodySizeLimitProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/body_size_limit/v3;body_size_limitv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Body Size Limit]
+// Body Size Limit :ref:`configuration overview <config_http_filters_body_size_limit>`.
+// [#extension: envoy.filters.http.body_size_limit]
+
+message BodySizeLimit {
+  // The maximum request body size allowed. If the request body exceeds this limit,
+  // the filter will return a 413 response.
+  google.protobuf.UInt32Value max_request_bytes = 1 [(validate.rules).uint32 = {gt: 0}];
+}

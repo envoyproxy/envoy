@@ -2,11 +2,11 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/substitution_format_string.pb.h"
+#include "envoy/formatter/http_formatter_context.h"
 #include "envoy/network/connection.h"
 #include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/config/datasource.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/codes.h"
@@ -15,13 +15,13 @@
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/connection_socket_impl.h"
-#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/server/generic_factory_context.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 
 namespace Envoy {
@@ -64,7 +64,7 @@ ReverseTunnelFilter::ReverseTunnelStats::generateStats(const std::string& prefix
 // ReverseTunnelFilterConfig implementation.
 absl::StatusOr<std::shared_ptr<ReverseTunnelFilterConfig>> ReverseTunnelFilterConfig::create(
     const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::FactoryContext& context, JwksFetcherFactory create_fetcher_fn) {
 
   Formatter::FormatterConstSharedPtr node_id_formatter;
   Formatter::FormatterConstSharedPtr cluster_id_formatter;
@@ -123,16 +123,28 @@ absl::StatusOr<std::shared_ptr<ReverseTunnelFilterConfig>> ReverseTunnelFilterCo
     }
   }
 
+  // Build the JWT handshake validator if it is configured. This runs here rather than in the
+  // constructor so that a bad configuration fails at config load time.
+  JwtHandshakeValidatorPtr jwt_validator;
+  if (proto_config.has_jwt_validator()) {
+    auto validator_or_error = JwtHandshakeValidator::create(proto_config.jwt_validator(), context,
+                                                            std::move(create_fetcher_fn));
+    if (!validator_or_error.ok()) {
+      return validator_or_error.status();
+    }
+    jwt_validator = std::move(validator_or_error.value());
+  }
+
   return std::shared_ptr<ReverseTunnelFilterConfig>(new ReverseTunnelFilterConfig(
       proto_config, std::move(node_id_formatter), std::move(cluster_id_formatter),
-      std::move(tenant_id_formatter)));
+      std::move(tenant_id_formatter), std::move(jwt_validator)));
 }
 
 ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
     const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
     Formatter::FormatterConstSharedPtr node_id_formatter,
     Formatter::FormatterConstSharedPtr cluster_id_formatter,
-    Formatter::FormatterConstSharedPtr tenant_id_formatter)
+    Formatter::FormatterConstSharedPtr tenant_id_formatter, JwtHandshakeValidatorPtr jwt_validator)
     : ping_interval_(proto_config.has_ping_interval()
                          ? std::chrono::milliseconds(
                                DurationUtil::durationToMilliseconds(proto_config.ping_interval()))
@@ -163,7 +175,10 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
       required_cluster_name_(proto_config.required_cluster_name()),
       use_http_upgrade_(proto_config.use_http_upgrade()),
       skip_rebalancing_(proto_config.skip_rebalancing()),
-      enable_connection_limit_(proto_config.enable_connection_limit()) {}
+      enable_connection_limit_(proto_config.enable_connection_limit()),
+      jwt_validator_(std::move(jwt_validator)) {}
+
+ReverseTunnelFilterConfig::~ReverseTunnelFilterConfig() = default;
 
 bool ReverseTunnelFilterConfig::validateConnectionLimit(absl::string_view node_id,
                                                         absl::string_view tenant_id) const {
@@ -181,6 +196,7 @@ bool ReverseTunnelFilterConfig::validateConnectionLimit(absl::string_view node_i
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id, absl::string_view tenant_id,
+    const Http::RequestHeaderMap& request_headers,
     const StreamInfo::StreamInfo& stream_info) const {
 
   if (!validateConnectionLimit(node_id, tenant_id)) {
@@ -194,9 +210,14 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
     return true;
   }
 
+  // Give the formatter the parsed handshake headers so validation strings can read them with
+  // %REQ(...)%, and %DYNAMIC_METADATA(namespace:claim)% can pick up any JWT claims published
+  // earlier in the handshake.
+  const Formatter::Context context(&request_headers);
+
   // Validate node_id if formatter is configured.
   if (node_id_formatter_) {
-    const std::string expected_node_id = node_id_formatter_->format({}, stream_info);
+    const std::string expected_node_id = node_id_formatter_->format(context, stream_info);
     if (!expected_node_id.empty() && expected_node_id != node_id) {
       ENVOY_LOG(debug, "reverse_tunnel: node_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_node_id, node_id);
@@ -206,7 +227,7 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
 
   // Validate cluster_id if formatter is configured.
   if (cluster_id_formatter_) {
-    const std::string expected_cluster_id = cluster_id_formatter_->format({}, stream_info);
+    const std::string expected_cluster_id = cluster_id_formatter_->format(context, stream_info);
     if (!expected_cluster_id.empty() && expected_cluster_id != cluster_id) {
       ENVOY_LOG(debug, "reverse_tunnel: cluster_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_cluster_id, cluster_id);
@@ -216,7 +237,7 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
 
   // Validate tenant_id if formatter is configured.
   if (tenant_id_formatter_) {
-    const std::string expected_tenant_id = tenant_id_formatter_->format({}, stream_info);
+    const std::string expected_tenant_id = tenant_id_formatter_->format(context, stream_info);
     if (!expected_tenant_id.empty() && expected_tenant_id != tenant_id) {
       ENVOY_LOG(debug, "reverse_tunnel: tenant_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_tenant_id, tenant_id);
@@ -489,10 +510,33 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
     }
   }
 
-  // Validate node_id, cluster_id, and tenant_id if validation is configured.
   auto& connection = parent_.read_callbacks_->connection();
-  const bool validation_passed =
-      parent_.config_->validateIdentifiers(node_id, cluster_id, tenant_id, connection.streamInfo());
+
+  // Authenticate the handshake's bearer token (if configured) before validation and before the
+  // socket is registered, so a forged or expired token can never yield a usable reverse tunnel.
+  // On success this publishes the verified claims as dynamic metadata for %DYNAMIC_METADATA%
+  // binding in the validation block below.
+  if (parent_.config_->jwtEnabled() &&
+      !parent_.config_->verifyHandshakeJwt(*headers_, connection.streamInfo())) {
+    if (parent_.config_->jwtRequired()) {
+      parent_.stats_.jwt_denied_.inc();
+      ENVOY_CONN_LOG(debug, "reverse_tunnel: jwt authentication failed", connection);
+      sendLocalReply(Http::Code::Unauthorized, "JWT authentication failed", nullptr, std::nullopt,
+                     "reverse_tunnel_jwt_denied");
+      connection.close(Network::ConnectionCloseType::FlushWrite);
+      return;
+    }
+    // In audit mode (allow_missing_or_failed) count what enforcement would have rejected but let
+    // the handshake proceed. No claims were published, so any %DYNAMIC_METADATA% binding will not
+    // match.
+    parent_.stats_.jwt_would_deny_.inc();
+    ENVOY_CONN_LOG(debug, "reverse_tunnel: jwt authentication failed (audit mode, allowing)",
+                   connection);
+  }
+
+  // Validate node_id, cluster_id, and tenant_id if validation is configured.
+  const bool validation_passed = parent_.config_->validateIdentifiers(
+      node_id, cluster_id, tenant_id, *headers_, connection.streamInfo());
 
   // Emit validation metadata if configured.
   parent_.config_->emitValidationMetadata(node_id, cluster_id, tenant_id, validation_passed,
@@ -538,7 +582,21 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
     }
   }
 
-  parent_.processAcceptedConnection(node_id, cluster_id, tenant_id, initiation_time_ms);
+  // Extract the initiator's worker and connection identifiers if present. Both are optional so
+  // older initiators that do not advertise them are handled gracefully (empty values).
+  const auto initiator_worker_vals =
+      headers_->get(Bootstrap::ReverseConnection::reverseTunnelWorkerIdHeader());
+  const absl::string_view initiator_worker_id =
+      initiator_worker_vals.empty() ? absl::string_view{}
+                                    : initiator_worker_vals[0]->value().getStringView();
+  const auto initiator_connection_vals =
+      headers_->get(Bootstrap::ReverseConnection::reverseTunnelConnectionIdHeader());
+  const absl::string_view initiator_connection_id =
+      initiator_connection_vals.empty() ? absl::string_view{}
+                                        : initiator_connection_vals[0]->value().getStringView();
+
+  parent_.processAcceptedConnection(node_id, cluster_id, tenant_id, initiation_time_ms,
+                                    initiator_worker_id, initiator_connection_id);
   parent_.stats_.accepted_.inc();
 
   // Close the listener-side connection so tunnel bytes go to the duped fd, not back into
@@ -553,7 +611,9 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
 void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
                                                     absl::string_view cluster_id,
                                                     absl::string_view tenant_id,
-                                                    int64_t initiation_time_ms) {
+                                                    int64_t initiation_time_ms,
+                                                    absl::string_view initiator_worker_id,
+                                                    absl::string_view initiator_connection_id) {
   ENVOY_CONN_LOG(debug,
                  "reverse_tunnel: connection accepted for node '{}' in cluster '{}' (tenant: '{}')",
                  read_callbacks_->connection(), node_id, cluster_id, tenant_id);
@@ -617,7 +677,8 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
   socket_manager->addConnectionSocket(std::string(node_id), std::string(cluster_id),
                                       std::move(wrapped_socket), ping_seconds,
-                                      /* rebalanced= */ config_->skipRebalancing(), tenant_id);
+                                      /* rebalanced= */ config_->skipRebalancing(), tenant_id,
+                                      initiator_worker_id, initiator_connection_id);
   ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
                  connection);
 
