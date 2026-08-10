@@ -539,22 +539,39 @@ TEST(StructuralMatchTest, KindMismatchRejected) {
   }
 }
 
-// Probes matchesPatternPath's degenerate arguments directly from inside a
-// callback: depth 0, depth >= kMaxTrackedDepth, and segment count != depth
-// all return false rather than reading out of bounds or matching.
+// Probes matchesPatternPath's degenerate arguments from inside a callback:
+// depth 0, depth >= kMaxTrackedDepth, segment count != depth, and a depth above
+// the cursor's level all return false rather than matching or reading out of
+// bounds.
+//
+// The last is reachable, not hypothetical: per-depth state survives a pop, so
+// levels above the cursor still hold a closed container's labels. Against
+// {"a":{"b":1},"c":"x"}, key_stack_[2] reads "b" while the cursor sits at "c".
 class MatchProbeHandler : public MockHandler {
 public:
   void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
 
   bool openStringCapture(absl::string_view, int depth, size_t) override {
-    const std::vector<WuffsJsonCursor::PatternSegment> one = {{"a", false}};
+    const std::vector<WuffsJsonCursor::PatternSegment> one = {{"c", false}};
     matched_correct_ = cursor_->matchesPatternPath(one, depth);
     matched_depth_zero_ = cursor_->matchesPatternPath(one, 0);
     matched_size_mismatch_ = cursor_->matchesPatternPath(one, 2);
     const std::vector<WuffsJsonCursor::PatternSegment> deep(WuffsJsonCursor::kMaxTrackedDepth,
                                                             {"a", false});
     matched_over_bound_ = cursor_->matchesPatternPath(deep, WuffsJsonCursor::kMaxTrackedDepth);
+    // Case 2: ["c","b"] names a path that only existed inside the closed {"b":1}.
+    const std::vector<WuffsJsonCursor::PatternSegment> c_b = {{"c"}, {"b"}};
+    matched_closed_sibling_ = cursor_->matchesPatternPath(c_b, 2);
     return false;
+  }
+
+  void onContainerClose(int depth, size_t) override {
+    // Case 1: `depth` here is the popped container's level, already one above
+    // the cursor. ["a","b"] described the chain until the pop.
+    if (depth == 2) {
+      const std::vector<WuffsJsonCursor::PatternSegment> a_b = {{"a"}, {"b"}};
+      matched_after_pop_ = cursor_->matchesPatternPath(a_b, depth);
+    }
   }
 
   const WuffsJsonCursor* cursor_{nullptr};
@@ -562,17 +579,21 @@ public:
   bool matched_depth_zero_{true};
   bool matched_size_mismatch_{true};
   bool matched_over_bound_{true};
+  bool matched_closed_sibling_{true};
+  bool matched_after_pop_{true};
 };
 
-TEST(StructuralMatchTest, DegenerateDepthArgumentsReturnFalse) {
+TEST(StructuralMatchTest, WrongDepthArgumentNeverMatches) {
   MatchProbeHandler h;
   WuffsJsonCursor cursor(h);
   h.setCursor(&cursor);
-  ASSERT_TRUE(cursor.feed(R"({"a":"x"})", /*closed=*/true).ok());
+  ASSERT_TRUE(cursor.feed(R"({"a":{"b":1},"c":"x"})", /*closed=*/true).ok());
   EXPECT_TRUE(h.matched_correct_); // sanity: the well-formed call matches
   EXPECT_FALSE(h.matched_depth_zero_);
   EXPECT_FALSE(h.matched_size_mismatch_);
   EXPECT_FALSE(h.matched_over_bound_);
+  EXPECT_FALSE(h.matched_closed_sibling_);
+  EXPECT_FALSE(h.matched_after_pop_);
 }
 
 // Executable form of the container depth-1 recipe documented on the cursor:
