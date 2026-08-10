@@ -15,6 +15,7 @@
 #include "source/common/quic/quic_ssl_connection_info.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/quic/send_buffer_monitor.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 #include "quiche/quic/core/quic_connection.h"
@@ -183,6 +184,12 @@ public:
   void incrementSentQuicResetStreamErrorStats(quic::QuicResetStreamError error, bool from_self,
                                               bool is_upstream);
 
+#ifndef ENVOY_ENABLE_UHV
+  // Latched value of the `validate_upstream_headers` runtime feature, read once per connection
+  // and consulted per stream when validating request headers.
+  bool shouldValidateUpstreamHeaders() const { return validate_upstream_headers_; }
+#endif
+
   bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override;
 
 protected:
@@ -233,6 +240,10 @@ private:
   std::string transport_failure_reason_;
   uint64_t bytes_to_send_{0};
   uint32_t max_headers_count_{std::numeric_limits<uint32_t>::max()};
+#ifndef ENVOY_ENABLE_UHV
+  const bool validate_upstream_headers_{
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers")};
+#endif
   // Keeps the buffer state of the connection, and react upon the changes of how many bytes are
   // buffered cross all streams' send buffer. The state is evaluated and may be changed upon each
   // stream write. QUICHE doesn't buffer data in connection, all the data is buffered in stream's
