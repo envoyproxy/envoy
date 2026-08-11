@@ -646,6 +646,7 @@ EXTENSIONS = {
     #
     "envoy.router.cluster_specifier_plugin.lua":     "//source/extensions/router/cluster_specifiers/lua:config",
     "envoy.router.cluster_specifier_plugin.matcher": "//source/extensions/router/cluster_specifiers/matcher:config",
+    "envoy.router.cluster_specifier_plugin.priority_group": "//source/extensions/router/cluster_specifiers/priority_group:config",
 
     #
     # Extensions for generic proxy

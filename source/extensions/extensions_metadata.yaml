@@ -1545,6 +1545,13 @@ envoy.router.cluster_specifier_plugin.matcher:
   status: alpha
   type_urls:
   - envoy.extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier
+envoy.router.cluster_specifier_plugin.priority_group:
+  categories:
+  - envoy.router.cluster_specifier_plugin
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier
 envoy.stat_sinks.dog_statsd:
   categories:
   - envoy.stats_sinks

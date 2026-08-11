@@ -1799,7 +1799,9 @@ message RetryPolicy {
   // .. note::
   //   This currently works when the route cluster specifier support the dynamic refresh,
   //   e.g. :ref:`matcher cluster specifier
-  //   <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`.
+  //   <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`
+  //   or :ref:`priority group cluster specifier
+  //   <envoy_v3_api_msg_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier>`.
   bool refresh_cluster_on_retry = 14;
 }
 

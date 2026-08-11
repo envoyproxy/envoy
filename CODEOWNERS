@@ -455,6 +455,7 @@
 # Cluster specifier
 /*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
 /*/extensions/router/cluster_specifiers/matcher @wbpcode @agrawroh
+/*/extensions/router/cluster_specifiers/priority_group @wbpcode @kanurag94
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED

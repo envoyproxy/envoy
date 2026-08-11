@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package envoy.extensions.router.cluster_specifiers.priority_group.v3;
+
+import "envoy/type/metadata/v3/metadata.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.router.cluster_specifiers.priority_group.v3";
+option java_outer_classname = "PriorityGroupProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/router/cluster_specifiers/priority_group/v3;priority_groupv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Priority Group Based Cluster Specifier]
+// [#extension: envoy.router.cluster_specifier_plugin.priority_group]
+
+// A weighted cluster of a :ref:`priority group
+// <envoy_v3_api_msg_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup>`.
+message ClusterWeight {
+  // Name of the upstream cluster.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Weight of the cluster relative to the other clusters of the same group.
+  google.protobuf.UInt32Value weight = 2
+      [(validate.rules).uint32 = {gte: 1}, (validate.rules).message = {required: true}];
+}
+
+// A named group of weighted clusters. All the clusters of a group are considered to have the
+// same priority and the target cluster is selected from the group based on the weights.
+message PriorityGroup {
+  // Name of the group. The name is used to reference the group from the :ref:`group override
+  // metadata
+  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.group_override_metadata>`
+  // and should be unique across all the groups of the same cluster specifier. If multiple groups
+  // share the same name, then the first one of them is used when the group is referenced by name.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The candidate clusters of this group.
+  repeated ClusterWeight clusters = 2 [(validate.rules).repeated = {min_items: 1}];
+}
+
+// Cluster specifier plugin that selects a :ref:`priority group
+// <envoy_v3_api_msg_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup>` based
+// on the attempt of the request first, and then selects a cluster from the selected group based
+// on the weights of the clusters.
+//
+// The group is selected by the attempt count of the request: the initial attempt uses the first
+// group of the list, the first retry uses the second group, and so on. If the attempt count
+// exceeds the number of the available groups, the selection wraps around to the beginning of the
+// list.
+//
+// This plugin supports refreshing the target cluster of the returned route entry, so it could be
+// used together with the :ref:`refresh cluster on retry
+// <envoy_v3_api_field_config.route.v3.RetryPolicy.refresh_cluster_on_retry>` to retry the request in
+// a different priority group.
+//
+// Example:
+//
+// .. validated-code-block:: yaml
+//   :type-name: envoy.extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier
+//
+//   priority_groups:
+//   - name: local
+//     clusters:
+//     - name: local_primary
+//       weight: 80
+//     - name: local_secondary
+//       weight: 20
+//   - name: remote
+//     clusters:
+//     - name: remote_primary
+//       weight: 100
+//
+// With the configuration above, the initial attempt will be routed to ``local_primary`` or
+// ``local_secondary`` (80/20), and the first retry will be routed to ``remote_primary``.
+//
+message PriorityGroupClusterSpecifier {
+  // The list of the priority groups. The order of the groups is the default selection order that
+  // is used when the :ref:`group override metadata
+  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.group_override_metadata>`
+  // is not configured or not available in the request.
+  repeated PriorityGroup priority_groups = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // Optional dynamic metadata key that is used to override the priority groups on a per-request
+  // basis. If this is configured and the referenced dynamic metadata value is a non-empty list,
+  // then the priority group of the current attempt is read from that list: the initial attempt
+  // uses the first element of the list, the first retry uses the second element, and so on,
+  // wrapping around when the attempt count exceeds the size of the list.
+  //
+  // Every element of the list must be a struct that overrides one priority group. Only the
+  // ``name`` field is supported for now and it selects the configured priority group with the
+  // same :ref:`name
+  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup.name>`.
+  // More fields may be supported in the future, for example to also override the weighted
+  // clusters of the group.
+  //
+  // The dynamic metadata is typically set by a filter that runs before the router filter, for
+  // example the :ref:`header to metadata filter
+  // <config_http_filters_header_to_metadata>`.
+  //
+  // Example of a matching dynamic metadata value:
+  //
+  // .. code-block:: yaml
+  //
+  //   envoy.my_filter:
+  //     priority_groups:
+  //     - name: remote
+  //     - name: local
+  //
+  // If the metadata is missing, is not a list, is an empty list, or the element of the current
+  // attempt does not select a configured priority group, then the default order of
+  // :ref:`priority_groups
+  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.priority_groups>`
+  // is used instead.
+  type.metadata.v3.MetadataKey group_override_metadata = 2;
+}
