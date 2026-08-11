@@ -110,6 +110,7 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
         uint64_t rq_issued = 0;
         LoadMetricStats::StatMap aggregated_host_custom_metrics;
 
+        // This message is removed if no upstream locality stats need to be sent.
         auto* locality_stats = cluster_stats->add_upstream_locality_stats();
         locality_stats->mutable_locality()->MergeFrom(hosts[0]->locality());
         locality_stats->set_priority(host_set->priority());
@@ -218,6 +219,8 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
             load_metric_stats->set_total_metric_value(metric.second.total_metric_value);
           }
         } else {
+          // If no upstream locality stats need to be sent, this trims the empty message that was
+          // added near the beginning of the host set loop.
           cluster_stats->mutable_upstream_locality_stats()->RemoveLast();
         }
       }
