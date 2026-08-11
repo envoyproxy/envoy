@@ -488,6 +488,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/http:filter_chain_helper_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",
@@ -628,6 +629,7 @@ envoy_cc_benchmark_binary(
     srcs = ["header_formatter_speed_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/router:router_lib",
         "//test/common/stream_info:test_util",
         "@benchmark",

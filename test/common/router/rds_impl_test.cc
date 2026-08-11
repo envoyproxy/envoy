@@ -807,6 +807,107 @@ TEST_F(RdsImplTest, VhdsUpdatePublishesWithoutRecreatingTheVhdsSubscription) {
                        ->clusterName());
 }
 
+// VHDS added by an RDS update to a route configuration that didn't have it before starts the VHDS
+// subscription.
+TEST_F(RdsImplTest, VHDSAddedByALaterRDSUpdate) {
+  setup();
+
+  const std::string without_vhds_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": [
+        {
+          "name": "foo",
+          "domains": ["foo"],
+          "routes": [{"match": {"prefix": "/foo"}, "route": {"cluster": "foo"}}]
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(without_vhds_json);
+  const auto decoded_resources_1 =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(rds_callbacks_->onConfigUpdate(decoded_resources_1.refvec_, response1.version_info()));
+  EXPECT_FALSE(rds_->configCast()->usesVhds());
+  // No VHDS subscription yet, so the RDS one is still the most recently created subscription.
+  EXPECT_EQ(rds_callbacks_,
+            server_factory_context_.cluster_manager_.subscription_factory_.callbacks_);
+
+  auto response2 = TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+      vhdsRdsConfigJson("2"));
+  const auto decoded_resources_2 =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response2);
+  EXPECT_OK(rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()));
+  EXPECT_TRUE(rds_->configCast()->usesVhds());
+
+  // The VHDS subscription was created, so it is now the most recently created subscription.
+  EXPECT_NE(rds_callbacks_,
+            server_factory_context_.cluster_manager_.subscription_factory_.callbacks_);
+}
+
+// A VHDS update publishes through the RDS publishing path, so that everything that hangs off it -
+// the route config provider, the update callbacks that scoped RDS registers - sees the rebuilt
+// route configuration. It must not re-create the VHDS subscription that is delivering the update.
+TEST_F(RdsImplTest, VhdsUpdatePublishesWithoutRecreatingTheVhdsSubscription) {
+  setup();
+
+  auto rds_response = TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+      vhdsRdsConfigJson("1"));
+  const auto decoded_rds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(rds_response);
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(
+      rds_callbacks_->onConfigUpdate(decoded_rds_resources.refvec_, rds_response.version_info()));
+  EXPECT_EQ(1UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+
+  // The RDS update created the VHDS subscription, so the subscription factory now hands out its
+  // callbacks.
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks =
+      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(nullptr, vhds_callbacks);
+  ASSERT_NE(rds_callbacks_, vhds_callbacks);
+
+  // Deliver a VHDS update through that subscription.
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+  auto* added = added_resources.Add();
+  added->set_name("bar");
+  added->set_version("2");
+  std::ignore = added->mutable_resource()->PackFrom(
+      TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
+name: bar
+domains: ["bar"]
+routes:
+- match: { prefix: "/" }
+  route: { cluster: "foo" }
+)EOF"));
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "2"));
+
+  // The VhdsSubscription survived delivering its own update, i.e. it wasn't re-created and
+  // destroyed from within beforeProviderUpdate() while its onConfigUpdate() was on the stack.
+  EXPECT_EQ(1UL, scope_.counter("foo.rds.vhds.foo_route_config.config_reload").value());
+  EXPECT_EQ(vhds_callbacks,
+            server_factory_context_.cluster_manager_.subscription_factory_.callbacks_);
+  // The RDS publishing path ran for the VHDS update, which is what propagates the rebuilt route
+  // configuration to the update callbacks.
+  EXPECT_EQ(2UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "bar"}, {":path", "/"}})
+                       ->routeEntry()
+                       ->clusterName());
+}
+
 // Validate behavior when the config fails delivery at the subscription level.
 TEST_F(RdsImplTest, FailureSubscription) {
   InSequence s;

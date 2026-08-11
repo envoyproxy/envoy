@@ -2861,6 +2861,23 @@ envoy_cc_library(
 )
 
 envoy_quic_cc_library(
+    name = "quic_core_ack_timestamp_list_lib",
+    srcs = ["quiche/quic/core/quic_ack_timestamp_list.cc"],
+    hdrs = ["quiche/quic/core/quic_ack_timestamp_list.h"],
+    deps = [
+        ":quic_core_data_lib",
+        ":quic_core_frames_frames_lib",
+        ":quic_core_time_lib",
+        ":quic_core_types_lib",
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_logging",
+        "@abseil-cpp//absl/container:fixed_array",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/types:span",
+    ],
+)
+
+envoy_quic_cc_library(
     name = "quic_core_framer_lib",
     srcs = ["quiche/quic/core/quic_framer.cc"],
     hdrs = [
@@ -2868,6 +2885,7 @@ envoy_quic_cc_library(
         "quiche/quic/core/scone.h",
     ],
     deps = [
+        ":quic_core_ack_timestamp_list_lib",
         ":quic_core_connection_id_generator_interface_lib",
         ":quic_core_constants_lib",
         ":quic_core_crypto_crypto_handshake_lib",

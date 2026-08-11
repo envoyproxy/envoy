@@ -987,6 +987,9 @@ envoy_dynamic_module_on_http_filter_response_trailers(
  * envoy_dynamic_module_on_http_filter_stream_complete is called when the HTTP stream is complete.
  * This is called before envoy_dynamic_module_on_http_filter_destroy and access logs are flushed.
  *
+ * Unlike envoy_dynamic_module_on_http_filter_destroy, this can run while another event hook of the
+ * same filter is on the stack, because a hook that ends the stream completes it inline.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
@@ -999,6 +1002,15 @@ void envoy_dynamic_module_on_http_filter_stream_complete(
 /**
  * envoy_dynamic_module_on_http_filter_destroy is called when the HTTP filter is destroyed for each
  * HTTP stream.
+ *
+ * Envoy runs this from the worker dispatcher's deferred deletion list, so it is never called while
+ * another event hook of the same filter is on the stack. A hook can end the stream, for example via
+ * envoy_dynamic_module_callback_http_filter_recreate_stream, which tears the filter chain down
+ * before the hook returns. Envoy does not destroy the in-module filter before that hook returns,
+ * and the callbacks the module makes after the teardown are safe.
+ *
+ * By the time this is called the filter is already detached from the HTTP stream, so the callbacks
+ * that need it are no-ops.
  *
  * @param filter_module_ptr is the pointer to the in-module HTTP filter.
  */
@@ -2155,6 +2167,38 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns,
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_struct is called by the module to set an
+ * entire dynamic metadata namespace from a serialized google.protobuf.Struct. The struct is merged
+ * into the namespace and existing entries with the same key are overwritten. If the buffer does not
+ * parse as a google.protobuf.Struct, this is a no-op.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct value to set.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_typed_metadata is called by the module to set an
+ * entire typed dynamic metadata namespace from a serialized google.protobuf.Any. The Any is merged
+ * into the namespace's typed_filter_metadata entry. If the buffer does not parse as a
+ * google.protobuf.Any, this is a no-op.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_any is the serialized google.protobuf.Any value to set.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
 
 /**
  * envoy_dynamic_module_callback_http_get_metadata_string is called by the module to get
@@ -3411,7 +3455,9 @@ void envoy_dynamic_module_callback_http_filter_send_go_away_and_close(
  * with new headers. This is useful for implementing internal redirects or request retries.
  *
  * After calling this function successfully, the current filter chain will be destroyed and a new
- * stream will be created. The filter should return StopIteration from the current event hook.
+ * stream will be created. The filter should return StopIteration from the current event hook. The
+ * in-module filter stays valid until the hook returns, and the callbacks the module makes after
+ * the teardown are safe and do not affect the recreated stream.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.

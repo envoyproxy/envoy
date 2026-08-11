@@ -34,9 +34,8 @@ namespace Rds {
  */
 class ConfigWarmer : protected Logger::Loggable<Logger::Id::rds> {
 public:
-  ConfigWarmer(
-      OptRef<Event::Dispatcher> dispatcher = {}, std::function<void()> on_warmed_callback = []() {})
-      : main_dispatcher_(dispatcher), on_warmed_callback_(on_warmed_callback) {}
+  ConfigWarmer(Event::Dispatcher& dispatcher, std::function<void()> on_warmed_callback)
+      : dispatcher_(dispatcher), on_warmed_callback_(on_warmed_callback) {}
 
   /**
    * Sets the observer that is notified once an update is warmed up.
@@ -65,7 +64,7 @@ public:
   void abortWarming() {
     if (init_manager_ != nullptr) {
       init_watcher_.reset();
-      mayDeferDeleteInitManager();
+      deferDeleteInitManager();
       update_id_.clear();
     }
   }
@@ -97,9 +96,9 @@ private:
   // ready. Drops the per-update init manager and notifies the observer.
   void onWarmed();
 
-  void mayDeferDeleteInitManager();
+  void deferDeleteInitManager();
 
-  OptRef<Event::Dispatcher> main_dispatcher_;
+  Event::Dispatcher& dispatcher_;
   std::function<void()> on_warmed_callback_;
   OptRef<RouteConfigUpdateObserver> observer_;
   // Init manager that is used to warm up the resources owned by the route configuration of the

@@ -31,13 +31,14 @@ absl::StatusOr<Http::FilterFactoryCb>
 GrpcJsonTranscoderFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   absl::Status creation_status = absl::OkStatus();
   JsonTranscoderConfigSharedPtr filter_config =
       std::make_shared<JsonTranscoderConfig>(proto_config, context.api(), creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
   auto stats = std::make_shared<GrpcJsonTranscoderFilterStats>(
-      GrpcJsonTranscoderFilterStats::generateStats(stats_prefix, context.scope()));
+      GrpcJsonTranscoderFilterStats::generateStats(extra_context.stats_prefix, context.scope()));
   return [filter_config, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<JsonTranscoderFilter>(filter_config, stats));
   };

@@ -5,6 +5,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/init/manager.h"
 #include "envoy/rds/route_config_provider.h"
 
 namespace Envoy {
@@ -57,6 +58,21 @@ public:
    * on it any more and doing so would only starve a listener that is already serving.
    */
   virtual void onRdsFailure() PURE;
+
+  /**
+   * Sets the observer of updates to the RouteConfiguration.
+   * @param observer supplies the observer. This should have a lifetime that is at least as long as
+   * the lifetime of this receiver.
+   */
+  virtual void setObserver(RouteConfigUpdateObserver& observer) PURE;
+
+  /**
+   * @return bool whether the RouteConfiguration built by a previous RDS update is still warming up,
+   * i.e. whether the observer hasn't been notified about it yet. An update that turns out to be a
+   * no-op leaves such an update alone, so this may be true even if the last onRdsUpdate() call
+   * returned false.
+   */
+  virtual bool configWarming() const PURE;
 
   /**
    * Sets the observer of updates to the RouteConfiguration.

@@ -72,6 +72,8 @@ void StaticRouteConfigProviderImpl::requestVirtualHostsUpdate(
   });
 }
 
+// TODO(wbpcode): for inline route configuration with VHDS, we assume the route configuration self
+// needn't be warmed up for now.
 StaticRouteConfigProviderImpl::VhdsContext::VhdsContext(
     const envoy::config::route::v3::RouteConfiguration& config,
     Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,

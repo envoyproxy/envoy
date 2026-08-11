@@ -194,13 +194,18 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
     options.extend(["-I" + include_path for include_path in include_paths])
     options.append("--descriptor_set_out=$@")
 
-    cmd = "$(location @com_google_protobuf//:protoc) " + " ".join(options + input_files)
+    # TODO(phlax): envoy_proto_descriptor is a genrule and cannot consume the proto toolchain
+    #    directly via ctx.toolchains. The binary exposed at //tools/protoc:protoc wraps the
+    #    same prebuilt protoc registered as the canonical proto toolchain and is the pragmatic
+    #    path for genrule consumers. A cleaner approach would be to convert this to a proper
+    #    rule that requests the toolchain, but the genrule is sufficient for now.
+    cmd = "$(location @envoy//tools/protoc:protoc) " + " ".join(options + input_files)
     native.genrule(
         name = name,
         srcs = srcs,
         outs = [out],
         cmd = cmd,
-        tools = ["@com_google_protobuf//:protoc"],
+        tools = ["@envoy//tools/protoc:protoc"],
     )
 
 # Dependencies on Google grpc should be wrapped with this function.

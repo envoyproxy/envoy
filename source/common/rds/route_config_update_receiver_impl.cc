@@ -47,13 +47,9 @@ private:
   std::unique_ptr<Init::ManagerImpl> init_manager_;
 };
 
-void ConfigWarmer::mayDeferDeleteInitManager() {
-  if (main_dispatcher_.has_value()) {
-    main_dispatcher_->deferredDelete(
-        std::make_unique<DeferredDeleteInitManagerCleanup>(std::move(init_manager_)));
-  } else {
-    init_manager_.reset();
-  }
+void ConfigWarmer::deferDeleteInitManager() {
+  dispatcher_.deferredDelete(
+      std::make_unique<DeferredDeleteInitManagerCleanup>(std::move(init_manager_)));
 }
 
 RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
