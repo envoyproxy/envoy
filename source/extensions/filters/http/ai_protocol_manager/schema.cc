@@ -45,10 +45,17 @@ std::string jsonTypeName(const nlohmann::json& json) {
 }
 
 std::string makeChildPath(absl::string_view parent_path, absl::string_view child_key) {
-  if (parent_path == "/") {
-    return absl::StrCat("/", child_key);
+  if (parent_path.empty()) {
+    return std::string(child_key);
   }
-  return absl::StrCat(parent_path, "/", child_key);
+  return absl::StrCat(parent_path, ".", child_key);
+}
+
+std::string makeArrayChildPath(absl::string_view parent_path, size_t index) {
+  if (parent_path.empty()) {
+    return absl::StrCat("[", index, "]");
+  }
+  return absl::StrCat(parent_path, "[", index, "]");
 }
 
 } // namespace
@@ -231,7 +238,7 @@ absl::Status Schema::validate(const nlohmann::json& json, absl::string_view path
     }
     if (element_schema_ != nullptr) {
       for (size_t i = 0; i < json.size(); ++i) {
-        const std::string child_path = makeChildPath(path, absl::StrCat(i));
+        const std::string child_path = makeArrayChildPath(path, i);
         auto status = element_schema_->validate(json[i], child_path);
         if (!status.ok()) {
           return status;

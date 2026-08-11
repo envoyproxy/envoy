@@ -25,6 +25,8 @@ namespace AiProtocolManager {
 // Supports primitive types (String, Number, Integer, Boolean, Null, Any), composite types
 // (Object, Array), and polymorphic union types (OneOf).
 //
+// Fields default to optional unless explicitly marked `.required()`.
+//
 // Allows explicit marking of `.offloadable()` string fields that accept buffer-offloaded
 // `ExternalRef` nodes from `JsonWithExtBuf`, while rejecting offload nodes on non-offloadable
 // metadata fields (e.g. `model`, `role`, `type`).
@@ -76,10 +78,6 @@ public:
     is_required_ = req;
     return *this;
   }
-  Schema& optional() {
-    is_required_ = false;
-    return *this;
-  }
   bool isRequired() const { return is_required_; }
 
   Schema& offloadable(bool off = true) {
@@ -114,9 +112,9 @@ public:
   }
 
   // Validation:
-  absl::Status validate(const nlohmann::json& json, absl::string_view path = "/") const;
+  absl::Status validate(const nlohmann::json& json, absl::string_view path = "") const;
   absl::Status validate(const JsonWithExtBuf& payload) const {
-    return validate(payload.json(), "/");
+    return validate(payload.json(), "");
   }
 
   // Introspection & Reflection accessors:
@@ -150,19 +148,25 @@ private:
 class RequestSchema {
 public:
   RequestSchema() : root_schema_(Schema::object({}).allowUnknownFields(true)) {}
-  explicit RequestSchema(Schema root_schema) : root_schema_(std::move(root_schema)) {}
+  explicit RequestSchema(Schema root_schema, std::vector<std::string> streamable_field_order = {})
+      : root_schema_(std::move(root_schema)),
+        streamable_field_order_(std::move(streamable_field_order)) {}
 
   const Schema& rootSchema() const { return root_schema_; }
+
+  // Returns the declared canonical ordering of streamable / offloadable field paths.
+  const std::vector<std::string>& streamableFieldOrder() const { return streamable_field_order_; }
 
   absl::Status validate(const JsonWithExtBuf& payload) const {
     return root_schema_.validate(payload);
   }
   absl::Status validate(const nlohmann::json& json) const {
-    return root_schema_.validate(json, "/");
+    return root_schema_.validate(json, "");
   }
 
 private:
   Schema root_schema_;
+  std::vector<std::string> streamable_field_order_;
 };
 
 // Response schema definition. Left empty / placeholder for now as response
@@ -170,12 +174,16 @@ private:
 class ResponseSchema {
 public:
   ResponseSchema() = default;
-  explicit ResponseSchema(Schema root_schema) : root_schema_(std::move(root_schema)) {}
+  explicit ResponseSchema(Schema root_schema, std::vector<std::string> streamable_field_order = {})
+      : root_schema_(std::move(root_schema)),
+        streamable_field_order_(std::move(streamable_field_order)) {}
 
   const std::optional<Schema>& rootSchema() const { return root_schema_; }
+  const std::vector<std::string>& streamableFieldOrder() const { return streamable_field_order_; }
 
 private:
   std::optional<Schema> root_schema_;
+  std::vector<std::string> streamable_field_order_;
 };
 
 // Container holding the pair of request and response schemas for an AI endpoint protocol.
@@ -187,6 +195,11 @@ public:
 
   const RequestSchema& requestSchema() const { return request_schema_; }
   const ResponseSchema& responseSchema() const { return response_schema_; }
+
+  // Canonical ordering of streamable / offloadable field paths for request payloads.
+  const std::vector<std::string>& requestStreamableFieldOrder() const {
+    return request_schema_.streamableFieldOrder();
+  }
 
   absl::Status validateRequest(const JsonWithExtBuf& payload) const {
     return request_schema_.validate(payload);

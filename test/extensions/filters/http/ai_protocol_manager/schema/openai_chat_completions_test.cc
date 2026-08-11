@@ -143,7 +143,18 @@ TEST(OpenAiChatCompletionsTest, MissingRequiredFields) {
   };
   auto role_err = payload_schema.validateRequest(missing_role);
   EXPECT_THAT(role_err, StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_EQ(role_err.message(), "missing required field: /messages/0/role");
+  EXPECT_EQ(role_err.message(), "missing required field: messages[0].role");
+}
+
+TEST(OpenAiChatCompletionsTest, CanonicalStreamableFieldOrder) {
+  PayloadSchema payload_schema = createPayloadSchema();
+  const std::vector<std::string> expected_order = {
+      "messages[].content",
+      "messages[].content[].text",
+      "messages[].tool_calls[].function.arguments",
+      "tools[].function.description",
+  };
+  EXPECT_EQ(payload_schema.requestStreamableFieldOrder(), expected_order);
 }
 
 TEST(OpenAiChatCompletionsTest, InvalidFieldValuesAndTypes) {

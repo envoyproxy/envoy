@@ -709,8 +709,8 @@ TEST_F(AiProtocolManagerFilterTest, RouteConfigIsStrictEvenWithBestEffortConfigu
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// A pass-through endpoint (no normalization) is parsed, validated, and forwarded
-// just the same; normalization only governs the transcoding a later change adds.
+// A pass-through endpoint (normalization is not yet supported) is parsed,
+// validated against its schema, and forwarded upstream.
 TEST_F(AiProtocolManagerFilterTest, PassThroughEndpointIsParsedAndForwarded) {
   setRouteConfig(/*normalize=*/false);
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);

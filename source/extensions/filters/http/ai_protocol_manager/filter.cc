@@ -116,6 +116,8 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
     request_parser_.reset();
 
     if (isAiEndpoint()) {
+      // TODO(penguingao): Support validating payload schema on the fly as the Wuffs parser
+      // streams and parses chunks, rejecting invalid fields early before end_stream.
       if (const PayloadSchema* payload_schema = SchemaRegistry::getSchema(schema_);
           payload_schema != nullptr) {
         const absl::Status validation_status = payload_schema->validateRequest(request_json_);

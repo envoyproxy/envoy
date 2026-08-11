@@ -92,7 +92,7 @@ TEST(SchemaTest, OffloadableStringValidation) {
 TEST(SchemaTest, ObjectValidation) {
   Schema schema = Schema::object({
       {"model", Schema::string().required()},
-      {"temperature", Schema::number().optional()},
+      {"temperature", Schema::number()},
   });
 
   // Valid object with required field.
@@ -107,7 +107,7 @@ TEST(SchemaTest, ObjectValidation) {
   nlohmann::json missing_req = {{"temperature", 0.7}};
   auto status = schema.validate(missing_req);
   EXPECT_THAT(status, StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_EQ(status.message(), "missing required field: /model");
+  EXPECT_EQ(status.message(), "missing required field: model");
 
   // Invalid type for property.
   nlohmann::json bad_type = {{"model", 123}};
@@ -138,7 +138,7 @@ TEST(SchemaTest, ArrayValidation) {
   nlohmann::json bad_arr = {"alpha", 42};
   auto status = schema.validate(bad_arr);
   EXPECT_THAT(status, StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_EQ(status.message(), "field '/1' has invalid type: expected string, got integer");
+  EXPECT_EQ(status.message(), "field '[1]' has invalid type: expected string, got integer");
 }
 
 TEST(SchemaTest, OneOfPolymorphicValidation) {
