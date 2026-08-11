@@ -51,14 +51,28 @@ const Protobuf::Value& Metadata::metadataValue(const envoy::config::core::v3::Me
 
 const Protobuf::Value& Metadata::structValue(const Protobuf::Struct& struct_value,
                                              const std::vector<std::string>& path) {
-  std::vector<PathSegment> segments;
-  segments.reserve(path.size());
-  for (const auto& key : path) {
-    PathSegment segment;
-    segment.key_ = key;
-    segments.push_back(std::move(segment));
+  const Protobuf::Struct* data_struct = &struct_value;
+  const Protobuf::Value* val = nullptr;
+  // go through path to select sub entries
+  for (const auto& p : path) {
+    if (nullptr == data_struct) { // sub entry not found
+      return Protobuf::Value::default_instance();
+    }
+    const auto entry_it = data_struct->fields().find(p);
+    if (entry_it == data_struct->fields().end()) {
+      return Protobuf::Value::default_instance();
+    }
+    val = &(entry_it->second);
+    if (val->has_struct_value()) {
+      data_struct = &(val->struct_value());
+    } else {
+      data_struct = nullptr;
+    }
   }
-  return structValue(struct_value, segments);
+  if (nullptr == val) {
+    return Protobuf::Value::default_instance();
+  }
+  return *val;
 }
 
 const Protobuf::Value& Metadata::structValue(const Protobuf::Struct& struct_value,
