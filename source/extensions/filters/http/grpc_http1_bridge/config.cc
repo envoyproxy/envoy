@@ -22,7 +22,8 @@ GrpcHttp1BridgeFilterConfig::createFilterFactoryFromProtoTyped(
 absl::StatusOr<Http::FilterFactoryCb>
 GrpcHttp1BridgeFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& factory_context) {
+    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::ExtraFactoryContext&) {
   return [&factory_context, proto_config](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(
         std::make_shared<Http1BridgeFilter>(factory_context.grpcContext(), proto_config));

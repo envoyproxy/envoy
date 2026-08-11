@@ -12,14 +12,24 @@ namespace AiProtocolManager {
 
 absl::StatusOr<Http::FilterFactoryCb>
 AiProtocolManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager&,
+    const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager&
+        proto_config,
     const std::string&, DualInfo, Server::Configuration::ServerFactoryContext&) {
   // One factory is shared by every stream on the chain. The in-memory
   // implementation is stateless, so a single shared instance is safe.
   auto buffer_factory = std::make_shared<InMemoryExternalBufferFactory>();
-  return [buffer_factory](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<AiProtocolManagerFilter>(*buffer_factory));
+  auto config = std::make_shared<const FilterConfig>(proto_config);
+  return [buffer_factory, config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<AiProtocolManagerFilter>(*buffer_factory, config));
   };
+}
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+AiProtocolManagerFilterConfigFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute&
+        proto_config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<const RouteConfig>(proto_config);
 }
 
 /**

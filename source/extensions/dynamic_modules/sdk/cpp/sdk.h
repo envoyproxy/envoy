@@ -482,6 +482,24 @@ public:
   }
 
   /**
+   * Sets an entire metadata namespace from a serialized google.protobuf.Struct. The struct is
+   * merged into the namespace and existing entries with the same key are overwritten. A buffer
+   * that does not parse as a google.protobuf.Struct is a no-op.
+   * @param ns The metadata namespace.
+   * @param serialized_struct The serialized google.protobuf.Struct to set.
+   */
+  virtual void setMetadataStruct(std::string_view ns, std::string_view serialized_struct) = 0;
+
+  /**
+   * Sets an entire typed metadata namespace from a serialized google.protobuf.Any. The Any is
+   * merged into the namespace's typed_filter_metadata entry, preserving the exact message type via
+   * the Any type_url. A buffer that does not parse as a google.protobuf.Any is a no-op.
+   * @param ns The metadata namespace.
+   * @param serialized_any The serialized google.protobuf.Any to set.
+   */
+  virtual void setTypedMetadata(std::string_view ns, std::string_view serialized_any) = 0;
+
+  /**
    * Appends a numeric value to the dynamic metadata list stored under the given namespace and key.
    * If the key does not exist, a new list is created. Returns false if the key exists but is not a
    * list, or if the metadata is not accessible.
@@ -745,7 +763,11 @@ public:
   virtual void sendGoAwayAndClose(bool graceful) = 0;
 
   /**
-   * Recreates the current stream, optionally with replacement headers.
+   * Recreates the current stream, optionally with replacement headers. Returns false if the
+   * recreation could not be initiated, for example when the request body has not been fully
+   * received. On success the filter chain is destroyed before the current event hook returns and
+   * the filter should stop iteration. The filter itself stays valid until the hook returns, and
+   * the callbacks it makes after the teardown are safe and do not affect the recreated stream.
    */
   virtual bool recreateStream(std::span<const HeaderView> headers = {}) = 0;
 
