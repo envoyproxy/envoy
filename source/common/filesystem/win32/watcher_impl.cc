@@ -80,7 +80,7 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
   } else {
     callback_map_[fii_key] = std::make_unique<DirectoryWatch>();
     callback_map_[fii_key]->dir_handle_ = dir_handle;
-    callback_map_[fii_key]->buffer_.resize(16384);
+    callback_map_[fii_key]->buffer_.resize(1024);
     callback_map_[fii_key]->watcher_ = this;
 
     // According to Microsoft docs, "the hEvent member of the OVERLAPPED structure is not used by
@@ -107,7 +107,10 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
     ENVOY_LOG(debug, "created watch for directory: '{}' handle: {}", result.directory_, dir_handle);
   }
 
-  callback_map_[fii_key]->watches_.push_back({file, events, cb});
+  {
+    absl::WriterMutexLock lock(&callback_map_[fii_key]->watches_mutex_);
+    callback_map_[fii_key]->watches_.push_back({file, events, cb});
+  }
   ENVOY_LOG(debug, "added watch for file '{}' in directory '{}'", result.file_, result.directory_);
   return absl::OkStatus();
 }
@@ -142,10 +145,13 @@ void WatcherImpl::issueFirstRead(ULONG_PTR param) {
   // a pointer to DirectoryWatch as the OVERLAPPED for ReadDirectoryChangesW. Then, the
   // completion routine can use its OVERLAPPED* parameter to access the DirectoryWatch see:
   // https://docs.microsoft.com/en-us/windows/desktop/ipc/named-pipe-server-using-completion-routines
-  ReadDirectoryChangesW(dir_watch->dir_handle_, &(dir_watch->buffer_[0]),
-                        dir_watch->buffer_.capacity(), false,
-                        FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE, nullptr,
-                        reinterpret_cast<LPOVERLAPPED>(param), &directoryChangeCompletion);
+  dir_watch->overlapped_.Internal = 0;
+  dir_watch->overlapped_.InternalHigh = 0;
+  const BOOL success = ReadDirectoryChangesW(
+      dir_watch->dir_handle_, dir_watch->buffer_.data(), dir_watch->buffer_.size() * sizeof(DWORD),
+      false, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE, nullptr,
+      reinterpret_cast<LPOVERLAPPED>(param), &directoryChangeCompletion);
+  RELEASE_ASSERT(success, fmt::format("ReadDirectoryChangesW failed: {}", GetLastError()));
 
   const BOOL rc = ::SetEvent(dir_watch->overlapped_.hEvent);
   ASSERT(rc);
@@ -200,20 +206,31 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
     }
 
     constexpr absl::string_view data{"a"};
-    for (FileWatch& watch : dir_watch->watches_) {
-      if (watch.file_ == file && (watch.events_ & events)) {
-        ENVOY_LOG(debug, "matched callback: file: {}", watcher->wstring_converter_.to_bytes(file));
-        const auto cb = watch.cb_;
-        const auto cb_closure = [cb, events]() -> void { cb(events); };
-        watcher->active_callbacks_.push(cb_closure);
-        // write a byte to the other end of the socket that libevent is watching
-        // this tells the libevent callback to pull this callback off the active_callbacks_
-        // queue. We do this so that the callbacks are executed in the main libevent loop,
-        // not in this completion routine
-        Buffer::RawSlice buffer{(void*)data.data(), 1};
-        auto result = watcher->write_handle_->writev(&buffer, 1);
-        RELEASE_ASSERT(result.return_value_ == 1,
-                       fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
+    // Protect watches_ access with ReaderMutexLock
+    {
+      absl::ReaderMutexLock lock(&dir_watch->watches_mutex_);
+      for (FileWatch& watch : dir_watch->watches_) {
+        // Windows filesystems are case-insensitive.
+        // An empty watch.file_ matches any file change in the watched directory.
+        if ((watch.file_.empty() || _wcsicmp(watch.file_.c_str(), file.c_str()) == 0) &&
+            (watch.events_ & events)) {
+          ENVOY_LOG(debug, "matched callback: file: {}",
+                    watcher->wstring_converter_.to_bytes(file));
+          const auto cb = watch.cb_;
+          const std::string file_name = watcher->wstring_converter_.to_bytes(file);
+          const auto cb_closure = [watcher, cb, events, file_name]() -> void {
+            watcher->callAndLogOnError(cb, events, file_name);
+          };
+          watcher->active_callbacks_.push(cb_closure);
+          // write a byte to the other end of the socket that libevent is watching
+          // this tells the libevent callback to pull this callback off the active_callbacks_
+          // queue. We do this so that the callbacks are executed in the main libevent loop,
+          // not in this completion routine
+          Buffer::RawSlice buffer{(void*)data.data(), 1};
+          auto result = watcher->write_handle_->writev(&buffer, 1);
+          RELEASE_ASSERT(result.return_value_ == 1,
+                         fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
+        }
       }
     }
 
@@ -226,10 +243,13 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
     return;
   }
 
-  ReadDirectoryChangesW(dir_watch->dir_handle_, &(dir_watch->buffer_[0]),
-                        dir_watch->buffer_.capacity(), false,
-                        FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE, nullptr,
-                        overlapped, directoryChangeCompletion);
+  overlapped->Internal = 0;
+  overlapped->InternalHigh = 0;
+  const BOOL success = ReadDirectoryChangesW(
+      dir_watch->dir_handle_, dir_watch->buffer_.data(), dir_watch->buffer_.size() * sizeof(DWORD),
+      false, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE, nullptr, overlapped,
+      directoryChangeCompletion);
+  RELEASE_ASSERT(success, fmt::format("ReadDirectoryChangesW failed: {}", GetLastError()));
 }
 
 void WatcherImpl::watchLoop() {
@@ -277,3 +297,26 @@ void WatcherImpl::watchLoop() {
 
 } // namespace Filesystem
 } // namespace Envoy
+
+void WatcherImpl::callAndLogOnError(const OnChangedCb& cb, uint32_t events,
+                                    const std::string& file) {
+  TRY_ASSERT_MAIN_THREAD {
+    const absl::Status status = cb(events);
+    if (!status.ok()) {
+      // Use ENVOY_LOG_EVERY_POW_2 to avoid log spam if a callback keeps failing.
+      ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' returned error: {}", file,
+                            status.message());
+    }
+  }
+  END_TRY
+  MULTI_CATCH(
+      const std::exception& e,
+      {
+        ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw exception: {}", file,
+                              e.what());
+      },
+      {
+        ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw unknown exception",
+                              file);
+      })
+}
