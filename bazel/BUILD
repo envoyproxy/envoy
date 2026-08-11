@@ -683,14 +683,47 @@ config_setting(
     values = {"cpu": "darwin"},
 )
 
+# Preserve legacy --cpu matching while supporting platform-based builds.
 config_setting(
-    name = "darwin_x86_64",
+    name = "darwin_x86_64_legacy",
     values = {"cpu": "darwin_x86_64"},
 )
 
 config_setting(
-    name = "darwin_arm64",
+    name = "darwin_x86_64_platform",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
+)
+
+selects.config_setting_group(
+    name = "darwin_x86_64",
+    match_any = [
+        ":darwin_x86_64_legacy",
+        ":darwin_x86_64_platform",
+    ],
+)
+
+config_setting(
+    name = "darwin_arm64_legacy",
     values = {"cpu": "darwin_arm64"},
+)
+
+config_setting(
+    name = "darwin_arm64_platform",
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:macos",
+    ],
+)
+
+selects.config_setting_group(
+    name = "darwin_arm64",
+    match_any = [
+        ":darwin_arm64_legacy",
+        ":darwin_arm64_platform",
+    ],
 )
 
 config_setting(
