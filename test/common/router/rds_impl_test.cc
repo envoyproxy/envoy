@@ -818,8 +818,7 @@ TEST_F(RdsImplTest, RdsUpdateWithUnchangedVhdsKeepsTheVhdsSubscription) {
   // Exactly one VHDS subscription is created for all of the RDS updates below, i.e. the first one
   // creates it and the later ones neither re-create nor drop it.
   EXPECT_CALL(server_factory_context_.cluster_manager_.subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _))
-      .Times(1);
+              subscriptionFromConfigSource(_, _, _, _, _, _));
 
   auto first_rds_response =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
