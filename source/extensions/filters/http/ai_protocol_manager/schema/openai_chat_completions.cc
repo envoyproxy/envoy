@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
-namespace OpenAi {
+namespace OpenAI {
 
 const Schema& toolCallSchema() {
   static const Schema schema = Schema::object({
@@ -111,7 +111,7 @@ PayloadSchema createPayloadSchema() {
       /*response_schema=*/ResponseSchema{}};
 }
 
-} // namespace OpenAi
+} // namespace OpenAI
 } // namespace AiProtocolManager
 } // namespace HttpFilters
 } // namespace Extensions

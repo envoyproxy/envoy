@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
-namespace OpenAi {
+namespace OpenAI {
 namespace {
 
 using StatusHelpers::IsOk;
@@ -191,8 +191,57 @@ TEST(OpenAiChatCompletionsTest, InvalidFieldValuesAndTypes) {
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }
 
+TEST(OpenAiChatCompletionsTest, SubSchemasDirectValidation) {
+  // Test toolCallSchema directly.
+  const Schema& tool_call_schema = toolCallSchema();
+  nlohmann::json valid_tool_call = {
+      {"id", "call_1"},
+      {"type", "function"},
+      {"function",
+       {{"name", "search"},
+        {"arguments", JsonWithExtBuf::makeExternalRef(JsonWithExtBuf::ExternalRef{0, 100})}}},
+  };
+  EXPECT_THAT(tool_call_schema.validate(valid_tool_call), IsOk());
+
+  nlohmann::json invalid_tool_call = {
+      {"id", "call_1"},
+      {"type", "unknown_type"},
+  };
+  EXPECT_THAT(tool_call_schema.validate(invalid_tool_call),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Test chatMessageSchema directly.
+  const Schema& chat_message_schema = chatMessageSchema();
+  nlohmann::json valid_msg = {
+      {"role", "assistant"}, {"content", "Hello"},       {"refusal", "Cannot comply"},
+      {"name", "bot"},       {"tool_call_id", "call_1"},
+  };
+  EXPECT_THAT(chat_message_schema.validate(valid_msg), IsOk());
+
+  nlohmann::json msg_invalid_role = {
+      {"role", "superadmin"},
+  };
+  EXPECT_THAT(chat_message_schema.validate(msg_invalid_role),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Test toolSchema directly.
+  const Schema& tool_schema = toolSchema();
+  nlohmann::json valid_tool = {
+      {"type", "function"},
+      {"function",
+       {{"name", "fetch_info"},
+        {"description", JsonWithExtBuf::makeExternalRef(JsonWithExtBuf::ExternalRef{0, 50})}}},
+  };
+  EXPECT_THAT(tool_schema.validate(valid_tool), IsOk());
+
+  nlohmann::json invalid_tool = {
+      {"type", "not_a_function"},
+  };
+  EXPECT_THAT(tool_schema.validate(invalid_tool), StatusCodeIs(absl::StatusCode::kInvalidArgument));
+}
+
 } // namespace
-} // namespace OpenAi
+} // namespace OpenAI
 } // namespace AiProtocolManager
 } // namespace HttpFilters
 } // namespace Extensions

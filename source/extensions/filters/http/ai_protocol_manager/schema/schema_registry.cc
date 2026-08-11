@@ -10,7 +10,7 @@ namespace AiProtocolManager {
 const PayloadSchema* SchemaRegistry::getSchema(PerRouteProto::Schema schema) {
   switch (schema) {
   case PerRouteProto::OPENAI_CHAT_COMPLETIONS: {
-    static const PayloadSchema openai_schema = OpenAi::createPayloadSchema();
+    static const PayloadSchema openai_schema = OpenAI::createPayloadSchema();
     return &openai_schema;
   }
   case PerRouteProto::UNSPECIFIED:

@@ -19,6 +19,10 @@ TEST(SchemaRegistryTest, SchemaRegistryLookup) {
 
   const PayloadSchema* unspec_schema = SchemaRegistry::getSchema(PerRouteProto::UNSPECIFIED);
   EXPECT_EQ(unspec_schema, nullptr);
+
+  const PayloadSchema* unknown_schema =
+      SchemaRegistry::getSchema(static_cast<PerRouteProto::Schema>(999));
+  EXPECT_EQ(unknown_schema, nullptr);
 }
 
 TEST(SchemaRegistryTest, AllDeclaredOffloadableFieldsInStreamOrder) {

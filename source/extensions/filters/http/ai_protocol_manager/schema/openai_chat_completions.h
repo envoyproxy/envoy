@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
-namespace OpenAi {
+namespace OpenAI {
 
 // Reusable sub-schemas and complete payload schema definition for OpenAI Chat Completions.
 const Schema& toolCallSchema();
@@ -16,7 +16,7 @@ const Schema& toolSchema();
 // Returns the full OpenAI Chat Completions PayloadSchema.
 PayloadSchema createPayloadSchema();
 
-} // namespace OpenAi
+} // namespace OpenAI
 } // namespace AiProtocolManager
 } // namespace HttpFilters
 } // namespace Extensions

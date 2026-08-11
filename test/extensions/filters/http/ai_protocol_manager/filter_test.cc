@@ -724,6 +724,21 @@ TEST_F(AiProtocolManagerFilterTest, PassThroughEndpointIsParsedAndForwarded) {
             R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
 }
 
+// A payload with valid JSON syntax but violating the route's schema is rejected with 400.
+TEST_F(AiProtocolManagerFilterTest, SchemaValidationRejectsInvalidPayload) {
+  setRouteConfig(/*normalize=*/false);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  // Missing required "messages" array.
+  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+  EXPECT_EQ(inject_calls_, 0);
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters
