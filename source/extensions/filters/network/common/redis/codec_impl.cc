@@ -704,7 +704,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         throw ProtocolError("unbalanced quotes in request");
       } else if (buffer[0] == 'x') {
         state_ = State::InlineStringQuotedEscapeHex;
-        pending_value_stack_.front().value_->asString().push_back(buffer[0]);
+        inline_hex_digit_count_ = 0;
       } else {
         char c;
         switch (buffer[0]) {
@@ -748,13 +748,13 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
       }
 
       auto& s = pending_value_stack_.front().value_->asString();
-      ASSERT((!s.empty() && s.back() == 'x') || (s.size() > 1 && s[s.size() - 2] == 'x'));
       s.push_back(buffer[0]);
-      if (s[s.size() - 3] == 'x') {
-        char c = static_cast<char>(std::stoul(&s[s.size() - 2], nullptr, 16));
-        s.resize(s.size() - 3);
+      if (++inline_hex_digit_count_ == 2) {
+        char c = static_cast<char>(std::stoul(s.substr(s.size() - 2), nullptr, 16));
+        s.resize(s.size() - 2);
         s.push_back(c);
         state_ = State::InlineStringQuoted;
+        inline_hex_digit_count_ = 0;
       }
 
       remaining--;
