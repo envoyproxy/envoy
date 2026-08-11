@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.clusters.composite.v3;
 
+import "envoy/type/metadata/v3/metadata.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -20,8 +22,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // health-based selection, the composite cluster uses the retry attempt count to
 // deterministically select which sub-cluster to route to.
 //
-// When retry attempts exceed the number of configured clusters, requests will fail with no
-// host available.
+// When retry attempts exceed the length of the order in effect for the request, requests will
+// fail with no host available.
+//
+// The order may optionally be chosen per request by a filter, by configuring
+// :ref:`order_metadata_key
+// <envoy_v3_api_field_extensions.clusters.composite.v3.ClusterConfig.order_metadata_key>`.
 //
 // Example configuration:
 //
@@ -49,7 +55,52 @@ message ClusterConfig {
 
   // List of clusters to use for request routing. The first cluster is used for the
   // initial request (attempt 1), the second cluster for the first retry (attempt 2),
-  // and so on. Must contain at least one cluster. When retry attempts exceed the number
-  // of configured clusters, requests will fail with no host available.
+  // and so on. Must contain at least one cluster. When retry attempts exceed the length of the
+  // order in effect for the request, requests will fail with no host available. A cluster must
+  // not name the composite cluster that contains it.
+  //
+  // This list is also the allowlist for :ref:`order_metadata_key
+  // <envoy_v3_api_field_extensions.clusters.composite.v3.ClusterConfig.order_metadata_key>`.
   repeated ClusterEntry clusters = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // Optional dynamic metadata key holding a per-request cluster order that replaces
+  // :ref:`clusters <envoy_v3_api_field_extensions.clusters.composite.v3.ClusterConfig.clusters>`
+  // for that request.
+  //
+  // The key is resolved against the request's dynamic metadata and must hold a list of strings,
+  // each naming a cluster. Entries that do not name a cluster present in ``clusters`` are
+  // ignored, so ``clusters`` acts as an allowlist and a request can never reach a cluster the
+  // configuration did not authorize. Entries may repeat, in which case the same cluster is used
+  // for more than one attempt. Attempt 1 uses the first surviving entry, attempt 2 the second,
+  // and so on; when attempts exceed the length of the surviving list, requests fail with no host
+  // available, just as they do with the static order.
+  //
+  // If the key is absent, does not hold a list, or no entry names a configured cluster, the
+  // statically configured ``clusters`` order is used. Malformed metadata never fails a request.
+  // Selection remains deterministic and does not consider sub-cluster health: an entry naming a
+  // cluster with no healthy hosts still consumes its attempt.
+  //
+  // The list is read again on each attempt and indexed by that attempt's number, so a filter that
+  // modifies it between retries must leave the already-consumed prefix in place and only append
+  // or replace later entries. Removing consumed entries shifts every remaining entry forward and
+  // will end the retry sequence early.
+  //
+  // The metadata namespace must not be ``envoy.lb``, which the router reserves: every field the
+  // request carries there is merged into the load balancer's
+  // :ref:`metadata match criteria <envoy_v3_api_field_config.route.v3.RouteAction.metadata_match>`,
+  // so an order list stored under it becomes a match criterion no host can satisfy.
+  //
+  // For example, given ``clusters`` of ``[primary, secondary, fallback]`` and:
+  //
+  // .. code-block:: yaml
+  //
+  //     order_metadata_key:
+  //       key: envoy.clusters.composite
+  //       path:
+  //       - key: order
+  //
+  // a request whose ``envoy.clusters.composite`` dynamic metadata contains
+  // ``order: ["fallback", "primary"]`` is routed to ``fallback`` on attempt 1 and ``primary`` on
+  // attempt 2, and fails on attempt 3.
+  type.metadata.v3.MetadataKey order_metadata_key = 2;
 }
