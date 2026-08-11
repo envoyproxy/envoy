@@ -30,7 +30,7 @@ absl::StatusOr<Http::FilterFactoryCb> BodySizeLimitFilterFactory::createFilterFa
 absl::StatusOr<Http::FilterFactoryCb>
 BodySizeLimitFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext&) {
+    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
   return createFilterFactory(proto_config);
 }
 
