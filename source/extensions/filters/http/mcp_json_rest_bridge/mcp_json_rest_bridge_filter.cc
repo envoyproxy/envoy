@@ -516,7 +516,6 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   path_ = std::string(path);
   mcp_operation_ = McpOperation::Undecided;
   server_name_ = std::move(server_name);
-  tool_name_.clear();
 
   if (request_headers.getMethodValue() != Http::Headers::get().MethodValues.Post) {
     ENVOY_STREAM_LOG(warn, "Only POST method is supported for MCP. Received: {}",
@@ -1160,8 +1159,6 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
                       McpConstants::Methods::TOOLS_CALL, params);
     return;
   }
-
-  tool_name_ = tool_name;
 
   // Set the per-request streaming flag based on the tool's config.
   text_content_streaming_enabled_ =
