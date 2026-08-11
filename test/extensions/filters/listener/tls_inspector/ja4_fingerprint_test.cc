@@ -25,6 +25,67 @@ TEST(JA4Fingerprinter, GreaseValueFiltering) {
   EXPECT_TRUE(JA4Fingerprinter::isNotGrease(0xffff)); // Not a GREASE value
 }
 
+// Build a signature_algorithms extension body containing the given list of
+// 16-bit sig-alg codepoints. Layout: 2-byte list length prefix followed by
+// the codepoints (big-endian).
+std::vector<uint8_t> buildSigAlgsExtensionBody(const std::vector<uint16_t>& sig_algs) {
+  const uint16_t list_len = static_cast<uint16_t>(sig_algs.size() * 2);
+  std::vector<uint8_t> body;
+  body.push_back(static_cast<uint8_t>(list_len >> 8));
+  body.push_back(static_cast<uint8_t>(list_len & 0xff));
+  for (uint16_t s : sig_algs) {
+    body.push_back(static_cast<uint8_t>(s >> 8));
+    body.push_back(static_cast<uint8_t>(s & 0xff));
+  }
+  return body;
+}
+
+// Build a TLS extensions blob containing a single signature_algorithms extension
+// (type 0x000d) whose body is |sig_algs_body|.
+std::vector<uint8_t> buildExtensionsWithSigAlgs(const std::vector<uint8_t>& sig_algs_body) {
+  const uint16_t ext_type = TLSEXT_TYPE_signature_algorithms;
+  const uint16_t ext_len = static_cast<uint16_t>(sig_algs_body.size());
+  std::vector<uint8_t> exts;
+  exts.push_back(static_cast<uint8_t>(ext_type >> 8));
+  exts.push_back(static_cast<uint8_t>(ext_type & 0xff));
+  exts.push_back(static_cast<uint8_t>(ext_len >> 8));
+  exts.push_back(static_cast<uint8_t>(ext_len & 0xff));
+  exts.insert(exts.end(), sig_algs_body.begin(), sig_algs_body.end());
+  return exts;
+}
+
+// Regression test for the JA4 spec's requirement that GREASE values be excluded
+// from the signature_algorithms input to the JA4_c hash. A ClientHello with a
+// GREASE codepoint inserted into signature_algorithms must produce the same
+// JA4 fingerprint as an otherwise-identical ClientHello without it. See
+// https://github.com/FoxIO-LLC/ja4/blob/main/technical_details/JA4.md
+TEST(JA4Fingerprinter, GreaseValueFilteredFromSignatureAlgorithms) {
+  const std::vector<uint16_t> sig_algs_no_grease = {0x0403, 0x0804};
+  const std::vector<uint16_t> sig_algs_with_grease = {0x0a0a, 0x0403, 0x0804};
+
+  const auto exts_no_grease =
+      buildExtensionsWithSigAlgs(buildSigAlgsExtensionBody(sig_algs_no_grease));
+  const auto exts_with_grease =
+      buildExtensionsWithSigAlgs(buildSigAlgsExtensionBody(sig_algs_with_grease));
+
+  // Two 16-bit codepoints for TLS 1.2 ECDHE-RSA-AES-128-GCM-SHA256 and -AES-256-GCM-SHA384.
+  const std::vector<uint8_t> ciphers = {0xc0, 0x2f, 0xc0, 0x30};
+
+  SSL_CLIENT_HELLO hello_no_grease{};
+  hello_no_grease.version = TLS1_2_VERSION;
+  hello_no_grease.cipher_suites = ciphers.data();
+  hello_no_grease.cipher_suites_len = ciphers.size();
+  hello_no_grease.extensions = exts_no_grease.data();
+  hello_no_grease.extensions_len = exts_no_grease.size();
+
+  SSL_CLIENT_HELLO hello_with_grease = hello_no_grease;
+  hello_with_grease.extensions = exts_with_grease.data();
+  hello_with_grease.extensions_len = exts_with_grease.size();
+
+  EXPECT_EQ(JA4Fingerprinter::create(&hello_no_grease),
+            JA4Fingerprinter::create(&hello_with_grease));
+}
+
 // This will test the ``JA4`` fingerprinting integration with the TLS Inspector code
 class TlsInspectorJA4IntegrationTest : public testing::Test {
 public:
