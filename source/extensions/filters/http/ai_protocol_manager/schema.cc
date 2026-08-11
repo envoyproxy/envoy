@@ -114,164 +114,229 @@ Schema Schema::oneOf(std::vector<Schema> candidates) {
   return s;
 }
 
-absl::Status Schema::validate(const nlohmann::json& json, absl::string_view path) const {
+std::vector<std::string> Schema::offloadableFieldPaths(absl::string_view current_path) const {
+  std::vector<std::string> paths;
+  if (is_offloadable_) {
+    paths.push_back(std::string(current_path));
+  }
   switch (type_) {
-  case Type::String: {
-    if (JsonWithExtBuf::isExternalRef(json)) {
-      if (!is_offloadable_) {
-        return absl::InvalidArgumentError(
-            absl::StrCat("field '", path, "' cannot be offloaded to external buffer"));
-      }
-      break;
-    }
-    if (!json.is_string()) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "field '", path, "' has invalid type: expected string, got ", jsonTypeName(json)));
-    }
-    if (!allowed_values_.empty()) {
-      const std::string val = json.get<std::string>();
-      if (std::find(allowed_values_.begin(), allowed_values_.end(), val) == allowed_values_.end()) {
-        return absl::InvalidArgumentError(
-            absl::StrCat("field '", path, "' has invalid value: '", val, "'"));
+  case Type::Object:
+    for (const auto& prop : properties_) {
+      if (prop.schema != nullptr) {
+        std::string child_path = makeChildPath(current_path, prop.name);
+        auto sub_paths = prop.schema->offloadableFieldPaths(child_path);
+        paths.insert(paths.end(), sub_paths.begin(), sub_paths.end());
       }
     }
     break;
-  }
-  case Type::Number: {
-    if (!json.is_number()) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "field '", path, "' has invalid type: expected number, got ", jsonTypeName(json)));
-    }
-    const double val =
-        json.is_number_float() ? json.get<double>() : static_cast<double>(json.get<int64_t>());
-    if (min_number_.has_value() && val < *min_number_) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("field '", path, "' value ", val, " is less than minimum ", *min_number_));
-    }
-    if (max_number_.has_value() && val > *max_number_) {
-      return absl::InvalidArgumentError(absl::StrCat("field '", path, "' value ", val,
-                                                     " is greater than maximum ", *max_number_));
-    }
-    break;
-  }
-  case Type::Integer: {
-    if (!json.is_number_integer() && !json.is_number_unsigned()) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "field '", path, "' has invalid type: expected integer, got ", jsonTypeName(json)));
-    }
-    const int64_t val = json.get<int64_t>();
-    if (min_integer_.has_value() && val < *min_integer_) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("field '", path, "' value ", val, " is less than minimum ", *min_integer_));
-    }
-    if (max_integer_.has_value() && val > *max_integer_) {
-      return absl::InvalidArgumentError(absl::StrCat("field '", path, "' value ", val,
-                                                     " is greater than maximum ", *max_integer_));
-    }
-    break;
-  }
-  case Type::Boolean: {
-    if (!json.is_boolean()) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "field '", path, "' has invalid type: expected boolean, got ", jsonTypeName(json)));
-    }
-    break;
-  }
-  case Type::Null: {
-    if (!json.is_null()) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "field '", path, "' has invalid type: expected null, got ", jsonTypeName(json)));
-    }
-    break;
-  }
-  case Type::Any: {
-    break;
-  }
-  case Type::Object: {
-    if (!json.is_object()) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "field '", path, "' has invalid type: expected object, got ", jsonTypeName(json)));
-    }
-    for (const Property& prop : properties_) {
-      auto it = json.find(prop.name);
-      const std::string child_path = makeChildPath(path, prop.name);
-      if (it == json.end()) {
-        if (prop.schema != nullptr && prop.schema->isRequired()) {
-          return absl::InvalidArgumentError(absl::StrCat("missing required field: ", child_path));
-        }
-      } else if (prop.schema != nullptr) {
-        auto status = prop.schema->validate(it.value(), child_path);
-        if (!status.ok()) {
-          return status;
-        }
-      }
-    }
-    if (!allow_unknown_fields_) {
-      for (auto it = json.begin(); it != json.end(); ++it) {
-        bool found = false;
-        for (const Property& prop : properties_) {
-          if (prop.name == it.key()) {
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          return absl::InvalidArgumentError(
-              absl::StrCat("unknown field: ", makeChildPath(path, it.key())));
-        }
-      }
-    }
-    break;
-  }
-  case Type::Array: {
-    if (!json.is_array()) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "field '", path, "' has invalid type: expected array, got ", jsonTypeName(json)));
-    }
-    if (min_integer_.has_value() && static_cast<int64_t>(json.size()) < *min_integer_) {
-      return absl::InvalidArgumentError(absl::StrCat("field '", path, "' array size ", json.size(),
-                                                     " is less than minimum ", *min_integer_));
-    }
-    if (max_integer_.has_value() && static_cast<int64_t>(json.size()) > *max_integer_) {
-      return absl::InvalidArgumentError(absl::StrCat("field '", path, "' array size ", json.size(),
-                                                     " is greater than maximum ", *max_integer_));
-    }
+  case Type::Array:
     if (element_schema_ != nullptr) {
-      for (size_t i = 0; i < json.size(); ++i) {
-        const std::string child_path = makeArrayChildPath(path, i);
-        auto status = element_schema_->validate(json[i], child_path);
-        if (!status.ok()) {
-          return status;
+      std::string child_path = current_path.empty() ? "[]" : absl::StrCat(current_path, "[]");
+      auto sub_paths = element_schema_->offloadableFieldPaths(child_path);
+      paths.insert(paths.end(), sub_paths.begin(), sub_paths.end());
+    }
+    break;
+  case Type::OneOf:
+    for (const auto& candidate : one_of_candidates_) {
+      auto sub_paths = candidate.offloadableFieldPaths(current_path);
+      paths.insert(paths.end(), sub_paths.begin(), sub_paths.end());
+    }
+    break;
+  default:
+    break;
+  }
+  return paths;
+}
+
+absl::Status Schema::validateString(const nlohmann::json& json, absl::string_view path) const {
+  if (JsonWithExtBuf::isExternalRef(json)) {
+    if (!is_offloadable_) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("field '", path, "' cannot be offloaded to external buffer"));
+    }
+    return absl::OkStatus();
+  }
+  if (!json.is_string()) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "field '", path, "' has invalid type: expected string, got ", jsonTypeName(json)));
+  }
+  if (!allowed_values_.empty()) {
+    const std::string val = json.get<std::string>();
+    if (std::find(allowed_values_.begin(), allowed_values_.end(), val) == allowed_values_.end()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("field '", path, "' has invalid value: '", val, "'"));
+    }
+  }
+  return absl::OkStatus();
+}
+
+absl::Status Schema::validateNumber(const nlohmann::json& json, absl::string_view path) const {
+  if (!json.is_number()) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "field '", path, "' has invalid type: expected number, got ", jsonTypeName(json)));
+  }
+  const double val =
+      json.is_number_float() ? json.get<double>() : static_cast<double>(json.get<int64_t>());
+  if (min_number_.has_value() && val < *min_number_) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("field '", path, "' value ", val, " is less than minimum ", *min_number_));
+  }
+  if (max_number_.has_value() && val > *max_number_) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("field '", path, "' value ", val, " is greater than maximum ", *max_number_));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status Schema::validateInteger(const nlohmann::json& json, absl::string_view path) const {
+  if (!json.is_number_integer() && !json.is_number_unsigned()) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "field '", path, "' has invalid type: expected integer, got ", jsonTypeName(json)));
+  }
+  const int64_t val = json.get<int64_t>();
+  if (min_integer_.has_value() && val < *min_integer_) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("field '", path, "' value ", val, " is less than minimum ", *min_integer_));
+  }
+  if (max_integer_.has_value() && val > *max_integer_) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("field '", path, "' value ", val, " is greater than maximum ", *max_integer_));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status Schema::validateBoolean(const nlohmann::json& json, absl::string_view path) const {
+  if (!json.is_boolean()) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "field '", path, "' has invalid type: expected boolean, got ", jsonTypeName(json)));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status Schema::validateNull(const nlohmann::json& json, absl::string_view path) const {
+  if (!json.is_null()) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "field '", path, "' has invalid type: expected null, got ", jsonTypeName(json)));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status Schema::validateObject(const nlohmann::json& json, absl::string_view path) const {
+  if (!json.is_object()) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "field '", path, "' has invalid type: expected object, got ", jsonTypeName(json)));
+  }
+  for (const Property& prop : properties_) {
+    auto it = json.find(prop.name);
+    const std::string child_path = makeChildPath(path, prop.name);
+    if (it == json.end()) {
+      if (prop.schema != nullptr && prop.schema->isRequired()) {
+        return absl::InvalidArgumentError(absl::StrCat("missing required field: ", child_path));
+      }
+    } else if (prop.schema != nullptr) {
+      auto status = prop.schema->validate(it.value(), child_path);
+      if (!status.ok()) {
+        return status;
+      }
+    }
+  }
+  if (!allow_unknown_fields_) {
+    for (auto it = json.begin(); it != json.end(); ++it) {
+      bool found = false;
+      for (const Property& prop : properties_) {
+        if (prop.name == it.key()) {
+          found = true;
+          break;
         }
       }
-    }
-    break;
-  }
-  case Type::OneOf: {
-    bool matched = false;
-    std::vector<std::string> failure_reasons;
-    for (const Schema& candidate : one_of_candidates_) {
-      auto status = candidate.validate(json, path);
-      if (status.ok()) {
-        matched = true;
-        break;
+      if (!found) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("unknown field: ", makeChildPath(path, it.key())));
       }
-      failure_reasons.push_back(std::string(status.message()));
     }
-    if (!matched) {
-      return absl::InvalidArgumentError(absl::StrCat("field '", path,
-                                                     "' did not match any allowed oneof schemas: [",
-                                                     absl::StrJoin(failure_reasons, "; "), "]"));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status Schema::validateArray(const nlohmann::json& json, absl::string_view path) const {
+  if (!json.is_array()) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "field '", path, "' has invalid type: expected array, got ", jsonTypeName(json)));
+  }
+  if (min_integer_.has_value() && static_cast<int64_t>(json.size()) < *min_integer_) {
+    return absl::InvalidArgumentError(absl::StrCat("field '", path, "' array size ", json.size(),
+                                                   " is less than minimum ", *min_integer_));
+  }
+  if (max_integer_.has_value() && static_cast<int64_t>(json.size()) > *max_integer_) {
+    return absl::InvalidArgumentError(absl::StrCat("field '", path, "' array size ", json.size(),
+                                                   " is greater than maximum ", *max_integer_));
+  }
+  if (element_schema_ != nullptr) {
+    for (size_t i = 0; i < json.size(); ++i) {
+      const std::string child_path = makeArrayChildPath(path, i);
+      auto status = element_schema_->validate(json[i], child_path);
+      if (!status.ok()) {
+        return status;
+      }
     }
+  }
+  return absl::OkStatus();
+}
+
+absl::Status Schema::validateOneOf(const nlohmann::json& json, absl::string_view path) const {
+  std::vector<std::string> failure_reasons;
+  for (const Schema& candidate : one_of_candidates_) {
+    auto status = candidate.validate(json, path);
+    if (status.ok()) {
+      return absl::OkStatus();
+    }
+    failure_reasons.push_back(std::string(status.message()));
+  }
+  return absl::InvalidArgumentError(absl::StrCat("field '", path,
+                                                 "' did not match any allowed oneof schemas: [",
+                                                 absl::StrJoin(failure_reasons, "; "), "]"));
+}
+
+absl::Status Schema::validate(const nlohmann::json& json, absl::string_view path) const {
+  absl::Status status = absl::OkStatus();
+  switch (type_) {
+  case Type::String:
+    status = validateString(json, path);
+    break;
+  case Type::Number:
+    status = validateNumber(json, path);
+    break;
+  case Type::Integer:
+    status = validateInteger(json, path);
+    break;
+  case Type::Boolean:
+    status = validateBoolean(json, path);
+    break;
+  case Type::Null:
+    status = validateNull(json, path);
+    break;
+  case Type::Any:
+    break;
+  case Type::Object:
+    status = validateObject(json, path);
+    break;
+  case Type::Array:
+    status = validateArray(json, path);
+    break;
+  case Type::OneOf:
+    status = validateOneOf(json, path);
     break;
   }
+
+  if (!status.ok()) {
+    return status;
   }
 
   if (custom_validator_) {
-    auto status = custom_validator_(json);
-    if (!status.ok()) {
+    auto custom_status = custom_validator_(json);
+    if (!custom_status.ok()) {
       return absl::InvalidArgumentError(
-          absl::StrCat("field '", path, "' failed validation: ", status.message()));
+          absl::StrCat("field '", path, "' failed validation: ", custom_status.message()));
     }
   }
 

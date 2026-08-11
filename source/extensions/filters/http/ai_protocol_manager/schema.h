@@ -124,8 +124,20 @@ public:
   const std::vector<Schema>& oneOfCandidates() const { return one_of_candidates_; }
   const std::vector<std::string>& allowedValues() const { return allowed_values_; }
 
+  // Recursively walks schema definition and returns all declared offloadable field paths.
+  std::vector<std::string> offloadableFieldPaths(absl::string_view current_path = "") const;
+
 private:
   explicit Schema(Type type) : type_(type) {}
+
+  absl::Status validateString(const nlohmann::json& json, absl::string_view path) const;
+  absl::Status validateNumber(const nlohmann::json& json, absl::string_view path) const;
+  absl::Status validateInteger(const nlohmann::json& json, absl::string_view path) const;
+  absl::Status validateBoolean(const nlohmann::json& json, absl::string_view path) const;
+  absl::Status validateNull(const nlohmann::json& json, absl::string_view path) const;
+  absl::Status validateObject(const nlohmann::json& json, absl::string_view path) const;
+  absl::Status validateArray(const nlohmann::json& json, absl::string_view path) const;
+  absl::Status validateOneOf(const nlohmann::json& json, absl::string_view path) const;
 
   Type type_{Type::Any};
   bool is_required_{false};
@@ -157,6 +169,11 @@ public:
   // Returns the declared canonical ordering of streamable / offloadable field paths.
   const std::vector<std::string>& streamableFieldOrder() const { return streamable_field_order_; }
 
+  // Returns all offloadable field paths declared in the request schema.
+  std::vector<std::string> offloadableFieldPaths() const {
+    return root_schema_.offloadableFieldPaths();
+  }
+
   absl::Status validate(const JsonWithExtBuf& payload) const {
     return root_schema_.validate(payload);
   }
@@ -181,6 +198,12 @@ public:
   const std::optional<Schema>& rootSchema() const { return root_schema_; }
   const std::vector<std::string>& streamableFieldOrder() const { return streamable_field_order_; }
 
+  // Returns all offloadable field paths declared in the response schema.
+  std::vector<std::string> offloadableFieldPaths() const {
+    return root_schema_.has_value() ? root_schema_->offloadableFieldPaths()
+                                    : std::vector<std::string>{};
+  }
+
 private:
   std::optional<Schema> root_schema_;
   std::vector<std::string> streamable_field_order_;
@@ -199,6 +222,11 @@ public:
   // Canonical ordering of streamable / offloadable field paths for request payloads.
   const std::vector<std::string>& requestStreamableFieldOrder() const {
     return request_schema_.streamableFieldOrder();
+  }
+
+  // Returns all offloadable field paths declared in the request schema.
+  std::vector<std::string> requestOffloadableFieldPaths() const {
+    return request_schema_.offloadableFieldPaths();
   }
 
   absl::Status validateRequest(const JsonWithExtBuf& payload) const {

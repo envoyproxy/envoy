@@ -168,6 +168,20 @@ TEST(SchemaTest, CustomValidator) {
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }
 
+TEST(SchemaTest, OffloadableFieldPathsDiscovery) {
+  Schema schema = Schema::object({
+      {"model", Schema::string()},
+      {"prompt", Schema::string().offloadable()},
+      {"messages", Schema::array(Schema::object({
+                       {"role", Schema::string()},
+                       {"content", Schema::string().offloadable()},
+                   }))},
+  });
+
+  const std::vector<std::string> expected = {"prompt", "messages[].content"};
+  EXPECT_EQ(schema.offloadableFieldPaths(), expected);
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

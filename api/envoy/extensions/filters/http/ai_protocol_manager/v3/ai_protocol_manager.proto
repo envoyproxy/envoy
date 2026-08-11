@@ -65,19 +65,24 @@ message AiProtocolManagerPerRoute {
   // The schema the request payload on this route follows.
   //
   // Setting this hands the payload to the filter to hold and validate: a body
-  // that is not well-formed JSON or does not conform to the declared schema is
-  // rejected with a 400 rather than forwarded for the upstream to interpret
-  // differently.
+  // that is not well-formed is rejected with a 400 rather than forwarded for the
+  // upstream to interpret differently.
+  //
+  // The schemas themselves are not part of this API yet; a later change adds
+  // them along with validation and transcoding against them. Until then the
+  // choice is recorded and carried, but the payload is not checked against it.
   Schema schema = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
 
   // Whether to normalize the payload from :ref:`schema
   // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.schema>`
   // into the canonical schema.
   //
-  // Normalization / transcoding is not implemented yet; a later change adds it.
-  // When normalization is implemented, setting this will transcode the payload
-  // into the canonical schema. Until then this field is accepted and has no effect;
-  // all declared routes operate as pass-through endpoints (validated in their own
-  // schema and forwarded in that same schema).
+  // When unset the route is a pass-through endpoint: the payload is validated in
+  // its own schema and forwarded upstream in that same schema. When set, it is
+  // additionally transcoded into the canonical schema, which is what lets one set
+  // of policies apply to payloads from different providers.
+  //
+  // Transcoding is not implemented yet; a later change adds it. Until then this
+  // field is accepted and has no effect.
   bool normalize = 2;
 }

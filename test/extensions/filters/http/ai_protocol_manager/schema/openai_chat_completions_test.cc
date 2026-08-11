@@ -1,6 +1,5 @@
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema/openai_chat_completions.h"
-#include "source/extensions/filters/http/ai_protocol_manager/schema/schema_registry.h"
 
 #include "test/test_common/status_utility.h"
 
@@ -190,14 +189,6 @@ TEST(OpenAiChatCompletionsTest, InvalidFieldValuesAndTypes) {
   };
   EXPECT_THAT(payload_schema.validateRequest(high_temp),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
-}
-
-TEST(OpenAiChatCompletionsTest, SchemaRegistryLookup) {
-  const PayloadSchema* schema = SchemaRegistry::getSchema(PerRouteProto::OPENAI_CHAT_COMPLETIONS);
-  ASSERT_NE(schema, nullptr);
-
-  const PayloadSchema* unspec_schema = SchemaRegistry::getSchema(PerRouteProto::UNSPECIFIED);
-  EXPECT_EQ(unspec_schema, nullptr);
 }
 
 } // namespace
