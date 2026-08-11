@@ -93,7 +93,6 @@ RUNTIME_GUARD(envoy_reloadable_features_map_http_stream_reset_to_tcp_rst);
 RUNTIME_GUARD(envoy_reloadable_features_match_headers_individually);
 RUNTIME_GUARD(envoy_reloadable_features_mcp_filter_use_new_metadata_namespace);
 RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
-RUNTIME_GUARD(envoy_reloadable_features_oauth2_chunk_large_token_cookies);
 // OAuth2 filter cookie decryption: when true (the default), decrypt() accepts legacy CBC
 // ciphertexts via the legacy AES-256-CBC fallback. When false, only "gcm."-prefixed ciphertexts
 // decrypt; legacy CBC cookies are rejected and the affected users are redirected to the OAuth
@@ -295,6 +294,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
 // no certificate compression.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
 
+// TODO: Flip to true after 1 release. This is default to false to allow users to upgrade 
+// without mixing old and new behavior in a large deployment. Once all instances are upgraded,
+// this can be flipped to true to enable the new behavior.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_oauth2_chunk_large_token_cookies);
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT

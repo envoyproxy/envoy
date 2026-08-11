@@ -1416,7 +1416,7 @@ void OAuth2Filter::setTokenCookie(Http::ResponseHeaderMap& headers, const std::s
 
   if (!oauth2ChunkLargeTokenCookiesEnabled() || data.size() <= max_allowed_data_size) {
     if (data.size() > max_allowed_data_size) {
-      ENVOY_LOG(warn,
+      ENVOY_LOG_EVERY_POW_2(warn,
                 "token cookie {} size {} exceeds the max allowed cookie size {}, but chunking is "
                 "disabled",
                 key, data.size(), max_allowed_data_size);
@@ -1428,7 +1428,7 @@ void OAuth2Filter::setTokenCookie(Http::ResponseHeaderMap& headers, const std::s
   const size_t required_chunks =
       (data.size() + max_allowed_data_size - 1) / max_allowed_data_size; // Ceiling division
   if (required_chunks > MaxChunksPerToken) {
-    ENVOY_LOG(error, "token cookie {} too large; requires {} chunks, max allowed is {}", key,
+    ENVOY_LOG_EVERY_POW_2(error, "token cookie {} too large; requires {} chunks, max allowed is {}", key,
               required_chunks, MaxChunksPerToken);
     return;
   }
@@ -1468,7 +1468,7 @@ OAuth2CookieValidator::findTokenCookie(const absl::flat_hash_map<std::string, st
     if (it != cookies.end()) {
       combinedValue += it->second;
     } else {
-      ENVOY_LOG(warn, "chunked cookie {} not found", cookie_chunk);
+      ENVOY_LOG(debug, "chunked cookie {} not found", cookie_chunk);
       return EMPTY_STRING; // similar to findValue when cookie is not found
     }
   }
