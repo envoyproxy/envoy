@@ -2,8 +2,10 @@
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.validate.h"
 
 #include "source/extensions/filters/http/ai_protocol_manager/config.h"
+#include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -126,6 +128,62 @@ TEST(AiProtocolManagerConfigTest, CreatesStreamFilterFromUpstreamContext) {
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);
+}
+
+// The per-route config proto is accepted and yields a RouteConfig carrying the
+// declared schema.
+TEST(AiProtocolManagerConfigTest, CreatesRouteSpecificConfig) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto_config;
+  proto_config.set_schema(PerRouteProto::OPENAI_CHAT_COMPLETIONS);
+  proto_config.set_normalize(true);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  AiProtocolManagerFilterConfigFactory factory;
+  auto route_config = factory
+                          .createRouteSpecificFilterConfig(
+                              proto_config, context, ProtobufMessage::getNullValidationVisitor())
+                          .value();
+  EXPECT_THAT(route_config.get(),
+              testing::WhenDynamicCastTo<const RouteConfig*>(testing::AllOf(
+                  testing::Property(&RouteConfig::schema, PerRouteProto::OPENAI_CHAT_COMPLETIONS),
+                  testing::Property(&RouteConfig::normalize, true))));
+}
+
+// normalize defaults off: a route that only declares a schema is a pass-through
+// endpoint.
+TEST(AiProtocolManagerConfigTest, RouteConfigDefaultsToNoNormalization) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto_config;
+  proto_config.set_schema(PerRouteProto::OPENAI_CHAT_COMPLETIONS);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  AiProtocolManagerFilterConfigFactory factory;
+  auto route_config = factory
+                          .createRouteSpecificFilterConfig(
+                              proto_config, context, ProtobufMessage::getNullValidationVisitor())
+                          .value();
+
+  EXPECT_THAT(route_config.get(), testing::WhenDynamicCastTo<const RouteConfig*>(
+                                      testing::Property(&RouteConfig::normalize, false)));
+}
+
+// The route config proto the factory hands the config subsystem is the per-route
+// message, not the filter-level one.
+TEST(AiProtocolManagerConfigTest, EmptyRouteConfigProtoIsPerRouteMessage) {
+  AiProtocolManagerFilterConfigFactory factory;
+  auto empty_proto = factory.createEmptyRouteConfigProto();
+  ASSERT_NE(empty_proto, nullptr);
+  EXPECT_NE(
+      Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute>(
+          empty_proto.get()),
+      nullptr);
+}
+
+// A schema is what declares the route an AI endpoint, so leaving it unspecified
+// is not a valid per-route config.
+TEST(AiProtocolManagerConfigTest, RouteConfigRequiresASchema) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute proto_config;
+  EXPECT_THROW(TestUtility::validate(proto_config), ProtoValidationException);
 }
 
 } // namespace

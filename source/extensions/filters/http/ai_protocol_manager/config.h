@@ -10,13 +10,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// Dual-registered factory: downstream (listener) and upstream (cluster) HTTP
-// filter. The upstream role serves deployments where handling must live on
-// the cluster, e.g. a dynamic-forward-proxy egress cluster. Both roles
-// install the full stream filter.
 class AiProtocolManagerFilterConfigFactory
     : public Common::DualFactoryBase<
-          envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager> {
+          envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager,
+          envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute> {
 public:
   AiProtocolManagerFilterConfigFactory()
       : DualFactoryBase("envoy.filters.http.ai_protocol_manager") {}
@@ -27,6 +24,13 @@ private:
           proto_config,
       const std::string& stats_prefix, DualInfo info,
       Server::Configuration::ServerFactoryContext& context) override;
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute&
+          proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
 };
 
 using UpstreamAiProtocolManagerFilterConfigFactory = AiProtocolManagerFilterConfigFactory;

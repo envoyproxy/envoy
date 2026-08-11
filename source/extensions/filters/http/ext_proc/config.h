@@ -37,8 +37,8 @@ private:
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& server_context) override;
+      Server::Configuration::ServerFactoryContext& server_context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 using UpstreamExternalProcessingFilterConfig = ExternalProcessingFilterConfig;

@@ -72,8 +72,10 @@ absl::StatusOr<Http::FilterFactoryCb> HealthCheckFilterConfig::createFilterFacto
 absl::StatusOr<Http::FilterFactoryCb>
 HealthCheckFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::health_check::v3::HealthCheck& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
-  return createFilterFactoryHelper(proto_config, stats_prefix, context, context.scope());
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  return createFilterFactoryHelper(proto_config, extra_context.stats_prefix, context,
+                                   context.scope());
 }
 
 /**
