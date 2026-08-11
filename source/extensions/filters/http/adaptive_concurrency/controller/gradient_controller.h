@@ -101,9 +101,7 @@ public:
   std::chrono::milliseconds fixedValue() const { return fixed_value_; }
 
   // True if minRTT is sampled.
-  bool isMinRTTSamplingEnabled() const {
-    return fixedValue() <= std::chrono::milliseconds::zero();
-  }
+  bool isMinRTTSamplingEnabled() const { return fixedValue() <= std::chrono::milliseconds::zero(); }
 
   // The percentage is normalized to the range [0.0, 1.0].
   double minRTTBufferPercent() const {
@@ -160,10 +158,10 @@ private:
   const uint32_t min_concurrency_;
 
   // The minimum allowed concurrency limit.
-  const uint32_t min_concurrency_limit_;
+  const uint32_t min_concurrency_limit_ = 0;
 
   // True when min_concurrency_limit was explicitly configured.
-  const bool min_concurrency_limit_configured_;
+  const bool min_concurrency_limit_configured_ = false;
 
   // The fixed value of minRTT, if present.
   const std::chrono::milliseconds fixed_value_;
