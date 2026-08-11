@@ -128,6 +128,8 @@ private:
   // the consecutive-attribute counter (see ValueComplete).
   uint32_t open_attribute_frames_{0};
   uint32_t pending_value_stack_depth_{0}; // counts toward kMaxNestingDepth
+  // Hex digit count for \xHH escape in inline quoted strings.
+  uint32_t inline_hex_digit_count_{0};
   uint64_t total_elements_{0};            // counts toward kMaxTotalElements
 };
 
