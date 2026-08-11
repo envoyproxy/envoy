@@ -459,6 +459,18 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_cluster_add_hosts(
   return false;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+    envoy_dynamic_module_type_cluster_envoy_ptr, uint32_t,
+    const envoy_dynamic_module_type_module_buffer*, const envoy_dynamic_module_type_module_buffer*,
+    const uint32_t*, const envoy_dynamic_module_type_module_buffer*,
+    const envoy_dynamic_module_type_module_buffer*, const envoy_dynamic_module_type_module_buffer*,
+    const envoy_dynamic_module_type_module_buffer*, size_t, size_t,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) size_t envoy_dynamic_module_callback_cluster_remove_hosts(
     envoy_dynamic_module_type_cluster_envoy_ptr,
     const envoy_dynamic_module_type_cluster_host_envoy_ptr*, size_t) {

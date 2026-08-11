@@ -914,10 +914,10 @@ TransactionRequest::create(Router& router, Common::Redis::RespValuePtr&& incomin
   // So if this is not a transaction command, a simple command or a custom command, it is an error.
   // We also support multi-key commands, but will leave it to the client to handle the case where
   // the keys provided are not from the same shard.
-  if (Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0 &&
-      Common::Redis::SupportedCommands::simpleCommands().count(command_name) == 0 &&
-      Common::Redis::SupportedCommands::multiKeyCommands().count(command_name) == 0 &&
-      custom_commands.count(command_name) == 0) {
+  if (!Common::Redis::SupportedCommands::transactionCommands().contains(command_name) &&
+      !Common::Redis::SupportedCommands::simpleCommands().contains(command_name) &&
+      !Common::Redis::SupportedCommands::multiKeyCommands().contains(command_name) &&
+      !custom_commands.contains(command_name)) {
     callbacks.onResponse(Common::Redis::Utility::makeError(
         fmt::format("'{}' command is not supported within transaction",
                     incoming_request->asArray()[0].asString())));
