@@ -392,6 +392,11 @@ WEAK_STUB(CertValidatorGetFilterState,
 WEAK_STUB(ClusterAddHosts,
           envoy_dynamic_module_callback_cluster_add_hosts(nullptr, 0, nullptr, nullptr, nullptr,
                                                           nullptr, nullptr, nullptr, 0, 0, nullptr))
+WEAK_STUB(ClusterAddHostsWithHostnames,
+          envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(nullptr, 0, nullptr,
+                                                                         nullptr, nullptr, nullptr,
+                                                                         nullptr, nullptr, nullptr,
+                                                                         0, 0, nullptr))
 WEAK_STUB(ClusterRemoveHosts,
           envoy_dynamic_module_callback_cluster_remove_hosts(nullptr, nullptr, 0))
 WEAK_STUB(ClusterPreInitComplete, envoy_dynamic_module_callback_cluster_pre_init_complete(nullptr))
@@ -1417,6 +1422,16 @@ WEAK_STUB(StatSinkSnapshotGetGaugeCount,
 WEAK_STUB(StatSinkSnapshotGetGauge,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(nullptr, 0, nullptr, 0,
                                                                      nullptr, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogram,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(nullptr, 0, nullptr, 0,
+                                                                         nullptr, nullptr, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramBucketCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(nullptr, 0))
+WEAK_STUB(StatSinkSnapshotGetHistogramBucket,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(nullptr, 0, 0,
+                                                                                nullptr, nullptr))
 WEAK_STUB(StatSinkSnapshotGetTextReadoutCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(nullptr))
 WEAK_STUB(StatSinkSnapshotGetTextReadout,
@@ -1560,6 +1575,9 @@ WEAK_STUB(HttpSetDynamicMetadataStringBatch,
           envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(nullptr,
                                                                                {nullptr, 0},
                                                                                nullptr, 0))
+WEAK_STUB(HttpSetDynamicMetadataStruct,
+          envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(nullptr, {nullptr, 0},
+                                                                         {nullptr, 0}))
 WEAK_STUB(HttpGetMetadataString, envoy_dynamic_module_callback_http_get_metadata_string(
                                      nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                      {nullptr, 0}, {nullptr, 0}, nullptr))

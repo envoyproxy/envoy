@@ -216,7 +216,7 @@ function bazel_envoy_api_build() {
     setup_clang_toolchain
     export CLANG_TOOLCHAIN_SETUP=1
     echo "Run protoxform test"
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+    bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
         --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
         --//tools/api_proto_plugin:extra_args=api_version:3.7 \
         //tools/protoprint:protoprint_test
@@ -306,9 +306,10 @@ function build_openssl_presubmit() {
     local merge_base
     if [[ -n "${CI_TARGET_BRANCH}" ]]; then
         git fetch origin "${CI_TARGET_BRANCH}" 2>/dev/null || true
-        merge_base="$(git merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "")"
-    fi
-    if [[ -z "${merge_base}" ]]; then
+        # Shallow clones may lack enough history for merge-base;
+        # fall back to diffing against the target branch directly.
+        merge_base="$(git merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "origin/${CI_TARGET_BRANCH}")"
+    else
         merge_base="HEAD~1"
     fi
 

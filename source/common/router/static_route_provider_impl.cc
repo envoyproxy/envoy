@@ -10,9 +10,9 @@ namespace Router {
 
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     const envoy::config::route::v3::RouteConfiguration& config, Rds::ConfigTraits& config_traits,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
     Rds::RouteConfigProviderManager& route_config_provider_manager)
-    : base_(config, config_traits, factory_context, route_config_provider_manager),
+    : base_(config, config_traits, factory_context, init_manager, route_config_provider_manager),
       route_config_provider_manager_(route_config_provider_manager),
       vhds_context_(config.has_vhds()
                         ? std::make_unique<VhdsContext>(config, factory_context, *this,
@@ -72,6 +72,8 @@ void StaticRouteConfigProviderImpl::requestVirtualHostsUpdate(
   });
 }
 
+// TODO(wbpcode): for inline route configuration with VHDS, we assume the route configuration self
+// needn't be warmed up for now.
 StaticRouteConfigProviderImpl::VhdsContext::VhdsContext(
     const envoy::config::route::v3::RouteConfiguration& config,
     Server::Configuration::ServerFactoryContext& factory_context,

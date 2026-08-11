@@ -319,6 +319,22 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlTest) {
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
+// Substitution matches a whole `{name}` or `{name=pattern}` and nothing else. These cases pin the
+// boundaries that the previous `\{name(?:=[^}]+)?\}` regex enforced.
+TEST(HttpRequestBuilderTest, ConstructBaseUrlVariableMatchingIsExact) {
+  json arguments = json::parse(R"json({"id": "7"})json");
+
+  // A longer name that merely starts with the variable name is left alone.
+  EXPECT_THAT(*constructBaseUrl("/v1/{identifier}/{id}", {"id"}, arguments),
+              StrEq("/v1/{identifier}/7"));
+
+  // An explicit pattern needs at least one character, so `{id=}` is not a variable.
+  EXPECT_THAT(*constructBaseUrl("/v1/{id=}", {"id"}, arguments), StrEq("/v1/{id=}"));
+
+  // Every occurrence is substituted, not just the first.
+  EXPECT_THAT(*constructBaseUrl("/v1/{id}/copy/{id}", {"id"}, arguments), StrEq("/v1/7/copy/7"));
+}
+
 } // namespace
 } // namespace McpJsonRestBridge
 } // namespace HttpFilters
