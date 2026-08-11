@@ -8,6 +8,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/utility.h"
+#include "source/common/formatter/coalesce_formatter.h"
 #include "source/common/formatter/http_specific_formatter.h"
 #include "source/common/formatter/serializer.h"
 #include "source/common/formatter/stream_info_formatter.h"
@@ -3722,6 +3723,103 @@ private:
   ValueSink sink_{serializer_};
 };
 
+TEST(SubstitutionFormatterTest, ValueSinkAddValue) {
+  {
+    ValueSinkHelper helper;
+    helper.sink().addNumber(static_cast<uint64_t>(18446744073709551615U));
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("18446744073709551615", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addNumber(static_cast<int64_t>(-42));
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("-42", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addNumber(1.5);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("1.5", helper.output());
+  }
+
+  // NaN is not representable in JSON and is serialized as null.
+  {
+    ValueSinkHelper helper;
+    helper.sink().addNumber(std::nan(""));
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("null", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addString("foo\"bar");
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("foo\"bar")", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addBool(true);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("true", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addBool(false);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("false", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addNull();
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("null", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addValue(ValueUtil::numberValue(2));
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("2", helper.output());
+  }
+
+  // An explicit null proto value is serialized rather than skipped.
+  {
+    ValueSinkHelper helper;
+    helper.sink().addValue(ValueUtil::nullValue());
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("null", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    Protobuf::Struct struct_value;
+    struct_value.mutable_fields()->insert({"foo", ValueUtil::stringValue("bar")});
+    helper.sink().addValue(struct_value);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"({"foo":"bar"})", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addValue(Protobuf::Struct());
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("{}", helper.output());
+  }
+
+  // A sink that was never written to is not consumed and produces no output.
+  {
+    ValueSinkHelper helper;
+    EXPECT_FALSE(helper.consumed());
+    EXPECT_EQ("", helper.output());
+  }
+}
+
 TEST(SubstitutionFormatterTest, HeaderFormatterFormatToAndFormatValueTo) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
@@ -6189,6 +6287,14 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterErrorCases) {
                 HasStatus(absl::StatusCode::kInvalidArgument, "COALESCE requires parameters"));
   }
 
+  // The command parser rejects the empty parameter before the formatter is created, so the
+  // empty configuration is checked by creating the formatter directly.
+  {
+    EXPECT_THAT(CoalesceFormatter::create("", absl::nullopt),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "COALESCE requires a JSON configuration parameter"));
+  }
+
   // Invalid JSON.
   {
     EXPECT_THAT(SubstitutionFormatParser::parse("%COALESCE(not json)%"),
@@ -6201,6 +6307,13 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterErrorCases) {
     EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"foo": "bar"})%)"),
                 HasStatus(absl::StatusCode::kInvalidArgument,
                           "COALESCE: JSON configuration must contain 'operators' array"));
+  }
+
+  // The operators field is present but is not an array.
+  {
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": "PROTOCOL"})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: 'operators' must be an array")));
   }
 
   // Empty operators array.
@@ -6231,6 +6344,26 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterErrorCases) {
         HasStatus(
             absl::StatusCode::kInvalidArgument,
             ContainsRegex("COALESCE: failed to parse operator at index 0.*unknown command.*")));
+  }
+
+  // The param field is present but is not a string.
+  {
+    EXPECT_THAT(
+        SubstitutionFormatParser::parse(
+            R"(%COALESCE({"operators": [{"command": "REQ", "param": 123}]})%)"),
+        HasStatus(
+            absl::StatusCode::kInvalidArgument,
+            ContainsRegex(
+                "COALESCE: failed to parse operator at index 0.*'param' field must be a string")));
+  }
+
+  // The max_length field is present but is not an integer.
+  {
+    EXPECT_THAT(SubstitutionFormatParser::parse(
+                    R"(%COALESCE({"operators": [{"command": "PROTOCOL", "max_length": "10"}]})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          ContainsRegex("COALESCE: failed to parse operator at index 0.*"
+                                        "'max_length' field must be an integer")));
   }
 
   // Invalid not positive max_length.
@@ -6277,6 +6410,56 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterFormatValue) {
     ASSERT_EQ(providers.size(), 1);
     auto value = providers[0]->formatValue({&request_headers}, null_stream_info);
     EXPECT_EQ(Protobuf::Value::kNullValue, value.kind_case());
+  }
+
+  // A string value longer than the COALESCE max length is truncated.
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["PROTOCOL"]}):4%)");
+    ASSERT_EQ(providers.size(), 1);
+    auto value = providers[0]->formatValue({}, stream_info);
+    EXPECT_EQ(Protobuf::Value::kStringValue, value.kind_case());
+    EXPECT_EQ("HTTP", value.string_value());
+  }
+
+  // A string value shorter than the COALESCE max length is left as is.
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["PROTOCOL"]}):100%)");
+    ASSERT_EQ(providers.size(), 1);
+    auto value = providers[0]->formatValue({}, stream_info);
+    EXPECT_EQ(Protobuf::Value::kStringValue, value.kind_case());
+    EXPECT_EQ("HTTP/1.1", value.string_value());
+  }
+
+  // A non-string value is returned as is and is not subject to the max length.
+  {
+    EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(Return(absl::optional<uint32_t>(503)));
+
+    auto providers =
+        *SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["RESPONSE_CODE"]}):1%)");
+    ASSERT_EQ(providers.size(), 1);
+    auto value = providers[0]->formatValue({}, stream_info);
+    EXPECT_EQ(Protobuf::Value::kNumberValue, value.kind_case());
+    EXPECT_EQ(503, value.number_value());
+  }
+
+  // An empty string value is skipped and the next operator is used.
+  {
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.0.0.1", 8080)};
+    auto downstream_address_provider =
+        std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+    downstream_address_provider->setRequestedServerName("");
+    EXPECT_CALL(stream_info, downstreamAddressProvider())
+        .WillRepeatedly(ReturnPointee(downstream_address_provider.get()));
+
+    auto providers = *SubstitutionFormatParser::parse(
+        R"(%COALESCE({"operators": ["REQUESTED_SERVER_NAME", "PROTOCOL"]})%)");
+    ASSERT_EQ(providers.size(), 1);
+    auto value = providers[0]->formatValue({}, stream_info);
+    EXPECT_EQ(Protobuf::Value::kStringValue, value.kind_case());
+    EXPECT_EQ("HTTP/1.1", value.string_value());
   }
 }
 
