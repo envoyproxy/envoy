@@ -132,6 +132,7 @@ envoy_cc_library(
         "//envoy/common:pure_lib",
         "//envoy/stats:stats_macros",
         "//source/common/protobuf",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/types:span",
