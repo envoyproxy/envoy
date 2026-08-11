@@ -6319,6 +6319,11 @@ TEST_P(ProtocolIntegrationTest, UpstreamRstStreamNoErrorWithBufferedTrailers) {
 
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    // For HTTP/3, the STOP_SENDING(NO_ERROR) arrives after the response and may or may not be
+    // processed before/after the stream is finished. Use waitForAnyTermination() to avoid flakes.
+    ASSERT_TRUE(response->waitForAnyTermination());
+    codec_client_->close();
   } else {
     ASSERT_TRUE(response->waitForReset());
     EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
