@@ -624,7 +624,9 @@ envoy_cc_test(
     ],
     deps = [
         ":http_protocol_integration_lib",
+        "//envoy/thread_local:thread_local_interface",
         "//test/test_common:test_time_lib",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -1094,6 +1096,27 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "quic_upstream_client_cert_integration_test",
+    size = "large",
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//conditions:default": ["quic_upstream_client_cert_integration_test.cc"],
+    }),
+    data = ["//test/config/integration/certs"],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = envoy_select_enable_http3([
+        ":http_protocol_integration_lib",
+        "//source/common/quic:envoy_quic_proof_source_lib",
+        "//source/common/tls:connection_info_impl_base_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ]),
 )
 
 envoy_cc_test(
@@ -2664,6 +2687,37 @@ envoy_cc_test(
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "listener_fcds_integration_test",
+    size = "large",
+    srcs = [
+        "listener_fcds_integration_test.cc",
+    ],
+    rbe_pool = "2core",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:connection_lib",
+        "//source/common/network:utility_lib",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/config:v2_link_hacks",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:resources_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
