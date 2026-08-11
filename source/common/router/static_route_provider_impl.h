@@ -62,7 +62,12 @@ private:
     VhdsContext(const envoy::config::route::v3::RouteConfiguration& config,
                 Server::Configuration::ServerFactoryContext& factory_context,
                 Init::Manager& init_manager, Rds::ProtoTraits& proto_traits);
-    ~VhdsContext() override { local_init_target_.ready(); }
+    ~VhdsContext() override {
+      // To destroy the receiver to ensure it will never callback to this observer.
+      config_update_info_->setObserver({});
+      config_update_info_.reset();
+      local_init_target_.ready();
+    }
 
     // Rds::RouteConfigUpdateObserver
     // Called when the route configuration that the receiver built is warmed up. Publishes it to

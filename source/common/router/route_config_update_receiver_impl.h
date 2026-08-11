@@ -42,6 +42,11 @@ public:
       : config_traits_(factory_context.messageValidationContext().dynamicValidationVisitor()),
         base_(config_traits_, proto_traits, factory_context), factory_context_(factory_context),
         stat_prefix_(stat_prefix) {}
+  ~RouteConfigUpdateReceiverImpl() override {
+    base_.warmer_.setObserver({});
+    base_.warmer_.abortWarming();
+    vhds_subscription_.reset();
+  }
 
   using VirtualHostMap = std::map<std::string, envoy::config::route::v3::VirtualHost>;
 
@@ -56,7 +61,7 @@ public:
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                     const std::string& version_info) override;
   void onRdsFailure() override { base_.onRdsFailure(); }
-  void setObserver(Rds::RouteConfigUpdateObserver& observer) override {
+  void setObserver(OptRef<Rds::RouteConfigUpdateObserver> observer) override {
     base_.warmer_.setObserver(observer);
   }
   bool configWarming() const override { return base_.warmer_.warming(); }
@@ -92,9 +97,9 @@ private:
                                                     : *base_.route_config_proto_;
   }
 
-  absl::Status
+  absl::StatusOr<VhdsSubscriptionPtr>
   createVhdsSubscription(const envoy::config::route::v3::RouteConfiguration& route_config,
-                         uint64_t new_vhds_config_hash, Init::Manager& init_manager);
+                         Init::Manager& init_manager);
 
   ConfigTraitsImpl config_traits_;
 

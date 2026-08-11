@@ -179,20 +179,22 @@ routes:
     return resources;
   }
 
-  // An RDS response for foo_route_config that configures VHDS.
-  static std::string vhdsRdsConfigJson(absl::string_view version) {
+  // An RDS response for foo_route_config that configures VHDS. The VHDS configuration is the same
+  // for every version, so that a test can change the route configuration without changing it.
+  static std::string vhdsRdsConfigJson(absl::string_view version,
+                                       absl::string_view vhost_name = "foo") {
     return fmt::format(R"EOF(
 {{
-  "version_info": "{}",
+  "version_info": "{0}",
   "resources": [
     {{
       "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
       "name": "foo_route_config",
       "virtual_hosts": [
         {{
-          "name": "foo",
-          "domains": ["foo"],
-          "routes": [{{"match": {{"prefix": "/foo"}}, "route": {{"cluster": "foo"}}}}]
+          "name": "{1}",
+          "domains": ["{1}"],
+          "routes": [{{"match": {{"prefix": "/{1}"}}, "route": {{"cluster": "foo"}}}}]
         }}
       ],
       "vhds": {{
@@ -209,7 +211,7 @@ routes:
   ]
 }}
 )EOF",
-                       version);
+                       version, vhost_name);
   }
 
   NiceMock<Server::MockInstance> server_;
@@ -802,6 +804,80 @@ TEST_F(RdsImplTest, VhdsUpdatePublishesWithoutRecreatingTheVhdsSubscription) {
   // configuration to the update callbacks.
   EXPECT_EQ(2UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
 
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "bar"}, {":path", "/"}})
+                       ->routeEntry()
+                       ->clusterName());
+}
+
+// An RDS update that leaves the VHDS configuration unchanged keeps the VHDS subscription that is
+// already running: that subscription is the one delivering the virtual hosts of the route
+// configuration that is being updated.
+TEST_F(RdsImplTest, RdsUpdateWithUnchangedVhdsKeepsTheVhdsSubscription) {
+  setup();
+
+  // Exactly one VHDS subscription is created for all of the RDS updates below, i.e. the first one
+  // creates it and the later ones neither re-create nor drop it.
+  EXPECT_CALL(server_factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .Times(1);
+
+  auto first_rds_response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+          vhdsRdsConfigJson("1"));
+  const auto first_decoded_rds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(
+          first_rds_response);
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(rds_callbacks_->onConfigUpdate(first_decoded_rds_resources.refvec_,
+                                           first_rds_response.version_info()));
+
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks =
+      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(nullptr, vhds_callbacks);
+  ASSERT_NE(rds_callbacks_, vhds_callbacks);
+
+  // The initial VHDS fetch publishes the route configuration that was waiting for it.
+  const auto vhds_resources = vhdsResources("bar", "bar");
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(vhds_resources);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+  EXPECT_EQ(1UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+
+  // A second RDS update changes the virtual hosts of the route configuration but not its VHDS
+  // configuration, so the VHDS subscription of the first update is kept.
+  auto second_rds_response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+          vhdsRdsConfigJson("2", "baz"));
+  const auto second_decoded_rds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(
+          second_rds_response);
+  EXPECT_OK(rds_callbacks_->onConfigUpdate(second_decoded_rds_resources.refvec_,
+                                           second_rds_response.version_info()));
+  EXPECT_EQ(2UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+  EXPECT_EQ(vhds_callbacks,
+            server_factory_context_.cluster_manager_.subscription_factory_.callbacks_);
+
+  // A third one behaves the same way. If the second update had dropped the subscription, this one
+  // would have had to create a new one, because a route configuration that configures VHDS without
+  // a subscription to deliver its virtual hosts is never updated again.
+  auto third_rds_response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+          vhdsRdsConfigJson("3", "qux"));
+  const auto third_decoded_rds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(
+          third_rds_response);
+  EXPECT_OK(rds_callbacks_->onConfigUpdate(third_decoded_rds_resources.refvec_,
+                                           third_rds_response.version_info()));
+  EXPECT_EQ(3UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+  EXPECT_EQ(vhds_callbacks,
+            server_factory_context_.cluster_manager_.subscription_factory_.callbacks_);
+
+  // The virtual host that VHDS delivered is still merged into the route configuration of the last
+  // RDS update.
+  EXPECT_TRUE(rds_->configCast()->usesVhds());
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "qux"}, {":path", "/qux"}})
+                       ->routeEntry()
+                       ->clusterName());
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "bar"}, {":path", "/"}})
                        ->routeEntry()
                        ->clusterName());

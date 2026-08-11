@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/init/manager.h"
@@ -62,9 +63,9 @@ public:
   /**
    * Sets the observer of updates to the RouteConfiguration.
    * @param observer supplies the observer. This should have a lifetime that is at least as long as
-   * the lifetime of this receiver.
+   * the lifetime of this receiver. nullopt means that there is no observer.
    */
-  virtual void setObserver(RouteConfigUpdateObserver& observer) PURE;
+  virtual void setObserver(OptRef<RouteConfigUpdateObserver> observer) PURE;
 
   /**
    * @return bool whether the RouteConfiguration built by a previous RDS update is still warming up,

@@ -293,8 +293,9 @@ class WarmingTestConfig : public TestConfig {
 public:
   WarmingTestConfig(const envoy::config::route::v3::RouteConfiguration& rc,
                     Server::Configuration::ServerFactoryContext& context,
-                    Init::Manager& init_manager, bool ready_synchronously)
-      : TestConfig(rc, context, false),
+                    Init::Manager& init_manager, bool ready_synchronously,
+                    bool ready_on_destruction = false)
+      : TestConfig(rc, context, false), ready_on_destruction_(ready_on_destruction),
         target_(fmt::format("warming target {}", rc.name()), [this, ready_synchronously]() {
           initializing_ = true;
           // The resource is already available, so it signals readiness from within the
@@ -307,6 +308,15 @@ public:
     init_manager.add(target_);
   }
 
+  ~WarmingTestConfig() override {
+    // Some resources give up and signal readiness when they are destroyed rather than leaving
+    // whatever waits for them warming forever. The VHDS subscription of a route configuration is
+    // one of them.
+    if (ready_on_destruction_) {
+      target_.ready();
+    }
+  }
+
   // Simulates the resource that is owned by this route configuration becoming ready.
   void ready() { target_.ready(); }
 
@@ -315,6 +325,7 @@ public:
   bool initializing_{false};
 
 private:
+  const bool ready_on_destruction_;
   Init::TargetImpl target_;
 };
 
@@ -336,8 +347,8 @@ public:
     }
     // The created configurations are kept alive so that a test can complete the warming of an
     // update that has already been superseded by a newer one.
-    configs_.push_back(std::make_shared<WarmingTestConfig>(route_config, context, init_manager,
-                                                           ready_synchronously_));
+    configs_.push_back(std::make_shared<WarmingTestConfig>(
+        route_config, context, init_manager, ready_synchronously_, ready_on_destruction_));
     return configs_.back();
   }
 
@@ -345,6 +356,8 @@ public:
   bool warming_{true};
   // Whether that resource is ready as soon as it is asked to initialize.
   bool ready_synchronously_{false};
+  // Whether that resource signals readiness when it is destroyed.
+  bool ready_on_destruction_{false};
   mutable std::vector<std::shared_ptr<WarmingTestConfig>> configs_;
 };
 
@@ -573,6 +586,30 @@ resources: []
   init_watcher_.expectReady();
   config_traits_.configs_[0]->ready();
   EXPECT_NE(nullptr, publishedRoute("foo"));
+}
+
+// Destroying everything while an update is still warming up must not publish that update, even
+// though the resource it warms up signals readiness as it is destroyed. By then the subscription
+// that would publish it is being destroyed itself.
+TEST_F(RdsWarmingTest, DestructionWhileWarmingDoesNotPublishTheWarmingUpdate) {
+  config_traits_.ready_on_destruction_ = true;
+  createProvider();
+
+  init_watcher_.expectReady().Times(0);
+  EXPECT_TRUE(pushUpdate(routeConfig("1", "foo")).ok());
+  ASSERT_EQ(1, config_traits_.configs_.size());
+  EXPECT_TRUE(receiver().configWarming());
+  EXPECT_EQ(0, configReloads());
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+
+  // Hand the only remaining reference to the route configuration over to the receiver, so that the
+  // resource that is warming up is destroyed together with it.
+  config_traits_.configs_.clear();
+
+  // The subscription signals readiness as it is destroyed, so that nothing keeps warming with it.
+  init_watcher_.expectReady();
+  provider_.reset();
+  EXPECT_EQ(0, configReloads());
 }
 
 // A failure to publish a route configuration that was warmed up asynchronously can't be reported to

@@ -35,6 +35,11 @@ using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Not;
 
+class MockRouteConfigUpdateObserver : public Rds::RouteConfigUpdateObserver {
+public:
+  MOCK_METHOD(void, onConfigWarmed, ());
+};
+
 class VhdsTest : public testing::Test {
 public:
   void SetUp() override {
@@ -110,6 +115,28 @@ TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   // Creating the receiver's VHDS subscription is part of applying the RDS update.
   makeRouteConfigUpdate(route_config);
+}
+
+// A receiver that is destroyed while an update is still waiting for its initial VHDS fetch must not
+// notify its observer. The observer owns the receiver, so it is itself being destroyed by then, and
+// dropping the VHDS subscription signals the init target that the update warms up with.
+TEST_F(VhdsTest, DestroyingTheReceiverWhileWarmingDoesNotNotifyTheObserver) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+
+  NiceMock<MockRouteConfigUpdateObserver> observer;
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+  config_update_info->setObserver(observer);
+
+  // The route configuration configures VHDS, so it isn't published until the initial VHDS fetch has
+  // landed, i.e. it is still warming up here.
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config, "1"));
+  EXPECT_TRUE(config_update_info->configWarming());
+
+  // Ensure that when the receiver and VHDS subscription are destroyed, the observer is not
+  // notified.
+  EXPECT_CALL(observer, onConfigWarmed()).Times(0);
+  config_update_info.reset();
 }
 
 // verify that api_type: GRPC fails validation

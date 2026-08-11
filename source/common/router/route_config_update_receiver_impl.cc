@@ -95,36 +95,57 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
   // No exception, the route configuration is valid, now we can try to create VHDS if necessary.
   const bool vhds_configuration_changed = new_vhds_config_hash != last_vhds_config_hash_;
 
+  // Captured here because the proto is moved into the state below, before it is used to decide
+  // what happens to the VHDS subscription.
+  const bool has_vhds = new_route_config->has_vhds();
+
   std::unique_ptr<Init::Manager> vhds_noop_init_manager;
   std::unique_ptr<Init::Watcher> vhds_noop_init_watcher;
-  if (!new_route_config->has_vhds()) {
-    // This route configuration doesn't use VHDS, so any subscription of a previous one goes away.
-    vhds_subscription_.reset();
-    last_vhds_config_hash_ = 0ull;
-  } else if (!base_.initialized_) {
-    // We are still waiting for the first valid route configuration update but received a different
-    // RDS update again. Then always create a new subscription because the previous init manager
-    // will be dropped and we need add the VHDS subscription to the new init manager.
-    RETURN_IF_NOT_OK(
-        createVhdsSubscription(*new_route_config, new_vhds_config_hash, *update_init_manager));
-  } else if (vhds_configuration_changed || vhds_subscription_ == nullptr) {
-    // We have received the first valid route configuration update and the VHDS configuration has
-    // changed. Then create a new subscription but use a noop init manager for this subscription to
-    // avoid blocking the main init manager.
-    // This is for the backward compatibility because the previous implementation doesn't won't
-    // block the new RDS update if the updated VHDS subscription is not ready.
-    vhds_noop_init_manager = std::make_unique<Init::ManagerImpl>(
-        fmt::format("VHDS noop init manager for {}", new_route_config->name()));
-    vhds_noop_init_watcher = std::make_unique<Init::WatcherImpl>(
-        fmt::format("VHDS noop init watcher for {}", new_route_config->name()), []() {});
-    RETURN_IF_NOT_OK(
-        createVhdsSubscription(*new_route_config, new_vhds_config_hash, *vhds_noop_init_manager));
+  VhdsSubscriptionPtr new_vhds_subscription;
+  if (has_vhds) {
+    if (!base_.initialized_) {
+      // We are still waiting for the first valid route configuration update but received a
+      // different RDS update again. Then always create a new subscription because the previous init
+      // manager will be dropped and we need add the VHDS subscription to the new init manager.
+      auto subscription_or_error = createVhdsSubscription(*new_route_config, *update_init_manager);
+      RETURN_IF_NOT_OK_REF(subscription_or_error.status());
+      new_vhds_subscription = std::move(subscription_or_error.value());
+    } else if (vhds_configuration_changed || vhds_subscription_ == nullptr) {
+      // We have received the first valid route configuration update and the VHDS configuration has
+      // changed. Then create a new subscription but use a noop init manager for this subscription
+      // to avoid blocking the main init manager.
+      // This is for the backward compatibility because the previous implementation doesn't won't
+      // block the new RDS update if the updated VHDS subscription is not ready.
+      vhds_noop_init_manager = std::make_unique<Init::ManagerImpl>(
+          fmt::format("VHDS noop init manager for {}", new_route_config->name()));
+      vhds_noop_init_watcher = std::make_unique<Init::WatcherImpl>(
+          fmt::format("VHDS noop init watcher for {}", new_route_config->name()), []() {});
+      auto subscription_or_error =
+          createVhdsSubscription(*new_route_config, *vhds_noop_init_manager);
+      RETURN_IF_NOT_OK_REF(subscription_or_error.status());
+      new_vhds_subscription = std::move(subscription_or_error.value());
+    }
+    // Otherwise the VHDS configuration is unchanged and its subscription is still around, so that
+    // subscription is kept: it is the one that is delivering the virtual hosts of the route
+    // configuration that is being updated here.
   }
 
   // The new route configuration and VHDS subscription have been built without error, now we can
   // update the state and start warming up.
   base_.updateState(std::move(new_route_config), new_hash, version_info, std::move(config),
                     std::move(update_init_manager), std::move(update_id));
+
+  // Now, the state is updated and previous warming update is aborted (if any), we can update the
+  // VHDS subscription here. So the destruction of the previous subscription will not bring any
+  // side effect.
+  if (new_vhds_subscription != nullptr) {
+    vhds_subscription_ = std::move(new_vhds_subscription);
+  } else if (!has_vhds) {
+    // This route configuration doesn't use VHDS, so the subscription of a previous one goes away.
+    vhds_subscription_.reset();
+  }
+  last_vhds_config_hash_ = new_vhds_config_hash;
+
   base_.startWarming();
 
   if (vhds_noop_init_manager != nullptr) {
@@ -205,17 +226,10 @@ bool RouteConfigUpdateReceiverImpl::updateVhosts(VirtualHostMap& vhosts,
   return vhosts_added;
 }
 
-absl::Status RouteConfigUpdateReceiverImpl::createVhdsSubscription(
-    const envoy::config::route::v3::RouteConfiguration& route_config, uint64_t new_vhds_config_hash,
-    Init::Manager& init_manager) {
-  auto subscription_or_error = VhdsSubscription::createVhdsSubscription(
-      route_config, factory_context_, stat_prefix_, *this, init_manager);
-  if (!subscription_or_error.ok()) {
-    return subscription_or_error.status();
-  }
-  vhds_subscription_ = std::move(subscription_or_error.value());
-  last_vhds_config_hash_ = new_vhds_config_hash;
-  return absl::OkStatus();
+absl::StatusOr<VhdsSubscriptionPtr> RouteConfigUpdateReceiverImpl::createVhdsSubscription(
+    const envoy::config::route::v3::RouteConfiguration& route_config, Init::Manager& init_manager) {
+  return VhdsSubscription::createVhdsSubscription(route_config, factory_context_, stat_prefix_,
+                                                  *this, init_manager);
 }
 
 } // namespace Router

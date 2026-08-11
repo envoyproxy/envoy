@@ -42,7 +42,7 @@ public:
    * @param observer supplies the observer. This should have a lifetime that is at least as long as
    * the lifetime of this warmer.
    */
-  void setObserver(RouteConfigUpdateObserver& observer) { observer_.emplace(observer); }
+  void setObserver(OptRef<RouteConfigUpdateObserver> observer) { observer_ = observer; }
 
   /**
    * Creates the init manager that the resources of the update that is about to be built should warm
@@ -134,6 +134,10 @@ class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver,
 public:
   RouteConfigUpdateReceiverImpl(ConfigTraits& config_traits, ProtoTraits& proto_traits,
                                 Server::Configuration::ServerFactoryContext& factory_context);
+  ~RouteConfigUpdateReceiverImpl() override {
+    warmer_.setObserver({});
+    warmer_.abortWarming();
+  }
 
   uint64_t getHash(const Protobuf::Message& rc) const { return MessageUtil::hash(rc); }
   bool checkHash(uint64_t new_hash) const {
@@ -156,7 +160,9 @@ public:
   // Recorded the same way a successful publish is, because from here on the two are
   // equivalent: in both cases the owning init manager has stopped waiting.
   void onRdsFailure() override { initialized_ = true; }
-  void setObserver(RouteConfigUpdateObserver& observer) override { warmer_.setObserver(observer); }
+  void setObserver(OptRef<RouteConfigUpdateObserver> observer) override {
+    warmer_.setObserver(observer);
+  }
   bool configWarming() const override { return warmer_.warming(); }
 
   uint64_t configHash() const override { return last_config_hash_; }

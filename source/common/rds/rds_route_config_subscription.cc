@@ -67,6 +67,10 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
+  // To destroy the receiver to ensure it will never callback to this observer.
+  config_update_info_->setObserver({});
+  config_update_info_.reset();
+
   // If we get destroyed during initialization, make sure we signal that we "initialized".
   local_init_target_.ready();
 
