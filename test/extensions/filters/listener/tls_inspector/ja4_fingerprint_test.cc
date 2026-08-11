@@ -25,6 +25,42 @@ TEST(JA4Fingerprinter, GreaseValueFiltering) {
   EXPECT_TRUE(JA4Fingerprinter::isNotGrease(0xffff)); // Not a GREASE value
 }
 
+// The optional ``protocol`` parameter to ``JA4Fingerprinter::create`` must:
+//   - default to ``Protocol::TLS`` so existing callers see no behavior change,
+//   - drive only the first character of the fingerprint (per the JA4 spec),
+//   - map ``TLS`` -> ``t``, ``QUIC`` -> ``q``, ``DTLS`` -> ``d``.
+TEST(JA4Fingerprinter, ProtocolParameterControlsFirstCharacter) {
+  // Two 16-bit ciphers: TLS 1.2 ECDHE-RSA-AES128-GCM-SHA256 and -AES256-GCM-SHA384.
+  const std::vector<uint8_t> ciphers = {0xc0, 0x2f, 0xc0, 0x30};
+
+  SSL_CLIENT_HELLO hello{};
+  hello.version = TLS1_2_VERSION;
+  hello.cipher_suites = ciphers.data();
+  hello.cipher_suites_len = ciphers.size();
+  hello.extensions = nullptr;
+  hello.extensions_len = 0;
+
+  const std::string default_output = JA4Fingerprinter::create(&hello);
+  const std::string tls_output = JA4Fingerprinter::create(&hello, JA4Fingerprinter::Protocol::TLS);
+  const std::string quic_output = JA4Fingerprinter::create(&hello, JA4Fingerprinter::Protocol::QUIC);
+  const std::string dtls_output = JA4Fingerprinter::create(&hello, JA4Fingerprinter::Protocol::DTLS);
+
+  // Default is TLS: no-arg and Protocol::TLS overloads produce byte-identical output.
+  EXPECT_EQ(default_output, tls_output);
+
+  // First character matches the caller-selected protocol.
+  ASSERT_FALSE(tls_output.empty());
+  ASSERT_FALSE(quic_output.empty());
+  ASSERT_FALSE(dtls_output.empty());
+  EXPECT_EQ(tls_output[0], 't');
+  EXPECT_EQ(quic_output[0], 'q');
+  EXPECT_EQ(dtls_output[0], 'd');
+
+  // Only the first character differs across protocol choices.
+  EXPECT_EQ(tls_output.substr(1), quic_output.substr(1));
+  EXPECT_EQ(tls_output.substr(1), dtls_output.substr(1));
+}
+
 // This will test the ``JA4`` fingerprinting integration with the TLS Inspector code
 class TlsInspectorJA4IntegrationTest : public testing::Test {
 public:

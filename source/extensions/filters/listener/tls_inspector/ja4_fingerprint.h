@@ -16,10 +16,10 @@ namespace TlsInspector {
  * ``JA4`` is an improved version of ``JA3`` that includes TLS version, ciphers, extensions,
  * and ALPN information in a hex format.
  *
- * Format: `tXXdYYZZ_CIPHERHASH_EXTENSIONHASH`
+ * Format: `pXXdYYZZ_CIPHERHASH_EXTENSIONHASH`
  *
  * Where:
- * - ``t`` = protocol type (t for TLS, q for QUIC, d for ``DTLS``)
+ * - ``p`` = protocol type (``t`` for TLS, ``q`` for QUIC, ``d`` for DTLS)
  * - ``XX`` = TLS version (13, 12, etc.)
  * - ``d/i`` = SNI presence (d = domain present, i = no SNI)
  * - ``YY`` = number of cipher suites (2 digits)
@@ -32,11 +32,24 @@ namespace TlsInspector {
 class JA4Fingerprinter {
 public:
   /**
+   * Transport protocol carrying the handshake. Determines the first character
+   * of the ``JA4`` fingerprint per the spec.
+   */
+  enum class Protocol : char {
+    TLS = 't',
+    QUIC = 'q',
+    DTLS = 'd',
+  };
+
+  /**
    * Creates a ``JA4`` fingerprint from a TLS ClientHello message.
    * @param ssl_client_hello The SSL ClientHello message
+   * @param protocol The transport protocol carrying the handshake. Defaults to
+   *   ``Protocol::TLS`` to preserve prior behavior for existing callers.
    * @return ``JA4`` fingerprint string
    */
-  static std::string create(const SSL_CLIENT_HELLO* ssl_client_hello);
+  static std::string create(const SSL_CLIENT_HELLO* ssl_client_hello,
+                            Protocol protocol = Protocol::TLS);
 
   /**
    * Checks if a value is not a GREASE value (RFC 8701)

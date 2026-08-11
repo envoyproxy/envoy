@@ -24,6 +24,18 @@ const std::array<uint16_t, 16> GREASE_VALUES = {
     0x0a0a, 0x1a1a, 0x2a2a, 0x3a3a, 0x4a4a, 0x5a5a, 0x6a6a, 0x7a7a,
     0x8a8a, 0x9a9a, 0xaaaa, 0xbaba, 0xcaca, 0xdada, 0xeaea, 0xfafa,
 };
+
+absl::string_view protocolChar(JA4Fingerprinter::Protocol protocol) {
+  switch (protocol) {
+  case JA4Fingerprinter::Protocol::QUIC:
+    return "q";
+  case JA4Fingerprinter::Protocol::DTLS:
+    return "d";
+  case JA4Fingerprinter::Protocol::TLS:
+    return "t";
+  }
+  return "t";
+}
 } // namespace
 
 bool JA4Fingerprinter::isNotGrease(uint16_t id) {
@@ -293,11 +305,12 @@ std::string JA4Fingerprinter::getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_cl
   return Envoy::Hex::encode(absl::Span<const uint8_t>(hash.data(), JA4_HASH_LENGTH / 2));
 }
 
-std::string JA4Fingerprinter::create(const SSL_CLIENT_HELLO* ssl_client_hello) {
+std::string JA4Fingerprinter::create(const SSL_CLIENT_HELLO* ssl_client_hello,
+                                     Protocol protocol) {
   return absl::StrCat(
-      // Protocol type (t for TLS, q for QUIC, d for `DTLS`)
-      // In this implementation, we only handle TLS
-      "t",
+      // Protocol type: ``t`` for TLS, ``q`` for QUIC, ``d`` for DTLS. Chosen by
+      // the caller based on the transport carrying the handshake.
+      protocolChar(protocol),
 
       // TLS Version
       getJA4TlsVersion(ssl_client_hello),
