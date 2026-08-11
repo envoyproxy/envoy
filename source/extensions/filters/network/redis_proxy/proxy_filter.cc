@@ -478,6 +478,20 @@ Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data, bool) {
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
+  catch (std::exception& e) {
+    // Defense in depth: catch any exception that escapes the decoder
+    // (e.g. std::invalid_argument, std::out_of_range from std::stoul)
+    // and map to the protocol error path instead of aborting the process.
+    ENVOY_LOG(error, "redis proxy caught unexpected exception: {}", e.what());
+    config_->stats_.downstream_cx_protocol_error_.inc();
+    Common::Redis::RespValue error;
+    error.type(Common::Redis::RespType::Error);
+    error.asString() = "downstream protocol error";
+    encoder_->encode(error, encoder_buffer_);
+    callbacks_->connection().write(encoder_buffer_, false);
+    callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    return Network::FilterStatus::StopIteration;
+  }
 }
 
 ProxyFilter::PendingRequest::PendingRequest(ProxyFilter& parent)
