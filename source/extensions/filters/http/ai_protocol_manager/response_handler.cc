@@ -66,9 +66,9 @@ bool ResponseHandler::processDocument(const nlohmann::json& json) {
     // error: skip it.
     return false;
   }
-  if (format_ == ApiFormat::Unknown) {
+  if (format_ == ApiProtocol::Unspecified) {
     format_ = TokenUsageExtractor::detectFormat(json);
-    if (format_ == ApiFormat::Unknown) {
+    if (format_ == ApiProtocol::Unspecified) {
       return false; // Not discriminating; a later document may be.
     }
   }
@@ -305,7 +305,7 @@ void SseResponseHandler::processSseEvent(absl::string_view event) {
   }
 }
 
-JsonResponseHandler::JsonResponseHandler(ApiFormat format, uint32_t max_inspected_body_size,
+JsonResponseHandler::JsonResponseHandler(ApiProtocol format, uint32_t max_inspected_body_size,
                                          AiProtocolManagerStats& stats,
                                          const Buffer::BufferMemoryAccountSharedPtr& /*account*/)
     : ResponseHandler(format, stats), max_inspected_body_size_(max_inspected_body_size),

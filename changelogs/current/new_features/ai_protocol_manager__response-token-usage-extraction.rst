@@ -7,10 +7,15 @@ encode callbacks against a bounded side copy), and normalized usage is
 published as dynamic metadata (default namespace ``envoy.ai.token_usage``)
 in both forms: the authoritative typed record
 (:ref:`envoy.data.ai.v3.TokenUsage <envoy_v3_api_msg_data.ai.v3.TokenUsage>`)
-and an equivalent untyped ``Struct`` projection. Extraction behaves identically in the
-downstream and upstream (cluster, e.g. dynamic-forward-proxy egress)
-installations of the filter, and the new
-:ref:`request_handling.payload_offload_enabled
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.payload_offload_enabled>`
-field allows a response-only installation whose request path is a pure
+and an equivalent untyped ``Struct`` projection. Inspection is scoped to
+routes carrying an
+:ref:`AiProtocolManagerPerRoute
+<envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`
+configuration, with :ref:`include_unconfigured_routes
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.include_unconfigured_routes>`
+widening it to every route. Extraction behaves identically in the downstream
+and upstream (cluster, e.g. dynamic-forward-proxy egress) installations of
+the filter, and leaving :ref:`request_handling
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.request_handling>`
+unset yields a response-only installation whose request path is a pure
 passthrough.

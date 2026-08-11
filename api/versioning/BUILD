@@ -418,6 +418,7 @@ proto_library(
         "//envoy/service/secret/v3:pkg",
         "//envoy/service/status/v3:pkg",
         "//envoy/service/tap/v3:pkg",
+        "//envoy/type/ai/v3:pkg",
         "//envoy/type/http/v3:pkg",
         "//envoy/type/matcher/v3:pkg",
         "//envoy/type/metadata/v3:pkg",

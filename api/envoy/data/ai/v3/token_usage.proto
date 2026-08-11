@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.data.ai.v3;
 
+import "envoy/type/ai/v3/api_protocol.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -15,88 +17,96 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/data/ai/v3;aiv
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#protodoc-title: AI gateway token usage]
-// Normalized LLM token usage extracted from a provider response.
+// [#protodoc-title: AI token usage]
 
-// Canonical token usage published by the :ref:`AI Protocol Manager filter
-// <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager>`
-// as **typed** dynamic metadata (the authoritative representation), alongside
-// an equivalent untyped ``Struct`` projection under the same namespace for
-// consumers that can only read untyped metadata (access-log formatters, CEL).
-// Consumers that understand this message should prefer it: its integer fields
-// carry full ``uint64`` precision, while the ``Struct`` projection is bounded
-// by the exactly-representable double range.
+// Canonical LLM token usage extracted from a provider response by the
+// :ref:`AI Protocol Manager filter <config_http_filters_ai_protocol_manager>`,
+// published as typed dynamic metadata (with an equivalent untyped ``Struct``
+// projection) under one namespace at a clean end of stream.
 //
-// The counts follow the filter's canonical *inclusive* contract:
-// ``input_tokens`` and ``output_tokens`` cover all billed input/output
-// (cache, tool-use, and reasoning buckets are subset breakdowns) and
-// ``total_tokens`` is their sum; see :ref:`BuiltinTokenUsageExtractor
-// <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.BuiltinTokenUsageExtractor>`
-// for the full contract. Every field is optional: dialects report different
-// subsets, and a status-only record (only ``api_format``, ``model``, and
-// ``extraction_status``) is published when extraction failed outright.
-// [#next-free-field: 12]
+// Counts are normalized onto one *inclusive* contract regardless of wire API:
+// ``input_tokens`` covers all input consumed (uncached input, cached reads,
+// cache writes, and tool-use prompt tokens) and ``output_tokens`` covers all
+// generated output including reasoning/thought tokens; the detail messages
+// are subsets of those canonical values. Every value remains
+// provider-reported and is not independently verified by Envoy.
+//
+// Every count is optional: wire APIs report different subsets, and a
+// status-only record (``api_protocol``, ``model`` when captured, and
+// ``extraction_status: FAILED``) is published when extraction failed
+// outright, distinguishing that from a response that supplied no usage
+// (which publishes nothing).
+// [#next-free-field: 10]
 message TokenUsage {
-  // The wire dialect the response spoke. Deliberately a *format*, not a
-  // provider identity: OpenAI-compatible backends legitimately speak a
-  // dialect they are not.
-  enum ApiFormat {
-    // The dialect was not identified (e.g. a status-only record for a stream
-    // whose usage-bearing events were never extracted).
-    API_FORMAT_UNSPECIFIED = 0;
-
-    OPENAI = 1;
-
-    ANTHROPIC = 2;
-
-    GEMINI = 3;
-  }
-
-  // Extraction quality. Publication itself already implies the response
-  // reached a clean end of stream.
+  // Quality of the extraction result.
   enum ExtractionStatus {
     EXTRACTION_STATUS_UNSPECIFIED = 0;
 
-    // Every observed usage document was extracted.
+    // All observed usage-bearing data was parsed successfully.
     COMPLETE = 1;
 
-    // Extraction lost input on the stream (an oversized event, an
-    // unparseable or malformed document, truncated SSE input, or a parse
-    // budget exhaustion): the counts may be stale or incomplete, or absent
-    // entirely for a status-only record.
+    // Usable counts were extracted, but some usage-bearing input was lost:
+    // malformed, truncated, or skipped by a configured resource limit. The
+    // counts may be stale (an earlier cumulative snapshot) or incomplete.
     PARTIAL = 2;
+
+    // Usage-bearing input was observed but no usable canonical count could
+    // be extracted; only ``api_protocol`` and ``model`` may be populated.
+    FAILED = 3;
   }
 
-  ApiFormat api_format = 1;
+  // The wire API the usage was extracted from. This names an API contract,
+  // not a provider identity: any OpenAI-compatible backend reports an OpenAI
+  // protocol here.
+  type.ai.v3.ApiProtocol api_protocol = 1;
 
-  // The response-reported model, when present.
+  // The model reported by the response, when present.
   string model = 2;
 
-  // Canonical inclusive input tokens.
+  // Canonical inclusive input token count.
   google.protobuf.UInt64Value input_tokens = 3;
 
-  // Canonical inclusive output tokens.
+  // Canonical inclusive output token count.
   google.protobuf.UInt64Value output_tokens = 4;
 
-  // ``input_tokens + output_tokens``, computed from the canonical components;
-  // falls back to the provider-reported total when a component is missing.
+  // Canonical total: ``input_tokens + output_tokens``. Present only when
+  // both canonical components are known, so the triple is always internally
+  // consistent. Compare against ``provider_total_tokens`` to detect a
+  // provider that reports inconsistently or in buckets unknown to the
+  // extractor.
   google.protobuf.UInt64Value total_tokens = 5;
 
-  // Cache-read input tokens; part of ``input_tokens``.
-  google.protobuf.UInt64Value cached_input_tokens = 6;
+  // Canonical input token breakdown.
+  InputTokenDetails input_token_details = 6;
 
-  // Cache-write input tokens; part of ``input_tokens``.
-  google.protobuf.UInt64Value cache_creation_input_tokens = 7;
+  // Canonical output token breakdown.
+  OutputTokenDetails output_token_details = 7;
 
-  // Tool-use prompt tokens; part of ``input_tokens``.
-  google.protobuf.UInt64Value tool_use_input_tokens = 8;
+  // The total token count reported directly by the provider, when it
+  // reported one — preserved regardless of whether it agrees with
+  // ``total_tokens``.
+  google.protobuf.UInt64Value provider_total_tokens = 8;
 
-  // Reasoning/thought tokens; part of ``output_tokens``.
-  google.protobuf.UInt64Value reasoning_tokens = 9;
+  // Quality of the extraction result.
+  ExtractionStatus extraction_status = 9;
+}
 
-  // The provider-reported total, present only when it disagrees with the
-  // computed ``total_tokens``.
-  google.protobuf.UInt64Value reported_total_tokens = 10;
+// Subsets of :ref:`input_tokens
+// <envoy_v3_api_field_data.ai.v3.TokenUsage.input_tokens>`.
+message InputTokenDetails {
+  // Cache-read input tokens.
+  google.protobuf.UInt64Value cached_tokens = 1;
 
-  ExtractionStatus extraction_status = 11;
+  // Cache-creation (cache-write) input tokens.
+  google.protobuf.UInt64Value cache_creation_tokens = 2;
+
+  // Tool-use prompt tokens.
+  google.protobuf.UInt64Value tool_use_tokens = 3;
+}
+
+// Subsets of :ref:`output_tokens
+// <envoy_v3_api_field_data.ai.v3.TokenUsage.output_tokens>`.
+message OutputTokenDetails {
+  // Reasoning or thought tokens.
+  google.protobuf.UInt64Value reasoning_tokens = 1;
 }

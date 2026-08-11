@@ -169,9 +169,9 @@ std::optional<uint64_t> addCounts(std::optional<uint64_t> base,
 // structure with renamed keys; they never mix in one document, so reading
 // either name from the same usage object is unambiguous. Responses API
 // streaming lifecycle events nest the payload under `response`.
-TokenUsage extractOpenAi(const nlohmann::json& json, bool& malformed) {
+TokenUsage extractOpenAi(ApiProtocol protocol, const nlohmann::json& json, bool& malformed) {
   TokenUsage usage;
-  usage.api_format = ApiFormat::OpenAi;
+  usage.api_protocol = protocol;
 
   const nlohmann::json* response = readObject(json, JsonKeys::get().Response, malformed);
   const nlohmann::json& node = response != nullptr ? *response : json;
@@ -227,7 +227,7 @@ TokenUsage extractOpenAi(const nlohmann::json& json, bool& malformed) {
 // are cumulative, which the caller's last-wins merge handles.
 TokenUsage extractAnthropic(const nlohmann::json& json, bool& malformed) {
   TokenUsage usage;
-  usage.api_format = ApiFormat::Anthropic;
+  usage.api_protocol = ApiProtocol::AnthropicMessages;
 
   const nlohmann::json* message = readObject(json, JsonKeys::get().Message, malformed);
   const nlohmann::json& node = message != nullptr ? *message : json;
@@ -267,7 +267,7 @@ TokenUsage extractAnthropic(const nlohmann::json& json, bool& malformed) {
 // maps to cached_input_tokens without any arithmetic.
 TokenUsage extractGemini(const nlohmann::json& json, bool& malformed) {
   TokenUsage usage;
-  usage.api_format = ApiFormat::Gemini;
+  usage.api_protocol = ApiProtocol::GeminiGenerateContent;
 
   if (auto model = readString(json, JsonKeys::get().ModelVersion); model.has_value()) {
     usage.model = std::move(model).value();
@@ -293,18 +293,20 @@ TokenUsage extractGemini(const nlohmann::json& json, bool& malformed) {
 
 } // namespace
 
-absl::string_view apiFormatName(ApiFormat format) {
-  switch (format) {
-  case ApiFormat::OpenAi:
-    return "openai";
-  case ApiFormat::Anthropic:
-    return "anthropic";
-  case ApiFormat::Gemini:
-    return "gemini";
-  case ApiFormat::Unknown:
+absl::string_view apiProtocolName(ApiProtocol protocol) {
+  switch (protocol) {
+  case ApiProtocol::OpenAiChatCompletions:
+    return "OPENAI_CHAT_COMPLETIONS";
+  case ApiProtocol::OpenAiResponses:
+    return "OPENAI_RESPONSES";
+  case ApiProtocol::AnthropicMessages:
+    return "ANTHROPIC_MESSAGES";
+  case ApiProtocol::GeminiGenerateContent:
+    return "GEMINI_GENERATE_CONTENT";
+  case ApiProtocol::Unspecified:
     break;
   }
-  return "unknown";
+  return "API_PROTOCOL_UNSPECIFIED";
 }
 
 void TokenUsage::merge(const TokenUsage& update) {
@@ -325,8 +327,8 @@ void TokenUsage::merge(const TokenUsage& update) {
   if (!update.model.empty()) {
     model = update.model;
   }
-  if (update.api_format != ApiFormat::Unknown) {
-    api_format = update.api_format;
+  if (update.api_protocol != ApiProtocol::Unspecified) {
+    api_protocol = update.api_protocol;
   }
 }
 
@@ -339,8 +341,8 @@ void TokenUsage::finalize() {
   finalized_ = true;
   // Canonicalize the accumulated native counts per dialect (see the header
   // for why this must not run per event).
-  switch (api_format) {
-  case ApiFormat::Anthropic:
+  switch (api_protocol) {
+  case ApiProtocol::AnthropicMessages:
     // Native input excludes the two disjoint cache buckets.
     if (input_tokens.has_value()) {
       input_tokens =
@@ -348,7 +350,7 @@ void TokenUsage::finalize() {
                     cache_creation_input_tokens, canonicalization_overflow_);
     }
     break;
-  case ApiFormat::Gemini:
+  case ApiProtocol::GeminiGenerateContent:
     // Native prompt/candidates counts exclude tool-use and thoughts.
     if (input_tokens.has_value()) {
       input_tokens = addCounts(input_tokens, tool_use_input_tokens, canonicalization_overflow_);
@@ -357,67 +359,63 @@ void TokenUsage::finalize() {
       output_tokens = addCounts(output_tokens, reasoning_tokens, canonicalization_overflow_);
     }
     break;
-  case ApiFormat::OpenAi:
-  case ApiFormat::Unknown:
+  case ApiProtocol::OpenAiChatCompletions:
+  case ApiProtocol::OpenAiResponses:
+  case ApiProtocol::Unspecified:
     // OpenAI's native counts are already inclusive.
     break;
   }
 
-  // Canonical total from the canonical components (total == input + output),
-  // published only when it round-trips exactly through the double-backed
-  // metadata field. The provider-reported total is the fallback when a
-  // component is missing, and surfaces as reported_total_tokens when it
-  // disagrees (an inconsistent provider, or a bucket unknown here).
-  const std::optional<uint64_t> reported = total_tokens;
+  // The provider-reported total (riding total_tokens during accumulation)
+  // moves to its own field, always preserved. total_tokens is exclusively the
+  // canonical sum, present only when both components are known and the sum
+  // round-trips exactly through the double-backed metadata field -- so its
+  // meaning never depends on what else was reported.
+  provider_total_tokens = total_tokens;
   total_tokens.reset();
-  const bool components_present = input_tokens.has_value() && output_tokens.has_value();
-  if (components_present) {
+  if (input_tokens.has_value() && output_tokens.has_value()) {
     const uint64_t sum = input_tokens.value() + output_tokens.value();
     if (sum <= MaxSafeCount) {
       total_tokens = sum;
     } else {
-      // Not exactly representable: publish no total (the reported total,
-      // which necessarily disagrees, surfaces below) and flag the record.
+      // Not exactly representable in the double-backed Struct projection:
+      // publish no canonical total and flag the record.
       canonicalization_overflow_ = true;
     }
-  } else {
-    total_tokens = reported;
-    return;
-  }
-  if (reported.has_value() &&
-      (!total_tokens.has_value() || reported.value() != total_tokens.value())) {
-    reported_total_tokens = reported;
   }
 }
 
-ApiFormat TokenUsageExtractor::detectFormat(const nlohmann::json& json) {
+ApiProtocol TokenUsageExtractor::detectFormat(const nlohmann::json& json) {
   // Gemini markers, validated by value shape: a foreign document with e.g. a
   // `candidates` *string* must not lock the stream. Real candidates lists are
   // non-empty arrays of objects.
   if (const auto it = json.find(JsonKeys::get().Candidates);
       it != json.end() && it->is_array() && !it->empty() && it->front().is_object()) {
-    return ApiFormat::Gemini;
+    return ApiProtocol::GeminiGenerateContent;
   }
   if (const auto it = json.find(JsonKeys::get().UsageMetadata);
       it != json.end() && it->is_object()) {
-    return ApiFormat::Gemini;
+    return ApiProtocol::GeminiGenerateContent;
   }
   if (readString(json, JsonKeys::get().ModelVersion).has_value()) {
-    return ApiFormat::Gemini;
+    return ApiProtocol::GeminiGenerateContent;
   }
 
   // OpenAI Chat Completions and non-streaming Responses discriminate on
   // `object`; Responses streaming events discriminate on `type` ("response.*").
   if (const auto object = readString(json, JsonKeys::get().ObjectKey); object.has_value()) {
-    if (absl::StartsWith(object.value(), "chat.completion") || object.value() == "response") {
-      return ApiFormat::OpenAi;
+    if (absl::StartsWith(object.value(), "chat.completion")) {
+      return ApiProtocol::OpenAiChatCompletions;
+    }
+    if (object.value() == "response") {
+      return ApiProtocol::OpenAiResponses;
     }
   }
 
   if (const auto type = readString(json, JsonKeys::get().Type); type.has_value()) {
     const absl::string_view type_view = type.value();
     if (absl::StartsWith(type_view, "response.")) {
-      return ApiFormat::OpenAi;
+      return ApiProtocol::OpenAiResponses;
     }
     // Anthropic markers need their documented companion structure: bare
     // `type` strings are generic, and a genuine stream always presents
@@ -427,59 +425,61 @@ ApiFormat TokenUsageExtractor::detectFormat(const nlohmann::json& json) {
     if (type_view == "message") {
       if (readString(json, JsonKeys::get().Role).has_value() ||
           readObject(json, JsonKeys::get().Usage, discard) != nullptr) {
-        return ApiFormat::Anthropic;
+        return ApiProtocol::AnthropicMessages;
       }
     } else if (type_view == "message_start") {
       if (readObject(json, JsonKeys::get().Message, discard) != nullptr) {
-        return ApiFormat::Anthropic;
+        return ApiProtocol::AnthropicMessages;
       }
     } else if (type_view == "message_delta") {
       if (readObject(json, JsonKeys::get().Usage, discard) != nullptr ||
           readObject(json, JsonKeys::get().Delta, discard) != nullptr) {
-        return ApiFormat::Anthropic;
+        return ApiProtocol::AnthropicMessages;
       }
     }
     // `message_stop`/`content_block_*` carry no structure and no usage.
   }
 
-  return ApiFormat::Unknown;
+  return ApiProtocol::Unspecified;
 }
 
-ExtractionResult TokenUsageExtractor::extract(ApiFormat format, const nlohmann::json& json) {
+ExtractionResult TokenUsageExtractor::extract(ApiProtocol format, const nlohmann::json& json) {
   ExtractionResult result;
   switch (format) {
-  case ApiFormat::OpenAi:
-    result.usage = extractOpenAi(json, result.malformed);
+  case ApiProtocol::OpenAiChatCompletions:
+  case ApiProtocol::OpenAiResponses:
+    result.usage = extractOpenAi(format, json, result.malformed);
     break;
-  case ApiFormat::Anthropic:
+  case ApiProtocol::AnthropicMessages:
     result.usage = extractAnthropic(json, result.malformed);
     break;
-  case ApiFormat::Gemini:
+  case ApiProtocol::GeminiGenerateContent:
     result.usage = extractGemini(json, result.malformed);
     break;
-  case ApiFormat::Unknown:
+  case ApiProtocol::Unspecified:
     break;
   }
   return result;
 }
 
-bool TokenUsageExtractor::isTerminalEvent(ApiFormat format, const nlohmann::json& json) {
+bool TokenUsageExtractor::isTerminalEvent(ApiProtocol format, const nlohmann::json& json) {
   const auto type = readString(json, JsonKeys::get().Type);
   if (!type.has_value()) {
     return false;
   }
   switch (format) {
-  case ApiFormat::Anthropic:
+  case ApiProtocol::AnthropicMessages:
     return type.value() == "message_stop";
-  case ApiFormat::OpenAi:
-    // Responses API terminal lifecycle events; also the usage carriers, so
-    // callers extract() first. Chat Completions terminates with the non-JSON
-    // `[DONE]` sentinel instead, handled before parsing.
+  case ApiProtocol::OpenAiResponses:
+    // Terminal lifecycle events; also the usage carriers, so callers
+    // extract() first.
     return type.value() == "response.completed" || type.value() == "response.failed" ||
            type.value() == "response.incomplete";
-  case ApiFormat::Gemini:
+  case ApiProtocol::OpenAiChatCompletions:
+    // Terminates with the non-JSON `[DONE]` sentinel, handled before parsing.
+  case ApiProtocol::GeminiGenerateContent:
     // No in-band terminator; extraction finalizes at end of stream.
-  case ApiFormat::Unknown:
+  case ApiProtocol::Unspecified:
     break;
   }
   return false;

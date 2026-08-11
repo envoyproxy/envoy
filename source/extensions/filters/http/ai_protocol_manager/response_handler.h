@@ -26,6 +26,7 @@ namespace AiProtocolManager {
 #define ALL_AI_PROTOCOL_MANAGER_STATS(COUNTER)                                                     \
   COUNTER(token_usage_found)                                                                       \
   COUNTER(token_usage_partial)                                                                     \
+  COUNTER(token_usage_failed)                                                                      \
   COUNTER(token_usage_missing)                                                                     \
   COUNTER(token_usage_total_mismatch)                                                              \
   COUNTER(token_usage_duplicate)                                                                   \
@@ -50,7 +51,7 @@ struct AiProtocolManagerStats {
 // possibly empty, or trailers) so pending parse work still resolves.
 class ResponseHandler {
 public:
-  ResponseHandler(ApiFormat format, AiProtocolManagerStats& stats)
+  ResponseHandler(ApiProtocol format, AiProtocolManagerStats& stats)
       : format_(format), stats_(stats) {}
   virtual ~ResponseHandler() = default;
 
@@ -75,7 +76,7 @@ protected:
   // callers stop processing later input against an authoritative result.
   bool processDocument(const nlohmann::json& json);
 
-  ApiFormat format_;
+  ApiProtocol format_;
   TokenUsage usage_;
   bool parsing_complete_{false};
   bool degraded_{false};
@@ -99,7 +100,7 @@ using ResponseHandlerPtr = std::unique_ptr<ResponseHandler>;
 // bytes are charged to the stream's buffer memory account when present.
 class SseResponseHandler : public ResponseHandler, public Logger::Loggable<Logger::Id::filter> {
 public:
-  SseResponseHandler(ApiFormat format, uint32_t max_event_size, uint32_t max_parsed_events,
+  SseResponseHandler(ApiProtocol format, uint32_t max_event_size, uint32_t max_parsed_events,
                      AiProtocolManagerStats& stats,
                      const Buffer::BufferMemoryAccountSharedPtr& account = nullptr)
       : ResponseHandler(format, stats), max_event_size_(max_event_size),
@@ -168,7 +169,7 @@ private:
 // stream. Bodies over max_inspected_body_size abandon extraction.
 class JsonResponseHandler : public ResponseHandler, public Logger::Loggable<Logger::Id::filter> {
 public:
-  JsonResponseHandler(ApiFormat format, uint32_t max_inspected_body_size,
+  JsonResponseHandler(ApiProtocol format, uint32_t max_inspected_body_size,
                       AiProtocolManagerStats& stats,
                       const Buffer::BufferMemoryAccountSharedPtr& account = nullptr);
 

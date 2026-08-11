@@ -12,10 +12,20 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// The AI API dialect a response speaks.
-enum class ApiFormat { Unknown, OpenAi, Anthropic, Gemini };
+// Internal mirror of :ref:`envoy.type.ai.v3.ApiProtocol`: the AI API
+// contract a response speaks. The two OpenAI protocols share extraction
+// logic but differ in streaming event semantics and detection markers.
+enum class ApiProtocol {
+  Unspecified,
+  OpenAiChatCompletions,
+  OpenAiResponses,
+  AnthropicMessages,
+  GeminiGenerateContent,
+};
 
-absl::string_view apiFormatName(ApiFormat format);
+// The envoy.type.ai.v3.ApiProtocol enum-value name for a protocol
+// (e.g. "OPENAI_CHAT_COMPLETIONS"), used by the Struct metadata projection.
+absl::string_view apiProtocolName(ApiProtocol protocol);
 
 // Normalized LLM token usage accumulated over a response. Every field is
 // optional: dialects report different subsets, across several events.
@@ -29,9 +39,9 @@ absl::string_view apiFormatName(ApiFormat format);
 //   input_tokens  = ALL input (uncached + cached reads + cache writes +
 //                   tool-use prompt tokens)
 //   output_tokens = ALL output, reasoning/thought tokens included
-//   total_tokens  = input_tokens + output_tokens; the provider-reported total
-//                   is the fallback when a component is missing, and surfaces
-//                   as reported_total_tokens when it disagrees.
+//   total_tokens  = input_tokens + output_tokens, present only when both
+//                   components are known; the provider's own total is always
+//                   preserved separately as provider_total_tokens.
 // Breakdown fields (cached/cache_creation/tool_use input, reasoning output)
 // are subsets of the canonical values. The contract normalizes inclusion
 // semantics only -- not tokenizer, model, or pricing differences.
@@ -43,16 +53,18 @@ struct TokenUsage {
   std::optional<uint64_t> cache_creation_input_tokens;
   std::optional<uint64_t> tool_use_input_tokens;
   std::optional<uint64_t> reasoning_tokens;
-  // Set by finalize() when the provider-reported total disagrees with the
-  // canonical input + output sum (which wins total_tokens).
-  std::optional<uint64_t> reported_total_tokens;
+  // The total as reported by the provider, moved here by finalize() (during
+  // accumulation the native total rides total_tokens); always preserved,
+  // whether or not it agrees with the canonical sum.
+  std::optional<uint64_t> provider_total_tokens;
   std::string model;
-  ApiFormat api_format{ApiFormat::Unknown};
+  ApiProtocol api_protocol{ApiProtocol::Unspecified};
 
   bool hasAny() const {
     return input_tokens.has_value() || output_tokens.has_value() || total_tokens.has_value() ||
            cached_input_tokens.has_value() || cache_creation_input_tokens.has_value() ||
-           tool_use_input_tokens.has_value() || reasoning_tokens.has_value();
+           tool_use_input_tokens.has_value() || reasoning_tokens.has_value() ||
+           provider_total_tokens.has_value();
   }
 
   // Field-wise merge, later non-empty value wins: one rule covers OpenAI's
@@ -94,18 +106,18 @@ public:
   // Detect the API dialect from a response document's shape. Detection is
   // stream-global once locked, so only strongly shaped, value-validated
   // markers decide; anything else stays Unknown for a later document.
-  static ApiFormat detectFormat(const nlohmann::json& json);
+  static ApiProtocol detectFormat(const nlohmann::json& json);
 
   // Extract the partial *native* usage this document carries (see the
   // TokenUsage lifecycle comment). Absent fields stay unset; the caller
   // accumulates via TokenUsage::merge() with canonicalization in finalize().
-  static ExtractionResult extract(ApiFormat format, const nlohmann::json& json);
+  static ExtractionResult extract(ApiProtocol format, const nlohmann::json& json);
 
   // True when this document marks the dialect's logical end of extraction
   // (Anthropic `message_stop`, OpenAI Responses terminal lifecycle events).
   // Callers must extract() first: terminal Responses events also carry the
   // usage. Chat Completions' non-JSON `[DONE]` is handled before parsing.
-  static bool isTerminalEvent(ApiFormat format, const nlohmann::json& json);
+  static bool isTerminalEvent(ApiProtocol format, const nlohmann::json& json);
 };
 
 } // namespace AiProtocolManager

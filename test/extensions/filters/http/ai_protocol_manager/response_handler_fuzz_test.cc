@@ -36,8 +36,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   }
 
   FuzzedDataProvider provider(buf, len);
-  const ApiFormat format = provider.PickValueInArray(
-      {ApiFormat::Unknown, ApiFormat::OpenAi, ApiFormat::Anthropic, ApiFormat::Gemini});
+  const ApiProtocol format = provider.PickValueInArray(
+      {ApiProtocol::Unspecified, ApiProtocol::OpenAiChatCompletions, ApiProtocol::OpenAiResponses,
+       ApiProtocol::AnthropicMessages, ApiProtocol::GeminiGenerateContent});
   // Small caps exercise discard mode and the complete-event skip; 1 is the
   // proto validation floor.
   const uint32_t max_event_size = provider.ConsumeIntegralInRange<uint32_t>(1, 4 * 1024);
@@ -80,7 +81,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   FUZZ_ASSERT(a.tool_use_input_tokens == b.tool_use_input_tokens);
   FUZZ_ASSERT(a.reasoning_tokens == b.reasoning_tokens);
   FUZZ_ASSERT(a.model == b.model);
-  FUZZ_ASSERT(a.api_format == b.api_format);
+  FUZZ_ASSERT(a.api_protocol == b.api_protocol);
   FUZZ_ASSERT(fragmented.parsingComplete() == whole.parsingComplete());
   FUZZ_ASSERT(fragmented.degraded() == whole.degraded());
 
@@ -92,7 +93,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   FUZZ_ASSERT(a_final.input_tokens == b_final.input_tokens);
   FUZZ_ASSERT(a_final.output_tokens == b_final.output_tokens);
   FUZZ_ASSERT(a_final.total_tokens == b_final.total_tokens);
-  FUZZ_ASSERT(a_final.reported_total_tokens == b_final.reported_total_tokens);
+  FUZZ_ASSERT(a_final.provider_total_tokens == b_final.provider_total_tokens);
   FUZZ_ASSERT(a_final.canonicalizationOverflow() == b_final.canonicalizationOverflow());
 
   // The JSON handler shares the accumulator; a quick no-crash pass.

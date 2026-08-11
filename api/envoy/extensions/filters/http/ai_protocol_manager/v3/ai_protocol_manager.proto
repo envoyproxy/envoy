@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ai_protocol_manager.v3;
 
+import "envoy/type/ai/v3/api_protocol.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -24,233 +26,169 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Configuration for the AI Protocol Manager filter.
 //
 // The filter manages AI endpoint traffic on both directions of a stream. On
-// the request path it holds a declared AI endpoint's payload, validates it
-// against the schema the endpoint serves, and normalizes it to a canonical
-// schema — which is what lets routing, admission and policy act on a payload
-// the proxy understands rather than on opaque bytes. On the response path it
-// can extract normalized LLM token usage into dynamic metadata.
+// the request path it holds a declared AI endpoint's payload and parses it,
+// which is what lets routing, admission and policy act on a payload the proxy
+// understands rather than on opaque bytes. On the response path it can
+// extract normalized LLM token usage into dynamic metadata.
 //
-// Which routes are AI endpoints is declared with the :ref:`per-route
-// configuration
-// <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`;
-// the filter leaves every other route's request alone. A response-only
-// installation (for example token-usage observation on a
-// dynamic-forward-proxy egress cluster) therefore declares no AI endpoints
-// and sets ``response_handling``.
+// Request and response processing are independently enabled by the presence
+// of ``request_handling`` and ``response_handling``. Which routes are AI
+// endpoints — and which :ref:`wire API <envoy_v3_api_enum_type.ai.v3.ApiProtocol>`
+// each speaks — is declared with the :ref:`per-route configuration
+// <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`.
 message AiProtocolManager {
-  // Whether to parse a JSON payload on a route that is not a declared AI
-  // endpoint.
-  //
-  // This exists for compatibility: it lets a chain that wants a parsed body on
-  // ordinary routes have one without declaring those routes AI endpoints. Such a
-  // route names no schema, so there is nothing to hold the payload to, and a body
-  // that fails to parse is forwarded unchanged rather than rejected. When unset
-  // (the default) those routes are passed through untouched -- neither parsed nor
-  // buffered.
-  //
-  // A declared AI endpoint is unaffected: its payload is always held and
-  // validated, and a malformed one rejected with a 400, regardless of this
-  // setting.
-  bool best_effort_parsing = 1;
+  // Request-side AI protocol processing. When unset, the decode path is a
+  // pure passthrough — including on routes carrying per-route configuration.
+  RequestHandling request_handling = 1;
 
-  // Response-side handling: observes upstream responses and extracts LLM token
-  // usage into dynamic metadata. When unset, responses pass through untouched.
-  // Independent of the request side: it applies to every handled response,
-  // whether or not its route is a declared AI endpoint.
+  // Response-side AI protocol processing. When unset, the encode path is a
+  // pure passthrough.
   ResponseHandling response_handling = 2;
 }
 
-// Per-route configuration for the AI Protocol Manager filter. Declares that the
-// route is an AI endpoint and which schema its payload follows, which is what
-// puts the payload under the filter's management.
-//
-// This is normally attached to a route matching the provider's REST path, for
-// example ``/chat/completions``.
-message AiProtocolManagerPerRoute {
-  // The schema a request payload can be declared to follow.
-  enum Schema {
-    // Not a valid choice; a route must name the schema its payload follows.
-    UNSPECIFIED = 0;
-
-    // The OpenAI Chat Completions request shape, served at ``/chat/completions``.
-    OPENAI_CHAT_COMPLETIONS = 1;
-  }
-
-  // The schema the request payload on this route follows.
+// Request-side processing configuration. A route that carries a
+// :ref:`per-route request declaration
+// <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.request>`
+// has its payload held, offloaded, and parsed strictly: a body that is not
+// well-formed JSON is rejected with a 400 rather than forwarded for the
+// upstream to interpret differently.
+message RequestHandling {
+  // Attempt best-effort JSON parsing on routes without a per-route
+  // configuration.
   //
-  // Setting this hands the payload to the filter to hold and validate: a body
-  // that is not well-formed is rejected with a 400 rather than forwarded for the
-  // upstream to interpret differently.
-  //
-  // The schemas themselves are not part of this API yet; a later change adds
-  // them along with validation and transcoding against them. Until then the
-  // choice is recorded and carried, but the payload is not checked against it.
-  Schema schema = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
-
-  // Whether to normalize the payload from :ref:`schema
-  // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.schema>`
-  // into the canonical schema.
-  //
-  // When unset the route is a pass-through endpoint: the payload is validated in
-  // its own schema and forwarded upstream in that same schema. When set, it is
-  // additionally transcoded into the canonical schema, which is what lets one set
-  // of policies apply to payloads from different providers.
-  //
-  // Transcoding is not implemented yet; a later change adds it. Until then this
-  // field is accepted and has no effect.
-  bool normalize = 2;
+  // Defaults to ``false``: unconfigured routes are not buffered or parsed.
+  // When ``true``, such routes are parsed too, but never failed over it — a
+  // route that declared no AI wire contract has nothing to hold its payload
+  // to, so a body that fails to parse is forwarded unchanged.
+  bool parse_unconfigured_routes = 1;
 }
 
-// Configuration for response (encode-path) handling.
-//
-// The filter tees the response body — streaming SSE (``text/event-stream``) or
-// JSON (``application/json``, including a streamed root-level JSON array) — and
-// extracts normalized LLM token usage. The filter never stops iteration or
-// modifies the original response; bounded extraction state is maintained
-// separately (see ``max_event_size`` and ``max_inspected_body_size``), and
-// extraction work — including the JSON parse at end of stream — runs on the
-// response's filter-chain callbacks. The extracted usage is published as
-// dynamic metadata at end of stream, where it is visible to later filters
-// (e.g. ext_proc ``metadata_options.forwarding_namespaces``), access loggers,
-// and CEL. Responses with a non-identity ``content-encoding`` are skipped
-// unless the body is decompressed earlier on the encode path.
-//
-// The result is published under one namespace in both metadata forms: the
-// authoritative typed record (:ref:`envoy.data.ai.v3.TokenUsage
-// <envoy_v3_api_msg_data.ai.v3.TokenUsage>`, full ``uint64`` precision) and
-// an equivalent untyped ``Struct`` projection for consumers that only read
-// untyped metadata (access-log formatters, CEL).
-// [#next-free-field: 6]
+// Response-side processing configuration. Individual response features are
+// enabled by the presence of their corresponding messages.
 message ResponseHandling {
-  // Extractor selection. A ``oneof`` so that alternatives — most notably a
-  // ``config.core.v3.TypedExtensionConfig`` custom extractor for dialects the
-  // built-in extractor does not know — can be added without reshaping the
-  // configuration. Deliberately not ``(validate.required)``: when no member
-  // is set, response handling behaves as an unset
-  // :ref:`BuiltinTokenUsageExtractor
-  // <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.BuiltinTokenUsageExtractor>`
-  // (auto-detection).
+  // Extract canonical token usage from eligible AI responses. When unset,
+  // token usage extraction is disabled.
+  TokenUsageExtraction token_usage = 1;
+}
+
+// Configuration for canonical response token-usage extraction.
+//
+// Eligible 2xx SSE and JSON responses are observed as they stream through;
+// the filter never stops iteration or modifies the response, and no
+// extraction failure can affect it. The result is published at a clean end
+// of stream under one namespace in both metadata forms: the authoritative
+// typed record (:ref:`envoy.data.ai.v3.TokenUsage
+// <envoy_v3_api_msg_data.ai.v3.TokenUsage>`) and an equivalent untyped
+// ``Struct`` projection for consumers that only read untyped metadata
+// (access-log formatters, CEL).
+message TokenUsageExtraction {
+  // Also inspect responses on routes without per-route configuration.
   //
-  // [#comment: Version skew for future members: a binary that predates a
-  // member does not silently fall back to auto-detection — Envoy's
-  // unknown-field validation rejects the configuration (statically, or NACKs
-  // it over xDS) unless the operator explicitly opted into
-  // ignore_unknown_dynamic_fields. The extractor boundary, including a
-  // TypedExtensionConfig member and its output-ownership contract, needs API
-  // shepherd review before a second member lands.]
-  oneof extractor {
-    // The built-in OpenAI/Anthropic/Gemini token-usage extractor.
-    BuiltinTokenUsageExtractor token_usage = 1;
-  }
+  // Defaults to ``false``: only routes carrying an
+  // :ref:`AiProtocolManagerPerRoute
+  // <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`
+  // configuration are inspected, so enabling token usage on a mixed listener
+  // does not silently parse unrelated JSON/SSE responses. Enable this for
+  // response-only installations whose routes cannot be declared — for
+  // example an upstream installation on a dynamic-forward-proxy cluster.
+  bool include_unconfigured_routes = 1;
 
-  // Namespace for the emitted token-usage dynamic metadata.
+  // Fallback wire API used when the route does not identify a response API.
+  //
+  // ``API_PROTOCOL_UNSPECIFIED`` means auto-detect from the response shape
+  // (only strongly shaped, value-validated markers lock a stream). This is a
+  // fallback, not an override of per-route response configuration; see the
+  // :ref:`per-route configuration
+  // <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`
+  // for the full precedence.
+  type.ai.v3.ApiProtocol default_api_protocol = 2 [(validate.rules).enum = {defined_only: true}];
+
+  // Namespace for the emitted typed and untyped dynamic metadata.
   // Defaults to ``envoy.ai.token_usage``.
-  string metadata_namespace = 2;
+  string metadata_namespace = 3;
 
-  // Maximum number of bytes of SSE extraction state buffered per stream: a
-  // pending (unterminated) event over the cap is discarded through its real
-  // terminating blank line, and a complete event over the cap is skipped
-  // without parsing. The response stream itself keeps flowing; only extraction
-  // state is dropped. Must be at least 1 — there is no way to disable the
-  // bound.
+  // Extraction resource limits. Defaults apply when unset.
+  TokenUsageExtractionLimits limits = 4;
+}
+
+// Per-stream memory and work limits for token-usage extraction. The response
+// itself always streams through unaffected; on any limit only extraction
+// state is dropped and the published record is flagged.
+message TokenUsageExtractionLimits {
+  // Maximum size of one SSE event inspected for token usage. This is a hard
+  // bound on retained extraction state, regardless of how large individual
+  // data frames are: a pending event over the cap is discarded through its
+  // real terminating blank line, and a complete event over the cap is
+  // skipped without parsing.
   //
   // Defaults to 1MiB: OpenAI Responses API streams carry usage on terminal
-  // lifecycle events that embed the *complete* response object (including all
-  // generated output), so ordinary long generations produce usage-bearing
-  // events far larger than typical SSE deltas. Lower this in constrained
-  // deployments at the cost of losing usage from long generations.
-  google.protobuf.UInt32Value max_event_size = 3 [(validate.rules).uint32 = {lte: 10485760 gte: 1}];
-
-  // Maximum number of response-body bytes inspected for a JSON (non-SSE)
-  // response. Larger bodies skip token extraction; the response is unaffected.
-  // A response whose ``content-length`` already exceeds the cap skips
-  // extraction without buffering anything. Must be at least 1. Defaults to
-  // 4MiB.
-  google.protobuf.UInt32Value max_inspected_body_size = 4
+  // lifecycle events that embed the complete response object, so ordinary
+  // long generations produce usage-bearing events far larger than typical
+  // SSE deltas. Lower this in constrained deployments at the cost of losing
+  // usage from long generations.
+  google.protobuf.UInt32Value max_sse_event_size = 1
       [(validate.rules).uint32 = {lte: 10485760 gte: 1}];
 
-  // Stream-wide extraction work budget: the maximum number of SSE data
-  // payloads parsed (as JSON) per response, counting malformed payloads.
-  // ``max_event_size`` bounds one event; this bounds the *number* of events a
-  // long-lived stream can make the worker parse — without it, a peer could
-  // send small under-cap events for the lifetime of the stream and consume
-  // parser/allocator CPU synchronously on the encode path. Events skipped by
-  // name (keepalives, content deltas) do not consume budget. On exhaustion
-  // the accumulated usage is kept and later published as
-  // ``extraction_status: partial``, extraction goes inert (counted by
-  // ``sse_event_budget_exhausted``), and the response streams on unaffected.
+  // Maximum JSON response body inspected for token usage. A larger body —
+  // including one whose ``content-length`` already exceeds the cap — is not
+  // inspected. Defaults to 4MiB.
+  google.protobuf.UInt32Value max_json_body_size = 2
+      [(validate.rules).uint32 = {lte: 10485760 gte: 1}];
+
+  // Maximum number of SSE payloads parsed as JSON for one response, counting
+  // malformed payloads; events skipped by name (keepalives, content deltas)
+  // do not count. ``max_sse_event_size`` bounds one event; this bounds the
+  // parse work a long-lived stream can extract from the worker. On
+  // exhaustion the accumulated usage is kept and published as partial, and
+  // extraction goes inert.
   //
-  // Defaults to 65536 — far above ordinary streams (one usage-bearing event,
-  // hundreds to thousands of deltas), while bounding worst-case per-stream
-  // parse work. Raise it for extremely long generations whose every chunk
-  // must be parsed (e.g. OpenAI Chat Completions streams, whose chunks are
-  // unnamed and cannot be skipped by classification).
-  google.protobuf.UInt32Value max_parsed_events = 5 [(validate.rules).uint32 = {gte: 1}];
+  // Defaults to 65536 — far above ordinary streams. Raise it for extremely
+  // long generations whose every chunk must be parsed (OpenAI Chat
+  // Completions streams, whose chunks are unnamed and cannot be skipped by
+  // classification).
+  google.protobuf.UInt32Value max_parsed_sse_events = 3 [(validate.rules).uint32 = {gte: 1}];
 }
 
-// The built-in token-usage extractor for the OpenAI, Anthropic, and Gemini
-// wire dialects.
+// Per-route configuration. Its presence declares the route an AI endpoint.
 //
-// The emitted counts follow one canonical, *inclusive* contract regardless of
-// dialect:
-//
-// * ``input_tokens``: ALL input consumed by the model — uncached input, cached
-//   reads, cache writes, and tool-use prompt tokens included.
-// * ``output_tokens``: ALL generated output — reasoning/thought tokens
-//   included.
-// * ``total_tokens``: ``input_tokens + output_tokens``, computed from the
-//   canonical components so the emitted triple is internally consistent. When
-//   the dialect also reports a total and it disagrees with the computed sum
-//   (an internally inconsistent response, or a usage bucket unknown to this
-//   extractor), the provider's value is surfaced separately as
-//   ``reported_total_tokens``; when a canonical component is missing, the
-//   provider-reported total is emitted as ``total_tokens`` as-is.
-//
-// The breakdown fields are subsets of the canonical values:
-// ``cached_input_tokens``, ``cache_creation_input_tokens``, and
-// ``tool_use_input_tokens`` are parts of ``input_tokens``;
-// ``reasoning_tokens`` is part of ``output_tokens``.
-//
-// Dialects report different shapes and the extractor normalizes them:
-// OpenAI's counts are already inclusive; Anthropic reports uncached input and
-// the two cache buckets as disjoint buckets (summed into the canonical
-// input); Gemini reports thoughts outside ``candidatesTokenCount`` and
-// tool-use prompts outside ``promptTokenCount`` (both are summed in).
-//
-// The canonical fields carry consistent *inclusion semantics* across
-// dialects. They deliberately do not make token counts equivalent units of
-// work or cost: tokenizer behavior, model vocabulary, cache pricing, and
-// provider pricing all differ, so cost accounting additionally needs
-// provider/model identity and a pricing model.
-//
-// The emitted metadata also carries ``extraction_status``: ``complete`` when
-// every observed usage document was extracted, ``partial`` when extraction
-// lost input on the stream — an event over ``max_event_size``, an unparseable
-// document, a known usage field with a malformed value, or SSE input
-// truncated before its terminating blank line — meaning the counts may be
-// stale or incomplete.
-message BuiltinTokenUsageExtractor {
-  // The wire dialect (API format) of the response. This deliberately names a
-  // *format*, not a provider identity: shape detection cannot distinguish an
-  // OpenAI-compatible backend (vLLM, gateways, Gemini's compatibility
-  // endpoint) from OpenAI itself. Provider identity, when needed, must come
-  // from configuration or routing metadata.
-  enum ApiFormat {
-    // Detect the format from the response shape. Only strong, dialect-unique
-    // markers lock detection; generic documents (e.g. a bare ``ping``
-    // heartbeat) are skipped.
-    AUTO_DETECT = 0;
+// Request and response wire protocols are declared separately because
+// protocol translation can make the client-facing request API differ from
+// the provider's response API. For response token-usage extraction the
+// effective wire API is resolved in precedence order: per-route
+// ``response.api_protocol``, then per-route ``request.api_protocol``, then
+// :ref:`default_api_protocol
+// <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.default_api_protocol>`,
+// then auto-detection.
+message AiProtocolManagerPerRoute {
+  // Request-side route configuration. Its presence hands the request payload
+  // to the filter to hold and validate (when :ref:`request_handling
+  // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.request_handling>`
+  // is enabled).
+  RequestPerRoute request = 1;
 
-    // OpenAI Chat Completions and Responses API dialects.
-    OPENAI = 1;
+  // Optional response-side route configuration. When absent, response
+  // processing inherits ``request.api_protocol`` when available, then the
+  // global fallback.
+  ResponsePerRoute response = 2;
+}
 
-    // Anthropic Messages API dialect.
-    ANTHROPIC = 2;
+// Per-route request-side behavior.
+message RequestPerRoute {
+  // The wire API a request payload on this route follows.
+  // ``API_PROTOCOL_UNSPECIFIED`` declares the endpoint without naming its
+  // API.
+  //
+  // [#comment: Schema validation and normalization against the declared API
+  // are not implemented yet; the choice is recorded and carried. A
+  // normalization knob will be added here once the transformation and its
+  // output contract exist.]
+  type.ai.v3.ApiProtocol api_protocol = 1 [(validate.rules).enum = {defined_only: true}];
+}
 
-    // Gemini ``generateContent`` / ``streamGenerateContent`` dialect.
-    GEMINI = 3;
-  }
-
-  // Format selection. Defaults to auto-detection from the response shape.
-  ApiFormat api_format = 1 [(validate.rules).enum = {defined_only: true}];
+// Per-route response-side behavior.
+message ResponsePerRoute {
+  // The wire API the response on this route follows. This can differ from
+  // ``request.api_protocol`` when the gateway performs protocol translation.
+  // ``API_PROTOCOL_UNSPECIFIED`` falls through the precedence chain above.
+  type.ai.v3.ApiProtocol api_protocol = 1 [(validate.rules).enum = {defined_only: true}];
 }

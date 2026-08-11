@@ -70,19 +70,21 @@ const char OpenAiChatStream[] =
 // The stream parses identically regardless of how it is sliced into frames.
 TEST_F(ResponseHandlerTest, SseOpenAiAcrossArbitraryFrameBoundaries) {
   for (const size_t frame_size : {1, 7, 64, 4096}) {
-    SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+    SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                               stats_);
     feed(handler, OpenAiChatStream, frame_size);
     EXPECT_EQ(handler.usage().input_tokens, 19) << "frame_size=" << frame_size;
     EXPECT_EQ(handler.usage().output_tokens, 10) << "frame_size=" << frame_size;
     EXPECT_EQ(handler.usage().total_tokens, 29) << "frame_size=" << frame_size;
-    EXPECT_EQ(handler.usage().api_format, ApiFormat::OpenAi);
+    EXPECT_EQ(handler.usage().api_protocol, ApiProtocol::OpenAiChatCompletions);
     EXPECT_EQ(handler.usage().model, "gpt-4o");
     EXPECT_TRUE(handler.parsingComplete()); // [DONE] seen.
   }
 }
 
 TEST_F(ResponseHandlerTest, SseOpenAiWithoutIncludeUsageYieldsNothing) {
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
   feed(
       handler,
       "data: {\"object\":\"chat.completion.chunk\",\"choices\":[{\"delta\":{}}],\"usage\":null}\n\n"
@@ -112,13 +114,14 @@ TEST_F(ResponseHandlerTest, SseAnthropicNamedEventsCumulative) {
       "event: message_stop\r\n"
       "data: {\"type\":\"message_stop\"}\r\n\r\n";
   for (const size_t frame_size : {3, 50, 8192}) {
-    SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+    SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                               stats_);
     feed(handler, stream, frame_size);
     EXPECT_EQ(handler.usage().input_tokens, 2679) << "frame_size=" << frame_size; // Native.
     EXPECT_EQ(handler.usage().output_tokens, 15) << "frame_size=" << frame_size;
     EXPECT_EQ(handler.usage().cached_input_tokens, 128);
     EXPECT_EQ(handler.usage().model, "claude-opus-5");
-    EXPECT_EQ(handler.usage().api_format, ApiFormat::Anthropic);
+    EXPECT_EQ(handler.usage().api_protocol, ApiProtocol::AnthropicMessages);
     EXPECT_TRUE(handler.parsingComplete()); // message_stop seen.
     EXPECT_FALSE(handler.degraded());
     TokenUsage finalized = handler.usage();
@@ -132,14 +135,15 @@ TEST_F(ResponseHandlerTest, SseAnthropicNamedEventsCumulative) {
 TEST_F(ResponseHandlerTest, PingDoesNotPoisonAutoDetection) {
   // A bare JSON heartbeat is a weak marker any gateway may emit: it must not
   // lock the stream format, or a subsequent OpenAI stream would be misread.
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
   feed(handler,
        "data: {\"type\":\"ping\"}\n\n"
        "data: {\"object\":\"chat.completion.chunk\",\"choices\":[],"
        "\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5,\"total_tokens\":15}}\n\n"
        "data: [DONE]\n\n",
        4096);
-  EXPECT_EQ(handler.usage().api_format, ApiFormat::OpenAi);
+  EXPECT_EQ(handler.usage().api_protocol, ApiProtocol::OpenAiChatCompletions);
   EXPECT_EQ(handler.usage().total_tokens, 15);
 }
 
@@ -152,7 +156,8 @@ TEST_F(ResponseHandlerTest, SseGeminiAltSseLastSnapshotWins) {
       "\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":6,"
       "\"candidatesTokenCount\":149,\"totalTokenCount\":155},"
       "\"modelVersion\":\"gemini-2.5-flash\"}\n\n";
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
   feed(handler, stream, 11);
   EXPECT_EQ(handler.usage().output_tokens, 149);
   EXPECT_EQ(handler.usage().total_tokens, 155);
@@ -162,7 +167,8 @@ TEST_F(ResponseHandlerTest, SseGeminiAltSseLastSnapshotWins) {
 }
 
 TEST_F(ResponseHandlerTest, SseCommentKeepAlivesAndUnknownEventsSkipped) {
-  SseResponseHandler handler(ApiFormat::Anthropic, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler handler(ApiProtocol::AnthropicMessages, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
   feed(handler,
        ": keep-alive\n\n"
        "event: some_future_event\ndata: {\"type\":\"some_future_event\"}\n\n"
@@ -173,7 +179,8 @@ TEST_F(ResponseHandlerTest, SseCommentKeepAlivesAndUnknownEventsSkipped) {
 }
 
 TEST_F(ResponseHandlerTest, SseInvalidJsonEventCountedAndSkipped) {
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
   feed(handler,
        "data: this-is-not-json\n\n"
        "data: {\"object\":\"chat.completion.chunk\",\"choices\":[],"
@@ -184,7 +191,7 @@ TEST_F(ResponseHandlerTest, SseInvalidJsonEventCountedAndSkipped) {
 }
 
 TEST_F(ResponseHandlerTest, SseOversizedPendingEventDiscarded) {
-  SseResponseHandler handler(ApiFormat::Unknown, /*max_event_size=*/64, TestMaxParsedEvents,
+  SseResponseHandler handler(ApiProtocol::Unspecified, /*max_event_size=*/64, TestMaxParsedEvents,
                              stats_);
   // More than 64 bytes with no blank-line delimiter anywhere.
   const std::string unterminated = "data: {\"pad\":\"" + std::string(200, 'x') + "\"";
@@ -199,7 +206,8 @@ TEST_F(ResponseHandlerTest, SseOversizedPendingEventDiscarded) {
 TEST_F(ResponseHandlerTest, SseExplicitFormatSkipsDetection) {
   // Without discriminating markers, AUTO would skip this; a configured
   // format extracts it.
-  SseResponseHandler handler(ApiFormat::Anthropic, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler handler(ApiProtocol::AnthropicMessages, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
   feed(handler, "data: {\"usage\":{\"input_tokens\":5,\"output_tokens\":7}}\n\n", 4096);
   EXPECT_EQ(handler.usage().input_tokens, 5);
   EXPECT_EQ(handler.usage().output_tokens, 7);
@@ -208,7 +216,7 @@ TEST_F(ResponseHandlerTest, SseExplicitFormatSkipsDetection) {
 TEST_F(ResponseHandlerTest, SseOversizedCompleteEventSkippedNotParsed) {
   // A fully delimited event over the cap must not bypass the limit: it is
   // skipped (no parse, no usage), and later small events are still processed.
-  SseResponseHandler handler(ApiFormat::Unknown, /*max_event_size=*/256, TestMaxParsedEvents,
+  SseResponseHandler handler(ApiProtocol::Unspecified, /*max_event_size=*/256, TestMaxParsedEvents,
                              stats_);
   const std::string oversized = "data: {\"object\":\"chat.completion.chunk\",\"pad\":\"" +
                                 std::string(4096, 'x') +
@@ -219,7 +227,7 @@ TEST_F(ResponseHandlerTest, SseOversizedCompleteEventSkippedNotParsed) {
                             "\"total_tokens\":3}}\n\n";
   // Deliver in one frame (oversized event complete on arrival) and fragmented.
   for (const size_t frame_size : {size_t(1 << 20), size_t(16)}) {
-    SseResponseHandler fresh(ApiFormat::Unknown, /*max_event_size=*/64, TestMaxParsedEvents,
+    SseResponseHandler fresh(ApiProtocol::Unspecified, /*max_event_size=*/64, TestMaxParsedEvents,
                              stats_);
     feed(fresh, oversized, frame_size, /*end_stream=*/false);
     EXPECT_FALSE(fresh.usage().hasAny()) << "frame_size=" << frame_size;
@@ -233,7 +241,8 @@ TEST_F(ResponseHandlerTest, SseOversizedCompleteEventSkippedNotParsed) {
 TEST_F(ResponseHandlerTest, SseTailAfterDoneSentinelIgnored) {
   // Junk after [DONE] in the same frame must not produce parse errors or
   // retained extraction work.
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
   feed(handler,
        "data: {\"object\":\"chat.completion.chunk\",\"choices\":[],"
        "\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2,\"total_tokens\":3}}\n\n"
@@ -253,7 +262,7 @@ TEST_F(ResponseHandlerTest, SseDiscardSplitTerminatorDoesNotFabricateBoundary) {
   // line state must remember that the terminator ended a *content* line, so no
   // event boundary is fabricated and the suffix (a well-formed usage chunk
   // small enough to parse) is not extracted.
-  SseResponseHandler handler(ApiFormat::Unknown, /*max_event_size=*/256, TestMaxParsedEvents,
+  SseResponseHandler handler(ApiProtocol::Unspecified, /*max_event_size=*/256, TestMaxParsedEvents,
                              stats_);
   Buffer::OwnedImpl frame1("data: " + std::string(300, 'x'));
   handler.onData(frame1);
@@ -269,7 +278,7 @@ TEST_F(ResponseHandlerTest, SseDiscardSplitTerminatorDoesNotFabricateBoundary) {
 
   // Control: a real blank line at the same frame position ends the oversized
   // event, so the following line IS a fresh event and extracts.
-  SseResponseHandler control(ApiFormat::Unknown, /*max_event_size=*/256, TestMaxParsedEvents,
+  SseResponseHandler control(ApiProtocol::Unspecified, /*max_event_size=*/256, TestMaxParsedEvents,
                              stats_);
   Buffer::OwnedImpl c1("data: " + std::string(300, 'x'));
   control.onData(c1);
@@ -295,9 +304,10 @@ TEST_F(ResponseHandlerTest, SseExtractionIdenticalUnderExtremeFragmentation) {
       "\r\n\r\n"
       "data: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":6}}\n\n"
       "data: {\"type\":\"message_stop\"}\n\n";
-  SseResponseHandler byte_wise(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler byte_wise(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                               stats_);
   feed(byte_wise, stream, 1);
-  SseResponseHandler whole(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler whole(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents, stats_);
   feed(whole, stream, stream.size());
   EXPECT_EQ(byte_wise.usage().input_tokens, whole.usage().input_tokens);
   EXPECT_EQ(byte_wise.usage().output_tokens, 6);
@@ -316,7 +326,7 @@ TEST_F(ResponseHandlerTest, SseSingleFrameOversizedEventIsStrictlyBounded) {
     // One frame containing an unterminated oversized event. Retention is
     // gated before every copy, so the buffer respects the cap at every call
     // boundary (there is no intra-call spike to observe).
-    SseResponseHandler handler(ApiFormat::Unknown, cap, TestMaxParsedEvents, stats_);
+    SseResponseHandler handler(ApiProtocol::Unspecified, cap, TestMaxParsedEvents, stats_);
     Buffer::OwnedImpl frame(huge_interior);
     handler.onData(frame);
     EXPECT_LE(SseResponseHandlerPeer::bufferedBytes(handler), cap);
@@ -326,7 +336,7 @@ TEST_F(ResponseHandlerTest, SseSingleFrameOversizedEventIsStrictlyBounded) {
   {
     // One frame containing a complete oversized event (terminator at the
     // end), followed by a small event that must still extract.
-    SseResponseHandler handler(ApiFormat::Unknown, cap, TestMaxParsedEvents, stats_);
+    SseResponseHandler handler(ApiProtocol::Unspecified, cap, TestMaxParsedEvents, stats_);
     Buffer::OwnedImpl frame(huge_interior + "\"}\n\n"
                                             "data: {\"object\":\"chat.completion.chunk\","
                                             "\"choices\":[],\"usage\":{\"prompt_tokens\":1,"
@@ -340,7 +350,7 @@ TEST_F(ResponseHandlerTest, SseSingleFrameOversizedEventIsStrictlyBounded) {
   {
     // Byte-at-a-time delivery of an over-cap event: the invariant holds at
     // every one of the ~cap call boundaries around the discard transition.
-    SseResponseHandler handler(ApiFormat::Unknown, cap, TestMaxParsedEvents, stats_);
+    SseResponseHandler handler(ApiProtocol::Unspecified, cap, TestMaxParsedEvents, stats_);
     const std::string prefix = huge_interior.substr(0, cap + 64);
     for (const char c : prefix) {
       Buffer::OwnedImpl byte(absl::string_view(&c, 1));
@@ -355,14 +365,15 @@ TEST_F(ResponseHandlerTest, WeakGeminiMarkerDoesNotPoisonAutoDetection) {
   // A document whose `candidates` value is not an array (generic key, foreign
   // dialect) must not lock the stream to Gemini; the later OpenAI usage chunk
   // must still be detected and extracted.
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
   feed(handler,
        "data: {\"candidates\":\"not-gemini\"}\n\n"
        "data: {\"object\":\"chat.completion.chunk\",\"choices\":[],"
        "\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5,\"total_tokens\":15}}\n\n"
        "data: [DONE]\n\n",
        4096);
-  EXPECT_EQ(handler.usage().api_format, ApiFormat::OpenAi);
+  EXPECT_EQ(handler.usage().api_protocol, ApiProtocol::OpenAiChatCompletions);
   EXPECT_EQ(handler.usage().total_tokens, 15);
 }
 
@@ -373,7 +384,7 @@ TEST_F(ResponseHandlerTest, GeminiToolUseBreakdownSurvivesHandlerMerge) {
   const std::string body =
       R"({"usageMetadata":{"promptTokenCount":6,"toolUsePromptTokenCount":5,
           "candidatesTokenCount":149,"thoughtsTokenCount":12,"totalTokenCount":172}})";
-  JsonResponseHandler handler(ApiFormat::Unknown, TestMaxBodySize, stats_);
+  JsonResponseHandler handler(ApiProtocol::Unspecified, TestMaxBodySize, stats_);
   feed(handler, body, 4096);
   EXPECT_EQ(handler.usage().tool_use_input_tokens, 5);
   TokenUsage finalized = handler.usage();
@@ -393,7 +404,7 @@ TEST_F(ResponseHandlerTest, JsonArrayStopsAtTerminalEvent) {
            "usage":{"input_tokens":1,"output_tokens":2,"total_tokens":3}}},
           {"response":{"usage":{"input_tokens":100,"output_tokens":200,
            "total_tokens":999}}}])";
-  JsonResponseHandler handler(ApiFormat::Unknown, TestMaxBodySize, stats_);
+  JsonResponseHandler handler(ApiProtocol::Unspecified, TestMaxBodySize, stats_);
   feed(handler, body, 4096);
   EXPECT_EQ(handler.usage().total_tokens, 3);
 }
@@ -402,7 +413,7 @@ TEST_F(ResponseHandlerTest, SseOversizedEventSuffixNotMisparsed) {
   // A later `data:` line of the SAME oversized event (no blank-line boundary
   // in between) must not be misread as a fresh event after the pending data
   // was discarded. The whole event is skipped; the next real event parses.
-  SseResponseHandler handler(ApiFormat::Unknown, /*max_event_size=*/64, TestMaxParsedEvents,
+  SseResponseHandler handler(ApiProtocol::Unspecified, /*max_event_size=*/64, TestMaxParsedEvents,
                              stats_);
   Buffer::OwnedImpl frame1("data: " + std::string(70, 'x')); // Unterminated, over cap.
   handler.onData(frame1);
@@ -416,7 +427,7 @@ TEST_F(ResponseHandlerTest, SseOversizedEventSuffixNotMisparsed) {
 }
 
 TEST_F(ResponseHandlerTest, SseDiscardedEventResumesAtNextRealEvent) {
-  SseResponseHandler handler(ApiFormat::Unknown, /*max_event_size=*/256, TestMaxParsedEvents,
+  SseResponseHandler handler(ApiProtocol::Unspecified, /*max_event_size=*/256, TestMaxParsedEvents,
                              stats_);
   // Oversized event fragmented across frames, terminated mid-frame, followed
   // by a genuine small event.
@@ -436,7 +447,7 @@ TEST_F(ResponseHandlerTest, SseDiscardBoundaryStraddlesFrames) {
   // The oversized event's terminating blank line arrives split across frames
   // (CRLF CRLF delivered one byte at a time): the retained tail must still
   // detect the boundary, and the following event must parse.
-  SseResponseHandler handler(ApiFormat::Unknown, /*max_event_size=*/256, TestMaxParsedEvents,
+  SseResponseHandler handler(ApiProtocol::Unspecified, /*max_event_size=*/256, TestMaxParsedEvents,
                              stats_);
   Buffer::OwnedImpl big("data: " + std::string(400, 'x'));
   handler.onData(big);
@@ -462,7 +473,7 @@ TEST_F(ResponseHandlerTest, NonObjectJsonShapesTolerated) {
         std::string("[[1],{\"usageMetadata\":{\"promptTokenCount\":1,"
                     "\"candidatesTokenCount\":2,\"totalTokenCount\":3}}]"),
         std::string("\"just-a-string\"")}) {
-    JsonResponseHandler handler(ApiFormat::Unknown, TestMaxBodySize, stats_);
+    JsonResponseHandler handler(ApiProtocol::Unspecified, TestMaxBodySize, stats_);
     feed(handler, body, 4096);
     if (absl::StrContains(body, "usageMetadata")) {
       // Object elements alongside non-object ones still extract.
@@ -472,7 +483,8 @@ TEST_F(ResponseHandlerTest, NonObjectJsonShapesTolerated) {
     }
   }
   // SSE events whose data payload is a JSON array or scalar.
-  SseResponseHandler sse(ApiFormat::Gemini, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler sse(ApiProtocol::GeminiGenerateContent, TestMaxEventSize, TestMaxParsedEvents,
+                         stats_);
   feed(sse, "data: []\n\ndata: 42\n\n", 4096);
   EXPECT_FALSE(sse.usage().hasAny());
   // Non-object roots (scalars and arrays alike) are valid JSON: they parse
@@ -483,7 +495,8 @@ TEST_F(ResponseHandlerTest, NonObjectJsonShapesTolerated) {
 TEST_F(ResponseHandlerTest, SseSplitCarriageReturnResolvedAtEndOfStream) {
   // An event whose final line terminator is a bare CR pending at EOF only
   // resolves when the parser sees end-of-stream (delivered via onEndStream).
-  SseResponseHandler handler(ApiFormat::Anthropic, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler handler(ApiProtocol::AnthropicMessages, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
   feed(handler, "data: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":9}}\r\n\r",
        /*frame_size=*/4096, /*end_stream=*/false);
   EXPECT_FALSE(handler.usage().hasAny()); // Still pending without EOS.
@@ -496,7 +509,8 @@ TEST_F(ResponseHandlerTest, IncompleteTerminalSseEventMarksPartial) {
   // spec discards the incomplete event, but the discarded input may have been
   // the usage-bearing final snapshot, so the surviving earlier counts must be
   // flagged.
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
   feed(handler,
        "data: {\"usageMetadata\":{\"promptTokenCount\":6,\"candidatesTokenCount\":16,"
        "\"totalTokenCount\":22}}\n\n"
@@ -508,7 +522,7 @@ TEST_F(ResponseHandlerTest, IncompleteTerminalSseEventMarksPartial) {
   EXPECT_EQ(stats_.sse_incomplete_event_.value(), 1);
 
   // A cleanly terminated stream does not trip the flag.
-  SseResponseHandler clean(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler clean(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents, stats_);
   feed(clean,
        "data: {\"usageMetadata\":{\"promptTokenCount\":6,\"candidatesTokenCount\":16,"
        "\"totalTokenCount\":22}}\n\n",
@@ -520,7 +534,8 @@ TEST_F(ResponseHandlerTest, IncompleteTerminalSseEventMarksPartial) {
 TEST_F(ResponseHandlerTest, MalformedFinalUsageFieldsMarkPartial) {
   // The final cumulative snapshot parses as JSON but its known count fields
   // are unusable: the earlier snapshot's counts survive, flagged partial.
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
   feed(handler,
        "data: {\"usageMetadata\":{\"promptTokenCount\":6,\"candidatesTokenCount\":16,"
        "\"totalTokenCount\":22}}\n\n"
@@ -536,14 +551,15 @@ TEST_F(ResponseHandlerTest, MalformedFinalUsageFieldsMarkPartial) {
 TEST_F(ResponseHandlerTest, GenericMessageEventDoesNotPoisonAutoDetection) {
   // A bare `{"type":"message"}` from a non-Anthropic gateway must not
   // lock the stream; the later OpenAI usage chunk still detects and extracts.
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
   feed(handler,
        "data: {\"type\":\"message\"}\n\n"
        "data: {\"object\":\"chat.completion.chunk\",\"choices\":[],"
        "\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5,\"total_tokens\":15}}\n\n"
        "data: [DONE]\n\n",
        4096);
-  EXPECT_EQ(handler.usage().api_format, ApiFormat::OpenAi);
+  EXPECT_EQ(handler.usage().api_protocol, ApiProtocol::OpenAiChatCompletions);
   EXPECT_EQ(handler.usage().total_tokens, 15);
 }
 
@@ -572,8 +588,8 @@ private:
 TEST_F(ResponseHandlerTest, ObservationBuffersUseStreamMemoryAccount) {
   auto account = std::make_shared<TestAccount>();
   {
-    SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_,
-                               account);
+    SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                               stats_, account);
     Buffer::OwnedImpl partial("data: {\"object\":\"chat.completion.chunk\"");
     handler.onData(partial);
     EXPECT_GT(account->balance(), 0); // Retained bytes are charged.
@@ -584,7 +600,7 @@ TEST_F(ResponseHandlerTest, ObservationBuffersUseStreamMemoryAccount) {
   {
     // The JSON handler streams the body straight into the parser: no side
     // copy is retained, so nothing is ever charged to the account.
-    JsonResponseHandler handler(ApiFormat::Unknown, TestMaxBodySize, stats_, account);
+    JsonResponseHandler handler(ApiProtocol::Unspecified, TestMaxBodySize, stats_, account);
     Buffer::OwnedImpl body("{\"type\":\"message\",\"usage\":{\"input_tokens\":5}}");
     handler.onData(body);
     EXPECT_EQ(account->balance(), 0);
@@ -600,8 +616,8 @@ TEST_F(ResponseHandlerTest, ContiguousEventsNeverChargeTheAccount) {
   // processed in place. Nothing is retained, so the account is never charged
   // -- the dominant shape of real streams costs no side memory at all.
   auto account = std::make_shared<TestAccount>();
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, TestMaxParsedEvents, stats_,
-                             account);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_, account);
   feed(handler, OpenAiChatStream, /*frame_size=*/1 << 20);
   EXPECT_EQ(handler.usage().total_tokens, 29);
   EXPECT_EQ(account->peak(), 0);
@@ -613,7 +629,7 @@ TEST_F(ResponseHandlerTest, FragmentedNearCapEventPeakChargeIsBounded) {
   // charge is bounded by twice the cap (and only for split events).
   constexpr uint32_t cap = 8 * 1024;
   auto account = std::make_shared<TestAccount>();
-  SseResponseHandler handler(ApiFormat::Unknown, cap, TestMaxParsedEvents, stats_, account);
+  SseResponseHandler handler(ApiProtocol::Unspecified, cap, TestMaxParsedEvents, stats_, account);
   const std::string stream = "data: {\"object\":\"chat.completion.chunk\",\"pad\":\"" +
                              std::string(6 * 1024, 'x') +
                              "\",\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2,"
@@ -629,7 +645,8 @@ TEST_F(ResponseHandlerTest, ParseBudgetExhaustionGoesInertAndPartial) {
   // The stream-wide budget bounds how many payloads are JSON-parsed. Once
   // exhausted the handler goes inert: accumulated usage survives (published
   // partial by the filter), later events cost nothing, and one counter fires.
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, /*max_parsed_events=*/3, stats_);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, /*max_parsed_events=*/3,
+                             stats_);
   Buffer::OwnedImpl first("data: {\"object\":\"chat.completion.chunk\",\"choices\":[],"
                           "\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2,"
                           "\"total_tokens\":3}}\n\n");
@@ -647,7 +664,8 @@ TEST_F(ResponseHandlerTest, ParseBudgetExhaustionGoesInertAndPartial) {
 TEST_F(ResponseHandlerTest, MalformedEventFloodIsBudgeted) {
   // Malformed payloads consume budget too: a stream repeating `data: x` can
   // only charge the parse-error counter a bounded number of times.
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, /*max_parsed_events=*/5, stats_);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, /*max_parsed_events=*/5,
+                             stats_);
   for (int i = 0; i < 50; ++i) {
     Buffer::OwnedImpl flood("data: not-json\n\n");
     handler.onData(flood);
@@ -663,7 +681,8 @@ TEST_F(ResponseHandlerTest, SkippableNamedEventsAreNeitherParsedNorBudgeted) {
   // alone, before the data payload is assembled or parsed: deliberately
   // invalid JSON payloads produce no parse errors, and a delta flood does not
   // consume the parse budget that the terminal usage event needs.
-  SseResponseHandler handler(ApiFormat::Unknown, TestMaxEventSize, /*max_parsed_events=*/2, stats_);
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, /*max_parsed_events=*/2,
+                             stats_);
   for (int i = 0; i < 20; ++i) {
     Buffer::OwnedImpl anthropic_delta("event: content_block_delta\n"
                                       "data: this{is)not[json\n\n");
@@ -692,11 +711,11 @@ TEST_F(ResponseHandlerTest, JsonBodyAcrossFrames) {
       R"({"id":"msg_1","type":"message","model":"claude-opus-5",
           "usage":{"input_tokens":2095,"output_tokens":503}})";
   for (const size_t frame_size : {1, 13, 4096}) {
-    JsonResponseHandler handler(ApiFormat::Unknown, TestMaxBodySize, stats_);
+    JsonResponseHandler handler(ApiProtocol::Unspecified, TestMaxBodySize, stats_);
     feed(handler, body, frame_size);
     EXPECT_EQ(handler.usage().input_tokens, 2095) << "frame_size=" << frame_size;
     EXPECT_EQ(handler.usage().output_tokens, 503) << "frame_size=" << frame_size;
-    EXPECT_EQ(handler.usage().api_format, ApiFormat::Anthropic);
+    EXPECT_EQ(handler.usage().api_protocol, ApiProtocol::AnthropicMessages);
   }
 }
 
@@ -709,16 +728,16 @@ TEST_F(ResponseHandlerTest, JsonRootArrayIsGeminiDefaultStreaming) {
           {"candidates":[{"content":{"parts":[{"text":"b"}]},"finishReason":"STOP"}],
            "usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":149,"totalTokenCount":155},
            "modelVersion":"gemini-2.5-flash"}])";
-  JsonResponseHandler handler(ApiFormat::Unknown, TestMaxBodySize, stats_);
+  JsonResponseHandler handler(ApiProtocol::Unspecified, TestMaxBodySize, stats_);
   feed(handler, body, 37);
   EXPECT_EQ(handler.usage().input_tokens, 6);
   EXPECT_EQ(handler.usage().output_tokens, 149);
   EXPECT_EQ(handler.usage().total_tokens, 155);
-  EXPECT_EQ(handler.usage().api_format, ApiFormat::Gemini);
+  EXPECT_EQ(handler.usage().api_protocol, ApiProtocol::GeminiGenerateContent);
 }
 
 TEST_F(ResponseHandlerTest, JsonBodyOverLimitSkipsExtraction) {
-  JsonResponseHandler handler(ApiFormat::Unknown, /*max_inspected_body_size=*/32, stats_);
+  JsonResponseHandler handler(ApiProtocol::Unspecified, /*max_inspected_body_size=*/32, stats_);
   const std::string body =
       R"({"usage":{"prompt_tokens":1},"pad":")" + std::string(100, 'x') + R"("})";
   feed(handler, body, 16);
@@ -727,20 +746,20 @@ TEST_F(ResponseHandlerTest, JsonBodyOverLimitSkipsExtraction) {
 }
 
 TEST_F(ResponseHandlerTest, JsonInvalidBodyCounted) {
-  JsonResponseHandler handler(ApiFormat::Unknown, TestMaxBodySize, stats_);
+  JsonResponseHandler handler(ApiProtocol::Unspecified, TestMaxBodySize, stats_);
   feed(handler, "<html>bad gateway</html>", 4096);
   EXPECT_EQ(stats_.response_parse_error_.value(), 1);
   EXPECT_FALSE(handler.usage().hasAny());
 }
 
 TEST_F(ResponseHandlerTest, JsonNonObjectRootTolerated) {
-  JsonResponseHandler handler(ApiFormat::Unknown, TestMaxBodySize, stats_);
+  JsonResponseHandler handler(ApiProtocol::Unspecified, TestMaxBodySize, stats_);
   feed(handler, "42", 4096);
   EXPECT_FALSE(handler.usage().hasAny());
 }
 
 TEST_F(ResponseHandlerTest, JsonUnknownShapeYieldsNothing) {
-  JsonResponseHandler handler(ApiFormat::Unknown, TestMaxBodySize, stats_);
+  JsonResponseHandler handler(ApiProtocol::Unspecified, TestMaxBodySize, stats_);
   feed(handler, R"({"status":"ok"})", 4096);
   EXPECT_FALSE(handler.usage().hasAny());
   EXPECT_EQ(stats_.response_parse_error_.value(), 0);

@@ -17,9 +17,16 @@ directions of a stream:
   <config_http_filters_ext_proc>` metadata forwarding), access loggers, and
   CEL expressions.
 
-It does so only for requests it has a reason to inspect. A request on a route
-that is not a declared AI endpoint -- and, unless :ref:`best_effort_parsing
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.best_effort_parsing>`
+Request and response processing are enabled independently, by the presence of
+:ref:`request_handling
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.request_handling>`
+and :ref:`response_handling
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.response_handling>`.
+
+The filter acts only on requests it has a reason to inspect. A request on a
+route that is not a declared AI endpoint -- and, unless
+:ref:`parse_unconfigured_routes
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>`
 is set, every request -- passes straight through: its headers are not held, its
 body is not offloaded, and no external buffer is created for it. A filter chain
 carrying this filter therefore costs ordinary pass-through for the traffic it
@@ -80,11 +87,13 @@ Configuration
 Which routes are AI endpoints is declared per route, with
 :ref:`AiProtocolManagerPerRoute
 <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`.
-A route that carries one names the :ref:`schema
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.schema>`
-its payload follows, and its payload is parsed strictly: a malformed body is
-rejected with a 400. This is normally attached to a route matching the
-provider's REST path, such as ``/chat/completions``:
+A route carrying a :ref:`request
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.request>`
+declaration names the :ref:`wire API
+<envoy_v3_api_enum_type.ai.v3.ApiProtocol>` its request payload follows, and
+(when ``request_handling`` is enabled) its payload is parsed strictly: a
+malformed body is rejected with a 400. This is normally attached to a route
+matching the provider's REST path, such as ``/chat/completions``:
 
 .. code-block:: yaml
 
@@ -96,19 +105,21 @@ provider's REST path, such as ``/chat/completions``:
     typed_per_filter_config:
       envoy.filters.http.ai_protocol_manager:
         "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute
-        schema: OPENAI_CHAT_COMPLETIONS
+        request:
+          api_protocol: OPENAI_CHAT_COMPLETIONS
 
-Such a route is a pass-through endpoint: the payload is forwarded upstream in
-its own schema. Setting :ref:`normalize
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.normalize>`
-additionally transcodes it into the canonical schema, which is what lets one set
-of filters operate on payloads from different providers.
+The request and response wire APIs are declared separately (an optional
+:ref:`response
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.response>`
+declaration covers gateways whose response API differs from the request API,
+e.g. under protocol translation); when the response API is undeclared it
+falls back to the request API.
 
 The filter-level configuration decides what happens on every other route. By
 default those requests are passed through untouched -- not parsed, and not
 offloaded; setting
-:ref:`best_effort_parsing
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.best_effort_parsing>`
+:ref:`parse_unconfigured_routes
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>`
 offloads and parses them too, but never fails a request over it -- a payload that
 does not parse is forwarded unchanged.
 
@@ -118,21 +129,26 @@ does not parse is forwarded unchanged.
   - name: envoy.filters.http.ai_protocol_manager
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
-      best_effort_parsing: true
+      request_handling:
+        parse_unconfigured_routes: true
 
 Response token-usage extraction
 -------------------------------
 
-When :ref:`response_handling
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.response_handling>`
+When :ref:`response_handling.token_usage
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponseHandling.token_usage>`
 is configured, 2xx responses with a ``text/event-stream`` or
 ``application/json`` content type are observed as they stream through the
-filter. The filter **never stops iteration or modifies the original
+filter. Inspection is scoped to routes carrying a per-route configuration;
+setting :ref:`include_unconfigured_routes
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.include_unconfigured_routes>`
+widens it to every route, for response-only installations whose routes cannot
+be declared (for example a dynamic-forward-proxy cluster). The filter **never stops iteration or modifies the original
 response**, and no extraction failure can affect it. Extraction works on a
-separately bounded side copy — hard-capped at :ref:`max_event_size
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponseHandling.max_event_size>`
-(SSE) or :ref:`max_inspected_body_size
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponseHandling.max_inspected_body_size>`
+separately bounded side copy — hard-capped at :ref:`max_sse_event_size
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtractionLimits.max_sse_event_size>`
+(SSE) or :ref:`max_json_body_size
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtractionLimits.max_json_body_size>`
 (JSON) per stream, regardless of how large individual data frames are, and
 charged to the stream's buffer memory account when :ref:`account tracking
 <envoy_v3_api_field_config.overload.v3.BufferFactoryConfig.minimum_account_to_track_power_of_two>`
@@ -151,8 +167,8 @@ short-lived, bounded by the same caps, and not charged. Named events that
 cannot carry usage (keepalives, content deltas, non-terminal OpenAI
 Responses lifecycle events) are dropped on their ``event:`` line alone,
 before any payload is assembled or parsed, and per-stream parse work is
-bounded by :ref:`max_parsed_events
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponseHandling.max_parsed_events>`.
+bounded by :ref:`max_parsed_sse_events
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtractionLimits.max_parsed_sse_events>`.
 
 Responses with a non-identity ``content-encoding`` are skipped (counted by
 ``unsupported_content_encoding``). To extract usage from compressed provider
@@ -177,10 +193,12 @@ Both streaming shapes are handled:
 * JSON bodies, including Gemini's default (non-SSE) streaming whose complete
   body is a root-level JSON array of chunks.
 
-The wire dialect is auto-detected from the response shape by default (only
-strong, dialect-unique markers lock detection), or pinned with
-:ref:`token_usage.api_format
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.BuiltinTokenUsageExtractor.api_format>`.
+The response's :ref:`wire API <envoy_v3_api_enum_type.ai.v3.ApiProtocol>` is
+resolved in precedence order: the route's declared response API, the route's
+declared request API, then :ref:`default_api_protocol
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.default_api_protocol>`;
+when none is declared it is auto-detected from the response shape (only
+strong, dialect-unique markers lock detection).
 Cumulative streaming counters (Anthropic ``message_delta``, Gemini snapshots)
 are merged with last-value-wins semantics per native field, and the canonical
 values are computed once, after the last event.
@@ -189,14 +207,14 @@ All emitted counts follow one canonical, **inclusive** contract regardless of
 dialect: ``input_tokens`` covers all input consumed (uncached input, cached
 reads, cache writes, and tool-use prompt tokens), ``output_tokens`` covers all
 generated output including reasoning/thought tokens, and ``total_tokens`` is
-computed as their sum, so the emitted triple is internally consistent. When
-the provider also reports a total and it disagrees with the computed sum (an
-internally inconsistent response, or a usage bucket unknown to the extractor),
-the provider's value is surfaced separately as ``reported_total_tokens``; when
-a canonical component is missing, the provider-reported total is emitted
-as ``total_tokens`` as-is. The breakdown fields (``cached_input_tokens``,
-``cache_creation_input_tokens``, ``tool_use_input_tokens``,
-``reasoning_tokens``) are parts of the canonical values. The extractor
+computed as their sum and emitted only when both components are known, so the
+emitted triple is always internally consistent. The total the provider itself
+reported is always preserved separately as ``provider_total_tokens``, whether
+or not it agrees with the canonical sum (a disagreement — an internally
+inconsistent response, or a usage bucket unknown to the extractor — is
+counted by ``token_usage_total_mismatch``). The breakdown fields
+(``input_token_details``, ``output_token_details``) are parts of the
+canonical values. The extractor
 normalizes each dialect's native shape onto this contract — for example
 Anthropic's disjoint cache buckets are summed into the canonical input, and
 Gemini's thoughts are summed into the canonical output.
@@ -224,19 +242,21 @@ At end of stream the result is published under the metadata namespace
 
 .. code-block:: yaml
 
-  api_format: "anthropic"        # openai | anthropic | gemini — the wire dialect
-  model: "claude-opus-5"         # response-reported model, when present
+  api_protocol: "ANTHROPIC_MESSAGES"  # the wire API, as an enum value name
+  model: "claude-opus-5"              # response-reported model, when present
   input_tokens: 1200
   output_tokens: 350
-  total_tokens: 1550
-  cached_input_tokens: 800       # when reported; part of input_tokens
-  cache_creation_input_tokens: 0 # when reported; part of input_tokens
-  tool_use_input_tokens: 0       # when reported; part of input_tokens
-  reasoning_tokens: 120          # when reported; part of output_tokens
-  reported_total_tokens: 1600    # only when the provider total disagrees
-  extraction_status: "complete"  # complete | partial
+  total_tokens: 1550                  # input + output; only when both are known
+  provider_total_tokens: 1550         # the provider's own total, always preserved
+  input_token_details:                # when reported; parts of input_tokens
+    cached_tokens: 800
+    cache_creation_tokens: 0
+    tool_use_tokens: 0
+  output_token_details:               # when reported; parts of output_tokens
+    reasoning_tokens: 120
+  extraction_status: "COMPLETE"       # COMPLETE | PARTIAL | FAILED
 
-``api_format`` names the wire dialect the response spoke, deliberately not a
+``api_protocol`` names the wire API the response spoke, deliberately not a
 provider identity: shape detection cannot distinguish an OpenAI-compatible
 backend (vLLM, other gateways, Gemini's compatibility endpoint) from OpenAI
 itself. When the actual provider identity is needed, derive it from
@@ -254,19 +274,19 @@ Metadata is only published at a clean end of the HTTP response (a reset or
 abandoned stream publishes nothing). When extraction failed outright — the
 only usage-bearing event exceeded a cap, or every usage document was
 malformed, unparseable, or truncated — a **status-only** record is published
-(``api_format``, ``model`` when captured, and ``extraction_status: partial``,
-with no counts), so per-stream consumers can distinguish "extraction failed"
-from "the provider supplied no usage", which publishes nothing and counts
-``token_usage_missing``. ``extraction_status`` reports extraction
-quality on top of that: ``complete`` means every observed usage document was
-extracted; ``partial`` means extraction lost input on this stream — an event
-over :ref:`max_event_size
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponseHandling.max_event_size>`,
+(``api_protocol``, ``model`` when captured, and ``extraction_status:
+FAILED``, with no counts), so per-stream consumers can distinguish
+"extraction failed" from "the provider supplied no usage", which publishes
+nothing and counts ``token_usage_missing``. ``extraction_status`` reports
+extraction quality: ``COMPLETE`` means every observed usage document was
+extracted; ``PARTIAL`` means usable counts were published but extraction lost
+input on this stream — an event over :ref:`max_sse_event_size
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtractionLimits.max_sse_event_size>`,
 an unparseable document, a known usage field carrying a malformed value
 (wrong type, negative, fractional, null, or out of range), SSE input
 truncated before its terminating blank line, or a canonical sum exceeding the
 exactly-representable bound — so the counts may be stale (for example an
-earlier cumulative snapshot) or incomplete. Neither value implies the model
+earlier cumulative snapshot) or incomplete. No status implies the model
 response succeeded (an OpenAI ``response.failed`` event carrying usage is
 still published). Usage can be legitimately absent (for example an OpenAI
 stream without ``stream_options.include_usage``); this is counted by the
@@ -289,7 +309,8 @@ Example configuration:
   - name: envoy.filters.http.ai_protocol_manager
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
-      response_handling: {}
+      response_handling:
+        token_usage: {}
 
 Filter ordering
 ~~~~~~~~~~~~~~~
@@ -354,15 +375,22 @@ loggers, and CEL exactly as in a downstream installation.
   publishing (counted by ``token_usage_duplicate``) rather than merging two
   observations into one hybrid record. Give each placement its own
   :ref:`metadata_namespace
-  <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponseHandling.metadata_namespace>`
+  <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.metadata_namespace>`
   to capture both.
 
 Response-only installation: a deployment that installs the filter purely to
 observe responses — for example token-usage extraction on a
-dynamic-forward-proxy egress cluster — simply declares no AI endpoints:
-requests on undeclared routes pass through untouched by default (no header
-hold, no offload, no per-attempt replay), so enabling ``response_handling``
-alone yields a response-only filter.
+dynamic-forward-proxy egress cluster — leaves ``request_handling`` unset (the
+decode path is then a pure passthrough: no header hold, no offload, no
+per-attempt replay) and, since such routes declare no per-route
+configuration, sets :ref:`include_unconfigured_routes
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.include_unconfigured_routes>`:
+
+.. code-block:: yaml
+
+  response_handling:
+    token_usage:
+      include_unconfigured_routes: true
 
 Upstream retries and hedging: each upstream attempt runs its own filter
 instance, but only the attempt whose response the router selects streams to a
@@ -378,15 +406,16 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  token_usage_found, Counter, A response yielded token usage and metadata was written (includes ``partial`` records).
-  token_usage_partial, Counter, A published record was flagged ``extraction_status: partial``.
+  token_usage_found, Counter, A response yielded token usage and metadata was written (includes ``PARTIAL`` records).
+  token_usage_partial, Counter, A published record was flagged ``extraction_status: PARTIAL``.
+  token_usage_failed, Counter, A status-only record was published (``extraction_status: FAILED``; no counts recovered).
   token_usage_missing, Counter, A handled response ended with no usage to extract.
-  token_usage_total_mismatch, Counter, The provider-reported total disagreed with the canonical input + output sum (``reported_total_tokens`` was emitted).
+  token_usage_total_mismatch, Counter, The provider-reported total disagreed with the canonical input + output sum.
   token_usage_duplicate, Counter, Publication skipped because another installation of the filter had already published the namespace for this stream.
   malformed_usage_field, Counter, "A document carried a known usage field with an unusable value (wrong type, negative, fractional, or out of range); the response is flagged partial."
   sse_incomplete_event, Counter, Non-empty SSE input could not form a complete event by end of stream and was discarded; the response is flagged partial.
-  sse_event_budget_exhausted, Counter, The stream hit :ref:`max_parsed_events <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponseHandling.max_parsed_events>`; extraction went inert and the response is flagged partial.
+  sse_event_budget_exhausted, Counter, The stream hit :ref:`max_parsed_sse_events <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtractionLimits.max_parsed_sse_events>`; extraction went inert and the response is flagged partial.
   response_parse_error, Counter, A JSON body or SSE event payload failed to parse (per occurrence; the stream is unaffected).
-  response_body_too_large, Counter, A JSON response exceeded ``max_inspected_body_size``; extraction skipped.
-  sse_event_too_large, Counter, Pending or complete SSE event data exceeded ``max_event_size``; that entire event was skipped.
+  response_body_too_large, Counter, A JSON response exceeded ``max_json_body_size``; extraction skipped.
+  sse_event_too_large, Counter, Pending or complete SSE event data exceeded ``max_sse_event_size``; that entire event was skipped.
   unsupported_content_encoding, Counter, The response carried a non-identity ``content-encoding``; extraction skipped.
