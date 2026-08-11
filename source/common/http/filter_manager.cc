@@ -1921,7 +1921,12 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
 
 void ActiveStreamDecoderFilter::addUpstreamSocketOptions(
     const Network::Socket::OptionsSharedPtr& options) {
-
+  if (options == nullptr) {
+    return;
+  }
+  if (parent_.upstream_options_ == nullptr) {
+    parent_.upstream_options_ = std::make_shared<Network::Socket::Options>();
+  }
   Network::Socket::appendOptions(parent_.upstream_options_, options);
 }
 

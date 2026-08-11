@@ -14,6 +14,7 @@
 
 #include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/filters/network/ext_proc/client_impl.h"
+#include "source/extensions/filters/network/ext_proc/matching_utils.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -98,21 +99,12 @@ private:
 class Config {
 public:
   Config(const envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor& config,
-         Stats::Scope& scope)
-      : failure_mode_allow_(config.failure_mode_allow()),
-        processing_mode_(config.processing_mode()), grpc_service_(config.grpc_service()),
-        untyped_forwarding_namespaces_(
-            config.metadata_options().forwarding_namespaces().untyped().begin(),
-            config.metadata_options().forwarding_namespaces().untyped().end()),
-        typed_forwarding_namespaces_(
-            config.metadata_options().forwarding_namespaces().typed().begin(),
-            config.metadata_options().forwarding_namespaces().typed().end()),
-        untyped_receiving_namespaces_(
-            config.metadata_options().receiving_namespaces().untyped().begin(),
-            config.metadata_options().receiving_namespaces().untyped().end()),
-        stats_(generateStats(config.stat_prefix(), scope)),
-        message_timeout_(std::chrono::milliseconds(
-            PROTOBUF_GET_MS_OR_DEFAULT(config, message_timeout, DefaultMessageTimeoutMs))) {};
+         Stats::Scope& scope,
+         Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+         const LocalInfo::LocalInfo* local_info, absl::Status& creation_status);
+
+  Config(const envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor& config,
+         Stats::Scope& scope);
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -138,6 +130,8 @@ public:
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
+  const ExpressionManager& expressionManager() const { return expression_manager_; }
+
 private:
   static constexpr uint64_t DefaultMessageTimeoutMs = 200;
 
@@ -154,6 +148,7 @@ private:
   const absl::flat_hash_set<std::string> untyped_receiving_namespaces_;
   NetworkExtProcStats stats_;
   const std::chrono::milliseconds message_timeout_;
+  const ExpressionManager expression_manager_;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
@@ -255,6 +250,7 @@ private:
 
   void sendRequest(Envoy::Buffer::Instance& data, bool end_stream, bool is_read);
   void addDynamicMetadata(ProcessingRequest& req);
+  void addAttributes(ProcessingRequest& req);
 
   Envoy::Network::FilterStatus handleStreamError();
   void closeConnection(const std::string& reason, Network::ConnectionCloseType close_type);
@@ -281,6 +277,7 @@ private:
   NetworkExtProcLoggingInfo* logging_info_{nullptr};
 
   bool processing_complete_{false};
+  bool attributes_sent_{false};
 
   bool read_pending_{false};
   bool write_pending_{false};

@@ -212,6 +212,7 @@ envoy_cc_test(
     srcs = ["static_route_provider_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/init:manager_lib",
         "//source/common/router:route_provider_manager_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/http:http_mocks",
@@ -261,6 +262,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
@@ -626,6 +628,7 @@ envoy_cc_benchmark_binary(
     srcs = ["header_formatter_speed_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/router:router_lib",
         "//test/common/stream_info:test_util",
         "@benchmark",

@@ -32,6 +32,8 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":filter_config_lib",
+        "//envoy/event:dispatcher_interface",
+        "//source/common/event:deferred_task",
         "//source/common/tracing:null_span_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],

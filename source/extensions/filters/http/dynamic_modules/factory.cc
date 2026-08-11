@@ -155,9 +155,9 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
 
 absl::StatusOr<Envoy::Http::FilterFactoryCb>
 DynamicModuleConfigFactory::createHttpFilterFactoryFromProtoTyped(
-    const FilterConfig& proto_config, const std::string& stat_prefix,
-    Server::Configuration::ServerFactoryContext& context) {
-  return createFilterFactory(proto_config, stat_prefix, context, context.scope());
+    const FilterConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  return createFilterFactory(proto_config, extra_context.stats_prefix, context, context.scope());
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

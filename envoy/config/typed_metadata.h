@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <type_traits>
 
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"

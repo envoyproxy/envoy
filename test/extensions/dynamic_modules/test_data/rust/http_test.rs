@@ -3,7 +3,7 @@ use envoy_proxy_dynamic_modules_rust_sdk::EnvoyBuffer;
 
 #[test]
 fn test_header_callbacks_filter_on_request_headers() {
-  let mut f = HeaderCallbacksFilter {};
+  let f = HeaderCallbacksFilter {};
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   envoy_filter
@@ -128,7 +128,7 @@ fn test_header_callbacks_filter_on_request_headers() {
 
 #[test]
 fn test_send_response_filter() {
-  let mut f = SendResponseFilter {};
+  let f = SendResponseFilter {};
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   envoy_filter
@@ -154,7 +154,7 @@ fn test_send_response_filter() {
 
 #[test]
 fn test_body_callbacks_filter_on_bodies() {
-  let mut f = BodyCallbacksFilter::default();
+  let f = BodyCallbacksFilter::default();
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   envoy_filter
@@ -280,7 +280,7 @@ fn test_buffer_limit_callbacks() {
 
 #[test]
 fn test_dynamic_metadata_callbacks_on_response_body() {
-  let mut f = DynamicMetadataCallbacksFilter {};
+  let f = DynamicMetadataCallbacksFilter {};
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   // on_request_headers expectations (number metadata).
@@ -636,7 +636,7 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
 
 #[test]
 fn test_response_flags_callbacks_filter() {
-  let mut f = ResponseFlagsCallbacksFilter {};
+  let f = ResponseFlagsCallbacksFilter {};
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   // Craft a bitmask with NoHealthyUpstream (bit 1), UpstreamOverflow (bit 7) and
