@@ -8,11 +8,10 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 
 const PayloadSchema* SchemaRegistry::getSchema(PerRouteProto::Schema schema) {
+  static const PayloadSchema openai_schema = OpenAI::createPayloadSchema();
   switch (schema) {
-  case PerRouteProto::OPENAI_CHAT_COMPLETIONS: {
-    static const PayloadSchema openai_schema = OpenAI::createPayloadSchema();
+  case PerRouteProto::OPENAI_CHAT_COMPLETIONS:
     return &openai_schema;
-  }
   case PerRouteProto::UNSPECIFIED:
   default:
     return nullptr;

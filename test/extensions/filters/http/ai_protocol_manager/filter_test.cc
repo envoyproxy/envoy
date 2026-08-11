@@ -739,6 +739,20 @@ TEST_F(AiProtocolManagerFilterTest, SchemaValidationRejectsInvalidPayload) {
   EXPECT_EQ(inject_calls_, 0);
 }
 
+// Trailers arriving after a stream was rejected are dropped with StopIteration.
+TEST_F(AiProtocolManagerFilterTest, TrailersDroppedAfterPayloadRejection) {
+  setRouteConfig(/*normalize=*/false);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  // Send malformed payload chunk that fails the stream.
+  Buffer::OwnedImpl bad_chunk(R"({"model" "gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(bad_chunk, false), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  // Send trailers on the dying stream.
+  Http::TestRequestTrailerMapImpl trailers;
+  EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

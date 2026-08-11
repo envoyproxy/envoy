@@ -289,29 +289,49 @@ TEST(SchemaTest, TypeMismatchRejections) {
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_THAT(Schema::string().validate(nlohmann::json::object()),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(Schema::string().validate(nlohmann::json(nullptr)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(Schema::string().validate(nlohmann::json::binary({})),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(Schema::string().validate(nlohmann::json(nlohmann::json::value_t::discarded)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
 
   // Number schema given non-number.
   EXPECT_THAT(Schema::number().validate(nlohmann::json("abc")),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(Schema::number().validate(nlohmann::json(nullptr)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  nlohmann::json ext_ref = JsonWithExtBuf::makeExternalRef(JsonWithExtBuf::ExternalRef{0, 10});
+  EXPECT_THAT(Schema::number().validate(ext_ref), StatusCodeIs(absl::StatusCode::kInvalidArgument));
 
   // Integer schema given non-integer.
   EXPECT_THAT(Schema::integer().validate(nlohmann::json(true)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(Schema::integer().validate(nlohmann::json(nullptr)),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
 
   // Boolean schema given non-boolean.
   EXPECT_THAT(Schema::boolean().validate(nlohmann::json(0)),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(Schema::boolean().validate(nlohmann::json(nullptr)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
 
   // Null schema given non-null.
   EXPECT_THAT(Schema::null().validate(nlohmann::json(false)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(Schema::null().validate(nlohmann::json("text")),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
 
   // Object schema given non-object.
   EXPECT_THAT(Schema::object({}).validate(nlohmann::json("not_an_object")),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(Schema::object({}).validate(nlohmann::json(nullptr)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
 
   // Array schema given non-array.
   EXPECT_THAT(Schema::array(Schema::string()).validate(nlohmann::json(123)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(Schema::array(Schema::string()).validate(nlohmann::json(nullptr)),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }
 
