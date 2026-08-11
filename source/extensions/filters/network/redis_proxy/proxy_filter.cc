@@ -477,6 +477,21 @@ Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data, bool) {
     callbacks_->connection().write(encoder_buffer_, false);
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
+  } catch (std::exception& e) {
+    // Defense in depth: the decoder must never let an unexpected exception escape
+    // (previously a std::invalid_argument from the inline-command hex escape parser
+    // could terminate the whole process). Treat any other exception as a protocol
+    // error and close the connection.
+    ENVOY_LOG(warn, "redis proxy: unexpected exception while decoding downstream data: {}",
+              e.what());
+    config_->stats_.downstream_cx_protocol_error_.inc();
+    Common::Redis::RespValue error;
+    error.type(Common::Redis::RespType::Error);
+    error.asString() = "downstream protocol error";
+    encoder_->encode(error, encoder_buffer_);
+    callbacks_->connection().write(encoder_buffer_, false);
+    callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    return Network::FilterStatus::StopIteration;
   }
 }
 
