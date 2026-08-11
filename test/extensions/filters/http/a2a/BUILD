@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["a2a_json_parser_test.cc"],
     deps = [
         "//source/extensions/filters/http/a2a:a2a_json_parser_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -34,6 +35,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/http/a2a:config",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

@@ -45,6 +45,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",
         "//test/mocks/init:init_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

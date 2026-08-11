@@ -85,7 +85,20 @@ UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatch
                                                                 stats_store.symbolTable());
     total_nodes_gauge_ = &stats_store.gaugeFromStatName(total_nodes_stat_name_storage.statName(),
                                                         Stats::Gauge::ImportMode::NeverImport);
+
+    cx_idle_expire_time_ = getHistogram("cx_idle_expire_time", stats_store, stat_prefix);
+    cx_upgrade_time_ = getHistogram("cx_upgrade_time", stats_store, stat_prefix);
+    cx_post_upgrade_lifetime_ = getHistogram("cx_post_upgrade_lifetime", stats_store, stat_prefix);
   }
+}
+
+Stats::Histogram* UpstreamSocketThreadLocal::getHistogram(absl::string_view name,
+                                                          Stats::Scope& stats_store,
+                                                          absl::string_view stat_prefix) {
+  std::string stat_name = fmt::format("{}.{}.{}", stat_prefix, dispatcher().name(), name);
+  Stats::StatNameManagedStorage stat_name_storage(stat_name, stats_store.symbolTable());
+  return &stats_store.histogramFromStatName(stat_name_storage.statName(),
+                                            Stats::Histogram::Unit::Milliseconds);
 }
 
 ReverseTunnelAcceptorExtension::~ReverseTunnelAcceptorExtension() {
@@ -102,7 +115,8 @@ ReverseTunnelAcceptorExtension::ReverseTunnelAcceptorExtension(
     const envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
         UpstreamReverseConnectionSocketInterface& config)
     : Envoy::Network::SocketInterfaceExtension(sock_interface), context_(context),
-      socket_interface_(&sock_interface) {
+      socket_interface_(&sock_interface),
+      max_connections_per_node_(config.max_connections_per_node()) {
   stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_acceptor");
   const uint32_t cfg_threshold = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, ping_failure_threshold, 3);
   ping_failure_threshold_ = std::max<uint32_t>(1, cfg_threshold);
@@ -186,6 +200,10 @@ void ReverseTunnelAcceptorExtension::populateLifecycleStreamInfo(
     maybeSetStringFilterState(*filter_state, kFilterStateClusterId, lifecycle.cluster_id);
     maybeSetStringFilterState(*filter_state, kFilterStateTenantId, lifecycle.tenant_id);
     maybeSetStringFilterState(*filter_state, kFilterStateWorker, lifecycle.worker);
+    maybeSetStringFilterState(*filter_state, kFilterStateInitiatorWorkerId,
+                              lifecycle.initiator_worker_id);
+    maybeSetStringFilterState(*filter_state, kFilterStateInitiatorConnectionId,
+                              lifecycle.initiator_connection_id);
     if (lifecycle.fd >= 0) {
       maybeSetUint64FilterState(*filter_state, kFilterStateFd, lifecycle.fd);
     }
@@ -197,6 +215,8 @@ void ReverseTunnelAcceptorExtension::populateLifecycleStreamInfo(
   setStringMetadataField(metadata, "cluster_id", lifecycle.cluster_id);
   setStringMetadataField(metadata, "tenant_id", lifecycle.tenant_id);
   setStringMetadataField(metadata, "worker", lifecycle.worker);
+  setStringMetadataField(metadata, "initiator_worker_id", lifecycle.initiator_worker_id);
+  setStringMetadataField(metadata, "initiator_connection_id", lifecycle.initiator_connection_id);
   setStringMetadataField(metadata, "socket_state", socketStateForEvent(event, lifecycle));
   if (!handoff_kind.empty()) {
     setStringMetadataField(metadata, "handoff_kind", handoff_kind);
@@ -245,6 +265,7 @@ void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
         if (auto* socket_manager = tls->socketManager(); socket_manager != nullptr) {
           socket_manager->setMissThreshold(ping_failure_threshold);
           socket_manager->setTenantIsolationEnabled(enable_tenant_isolation);
+          socket_manager->setMaxConnectionsPerNode(max_connections_per_node_);
         }
         return tls;
       });

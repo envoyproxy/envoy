@@ -402,6 +402,9 @@ struct DownstreamTiming {
   std::optional<MonotonicTime> lastDownstreamTxByteSent() const {
     return last_downstream_tx_byte_sent_;
   }
+  std::optional<MonotonicTime> downstreamHandshakeStart() const {
+    return downstream_handshake_start_;
+  }
   std::optional<MonotonicTime> downstreamHandshakeComplete() const {
     return downstream_handshake_complete_;
   }
@@ -430,6 +433,14 @@ struct DownstreamTiming {
     ASSERT(!last_downstream_tx_byte_sent_);
     last_downstream_tx_byte_sent_ = time_source.monotonicTime();
   }
+  void onDownstreamHandshakeStart(TimeSource& time_source) {
+    // Records the time the TLS handshake started, i.e. when the ClientHello was received.
+    // Only the first value is kept so the handshake duration is not skewed by renegotiation
+    // or resumption.
+    if (!downstream_handshake_start_) {
+      downstream_handshake_start_ = time_source.monotonicTime();
+    }
+  }
   void onDownstreamHandshakeComplete(TimeSource& time_source) {
     // An existing value can be overwritten, e.g. in resumption case.
     downstream_handshake_complete_ = time_source.monotonicTime();
@@ -446,6 +457,10 @@ struct DownstreamTiming {
     ASSERT(!downstream_connection_begin_);
     downstream_connection_begin_ = time;
   }
+  // Sets the downstream handshake start/complete time points to specific values. Used to copy the
+  // connection-level time points onto a request-level stream info for access logging.
+  void setDownstreamHandshakeStart(MonotonicTime time) { downstream_handshake_start_ = time; }
+  void setDownstreamHandshakeComplete(MonotonicTime time) { downstream_handshake_complete_ = time; }
   void onDownstreamConnectionEnd(TimeSource& time_source) {
     // Record only the first close so the connection duration is not inflated.
     if (!downstream_connection_end_) {
@@ -460,6 +475,9 @@ struct DownstreamTiming {
   std::optional<MonotonicTime> first_downstream_tx_byte_sent_;
   // The time when the last byte of the response was sent downstream.
   std::optional<MonotonicTime> last_downstream_tx_byte_sent_;
+  // The time the TLS handshake started, i.e. when the ClientHello was received. Set at
+  // connection level.
+  std::optional<MonotonicTime> downstream_handshake_start_;
   // The time the TLS handshake completed. Set at connection level.
   std::optional<MonotonicTime> downstream_handshake_complete_;
   // The time the final ack was received from the client.

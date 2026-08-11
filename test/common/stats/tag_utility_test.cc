@@ -34,7 +34,7 @@ TEST_F(TagUtilityTest, Dynamic) {
   EXPECT_EQ("prefix.name", symbol_table_.toString(joiner.tagExtractedName()));
 }
 
-// With no tags and no explicit name, the tag-aware constructor behaves like a plain
+// With no tags and no explicit name, the explicit-tags constructor behaves like a plain
 // tag_extracted_prefix + tag_extracted_name join.
 // Constructor arg order:
 // (tag_extracted_prefix, prefix_tags, prefix, tag_extracted_name, name_tags, name, symbol_table).

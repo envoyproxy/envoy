@@ -38,6 +38,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

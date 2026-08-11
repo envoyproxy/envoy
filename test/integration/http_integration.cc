@@ -46,6 +46,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 
 #include "absl/time/time.h"
 #include "base_integration_test.h"
@@ -1006,7 +1007,7 @@ void HttpIntegrationTest::testRouterRetryOnResetBeforeRequestAfterHeaders() {
   auto response = std::move(encoder_decoder.second);
   auto status = request_encoder_->encodeHeaders(headers, false);
   // Make sure we transmit headers successfully
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(status);
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   // Reset the upstream connection after the headers have been sent
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -1419,6 +1420,12 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
         hcm.mutable_max_request_headers_kb()->set_value(max_size);
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
+        // Disable route timeout to prevent 504 on slow CI (#44416).
+        auto* route = hcm.mutable_route_config()
+                          ->mutable_virtual_hosts(0)
+                          ->mutable_routes(0)
+                          ->mutable_route();
+        route->mutable_timeout()->set_seconds(0);
       });
   setMaxRequestHeadersKb(max_size);
   setMaxRequestHeadersCount(max_count);

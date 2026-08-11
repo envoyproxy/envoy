@@ -107,7 +107,8 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
 
   request->body().add(body);
   request->headers().setContentLength(body.length());
-  ENVOY_STREAM_LOG(debug, "Dispatching OAuth request for access token.", *decoder_callbacks_);
+  ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "Dispatching OAuth request for access token.");
   dispatchRequest(std::move(request));
 }
 
@@ -158,8 +159,8 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
 
   request->body().add(body);
   request->headers().setContentLength(body.length());
-  ENVOY_STREAM_LOG(debug, "Dispatching OAuth request for update access token by refresh token.",
-                   *decoder_callbacks_);
+  ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "Dispatching OAuth request for update access token by refresh token.");
   dispatchRequest(std::move(request));
 }
 
@@ -238,9 +239,10 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   const auto response_code = message->headers().Status()->value().getStringView();
 
   if (response_code != "200") {
-    ENVOY_STREAM_LOG(debug, "Oauth response code: {}", *decoder_callbacks_, response_code);
-    ENVOY_STREAM_LOG(debug, "Oauth response body: {}", *decoder_callbacks_,
-                     message->bodyAsString());
+    ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                            "Oauth response code: {}", response_code);
+    ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                            "Oauth response body: {}", message->bodyAsString());
     switch (oldState) {
     case OAuthState::PendingAccessToken:
       handleOAuthFailure(is_request_dispatched, "Failed to get access token",
@@ -317,7 +319,8 @@ void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
     return;
   }
 
-  ENVOY_STREAM_LOG(debug, "OAuth request failed.", *decoder_callbacks_);
+  ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "OAuth request failed.");
   const OAuthState oldState = state_;
   state_ = OAuthState::Idle;
 

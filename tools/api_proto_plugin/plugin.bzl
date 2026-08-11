@@ -1,5 +1,6 @@
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@com_google_protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
+load("@envoy//bazel:proto_toolchain.bzl", "get_proto_compiler", "use_proto_toolchain")
 
 # Borrowed from https://github.com/grpc/grpc-java/blob/v1.24.1/java_grpc_library.bzl#L61
 def _path_ignoring_repository(f):
@@ -91,7 +92,7 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes, 
     args.add_all(target[ProtoInfo].direct_sources)
 
     ctx.actions.run(
-        executable = ctx.executable._protoc,
+        executable = get_proto_compiler(ctx),
         arguments = [args],
         inputs = depset(transitive = inputs),
         tools = [ctx.executable._api_proto_plugin],
@@ -109,11 +110,6 @@ def api_proto_plugin_aspect(
         use_type_db = False,
         extra_inputs = []):
     _attrs = {
-        "_protoc": attr.label(
-            default = Label("@com_google_protobuf//:protoc"),
-            executable = True,
-            cfg = "exec",
-        ),
         # Handle both string labels and pre-constructed Label objects.
         # Use type comparison instead of string check for robustness.
         "_api_proto_plugin": attr.label(
@@ -137,4 +133,5 @@ def api_proto_plugin_aspect(
         attr_aspects = ["deps"],
         attrs = _attrs,
         implementation = aspect_impl,
+        toolchains = use_proto_toolchain(),
     )

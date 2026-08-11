@@ -38,6 +38,7 @@ func init() {
 		"http_struct_config":           &HttpStructConfigFactory{},
 		"list_metadata_callbacks":      &ListMetadataCallbacksConfigFactory{},
 		"log_level":                    &LogLevelConfigFactory{},
+		"generic_secret_callbacks":     &GenericSecretCallbacksConfigFactory{},
 	})
 }
 
@@ -1510,5 +1511,76 @@ func (p *LogLevelFilter) OnResponseHeaders(headers shared.HeaderMap,
 	headers.Set("x-log-level", strconv.FormatUint(uint64(p.handle.GetLogLevel()), 10))
 	headers.Set("x-log-info-enabled", strconv.FormatBool(p.handle.IsLogLevelEnabled(shared.LogLevelInfo)))
 	headers.Set("x-log-error-enabled", strconv.FormatBool(p.handle.IsLogLevelEnabled(shared.LogLevelError)))
+	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// GenericSecretCallbacks
+// -----------------------------------------------------------------------------
+
+// GenericSecretCallbacksConfigFactory subscribes to a generic secret at config load and exposes the
+// value on the response, both as read per-stream and as read from the config context during
+// initialization.
+type GenericSecretCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *GenericSecretCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	// A secret that is not configured anywhere cannot be subscribed to.
+	if id := handle.SubscribeGenericSecret("not_configured", ""); id != 0 {
+		return nil, fmt.Errorf("subscribing to an unconfigured secret unexpectedly succeeded: %d", id)
+	}
+
+	secret := handle.SubscribeGenericSecret(string(config), "")
+	if secret == 0 {
+		return nil, fmt.Errorf("failed to subscribe to the secret %q", string(config))
+	}
+
+	// The value is readable right away from the config context, since a static secret is available
+	// before any request is served.
+	value, ok := handle.GetGenericSecret(secret)
+	if !ok {
+		return nil, fmt.Errorf("failed to read the secret %q", string(config))
+	}
+	return &GenericSecretCallbacksFilterFactory{
+		secret: secret,
+		// The buffer aliases Envoy memory that is only valid for this callback, so copy it.
+		valueAtConfig: string(value.ToBytes()),
+	}, nil
+}
+
+type GenericSecretCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	secret        shared.GenericSecretID
+	valueAtConfig string
+}
+
+func (f *GenericSecretCallbacksFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &GenericSecretCallbacksFilter{
+		handle:        handle,
+		secret:        f.secret,
+		valueAtConfig: f.valueAtConfig,
+	}
+}
+
+type GenericSecretCallbacksFilter struct {
+	shared.EmptyHttpFilter
+	handle        shared.HttpFilterHandle
+	secret        shared.GenericSecretID
+	valueAtConfig string
+}
+
+func (p *GenericSecretCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	value, ok := p.handle.GetGenericSecret(p.secret)
+	assertEq(ok, true, "reading the subscribed secret")
+	headers.Set("x-secret-value", value.ToUnsafeString())
+	headers.Set("x-secret-value-at-config", p.valueAtConfig)
+
+	// An ID that was never returned by a subscription is not readable.
+	_, ok = p.handle.GetGenericSecret(shared.GenericSecretID(12345))
+	assertEq(ok, false, "reading an unknown secret ID")
+
 	return shared.HeadersStatusContinue
 }

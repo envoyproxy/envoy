@@ -11,5 +11,6 @@ Watchdog
   :glob:
   :maxdepth: 2
 
+  ../../extensions/watchdog/backtrace_action/v3/*
   ../../extensions/watchdog/profile_action/v3/*
   ../../watchdog/v3/*

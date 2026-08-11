@@ -320,8 +320,7 @@ TEST_F(ExtractionUtilTest, SingularFieldUseLastValue_EmptyLastValue) {
 
   absl::StatusOr<std::string> st = SingularFieldUseLastValue(
       "first_value", &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  EXPECT_TRUE(st.ok());
-  EXPECT_EQ(st.value(), "first_value");
+  EXPECT_THAT(st, IsOkAndHolds("first_value"));
 }
 
 TEST_F(ExtractionUtilTest, SingularFieldUseLastValue_NonEmptyLastValue) {
@@ -333,20 +332,18 @@ TEST_F(ExtractionUtilTest, SingularFieldUseLastValue_NonEmptyLastValue) {
 
   absl::StatusOr<std::string> st = SingularFieldUseLastValue(
       "", &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  EXPECT_TRUE(st.ok());
-  EXPECT_EQ(st.value(), "repeated-string-0");
+  EXPECT_THAT(st, IsOkAndHolds("repeated-string-0"));
 }
 
 TEST_F(ExtractionUtilTest, RedactStructRecursively_EmptyPath) {
   Struct message_struct = createNestedStruct({"level1", "level2"}, "value");
-  EXPECT_TRUE(RedactStructRecursively({}, {}, &message_struct).ok());
+  EXPECT_OK(RedactStructRecursively({}, {}, &message_struct));
 }
 
 TEST_F(ExtractionUtilTest, RedactStructRecursively_InvalidPath) {
   Struct message_struct = createNestedStruct({"level1", "level2"}, "value");
   std::vector<std::string> path_pieces = {"invalid", "path_end"};
-  EXPECT_TRUE(
-      RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
+  EXPECT_OK(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct));
 
   // Verify that the field "level2" has been replaced with an empty Struct
   const auto& level1_field = message_struct.fields().at("level1");
@@ -358,8 +355,7 @@ TEST_F(ExtractionUtilTest, RedactStructRecursively_InvalidPath) {
 TEST_F(ExtractionUtilTest, RedactStructRecursively_ValidPath) {
   Struct message_struct = createNestedStruct({"level1", "level2"}, "value");
   std::vector<std::string> path_pieces = {"level1", "level2"};
-  EXPECT_TRUE(
-      RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
+  EXPECT_OK(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct));
 
   // Verify that the field "level2" has been replaced with an empty Struct
   const auto& level1_field = message_struct.fields().at("level1");
@@ -371,8 +367,7 @@ TEST_F(ExtractionUtilTest, RedactStructRecursively_ValidPath) {
 TEST_F(ExtractionUtilTest, RedactStructRecursively_MissingIntermediateField) {
   Struct message_struct = createNestedStruct({"level1"}, "value");
   std::vector<std::string> path_pieces = {"level1", "level2"};
-  EXPECT_TRUE(
-      RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
+  EXPECT_OK(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct));
 
   // Verify that "level2" field is created as an empty Struct
   const auto& level1_field = message_struct.fields().at("level1");
@@ -408,8 +403,7 @@ TEST_F(ExtractionUtilTest, FindSingularLastValue_SingleStringField) {
 
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  ASSERT_TRUE(result.ok());
-  EXPECT_EQ(result.value(), "");
+  ASSERT_THAT(result, IsOkAndHolds(""));
 }
 
 TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedStringField) {
@@ -421,8 +415,7 @@ TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedStringField) {
 
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(result.value(), "repeated-string-0");
+  EXPECT_THAT(result, IsOkAndHolds("repeated-string-0"));
 }
 
 TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedMessageField) {
@@ -433,10 +426,8 @@ TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedMessageField) {
 
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  ASSERT_TRUE(result.ok());
-  EXPECT_EQ(
-      result.value(),
-      "\n\vtest-bucket\x15\xCD\xCCL?\x1A\rtest-object-1\x1A\rtest-object-2\x1A\rtest-object-3");
+  ASSERT_THAT(result, IsOkAndHolds("\n\vtest-bucket\x15\xCD\xCCL?\x1A\rtest-object-"
+                                   "1\x1A\rtest-object-2\x1A\rtest-object-3"));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_string) {

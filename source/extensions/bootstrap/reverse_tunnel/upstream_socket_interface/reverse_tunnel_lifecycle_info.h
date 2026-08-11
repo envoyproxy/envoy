@@ -21,13 +21,18 @@ struct ReverseTunnelLifecycleInfo {
   std::string tenant_id;
   Network::Address::InstanceConstSharedPtr local_address;
   Network::Address::InstanceConstSharedPtr remote_address;
+  // The acceptor's own worker (dispatcher name) that owns this socket.
   std::string worker;
+  // The initiator's worker and connection identifiers, extracted from the handshake. Empty when the
+  // initiator did not advertise them. Distinct from ``worker`` above, which is the acceptor's.
+  std::string initiator_worker_id;
+  std::string initiator_connection_id;
   int fd{-1};
   bool handed_off_to_upstream{false};
   bool upstream_lifecycle_filter_attached{false};
   bool socket_dead_notified{false};
   bool close_log_emitted{false};
-  std::string close_reason;
+  std::string close_reason{};
 };
 
 inline constexpr absl::string_view kAccessLogMetadataNamespace = "envoy.reverse_tunnel.lifecycle";
@@ -37,6 +42,10 @@ inline constexpr absl::string_view kFilterStateClusterId = "envoy.reverse_tunnel
 inline constexpr absl::string_view kFilterStateTenantId = "envoy.reverse_tunnel.tenant_id";
 inline constexpr absl::string_view kFilterStateWorker = "envoy.reverse_tunnel.worker";
 inline constexpr absl::string_view kFilterStateFd = "envoy.reverse_tunnel.fd";
+inline constexpr absl::string_view kFilterStateInitiatorWorkerId =
+    "envoy.reverse_tunnel.initiator_worker_id";
+inline constexpr absl::string_view kFilterStateInitiatorConnectionId =
+    "envoy.reverse_tunnel.initiator_connection_id";
 
 inline constexpr absl::string_view kLifecycleEventTunnelSetup = "tunnel_setup";
 inline constexpr absl::string_view kLifecycleEventIdlePingSent = "idle_ping_sent";

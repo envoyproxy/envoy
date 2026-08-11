@@ -361,7 +361,7 @@ public:
 /** A macro to create `Get<JavaType>ArrayElement` function. */
 #define DECLARE_GET_ARRAY_ELEMENTS(JAVA_TYPE, JNI_ARRAY_TYPE, JNI_ELEMENT_TYPE)                    \
   [[nodiscard]] ArrayElementsUniquePtr<JNI_ARRAY_TYPE, JNI_ELEMENT_TYPE>                           \
-      get##JAVA_TYPE##ArrayElements(JNI_ARRAY_TYPE array, jboolean* is_copy);
+  get##JAVA_TYPE##ArrayElements(JNI_ARRAY_TYPE array, jboolean* is_copy);
 
   /**
    * Helper functions for `Get<JavaType>ArrayElements`.

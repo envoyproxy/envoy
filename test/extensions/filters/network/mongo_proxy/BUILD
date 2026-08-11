@@ -33,6 +33,7 @@ envoy_extension_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/extensions/filters/network/mongo_proxy:bson_lib",
         "//source/extensions/filters/network/mongo_proxy:codec_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 

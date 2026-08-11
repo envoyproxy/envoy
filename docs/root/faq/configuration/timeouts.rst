@@ -173,9 +173,9 @@ stream timeouts already introduced above.
 Scaled timeouts
 ^^^^^^^^^^^^^^^
 
-In situations where envoy is under high load, Envoy can dynamically configure timeouts using scaled timeouts.
+In situations where Envoy is under high load, Envoy can dynamically configure timeouts using scaled timeouts.
 Envoy supports scaled timeouts through the :ref:`Overload Manager <envoy_v3_api_msg_config.overload.v3.OverloadManager>`, configured
-in envoy :ref:`bootstrap configuration <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.overload_manager>`.
+in Envoy :ref:`bootstrap configuration <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.overload_manager>`.
 Using a :ref:`reduce timeouts <config_overload_manager_reducing_timeouts>` overload action,
 the Overload Manager can be configured to monitor :ref:`resources <envoy_v3_api_msg_config.overload.v3.ResourceMonitor>`
 and scale timeouts accordingly. For example, a common use case may be to monitor the Envoy :ref:`heap size <envoy_v3_api_msg_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig>`

@@ -50,6 +50,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",

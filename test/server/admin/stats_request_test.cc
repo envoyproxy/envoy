@@ -217,5 +217,30 @@ TEST_F(StatsRequestTest, OneStatPrometheus) {
                    "reached Prometheus case in switch unexpectedly");
 }
 
+TEST_F(StatsRequestTest, ShouldShowMetric) {
+  store_.rootScope()->counterFromStatName(makeStatName("foo"));
+  store_.rootScope()->counterFromStatName(makeStatName("bar"));
+  Buffer::OwnedImpl resp;
+
+  {
+    StatsParams params;
+    params.parse("?filter=foo&format=text", resp);
+    StatsRequest request(store_, params, endpoints_helper_.cm_);
+    EXPECT_EQ("foo: 0\n", response(request));
+  }
+  {
+    StatsParams params;
+    params.parse("?filter=foo&invert_filter&format=text", resp);
+    StatsRequest request(store_, params, endpoints_helper_.cm_);
+    EXPECT_EQ("bar: 0\n", response(request));
+  }
+  {
+    StatsParams params;
+    params.parse("?format=text", resp);
+    StatsRequest request(store_, params, endpoints_helper_.cm_);
+    EXPECT_EQ("bar: 0\nfoo: 0\n", response(request));
+  }
+}
+
 } // namespace Server
 } // namespace Envoy

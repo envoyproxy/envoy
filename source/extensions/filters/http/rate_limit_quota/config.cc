@@ -27,7 +27,8 @@ namespace RateLimitQuota {
 
 using TlsStore = GlobalTlsStores::TlsStore;
 
-Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+RateLimitQuotaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig&
         filter_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
@@ -51,7 +52,7 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
     matcher = matcher_factory.create(config->bucket_matchers())();
   }
   if (!visitor.errors().empty()) {
-    throw EnvoyException(absl::StrJoin(visitor.errors(), "\n"));
+    return absl::InvalidArgumentError(absl::StrJoin(visitor.errors(), "\n"));
   }
 
   std::string rlqs_server_target = config->rlqs_server().has_envoy_grpc()
@@ -59,8 +60,10 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
                                        : config->rlqs_server().google_grpc().target_uri();
 
   // Get the TLS store from the global map, or create one if it doesn't exist.
-  std::shared_ptr<TlsStore> tls_store = GlobalTlsStores::getTlsStore(
-      config_with_hash_key, context, rlqs_server_target, filter_config.domain());
+  auto tls_store_or = GlobalTlsStores::getTlsStore(config_with_hash_key, context,
+                                                   rlqs_server_target, filter_config.domain());
+  RETURN_IF_NOT_OK_REF(tls_store_or.status());
+  std::shared_ptr<TlsStore> tls_store = std::move(tls_store_or.value());
 
   return [&, config = std::move(config), config_with_hash_key, tls_store = std::move(tls_store),
           matcher = std::move(matcher)](Http::FilterChainFactoryCallbacks& callbacks) -> void {

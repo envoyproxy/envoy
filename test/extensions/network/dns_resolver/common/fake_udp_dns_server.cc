@@ -26,25 +26,25 @@ FakeUdpDnsServer::FakeUdpDnsServer(bool ipv6) {
   RELEASE_ASSERT(fcntl(fd_, F_SETFL, flags | O_NONBLOCK) == 0, "fcntl F_SETFL failed.");
 
   if (ipv6) {
-    struct sockaddr_in6 addr {};
+    struct sockaddr_in6 addr{};
     addr.sin6_family = AF_INET6;
     addr.sin6_addr = in6addr_loopback;
     RELEASE_ASSERT(bind(fd_, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0,
                    "Failed to bind IPv6 UDP socket.");
 
-    struct sockaddr_in6 bound {};
+    struct sockaddr_in6 bound{};
     socklen_t len = sizeof(bound);
     getsockname(fd_, reinterpret_cast<struct sockaddr*>(&bound), &len);
     port_ = ntohs(bound.sin6_port);
     address_ = "::1";
   } else {
-    struct sockaddr_in addr {};
+    struct sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     RELEASE_ASSERT(bind(fd_, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0,
                    "Failed to bind IPv4 UDP socket.");
 
-    struct sockaddr_in bound {};
+    struct sockaddr_in bound{};
     socklen_t len = sizeof(bound);
     getsockname(fd_, reinterpret_cast<struct sockaddr*>(&bound), &len);
     port_ = ntohs(bound.sin_port);
@@ -81,8 +81,8 @@ void FakeUdpDnsServer::stop() {
 
 void FakeUdpDnsServer::serve() {
   uint8_t buf[512];
-  struct sockaddr_storage client_addr {};
-  struct pollfd pfd {};
+  struct sockaddr_storage client_addr{};
+  struct pollfd pfd{};
   pfd.fd = fd_;
   pfd.events = POLLIN;
 
@@ -216,12 +216,12 @@ std::vector<uint8_t> FakeUdpDnsServer::buildResponse(const uint8_t* query, size_
 
     // `RDATA`.
     if (qtype == kDnsTypeA) {
-      struct in_addr addr {};
+      struct in_addr addr{};
       inet_pton(AF_INET, record->address.c_str(), &addr);
       const auto* bytes = reinterpret_cast<const uint8_t*>(&addr);
       resp.insert(resp.end(), bytes, bytes + 4);
     } else {
-      struct in6_addr addr6 {};
+      struct in6_addr addr6{};
       inet_pton(AF_INET6, record->address.c_str(), &addr6);
       const auto* bytes = reinterpret_cast<const uint8_t*>(&addr6);
       resp.insert(resp.end(), bytes, bytes + 16);

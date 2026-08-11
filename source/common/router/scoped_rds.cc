@@ -55,14 +55,16 @@ ConfigProviderPtr create(
             ProtobufTypes::ConstMessagePtrVector>(scoped_route_list.scoped_route_configurations()),
         factory_context,
         ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
-                                                config.scoped_routes().rds_config_source()));
+                                                config.scoped_routes().rds_config_source(),
+                                                init_manager));
   }
   case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ConfigSpecifierCase::kScopedRds:
     return scoped_routes_config_provider_manager.createXdsConfigProvider(
         config.scoped_routes().scoped_rds(), factory_context, init_manager, stat_prefix,
         ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
-                                                config.scoped_routes().rds_config_source()));
+                                                config.scoped_routes().rds_config_source(),
+                                                init_manager));
   case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ConfigSpecifierCase::CONFIG_SPECIFIER_NOT_SET:
     PANIC("not implemented");
@@ -87,6 +89,7 @@ namespace {
 std::vector<ScopedRouteInfoConstSharedPtr>
 makeScopedRouteInfos(ProtobufTypes::ConstMessagePtrVector&& config_protos,
                      Server::Configuration::ServerFactoryContext& factory_context,
+                     Init::Manager& init_manager,
                      ScopedRoutesConfigProviderManager& config_provider_manager) {
   std::vector<ScopedRouteInfoConstSharedPtr> scopes;
   for (std::unique_ptr<const Protobuf::Message>& config_proto : config_protos) {
@@ -104,7 +107,7 @@ makeScopedRouteInfos(ProtobufTypes::ConstMessagePtrVector&& config_protos,
     }
     RouteConfigProviderPtr route_config_provider =
         config_provider_manager.routeConfigProviderManager().createStaticRouteConfigProvider(
-            scoped_route_config.route_configuration(), factory_context,
+            scoped_route_config.route_configuration(), factory_context, init_manager,
             factory_context.messageValidationContext().staticValidationVisitor());
     scopes.push_back(std::make_shared<const ScopedRouteInfo>(std::move(scoped_route_config),
                                                              route_config_provider->configCast()));
@@ -117,15 +120,15 @@ makeScopedRouteInfos(ProtobufTypes::ConstMessagePtrVector&& config_protos,
 
 InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
     ProtobufTypes::ConstMessagePtrVector&& config_protos, std::string name,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
     ScopedRoutesConfigProviderManager& config_provider_manager,
     envoy::config::core::v3::ConfigSource rds_config_source)
     : Envoy::Config::ImmutableConfigProviderBase(factory_context, config_provider_manager,
                                                  ConfigProviderInstanceType::Inline,
                                                  ConfigProvider::ApiType::Delta),
       name_(std::move(name)),
-      scopes_(
-          makeScopedRouteInfos(std::move(config_protos), factory_context, config_provider_manager)),
+      scopes_(makeScopedRouteInfos(std::move(config_protos), factory_context, init_manager,
+                                   config_provider_manager)),
       config_(std::make_shared<ScopedConfigImpl>(scopes_)),
       rds_config_source_(std::move(rds_config_source)) {}
 
@@ -296,7 +299,7 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
     if (scoped_route_config.has_route_configuration()) {
       RouteConfigProviderPtr route_config_provider =
           route_config_provider_manager_.createStaticRouteConfigProvider(
-              scoped_route_config.route_configuration(), factory_context_,
+              scoped_route_config.route_configuration(), factory_context_, init_manager,
               factory_context_.messageValidationContext().staticValidationVisitor());
       scoped_route_info = std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config),
                                                             route_config_provider->configCast());
@@ -678,8 +681,8 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createStaticConfigProvider(
     const ConfigProviderManager::OptionalArg& optarg) {
   const auto& typed_optarg = static_cast<const ScopedRoutesConfigProviderManagerOptArg&>(optarg);
   return std::make_unique<InlineScopedRoutesConfigProvider>(
-      std::move(config_protos), typed_optarg.scoped_routes_name_, factory_context, *this,
-      typed_optarg.rds_config_source_);
+      std::move(config_protos), typed_optarg.scoped_routes_name_, factory_context,
+      typed_optarg.init_manager_, *this, typed_optarg.rds_config_source_);
 }
 
 REGISTER_FACTORY(SrdsFactoryDefault, SrdsFactory);

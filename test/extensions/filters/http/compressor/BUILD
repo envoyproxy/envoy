@@ -56,6 +56,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/compression/brotli/compressor/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/compression/gzip/compressor/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
     ],
 )
 
@@ -75,9 +76,11 @@ envoy_extension_cc_test(
         ":mock_config_cc_proto",
         "//source/extensions/compression/common/compressor:compressor_factory_base_lib",
         "//source/extensions/filters/http/compressor:config",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

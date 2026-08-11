@@ -19,6 +19,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 
@@ -88,12 +89,12 @@ class DynamicModuleNetworkFilterAbiCallbackTest : public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
-    EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
-    EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    EXPECT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
     // Re-open stat creation so tests can call `define_*` from the test thread.
     filter_config_->stat_creation_frozen_ = false;
@@ -1671,12 +1672,12 @@ class DynamicModuleNetworkFilterHttpCalloutTest : public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
-    EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
-    EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    EXPECT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
     // Re-open stat creation so tests can call `define_*` from the test thread.
     filter_config_->stat_creation_frozen_ = false;

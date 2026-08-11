@@ -13,11 +13,15 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
 using testing::InvokeWithoutArgs;
+using ::testing::Not;
 using testing::Return;
 using testing::StartsWith;
 
@@ -511,7 +515,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, InvalidSource) {
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
-  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status, Not(IsOk()));
   EXPECT_FALSE(provider->getCredentials().certificateChainDerB64().has_value());
 }
 
@@ -527,7 +531,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, InvalidPath) {
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
-  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status, Not(IsOk()));
   EXPECT_FALSE(provider->getCredentials().certificateChainDerB64().has_value());
 }
 
@@ -551,7 +555,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, PrivateKeyInvalidPath) {
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
-  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status, Not(IsOk()));
   EXPECT_FALSE(provider->getCredentials().certificatePrivateKey().has_value());
 }
 
@@ -618,7 +622,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, UnsupportedAlgorithm) {
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   auto credentials = provider->getCredentials();
 
   EXPECT_FALSE(credentials.certificateDerB64().has_value());
@@ -656,7 +660,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, MissingSerial) {
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   auto credentials = provider->getCredentials();
 
   EXPECT_FALSE(credentials.certificateDerB64().has_value());
@@ -683,7 +687,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadChainFailed) {
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
-  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status, Not(IsOk()));
 }
 
 TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadPrivateKeyFailed) {
@@ -708,7 +712,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadPrivateKeyFailed) {
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
-  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status, Not(IsOk()));
 }
 
 TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
@@ -741,7 +745,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, std::nullopt);
   auto status = provider->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   auto credentials = provider->getCredentials();
 
   EXPECT_TRUE(credentials.certificateDerB64().has_value());
@@ -792,7 +796,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   status = provider->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 
   credentials = provider->getCredentials();
 
@@ -851,7 +855,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   status = provider->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   credentials = provider->getCredentials();
 
   EXPECT_TRUE(credentials.certificateDerB64().has_value());
@@ -898,7 +902,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   status = provider->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   credentials = provider->getCredentials();
 
   EXPECT_TRUE(credentials.certificateDerB64().has_value());
@@ -947,7 +951,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   status = provider->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   credentials = provider->getCredentials();
 
   EXPECT_TRUE(credentials.certificateDerB64().has_value());
@@ -980,8 +984,7 @@ TEST(EmptyPem, PemToAlgorithmSerialExpiration) {
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration("", algorithm, serial, time);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "Invalid certificate size");
+  EXPECT_THAT(status, HasStatusMessage("Invalid certificate size"));
 }
 
 TEST(ExpiredPem, PemToAlgorithmSerialExpiration) {
@@ -999,8 +1002,7 @@ TEST(ExpiredPem, PemToAlgorithmSerialExpiration) {
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status =
       provider_friend.pemToAlgorithmSerialExpiration(expired_cert, algorithm, serial, time);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "Certificate has already expired");
+  EXPECT_THAT(status, HasStatusMessage("Certificate has already expired"));
 }
 
 TEST(PemTooLarge, PemToAlgorithmSerialExpiration) {
@@ -1019,8 +1021,7 @@ TEST(PemTooLarge, PemToAlgorithmSerialExpiration) {
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(large_cert, algorithm, serial, time);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "Invalid certificate size");
+  EXPECT_THAT(status, HasStatusMessage("Invalid certificate size"));
 }
 
 TEST(JunkPem, PemToAlgorithmSerialExpiration) {
@@ -1039,8 +1040,7 @@ TEST(JunkPem, PemToAlgorithmSerialExpiration) {
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(junk_pem, algorithm, serial, time);
-  EXPECT_FALSE(status.ok());
-  EXPECT_THAT(status.message(), StartsWith("Invalid certificate - PEM read x509 failed"));
+  EXPECT_THAT(status, HasStatusMessage(StartsWith("Invalid certificate - PEM read x509 failed")));
 }
 
 TEST(ValidPemWithAppendedJunk, PemToAlgorithmSerialExpiration) {
@@ -1061,7 +1061,7 @@ TEST(ValidPemWithAppendedJunk, PemToAlgorithmSerialExpiration) {
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(junk_pem, algorithm, serial, time);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_EQ(serial, "131827979019394590882466519576505238184");
   EXPECT_EQ(algorithm, X509Credentials::PublicKeySignatureAlgorithm::RSA);
   EXPECT_EQ(time, SystemTime(std::chrono::seconds(8070142567)));
@@ -1081,8 +1081,7 @@ TEST(JunkPem, PemToDerB64) {
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, false);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "No certificates found in PEM data");
+  EXPECT_THAT(status, HasStatusMessage("No certificates found in PEM data"));
 }
 
 TEST(JunkPemChain, PemToDerB64) {
@@ -1099,8 +1098,7 @@ TEST(JunkPemChain, PemToDerB64) {
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, true);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "No certificates found in PEM data");
+  EXPECT_THAT(status, HasStatusMessage("No certificates found in PEM data"));
 }
 
 TEST(JunkCertStartLine, PemToDerB64) {
@@ -1118,8 +1116,7 @@ TEST(JunkCertStartLine, PemToDerB64) {
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, false);
-  EXPECT_FALSE(status.ok());
-  EXPECT_THAT(status.message(), StartsWith("Certificate could not be parsed"));
+  EXPECT_THAT(status, HasStatusMessage(StartsWith("Certificate could not be parsed")));
 }
 
 TEST(JunkChainStartLine, PemToDerB64) {
@@ -1138,8 +1135,7 @@ TEST(JunkChainStartLine, PemToDerB64) {
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, true);
-  EXPECT_FALSE(status.ok());
-  EXPECT_THAT(status.message(), StartsWith("Certificate chain PEM #0 could not be parsed"));
+  EXPECT_THAT(status, HasStatusMessage(StartsWith("Certificate chain PEM #0 could not be parsed")));
 }
 
 TEST(SingleCertTooLarge, PemToDerB64) {
@@ -1156,8 +1152,7 @@ TEST(SingleCertTooLarge, PemToDerB64) {
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, false);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "Invalid certificate size");
+  EXPECT_THAT(status, HasStatusMessage("Invalid certificate size"));
 }
 
 TEST(ChainTooLarge, PemToDerB64) {
@@ -1175,8 +1170,7 @@ TEST(ChainTooLarge, PemToDerB64) {
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_chain, out_chain, true);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "Invalid certificate chain size");
+  EXPECT_THAT(status, HasStatusMessage("Invalid certificate chain size"));
 }
 
 TEST(ChainParse, PemToDerB64) {
@@ -1215,10 +1209,10 @@ TEST(ChainParse, PemToDerB64) {
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context, certificate_data_source, private_key_data_source, std::nullopt);
   auto status = provider->initialize();
-  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status, Not(IsOk()));
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   status = provider_friend.pemToDerB64(chain, out_chain, true);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_EQ(out_chain, converted_pem);
 }
 
@@ -1240,7 +1234,7 @@ TEST(Refresh, InvalidChainInsideRefresh) {
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto a = provider_friend.getCredentials();
   EXPECT_FALSE(provider_friend.getCredentials().certificateChainDerB64().has_value());
@@ -1262,7 +1256,7 @@ TEST(Refresh, InvalidKeyInsideRefresh) {
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto a = provider_friend.getCredentials();
   EXPECT_FALSE(provider_friend.getCredentials().certificatePrivateKey().has_value());
@@ -1283,7 +1277,7 @@ TEST(NeedsRefresh, ExpirationTimeInPast) {
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
 

@@ -35,6 +35,20 @@ public:
    */
   virtual std::string format(const Context& context,
                              const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * Append the formatted substitution line to the given sink. Callers that format repeatedly
+   * can hand in a reused buffer and avoid the allocation that format() performs on every call.
+   * Implementations that build the line incrementally should override this; the default simply
+   * appends the result of format().
+   * @param sink supplies the string the substitution line is appended to.
+   * @param context supplies the formatter context.
+   * @param stream_info supplies the stream info.
+   */
+  virtual void formatTo(std::string& sink, const Context& context,
+                        const StreamInfo::StreamInfo& stream_info) const {
+    sink.append(format(context, stream_info));
+  }
 };
 
 using FormatterPtr = std::unique_ptr<Formatter>;
@@ -56,6 +70,26 @@ public:
    */
   virtual std::optional<std::string> format(const Context& context,
                                             const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * Append the extracted value to the given sink. This is the allocation-free counterpart of
+   * format() and should be overridden by providers that can write their value directly into the
+   * sink. The default implementation appends the result of format().
+   * @param sink supplies the string the value is appended to. It is left unmodified if no value
+   *        is extracted.
+   * @param context supplies the formatter context.
+   * @param stream_info supplies the stream info.
+   * @return bool true if a value was extracted and appended to the sink.
+   */
+  virtual bool formatTo(std::string& sink, const Context& context,
+                        const StreamInfo::StreamInfo& stream_info) const {
+    const std::optional<std::string> value = format(context, stream_info);
+    if (!value.has_value()) {
+      return false;
+    }
+    sink.append(*value);
+    return true;
+  }
 
   /**
    * Format the value with the given context and stream info.

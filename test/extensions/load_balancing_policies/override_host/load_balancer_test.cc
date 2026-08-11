@@ -20,6 +20,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -62,7 +63,7 @@ protected:
         factory_.create(*lb_config_, *cluster_info_, main_thread_priority_set_,
                         server_factory_context_.runtime_loader_,
                         server_factory_context_.api_.random_, server_factory_context_.time_system_);
-    ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+    ASSERT_OK(thread_aware_lb_->initialize());
     thread_local_lb_factory_ = thread_aware_lb_->factory();
     load_balancer_ = thread_local_lb_factory_->create(lb_params_);
   }

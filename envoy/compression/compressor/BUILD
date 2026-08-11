@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["compressor.h"],
     deps = [
         "//envoy/buffer:buffer_interface",
+        "//envoy/common:pure_lib",
     ],
 )
 
@@ -21,6 +22,7 @@ envoy_cc_library(
     hdrs = ["factory.h"],
     deps = [
         ":compressor_interface",
+        "//envoy/common:pure_lib",
     ],
 )
 
@@ -30,6 +32,7 @@ envoy_cc_library(
     deps = [
         ":compressor_factory_interface",
         "//envoy/config:typed_config_interface",
-        "//envoy/server:filter_config_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/protobuf",
     ],
 )

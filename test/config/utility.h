@@ -225,6 +225,10 @@ public:
   static std::string smallBufferFilter();
   // A string for a health check filter which can be used with prependFilter()
   static std::string defaultHealthCheckFilter();
+  // A string for a basic body size limit filter, which can be used with prependFilter()
+  static std::string defaultBodySizeLimitFilter();
+  // A string for a small body size limit filter, which can be used with prependFilter()
+  static std::string smallBodySizeLimitFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
   // A cluster that uses the startTls transport socket.

@@ -16,6 +16,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -169,8 +170,7 @@ TEST_F(LedsTest, OnConfigUpdateSuccess) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::LbEndpoint>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  EXPECT_TRUE(
-      leds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "").ok());
+  EXPECT_OK(leds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, ""));
   EXPECT_EQ(1UL, callbacks_called_counter_);
   EXPECT_TRUE(leds_subscription_->isUpdated());
   const auto& all_endpoints_map = leds_subscription_->getEndpointsMap();
@@ -183,14 +183,14 @@ TEST_F(LedsTest, OnConfigUpdateEmpty) {
   initialize();
   EXPECT_FALSE(leds_subscription_->isUpdated());
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  EXPECT_TRUE(leds_callbacks_->onConfigUpdate({}, removed_resources, "").ok());
+  EXPECT_OK(leds_callbacks_->onConfigUpdate({}, removed_resources, ""));
   EXPECT_EQ(1UL, stats_.counter("cluster.xds_cluster.leds.update_empty").value());
   // Verify that the callback was called even after an empty update.
   EXPECT_EQ(1UL, callbacks_called_counter_);
   EXPECT_TRUE(leds_subscription_->isUpdated());
 
   // Verify that the second time an empty update arrives, the callback isn't called.
-  EXPECT_TRUE(leds_callbacks_->onConfigUpdate({}, removed_resources, "").ok());
+  EXPECT_OK(leds_callbacks_->onConfigUpdate({}, removed_resources, ""));
   EXPECT_EQ(2UL, stats_.counter("cluster.xds_cluster.leds.update_empty").value());
   EXPECT_EQ(1UL, callbacks_called_counter_);
 }
@@ -218,8 +218,7 @@ TEST_F(LedsTest, OnConfigUpdateFailedEndpoints) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::LbEndpoint>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  EXPECT_TRUE(
-      leds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "").ok());
+  EXPECT_OK(leds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, ""));
   EXPECT_EQ(1UL, callbacks_called_counter_);
 
   // Verify there's an endpoint.
@@ -254,8 +253,7 @@ TEST_F(LedsTest, UpdateEndpoint) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::LbEndpoint>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  EXPECT_TRUE(
-      leds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "").ok());
+  EXPECT_OK(leds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, ""));
   EXPECT_EQ(1UL, callbacks_called_counter_);
   EXPECT_TRUE(leds_subscription_->isUpdated());
   const auto& all_endpoints_map = leds_subscription_->getEndpointsMap();
@@ -268,9 +266,8 @@ TEST_F(LedsTest, UpdateEndpoint) {
   const auto& updated_resources = buildAddedResources({lb_endpoint1_update}, {lb_endpoint1_name});
   const auto decoded_resources_update =
       TestUtility::decodeResources<envoy::config::endpoint::v3::LbEndpoint>(updated_resources);
-  EXPECT_TRUE(
-      leds_callbacks_->onConfigUpdate(decoded_resources_update.refvec_, removed_resources, "")
-          .ok());
+  EXPECT_OK(
+      leds_callbacks_->onConfigUpdate(decoded_resources_update.refvec_, removed_resources, ""));
   EXPECT_EQ(2UL, callbacks_called_counter_);
   EXPECT_TRUE(leds_subscription_->isUpdated());
   const auto& all_endpoints_update = leds_subscription_->getEndpointsMap();
@@ -294,8 +291,7 @@ TEST_F(LedsTest, RemoveEndpoint) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::endpoint::v3::LbEndpoint>(added_resources);
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
-  EXPECT_TRUE(
-      leds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "").ok());
+  EXPECT_OK(leds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, ""));
   EXPECT_EQ(1UL, callbacks_called_counter_);
   EXPECT_TRUE(leds_subscription_->isUpdated());
   const auto& all_endpoints_map = leds_subscription_->getEndpointsMap();
@@ -305,7 +301,7 @@ TEST_F(LedsTest, RemoveEndpoint) {
 
   // Remove the first endpoint.
   const auto& removed_resources_update = buildRemovedResources({lb_endpoint1_name});
-  EXPECT_TRUE(leds_callbacks_->onConfigUpdate({}, removed_resources_update, "").ok());
+  EXPECT_OK(leds_callbacks_->onConfigUpdate({}, removed_resources_update, ""));
   EXPECT_EQ(2UL, callbacks_called_counter_);
   EXPECT_TRUE(leds_subscription_->isUpdated());
   const auto& all_endpoints_update = leds_subscription_->getEndpointsMap();

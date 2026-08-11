@@ -6,6 +6,7 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -147,7 +148,7 @@ public:
     auto accepted = filter_->onAccept(cb_);
     EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
     while (!got_continue) {
-      ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+      ASSERT_OK(file_event_callback_(Event::FileReadyType::Read));
       auto status = filter_->onData(*buffer_);
       if (status == Network::FilterStatus::Continue) {
         got_continue = true;
@@ -224,7 +225,7 @@ public:
     auto accepted = filter_->onAccept(cb_);
     EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
     while (!got_continue) {
-      ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+      ASSERT_OK(file_event_callback_(Event::FileReadyType::Read));
       auto status = filter_->onData(*buffer_);
       if (status == Network::FilterStatus::Continue) {
         got_continue = true;
@@ -288,7 +289,7 @@ public:
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
     auto accepted = filter_->onAccept(cb_);
     EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
-    ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+    ASSERT_OK(file_event_callback_(Event::FileReadyType::Read));
     auto status = filter_->onData(*buffer_);
     EXPECT_EQ(status, Network::FilterStatus::Continue);
     if (alpn == Http::Utility::AlpnNames::get().Http11) {
@@ -347,7 +348,7 @@ public:
     EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
     auto accepted = filter_->onAccept(cb_);
     EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
-    ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+    ASSERT_OK(file_event_callback_(Event::FileReadyType::Read));
     auto status = filter_->onData(*buffer_);
     EXPECT_EQ(status, Network::FilterStatus::Continue);
     EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
@@ -552,7 +553,7 @@ TEST_P(HttpInspectorTest, InvalidConnectionPreface) {
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
-  ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto status = filter_->onData(*buffer_);
   EXPECT_EQ(status, Network::FilterStatus::StopIteration);
   EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
@@ -667,7 +668,7 @@ TEST_P(HttpInspectorTest, Http1WithLargeRequestLine) {
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
   while (!got_continue) {
-    ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+    ASSERT_OK(file_event_callback_(Event::FileReadyType::Read));
     auto status = filter_->onData(*buffer_);
     if (status == Network::FilterStatus::Continue) {
       got_continue = true;
@@ -721,7 +722,7 @@ TEST_P(HttpInspectorTest, Http1WithLargeHeader) {
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
   while (!got_continue) {
-    ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+    ASSERT_OK(file_event_callback_(Event::FileReadyType::Read));
     auto status = filter_->onData(*buffer_);
     if (status == Network::FilterStatus::Continue) {
       got_continue = true;
@@ -748,7 +749,7 @@ TEST_P(HttpInspectorTest, HttpExceedMaxBufferSize) {
             return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
           }));
 
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
@@ -777,7 +778,7 @@ TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
             memcpy(buffer, data.data(), amount_to_copy);
             return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
           }));
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
@@ -794,7 +795,7 @@ TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
             memcpy(buffer, data.data(), amount_to_copy);
             return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
           }));
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   status = filter_->onData(*buffer_);
   EXPECT_EQ(status, Network::FilterStatus::StopIteration);
@@ -809,7 +810,7 @@ TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
             memcpy(buffer, data.data(), amount_to_copy);
             return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
           }));
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));

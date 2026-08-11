@@ -18,6 +18,31 @@ namespace {
 using testing::NiceMock;
 using testing::ReturnRef;
 
+// A minimal command parser that resolves the "%FAKE_COMMAND%" token to a fixed value, used to
+// verify that configured formatter command parsers are threaded into custom_tags creation.
+class FakeCommandParser : public Formatter::CommandParser {
+public:
+  class Provider : public Formatter::FormatterProvider {
+  public:
+    std::optional<std::string> format(const Formatter::Context&,
+                                      const StreamInfo::StreamInfo&) const override {
+      return "fake_value";
+    }
+    Protobuf::Value formatValue(const Formatter::Context&,
+                                const StreamInfo::StreamInfo&) const override {
+      return ValueUtil::stringValue("fake_value");
+    }
+  };
+
+  absl::StatusOr<Formatter::FormatterProviderPtr>
+  parse(absl::string_view command, absl::string_view, std::optional<size_t>) const override {
+    if (command == "FAKE_COMMAND") {
+      return std::make_unique<Provider>();
+    }
+    return {nullptr};
+  }
+};
+
 const std::string kTestZone = "test_zone";
 const std::string kTestCluster = "test_cluster";
 const std::string kTestNode = "test_node";
@@ -340,6 +365,33 @@ TEST(OtlpLogUtilsTest, AddCustomTagsToAttributesWithLiteralTags) {
   auto* attr = expected.add_attributes();
   attr->set_key("literal_tag");
   attr->mutable_value()->set_string_value("literal_value");
+
+  EXPECT_TRUE(TestUtility::protoEqual(log_entry, expected));
+}
+
+// Verifies that configured formatter command parsers are used when creating custom tags, so a
+// custom tag whose value uses a formatter extension command resolves (#45453).
+TEST(OtlpLogUtilsTest, CustomTagsUseConfiguredFormatters) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  auto* tag = config.add_custom_tags();
+  tag->set_tag("fmt_tag");
+  tag->set_value("%FAKE_COMMAND%");
+
+  std::vector<Formatter::CommandParserPtr> commands;
+  commands.push_back(std::make_unique<FakeCommandParser>());
+  auto custom_tags = getCustomTags(config, commands);
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  Formatter::Context context(&request_headers);
+  addCustomTagsToAttributes(custom_tags, context, stream_info, log_entry);
+
+  opentelemetry::proto::logs::v1::LogRecord expected;
+  auto* attr = expected.add_attributes();
+  attr->set_key("fmt_tag");
+  attr->mutable_value()->set_string_value("fake_value");
 
   EXPECT_TRUE(TestUtility::protoEqual(log_entry, expected));
 }

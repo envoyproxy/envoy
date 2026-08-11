@@ -13,5 +13,6 @@ envoy_cc_test(
     srcs = ["wuffs_json_cursor_test.cc"],
     deps = [
         "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )

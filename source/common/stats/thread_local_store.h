@@ -167,7 +167,7 @@ public:
   static const char IterateScopeSync[];
   static const char MainDispatcherCleanupSync[];
 
-  ThreadLocalStoreImpl(Allocator& alloc, bool use_tag_scope = false);
+  explicit ThreadLocalStoreImpl(Allocator& alloc);
   ~ThreadLocalStoreImpl() override;
   // Stats::Store
   NullCounterImpl& nullCounter() override { return null_counter_; }
@@ -202,6 +202,15 @@ public:
   }
   void setStatsMatcher(StatsMatcherPtr&& stats_matcher) override;
   void setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) override;
+  // Enables/disables the explicit-tags logic store-wide. This should be called before
+  // any scope that with non-empty prefix is created.
+  void setUseExplicitTags(bool use_explicit_tags) override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    use_explicit_tags_ = use_explicit_tags;
+  }
+  // Whether the store is using the explicit-tags logic. Exposed primarily so tests can verify the
+  // value selected during server initialization.
+  bool useExplicitTags() const { return use_explicit_tags_; }
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
@@ -291,6 +300,12 @@ private:
 
   struct ScopeImpl : public Scope {
     ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable,
+              const ScopeStatsLimitSettings& limits = {},
+              StatsMatcherSharedPtr scope_matcher = nullptr);
+    // Explicit-tags constructor. Used when the store is in explicit-tags mode
+    // (use_explicit_tags_ == true).
+    ScopeImpl(StatName base_name, StatNameTagSpan name_tags, StatName tagged_name,
+              ThreadLocalStoreImpl& parent, bool evictable,
               const ScopeStatsLimitSettings& limits = {},
               StatsMatcherSharedPtr scope_matcher = nullptr);
     ~ScopeImpl() override;
@@ -452,7 +467,7 @@ private:
       return std::cref(*iter->second);
     }
 
-    StatName prefix() const override { return prefix_.statName(); }
+    StatName prefix() const override { return prefix_; }
 
     // Returns the central cache, asserting that the parent lock is held.
     //
@@ -488,6 +503,13 @@ private:
       return effectiveMatcher().fastRejects(name);
     }
 
+    // Whether this scope uses the explicit-tags logic (propagating scope-level tags) or the legacy
+    // logic (which drops scope-level tag metadata). This mirrors the store-level flag, which is the
+    // single source of truth. Note that prefix_tags_ may still be null when this is true: a
+    // scope created in legacy mode before setUseExplicitTags() enabled the flag has no
+    // prefix_tags_.
+    bool useExplicitTags() const { return parent_.use_explicit_tags_; }
+
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     const bool evictable_{};
@@ -495,50 +517,13 @@ private:
     const ScopeStatsLimitSettings limits_;
     StatsMatcherSharedPtr scope_matcher_;
 
-  protected:
-    StatNameStorage prefix_;
+    StatNameList prefix_list_;
+    StatName prefix_;
+    StatName base_prefix_;
+    std::vector<StatNameTag> prefix_tags_;
+
     mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
     std::function<void()> cleanup_callback_;
-  };
-
-  // Tag-aware scope for the thread-local store. It tracks a tag-extracted prefix separately from
-  // the prefix (the base ScopeImpl's prefix_, which may carry interspersed tag values) and a set
-  // of scope-level prefix tags propagated onto every stat it creates. The tag-aware Scope APIs are
-  // implemented here; see TagStatNameJoiner.
-  class TagScopeImpl : public ScopeImpl {
-  public:
-    // `name` is the scope's tag-extracted prefix; `tagged_name` is its flat prefix with tag
-    // values interleaved (stored in the base ScopeImpl's prefix_).
-    TagScopeImpl(std::unique_ptr<StatNamePool> pool, StatName name, StatNameTagSpan name_tags,
-                 StatName tagged_name, ThreadLocalStoreImpl& store, bool evictable,
-                 const ScopeStatsLimitSettings& limits = {},
-                 StatsMatcherSharedPtr matcher = nullptr);
-
-    ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name,
-                                             TagStringViewSpan name_tags,
-                                             absl::string_view tagged_name, bool evictable,
-                                             const ScopeStatsLimitSettings& limits,
-                                             StatsMatcherSharedPtr matcher) override;
-    ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan name_tags,
-                                       StatName tagged_name, bool evictable,
-                                       const ScopeStatsLimitSettings& limits,
-                                       StatsMatcherSharedPtr matcher) override;
-    Counter& counterFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
-                                   StatName tagged_name) override;
-    Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
-                               StatName tagged_name, Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
-                                       StatName tagged_name, Histogram::Unit unit) override;
-    TextReadout& textReadoutFromTaggedName(StatName base_name,
-                                           std::optional<StatNameTagSpan> name_tags,
-                                           StatName tagged_name) override;
-
-  private:
-    std::unique_ptr<StatNamePool> pool_;
-    // The scope's tag-extracted prefix. Paired with the base ScopeImpl's prefix_
-    // (which holds the tagged/flat prefix) and prefix_tags_.
-    StatName tag_extracted_prefix_;
-    StatNameTagVec prefix_tags_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -646,8 +631,12 @@ private:
   uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
 
   StatNameSetPtr well_known_tags_;
-  // When true, the default scope is a TagScopeImpl, enabling the tag-aware Scope APIs.
-  const bool use_tag_scope_ = false;
+  // When true, scopes use the explicit-tags logic (ScopeImpl::useExplicitTags()), enabling the
+  // explicit-tags Scope APIs that propagate scope-level tags. When false, the legacy logic is used.
+  // Set once via setUseExplicitTags() during single-threaded startup (see the setter's contract);
+  // the root scope is always created explicit-tag-capable so this can be enabled without recreating
+  // it.
+  bool use_explicit_tags_ = false;
 
   mutable Thread::MutexBasicLockable hist_mutex_;
   StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);

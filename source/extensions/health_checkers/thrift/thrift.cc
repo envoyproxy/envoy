@@ -64,8 +64,14 @@ void ThriftHealthChecker::ThriftActiveHealthCheckSession::onInterval() {
     client_ = parent_.client_factory_.create(
         *this, parent_.transport_, parent_.protocol_, parent_.method_name_, host_,
         /* health checker seq id */ 0, /* fixed_seq_id */ true);
-    client_->start();
     expect_close_ = false;
+    // The underlying connection can fail to be created (e.g. a network namespace binding failure).
+    // Report a network failure and stop rather than crashing on a null dereference.
+    if (!client_->start()) {
+      handleFailure(envoy::data::core::v3::NETWORK);
+      client_.reset();
+      return;
+    }
   }
 
   client_->sendRequest();

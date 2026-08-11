@@ -173,8 +173,10 @@ AsyncStreamImpl::~AsyncStreamImpl() {
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   const auto thread_local_cluster = parent_.cm_.getThreadLocalCluster(parent_.remote_cluster_name_);
   if (thread_local_cluster == nullptr) {
-    notifyRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available");
+    // Mark the stream as reset before notifying so that a re-entrant resetStream()/cleanup() from
+    // the callback does not attempt to reset the (still null) underlying stream.
     http_reset_ = true;
+    notifyRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available");
     return;
   }
 
@@ -183,8 +185,13 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   dispatcher_ = &http_async_client.dispatcher();
   stream_ = http_async_client.start(*this, options_.setBufferBodyForRetry(buffer_body_for_retry));
   if (stream_ == nullptr) {
-    notifyRemoteClose(Status::WellKnownGrpcStatus::Unavailable, EMPTY_STRING);
-    http_reset_ = true;
+    // Http::AsyncClient::start() may synchronously invokes onReset() on stream creation failure,
+    // which already notifies remote close and sets http_reset_. Guard against notifying (and
+    // finishing the span) a second time here.
+    if (!http_reset_) {
+      http_reset_ = true;
+      notifyRemoteClose(Status::WellKnownGrpcStatus::Unavailable, EMPTY_STRING);
+    }
     return;
   }
 
@@ -210,7 +217,9 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
                                             true                             // async_client_span_
   );
   current_span_->injectContext(trace_context, upstream_context);
-  callbacks_.onCreateInitialMetadata(headers_message_->headers());
+  if (callbacks_.has_value()) {
+    callbacks_->onCreateInitialMetadata(headers_message_->headers());
+  }
   // base64 encode on "-bin" metadata.
   base64EscapeBinHeaders(headers_message_->headers());
   stream_->sendHeaders(headers_message_->headers(), false);
@@ -229,13 +238,17 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
     // grpc-status be used if available.
     if (end_stream && grpc_status) {
       // Trailers-only response.
-      callbacks_.onReceiveInitialMetadata(Http::ResponseHeaderMapImpl::create());
+      if (callbacks_.has_value()) {
+        callbacks_->onReceiveInitialMetadata(Http::ResponseHeaderMapImpl::create());
+      }
       // Due to headers/trailers type differences we need to copy here. This is an uncommon case but
       // we can potentially optimize in the future.
       onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
       return;
     }
-    callbacks_.onReceiveInitialMetadata(Http::ResponseHeaderMapImpl::create());
+    if (callbacks_.has_value()) {
+      callbacks_->onReceiveInitialMetadata(Http::ResponseHeaderMapImpl::create());
+    }
     // Status is translated via Utility::httpToGrpcStatus per
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
     streamError(Utility::httpToGrpcStatus(http_response_status));
@@ -243,16 +256,18 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
   }
   if (end_stream) {
     // Trailers-only response.
-    callbacks_.onReceiveInitialMetadata(Http::ResponseHeaderMapImpl::create());
+    if (callbacks_.has_value()) {
+      callbacks_->onReceiveInitialMetadata(Http::ResponseHeaderMapImpl::create());
+    }
     // Due to headers/trailers type differences we need to copy here. This is an uncommon case but
     // we can potentially optimize in the future.
     onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
     return;
   }
   // Normal response headers/Server initial metadata.
-  if (!waiting_to_delete_on_remote_close_) {
-    callbacks_.onReceiveInitialMetadata(end_stream ? Http::ResponseHeaderMapImpl::create()
-                                                   : std::move(headers));
+  if (callbacks_.has_value()) {
+    callbacks_->onReceiveInitialMetadata(end_stream ? Http::ResponseHeaderMapImpl::create()
+                                                    : std::move(headers));
   }
 }
 
@@ -278,11 +293,12 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
       streamError(Status::WellKnownGrpcStatus::Internal);
       return;
     }
-    if (!waiting_to_delete_on_remote_close_ &&
-        !callbacks_.onReceiveMessageRaw(frame.data_ ? std::move(frame.data_)
-                                                    : std::make_unique<Buffer::OwnedImpl>())) {
-      streamError(Status::WellKnownGrpcStatus::Internal);
-      return;
+    if (callbacks_.has_value()) {
+      if (!callbacks_->onReceiveMessageRaw(frame.data_ ? std::move(frame.data_)
+                                                       : std::make_unique<Buffer::OwnedImpl>())) {
+        streamError(Status::WellKnownGrpcStatus::Internal);
+        return;
+      }
     }
     // If the HTTP stream has already been reset, we can return early.
     if (http_reset_) {
@@ -302,8 +318,8 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
 void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   auto grpc_status = Common::getGrpcStatus(*trailers);
   const std::string grpc_message = Common::getGrpcMessage(*trailers);
-  if (!waiting_to_delete_on_remote_close_) {
-    callbacks_.onReceiveTrailingMetadata(std::move(trailers));
+  if (callbacks_.has_value()) {
+    callbacks_->onReceiveTrailingMetadata(std::move(trailers));
   }
   if (!grpc_status) {
     grpc_status = Status::WellKnownGrpcStatus::Unknown;
@@ -313,8 +329,8 @@ void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::streamError(Status::GrpcStatus grpc_status, const std::string& message) {
-  if (!waiting_to_delete_on_remote_close_) {
-    callbacks_.onReceiveTrailingMetadata(Http::ResponseTrailerMapImpl::create());
+  if (callbacks_.has_value()) {
+    callbacks_->onReceiveTrailingMetadata(Http::ResponseTrailerMapImpl::create());
   }
   notifyRemoteClose(grpc_status, message);
   resetStream();
@@ -327,8 +343,8 @@ void AsyncStreamImpl::notifyRemoteClose(Grpc::Status::GrpcStatus status,
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
   current_span_->finishSpan();
-  if (!waiting_to_delete_on_remote_close_) {
-    callbacks_.onRemoteClose(status, enhancedGrpcMessage(message, stream_));
+  if (callbacks_.has_value()) {
+    callbacks_->onRemoteClose(status, enhancedGrpcMessage(message, stream_));
   }
 }
 
@@ -351,8 +367,13 @@ void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& buffer, bool end_stre
 }
 
 void AsyncStreamImpl::closeStream() {
-  Buffer::OwnedImpl empty_buffer;
-  stream_->sendData(empty_buffer, true);
+  // The underlying stream may never have been established (e.g. cluster missing or stream creation
+  // failed), in which case there is nothing to half-close. Note we intentionally do not reset
+  // callbacks_ here: this is a client-side half-close and the server may still deliver a response.
+  if (stream_ != nullptr) {
+    Buffer::OwnedImpl empty_buffer;
+    stream_->sendData(empty_buffer, true);
+  }
   current_span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
   current_span_->finishSpan();
 }
@@ -360,16 +381,25 @@ void AsyncStreamImpl::closeStream() {
 void AsyncStreamImpl::resetStream() { cleanup(); }
 
 void AsyncStreamImpl::cleanup() {
+  // No further callbacks may be invoked on a cleaned-up stream. Reset the reference so any
+  // re-entrant or subsequent delivery (e.g. a redundant remote close) becomes a no-op.
+  callbacks_.reset();
+
   // Unsubscribe the side stream watermark callbacks, if hasn't done so.
   if (options_.sidestream_watermark_callbacks != nullptr) {
-    stream_->removeWatermarkCallbacks();
+    if (stream_ != nullptr) {
+      stream_->removeWatermarkCallbacks();
+    }
     options_.sidestream_watermark_callbacks = nullptr;
   }
 
-  // Do not reset if the stream is being cleaning up after server has half-closed.
+  // Do not reset if the stream is being cleaning up after server has half-closed. The stream may
+  // also be null if it was never successfully started.
   if (!http_reset_ && !waiting_to_delete_on_remote_close_) {
     http_reset_ = true;
-    stream_->reset();
+    if (stream_ != nullptr) {
+      stream_->reset();
+    }
   }
 
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
@@ -385,6 +415,11 @@ void AsyncStreamImpl::cleanup() {
 void AsyncStreamImpl::waitForRemoteCloseAndDelete() {
   if (!waiting_to_delete_on_remote_close_) {
     waiting_to_delete_on_remote_close_ = true;
+
+    // The owner is detaching: per the contract, no further callbacks may be invoked. The callbacks
+    // object may be destroyed by the owner while this stream lives on awaiting remote close, so
+    // drop the reference to avoid use-after-free.
+    callbacks_.reset();
 
     if (options_.sidestream_watermark_callbacks != nullptr) {
       stream_->removeWatermarkCallbacks();

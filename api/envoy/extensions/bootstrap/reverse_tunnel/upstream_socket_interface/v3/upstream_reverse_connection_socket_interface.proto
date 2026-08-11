@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.bootstrap.reverse_tunnel.upstream_socket_interface]
 
 // Configuration for the upstream reverse connection socket interface.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message UpstreamReverseConnectionSocketInterface {
   // Stat prefix for upstream reverse connection socket interface stats.
   string stat_prefix = 1;
@@ -49,4 +49,13 @@ message UpstreamReverseConnectionSocketInterface {
   // Access logs emitted for reverse tunnel lifecycle events. Entries are generated for tunnel setup,
   // socket handoff, tunnel close, and post-handoff HTTP/2 keepalive timeout observations.
   repeated config.accesslog.v3.AccessLog access_log = 6;
+
+  // Maximum number of concurrently accepted reverse connections per node (and per tenant
+  // when tenant isolation is enabled). The cap is only consulted for reverse tunnel network
+  // filters that opt in via ``enable_connection_limit``; filters that leave it disabled ignore it.
+  // The cap is enforced per worker thread, so the effective ceiling is roughly this value
+  // multiplied by the number of workers; it is also only approximate when rebalancing is enabled.
+  // Defaults to 0; combined with ``enable_connection_limit: true`` a value of 0 rejects all
+  // connections, so set a non-zero value whenever a filter enables the limit.
+  uint32 max_connections_per_node = 7;
 }

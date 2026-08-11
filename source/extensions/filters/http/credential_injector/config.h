@@ -30,8 +30,8 @@ private:
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector& config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 using UpstreamCredentialInjectorFilterFactory = CredentialInjectorFilterFactory;

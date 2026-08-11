@@ -1,6 +1,7 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "cel/expr/syntax.pb.h"
@@ -48,7 +49,7 @@ TEST_F(StringFunctionsTest, Replace) {
   auto cel_expr = createExpression(*builder_, expr);
   Protobuf::Arena arena;
   auto result = cel_expr->Evaluate(*activation_, &arena);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   EXPECT_TRUE(result.value().IsString());
   EXPECT_EQ(result.value().StringOrDie().value(), "wello wello");
 }
@@ -65,7 +66,7 @@ TEST_F(StringFunctionsTest, ReplaceWithLimit) {
   auto cel_expr = createExpression(*builder_, expr);
   Protobuf::Arena arena;
   auto result = cel_expr->Evaluate(*activation_, &arena);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   EXPECT_TRUE(result.value().IsString());
   EXPECT_EQ(result.value().StringOrDie().value(), "wello hello");
 }
@@ -80,7 +81,7 @@ TEST_F(StringFunctionsTest, Split) {
   auto cel_expr = createExpression(*builder_, expr);
   Protobuf::Arena arena;
   auto result = cel_expr->Evaluate(*activation_, &arena);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   EXPECT_TRUE(result.value().IsList());
   const auto& list = *result.value().ListOrDie();
   EXPECT_EQ(list.size(), 3);
@@ -100,7 +101,7 @@ TEST_F(StringFunctionsTest, SplitWithLimit) {
   auto cel_expr = createExpression(*builder_, expr);
   Protobuf::Arena arena;
   auto result = cel_expr->Evaluate(*activation_, &arena);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   EXPECT_TRUE(result.value().IsList());
   const auto& list = *result.value().ListOrDie();
   EXPECT_EQ(list.size(), 2);
@@ -156,7 +157,7 @@ TEST_F(StringFunctionsTest, StringConversionAndConcatEnabled) {
   auto cel_conv = createExpression(*builder_, conv_expr);
   auto conv_result = cel_conv->Evaluate(*activation_, &arena);
 
-  ASSERT_TRUE(conv_result.ok());
+  ASSERT_OK(conv_result);
   EXPECT_TRUE(conv_result.value().IsString());
   EXPECT_EQ(conv_result.value().StringOrDie().value(), "123");
 
@@ -169,7 +170,7 @@ TEST_F(StringFunctionsTest, StringConversionAndConcatEnabled) {
   auto cel_concat = createExpression(*builder_, concat_expr);
   auto concat_result = cel_concat->Evaluate(*activation_, &arena);
 
-  ASSERT_TRUE(concat_result.ok());
+  ASSERT_OK(concat_result);
   EXPECT_TRUE(concat_result.value().IsString());
   EXPECT_EQ(concat_result.value().StringOrDie().value(), "foobar");
 }
@@ -186,7 +187,7 @@ TEST_F(StringFunctionsTest, ContainsFunction) {
   Protobuf::Arena arena;
   auto result = cel_expr->Evaluate(*activation_, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsBool());
   EXPECT_TRUE(result.value().BoolOrDie());
 }
@@ -203,7 +204,7 @@ TEST_F(StringFunctionsTest, StartsWithFunction) {
   Protobuf::Arena arena;
   auto result = cel_expr->Evaluate(*activation_, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsBool());
   EXPECT_TRUE(result.value().BoolOrDie());
 }
@@ -220,7 +221,7 @@ TEST_F(StringFunctionsTest, EndsWithFunction) {
   Protobuf::Arena arena;
   auto result = cel_expr->Evaluate(*activation_, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsBool());
   EXPECT_TRUE(result.value().BoolOrDie());
 }
@@ -237,7 +238,7 @@ TEST_F(StringFunctionsTest, ContainsFunctionFalse) {
   Protobuf::Arena arena;
   auto result = cel_expr->Evaluate(*activation_, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsBool());
   EXPECT_FALSE(result.value().BoolOrDie());
 }
@@ -254,7 +255,7 @@ TEST_F(StringFunctionsTest, StartsWithFunctionFalse) {
   Protobuf::Arena arena;
   auto result = cel_expr->Evaluate(*activation_, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsBool());
   EXPECT_FALSE(result.value().BoolOrDie());
 }
@@ -271,7 +272,7 @@ TEST_F(StringFunctionsTest, EndsWithFunctionFalse) {
   Protobuf::Arena arena;
   auto result = cel_expr->Evaluate(*activation_, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsBool());
   EXPECT_FALSE(result.value().BoolOrDie());
 }
@@ -287,7 +288,7 @@ TEST_F(StringFunctionsTest, LowerAsciiFunction) {
   Protobuf::Arena arena;
   auto result = cel_expr->Evaluate(*activation_, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsString());
   EXPECT_EQ(result.value().StringOrDie().value(), "hello");
 }
@@ -303,7 +304,7 @@ TEST_F(StringFunctionsTest, UpperAsciiFunction) {
   Protobuf::Arena arena;
   auto result = cel_expr->Evaluate(*activation_, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsString());
   EXPECT_EQ(result.value().StringOrDie().value(), "HELLO");
 }
@@ -322,7 +323,7 @@ TEST_F(StringFunctionsTest, StringFunctionsWithEmptyStrings) {
   auto cel_expr = createExpression(*builder_, contains_expr);
   auto result = cel_expr->Evaluate(*activation_, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsBool());
   EXPECT_TRUE(result.value().BoolOrDie()); // Empty string is contained in any string
 
@@ -335,7 +336,7 @@ TEST_F(StringFunctionsTest, StringFunctionsWithEmptyStrings) {
   auto lower_cel_expr = createExpression(*builder_, lower_expr);
   auto lower_result = lower_cel_expr->Evaluate(*activation_, &arena);
 
-  ASSERT_TRUE(lower_result.ok());
+  ASSERT_OK(lower_result);
   EXPECT_TRUE(lower_result.value().IsString());
   EXPECT_EQ(lower_result.value().StringOrDie().value(), "");
 }

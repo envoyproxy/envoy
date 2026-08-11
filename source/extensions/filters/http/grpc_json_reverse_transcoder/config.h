@@ -27,7 +27,8 @@ private:
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
           GrpcJsonReverseTranscoder& proto_config,
-      const std::string&, Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

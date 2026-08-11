@@ -4,11 +4,11 @@
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stats/stats.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/init/target_impl.h"
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
-#include "source/extensions/filters/http/jwt_authn/stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,7 +37,8 @@ public:
   JwksAsyncFetcher(const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks,
                    Router::RetryPolicyConstSharedPtr retry_policy,
                    Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
-                   JwtAuthnFilterStats& stats, JwksDoneFetched done_fn);
+                   Stats::Counter& fetch_success, Stats::Counter& fetch_failed,
+                   JwksDoneFetched done_fn);
 
   // Get the remote Jwks cache duration.
   static std::chrono::seconds
@@ -61,8 +62,9 @@ private:
   Server::Configuration::FactoryContext& context_;
   // the jwks fetcher creator function
   const CreateJwksFetcherCb create_fetcher_fn_;
-  // stats
-  JwtAuthnFilterStats& stats_;
+  // counters incremented on a successful and a failed fetch
+  Stats::Counter& fetch_success_;
+  Stats::Counter& fetch_failed_;
   // the Jwks done function.
   const JwksDoneFetched done_fn_;
 

@@ -962,6 +962,36 @@ TEST_F(LaxBinaryProtocolTest, ReadMessageBegin) {
     EXPECT_EQ(buffer.length(), 9);
   }
 
+  // Name length that wraps 32-bit arithmetic in the insufficient-data check
+  {
+    Buffer::OwnedImpl buffer;
+    resetMetadata();
+
+    buffer.writeBEInt<uint32_t>(0xFFFFFFF7); // name length
+    addRepeated(buffer, 5, 'x');
+
+    bool result = true;
+    EXPECT_NO_THROW(result = proto.readMessageBegin(buffer, metadata_));
+    EXPECT_FALSE(result);
+    expectDefaultMetadata();
+    EXPECT_EQ(buffer.length(), 9);
+  }
+
+  // Name length whose wrapped peek offset lands inside the length field itself
+  {
+    Buffer::OwnedImpl buffer;
+    resetMetadata();
+
+    buffer.writeBEInt<uint32_t>(0xFFFFFFFF); // name length
+    addRepeated(buffer, 5, 'x');
+
+    bool result = true;
+    EXPECT_NO_THROW(result = proto.readMessageBegin(buffer, metadata_));
+    EXPECT_FALSE(result);
+    expectDefaultMetadata();
+    EXPECT_EQ(buffer.length(), 9);
+  }
+
   // Named message
   {
     Buffer::OwnedImpl buffer;

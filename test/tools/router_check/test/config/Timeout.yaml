@@ -1,0 +1,17 @@
+virtual_hosts:
+- name: www
+  domains:
+  - www.example.com
+  routes:
+  # Both routes use the same cluster; per-route timeouts are the only distinction.
+  - match:
+      safe_regex:
+        regex: "^/api/v[0-9]/.*"
+    route:
+      cluster: service
+      timeout: 120s
+  - match:
+      prefix: /
+    route:
+      cluster: service
+      timeout: 30s

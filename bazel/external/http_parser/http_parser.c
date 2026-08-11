@@ -1079,6 +1079,10 @@ reexecute:
             break;
           case CR:
           case LF:
+            if (parser->method == HTTP_CONNECT) {
+              SET_ERRNO(HPE_INVALID_VERSION);
+              goto error;
+            }
             parser->http_major = 0;
             parser->http_minor = 9;
             UPDATE_STATE((ch == CR) ?

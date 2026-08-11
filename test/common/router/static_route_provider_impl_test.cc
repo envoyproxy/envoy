@@ -6,6 +6,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/init/manager_impl.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
 #include "source/common/router/route_provider_manager.h"
@@ -16,6 +17,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -50,6 +52,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
   Event::SimulatedTimeSystem time_system_;
+  Init::ManagerImpl init_manager_{"test route config"};
   ProtoTraitsImpl proto_traits_;
   ConfigTraitsImpl config_traits_{validation_visitor_};
   Rds::RouteConfigProviderManager rds_manager_;
@@ -73,7 +76,7 @@ virtual_hosts:
   server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
 
   StaticRouteConfigProviderImpl provider(route_config, config_traits_, server_factory_context_,
-                                         rds_manager_);
+                                         init_manager_, rds_manager_);
 
   EXPECT_EQ("foo", provider.configCast()->name());
   EXPECT_TRUE(provider.configInfo().has_value());
@@ -126,7 +129,7 @@ vhds:
       }));
 
   StaticRouteConfigProviderImpl provider(route_config, config_traits_, server_factory_context_,
-                                         rds_manager_);
+                                         init_manager_, rds_manager_);
 
   EXPECT_EQ("foo", provider.configCast()->name());
   EXPECT_TRUE(provider.configInfo().has_value());
@@ -165,7 +168,7 @@ vhds:
 
   // VhdsSubscription::onConfigUpdate will call provider.onConfigUpdate() which will post to worker
   // thread (Second post).
-  EXPECT_TRUE(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1").ok());
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
 
   EXPECT_TRUE(cb_called);
   auto config_impl = std::static_pointer_cast<const ConfigImpl>(provider.configCast());
@@ -207,7 +210,7 @@ vhds:
       }));
 
   StaticRouteConfigProviderImpl provider(route_config, config_traits_, server_factory_context_,
-                                         rds_manager_);
+                                         init_manager_, rds_manager_);
 
   // Request for example1.com.
   bool cb1_called = false;
@@ -266,7 +269,7 @@ vhds:
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
       .Times(2)
       .WillRepeatedly(Invoke([](absl::AnyInvocable<void()> callback) { callback(); }));
-  EXPECT_TRUE(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1").ok());
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
 
   EXPECT_TRUE(cb1_called);
   EXPECT_TRUE(cb2_called);

@@ -17,7 +17,7 @@
 namespace Envoy {
 namespace Config {
 
-template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
+template <class ResponseProto> using ResponseProtoPtr = Grpc::ResponsePtr<ResponseProto>;
 
 // Oversees communication for gRPC xDS implementations (parent to both regular xDS and delta
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of

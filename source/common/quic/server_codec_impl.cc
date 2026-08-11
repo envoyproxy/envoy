@@ -57,6 +57,7 @@ void QuicHttpServerConnectionImpl::shutdownNotice() {
 }
 
 void QuicHttpServerConnectionImpl::goAway() {
+  stats_.goaway_sent_.inc();
   quic_server_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
 }
 

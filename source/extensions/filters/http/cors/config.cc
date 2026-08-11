@@ -28,10 +28,11 @@ absl::StatusOr<Http::FilterFactoryCb> CorsFilterFactory::createFilterFactoryFrom
 }
 
 absl::StatusOr<Http::FilterFactoryCb> CorsFilterFactory::createHttpFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::cors::v3::Cors&, const std::string& stats_prefix,
-    Server::Configuration::ServerFactoryContext& context) {
+    const envoy::extensions::filters::http::cors::v3::Cors&,
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   CorsFilterConfigSharedPtr config =
-      std::make_shared<CorsFilterConfig>(stats_prefix, context.scope());
+      std::make_shared<CorsFilterConfig>(extra_context.stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CorsFilter>(config));
   };

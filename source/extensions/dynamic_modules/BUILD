@@ -36,6 +36,7 @@ envoy_cc_library(
         "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/dynamic_modules/abi",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/types:span",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
     ],

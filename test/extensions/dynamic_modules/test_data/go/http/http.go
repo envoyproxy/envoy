@@ -525,6 +525,23 @@ func (p *dynamicMetadataCallbacksFilter) OnRequestHeaders(headers shared.HeaderM
 		panic("metadata type mismatch not detected")
 	}
 
+	// Set a whole namespace from a serialized google.protobuf.Struct { "k": "v" }, asserted
+	// end-to-end by the C++ integration test in filter_test.cc. The bytes are hand-encoded because
+	// the test module has no protobuf dependency:
+	//   0a 08              field 1 (fields), LEN 8
+	//     0a 01 6b           entry.key   = "k"
+	//     12 03 1a 01 76     entry.value = Value { string_value = "v" }
+	p.handle.SetMetadataStruct("ns_req_header_struct",
+		[]byte{0x0a, 0x08, 0x0a, 0x01, 0x6b, 0x12, 0x03, 0x1a, 0x01, 0x76})
+
+	// Set a whole typed namespace from a serialized google.protobuf.Any, asserted end-to-end by
+	// the C++ integration test in filter_test.cc. The bytes are hand-encoded because the test
+	// module has no protobuf dependency:
+	//   0a 03 74 2f 78     field 1 (type_url) = "t/x"
+	//   12 02 01 02        field 2 (value)    = 0x01 0x02
+	p.handle.SetTypedMetadata("ns_req_header_typed",
+		[]byte{0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02})
+
 	// Try getting metadata from router, cluster, and host.
 	if val, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeRoute,
 		"metadata", "route_key"); !ok || val.ToUnsafeString() != "route" {

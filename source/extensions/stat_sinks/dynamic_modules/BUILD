@@ -18,6 +18,7 @@ envoy_cc_library(
     hdrs = ["flush_context.h"],
     deps = [
         ":sink_config_lib",
+        "//envoy/stats:histogram_interface",
         "//envoy/stats:sink_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",

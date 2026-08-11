@@ -93,7 +93,7 @@ EXPECT_THAT(response->headers(), IsSupersetOfHeaders(required_headers));
 ## Controlling time in tests
 
 In Envoy production code, time and timers are managed via
-[`Event::TimeSystem`](https://github.com/envoyproxy/envoy/blob/main/include/envoy/event/timer.h),
+[`Event::TimeSystem`](https://github.com/envoyproxy/envoy/blob/main/envoy/event/timer.h),
 which provides a mechanism for querying the time and setting up time-based
 callbacks. Bypassing this abstraction in Envoy code is flagged as a format
 violation in CI.

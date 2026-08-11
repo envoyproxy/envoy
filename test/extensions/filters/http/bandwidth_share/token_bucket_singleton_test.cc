@@ -10,6 +10,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -60,10 +61,8 @@ TEST_F(TokenBucketSingletonTest, ReturnsCachedBucketUntilRuntimeValueChanges) {
       .WillByDefault([&runtime_kbps](absl::string_view, uint64_t) { return runtime_kbps; });
   TokenBucketSingleton singleton(time_system_, scope(), tls_);
 
-  ASSERT_TRUE(
-      singleton.setBucket("shared", runtimeUInt32(), 1, std::chrono::milliseconds{25}).ok());
-  ASSERT_TRUE(
-      singleton.setBucket("shared", runtimeUInt32(), 1, std::chrono::milliseconds{25}).ok());
+  ASSERT_OK(singleton.setBucket("shared", runtimeUInt32(), 1, std::chrono::milliseconds{25}));
+  ASSERT_OK(singleton.setBucket("shared", runtimeUInt32(), 1, std::chrono::milliseconds{25}));
 
   auto initial = singleton.getBucket("shared");
   ASSERT_NE(nullptr, initial);
@@ -83,8 +82,7 @@ TEST_F(TokenBucketSingletonTest, RuntimeValueChangeReleasesOldCachedBucket) {
       .WillByDefault([&runtime_kbps](absl::string_view, uint64_t) { return runtime_kbps; });
   TokenBucketSingleton singleton(time_system_, scope(), tls_);
 
-  ASSERT_TRUE(
-      singleton.setBucket("shared", runtimeUInt32(), 1, std::chrono::milliseconds{25}).ok());
+  ASSERT_OK(singleton.setBucket("shared", runtimeUInt32(), 1, std::chrono::milliseconds{25}));
 
   std::shared_ptr<FairTokenBucket::Bucket> initial = singleton.getBucket("shared");
   std::weak_ptr<FairTokenBucket::Bucket> weak_initial = initial;
@@ -102,8 +100,7 @@ TEST_F(TokenBucketSingletonTest, RuntimeValueZeroDisablesBucketAndCanReenable) {
       .WillByDefault([&runtime_kbps](absl::string_view, uint64_t) { return runtime_kbps; });
   TokenBucketSingleton singleton(time_system_, scope(), tls_);
 
-  ASSERT_TRUE(
-      singleton.setBucket("maybe", runtimeUInt32(10), 10, std::chrono::milliseconds{50}).ok());
+  ASSERT_OK(singleton.setBucket("maybe", runtimeUInt32(10), 10, std::chrono::milliseconds{50}));
   EXPECT_EQ(nullptr, singleton.getBucket("maybe"));
 
   runtime_kbps = 3;

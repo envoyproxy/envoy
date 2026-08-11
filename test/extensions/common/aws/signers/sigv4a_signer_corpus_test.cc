@@ -12,6 +12,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 using testing::ReturnRef;
@@ -178,7 +179,7 @@ public:
 
     auto ec_key_or =
         sigv4a_key_derivation->derivePrivateKey(absl::string_view(akid), absl::string_view(skid));
-    EXPECT_TRUE(ec_key_or.ok());
+    EXPECT_OK(ec_key_or);
     sigv4a_key_derivation->derivePublicKey(ec_key_or.value());
     signature = Hex::decode(calculated_signature);
 

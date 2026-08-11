@@ -24,6 +24,7 @@ envoy_cc_test(
         "//test/common/tls:ssl_test_utils",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )

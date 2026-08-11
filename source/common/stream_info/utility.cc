@@ -226,6 +226,14 @@ std::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteRecei
   return duration(timing.value().get().lastDownstreamRxByteReceived(), stream_info_);
 }
 
+std::optional<std::chrono::nanoseconds> TimingUtility::downstreamHandshakeStart() {
+  OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
+  if (!timing) {
+    return std::nullopt;
+  }
+  return duration(timing.value().get().downstreamHandshakeStart(), stream_info_);
+}
+
 std::optional<std::chrono::nanoseconds> TimingUtility::downstreamHandshakeComplete() {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {

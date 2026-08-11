@@ -24,6 +24,7 @@ envoy_extension_cc_test(
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http/bandwidth_limit:bandwidth_limit_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3:pkg_cc_proto",
     ],
 )

@@ -861,6 +861,26 @@ func (h *dymHttpFilterHandle) SetMetadata(metadataNamespace, key string, value a
 	runtime.KeepAlive(strValue)
 }
 
+func (h *dymHttpFilterHandle) SetMetadataStruct(metadataNamespace string, serializedStruct []byte) {
+	C.envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		bytesToModuleBuffer(serializedStruct),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(serializedStruct)
+}
+
+func (h *dymHttpFilterHandle) SetTypedMetadata(metadataNamespace string, serializedAny []byte) {
+	C.envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		bytesToModuleBuffer(serializedAny),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(serializedAny)
+}
+
 func (h *dymHttpFilterHandle) GetAttributeNumber(
 	attributeID shared.AttributeID,
 ) (float64, bool) {
@@ -1566,6 +1586,21 @@ func (h *dymHttpFilterHandle) IncrementCounterValue(id shared.MetricID,
 	return shared.MetricsResult(ret)
 }
 
+func (h *dymHttpFilterHandle) GetGenericSecret(
+	id shared.GenericSecretID,
+) (shared.UnsafeEnvoyBuffer, bool) {
+	var value C.envoy_dynamic_module_type_envoy_buffer
+	ok := C.envoy_dynamic_module_callback_http_filter_get_generic_secret(
+		h.hostPluginPtr,
+		(C.size_t)(uint64(id)),
+		&value,
+	)
+	if !bool(ok) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(value), true
+}
+
 func newDymStreamPluginHandle(
 	hostPluginPtr C.envoy_dynamic_module_type_http_filter_envoy_ptr,
 ) *dymHttpFilterHandle {
@@ -1772,6 +1807,36 @@ func (h *dymConfigHandle) IncrementCounterValue(id shared.MetricID,
 	runtime.KeepAlive(tagsValues)
 	runtime.KeepAlive(tagValueViews)
 	return shared.MetricsResult(ret)
+}
+
+func (h *dymConfigHandle) SubscribeGenericSecret(
+	name string, sdsConfigSource string,
+) shared.GenericSecretID {
+	id := C.envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+		h.hostConfigPtr,
+		stringToModuleBuffer(name),
+		// An empty buffer tells Envoy to resolve the name as a static secret.
+		stringToModuleBuffer(sdsConfigSource),
+	)
+	runtime.KeepAlive(name)
+	runtime.KeepAlive(sdsConfigSource)
+	// 0 is reserved to signal that the subscription could not be created.
+	return shared.GenericSecretID(uint64(id))
+}
+
+func (h *dymConfigHandle) GetGenericSecret(
+	id shared.GenericSecretID,
+) (shared.UnsafeEnvoyBuffer, bool) {
+	var value C.envoy_dynamic_module_type_envoy_buffer
+	ok := C.envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+		h.hostConfigPtr,
+		(C.size_t)(uint64(id)),
+		&value,
+	)
+	if !bool(ok) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(value), true
 }
 
 func (h *dymConfigHandle) HttpCallout(

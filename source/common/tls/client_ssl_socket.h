@@ -56,6 +56,14 @@ public:
 
   Envoy::Ssl::ClientContextSharedPtr sslCtx() override;
 
+  // Installs a hook invoked at the start of each SDS-triggered secret update, before the new
+  // context is created. Returning a failure status rejects the update (it propagates back to SDS
+  // as an update rejection) and leaves the existing context unchanged. Used by wrapping transport
+  // socket factories (e.g. QUIC) to reject secrets they cannot support.
+  void setSecretUpdateValidationHook(std::function<absl::Status()> hook) {
+    secret_update_validation_hook_ = std::move(hook);
+  }
+
 protected:
   ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope,
@@ -66,6 +74,7 @@ private:
   Stats::Scope& stats_scope_;
   SslSocketFactoryStats stats_;
   Envoy::Ssl::ClientContextConfigPtr config_;
+  std::function<absl::Status()> secret_update_validation_hook_;
   mutable absl::Mutex ssl_ctx_mu_;
   Envoy::Ssl::ClientContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
 };

@@ -136,6 +136,13 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
             ->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
                                           parent_.transportSocketMatchMetadata().get())
             .connection_;
+    // Connection creation can fail, e.g. when binding to a configured network namespace that is
+    // no longer available. Treat this as a network failure rather than crashing on a null
+    // dereference below.
+    if (client_ == nullptr) {
+      handleFailure(envoy::data::core::v3::NETWORK);
+      return;
+    }
     session_callbacks_ = std::make_shared<TcpSessionCallbacks>(*this);
     client_->addConnectionCallbacks(*session_callbacks_);
     client_->addReadFilter(session_callbacks_);
@@ -172,6 +179,11 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
+  // client_ can be null if the connection failed to be created on this interval (e.g. a network
+  // namespace binding failure). The failure has already been reported, so there is nothing to do.
+  if (client_ == nullptr) {
+    return;
+  }
   ENVOY_CONN_LOG(debug, "hc tcp connection timeout, health_flags={}, health_check_address={}",
                  *client_, HostUtility::healthFlagsToString(*host_),
                  host_->healthCheckAddress()->asString());

@@ -33,8 +33,6 @@ void NetworkConfigurationFilter::setDecoderFilterCallbacks(
       StreamInfo::FilterState::LifeSpan::Request);
 
   auto options = std::make_shared<Network::Socket::Options>();
-  connectivity_manager_->setInterfaceBindingEnabled(enable_interface_binding_);
-  connectivity_manager_->setDrainPostDnsRefreshEnabled(enable_drain_post_dns_refresh_);
   extra_stream_info_->configuration_key_ = connectivity_manager_->addUpstreamSocketOptions(options);
   decoder_callbacks_->addUpstreamSocketOptions(options);
 }

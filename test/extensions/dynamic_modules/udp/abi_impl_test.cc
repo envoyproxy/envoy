@@ -8,6 +8,7 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/status_utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,7 +20,7 @@ public:
   void SetUp() override {
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
         Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false);
-    EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter
         proto_config;

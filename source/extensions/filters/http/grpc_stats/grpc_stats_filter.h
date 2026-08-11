@@ -30,12 +30,13 @@ struct GrpcStatsObject : public StreamInfo::FilterState::Object {
 };
 
 class GrpcStatsFilterConfigFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::grpc_stats::v3::FilterConfig> {
+    : public Common::ExceptionFreeFactoryBase<
+          envoy::extensions::filters::http::grpc_stats::v3::FilterConfig> {
 public:
-  GrpcStatsFilterConfigFactory() : FactoryBase("envoy.filters.http.grpc_stats") {}
+  GrpcStatsFilterConfigFactory() : ExceptionFreeFactoryBase("envoy.filters.http.grpc_stats") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
       const std::string&, Server::Configuration::FactoryContext&) override;
 };

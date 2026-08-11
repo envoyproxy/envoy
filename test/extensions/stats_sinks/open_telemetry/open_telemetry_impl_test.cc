@@ -196,7 +196,7 @@ TEST_F(OpenTelemetryGrpcMetricsExporterImplTest, SendExportRequest) {
 }
 
 TEST_F(OpenTelemetryGrpcMetricsExporterImplTest, PartialSuccess) {
-  auto response = std::make_unique<MetricsExportResponse>();
+  auto response = Grpc::ResponsePtr<MetricsExportResponse>();
   response->mutable_partial_success()->set_rejected_data_points(1);
   exporter_->onSuccess(std::move(response), Tracing::NullSpan::instance());
 }

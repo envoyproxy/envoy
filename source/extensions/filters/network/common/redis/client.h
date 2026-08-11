@@ -2,7 +2,9 @@
 
 #include <cstdint>
 
+#include "envoy/common/optref.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
@@ -102,14 +104,13 @@ public:
   virtual PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) PURE;
 
   /**
-   * Initialize the connection. Issue the auth command and readonly command as needed.
-   * @param auth password for upstream host.
+   * Initialize the connection. Drives the AUTH / HELLO 3 / READONLY / AWS IAM negotiation
+   * pipeline owned by the implementation; until this returns and any deferred init step
+   * (HELLO 3 ack, IAM token fetch) completes, user makeRequest calls are held internally.
+   * @param auth_username username for upstream host (RESP2 ACL or HELLO 3 AUTH user).
+   * @param auth_password password for upstream host.
    */
   virtual void initialize(const std::string& auth_username, const std::string& auth_password) PURE;
-
-  virtual void sendAwsIamAuth(
-      const std::string& auth_username,
-      const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;
@@ -218,10 +219,18 @@ public:
    * @param config supplies the connection pool configuration.
    * @param redis_command_stats supplies the redis command stats.
    * @param scope supplies the stats scope.
-   * @param auth password for upstream host.
+   * @param auth_username auth username for upstream host (empty when unused).
+   * @param auth_password auth password for upstream host (empty when unused).
    * @param is_transaction_client true if this client was created to relay a transaction.
    * @param aws_iam_config supplies the AWS IAM configuration from protobuf
    * @param aws_iam_authenticator supplies the AWS IAM authenticator created during config
+   * @param upstream_protocol_version selects the upstream RESP protocol negotiated on the new
+   *        connection. ``Resp3`` triggers a ``HELLO 3`` handshake from ``ClientImpl::initialize``;
+   *        ``Resp2`` keeps the legacy behavior (no HELLO).
+   * @param upstream_resp3_hello_failure optional counter incremented on every HELLO 3 negotiation
+   *        failure (error reply, wrong reply shape, redirection, network failure). Empty for
+   *        callers that do not own a per-cluster stat for it (e.g. the redis health checker and
+   *        cluster discovery, which always negotiate RESP2 and never trigger the counter).
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr
@@ -231,7 +240,9 @@ public:
          bool is_transaction_client,
          std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
          std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-             aws_iam_authenticator) PURE;
+             aws_iam_authenticator,
+         Common::Redis::RespProtocolVersion upstream_protocol_version,
+         OptRef<Stats::Counter> upstream_resp3_hello_failure) PURE;
 };
 
 // A MULTI command sent when starting a transaction.
@@ -282,8 +293,7 @@ struct Transaction {
 
   // The key which represents the transaction hash slot.
   std::string key_;
-  // clients_[0] represents the main connection, clients_[1..n] are for
-  // the mirroring policies.
+  // clients_[0] represents the main connection, clients_[1..n] are for the mirroring policies.
   std::vector<ClientPtr> clients_;
   Network::ConnectionCallbacks* connection_cb_;
 

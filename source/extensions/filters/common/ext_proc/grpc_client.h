@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "source/common/grpc/typed_async_client.h"
 #include "source/common/http/sidestream_watermark.h"
 #include "source/extensions/filters/common/ext_proc/client_base.h"
 
@@ -17,7 +18,7 @@ namespace ExternalProcessing {
 template <typename ResponseType> class ProcessorCallbacks : public RequestCallbacks<ResponseType> {
 public:
   ~ProcessorCallbacks() override = default;
-  virtual void onReceiveMessage(std::unique_ptr<ResponseType>&& response) PURE;
+  virtual void onReceiveMessage(Grpc::ResponsePtr<ResponseType>&& response) PURE;
   virtual void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) PURE;
   virtual void onGrpcClose() PURE;
   virtual void logStreamInfo() PURE;

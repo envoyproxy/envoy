@@ -28,6 +28,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -126,6 +127,7 @@ public:
         return *iter->second;
       }
       const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
+      Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override { return nullptr; }
 
       const envoy::config::listener::v3::UdpListenerConfig config_;
       std::unique_ptr<Network::ActiveUdpListenerFactory> listener_factory_;
@@ -2139,7 +2141,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   EXPECT_CALL(*access_log_, log(_, _));
   EXPECT_CALL(*timeout, disableTimer());
 
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(io_handle, createFileEvent_(_, _, _, _));
   EXPECT_CALL(*listener, onDestroy());

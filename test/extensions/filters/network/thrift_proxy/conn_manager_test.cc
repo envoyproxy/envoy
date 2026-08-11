@@ -834,9 +834,14 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
   write_buffer_.writeBEInt<uint32_t>(err.length());
   write_buffer_.add(err);
   addSeq(write_buffer_, {
-                            0x08, 0x00, 0x02,       // begin i32 field
-                            0x00, 0x00, 0x00, 0x07, // protocol error
-                            0x00,                   // stop field
+                            0x08,
+                            0x00,
+                            0x02, // begin i32 field
+                            0x00,
+                            0x00,
+                            0x00,
+                            0x07, // protocol error
+                            0x00, // stop field
                         });
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, true))
@@ -900,9 +905,14 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) 
   write_buffer_.writeBEInt<int32_t>(err.length());
   write_buffer_.add(err);
   addSeq(write_buffer_, {
-                            0x08, 0x00, 0x02,       // begin i32 field
-                            0x00, 0x00, 0x00, 0x05, // missing result
-                            0x00,                   // stop field
+                            0x08,
+                            0x00,
+                            0x02, // begin i32 field
+                            0x00,
+                            0x00,
+                            0x00,
+                            0x05, // missing result
+                            0x00, // stop field
                         });
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, true))

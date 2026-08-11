@@ -2,6 +2,7 @@
 #include "envoy/extensions/compression/brotli/compressor/v3/brotli.pb.h"
 #include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/compression/brotli/decompressor/brotli_decompressor_impl.h"
@@ -901,6 +902,146 @@ TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusCompress
                 .get(Http::Headers::get().EnvoyCompressionStatus)[0]
                 ->value()
                 .getStringView());
+}
+
+class CompressorUpstreamIntegrationTest
+    : public Event::SimulatedTimeSystem,
+      public HttpIntegrationTest,
+      public testing::TestWithParam<Network::Address::IpVersion> {
+public:
+  CompressorUpstreamIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void SetUp() override { decompressor_.init(window_bits); }
+  void TearDown() override { cleanupUpstreamAndDownstream(); }
+
+  void addUpstreamCompressorFilter(const std::string& config_yaml) {
+    config_helper_.addConfigModifier(
+        [config_yaml](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
+          auto& router_filter = *hcm.mutable_http_filters()->rbegin();
+          ASSERT_EQ(router_filter.name(), "envoy.filters.http.router");
+          envoy::extensions::filters::http::router::v3::Router router_config;
+          if (router_filter.has_typed_config()) {
+            std::ignore = router_filter.typed_config().UnpackTo(&router_config);
+          }
+          auto* upstream_filter = router_config.add_upstream_http_filters();
+          TestUtility::loadFromYaml(config_yaml, *upstream_filter);
+
+          auto* codec_filter = router_config.add_upstream_http_filters();
+          codec_filter->set_name("envoy.filters.http.upstream_codec");
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec codec_config;
+          std::ignore = codec_filter->mutable_typed_config()->PackFrom(codec_config);
+
+          std::ignore = router_filter.mutable_typed_config()->PackFrom(router_config);
+        });
+  }
+
+  void initializeFilter(const std::string& config_yaml) {
+    addUpstreamCompressorFilter(config_yaml);
+    initialize();
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  }
+
+  const std::string default_upstream_config{R"EOF(
+    name: envoy.filters.http.compressor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+      compressor_library:
+        name: testlib
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+  )EOF"};
+
+  const std::string request_compression_config{R"EOF(
+    name: envoy.filters.http.compressor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+      request_direction_config:
+        common_config:
+          enabled:
+            default_value: true
+      compressor_library:
+        name: testlib
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+  )EOF"};
+
+  const uint64_t window_bits{15 | 16};
+  Stats::IsolatedStoreImpl stats_store_;
+  Extensions::Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_{
+      *stats_store_.rootScope(), "test", 4096, 100};
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, CompressorUpstreamIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(CompressorUpstreamIntegrationTest, UpstreamResponseCompression) {
+  initializeFilter(default_upstream_config);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"accept-encoding", "gzip"}};
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"content-length", "4400"}, {"content-type", "text/html"}};
+
+  const Buffer::OwnedImpl expected_response{std::string(4400, 'a')};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 4400);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  Http::HeaderMap::GetResult content_encoding =
+      response->headers().get(Http::CustomHeaders::get().ContentEncoding);
+  ASSERT_FALSE(content_encoding.empty());
+  EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
+            content_encoding[0]->value().getStringView());
+
+  Buffer::OwnedImpl decompressed_response{};
+  const Buffer::OwnedImpl compressed_response{response->body()};
+  decompressor_.decompress(compressed_response, decompressed_response);
+  ASSERT_EQ(4400, decompressed_response.length());
+  EXPECT_TRUE(TestUtility::buffersEqual(expected_response, decompressed_response));
+}
+
+TEST_P(CompressorUpstreamIntegrationTest, UpstreamRequestCompression) {
+  initializeFilter(request_compression_config);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"content-length", "1024"}};
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"content-length", "10"}, {"content-type", "text/html"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 1024, response_headers, 10);
+
+  EXPECT_TRUE(upstream_request_->complete());
+
+  EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
+            upstream_request_->headers()
+                .get(Http::CustomHeaders::get().ContentEncoding)[0]
+                ->value()
+                .getStringView());
+
+  const Buffer::OwnedImpl expected_request{std::string(1024, 'a')};
+  Buffer::OwnedImpl decompressed_request{};
+  const Buffer::OwnedImpl compressed_request{upstream_request_->body()};
+  decompressor_.decompress(compressed_request, decompressed_request);
+  ASSERT_EQ(1024, decompressed_request.length());
+  EXPECT_TRUE(TestUtility::buffersEqual(expected_request, decompressed_request));
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 } // namespace Envoy

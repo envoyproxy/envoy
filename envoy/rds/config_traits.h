@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/init/manager.h"
 #include "envoy/rds/config.h"
 #include "envoy/server/factory_context.h"
 
@@ -55,6 +56,11 @@ public:
    * to the corresponding route configuration class.
    * @param rc supplies the RouteConfiguration.
    * @param context supplies the context of the server factory.
+   * @param init_manager supplies the init manager that the resources owned by the new route
+   * configuration should use to warm up. The init manager is only required to be alive until the
+   * new route configuration is warmed up and published. The returned config will be treated as
+   * warmed up and published when the init manager is initialized. NOTE: Never store the
+   * init_manager reference.
    * @param validate_clusters_default specifies whether the clusters that the route
    *    table refers to will be validated by the cluster manager. Currently thrift
    *    route config provider manager validates the clusters for static route config
@@ -63,6 +69,7 @@ public:
    */
   virtual ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,
                                             Server::Configuration::ServerFactoryContext& context,
+                                            Init::Manager& init_manager,
                                             bool validate_clusters_default) const PURE;
 };
 

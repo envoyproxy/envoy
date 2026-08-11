@@ -33,7 +33,7 @@ configuration, traffic to a particular route in a virtual host can be
 gradually shifted from one cluster to another. Consider the following
 example configuration, where two versions ``helloworld_v1`` and
 ``helloworld_v2`` of a service named ``helloworld`` are declared in the
-envoy configuration file.
+Envoy configuration file.
 
 .. code-block:: yaml
 

@@ -37,7 +37,8 @@ absl::StatusOr<Network::FilterFactoryCb> GeoipFilterFactory::createFilterFactory
           provider_config);
   ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
       provider_config, context.messageValidationVisitor(), geo_provider_factory);
-  auto driver = geo_provider_factory.createGeoipProviderDriver(*message, stat_prefix, context);
+  auto driver = geo_provider_factory.createGeoipProviderDriver(*message, stat_prefix,
+                                                               context.serverFactoryContext());
 
   return [filter_config, driver](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<GeoipFilter>(filter_config, driver));

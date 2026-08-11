@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/test_common/utility.h"

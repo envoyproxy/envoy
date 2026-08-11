@@ -15,8 +15,10 @@ The following lists the filter state object keys used by the Envoy extensions to
   Accepts a comma-separated list of protocols as a constructor, e.g. "h2,http/1.1".
 
 ``envoy.network.upstream_subject_alt_names``
-  Enables additional verification of the upstream peer certificate SAN names. Accepts a comma-separated list of SAN
-  names as a constructor.
+  Enables additional verification of the upstream peer certificate SAN names. Both the
+  :ref:`default certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`
+  and the :ref:`SPIFFE certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>`
+  support this. Accepts a comma-separated list of SAN names as a constructor.
 
 ``envoy.tcp_proxy.cluster``
   :ref:`TCP proxy <config_network_filters_tcp_proxy>` dynamic cluster name selection on a per-connection basis. Accepts
@@ -151,6 +153,22 @@ configuration with a :ref:`factory lookup key
   Same as ``envoy.string`` but supports connection pool hashing when :ref:`shared with the upstream
   <arch_overview_advanced_filter_state_sharing>`. Please use with care as it can lead to significant
   increase in the number of upstream connections when used with HTTP upstreams.
+
+``envoy.bool``
+  A generic boolean object factory for creating filter state entries with boolean values.
+  Accepts the following case-insensitive values: ``true``, ``t``, ``yes``, ``y``, ``1`` for true;
+  ``false``, ``f``, ``no``, ``n``, ``0`` for false. Invalid values are rejected and do not create
+  a filter state object.
+
+  Example configuration:
+
+  .. code-block:: yaml
+
+    object_key: my.custom.gate
+    factory_key: envoy.bool
+    format_string:
+      text_format_source:
+        inline_string: "true"
 
 ``envoy.network.ip``
   A factory to create IP addresses from ``IPv4`` and ``IPv6`` address strings.

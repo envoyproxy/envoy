@@ -43,14 +43,18 @@ namespace Envoy {
 namespace Formatter {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOk;
 using StatusHelpers::HasStatus;
 using testing::Const;
+using testing::ContainsRegex;
 using testing::HasSubstr;
 using testing::Invoke;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::StartsWith;
 
 // Helper class to test StreamInfoFormatter.
 class StreamInfoFormatter : public FormatterProvider {
@@ -409,6 +413,24 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("25", roundtrip_duration_format.format({}, stream_info));
     EXPECT_THAT(roundtrip_duration_format.formatValue({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(25.0)));
+  }
+
+  {
+    StreamInfoFormatter rtt_format("DOWNSTREAM_CX_RTT");
+
+    // No round trip time set yet.
+    EXPECT_EQ(std::nullopt, rtt_format.format({}, stream_info));
+    EXPECT_THAT(rtt_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter rtt_format("DOWNSTREAM_CX_RTT");
+
+    stream_info.downstream_connection_info_provider_->setRoundTripTime(
+        std::chrono::milliseconds(42));
+
+    EXPECT_EQ("42", rtt_format.format({}, stream_info));
+    EXPECT_THAT(rtt_format.formatValue({}, stream_info), ProtoEq(ValueUtil::numberValue(42.0)));
   }
 
   {
@@ -1690,8 +1712,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     std::vector<std::string> time_points{
-        "DS_RX_BEG", "DS_RX_END", "US_CX_BEG", "US_CX_END", "US_HS_END", "US_TX_BEG",
-        "US_TX_END", "US_RX_BEG", "US_RX_END", "DS_TX_BEG", "DS_TX_END", "custom_time_point",
+        "DS_RX_BEG", "DS_RX_END",         "US_CX_BEG", "US_CX_END", "US_HS_END",
+        "US_TX_BEG", "US_TX_END",         "US_RX_BEG", "US_RX_END", "DS_TX_BEG",
+        "DS_TX_END", "custom_time_point", "DS_HS_BEG", "DS_HS_END",
     };
 
     std::vector<std::string> precisions{"ms", "us", "ns"};
@@ -1791,6 +1814,16 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
       stream_info.downstream_timing_.setValue("custom_time_point",
                                               MonotonicTime(std::chrono::nanoseconds(12000000)));
 
+      // DS_HS_BEG
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(13000000))));
+      stream_info.downstream_timing_.onDownstreamHandshakeStart(time_system);
+
+      // DS_HS_END
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(14000000))));
+      stream_info.downstream_timing_.onDownstreamHandshakeComplete(time_system);
+
       for (size_t start_index = 0; start_index < time_points.size(); start_index++) {
         for (size_t end_index = 0; end_index < time_points.size(); end_index++) {
           uint64_t precision_factor = 1;
@@ -1879,6 +1912,36 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     StreamInfoFormatter upstream_format("FILTER_CHAIN_NAME");
 
     EXPECT_EQ("mock_filter_chain_name", upstream_format.format({}, stream_info));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+    auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+    ON_CALL(*listener_info, name()).WillByDefault(Return("mock_listener_name"));
+    stream_info.downstream_connection_info_provider_->setListenerInfo(listener_info);
+
+    StreamInfoFormatter upstream_format("LISTENER_NAME");
+
+    EXPECT_EQ("mock_listener_name", upstream_format.format({}, stream_info));
+  }
+
+  {
+    // No listener info set: the operator yields std::nullopt.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setListenerInfo(nullptr);
+    StreamInfoFormatter upstream_format("LISTENER_NAME");
+    EXPECT_EQ(std::nullopt, upstream_format.format({}, stream_info));
+  }
+
+  {
+    // Empty listener name: the operator yields std::nullopt.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+    ON_CALL(*listener_info, name()).WillByDefault(Return(""));
+    stream_info.downstream_connection_info_provider_->setListenerInfo(listener_info);
+    StreamInfoFormatter upstream_format("LISTENER_NAME");
+    EXPECT_EQ(std::nullopt, upstream_format.format({}, stream_info));
   }
 
   {
@@ -3464,9 +3527,9 @@ TEST(SubstitutionFormatterTest, QueryParametersFormatter) {
   formatter_context.setRequestHeaders(request_header);
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse("%QUERY_PARAMS(A)%").IgnoreError(), EnvoyException,
-        "Invalid QUERY_PARAMS option: 'A', only 'ORIG'/'DECODED' are allowed");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%QUERY_PARAMS(A)%"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "Invalid QUERY_PARAMS option: 'A', only 'ORIG'/'DECODED' are allowed"));
   }
 
   {
@@ -5535,7 +5598,7 @@ TEST(SubstitutionFormatterTest, ParserSuccesses) {
                                          "%DOWNSTREAM_PEER_FINGERPRINT_256%"};
 
   for (const std::string& test_case : test_cases) {
-    EXPECT_TRUE(parser.parse(test_case).status().ok());
+    EXPECT_OK(parser.parse(test_case).status());
   }
 }
 
@@ -5590,8 +5653,8 @@ TEST(SubstitutionFormatterTest, PercentEscapingEdgeCase) {
 
 TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%ENVIRONMENT()%").IgnoreError(),
-                              EnvoyException, "ENVIRONMENT requires parameters");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%ENVIRONMENT()%"),
+                HasStatus(absl::StatusCode::kInvalidArgument, "ENVIRONMENT requires parameters"));
   }
 
   {
@@ -5633,15 +5696,16 @@ TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
 
 TEST(SubstitutionFormatterTest, PathTest) {
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%PATH(A)%").IgnoreError(),
-                              EnvoyException,
-                              "Invalid PATH option: 'A', only 'WQ'/'NQ' are allowed");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%PATH(A)%"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "Invalid PATH option: 'A', only 'WQ'/'NQ' are allowed"));
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse("%PATH(NQ:B)%").IgnoreError(), EnvoyException,
-        "Invalid PATH option: 'B', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed");
+    EXPECT_THAT(
+        SubstitutionFormatParser::parse("%PATH(NQ:B)%"),
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  "Invalid PATH option: 'B', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed"));
   }
 
   {
@@ -5703,9 +5767,9 @@ TEST(SubstitutionFormatParser, SyntaxVerifierFail) {
       };
 
   for (const auto& test_case : test_cases) {
-    EXPECT_FALSE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
-                                                    std::get<1>(test_case), std::get<2>(test_case))
-                     .ok());
+    EXPECT_THAT(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                   std::get<1>(test_case), std::get<2>(test_case)),
+                Not(IsOk()));
   }
 }
 
@@ -5734,9 +5798,8 @@ TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
            std::nullopt}};
 
   for (const auto& test_case : test_cases) {
-    EXPECT_TRUE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
-                                                   std::get<1>(test_case), std::get<2>(test_case))
-                    .ok());
+    EXPECT_OK(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                 std::get<1>(test_case), std::get<2>(test_case)));
   }
 }
 
@@ -5937,60 +6000,62 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterGridTest) {
 TEST(SubstitutionFormatterTest, CoalesceFormatterErrorCases) {
   // Empty JSON config.
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%COALESCE()%").IgnoreError(),
-                              EnvoyException, "COALESCE requires parameters");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%COALESCE()%"),
+                HasStatus(absl::StatusCode::kInvalidArgument, "COALESCE requires parameters"));
   }
 
   // Invalid JSON.
   {
-    EXPECT_THROW_WITH_REGEX(SubstitutionFormatParser::parse("%COALESCE(not json)%").IgnoreError(),
-                            EnvoyException, "COALESCE: failed to parse JSON configuration.*");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%COALESCE(not json)%"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: failed to parse JSON configuration")));
   }
 
   // Missing operators field.
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"foo": "bar"})%)").IgnoreError(),
-        EnvoyException, "COALESCE: JSON configuration must contain 'operators' array");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"foo": "bar"})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "COALESCE: JSON configuration must contain 'operators' array"));
   }
 
   // Empty operators array.
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": []})%)").IgnoreError(),
-        EnvoyException, "COALESCE: 'operators' array must not be empty");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": []})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "COALESCE: 'operators' array must not be empty"));
   }
 
   // Invalid operator which is not a string or object.
   {
-    EXPECT_THROW_WITH_REGEX(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [123]})%)").IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [123]})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: failed to parse operator at index 0")));
   }
 
   // Missing command field in operator object.
   {
-    EXPECT_THROW_WITH_REGEX(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [{"param": "foo"}]})%)")
-            .IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [{"param": "foo"}]})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: failed to parse operator at index 0")));
   }
 
   // Unknown command.
   {
-    EXPECT_THROW_WITH_REGEX(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["UNKNOWN_COMMAND"]})%)")
-            .IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*unknown command.*");
+    EXPECT_THAT(
+        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["UNKNOWN_COMMAND"]})%)"),
+        HasStatus(
+            absl::StatusCode::kInvalidArgument,
+            ContainsRegex("COALESCE: failed to parse operator at index 0.*unknown command.*")));
   }
 
   // Invalid not positive max_length.
   {
-    EXPECT_THROW_WITH_REGEX(
+    EXPECT_THAT(
         SubstitutionFormatParser::parse(
-            R"(%COALESCE({"operators": [{"command": "PROTOCOL", "max_length": 0}]})%)")
-            .IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*max_length.*positive.*");
+            R"(%COALESCE({"operators": [{"command": "PROTOCOL", "max_length": 0}]})%)"),
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  ContainsRegex(
+                      "COALESCE: failed to parse operator at index 0.*max_length.*positive.*")));
   }
 }
 
@@ -6048,7 +6113,7 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterWithOtherCommands) {
 
   auto formatter_or_error = FormatterImpl::create(
       R"(protocol=%PROTOCOL% host=%COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}]})%)");
-  ASSERT_TRUE(formatter_or_error.ok());
+  ASSERT_OK(formatter_or_error);
   auto& formatter = *formatter_or_error.value();
 
   std::string result = formatter.format({&request_headers}, stream_info);

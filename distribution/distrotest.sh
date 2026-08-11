@@ -121,7 +121,7 @@ pgrep envoy
 run_log proxy-responds "Check proxy responds"
 # The website can be flakey, give it a minute of trying...
 RESPONSE="$(retry 60 curl -s http://localhost:10000/)"
-echo "$RESPONSE" | grep "Envoy is an open source edge and service proxy, designed for cloud-native applications"
+echo "$RESPONSE" | grep "Envoy is an open source edge and service proxy"
 
 run_log stop-envoy "Stop envoy"
 sudo -u envoy pkill envoy && echo "Envoy stopped"

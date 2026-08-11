@@ -603,7 +603,7 @@ ClusterFactory::createClusterWithConfig(
     Upstream::ClusterFactoryContext& context) {
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context.serverFactoryContext(), context.messageValidationVisitor());
+      context.serverFactoryContext());
 
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (!cluster_config.has_upstream_http_protocol_options()) {

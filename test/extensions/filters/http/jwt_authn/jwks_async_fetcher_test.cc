@@ -1,5 +1,6 @@
 #include "source/common/router/retry_policy_impl.h"
 #include "source/extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
+#include "source/extensions/filters/http/jwt_authn/stats.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
@@ -82,7 +83,7 @@ public:
                 fetch_receiver_array_.push_back(&receiver);
               });
         },
-        stats_,
+        stats_.jwks_fetch_success_, stats_.jwks_fetch_failed_,
         [this](Envoy::JwtVerify::JwksPtr&& jwks) { out_jwks_array_.push_back(std::move(jwks)); });
 
     if (initManagerUsed()) {

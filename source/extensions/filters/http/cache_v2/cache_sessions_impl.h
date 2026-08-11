@@ -272,10 +272,10 @@ private:
 class CacheSessionsImpl : public CacheSessions,
                           public std::enable_shared_from_this<CacheSessionsImpl> {
 public:
-  CacheSessionsImpl(Server::Configuration::FactoryContext& context,
+  CacheSessionsImpl(Server::Configuration::ServerFactoryContext& context,
                     std::unique_ptr<HttpCache> cache)
-      : time_source_(context.serverFactoryContext().timeSource()), cache_(std::move(cache)),
-        stats_(generateStats(context.serverFactoryContext().scope(), cache_->cacheInfo().name_)) {}
+      : time_source_(context.timeSource()), cache_(std::move(cache)),
+        stats_(generateStats(context.scope(), cache_->cacheInfo().name_)) {}
 
   void lookup(ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb) override;
   CacheFilterStats& stats() const override { return *stats_; }

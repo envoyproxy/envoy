@@ -8,6 +8,7 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
@@ -745,7 +746,7 @@ TEST_F(WebIdentityCredentialsProviderTest, TokenFileWatcherRefresh) {
   // Write new token
   TestEnvironment::writeStringToFileForTest("web_token", "new_file_token", false);
   // Trigger file watcher callback
-  EXPECT_TRUE(watcher_callback(Filesystem::Watcher::Events::MovedTo).ok());
+  EXPECT_OK(watcher_callback(Filesystem::Watcher::Events::MovedTo));
 
   // Refresh should pick up new token
   timer_->invokeCallback();

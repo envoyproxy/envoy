@@ -22,6 +22,7 @@
 #include "test/mocks/server/worker_factory.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -100,10 +101,8 @@ public:
         .Times(AtLeast(0));
 
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
-    EXPECT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
-                    bootstrap, options_,
-                    server_.messageValidationContext().staticValidationVisitor(), *api_)
-                    .ok());
+    EXPECT_OK(Server::InstanceUtil::loadBootstrapConfig(
+        bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_));
     absl::Status creation_status;
     Server::Configuration::InitialImpl initial_config(bootstrap, creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
@@ -214,9 +213,8 @@ void testMerge() {
   OptionsImplBase options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
                                                         Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  ASSERT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
-                  bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
-                  .ok());
+  ASSERT_OK(Server::InstanceUtil::loadBootstrapConfig(
+      bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api));
   EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
 }
 
@@ -241,9 +239,8 @@ uint32_t run(const std::string& directory) {
           Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
       ConfigTest test1(options);
       envoy::config::bootstrap::v3::Bootstrap bootstrap;
-      EXPECT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
-                      bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
-                      .ok());
+      EXPECT_OK(Server::InstanceUtil::loadBootstrapConfig(
+          bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api));
       ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
       OptionsImplBase config = asConfigYaml(options, *api);
       ConfigTest test2(config);

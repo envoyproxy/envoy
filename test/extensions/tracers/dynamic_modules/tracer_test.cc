@@ -4,12 +4,16 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
 using testing::NiceMock;
+using ::testing::Not;
 
 namespace Envoy {
 namespace Extensions {
@@ -28,10 +32,10 @@ DynamicModuleTracerConfigSharedPtr createTracerConfig(const std::string& module_
                                                       Stats::Scope& scope) {
   auto module =
       Envoy::Extensions::DynamicModules::newDynamicModuleByName(module_name, false, false);
-  EXPECT_TRUE(module.ok());
+  EXPECT_OK(module);
   auto config_or =
       newDynamicModuleTracerConfig("test_tracer", "", "test_ns", std::move(module.value()), scope);
-  EXPECT_TRUE(config_or.ok());
+  EXPECT_OK(config_or);
   return config_or.value();
 }
 
@@ -47,35 +51,34 @@ public:
 TEST_F(TracerConfigTest, CreateSuccess) {
   auto module =
       Envoy::Extensions::DynamicModules::newDynamicModuleByName("tracer_no_op", false, false);
-  ASSERT_TRUE(module.ok());
+  ASSERT_OK(module);
 
   Stats::IsolatedStoreImpl store;
   auto config = newDynamicModuleTracerConfig("test_tracer", "test_config", "test_ns",
                                              std::move(module.value()), *store.rootScope());
-  ASSERT_TRUE(config.ok());
+  ASSERT_OK(config);
   EXPECT_NE(config.value()->in_module_config_, nullptr);
 }
 
 TEST_F(TracerConfigTest, CreateFailMissingSymbol) {
   auto module = Envoy::Extensions::DynamicModules::newDynamicModuleByName("no_op", false, false);
-  ASSERT_TRUE(module.ok());
+  ASSERT_OK(module);
 
   Stats::IsolatedStoreImpl store;
   auto config = newDynamicModuleTracerConfig("test_tracer", "", "test_ns",
                                              std::move(module.value()), *store.rootScope());
-  ASSERT_FALSE(config.ok());
+  ASSERT_THAT(config, Not(IsOk()));
 }
 
 TEST_F(TracerConfigTest, CreateFailConfigInitReturnsNull) {
   auto module =
       Envoy::Extensions::DynamicModules::newDynamicModuleByName("tracer_config_fail", false, false);
-  ASSERT_TRUE(module.ok());
+  ASSERT_OK(module);
 
   Stats::IsolatedStoreImpl store;
   auto config = newDynamicModuleTracerConfig("test_tracer", "", "test_ns",
                                              std::move(module.value()), *store.rootScope());
-  ASSERT_FALSE(config.ok());
-  EXPECT_EQ(config.status().message(), "Failed to initialize dynamic module tracer config");
+  ASSERT_THAT(config, HasStatusMessage("Failed to initialize dynamic module tracer config"));
 }
 
 // =============================================================================

@@ -860,6 +860,21 @@ func (mr *MockHttpFilterHandleMockRecorder) GetFilterStateTyped(key any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFilterStateTyped", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetFilterStateTyped), key)
 }
 
+// GetGenericSecret mocks base method.
+func (m *MockHttpFilterHandle) GetGenericSecret(id shared.GenericSecretID) (shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetGenericSecret", id)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetGenericSecret indicates an expected call of GetGenericSecret.
+func (mr *MockHttpFilterHandleMockRecorder) GetGenericSecret(id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGenericSecret", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetGenericSecret), id)
+}
+
 // GetLogLevel mocks base method.
 func (m *MockHttpFilterHandle) GetLogLevel() shared.LogLevel {
 	m.ctrl.T.Helper()
@@ -1525,6 +1540,18 @@ func (mr *MockHttpFilterHandleMockRecorder) SetMetadata(metadataNamespace, key, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMetadata", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetMetadata), metadataNamespace, key, value)
 }
 
+// SetMetadataStruct mocks base method.
+func (m *MockHttpFilterHandle) SetMetadataStruct(metadataNamespace string, serializedStruct []byte) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetMetadataStruct", metadataNamespace, serializedStruct)
+}
+
+// SetMetadataStruct indicates an expected call of SetMetadataStruct.
+func (mr *MockHttpFilterHandleMockRecorder) SetMetadataStruct(metadataNamespace, serializedStruct any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMetadataStruct", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetMetadataStruct), metadataNamespace, serializedStruct)
+}
+
 // SetSocketOptionBytes mocks base method.
 func (m *MockHttpFilterHandle) SetSocketOptionBytes(level, name int64, state shared.SocketOptionState, direction shared.SocketDirection, value []byte) bool {
 	m.ctrl.T.Helper()
@@ -1551,6 +1578,18 @@ func (m *MockHttpFilterHandle) SetSocketOptionInt(level, name int64, state share
 func (mr *MockHttpFilterHandleMockRecorder) SetSocketOptionInt(level, name, state, direction, value any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSocketOptionInt", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetSocketOptionInt), level, name, state, direction, value)
+}
+
+// SetTypedMetadata mocks base method.
+func (m *MockHttpFilterHandle) SetTypedMetadata(metadataNamespace string, serializedAny []byte) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetTypedMetadata", metadataNamespace, serializedAny)
+}
+
+// SetTypedMetadata indicates an expected call of SetTypedMetadata.
+func (mr *MockHttpFilterHandleMockRecorder) SetTypedMetadata(metadataNamespace, serializedAny any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTypedMetadata", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetTypedMetadata), metadataNamespace, serializedAny)
 }
 
 // SetUpstreamOverrideHost mocks base method.
@@ -1683,6 +1722,21 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) DefineHistogram(name any, tagK
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{name}, tagKeys...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DefineHistogram", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).DefineHistogram), varargs...)
+}
+
+// GetGenericSecret mocks base method.
+func (m *MockHttpFilterConfigHandle) GetGenericSecret(id shared.GenericSecretID) (shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetGenericSecret", id)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetGenericSecret indicates an expected call of GetGenericSecret.
+func (mr *MockHttpFilterConfigHandleMockRecorder) GetGenericSecret(id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGenericSecret", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).GetGenericSecret), id)
 }
 
 // GetScheduler mocks base method.
@@ -1860,4 +1914,18 @@ func (m *MockHttpFilterConfigHandle) StartHttpStream(cluster string, headers [][
 func (mr *MockHttpFilterConfigHandleMockRecorder) StartHttpStream(cluster, headers, body, endOfStream, timeoutMs, cb any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartHttpStream", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).StartHttpStream), cluster, headers, body, endOfStream, timeoutMs, cb)
+}
+
+// SubscribeGenericSecret mocks base method.
+func (m *MockHttpFilterConfigHandle) SubscribeGenericSecret(name, sdsConfigSource string) shared.GenericSecretID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubscribeGenericSecret", name, sdsConfigSource)
+	ret0, _ := ret[0].(shared.GenericSecretID)
+	return ret0
+}
+
+// SubscribeGenericSecret indicates an expected call of SubscribeGenericSecret.
+func (mr *MockHttpFilterConfigHandleMockRecorder) SubscribeGenericSecret(name, sdsConfigSource any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeGenericSecret", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).SubscribeGenericSecret), name, sdsConfigSource)
 }

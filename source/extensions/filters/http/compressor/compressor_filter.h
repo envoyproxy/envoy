@@ -284,6 +284,9 @@ private:
   // Returns the appropriate content encoding for the current route.
   std::string getContentEncoding() const;
 
+  // Returns the request stream info (downstream or upstream depending on the filter type).
+  StreamInfo::StreamInfo& streamInfo() const;
+
   Envoy::Compression::Compressor::CompressorPtr response_compressor_;
   Envoy::Compression::Compressor::CompressorPtr request_compressor_;
   const CompressorFilterConfigSharedPtr config_;

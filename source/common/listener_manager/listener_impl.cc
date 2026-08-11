@@ -40,6 +40,8 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/active_quic_listener.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/quic_packet_writer_interface.h"
 #include "source/common/quic/udp_gso_batch_writer.h"
 #endif
 
@@ -74,6 +76,7 @@ bool shouldBindToPort(const envoy::config::listener::v3::Listener& config) {
   return PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, bind_to_port, true) &&
          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true);
 }
+
 } // namespace
 
 absl::StatusOr<std::unique_ptr<ListenSocketFactoryImpl>> ListenSocketFactoryImpl::create(
@@ -267,10 +270,13 @@ generateListenerStatsScope(const envoy::config::listener::v3::Listener& config,
   auto& stats = server.stats();
   Stats::StatsMatcherSharedPtr scope_matcher;
 
-  // Check for a per-listener stats matcher in typed_filter_metadata. If present, unpack it as
-  // StatsMatcher and use it to restrict which stats are created for this listener's scope.
-  const auto& typed_meta = config.metadata().typed_filter_metadata();
-  if (auto it = typed_meta.find(StatsMatcherMetadataKey); it != typed_meta.end()) {
+  if (config.has_stats_matcher()) {
+    scope_matcher = std::make_shared<Stats::StatsMatcherImpl>(
+        config.stats_matcher(), stats.symbolTable(), server.serverFactoryContext());
+  } else if (auto it = config.metadata().typed_filter_metadata().find(StatsMatcherMetadataKey);
+             it != config.metadata().typed_filter_metadata().end()) {
+    // Check for a per-listener stats matcher in typed_filter_metadata. If present, unpack it as
+    // StatsMatcher and use it to restrict which stats are created for this listener's scope.
     envoy::config::metrics::v3::StatsMatcher stats_matcher_proto;
     if (auto status = MessageUtil::unpackTo(it->second, stats_matcher_proto); status.ok()) {
       MessageUtil::validate(stats_matcher_proto,
@@ -469,9 +475,10 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 
   filter_chain_manager_ = std::make_unique<FilterChainManagerImpl>(
-      addresses_, listener_factory_context_->parentFactoryContext(), initManager()),
+      addresses_, listener_factory_context_->parentFactoryContext(), initManager());
 
   buildAccessLog(config);
+
   SET_AND_RETURN_IF_NOT_OK(validateConfig(), creation_status);
 
   // buildUdpListenerFactory() must come before buildListenSocketOptions() because the UDP
@@ -495,6 +502,21 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     // with their parent's initManager.
     parent_.server_.initManager().add(listener_init_target_);
   }
+}
+
+std::shared_ptr<FcdsSharedFilterChainManager>
+ListenerImpl::maybeCreateFilterChainManager(const envoy::config::listener::v3::Listener& config) {
+  if (config.has_fcds_config()) {
+    return parent_.server_.serverFactoryContext()
+        .singletonManager()
+        .getTyped<FcdsSharedFilterChainManager>(
+            std::string(FcdsSharedFilterChainManagerName),
+            [this]() -> Singleton::InstanceSharedPtr {
+              return std::make_shared<FcdsSharedFilterChainManager>(
+                  parent_.server_.serverFactoryContext(), *parent_.factory_);
+            });
+  }
+  return nullptr;
 }
 
 ListenerImpl::ListenerImpl(ListenerImpl& origin,
@@ -597,6 +619,12 @@ absl::Status ListenerImpl::validateConfig() {
           "listener {}: enable_mptcp is set but MPTCP is not supported by the operating system",
           name_));
     }
+  }
+  // UDP listeners always carry socket options (e.g. packet info), but with bind_to_port
+  // disabled no socket is created to apply them to, which previously crashed at startup.
+  if (!bind_to_port_ && socket_type_ == Network::Socket::Type::Datagram) {
+    return absl::InvalidArgumentError(
+        fmt::format("listener {}: bind_to_port: false is not supported for UDP listeners", name_));
   }
   return absl::OkStatus();
 }
@@ -714,6 +742,18 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
         validation_visitor_, *listener_factory_context_);
+
+    if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
+      auto* quic_packet_writer_factory_factory =
+          Config::Utility::getFactory<Quic::QuicPacketWriterFactoryFactory>(
+              config.udp_listener_config().udp_packet_packet_writer_config());
+      if (quic_packet_writer_factory_factory != nullptr) {
+        udp_listener_config_->quic_writer_factory_ =
+            quic_packet_writer_factory_factory->createQuicPacketWriterFactory(
+                config.udp_listener_config().udp_packet_packet_writer_config(),
+                *listener_factory_context_);
+      }
+    }
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
     // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from
@@ -839,6 +879,7 @@ ListenerImpl::createListenerFilterFactories(const envoy::config::listener::v3::L
 absl::Status
 ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Listener& config) {
   if (config.filter_chains().empty() && !config.has_default_filter_chain() &&
+      !config.has_fcds_config() &&
       (socket_type_ == Network::Socket::Type::Stream ||
        !udp_listener_config_->listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
@@ -881,7 +922,8 @@ absl::Status ListenerImpl::buildFilterChains(const envoy::config::listener::v3::
       config.has_filter_chain_matcher() ? &config.filter_chain_matcher() : nullptr,
       config.filter_chains(),
       config.has_default_filter_chain() ? &config.default_filter_chain() : nullptr, builder,
-      *filter_chain_manager_);
+      *filter_chain_manager_, maybeCreateFilterChainManager(config),
+      config.fcds_config().config_source(), *this);
 }
 
 bool ListenerImpl::reusePortBpfCpuSteeringEnabled(
@@ -1015,6 +1057,7 @@ void ListenerImpl::buildProxyProtocolListenerFilter(
     listener_filter_factories_.push_back(std::move(filter_config_provider));
   }
 }
+
 PerListenerFactoryContextImpl::PerListenerFactoryContextImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::config::listener::v3::Listener& config_message, ListenerImpl& listener_impl,
@@ -1148,12 +1191,6 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   // The in place update needs the active listener in worker thread. worker_started guarantees the
   // existence of that active listener.
   if (!worker_started) {
-    return false;
-  }
-
-  // If FCDS is used, LDS updates will cause full listener update. It's expected that if FCDS is
-  // used, dynamic filter chain updates will be applied using FCDS rather than LDS.
-  if (configInternal().has_fcds_config()) {
     return false;
   }
 
@@ -1406,6 +1443,12 @@ bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v
   // Without message reflection, err on the side of reloads.
   return false;
 #endif
+}
+
+void ListenerImpl::drainFilterChain(Network::DrainableFilterChainSharedPtr draining) {
+  if (parent_.isWorkerStarted()) {
+    parent_.drainFilterChains(*this, {std::move(draining)});
+  }
 }
 
 } // namespace Server

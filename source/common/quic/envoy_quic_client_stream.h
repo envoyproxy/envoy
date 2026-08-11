@@ -78,8 +78,6 @@ public:
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                           quic::ConnectionCloseSource source) override;
 
-  void clearWatermarkBuffer();
-
   // quic::QuicSpdyStream::MetadataVisitor
   void OnMetadataComplete(size_t frame_len, const quic::QuicHeaderList& header_list) override;
 

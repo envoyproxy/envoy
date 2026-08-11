@@ -1,8 +1,13 @@
 #pragma once
 
+#include <string>
+
+#include "envoy/common/pure.h"
 #include "envoy/compression/decompressor/factory.h"
 #include "envoy/config/typed_config.h"
-#include "envoy/server/filter_config.h"
+#include "envoy/server/factory_context.h"
+
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Compression {

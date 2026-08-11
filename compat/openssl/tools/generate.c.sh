@@ -31,7 +31,7 @@ INCLUDE_DIR="${3?"INCLUDE_DIR not specified"}"
 ################################################################################
 # Find out which header file the function is declared in
 ################################################################################
-HDR_FILE=$(grep -r "OPENSSL_EXPORT.*[^A-Za-z0-9_]${FUNC_NAME}[ \t]*(" "${INCLUDE_DIR}"/openssl/* | cut -d: -f1)
+HDR_FILE=$(grep -r --exclude-dir='*.tmp' "OPENSSL_EXPORT.*[^A-Za-z0-9_]${FUNC_NAME}[ \t]*(" "${INCLUDE_DIR}"/openssl/* | cut -d: -f1)
 if [ ! -f "$HDR_FILE" ]; then
   error "Failed to determine header file for $FUNC_NAME"
 fi

@@ -487,14 +487,6 @@ void EnvoyQuicServerStream::OnClose() {
   stats_gatherer_ = nullptr;
 }
 
-void EnvoyQuicServerStream::clearWatermarkBuffer() {
-  if (BufferedDataBytes() > 0) {
-    // If the stream is closed without sending out all buffered data, regard
-    // them as sent now and adjust connection buffer book keeping.
-    updateBytesBuffered(BufferedDataBytes(), 0);
-  }
-}
-
 void EnvoyQuicServerStream::OnCanWrite() {
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   quic::QuicSpdyServerStreamBase::OnCanWrite();

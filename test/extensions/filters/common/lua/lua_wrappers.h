@@ -28,7 +28,9 @@ template <class T> class LuaWrappersTestBase : public testing::Test {
 public:
   virtual void setup(const std::string& code) {
     coroutine_.reset();
-    state_ = std::make_unique<ThreadLocalState>(code, tls_);
+    absl::Status creation_status = absl::OkStatus();
+    state_ = std::make_unique<ThreadLocalState>(code, tls_, creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     state_->registerType<T>();
     coroutine_ = state_->createCoroutine();
     lua_pushcclosure(coroutine_->luaState(), luaTestPrint, 0);
@@ -38,9 +40,9 @@ public:
 
   void TearDown() override { testing::Mock::VerifyAndClear(&printer_); }
 
-  void start(const std::string& method) {
-    coroutine_->start(state_->getGlobalRef(state_->registerGlobal(method, initializers_)), 1,
-                      yield_callback_);
+  absl::Status start(const std::string& method) {
+    return coroutine_->start(state_->getGlobalRef(state_->registerGlobal(method, initializers_)), 1,
+                             yield_callback_);
   }
 
   static int luaTestPrint(lua_State* state) {
@@ -51,7 +53,7 @@ public:
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   ThreadLocalStatePtr state_;
-  std::function<void()> yield_callback_;
+  YieldCallback yield_callback_;
   CoroutinePtr coroutine_;
   Printer& printer_{getPrinter()};
   InitializerList initializers_;

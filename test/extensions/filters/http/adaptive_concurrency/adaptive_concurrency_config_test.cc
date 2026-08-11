@@ -64,10 +64,12 @@ enabled:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor()).Times(testing::AnyNumber());
-  Http::FilterFactoryCb cb =
-      factory
-          .createHttpFilterFactoryFromProto(*proto_config, "stats", context.server_factory_context_)
-          .value();
+  Server::Configuration::ExtraFactoryContext extra_context{
+      context.server_factory_context_.messageValidationVisitor(), "stats"};
+  Http::FilterFactoryCb cb = factory
+                                 .createHttpFilterFactoryFromProto(
+                                     *proto_config, context.server_factory_context_, extra_context)
+                                 .value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

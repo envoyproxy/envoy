@@ -6,6 +6,8 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "absl/functional/function_ref.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -60,6 +62,13 @@ public:
   forEachHostMetric(const ClusterManager& cluster_manager,
                     const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
                     const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& gauge_cb);
+
+  /**
+   * Invokes `callback(HostLbPolicyData&)` for each load-balancing-policy data entry on `host` whose
+   * receivesOrcaLoadReport() is true.
+   */
+  static void forEachOrcaLoadReportRecipient(const HostDescription& host,
+                                             absl::FunctionRef<void(HostLbPolicyData&)> callback);
 };
 
 } // namespace Upstream

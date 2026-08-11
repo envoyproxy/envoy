@@ -7,6 +7,7 @@
 #include "test/extensions/common/dubbo/mocks.h"
 #include "test/extensions/filters/network/generic_proxy/mocks/codec.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -59,7 +60,9 @@ TEST(DubboRequestTest, DubboRequestTest) {
   }
 
   // Static attributes test.
-  { EXPECT_EQ("dubbo", request.protocol()); }
+  {
+    EXPECT_EQ("dubbo", request.protocol());
+  }
 
   // Basic attributes test.
   {
@@ -339,7 +342,7 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
     EXPECT_CALL(*raw_serializer, serializeRpcResponse(_, _));
     EXPECT_CALL(callbacks, writeToConnection(_));
 
-    EXPECT_TRUE(server_codec.encode(response, encoding_context).ok());
+    EXPECT_OK(server_codec.encode(response, encoding_context));
   }
 
   {
@@ -539,7 +542,7 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _));
     EXPECT_CALL(callbacks, writeToConnection(_));
 
-    EXPECT_TRUE(client_codec.encode(request, encoding_context).ok());
+    EXPECT_OK(client_codec.encode(request, encoding_context));
   }
 
   // Encode one-way request.
@@ -559,7 +562,7 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _));
     EXPECT_CALL(callbacks, writeToConnection(_));
 
-    EXPECT_TRUE(client_codec.encode(request, encoding_context).ok());
+    EXPECT_OK(client_codec.encode(request, encoding_context));
   }
 }
 

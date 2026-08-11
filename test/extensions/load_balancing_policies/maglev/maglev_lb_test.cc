@@ -14,6 +14,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 namespace Envoy {
@@ -95,7 +96,7 @@ public:
     }
 
     createLb();
-    EXPECT_TRUE(lb_->initialize().ok());
+    EXPECT_OK(lb_->initialize());
   }
 
   NiceMock<MockPrioritySet> priority_set_;

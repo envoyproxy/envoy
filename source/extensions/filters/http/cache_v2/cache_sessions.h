@@ -90,7 +90,7 @@ public:
   // This is implemented in CacheSessionsImpl so that tests which only use a mock don't
   // need to build the real thing, but declared here so that the actual use-site can
   // create an instance without including the larger header.
-  static std::shared_ptr<CacheSessions> create(Server::Configuration::FactoryContext& context,
+  static std::shared_ptr<CacheSessions> create(Server::Configuration::ServerFactoryContext& context,
                                                std::unique_ptr<HttpCache> cache);
 
   virtual void lookup(ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb) PURE;

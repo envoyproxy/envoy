@@ -18,13 +18,16 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::InSequence;
+using ::testing::Not;
 using testing::Return;
 using testing::StrEq;
 using testing::Throw;
@@ -109,8 +112,7 @@ resources:
 
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
-  EXPECT_TRUE(
-      cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()));
   EXPECT_EQ("0", cds_->versionInfo());
 
   const std::string response2_yaml = R"EOF(
@@ -123,8 +125,7 @@ resources:
   EXPECT_CALL(cm_, removeCluster("cluster1", false)).WillOnce(Return(true));
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response2);
-  EXPECT_TRUE(
-      cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()));
   EXPECT_EQ("1", cds_->versionInfo());
 }
 
@@ -153,7 +154,7 @@ TEST_F(CdsApiImplTest, EmptyConfigUpdate) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
   EXPECT_CALL(initialized_, ready());
 
-  EXPECT_TRUE(cds_callbacks_->onConfigUpdate({}, "").ok());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate({}, ""));
   EXPECT_EQ(0UL, scope_.counter("cluster_manager.cds.config_reload").value());
   EXPECT_EQ(
       0UL,
@@ -178,7 +179,7 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
   expectAdd("cluster_2");
 
   const auto decoded_resources = TestUtility::decodeResources({cluster_1, cluster_2});
-  EXPECT_TRUE(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""));
 }
 
 TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
@@ -210,7 +211,7 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
     }
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(resources);
-    EXPECT_TRUE(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1").ok());
+    EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1"));
   }
 
   {
@@ -229,7 +230,7 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
     EXPECT_CALL(cm_, removeCluster(StrEq("cluster_1"), false)).WillOnce(Return(true));
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(resources);
-    EXPECT_TRUE(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed, "v2").ok());
+    EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed, "v2"));
   }
 }
 
@@ -293,8 +294,7 @@ resources:
   EXPECT_EQ("", cds_->versionInfo());
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
-  EXPECT_TRUE(
-      cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()));
   EXPECT_EQ("0", cds_->versionInfo());
 
   const std::string response2_yaml = R"EOF(
@@ -324,8 +324,7 @@ resources:
   EXPECT_CALL(cm_, removeCluster("cluster2", false));
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response2);
-  EXPECT_TRUE(
-      cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()));
 
   EXPECT_EQ("1", cds_->versionInfo());
   EXPECT_EQ(2UL, scope_.counter("cluster_manager.cds.config_reload").value());
@@ -365,8 +364,8 @@ resources:
   EXPECT_CALL(initialized_, ready());
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
-  EXPECT_FALSE(
-      cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+  EXPECT_THAT(cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
+              Not(IsOk()));
   EXPECT_EQ("", cds_->versionInfo());
 }
 
@@ -402,8 +401,7 @@ resources:
 
   expectAdd("sotw_cluster_1", "0");
   EXPECT_CALL(initialized_, ready());
-  EXPECT_TRUE(
-      cds_callbacks_->onConfigUpdate(decoded_resources1.refvec_, response1.version_info()).ok());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources1.refvec_, response1.version_info()));
   EXPECT_EQ("0", cds_->versionInfo());
 
   // 2. A second SotW update removes "sotw_cluster_1" and adds "sotw_cluster_2".
@@ -426,8 +424,7 @@ resources:
   EXPECT_CALL(cm_, removeCluster("sotw_cluster_1", false));
   EXPECT_CALL(cm_, removeCluster("od_cluster_1", false)).Times(0);
 
-  EXPECT_TRUE(
-      cds_callbacks_->onConfigUpdate(decoded_resources2.refvec_, response2.version_info()).ok());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources2.refvec_, response2.version_info()));
   EXPECT_EQ("1", cds_->versionInfo());
 }
 
@@ -451,8 +448,7 @@ resources:
 
   expectAdd("sotw_cluster_1", "0");
   EXPECT_CALL(initialized_, ready());
-  EXPECT_TRUE(
-      cds_callbacks_->onConfigUpdate(decoded_resources1.refvec_, response1.version_info()).ok());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources1.refvec_, response1.version_info()));
 
   // 2. A second SotW update still contains "sotw_cluster_1".
   // An on-demand cluster "od_cluster_1" has also been added.
@@ -472,8 +468,7 @@ resources:
   // No clusters should be removed.
   EXPECT_CALL(cm_, removeCluster(_, false)).Times(0);
 
-  EXPECT_TRUE(
-      cds_callbacks_->onConfigUpdate(decoded_resources2.refvec_, response2.version_info()).ok());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources2.refvec_, response2.version_info()));
   EXPECT_EQ("1", cds_->versionInfo());
 }
 

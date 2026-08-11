@@ -1,8 +1,11 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "source/extensions/filters/network/common/redis/codec.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,6 +21,20 @@ public:
 };
 
 RespValuePtr makeError(const std::string& error);
+
+// Construct a RespValue holding a BulkString. Convenience factory used by code
+// that builds RESP request/reply payloads piecemeal (e.g., HELLO replies,
+// canned commands sent from the conn pool).
+RespValue makeBulkString(absl::string_view value);
+
+// Construct a RespValue holding an Integer.
+RespValue makeInteger(int64_t value);
+
+// Build a RESP command request (Array of BulkStrings) from a command name
+// followed by its argument list. Mirrors the canonical "command + args" shape
+// every Redis request takes on the wire and saves callers from open-coding
+// the loop in AuthRequest / ReadOnlyRequest / AskingRequest etc.
+RespValue makeRequest(absl::string_view command, const std::vector<std::string>& args);
 
 class ReadOnlyRequest : public Redis::RespValue {
 public:

@@ -648,12 +648,17 @@ public:
      * @param hosts_removed supplies the hosts removed since the last update.
      * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
      * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
+     * @param cross_priority_host_map read only cross-priority host map which is created in the main
+     * thread and shared by all the worker threads. This is used when a coalesced batch host update
+     * is applied to a worker thread's priority set, where the shared map is delivered once for the
+     * whole batch.
      */
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
                              std::optional<bool> weighted_priority_health,
-                             std::optional<uint32_t> overprovisioning_factor) PURE;
+                             std::optional<uint32_t> overprovisioning_factor,
+                             HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
   };
 
   /**
@@ -678,6 +683,13 @@ public:
    * @param callback callback to use to add hosts.
    */
   virtual void batchHostUpdate(BatchUpdateCb& callback) PURE;
+
+  /**
+   * @return true if a batch host update (see batchHostUpdate()) is currently in progress. This
+   * remains true while the batch's end-of-batch MemberUpdateCb callbacks are running, allowing
+   * update callbacks to distinguish a coalesced batch update from an individual update.
+   */
+  virtual bool batchUpdateActive() const PURE;
 };
 
 /**
@@ -755,6 +767,7 @@ public:
   COUNTER(upstream_cx_none_healthy)                                                                \
   COUNTER(upstream_cx_overflow)                                                                    \
   COUNTER(upstream_cx_pool_overflow)                                                               \
+  COUNTER(upstream_cx_preconnect_skipped)                                                          \
   COUNTER(upstream_cx_protocol_error)                                                              \
   COUNTER(upstream_cx_rx_bytes_total)                                                              \
   COUNTER(upstream_cx_total)                                                                       \
@@ -1076,6 +1089,13 @@ public:
    * @return how many streams should be anticipated per each current stream.
    */
   virtual float peekaheadRatio() const PURE;
+
+  /**
+   * @param host the upstream host being considered for a preconnect.
+   * @return whether anticipatory connections may be opened to the host, per the cluster's
+   * preconnect_enabled_metadata matcher. Does not affect on-demand connections for requests.
+   */
+  virtual bool shouldPreconnect(const Host& host) const PURE;
 
   /**
    * @return soft limit on size of the cluster's connections read and write buffers.

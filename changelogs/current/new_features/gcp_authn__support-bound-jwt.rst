@@ -1,1 +1,0 @@
-Added support to fetch and inject bound JWTs from the GCE Metadata Server. Configured via the ``bound_jwt`` field in the :ref:`Audience proto <envoy_v3_api_msg_extensions.filters.http.gcp_authn.v3.Audience>`.

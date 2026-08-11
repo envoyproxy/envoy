@@ -30,7 +30,7 @@ inline absl::string_view statusToString(Status status) {
   case Status::ParseError:
     return McpConstants::StatusValues::PARSE_ERROR;
   case Status::NoMcp:
-    return McpConstants::StatusValues::NO_MCP;
+    return McpConstants::StatusValues::REJECT_NO_MCP;
   case Status::NotJsonRpc:
     return McpConstants::StatusValues::NOT_JSONRPC;
   case Status::DuplicateKeys:

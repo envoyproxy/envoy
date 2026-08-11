@@ -19,12 +19,9 @@ void KafkaServerCodec::setCodecCallbacks(GenericProxy::ServerCodecCallbacks& cal
 
 void KafkaServerCodec::decode(Envoy::Buffer::Instance& buffer, bool) {
   request_buffer_.move(buffer);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.generic_proxy_codec_buffer_limit")) {
-    if (request_buffer_.length() > request_callbacks_->callbacks_.connection()->bufferLimit()) {
-      request_callbacks_->callbacks_.onDecodingFailure();
-      return;
-    }
+  if (request_buffer_.length() > request_callbacks_->callbacks_.connection()->bufferLimit()) {
+    request_callbacks_->callbacks_.onDecodingFailure();
+    return;
   }
   request_decoder_->onData(request_buffer_);
   // All data has been consumed, so we can drain the buffer.
@@ -69,12 +66,9 @@ void KafkaClientCodec::setCodecCallbacks(GenericProxy::ClientCodecCallbacks& cal
 
 void KafkaClientCodec::decode(Envoy::Buffer::Instance& buffer, bool) {
   response_buffer_.move(buffer);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.generic_proxy_codec_buffer_limit")) {
-    if (response_buffer_.length() > response_callbacks_->callbacks_.connection()->bufferLimit()) {
-      response_callbacks_->callbacks_.onDecodingFailure();
-      return;
-    }
+  if (response_buffer_.length() > response_callbacks_->callbacks_.connection()->bufferLimit()) {
+    response_callbacks_->callbacks_.onDecodingFailure();
+    return;
   }
   response_decoder_->onData(response_buffer_);
   // All data has been consumed, so we can drain the buffer.

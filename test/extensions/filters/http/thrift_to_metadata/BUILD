@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "//test/common/buffer:utility_lib",
         "//test/common/stream_info:test_util",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 

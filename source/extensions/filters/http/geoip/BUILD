@@ -41,6 +41,7 @@ envoy_cc_extension(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/geoip:geoip_filter_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/filters/http/geoip/v3:pkg_cc_proto",
     ],
 )

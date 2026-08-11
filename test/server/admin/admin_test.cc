@@ -22,6 +22,7 @@
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -187,6 +188,7 @@ TEST_P(AdminInstanceTest, Help) {
   /stats: print server stats
       usedonly: Only include stats that have been written by system since restart
       filter: Regular expression (Google re2) for filtering stats
+      invert_filter: Invert the filter regex
       format: Format to use; One of (html, active-html, text, json)
       type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
       histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, detailed, summary)
@@ -194,6 +196,7 @@ TEST_P(AdminInstanceTest, Help) {
       usedonly: Only include stats that have been written by system since restart
       text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)
       filter: Regular expression (Google re2) for filtering stats
+      invert_filter: Invert the filter regex
       histogram_buckets: Histogram bucket display mode; One of (cumulative, summary)
   /stats/recentlookups: Show recent stat-name lookups
   /stats/recentlookups/clear (POST): clear list of stat-name lookups and counter
@@ -341,7 +344,7 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.routeConfigProvider().config();
   peer.routeConfigProvider().configInfo();
   peer.routeConfigProvider().lastUpdated();
-  ASSERT_TRUE(peer.routeConfigProvider().onConfigUpdate().ok());
+  ASSERT_OK(peer.routeConfigProvider().onConfigUpdate());
 
   peer.scopedRouteConfigProvider().lastUpdated();
   peer.scopedRouteConfigProvider().getConfig();
@@ -358,7 +361,7 @@ TEST_P(AdminInstanceTest, Overrides) {
 
   peer.socketFactory().clone();
   peer.socketFactory().closeAllSockets();
-  ASSERT_TRUE(peer.socketFactory().doFinalPreWorkerInit().ok());
+  ASSERT_OK(peer.socketFactory().doFinalPreWorkerInit());
 
   peer.listener().name();
   peer.listener().udpListenerConfig();

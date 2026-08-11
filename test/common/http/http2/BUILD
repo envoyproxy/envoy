@@ -37,6 +37,7 @@ envoy_cc_test(
         "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@quiche//:http2_adapter",
@@ -75,6 +76,7 @@ envoy_cc_test(
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )
@@ -125,6 +127,7 @@ envoy_cc_test(
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -166,6 +169,7 @@ envoy_cc_test(
         "//source/common/http/http2:protocol_constraints_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )

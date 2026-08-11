@@ -27,7 +27,7 @@ public:
   /**
    * Combines a scope's tag-extracted prefix, prefix tags, and tagged (flat) prefix, together with
    * a stat's tag-extracted name, name tags and optional tagged (flat) name, into a single joined
-   * name. This is used by the tag-aware scope implementations to avoid needing to re-parse the
+   * name. This is used by the explicit-tags scope logic to avoid needing to re-parse the
    * final flat stat name in order to extract tags from it.
    *
    * @param prefix StatName the tag-extracted prefix for this scope (no tag values).
@@ -61,7 +61,7 @@ public:
    *
    * Tags come from one of two mutually-exclusive sources depending on the constructor used:
    * the legacy constructor stores the caller-owned span directly (`stat_name_tags_`); the
-   * tag-aware constructor derives and owns them in `effective_tags_`.
+   * explicit-tags constructor derives and owns them in `effective_tags_`.
    */
   std::optional<StatNameTagSpan> effectiveTags() const {
     if (stat_name_tags_.has_value()) {
@@ -86,7 +86,7 @@ private:
   // lifetime. effectiveTags() returns this directly when set.
   std::optional<StatNameTagSpan> stat_name_tags_;
 
-  // Set only by the tag-aware constructor: the inherited (prefix) tags followed by this
+  // Set only by the explicit-tags constructor: the inherited (prefix) tags followed by this
   // element's own (name) tags, owned (copied) by this joiner. effectiveTags() returns a span over
   // this when it is non-empty.
   StatNameTagVec effective_tags_;

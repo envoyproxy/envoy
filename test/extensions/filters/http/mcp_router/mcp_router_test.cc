@@ -9,6 +9,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -20,9 +21,12 @@ namespace HttpFilters {
 namespace McpRouter {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::_;
 using testing::AnyNumber;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::ReturnRef;
 
 // Verifies parseMethodString correctly maps MCP method strings to enum values.
@@ -68,7 +72,8 @@ TEST_F(McpRouterConfigTest, MultipleBackendsEnablesMultiplexing) {
   server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
   server2->mutable_mcp_cluster()->set_path("/mcp/calc");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
 
   EXPECT_EQ(config.backends().size(), 2);
   EXPECT_TRUE(config.isMultiplexing());
@@ -95,7 +100,8 @@ TEST_F(McpRouterConfigTest, SingleBackendSetsDefaultName) {
   server->set_name("tools");
   server->mutable_mcp_cluster()->set_cluster("tools_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
 
   EXPECT_EQ(config.backends().size(), 1);
   EXPECT_FALSE(config.isMultiplexing());
@@ -110,7 +116,8 @@ TEST_F(McpRouterConfigTest, DefaultPathWhenNotSpecified) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
 
   const McpBackendConfig* backend = config.findBackend("test");
   ASSERT_NE(backend, nullptr);
@@ -125,7 +132,8 @@ TEST_F(McpRouterConfigTest, DefaultMetadataNamespace) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_EQ(config.metadataNamespace(), "envoy.filters.http.mcp");
 }
 
@@ -139,8 +147,8 @@ TEST_F(McpRouterConfigTest, McpRouterClusterConfigImplParsesProto) {
   server->mutable_mcp_cluster()->mutable_timeout()->set_seconds(10);
 
   envoy::extensions::filters::http::mcp_router::v3::McpRouter base_proto;
-  auto base_config = std::make_shared<McpRouterConfigImpl>(base_proto, "test.", *store_.rootScope(),
-                                                           factory_context_);
+  auto base_config = std::make_shared<McpRouterConfigImpl>(
+      base_proto, "test.", *store_.rootScope(), factory_context_.server_factory_context_);
 
   McpRouterClusterConfigImpl cluster_config(proto_config, base_config);
 
@@ -254,7 +262,7 @@ TEST_F(SessionCodecTest, BuildCompositeSessionId) {
 
   EXPECT_TRUE(absl::StrContains(composite, "route1@"));
   auto parsed = SessionCodec::parseCompositeSessionId(composite);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
   EXPECT_EQ(parsed->subject, "user1");
   EXPECT_TRUE(absl::StrContains(composite, "backend1:"));
   EXPECT_TRUE(absl::StrContains(composite, "backend2:"));
@@ -270,7 +278,7 @@ TEST_F(SessionCodecTest, ParseCompositeSessionId) {
   std::string composite = SessionCodec::buildCompositeSessionId("myroute", "myuser", sessions);
 
   auto parsed = SessionCodec::parseCompositeSessionId(composite);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   EXPECT_EQ(parsed->route, "myroute");
   EXPECT_EQ(parsed->subject, "myuser");
@@ -281,10 +289,10 @@ TEST_F(SessionCodecTest, ParseCompositeSessionId) {
 
 // Verifies parsing rejects malformed session IDs.
 TEST_F(SessionCodecTest, ParseCompositeSessionIdRejectsMalformedInput) {
-  EXPECT_FALSE(SessionCodec::parseCompositeSessionId("no-at-signs").ok());
-  EXPECT_FALSE(SessionCodec::parseCompositeSessionId("one@part").ok());
-  EXPECT_FALSE(SessionCodec::parseCompositeSessionId("route@user@backend-no-colon").ok());
-  EXPECT_FALSE(SessionCodec::parseCompositeSessionId("route@user@:session").ok());
+  EXPECT_THAT(SessionCodec::parseCompositeSessionId("no-at-signs"), Not(IsOk()));
+  EXPECT_THAT(SessionCodec::parseCompositeSessionId("one@part"), Not(IsOk()));
+  EXPECT_THAT(SessionCodec::parseCompositeSessionId("route@user@backend-no-colon"), Not(IsOk()));
+  EXPECT_THAT(SessionCodec::parseCompositeSessionId("route@user@:session"), Not(IsOk()));
 }
 
 // Verifies full encode-decode-parse round-trip.
@@ -299,7 +307,7 @@ TEST_F(SessionCodecTest, FullRoundTrip) {
   std::string decoded = SessionCodec::decode(encoded);
 
   auto parsed = SessionCodec::parseCompositeSessionId(decoded);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   EXPECT_EQ(parsed->route, "route");
   EXPECT_EQ(parsed->subject, "subject");
@@ -318,7 +326,7 @@ TEST_F(SessionCodecTest, SpecialCharactersInSessionId) {
   std::string decoded = SessionCodec::decode(encoded);
 
   auto parsed = SessionCodec::parseCompositeSessionId(decoded);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   EXPECT_EQ(parsed->backend_sessions["backend"], "sess+with/special=chars");
 }
@@ -330,7 +338,8 @@ TEST_F(McpRouterConfigTest, SessionIdentityDisabledByDefault) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_FALSE(config.hasSessionIdentity());
   EXPECT_FALSE(config.shouldEnforceValidation());
 }
@@ -345,7 +354,8 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithHeaderSource) {
   auto* identity = proto_config.mutable_session_identity();
   identity->mutable_identity()->mutable_header()->set_name("x-user-id");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<HeaderSubjectSource>(config.subjectSource()));
   EXPECT_FALSE(config.shouldEnforceValidation()); // DISABLED by default
@@ -364,7 +374,8 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithMetadataSource) {
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<MetadataSubjectSource>(config.subjectSource()));
 }
@@ -382,7 +393,8 @@ TEST_F(McpRouterConfigTest, MetadataKeyPathParsed) {
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   const auto& source = absl::get<MetadataSubjectSource>(config.subjectSource());
   EXPECT_EQ(source.filter, "jwt");
   ASSERT_EQ(source.path_keys.size(), 2);
@@ -402,7 +414,8 @@ TEST_F(McpRouterConfigTest, ValidationModeEnforce) {
   identity->mutable_validation()->set_mode(
       envoy::extensions::filters::http::mcp_router::v3::ValidationPolicy::ENFORCE);
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(config.shouldEnforceValidation());
   EXPECT_EQ(config.validationMode(), ValidationMode::Enforce);
@@ -420,7 +433,8 @@ protected:
   McpRouterConfigSharedPtr
   createConfig(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config) {
     return std::make_shared<McpRouterConfigImpl>(proto_config, std::string("test."),
-                                                 *store_.rootScope(), factory_context_);
+                                                 *store_.rootScope(),
+                                                 factory_context_.server_factory_context_);
   }
 
   void setDynamicMetadata(const std::string& filter_name, const std::string& key,
@@ -766,13 +780,13 @@ TEST(AggregateToolsListTest, PreservesAllToolAttributes) {
   })";
 
   auto parsed = Json::Factory::loadFromString(backend_response);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   auto result = (*parsed)->getObject("result");
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
 
   auto tools = (*result)->getObjectArray("tools");
-  ASSERT_TRUE(tools.ok());
+  ASSERT_OK(tools);
   ASSERT_EQ(tools->size(), 1);
 
   const auto& tool = (*tools)[0];
@@ -780,30 +794,26 @@ TEST(AggregateToolsListTest, PreservesAllToolAttributes) {
 
   // Verify all attributes are present.
   auto name = tool->getString("name");
-  EXPECT_TRUE(name.ok());
-  EXPECT_EQ(*name, "get_weather");
+  EXPECT_THAT(name, IsOkAndHolds("get_weather"));
 
   auto title = tool->getString("title");
-  EXPECT_TRUE(title.ok());
-  EXPECT_EQ(*title, "Weather Tool");
+  EXPECT_THAT(title, IsOkAndHolds("Weather Tool"));
 
   auto desc = tool->getString("description");
-  EXPECT_TRUE(desc.ok());
-  EXPECT_EQ(*desc, "Get weather information");
+  EXPECT_THAT(desc, IsOkAndHolds("Get weather information"));
 
   auto input_schema = tool->getObject("inputSchema");
-  EXPECT_TRUE(input_schema.ok());
-  EXPECT_TRUE(*input_schema != nullptr);
+  EXPECT_THAT(input_schema, IsOkAndHolds(::testing::NotNull()));
 
   // Verify nested inputSchema properties are present.
   auto props = (*input_schema)->getObject("properties");
-  EXPECT_TRUE(props.ok());
+  EXPECT_OK(props);
 
   auto output_schema = tool->getObject("outputSchema");
-  EXPECT_TRUE(output_schema.ok());
+  EXPECT_OK(output_schema);
 
   auto annotations = tool->getObject("annotations");
-  EXPECT_TRUE(annotations.ok());
+  EXPECT_OK(annotations);
 }
 
 // Verifies tool JSON serialization preserves nested inputSchema.
@@ -821,30 +831,29 @@ TEST(AggregateToolsListTest, SerializationPreservesNestedInputSchema) {
   })";
 
   auto parsed = Json::Factory::loadFromString(tool_json);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   // Serialize and re-parse to verify round-trip.
   std::string serialized = (*parsed)->asJsonString();
 
   auto reparsed = Json::Factory::loadFromString(serialized);
-  ASSERT_TRUE(reparsed.ok());
+  ASSERT_OK(reparsed);
 
   auto input_schema = (*reparsed)->getObject("inputSchema");
-  ASSERT_TRUE(input_schema.ok());
+  ASSERT_OK(input_schema);
 
   auto props = (*input_schema)->getObject("properties");
-  ASSERT_TRUE(props.ok());
+  ASSERT_OK(props);
 
   auto query_prop = (*props)->getObject("query");
-  EXPECT_TRUE(query_prop.ok());
+  EXPECT_OK(query_prop);
 
   auto count_prop = (*props)->getObject("count");
-  EXPECT_TRUE(count_prop.ok());
+  EXPECT_OK(count_prop);
 
   // Verify the nested properties are preserved.
   auto count_type = (*count_prop)->getString("type");
-  EXPECT_TRUE(count_type.ok());
-  EXPECT_EQ(*count_type, "integer");
+  EXPECT_THAT(count_type, IsOkAndHolds("integer"));
 }
 
 // Verifies lazy_initialization config field defaults to false and can be enabled.
@@ -854,7 +863,8 @@ TEST_F(McpRouterConfigTest, LazyInitializationDefault) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_FALSE(config.lazyInitialization());
 }
 
@@ -865,7 +875,8 @@ TEST_F(McpRouterConfigTest, LazyInitializationEnabled) {
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
   proto_config.set_lazy_initialization(true);
 
-  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
   EXPECT_TRUE(config.lazyInitialization());
 }
 
@@ -873,8 +884,8 @@ TEST_F(McpRouterConfigTest, LazyInitializationEnabled) {
 TEST_F(McpRouterConfigTest, ClusterConfigDelegatesLazyInit) {
   envoy::extensions::filters::http::mcp_router::v3::McpRouter base_proto;
   base_proto.set_lazy_initialization(true);
-  auto base_config = std::make_shared<McpRouterConfigImpl>(base_proto, "test.", *store_.rootScope(),
-                                                           factory_context_);
+  auto base_config = std::make_shared<McpRouterConfigImpl>(
+      base_proto, "test.", *store_.rootScope(), factory_context_.server_factory_context_);
 
   envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig cluster_proto;
   auto* server = cluster_proto.add_servers();
@@ -2117,7 +2128,7 @@ TEST_F(SessionCodecTest, EmptyBackendSessions) {
   std::string composite = SessionCodec::buildCompositeSessionId("route", "user", empty_sessions);
 
   auto parsed = SessionCodec::parseCompositeSessionId(composite);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
   EXPECT_EQ(parsed->route, "route");
   EXPECT_EQ(parsed->subject, "user");
   EXPECT_TRUE(parsed->backend_sessions.empty());
@@ -2138,10 +2149,10 @@ TEST(AggregateToolsListTest, IconsArrayPreserved) {
   })";
 
   auto parsed = Json::Factory::loadFromString(tool_json);
-  ASSERT_TRUE(parsed.ok());
+  ASSERT_OK(parsed);
 
   auto icons = (*parsed)->getObjectArray("icons");
-  ASSERT_TRUE(icons.ok());
+  ASSERT_OK(icons);
   EXPECT_EQ(icons->size(), 2);
 }
 

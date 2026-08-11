@@ -275,9 +275,22 @@ public:
                              0x05, '2', '.', '0', '.', '2'}); // Dubbo version
     } else {
       buffer.add(std::string{
-          0x04, 't', 'e', 's', 't',      // Service name
-          0x05, '0', '.', '0', '.', '0', // Service version
-          0x04, 't', 'e', 's', 't',      // method name
+          0x04,
+          't',
+          'e',
+          's',
+          't', // Service name
+          0x05,
+          '0',
+          '.',
+          '0',
+          '.',
+          '0', // Service version
+          0x04,
+          't',
+          'e',
+          's',
+          't', // method name
       });
     }
   }

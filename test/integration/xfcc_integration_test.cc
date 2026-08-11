@@ -243,6 +243,25 @@ TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubject) {
                                        current_xfcc_by_hash_ + ";" + client_subject_);
 }
 
+TEST_P(XfccIntegrationTest, MtlsSanitizeSetIssuer) {
+  fcc_ = envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      SANITIZE_SET;
+  sccd_.set_issuer(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader(previous_xfcc_,
+                                       current_xfcc_by_hash_ + ";" + client_issuer_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubjectIssuer) {
+  fcc_ = envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      SANITIZE_SET;
+  sccd_.mutable_subject()->set_value(true);
+  sccd_.set_issuer(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader(previous_xfcc_, current_xfcc_by_hash_ + ";" +
+                                                           client_subject_ + ";" + client_issuer_);
+}
+
 TEST_P(XfccIntegrationTest, MtlsSanitizeSetUri) {
   fcc_ = envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       SANITIZE_SET;

@@ -25,6 +25,7 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/http:async_client_lib",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
     ],
 )
 

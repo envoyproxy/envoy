@@ -75,9 +75,15 @@ public:
   }
 
   void createVerifier() {
-    filter_config_ = std::make_shared<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_);
-    verifier_ = Verifier::create(proto_config_.rules(0).requires_(), proto_config_.providers(),
-                                 *filter_config_);
+    absl::Status creation_status = absl::OkStatus();
+    filter_config_ =
+        std::make_shared<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_, creation_status);
+    ASSERT_TRUE(creation_status.ok());
+
+    auto verifier_or = Verifier::create(proto_config_.rules(0).requires_(),
+                                        proto_config_.providers(), *filter_config_);
+    ASSERT_TRUE(verifier_or.ok());
+    verifier_ = std::move(verifier_or).value();
   }
 
   void modifyRequirement(const std::string& yaml) {

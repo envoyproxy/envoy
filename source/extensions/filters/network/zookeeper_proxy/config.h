@@ -16,13 +16,13 @@ namespace ZooKeeperProxy {
  * Config registration for the ZooKeeper proxy filter.
  */
 class ZooKeeperConfigFactory
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::network::zookeeper_proxy::v3::ZooKeeperProxy> {
 public:
-  ZooKeeperConfigFactory() : FactoryBase(NetworkFilterNames::get().ZooKeeperProxy) {}
+  ZooKeeperConfigFactory() : ExceptionFreeFactoryBase(NetworkFilterNames::get().ZooKeeperProxy) {}
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::zookeeper_proxy::v3::ZooKeeperProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };

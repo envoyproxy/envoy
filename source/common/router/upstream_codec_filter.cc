@@ -15,6 +15,7 @@
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/notification.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
 #include "source/common/grpc/common.h"
@@ -23,6 +24,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Router {
@@ -173,6 +175,29 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
                    "envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain") &&
                status >= 400) {
       maybeEndDecode(end_stream);
+      const bool has_upgrade_header = (headers->Upgrade() != nullptr);
+      const bool has_connection_upgrade =
+          (headers->Connection() != nullptr &&
+           Envoy::StringUtil::caseFindToken(headers->getConnectionValue(), ",",
+                                            Http::Headers::get().ConnectionValues.Upgrade));
+      const bool strip_upgrade_header = Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.strip_upgrade_header_on_failed_websocket_upgrades");
+      if (has_upgrade_header) {
+        ENVOY_NOTIFICATION("failed_websocket_upgrades_has_upgrade_header",
+                           "Websocket upgrade failed handshake but has upgrade header present");
+        if (strip_upgrade_header) {
+          headers->removeUpgrade();
+        }
+      }
+      if (has_connection_upgrade) {
+        ENVOY_NOTIFICATION("failed_websocket_upgrades_has_connection_upgrade_present",
+                           "WebSocket upgrade failed handshake but has connection header present");
+        if (strip_upgrade_header) {
+          Http::Utility::removeConnectionUpgrade(
+              *headers,
+              Envoy::StringUtil::CaseUnorderedSet{Http::Headers::get().ConnectionValues.Upgrade});
+        }
+      }
       filter_.callbacks_->encodeHeaders(std::move(headers), end_stream,
                                         StreamInfo::ResponseCodeDetails::get().ViaUpstream);
       return;

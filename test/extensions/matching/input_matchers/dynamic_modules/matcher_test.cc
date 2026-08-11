@@ -1,6 +1,7 @@
 #include "source/extensions/matching/input_matchers/dynamic_modules/matcher.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -29,22 +30,22 @@ public:
 TEST_F(DynamicModuleMatcherTest, AlwaysMatchModule) {
   auto module_or_error =
       Extensions::DynamicModules::newDynamicModuleByName("matcher_no_op", true, false);
-  ASSERT_TRUE(module_or_error.ok());
+  ASSERT_OK(module_or_error);
 
   auto module = std::shared_ptr<Extensions::DynamicModules::DynamicModule>(
       std::move(module_or_error.value()));
 
   auto on_config_new = module->getFunctionPointer<OnMatcherConfigNewType>(
       "envoy_dynamic_module_on_matcher_config_new");
-  ASSERT_TRUE(on_config_new.ok());
+  ASSERT_OK(on_config_new);
 
   auto on_config_destroy = module->getFunctionPointer<OnMatcherConfigDestroyType>(
       "envoy_dynamic_module_on_matcher_config_destroy");
-  ASSERT_TRUE(on_config_destroy.ok());
+  ASSERT_OK(on_config_destroy);
 
   auto on_match =
       module->getFunctionPointer<OnMatcherMatchType>("envoy_dynamic_module_on_matcher_match");
-  ASSERT_TRUE(on_match.ok());
+  ASSERT_OK(on_match);
 
   envoy_dynamic_module_type_envoy_buffer name_buf = {"test", 4};
   envoy_dynamic_module_type_envoy_buffer config_buf = {"", 0};
@@ -68,22 +69,22 @@ TEST_F(DynamicModuleMatcherTest, AlwaysMatchModule) {
 TEST_F(DynamicModuleMatcherTest, HeaderCheckModule) {
   auto module_or_error =
       Extensions::DynamicModules::newDynamicModuleByName("matcher_check_headers", true, false);
-  ASSERT_TRUE(module_or_error.ok());
+  ASSERT_OK(module_or_error);
 
   auto module = std::shared_ptr<Extensions::DynamicModules::DynamicModule>(
       std::move(module_or_error.value()));
 
   auto on_config_new = module->getFunctionPointer<OnMatcherConfigNewType>(
       "envoy_dynamic_module_on_matcher_config_new");
-  ASSERT_TRUE(on_config_new.ok());
+  ASSERT_OK(on_config_new);
 
   auto on_config_destroy = module->getFunctionPointer<OnMatcherConfigDestroyType>(
       "envoy_dynamic_module_on_matcher_config_destroy");
-  ASSERT_TRUE(on_config_destroy.ok());
+  ASSERT_OK(on_config_destroy);
 
   auto on_match =
       module->getFunctionPointer<OnMatcherMatchType>("envoy_dynamic_module_on_matcher_match");
-  ASSERT_TRUE(on_match.ok());
+  ASSERT_OK(on_match);
 
   // Configure the module to look for "x-test-header".
   envoy_dynamic_module_type_envoy_buffer name_buf = {"header_check", 12};
@@ -131,7 +132,7 @@ TEST_F(DynamicModuleMatcherTest, HeaderCheckModule) {
 TEST_F(DynamicModuleMatcherTest, SupportedDataInputTypes) {
   auto module_or_error =
       Extensions::DynamicModules::newDynamicModuleByName("matcher_no_op", true, false);
-  ASSERT_TRUE(module_or_error.ok());
+  ASSERT_OK(module_or_error);
 
   auto module = std::shared_ptr<Extensions::DynamicModules::DynamicModule>(
       std::move(module_or_error.value()));
@@ -160,7 +161,7 @@ class OtherCustomMatchData : public ::Envoy::Matcher::CustomMatchData {};
 TEST_F(DynamicModuleMatcherTest, NonDynamicModuleCustomMatchDataReturnsFalse) {
   auto module_or_error =
       Extensions::DynamicModules::newDynamicModuleByName("matcher_no_op", true, false);
-  ASSERT_TRUE(module_or_error.ok());
+  ASSERT_OK(module_or_error);
 
   auto module = std::shared_ptr<Extensions::DynamicModules::DynamicModule>(
       std::move(module_or_error.value()));
@@ -189,7 +190,7 @@ TEST_F(DynamicModuleMatcherTest, NonDynamicModuleCustomMatchDataReturnsFalse) {
 TEST_F(DynamicModuleMatcherTest, NonCustomMatchDataReturnsFalse) {
   auto module_or_error =
       Extensions::DynamicModules::newDynamicModuleByName("matcher_no_op", true, false);
-  ASSERT_TRUE(module_or_error.ok());
+  ASSERT_OK(module_or_error);
 
   auto module = std::shared_ptr<Extensions::DynamicModules::DynamicModule>(
       std::move(module_or_error.value()));
@@ -216,7 +217,7 @@ TEST_F(DynamicModuleMatcherTest, NonCustomMatchDataReturnsFalse) {
 TEST_F(DynamicModuleMatcherTest, NullRequestHeaders) {
   auto module_or_error =
       Extensions::DynamicModules::newDynamicModuleByName("matcher_check_headers", true, false);
-  ASSERT_TRUE(module_or_error.ok());
+  ASSERT_OK(module_or_error);
 
   auto module = std::shared_ptr<Extensions::DynamicModules::DynamicModule>(
       std::move(module_or_error.value()));

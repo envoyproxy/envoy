@@ -1,4 +1,5 @@
 #include <memory>
+#include <optional>
 
 #include "envoy/common/optref.h"
 #include "envoy/http/filter.h"
@@ -30,6 +31,7 @@ namespace Envoy {
 namespace Http {
 namespace {
 using Protobuf::util::MessageDifferencer;
+
 class FilterManagerTest : public testing::Test {
 public:
   void initialize() {
@@ -69,6 +71,87 @@ public:
     auto expected = std::make_unique<Protobuf::StringValue>();
     expected->set_value(expected_name);
     EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
+  }
+
+  void runSendDirectLocalReplySavedResponseMetadataTest(bool flush_saved_response_metadata) {
+    initialize();
+
+    std::shared_ptr<MockStreamFilter> filter_1(new NiceMock<MockStreamFilter>());
+    std::shared_ptr<MockStreamFilter> filter_2(new NiceMock<MockStreamFilter>());
+
+    EXPECT_CALL(filter_factory_, createFilterChain(_))
+        .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+          auto factory = createStreamFilterFactoryCb(filter_1);
+          callbacks.setFilterConfigName("configName1");
+          factory(callbacks);
+          factory = createStreamFilterFactoryCb(filter_2);
+          callbacks.setFilterConfigName("configName2");
+          factory(callbacks);
+          return true;
+        }));
+
+    RequestHeaderMapPtr request_headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    ON_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillByDefault(Return(makeOptRef(*request_headers)));
+    ON_CALL(filter_manager_callbacks_, responseHeaders())
+        .WillByDefault(testing::Invoke([this]() -> ResponseHeaderMapOptRef {
+          return makeOptRefFromPtr(filter_manager_callbacks_.response_headers_.get());
+        }));
+
+    filter_manager_->createDownstreamFilterChain();
+    filter_manager_->requestHeadersInitialized();
+
+    EXPECT_CALL(*filter_1, decodeHeaders(_, _)).WillOnce(Return(FilterHeadersStatus::Continue));
+    EXPECT_CALL(*filter_2, decodeHeaders(_, _)).WillOnce(Return(FilterHeadersStatus::Continue));
+    filter_manager_->decodeHeaders(*request_headers, false);
+
+    MetadataMap metadata_map = {{"local-reply", "metadata"}};
+    EXPECT_CALL(filter_manager_callbacks_, setResponseHeaders_(_)).Times(2);
+    EXPECT_CALL(local_reply_, rewrite(_, _, _, _, _, _));
+    if (!flush_saved_response_metadata) {
+      EXPECT_CALL(filter_manager_callbacks_, encodeMetadata(_)).Times(0);
+    }
+
+    {
+      InSequence s;
+      EXPECT_CALL(*filter_2, encodeHeaders(_, false))
+          .WillOnce(testing::Invoke([&](ResponseHeaderMap&, bool) -> FilterHeadersStatus {
+            filter_2->encoder_callbacks_->addEncodedMetadata(
+                std::make_unique<MetadataMap>(metadata_map));
+            return FilterHeadersStatus::Continue;
+          }));
+      EXPECT_CALL(*filter_1, encodeHeaders(_, false))
+          .WillOnce(testing::Invoke([&](ResponseHeaderMap&, bool) -> FilterHeadersStatus {
+            filter_1->encoder_callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
+                                                         std::nullopt, "direct_local_reply");
+            return FilterHeadersStatus::StopIteration;
+          }));
+      EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, false));
+      EXPECT_CALL(filter_manager_callbacks_, encodeData(_, !flush_saved_response_metadata))
+          .WillOnce(testing::Invoke([&](Buffer::Instance& data, bool end_stream) -> void {
+            EXPECT_EQ("body", data.toString());
+            EXPECT_EQ(!flush_saved_response_metadata, end_stream);
+          }));
+      if (flush_saved_response_metadata) {
+        EXPECT_CALL(filter_manager_callbacks_, encodeMetadata(_))
+            .WillOnce(testing::Invoke([&](MetadataMapPtr&& metadata_map_ptr) -> void {
+              EXPECT_EQ(metadata_map, *metadata_map_ptr);
+            }));
+        EXPECT_CALL(filter_manager_callbacks_, encodeData(_, true))
+            .WillOnce(testing::Invoke(
+                [](Buffer::Instance& data, bool) -> void { EXPECT_EQ(0, data.length()); }));
+      }
+      EXPECT_CALL(filter_manager_callbacks_, endStream());
+    }
+
+    filter_2->decoder_callbacks_->encodeHeaders(
+        std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+        false, "upstream_response");
+
+    validateFilterStateData("configName1");
+
+    filter_manager_->destroyFilters();
   }
 
   std::unique_ptr<DownstreamFilterManager> filter_manager_;
@@ -260,6 +343,17 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
   validateFilterStateData("configName2");
 
   filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, SendDirectLocalReplyEncodesSavedResponseMetadata) {
+  runSendDirectLocalReplySavedResponseMetadataTest(true);
+}
+
+TEST_F(FilterManagerTest, SendDirectLocalReplySkipsSavedResponseMetadataWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.direct_local_reply_flush_saved_response_metadata", "false"}});
+  runSendDirectLocalReplySavedResponseMetadataTest(false);
 }
 
 TEST_F(FilterManagerTest, OnLocalReply) {

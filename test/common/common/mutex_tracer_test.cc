@@ -53,7 +53,9 @@ TEST_F(MutexTracerTest, AddN) {
 // Call the contention hook in a real contention scenario.
 TEST_F(MutexTracerTest, OneThreadNoContention) {
   // Regular operation doesn't cause contention.
-  { Thread::LockGuard lock(mu_); }
+  {
+    Thread::LockGuard lock(mu_);
+  }
 
   EXPECT_EQ(tracer_.numContentions(), 0);
   EXPECT_EQ(tracer_.currentWaitCycles(), 0);

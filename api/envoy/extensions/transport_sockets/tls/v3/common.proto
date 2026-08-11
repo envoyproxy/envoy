@@ -77,6 +77,24 @@ message TlsParameters {
     //   Please refer to the `BoringSSL CNSA2_202603 compliance policy <https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20260413.0/include/openssl/ssl.h#6293>`_
     //   for details.
     CNSA2_202603 = 1;
+
+    // CNSA1_202603 configures a TLS connection to use:
+    //   * TLS 1.2 or TLS 1.3.
+    //   * For TLS 1.2, only TLS_ECDHE_[ECDSA|RSA]_WITH_AES_256_GCM_SHA384.
+    //   * For TLS 1.3, only AES-256-GCM.
+    //   * ML-KEM-1024 or P-384 for key agreement, preferring ML-KEM-1024 if the
+    //     client supports it.
+    //   * For handshake signatures, only ECDSA with P-384 and SHA-384, or RSA
+    //     with SHA-384.
+    //
+    // Note: this setting aids with compliance with CNSA requirements but does not
+    // guarantee it. Careful reading of RFC 9151 is recommended.
+    //
+    // .. attention::
+    //
+    //   Please refer to the `BoringSSL CNSA1_202603 compliance policy <https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20260413.0/include/openssl/ssl.h#6280>`_
+    //   for details.
+    CNSA1_202603 = 2;
   }
 
   // Minimum TLS protocol version. By default, it's ``TLSv1_2`` for both clients and servers.

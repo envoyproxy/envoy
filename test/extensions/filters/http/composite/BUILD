@@ -30,6 +30,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 

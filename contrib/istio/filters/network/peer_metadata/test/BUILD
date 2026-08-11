@@ -12,8 +12,10 @@ envoy_cc_test(
     name = "peer_metadata_test",
     srcs = ["peer_metadata_test.cc"],
     deps = [
+        "//contrib/istio/filters/common/source:peer_metadata_registry_lib",
         "//contrib/istio/filters/network/peer_metadata/source:config",
         "//envoy/router:string_accessor_interface",
+        "//source/common/router:string_accessor_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",

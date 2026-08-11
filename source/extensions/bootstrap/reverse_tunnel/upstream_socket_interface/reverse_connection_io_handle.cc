@@ -12,15 +12,19 @@ namespace Bootstrap {
 namespace ReverseConnection {
 
 UpstreamReverseConnectionIOHandle::UpstreamReverseConnectionIOHandle(
-    Network::ConnectionSocketPtr socket, const std::string& cluster_name)
+    Network::ConnectionSocketPtr socket, const std::string& cluster_name,
+    UpstreamSocketThreadLocal& registry)
     : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), cluster_name_(cluster_name),
-      owned_socket_(std::move(socket)) {
+      owned_socket_(std::move(socket)), registry_{registry},
+      cx_post_upgrade_lifetime_{*registry.cx_post_upgrade_lifetime_,
+                                registry.dispatcher().timeSource()} {
   ENVOY_LOG(trace, "reverse_tunnel: created IO handle for cluster: {}, fd: {}", cluster_name_, fd_);
 }
 
 UpstreamReverseConnectionIOHandle::~UpstreamReverseConnectionIOHandle() {
   ENVOY_LOG(trace, "reverse_tunnel: destroying IO handle for cluster: {}, fd: {}", cluster_name_,
             fd_);
+  cx_post_upgrade_lifetime_.complete();
 }
 
 Api::SysCallIntResult
@@ -36,31 +40,7 @@ Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::close() {
   if (owned_socket_) {
     ENVOY_LOG(debug, "reverse_tunnel: releasing socket for cluster: {}", cluster_name_);
 
-    // Before releasing the socket, notify the socket manager that this socket is dying.
-    // This will trigger the callback chain to mark the host as unhealthy.
-    auto* upstream_interface =
-        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
-    if (upstream_interface == nullptr) {
-      ENVOY_LOG(error, "reverse_tunnel: upstream_interface is null");
-      return IoSocketHandleImpl::close();
-    }
-    auto* acceptor = const_cast<ReverseTunnelAcceptor*>(
-        dynamic_cast<const ReverseTunnelAcceptor*>(upstream_interface));
-    if (acceptor == nullptr) {
-      ENVOY_LOG(error, "reverse_tunnel: acceptor is null after dynamic_cast");
-      return IoSocketHandleImpl::close();
-    }
-    auto* tls_registry = acceptor->getLocalRegistry();
-    if (tls_registry == nullptr || tls_registry->socketManager() == nullptr) {
-      ENVOY_LOG(error,
-                "reverse_tunnel: tls_registry or socketManager is null. tls_registry={}, "
-                "socketManager={}",
-                tls_registry ? "not_null" : "null",
-                tls_registry && tls_registry->socketManager() ? "not_null" : "null");
-      return IoSocketHandleImpl::close();
-    }
-    ENVOY_LOG(warn, "reverse_tunnel: notifying socket manager of socket death. fd: {}", fd_);
-    auto* socket_manager = tls_registry->socketManager();
+    auto* socket_manager = registry_.socketManager();
     socket_manager->markSocketDead(fd_);
 
     owned_socket_.reset();

@@ -102,7 +102,7 @@ jobs:
     # Handle any failure in triggering job
     # Remove any `checks` we dont care about
     # Prepare a check request
-    - uses: envoyproxy/toolshed/actions/github/env/load@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/github/env/load@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       name: Load env
       id: data
       with:
@@ -113,13 +113,13 @@ jobs:
         GH_TOKEN: ${{ github.token }}
 
     #  Update the check
-    - uses: envoyproxy/toolshed/actions/appauth@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/appauth@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/actions/github/checks@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/github/checks@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       name: Update check
       if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
       with:
@@ -127,13 +127,12 @@ jobs:
         checks: ${{ toJSON(fromJSON(steps.data.outputs.data).checks) }}
         token: ${{ steps.appauth.outputs.token }}
 
-    - uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/jq@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       name: Print request summary
       with:
         input: |
-          action: ${{ fromJSON(steps.data.outputs.data).data.check.action }}
-          summary: ${{ toJSON(fromJSON(steps.data.outputs.data).data.summary) }}
-        input-format: yaml
+          {"action": ${{ toJSON(fromJSON(steps.data.outputs.data).data.check.action) }},
+           "summary": ${{ toJSON(fromJSON(steps.data.outputs.data).data.summary) }}}
         output-path: GITHUB_STEP_SUMMARY
         options: -r
         filter: |
@@ -147,17 +146,16 @@ jobs:
           | $summary.summary as $summary
           | "${{ inputs.template-request-summary }}"
 
-    - uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/jq@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       id: request-output
       name: Load request
       with:
         input: |
-          check: ${{ toJSON(fromJSON(steps.data.outputs.data).data.check) }}
-          config: ${{ toJSON(fromJSON(steps.data.outputs.data).data.config) }}
-          request: ${{ toJSON(fromJSON(steps.data.outputs.data).data.request) }}
-          run: ${{ toJSON(fromJSON(steps.data.outputs.data).data.run) }}
-          summary_title: ${{ fromJSON(steps.data.outputs.data).data.summary.title }}
-        input-format: yaml
+          {"check": ${{ toJSON(fromJSON(steps.data.outputs.data).data.check) }},
+           "config": ${{ toJSON(fromJSON(steps.data.outputs.data).data.config) }},
+           "request": ${{ toJSON(fromJSON(steps.data.outputs.data).data.request) }},
+           "run": ${{ toJSON(fromJSON(steps.data.outputs.data).data.run) }},
+           "summary_title": ${{ toJSON(fromJSON(steps.data.outputs.data).data.summary.title) }}}
         filter: |
           .
           | .summary = {title: .summary_title}

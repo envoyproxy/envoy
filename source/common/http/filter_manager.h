@@ -1115,6 +1115,8 @@ private:
                   FilterIterationStartState filter_iteration_start_state);
   void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers);
   void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
+  bool hasSavedResponseMetadata() const;
+  void encodeSavedResponseMetadataToCodec();
 
   // Returns true if new metadata is decoded. Otherwise, returns false.
   bool processNewlyAddedMetadata();
@@ -1170,8 +1172,7 @@ private:
   // filter subscribing mid-stream is brought up to the current back-pressure state.
   uint32_t upstream_high_watermark_count_{0};
   std::list<UpstreamWatermarkCallbacks*> upstream_watermark_callbacks_;
-  Network::Socket::OptionsSharedPtr upstream_options_ =
-      std::make_shared<Network::Socket::Options>();
+  Network::Socket::OptionsSharedPtr upstream_options_;
   Upstream::LoadBalancerContext::OverrideHost upstream_override_host_;
 
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,

@@ -41,6 +41,10 @@ public:
   Network::ListenerFilterBuffer* currentBuffer() { return current_buffer_; }
   Network::Address::InstanceConstSharedPtr& cachedOriginalDst() { return cached_original_dst_; }
 
+  // Temporary storage for the serialized typed filter state value returned by
+  // get_filter_state_typed. Valid until the next call into the module on the same filter.
+  std::optional<std::string> last_serialized_filter_state_;
+
   // Test-only setters.
   void setCallbacksForTest(Network::ListenerFilterCallbacks* callbacks) { callbacks_ = callbacks; }
   void setCurrentBufferForTest(Network::ListenerFilterBuffer* buffer) { current_buffer_ = buffer; }

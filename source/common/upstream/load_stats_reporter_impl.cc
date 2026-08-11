@@ -263,7 +263,7 @@ void LoadStatsReporterImpl::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&
 }
 
 void LoadStatsReporterImpl::onReceiveMessage(
-    std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) {
+    Grpc::ResponsePtr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
   message_ = std::move(message);
   startLoadReportPeriod();

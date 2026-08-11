@@ -35,6 +35,7 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:path_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

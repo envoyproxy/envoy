@@ -1,5 +1,7 @@
 #include "source/common/formatter/substitution_format_string.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 #include "absl/status/statusor.h"
 
 namespace Envoy {
@@ -57,6 +59,13 @@ absl::StatusOr<FormatterPtr>
 SubstitutionFormatStringUtils::createJsonFormatter(const Protobuf::Struct& struct_format,
                                                    bool omit_empty_values,
                                                    const std::vector<CommandParserPtr>& commands) {
+  // The pre-serialized JSON formatter cannot omit keys with null values because keys and
+  // delimiters are serialized when loading the configuration. When omit_empty_values is set, use
+  // the tree-structured formatter that can make the omission decision at format time instead.
+  if (omit_empty_values && Runtime::runtimeFeatureEnabled(
+                               "envoy.reloadable_features.json_formatter_omit_empty_values")) {
+    return OmitEmptyJsonFormatterImpl::create(struct_format, commands);
+  }
   return JsonFormatterImpl::create(struct_format, omit_empty_values, commands);
 }
 

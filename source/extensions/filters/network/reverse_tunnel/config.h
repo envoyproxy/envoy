@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.validate.h"
 
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -27,6 +28,10 @@ private:
   absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
       Server::Configuration::FactoryContext& context) override;
+
+  absl::Status validateConnLimit(
+      const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config)
+      const;
 };
 
 } // namespace ReverseTunnel

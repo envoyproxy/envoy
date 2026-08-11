@@ -117,7 +117,7 @@ ConfigImpl::ConfigImpl(
         config.trds(), context_.serverFactoryContext(), stats_prefix_, context_.initManager());
   } else {
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), context_.serverFactoryContext());
+        config.route_config(), context_.serverFactoryContext(), context_.initManager());
   }
 
   for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {

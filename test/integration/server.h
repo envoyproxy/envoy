@@ -399,6 +399,7 @@ public:
   void setTagProducer(TagProducerPtr&&) override {}
   void setStatsMatcher(StatsMatcherPtr&&) override {}
   void setHistogramSettings(HistogramSettingsConstPtr&&) override {}
+  void setUseExplicitTags(bool) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb cb) override { merge_cb_ = cb; }

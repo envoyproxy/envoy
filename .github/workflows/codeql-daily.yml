@@ -28,7 +28,7 @@ jobs:
 
     steps:
 
-    - uses: envoyproxy/toolshed/actions/bind-mounts@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/bind-mounts@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       if: |
         ! github.event.repository.private
       with:
@@ -43,7 +43,7 @@ jobs:
       if: |
         env.BUILD_TARGETS != ''
         && github.event.repository.private
-      uses: envoyproxy/toolshed/actions/diskspace@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      uses: envoyproxy/toolshed/actions/diskspace@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       with:
         to_remove: |
           /usr/local/.ghcup
@@ -64,10 +64,9 @@ jobs:
        sudo apt-get update --error-on=any
        sudo apt-get install --yes \
            libtool libtinfo5 automake autoconf curl unzip
-       # Note: the llvm/clang version should match the version specifed in:
-       #  - bazel/repository_locations.bzl
+       # Note: the llvm/clang version should match the version specified in:
+       #  - bazel/toolchains.bzl
        #  - .github/workflows/codeql-push.yml
-       #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
        #
        # IMPORTANT: the clang bundle MUST be unpacked outside $GITHUB_WORKSPACE (we use $RUNNER_TEMP).
        # The CodeQL C++ extractor treats anything under the source root as project code, so headers
@@ -75,17 +74,17 @@ jobs:
        # (e.g. cpp/new-free-mismatch in <vector>, alert #1881). Keeping it under $RUNNER_TEMP makes
        # CodeQL classify those headers as system headers — same as /usr/include/c++/** on a normal
        # build. Do NOT move this back into the checkout tree.
-       mkdir -p "${RUNNER_TEMP}/clang18.1.8"
-       cd "${RUNNER_TEMP}/clang18.1.8"
-       wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz
-       tar -xf clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
+       mkdir -p "${RUNNER_TEMP}/clang22.1.8"
+       cd "${RUNNER_TEMP}/clang22.1.8"
+       wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz
+       tar -xf LLVM-22.1.8-Linux-X64.tar.xz --strip-components 1
 
     - name: Build
       run: |
        bazelisk shutdown
        bazel build \
            -c fastbuild \
-           --repo_env=BAZEL_LLVM_PATH="${RUNNER_TEMP}/clang18.1.8" \
+           --repo_env=BAZEL_LLVM_PATH="${RUNNER_TEMP}/clang22.1.8" \
            --spawn_strategy=local \
            --discard_analysis_cache \
            --nouse_action_cache \

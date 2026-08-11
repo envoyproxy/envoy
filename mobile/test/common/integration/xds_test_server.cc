@@ -21,6 +21,7 @@
 #include "test/test_common/utility.h"
 
 namespace Envoy {
+using testing::NiceMock;
 
 XdsTestServer::XdsTestServer()
     : api_(Api::createApiForTest(stats_store_, time_system_)),

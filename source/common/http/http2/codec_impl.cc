@@ -186,14 +186,8 @@ int reasonToReset(StreamResetReason reason, bool response_end_stream_sent) {
   case StreamResetReason::RemoteResetNoError:
     return OGHTTP2_NO_ERROR;
   case StreamResetReason::ProtocolError:
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
-      return OGHTTP2_NO_ERROR;
-    }
     return OGHTTP2_PROTOCOL_ERROR;
   default:
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
-      return OGHTTP2_NO_ERROR;
-    }
     // If the response has been fully sent then we reset with OGHTTP2_NO_ERROR to tell
     // there is no transport level error.
     return response_end_stream_sent ? OGHTTP2_NO_ERROR : OGHTTP2_INTERNAL_ERROR;
@@ -1581,25 +1575,11 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
           // depending whether the connection is upstream or downstream.
           reason = getMessagingErrorResetReason();
         } else {
-          if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
-            reason = errorCodeToResetReason(error_code);
-            if (error_code == OGHTTP2_REFUSED_STREAM) {
-              stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-            } else {
-              stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
-            }
+          reason = errorCodeToResetReason(error_code);
+          if (error_code == OGHTTP2_REFUSED_STREAM) {
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
           } else {
-            if (error_code == OGHTTP2_REFUSED_STREAM) {
-              reason = StreamResetReason::RemoteRefusedStreamReset;
-              stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-            } else {
-              if (error_code == OGHTTP2_CONNECT_ERROR) {
-                reason = StreamResetReason::ConnectError;
-              } else {
-                reason = StreamResetReason::RemoteReset;
-              }
-              stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
-            }
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
           }
         }
         stream->runResetCallbacks(reason, absl::string_view());

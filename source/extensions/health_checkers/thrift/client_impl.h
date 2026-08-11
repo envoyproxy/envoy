@@ -88,7 +88,7 @@ public:
   void onData(Buffer::Instance& data);
 
   // Client
-  void start() override;
+  bool start() override;
   bool sendRequest() override;
   void close() override;
 

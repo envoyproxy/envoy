@@ -146,7 +146,7 @@ public:
   filterMatchCriteria(const std::set<std::string>& names) const override {
     auto new_criteria = std::make_unique<TestMetadataMatchCriteria>(*this);
     for (auto it = new_criteria->matches_.begin(); it != new_criteria->matches_.end();) {
-      if (names.count(it->get()->name()) == 0) {
+      if (!names.contains(it->get()->name())) {
         it = new_criteria->matches_.erase(it);
       } else {
         it++;

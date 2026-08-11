@@ -85,7 +85,7 @@ to ignore policy criteria below.
 
 |Criteria|Requirement|Mnemonic|Weight|Rationale|
 |--------|-----------|--------|------|---------|
-|Cloud Native Computing Foundation (CNCF) [approved license](https://github.com/cncf/foundation/blob/master/allowed-third-party-license-policy.md#approved-licenses-for-allowlist)|MUST|License|High||
+|Cloud Native Computing Foundation (CNCF) [approved license](https://github.com/cncf/foundation/blob/main/policies-guidance/allowed-third-party-license-policy.md#approved-licenses-for-allowlist)|MUST|License|High||
 |Dependencies must not substantially increase the binary size unless they are optional (i.e. confined to specific extensions)|MUST|BinarySize|High|Envoy Mobile is sensitive to binary size. We should pick dependencies that are used in core with this criteria in mind.|
 |No duplication of existing dependencies|MUST|NoDuplication|High|Avoid maintenance cost of multiple JSON parsers etc|
 |Hosted on a git repository and the archive fetch must directly reference this repository. We will NOT support intermediate artifacts built by-hand located on GCS, S3, etc.|MUST|Source|High|Flows based on manual updates are fragile (they are not tested until needed), often suffer from missing documentation and shared exercise, may fail during emergency zero day updates and have no audit trail (i.e. it's unclear how the artifact we depend upon came to be at a later date).|

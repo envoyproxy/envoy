@@ -1,6 +1,7 @@
 #include "source/extensions/filters/network/tcp_bandwidth_limit/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -30,7 +31,7 @@ public:
     ON_CALL(server_context_, timeSource()).WillByDefault(ReturnRef(time_source_));
 
     auto result = factory_->createFilterFactoryFromProto(proto_config, context_);
-    EXPECT_TRUE(result.ok());
+    EXPECT_OK(result);
     cb_ = result.value();
   }
 

@@ -336,6 +336,7 @@ protected:
 
   // Envoy::Config::ConfigProvider
   ConfigConstSharedPtr getConfig() const override { return subscription_->getConfig(); }
+  ConfigProtoVector getConfigProtos() const override { return {}; }
 
   ConfigSubscriptionCommonBaseSharedPtr subscription_;
 

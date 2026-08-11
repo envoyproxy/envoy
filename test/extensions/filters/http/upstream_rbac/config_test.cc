@@ -4,6 +4,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -25,7 +26,7 @@ TEST(UpstreamRbacConfigTest, CreatesUpstreamFilter) {
   testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> context;
 
   auto cb = factory.createFilterFactoryFromProto(simpleConfig(), "stats", context);
-  EXPECT_TRUE(cb.ok());
+  EXPECT_OK(cb);
 
   testing::NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   EXPECT_CALL(callbacks, addStreamDecoderFilter(testing::_));

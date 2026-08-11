@@ -11,6 +11,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -23,6 +24,7 @@ namespace LoadBalancingPolicies {
 namespace Common {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::testing::NiceMock;
 using ::testing::Return;
 
@@ -113,8 +115,7 @@ TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_Valid) {
   report.set_application_utilization(0.5);
   auto result =
       OrcaLoadReportHandler::calculateWeightFromOrcaReport(report, {"named_metrics.foo"}, 0.0);
-  ASSERT_TRUE(result.ok());
-  EXPECT_EQ(result.value(), 2000);
+  ASSERT_THAT(result, IsOkAndHolds(2000));
 }
 
 TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_NoQps) {
@@ -138,8 +139,7 @@ TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_MaxWeight) {
   report.set_application_utilization(0.0000001);
   auto result =
       OrcaLoadReportHandler::calculateWeightFromOrcaReport(report, {"named_metrics.foo"}, 0.0);
-  ASSERT_TRUE(result.ok());
-  EXPECT_EQ(result.value(), std::numeric_limits<uint32_t>::max());
+  ASSERT_THAT(result, IsOkAndHolds(std::numeric_limits<uint32_t>::max()));
 }
 
 TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_ErrorPenalty) {
@@ -149,8 +149,7 @@ TEST(OrcaLoadReportHandlerTest, CalculateWeightFromOrcaReport_ErrorPenalty) {
   report.set_application_utilization(0.5);
   auto result =
       OrcaLoadReportHandler::calculateWeightFromOrcaReport(report, {"named_metrics.foo"}, 2.0);
-  ASSERT_TRUE(result.ok());
-  EXPECT_EQ(result.value(), 1428);
+  ASSERT_THAT(result, IsOkAndHolds(1428));
 }
 
 // ============================================================
@@ -296,9 +295,11 @@ protected:
     config_.blackout_period = std::chrono::milliseconds(10000);
     config_.weight_expiration_period = std::chrono::milliseconds(180000);
     config_.weight_update_period = std::chrono::milliseconds(1000);
+    report_handler_ = std::make_shared<OrcaLoadReportHandler>(config_, time_system_);
   }
 
   OrcaWeightManagerConfig config_;
+  OrcaLoadReportHandlerSharedPtr report_handler_;
   NiceMock<Upstream::MockPrioritySet> priority_set_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::SimulatedTimeSystem time_system_;
@@ -313,7 +314,7 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnHosts_AllValid) {
   for (int i = 0; i < 3; ++i) {
     auto host = makeWeightTrackingMockHost();
     host->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
-        manager->reportHandler(), 40 + i,
+        report_handler_, 40 + i,
         /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
         /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
     hosts.push_back(host);
@@ -335,7 +336,7 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnHosts_Mixed) {
   // First host has valid weight.
   auto h1 = makeWeightTrackingMockHost();
   h1->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
-      manager->reportHandler(), 42,
+      report_handler_, 42,
       /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
       /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
   hosts.push_back(h1);
@@ -378,14 +379,14 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnHosts_EvenMedian) {
   Upstream::HostVector hosts;
   auto h1 = makeWeightTrackingMockHost();
   h1->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
-      manager->reportHandler(), 5,
+      report_handler_, 5,
       /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
       /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
   hosts.push_back(h1);
 
   auto h2 = makeWeightTrackingMockHost();
   h2->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
-      manager->reportHandler(), 42,
+      report_handler_, 42,
       /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
       /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
   hosts.push_back(h2);
@@ -443,7 +444,7 @@ TEST_F(OrcaWeightManagerTest, Initialize_AttachesHostDataToExistingHosts) {
 
   EXPECT_CALL(*timer, enableTimer(config_.weight_update_period, nullptr));
   auto status = manager->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 
   // Verify all hosts now have LB data attached.
   for (const auto& host : hosts) {
@@ -460,7 +461,7 @@ TEST_F(OrcaWeightManagerTest, Initialize_StartsWeightCalculationTimer) {
 
   EXPECT_CALL(*timer, enableTimer(config_.weight_update_period, nullptr));
   auto status = manager->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 }
 
 TEST_F(OrcaWeightManagerTest, Initialize_PriorityUpdateCallbackAttachesDataToNewHosts) {
@@ -470,7 +471,7 @@ TEST_F(OrcaWeightManagerTest, Initialize_PriorityUpdateCallbackAttachesDataToNew
 
   EXPECT_CALL(*timer, enableTimer(config_.weight_update_period, nullptr));
   auto status = manager->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 
   // Add new hosts via priority update callback.
   auto* host_set = priority_set_.getMockHostSet(0);
@@ -496,14 +497,14 @@ TEST_F(OrcaWeightManagerTest, TimerCallback_UpdatesWeightsAndReenablesTimer) {
 
   EXPECT_CALL(*timer, enableTimer(config_.weight_update_period, nullptr));
   auto status = manager->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 
   // Set up hosts with valid weights so the callback fires on change.
   auto* host_set = priority_set_.getMockHostSet(0);
   Upstream::HostVector hosts;
   auto h1 = makeWeightTrackingMockHost();
   h1->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
-      manager->reportHandler(), 100,
+      report_handler_, 100,
       /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
       /*last_update_time=*/MonotonicTime(std::chrono::seconds(50))));
   hosts.push_back(h1);
@@ -529,7 +530,7 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnMainThread_CallbackFiredOnChange) {
   Upstream::HostVector hosts;
   auto h1 = makeWeightTrackingMockHost(/*initial_weight=*/1);
   h1->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
-      manager->reportHandler(), 200,
+      report_handler_, 200,
       /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
       /*last_update_time=*/MonotonicTime(std::chrono::seconds(50))));
   hosts.push_back(h1);
@@ -570,7 +571,7 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnMainThread_MultiplePriorities) {
   auto* host_set0 = priority_set_.getMockHostSet(0);
   auto h0 = makeWeightTrackingMockHost(/*initial_weight=*/1);
   h0->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
-      manager->reportHandler(), 50,
+      report_handler_, 50,
       /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
       /*last_update_time=*/MonotonicTime(std::chrono::seconds(50))));
   host_set0->hosts_ = {h0};
@@ -579,7 +580,7 @@ TEST_F(OrcaWeightManagerTest, UpdateWeightsOnMainThread_MultiplePriorities) {
   auto* host_set1 = priority_set_.getMockHostSet(1);
   auto h1 = makeWeightTrackingMockHost(/*initial_weight=*/1);
   h1->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
-      manager->reportHandler(), 75,
+      report_handler_, 75,
       /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
       /*last_update_time=*/MonotonicTime(std::chrono::seconds(50))));
   host_set1->hosts_ = {h1};
@@ -603,7 +604,7 @@ TEST_F(OrcaWeightManagerTest, AddLbPolicyDataToHosts_SkipsHostsWithExistingData)
   // Host with existing data.
   auto h1 = makeWeightTrackingMockHost();
   h1->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
-      manager->reportHandler(), 42,
+      report_handler_, 42,
       /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
       /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
   hosts.push_back(h1);
@@ -616,7 +617,7 @@ TEST_F(OrcaWeightManagerTest, AddLbPolicyDataToHosts_SkipsHostsWithExistingData)
 
   EXPECT_CALL(*timer, enableTimer(config_.weight_update_period, nullptr));
   auto status = manager->initialize();
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
 
   // h1's existing data should be preserved (weight=42).
   auto typed_h1 = h1->typedLbPolicyData<OrcaHostLbPolicyData>();
@@ -639,7 +640,7 @@ TEST_F(OrcaWeightManagerTest, OddMedian) {
   for (uint32_t w : {10u, 20u, 30u}) {
     auto h = makeWeightTrackingMockHost();
     h->addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
-        manager->reportHandler(), w,
+        report_handler_, w,
         /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
         /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
     hosts.push_back(h);

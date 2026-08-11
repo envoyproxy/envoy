@@ -140,7 +140,9 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
   const int fd = 321;
   auto socket = createMockSocket(fd);
   socket_manager_->addConnectionSocket("node-c", "cluster-c", std::move(socket),
-                                       std::chrono::seconds(30), false, "tenant-c");
+                                       std::chrono::seconds(30), false, "tenant-c",
+                                       /*initiator_worker_id=*/"worker_5",
+                                       /*initiator_connection_id=*/"42");
   handed_off_socket_ = socket_manager_->getConnectionSocket("node-c");
   ASSERT_NE(handed_off_socket_, nullptr);
 
@@ -154,6 +156,8 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
   EXPECT_EQ(filterStateString(kFilterStateNodeId), "node-c");
   EXPECT_EQ(filterStateString(kFilterStateClusterId), "cluster-c");
   EXPECT_EQ(filterStateString(kFilterStateTenantId), "tenant-c");
+  EXPECT_EQ(filterStateString(kFilterStateInitiatorWorkerId), "worker_5");
+  EXPECT_EQ(filterStateString(kFilterStateInitiatorConnectionId), "42");
   EXPECT_EQ(filterStateUint64(kFilterStateFd), fd);
 
   auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();

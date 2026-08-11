@@ -154,6 +154,9 @@ private:
   bool compareRedirectCode(ToolConfig& tool_config,
                            const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                            envoy::RouterCheckToolSchema::ValidationFailure& failure);
+  bool compareTimeout(ToolConfig& tool_config,
+                      const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                      envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareRequestHeaderFields(ToolConfig& tool_config,
                                   const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                                   envoy::RouterCheckToolSchema::ValidationFailure& failure);
