@@ -7,7 +7,6 @@
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/strings/match.h"
-#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,8 +15,9 @@ namespace AiProtocolManager {
 
 namespace {
 
-// Keys materialized once: the Json::Object accessors take `const
-// std::string&`, and per-probe temporaries would allocate on the hot path.
+// Keys materialized once: nlohmann's object map is keyed by std::string
+// without a transparent comparator, so per-probe temporaries would allocate on
+// the hot path.
 struct JsonKeyValues {
   const std::string PromptTokens{"prompt_tokens"};
   const std::string CompletionTokens{"completion_tokens"};
@@ -54,80 +54,75 @@ struct JsonKeyValues {
 };
 using JsonKeys = ConstSingleton<JsonKeyValues>;
 
-// Counts are published into a protobuf `number_value` (an IEEE double); only
-// values a double represents exactly survive the round trip. Anything above
-// this bound, or non-finite, negative, or fractional, is rejected rather than
-// coerced. The bound also keeps summed counts far from uint64_t overflow.
+// Counts are published into a protobuf `number_value` (an IEEE double) in the
+// Struct projection; only values a double represents exactly survive that
+// round trip. Anything above this bound, or non-finite, negative, or
+// fractional, is rejected rather than coerced. The bound also keeps summed
+// counts far from uint64_t overflow.
 constexpr uint64_t MaxSafeCount = (uint64_t(1) << 53) - 1;
 
-// Distinguishes a present container-typed member (object/array) from a
-// present-but-null member on a lookup-failure path; used by readObject() to
-// apply its per-position null policy.
-bool presentValueIsContainer(const Json::Object& json, const std::string& key) {
-  bool container = false;
-  json.iterate([&container, &key](const std::string& member, const Json::Object& value) {
-        if (member == key) {
-          container = value.isObject() || value.isArray();
-          return false; // Stop iterating.
-        }
-        return true;
-      })
-      .IgnoreError(); // The receiver is object-checked by every caller.
-  return container;
-}
-
 // Read a token count (integer or JSON double). Returns nullopt for a missing
-// key; a key that is present but unusable also sets `malformed`.
-std::optional<uint64_t> readCount(const Json::Object& json, const std::string& key,
+// key; a key that is present but unusable -- wrong type, container, null
+// (no dialect documents null counts), negative, fractional, or out of range
+// -- also sets `malformed`, so a corrupt final cumulative update cannot leave
+// an earlier value published as complete.
+std::optional<uint64_t> readCount(const nlohmann::json& json, const std::string& key,
                                   bool& malformed) {
-  // Missing fields are the normal case: a presence gate keeps a miss to a map
-  // lookup instead of a formatted error-status allocation.
-  if (!json.hasObject(key)) {
+  const auto it = json.find(key);
+  if (it == json.end()) {
     return std::nullopt;
   }
-  auto value_or = json.getValue(key);
-  if (!value_or.ok()) {
-    // Present but object, array, or null -- all malformed for a count: no
-    // dialect documents null counts, so a null here is indistinguishable from
-    // a corrupt final update.
-    malformed = true;
-    return std::nullopt;
-  }
-  const Json::ValueType& value = value_or.value();
-  if (const int64_t* as_int = absl::get_if<int64_t>(&value); as_int != nullptr) {
-    if (*as_int < 0 || static_cast<uint64_t>(*as_int) > MaxSafeCount) {
+  const nlohmann::json& value = *it;
+  // JsonWithExtBufParser stores any literal that fits int64 as a *signed*
+  // integer (is_number_unsigned() is true only above INT64_MAX), so probe the
+  // signed representation first.
+  if (value.is_number_integer()) {
+    if (value.is_number_unsigned()) {
+      const uint64_t count = value.get<uint64_t>();
+      if (count > MaxSafeCount) {
+        malformed = true;
+        return std::nullopt;
+      }
+      return count;
+    }
+    const int64_t count = value.get<int64_t>();
+    if (count < 0 || static_cast<uint64_t>(count) > MaxSafeCount) {
       malformed = true;
       return std::nullopt;
     }
-    return static_cast<uint64_t>(*as_int);
+    return static_cast<uint64_t>(count);
   }
-  if (const double* as_double = absl::get_if<double>(&value); as_double != nullptr) {
+  if (value.is_number_float()) {
+    const double as_double = value.get<double>();
     // Range-check before the float-to-integer cast: converting an
     // out-of-range double to uint64_t is undefined behavior.
-    if (!std::isfinite(*as_double) || *as_double < 0 ||
-        *as_double > static_cast<double>(MaxSafeCount) || std::trunc(*as_double) != *as_double) {
+    if (!std::isfinite(as_double) || as_double < 0 ||
+        as_double > static_cast<double>(MaxSafeCount) || std::trunc(as_double) != as_double) {
       malformed = true;
       return std::nullopt;
     }
-    return static_cast<uint64_t>(*as_double);
+    return static_cast<uint64_t>(as_double);
   }
-  malformed = true; // Present with a non-numeric scalar type (string, bool).
+  malformed = true; // Present with a non-numeric value (string, bool, null, container).
   return std::nullopt;
 }
 
 // Response strings are upstream-controlled; the cap keeps one response from
-// turning into a multi-megabyte metadata value or access-log entry.
+// turning into a multi-megabyte metadata value or access-log entry. A string
+// offloaded as an external reference is not a string node and reads as
+// absent.
 constexpr size_t MaxStringValueSize = 256;
 
-std::optional<std::string> readString(const Json::Object& json, const std::string& key) {
-  if (!json.hasObject(key)) {
+std::optional<std::string> readString(const nlohmann::json& json, const std::string& key) {
+  const auto it = json.find(key);
+  if (it == json.end() || !it->is_string()) {
     return std::nullopt;
   }
-  auto value_or = json.getString(key);
-  if (!value_or.ok() || value_or.value().empty() || value_or.value().size() > MaxStringValueSize) {
+  const auto& value = it->get_ref<const std::string&>();
+  if (value.empty() || value.size() > MaxStringValueSize) {
     return std::nullopt;
   }
-  return value_or.value();
+  return value;
 }
 
 // Whether a present-but-null object position is benignly absent or malformed.
@@ -137,22 +132,20 @@ std::optional<std::string> readString(const Json::Object& json, const std::strin
 // malformed when null.
 enum class NullPolicy { AllowNullAsAbsent, NullIsMalformed };
 
-Json::ObjectSharedPtr readObject(const Json::Object& json, const std::string& key, bool& malformed,
+const nlohmann::json* readObject(const nlohmann::json& json, const std::string& key,
+                                 bool& malformed,
                                  NullPolicy null_policy = NullPolicy::NullIsMalformed) {
-  if (!json.hasObject(key)) {
+  const auto it = json.find(key);
+  if (it == json.end()) {
     return nullptr;
   }
-  auto object_or = json.getObject(key);
-  if (!object_or.ok()) {
-    // Present but not an object: scalars and arrays are always malformed;
-    // null follows the position's documented null handling.
-    if (json.getValue(key).ok() || presentValueIsContainer(json, key) ||
-        null_policy == NullPolicy::NullIsMalformed) {
-      malformed = true;
-    }
-    return nullptr;
+  if (it->is_object()) {
+    return &*it;
   }
-  return object_or.value();
+  if (!it->is_null() || null_policy == NullPolicy::NullIsMalformed) {
+    malformed = true;
+  }
+  return nullptr;
 }
 
 // Adds an optional adjunct onto a base count. A sum above the metadata-safe
@@ -173,22 +166,21 @@ std::optional<uint64_t> addCounts(std::optional<uint64_t> base,
 }
 
 // OpenAI: Chat Completions and Responses API. The two dialects share one
-// structure with renamed keys (prompt_tokens/completion_tokens vs
-// input_tokens/output_tokens); they never mix in one document, so reading
+// structure with renamed keys; they never mix in one document, so reading
 // either name from the same usage object is unambiguous. Responses API
 // streaming lifecycle events nest the payload under `response`.
-TokenUsage extractOpenAi(const Json::Object& json, bool& malformed) {
+TokenUsage extractOpenAi(const nlohmann::json& json, bool& malformed) {
   TokenUsage usage;
   usage.api_format = ApiFormat::OpenAi;
 
-  const Json::ObjectSharedPtr response = readObject(json, JsonKeys::get().Response, malformed);
-  const Json::Object& node = response != nullptr ? *response : json;
+  const nlohmann::json* response = readObject(json, JsonKeys::get().Response, malformed);
+  const nlohmann::json& node = response != nullptr ? *response : json;
 
   if (auto model = readString(node, JsonKeys::get().Model); model.has_value()) {
     usage.model = std::move(model).value();
   }
 
-  const Json::ObjectSharedPtr usage_node =
+  const nlohmann::json* usage_node =
       readObject(node, JsonKeys::get().Usage, malformed, NullPolicy::AllowNullAsAbsent);
   if (usage_node == nullptr) {
     return usage;
@@ -204,7 +196,7 @@ TokenUsage extractOpenAi(const Json::Object& json, bool& malformed) {
   }
   usage.total_tokens = readCount(*usage_node, JsonKeys::get().TotalTokens, malformed);
 
-  Json::ObjectSharedPtr input_details = readObject(*usage_node, JsonKeys::get().PromptTokensDetails,
+  const nlohmann::json* input_details = readObject(*usage_node, JsonKeys::get().PromptTokensDetails,
                                                    malformed, NullPolicy::AllowNullAsAbsent);
   if (input_details == nullptr) {
     input_details = readObject(*usage_node, JsonKeys::get().InputTokensDetails, malformed,
@@ -216,7 +208,7 @@ TokenUsage extractOpenAi(const Json::Object& json, bool& malformed) {
         readCount(*input_details, JsonKeys::get().CacheWriteTokens, malformed);
   }
 
-  Json::ObjectSharedPtr output_details =
+  const nlohmann::json* output_details =
       readObject(*usage_node, JsonKeys::get().CompletionTokensDetails, malformed,
                  NullPolicy::AllowNullAsAbsent);
   if (output_details == nullptr) {
@@ -233,18 +225,18 @@ TokenUsage extractOpenAi(const Json::Object& json, bool& malformed) {
 // carry `usage` at the root; `message_start` nests a Message object (with
 // `model` and the input-side usage) under `message`. `message_delta` counts
 // are cumulative, which the caller's last-wins merge handles.
-TokenUsage extractAnthropic(const Json::Object& json, bool& malformed) {
+TokenUsage extractAnthropic(const nlohmann::json& json, bool& malformed) {
   TokenUsage usage;
   usage.api_format = ApiFormat::Anthropic;
 
-  const Json::ObjectSharedPtr message = readObject(json, JsonKeys::get().Message, malformed);
-  const Json::Object& node = message != nullptr ? *message : json;
+  const nlohmann::json* message = readObject(json, JsonKeys::get().Message, malformed);
+  const nlohmann::json& node = message != nullptr ? *message : json;
 
   if (auto model = readString(node, JsonKeys::get().Model); model.has_value()) {
     usage.model = std::move(model).value();
   }
 
-  const Json::ObjectSharedPtr usage_node = readObject(node, JsonKeys::get().Usage, malformed);
+  const nlohmann::json* usage_node = readObject(node, JsonKeys::get().Usage, malformed);
   if (usage_node == nullptr) {
     return usage;
   }
@@ -261,9 +253,8 @@ TokenUsage extractAnthropic(const Json::Object& json, bool& malformed) {
   usage.cache_creation_input_tokens =
       readCount(*usage_node, JsonKeys::get().CacheCreationInputTokens, malformed);
 
-  if (const Json::ObjectSharedPtr details =
-          readObject(*usage_node, JsonKeys::get().OutputTokensDetails, malformed,
-                     NullPolicy::AllowNullAsAbsent);
+  if (const nlohmann::json* details = readObject(*usage_node, JsonKeys::get().OutputTokensDetails,
+                                                 malformed, NullPolicy::AllowNullAsAbsent);
       details != nullptr) {
     usage.reasoning_tokens = readCount(*details, JsonKeys::get().ThinkingTokens, malformed);
   }
@@ -274,7 +265,7 @@ TokenUsage extractAnthropic(const Json::Object& json, bool& malformed) {
 // GenerateContentResponse; `usageMetadata` snapshots are cumulative (last
 // wins). `cachedContentTokenCount` is a subset of `promptTokenCount`, so it
 // maps to cached_input_tokens without any arithmetic.
-TokenUsage extractGemini(const Json::Object& json, bool& malformed) {
+TokenUsage extractGemini(const nlohmann::json& json, bool& malformed) {
   TokenUsage usage;
   usage.api_format = ApiFormat::Gemini;
 
@@ -282,8 +273,7 @@ TokenUsage extractGemini(const Json::Object& json, bool& malformed) {
     usage.model = std::move(model).value();
   }
 
-  const Json::ObjectSharedPtr usage_node =
-      readObject(json, JsonKeys::get().UsageMetadata, malformed);
+  const nlohmann::json* usage_node = readObject(json, JsonKeys::get().UsageMetadata, malformed);
   if (usage_node == nullptr) {
     return usage;
   }
@@ -400,21 +390,19 @@ void TokenUsage::finalize() {
   }
 }
 
-ApiFormat TokenUsageExtractor::detectFormat(const Json::Object& json) {
-  // Gemini markers, validated by value shape: hasObject() checks key presence
-  // only, and a foreign document with e.g. a `candidates` *string* must not
-  // lock the stream. Real candidates lists are non-empty arrays of objects
-  // (getObjectArray() does not type-check elements, so the first is probed).
-  bool candidates_shaped = false;
-  if (json.hasObject(JsonKeys::get().Candidates)) {
-    const auto candidates_or = json.getObjectArray(JsonKeys::get().Candidates);
-    candidates_shaped = candidates_or.ok() && !candidates_or.value().empty() &&
-                        candidates_or.value()[0] != nullptr && candidates_or.value()[0]->isObject();
+ApiFormat TokenUsageExtractor::detectFormat(const nlohmann::json& json) {
+  // Gemini markers, validated by value shape: a foreign document with e.g. a
+  // `candidates` *string* must not lock the stream. Real candidates lists are
+  // non-empty arrays of objects.
+  if (const auto it = json.find(JsonKeys::get().Candidates);
+      it != json.end() && it->is_array() && !it->empty() && it->front().is_object()) {
+    return ApiFormat::Gemini;
   }
-  const bool usage_metadata_shaped = json.hasObject(JsonKeys::get().UsageMetadata) &&
-                                     json.getObject(JsonKeys::get().UsageMetadata).ok();
-  if (usage_metadata_shaped || candidates_shaped ||
-      readString(json, JsonKeys::get().ModelVersion).has_value()) {
+  if (const auto it = json.find(JsonKeys::get().UsageMetadata);
+      it != json.end() && it->is_object()) {
+    return ApiFormat::Gemini;
+  }
+  if (readString(json, JsonKeys::get().ModelVersion).has_value()) {
     return ApiFormat::Gemini;
   }
 
@@ -451,12 +439,13 @@ ApiFormat TokenUsageExtractor::detectFormat(const Json::Object& json) {
         return ApiFormat::Anthropic;
       }
     }
+    // `message_stop`/`content_block_*` carry no structure and no usage.
   }
 
   return ApiFormat::Unknown;
 }
 
-ExtractionResult TokenUsageExtractor::extract(ApiFormat format, const Json::Object& json) {
+ExtractionResult TokenUsageExtractor::extract(ApiFormat format, const nlohmann::json& json) {
   ExtractionResult result;
   switch (format) {
   case ApiFormat::OpenAi:
@@ -474,7 +463,7 @@ ExtractionResult TokenUsageExtractor::extract(ApiFormat format, const Json::Obje
   return result;
 }
 
-bool TokenUsageExtractor::isTerminalEvent(ApiFormat format, const Json::Object& json) {
+bool TokenUsageExtractor::isTerminalEvent(ApiFormat format, const nlohmann::json& json) {
   const auto type = readString(json, JsonKeys::get().Type);
   if (!type.has_value()) {
     return false;

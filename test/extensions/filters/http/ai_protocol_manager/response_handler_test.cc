@@ -475,10 +475,9 @@ TEST_F(ResponseHandlerTest, NonObjectJsonShapesTolerated) {
   SseResponseHandler sse(ApiFormat::Gemini, TestMaxEventSize, TestMaxParsedEvents, stats_);
   feed(sse, "data: []\n\ndata: 42\n\n", 4096);
   EXPECT_FALSE(sse.usage().hasAny());
-  // Scalar roots come back from the loader as a null root and are counted as
-  // parse errors (the string body above and the `42` payload); array roots
-  // are skipped silently. Either way, nothing crashes and nothing extracts.
-  EXPECT_EQ(stats_.response_parse_error_.value(), 2);
+  // Non-object roots (scalars and arrays alike) are valid JSON: they parse
+  // cleanly and are skipped as unsupported shapes, not counted as errors.
+  EXPECT_EQ(stats_.response_parse_error_.value(), 0);
 }
 
 TEST_F(ResponseHandlerTest, SseSplitCarriageReturnResolvedAtEndOfStream) {
@@ -583,11 +582,14 @@ TEST_F(ResponseHandlerTest, ObservationBuffersUseStreamMemoryAccount) {
   }
   EXPECT_EQ(account->balance(), 0);
   {
+    // The JSON handler streams the body straight into the parser: no side
+    // copy is retained, so nothing is ever charged to the account.
     JsonResponseHandler handler(ApiFormat::Unknown, TestMaxBodySize, stats_, account);
     Buffer::OwnedImpl body("{\"type\":\"message\",\"usage\":{\"input_tokens\":5}}");
     handler.onData(body);
-    EXPECT_GT(account->balance(), 0);
+    EXPECT_EQ(account->balance(), 0);
     handler.onEndStream();
+    EXPECT_EQ(handler.usage().input_tokens, 5);
     EXPECT_EQ(account->balance(), 0);
   }
   EXPECT_EQ(account->balance(), 0);

@@ -89,7 +89,9 @@ envoy_cc_library(
     srcs = ["token_usage_extractor.cc"],
     hdrs = ["token_usage_extractor.h"],
     deps = [
-        "//source/common/json:json_loader_lib",
+        ":json_with_ext_buf_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/singleton:const_singleton",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:variant",
@@ -101,6 +103,7 @@ envoy_cc_library(
     srcs = ["response_handler.cc"],
     hdrs = ["response_handler.h"],
     deps = [
+        ":json_with_ext_buf_parser_lib",
         ":token_usage_extractor_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/common:pure_lib",
@@ -109,7 +112,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/http/sse:sse_parser_lib",
-        "//source/common/json:json_loader_lib",
         "@abseil-cpp//absl/strings",
     ],
 )

@@ -4,7 +4,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/http/sse/sse_parser.h"
-#include "source/common/json/json_loader.h"
 
 #include "absl/strings/match.h"
 
@@ -61,11 +60,10 @@ bool skippableEventType(absl::string_view event_type) {
 }
 } // namespace
 
-bool ResponseHandler::processDocument(const Json::Object& json) {
-  if (!json.isObject()) {
+bool ResponseHandler::processDocument(const nlohmann::json& json) {
+  if (!json.is_object()) {
     // Non-object JSON (scalar, array, null) is an unsupported shape, not an
-    // error -- and it must not reach the object-only accessors below, which
-    // treat invocation on a non-object node as an internal bug.
+    // error: skip it.
     return false;
   }
   if (format_ == ApiFormat::Unknown) {
@@ -293,8 +291,8 @@ void SseResponseHandler::processSseEvent(absl::string_view event) {
   }
   --parse_budget_;
 
-  auto json_or = Json::Factory::loadFromString(data);
-  if (!json_or.ok() || json_or.value() == nullptr) {
+  JsonWithExtBufParser parser({});
+  if (const absl::Status status = parser.feed(data, /*end_stream=*/true); !status.ok()) {
     // Never log payload bytes: they can carry model output or user data.
     ENVOY_LOG(debug, "ai_protocol_manager: {}-byte SSE event data is not valid JSON, skipped",
               data.size());
@@ -302,66 +300,79 @@ void SseResponseHandler::processSseEvent(absl::string_view event) {
     degraded_ = true;
     return;
   }
-  if (processDocument(*json_or.value())) {
+  if (processDocument(parser.takeDocument().json())) {
     parsing_complete_ = true;
   }
 }
 
+JsonResponseHandler::JsonResponseHandler(ApiFormat format, uint32_t max_inspected_body_size,
+                                         AiProtocolManagerStats& stats,
+                                         const Buffer::BufferMemoryAccountSharedPtr& /*account*/)
+    : ResponseHandler(format, stats), max_inspected_body_size_(max_inspected_body_size),
+      parser_(std::make_unique<JsonWithExtBufParser>(JsonWithExtBufParser::Config{})) {}
+
 void JsonResponseHandler::onData(const Buffer::Instance& data) {
-  if (over_limit_ || parsing_complete_) {
+  if (over_limit_ || parse_failed_ || parsing_complete_) {
     return;
   }
-  // buffer_.length() <= max_inspected_body_size_ is an invariant, so the
-  // subtraction cannot underflow.
-  if (data.length() > max_inspected_body_size_ - buffer_.length()) {
+  // The body streams straight into the parser -- no side copy is retained;
+  // oversized string values become 16-byte external references rather than
+  // materialized bytes.
+  if (data.length() > max_inspected_body_size_ - bytes_fed_) {
     ENVOY_LOG(debug,
               "ai_protocol_manager: response body exceeds max_inspected_body_size ({}), "
               "skipping token extraction",
               max_inspected_body_size_);
     stats_.response_body_too_large_.inc();
-    over_limit_ = true;
     degraded_ = true;
-    buffer_.drain(buffer_.length());
+    over_limit_ = true;
+    parser_.reset();
     return;
   }
-  buffer_.add(data);
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+    bytes_fed_ += slice.len_;
+    const absl::Status status = parser_->feed(
+        absl::string_view(static_cast<const char*>(slice.mem_), slice.len_), /*end_stream=*/false);
+    if (!status.ok()) {
+      // Never log payload bytes; the status carries no body content.
+      ENVOY_LOG(debug, "ai_protocol_manager: response body is not valid JSON");
+      stats_.response_parse_error_.inc();
+      degraded_ = true;
+      parse_failed_ = true;
+      parser_.reset();
+      return;
+    }
+  }
 }
 
 void JsonResponseHandler::onEndStream() {
-  if (over_limit_ || parsing_complete_) {
+  if (over_limit_ || parse_failed_ || parsing_complete_ || parser_ == nullptr) {
     return;
   }
   parsing_complete_ = true;
-  auto json_or = Json::Factory::loadFromString(buffer_.toString());
-  buffer_.drain(buffer_.length());
-  if (!json_or.ok() || json_or.value() == nullptr) {
-    // Never log payload bytes; see the SSE parse-error note.
+  if (const absl::Status status = parser_->feed("", /*end_stream=*/true); !status.ok()) {
     ENVOY_LOG(debug, "ai_protocol_manager: response body is not valid JSON");
     stats_.response_parse_error_.inc();
     degraded_ = true;
+    parser_.reset();
     return;
   }
-  const Json::ObjectSharedPtr& root = json_or.value();
+  const nlohmann::json document = std::move(parser_->takeDocument().json());
+  parser_.reset();
 
   // A root-level array is Gemini's default (non-SSE) streaming. Elements are
   // processed in order, stopping at a terminal event so a later element
   // cannot override an authoritative terminal result.
-  if (root->isArray()) {
-    auto elements_or = root->asObjectArray();
-    if (!elements_or.ok()) {
-      stats_.response_parse_error_.inc();
-      degraded_ = true;
-      return;
-    }
-    for (const Json::ObjectSharedPtr& element : elements_or.value()) {
-      if (element != nullptr && processDocument(*element)) {
+  if (document.is_array()) {
+    for (const nlohmann::json& element : document) {
+      if (processDocument(element)) {
         break;
       }
     }
     return;
   }
 
-  processDocument(*root);
+  processDocument(document);
 }
 
 } // namespace AiProtocolManager

@@ -136,8 +136,11 @@ separately bounded side copy — hard-capped at :ref:`max_event_size
 (JSON) per stream, regardless of how large individual data frames are, and
 charged to the stream's buffer memory account when :ref:`account tracking
 <envoy_v3_api_field_config.overload.v3.BufferFactoryConfig.minimum_account_to_track_power_of_two>`
-is enabled — and the extraction work, including the JSON parse at end of
-stream, runs on the response's filter-chain callbacks. A complete SSE event
+is enabled — and the extraction work runs on the response's filter-chain
+callbacks. Parsing uses the filter's shared streaming JSON machinery
+(``JsonWithExtBufParser``): a JSON body streams incrementally into the parser
+with no retained side copy, and oversized string values are never
+materialized in the document. A complete SSE event
 arriving within one data frame — the dominant shape of real streams — is
 processed in place and retains nothing; only an event split across frames is
 buffered (consolidating a split event can transiently hold a second

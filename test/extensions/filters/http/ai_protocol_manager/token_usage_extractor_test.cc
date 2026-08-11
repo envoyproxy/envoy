@@ -1,4 +1,3 @@
-#include "source/common/json/json_loader.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage_extractor.h"
 
 #include "gtest/gtest.h"
@@ -9,15 +8,15 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 namespace {
 
-Json::ObjectSharedPtr parse(const std::string& json) {
-  auto result = Json::Factory::loadFromString(json);
-  EXPECT_TRUE(result.ok());
-  return result.value();
+nlohmann::json parse(const std::string& json) {
+  nlohmann::json result = nlohmann::json::parse(json, nullptr, /*allow_exceptions=*/false);
+  EXPECT_FALSE(result.is_discarded()) << json;
+  return result;
 }
 
 // Most cases only need the usage half of the extraction result; malformed-flag
 // behavior is covered by the dedicated tests below.
-TokenUsage extractUsage(ApiFormat format, const Json::Object& json) {
+TokenUsage extractUsage(ApiFormat format, const nlohmann::json& json) {
   return TokenUsageExtractor::extract(format, json).usage;
 }
 
@@ -26,35 +25,35 @@ TokenUsage extractUsage(ApiFormat format, const Json::Object& json) {
 
 TEST(DetectFormatTest, OpenAiChatCompletion) {
   EXPECT_EQ(
-      TokenUsageExtractor::detectFormat(*parse(R"({"object":"chat.completion","model":"gpt-4o"})")),
+      TokenUsageExtractor::detectFormat(parse(R"({"object":"chat.completion","model":"gpt-4o"})")),
       ApiFormat::OpenAi);
   EXPECT_EQ(TokenUsageExtractor::detectFormat(
-                *parse(R"({"object":"chat.completion.chunk","choices":[]})")),
+                parse(R"({"object":"chat.completion.chunk","choices":[]})")),
             ApiFormat::OpenAi);
 }
 
 TEST(DetectFormatTest, OpenAiResponsesApi) {
   // Non-streaming Response object and streaming lifecycle events.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"object":"response","output":[]})")),
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"object":"response","output":[]})")),
             ApiFormat::OpenAi);
   EXPECT_EQ(
-      TokenUsageExtractor::detectFormat(*parse(R"({"type":"response.completed","response":{}})")),
+      TokenUsageExtractor::detectFormat(parse(R"({"type":"response.completed","response":{}})")),
       ApiFormat::OpenAi);
   EXPECT_EQ(TokenUsageExtractor::detectFormat(
-                *parse(R"({"type":"response.output_text.delta","delta":"hi"})")),
+                parse(R"({"type":"response.output_text.delta","delta":"hi"})")),
             ApiFormat::OpenAi);
 }
 
 TEST(DetectFormatTest, Anthropic) {
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"type":"message","role":"assistant"})")),
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"message","role":"assistant"})")),
             ApiFormat::Anthropic);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"type":"message_start","message":{}})")),
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"message_start","message":{}})")),
             ApiFormat::Anthropic);
   EXPECT_EQ(TokenUsageExtractor::detectFormat(
-                *parse(R"({"type":"message_delta","usage":{"output_tokens":3}})")),
+                parse(R"({"type":"message_delta","usage":{"output_tokens":3}})")),
             ApiFormat::Anthropic);
   EXPECT_EQ(
-      TokenUsageExtractor::detectFormat(*parse(R"({"type":"message","usage":{"input_tokens":1}})")),
+      TokenUsageExtractor::detectFormat(parse(R"({"type":"message","usage":{"input_tokens":1}})")),
       ApiFormat::Anthropic);
 }
 
@@ -64,28 +63,27 @@ TEST(DetectFormatTest, StructurelessAnthropicShapedTypesDoNotLock) {
   // as evidence risks poisoning a foreign stream (a lone message_stop would
   // even terminate extraction). In a genuine Anthropic stream, message_start
   // or the non-streaming Message locks the format first.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"type":"message"})")), ApiFormat::Unknown);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"type":"message_stop"})")),
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"message"})")), ApiFormat::Unknown);
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"message_stop"})")),
             ApiFormat::Unknown);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"type":"content_block_delta"})")),
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"content_block_delta"})")),
             ApiFormat::Unknown);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"type":"message_start"})")),
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"message_start"})")),
             ApiFormat::Unknown);
 }
 
 TEST(DetectFormatTest, Gemini) {
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"candidates":[{"content":{}}]})")),
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"candidates":[{"content":{}}]})")),
             ApiFormat::Gemini);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"usageMetadata":{}})")),
-            ApiFormat::Gemini);
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"usageMetadata":{}})")), ApiFormat::Gemini);
 }
 
 TEST(DetectFormatTest, Unknown) {
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"foo":"bar"})")), ApiFormat::Unknown);
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"foo":"bar"})")), ApiFormat::Unknown);
   // A bare content delta with no discriminating markers.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"text":"hello"})")), ApiFormat::Unknown);
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"text":"hello"})")), ApiFormat::Unknown);
   // `ping` is a weak marker any gateway may emit: it must not lock detection.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"type":"ping"})")), ApiFormat::Unknown);
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"ping"})")), ApiFormat::Unknown);
 }
 
 TEST(DetectFormatTest, TypeMismatchedMarkersDoNotLock) {
@@ -93,22 +91,21 @@ TEST(DetectFormatTest, TypeMismatchedMarkersDoNotLock) {
   // hasObject()-style key presence alone must not lock the stream: detection
   // is stream-global, and a foreign document with a `candidates` string would
   // otherwise poison every later event.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"candidates":"not-gemini"})")),
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"candidates":"not-gemini"})")),
             ApiFormat::Unknown);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"usageMetadata":"nope"})")),
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"usageMetadata":"nope"})")),
             ApiFormat::Unknown);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"usageMetadata":[1]})")),
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"usageMetadata":[1]})")),
             ApiFormat::Unknown);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"modelVersion":42})")),
-            ApiFormat::Unknown);
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"modelVersion":42})")), ApiFormat::Unknown);
   // An array of non-objects is not a Gemini candidates list, and neither is
   // an empty array: real GenerateContentResponse chunks carry candidate
   // objects, so an empty generic `candidates` must not lock the stream.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"candidates":[1,"x",null]})")),
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"candidates":[1,"x",null]})")),
             ApiFormat::Unknown);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"candidates":[]})")), ApiFormat::Unknown);
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"candidates":[]})")), ApiFormat::Unknown);
   // The correctly-shaped markers still detect.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(*parse(R"({"modelVersion":"gemini-2.5-pro"})")),
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"modelVersion":"gemini-2.5-pro"})")),
             ApiFormat::Gemini);
 }
 
@@ -116,7 +113,7 @@ TEST(DetectFormatTest, TypeMismatchedMarkersDoNotLock) {
 // OpenAI extraction.
 
 TEST(ExtractOpenAiTest, ChatCompletionNonStreaming) {
-  const auto usage = extractUsage(ApiFormat::OpenAi, *parse(R"(
+  const auto usage = extractUsage(ApiFormat::OpenAi, parse(R"(
       {"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4o-2024-08-06",
        "choices":[{"message":{"content":"hi"}}],
        "usage":{"prompt_tokens":19,"completion_tokens":10,"total_tokens":29,
@@ -134,7 +131,7 @@ TEST(ExtractOpenAiTest, ChatCompletionNonStreaming) {
 
 TEST(ExtractOpenAiTest, ChatCompletionUsageChunk) {
   // The include_usage terminal chunk: empty choices, populated usage.
-  const auto usage = extractUsage(ApiFormat::OpenAi, *parse(R"(
+  const auto usage = extractUsage(ApiFormat::OpenAi, parse(R"(
       {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini",
        "choices":[],"usage":{"prompt_tokens":19,"completion_tokens":10,"total_tokens":29}})"));
   EXPECT_EQ(usage.input_tokens, 19);
@@ -143,7 +140,7 @@ TEST(ExtractOpenAiTest, ChatCompletionUsageChunk) {
 }
 
 TEST(ExtractOpenAiTest, UsageNullChunkYieldsNothing) {
-  const auto usage = extractUsage(ApiFormat::OpenAi, *parse(R"(
+  const auto usage = extractUsage(ApiFormat::OpenAi, parse(R"(
       {"object":"chat.completion.chunk","model":"gpt-4o",
        "choices":[{"delta":{"content":"hi"}}],"usage":null})"));
   EXPECT_FALSE(usage.hasAny());
@@ -151,7 +148,7 @@ TEST(ExtractOpenAiTest, UsageNullChunkYieldsNothing) {
 }
 
 TEST(ExtractOpenAiTest, ResponsesApiCompletedEvent) {
-  const auto json = parse(R"(
+  const nlohmann::json json = parse(R"(
       {"type":"response.completed","sequence_number":7,
        "response":{"id":"resp_1","object":"response","status":"completed","model":"gpt-5.4",
                    "usage":{"input_tokens":36,
@@ -159,7 +156,7 @@ TEST(ExtractOpenAiTest, ResponsesApiCompletedEvent) {
                             "output_tokens":87,
                             "output_tokens_details":{"reasoning_tokens":40},
                             "total_tokens":123}}})");
-  const auto usage = extractUsage(ApiFormat::OpenAi, *json);
+  const auto usage = extractUsage(ApiFormat::OpenAi, json);
   EXPECT_EQ(usage.input_tokens, 36);
   EXPECT_EQ(usage.output_tokens, 87);
   EXPECT_EQ(usage.total_tokens, 123);
@@ -168,23 +165,23 @@ TEST(ExtractOpenAiTest, ResponsesApiCompletedEvent) {
   EXPECT_EQ(usage.reasoning_tokens, 40);
   EXPECT_EQ(usage.model, "gpt-5.4");
   // Terminal lifecycle events end extraction.
-  EXPECT_TRUE(TokenUsageExtractor::isTerminalEvent(ApiFormat::OpenAi, *json));
+  EXPECT_TRUE(TokenUsageExtractor::isTerminalEvent(ApiFormat::OpenAi, json));
 }
 
 TEST(ExtractOpenAiTest, ResponsesApiFailedAndIncompleteAreTerminal) {
   EXPECT_TRUE(TokenUsageExtractor::isTerminalEvent(
-      ApiFormat::OpenAi, *parse(R"({"type":"response.failed","response":{}})")));
+      ApiFormat::OpenAi, parse(R"({"type":"response.failed","response":{}})")));
   EXPECT_TRUE(TokenUsageExtractor::isTerminalEvent(
-      ApiFormat::OpenAi, *parse(R"({"type":"response.incomplete","response":{}})")));
+      ApiFormat::OpenAi, parse(R"({"type":"response.incomplete","response":{}})")));
   EXPECT_FALSE(TokenUsageExtractor::isTerminalEvent(
-      ApiFormat::OpenAi, *parse(R"({"type":"response.in_progress","response":{}})")));
+      ApiFormat::OpenAi, parse(R"({"type":"response.in_progress","response":{}})")));
 }
 
 // ---------------------------------------------------------------------------
 // Anthropic extraction.
 
 TEST(ExtractAnthropicTest, NonStreaming) {
-  const auto usage = extractUsage(ApiFormat::Anthropic, *parse(R"(
+  const auto usage = extractUsage(ApiFormat::Anthropic, parse(R"(
       {"id":"msg_1","type":"message","role":"assistant","model":"claude-opus-5",
        "usage":{"input_tokens":2095,"output_tokens":503,
                 "cache_creation_input_tokens":2051,"cache_read_input_tokens":1024,
@@ -212,7 +209,7 @@ TEST(ExtractAnthropicTest, StreamingAccumulation) {
   TokenUsage accumulated;
 
   // message_start carries the input side and the model, nested under `message`.
-  accumulated.merge(extractUsage(ApiFormat::Anthropic, *parse(R"(
+  accumulated.merge(extractUsage(ApiFormat::Anthropic, parse(R"(
       {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant",
        "model":"claude-opus-5","content":[],
        "usage":{"input_tokens":2679,"cache_creation_input_tokens":0,
@@ -220,10 +217,10 @@ TEST(ExtractAnthropicTest, StreamingAccumulation) {
   // Cumulative message_delta events; the last one wins.
   accumulated.merge(
       extractUsage(ApiFormat::Anthropic,
-                   *parse(R"({"type":"message_delta","delta":{},"usage":{"output_tokens":7}})")));
+                   parse(R"({"type":"message_delta","delta":{},"usage":{"output_tokens":7}})")));
   accumulated.merge(extractUsage(
       ApiFormat::Anthropic,
-      *parse(
+      parse(
           R"({"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":15}})")));
 
   accumulated.finalize();
@@ -236,10 +233,10 @@ TEST(ExtractAnthropicTest, StreamingAccumulation) {
 TEST(ExtractAnthropicTest, FatMessageDeltaOverridesInputSide) {
   // Newer responses repeat input-side counts in message_delta; last wins.
   TokenUsage accumulated;
-  accumulated.merge(extractUsage(ApiFormat::Anthropic, *parse(R"(
+  accumulated.merge(extractUsage(ApiFormat::Anthropic, parse(R"(
       {"type":"message_start","message":{"model":"claude-opus-5",
        "usage":{"input_tokens":100,"output_tokens":1}}})")));
-  accumulated.merge(extractUsage(ApiFormat::Anthropic, *parse(R"(
+  accumulated.merge(extractUsage(ApiFormat::Anthropic, parse(R"(
       {"type":"message_delta","delta":{"stop_reason":"end_turn"},
        "usage":{"input_tokens":10682,"cache_creation_input_tokens":0,
                 "cache_read_input_tokens":0,"output_tokens":510}})")));
@@ -250,23 +247,23 @@ TEST(ExtractAnthropicTest, FatMessageDeltaOverridesInputSide) {
 TEST(ExtractAnthropicTest, MessageStartWithoutUsageIsTolerated) {
   const auto usage =
       extractUsage(ApiFormat::Anthropic,
-                   *parse(R"({"type":"message_start","message":{"model":"claude-opus-5"}})"));
+                   parse(R"({"type":"message_start","message":{"model":"claude-opus-5"}})"));
   EXPECT_FALSE(usage.hasAny());
   EXPECT_EQ(usage.model, "claude-opus-5");
 }
 
 TEST(ExtractAnthropicTest, MessageStopIsTerminal) {
   EXPECT_TRUE(TokenUsageExtractor::isTerminalEvent(ApiFormat::Anthropic,
-                                                   *parse(R"({"type":"message_stop"})")));
+                                                   parse(R"({"type":"message_stop"})")));
   EXPECT_FALSE(TokenUsageExtractor::isTerminalEvent(ApiFormat::Anthropic,
-                                                    *parse(R"({"type":"message_delta"})")));
+                                                    parse(R"({"type":"message_delta"})")));
 }
 
 // ---------------------------------------------------------------------------
 // Gemini extraction.
 
 TEST(ExtractGeminiTest, UsageMetadata) {
-  const auto usage = extractUsage(ApiFormat::Gemini, *parse(R"(
+  const auto usage = extractUsage(ApiFormat::Gemini, parse(R"(
       {"candidates":[{"content":{"parts":[{"text":"hi"}],"role":"model"},"finishReason":"STOP"}],
        "usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":149,"totalTokenCount":167,
                         "cachedContentTokenCount":2,"thoughtsTokenCount":12},
@@ -290,7 +287,7 @@ TEST(ExtractGeminiTest, UsageMetadata) {
 TEST(ExtractGeminiTest, ToolUseAndThoughtsAccounting) {
   // Reviewer merge-gate case: canonical input adds tool-use prompt tokens,
   // canonical output adds thoughts, and both match the provider total.
-  auto usage = extractUsage(ApiFormat::Gemini, *parse(R"(
+  auto usage = extractUsage(ApiFormat::Gemini, parse(R"(
       {"usageMetadata":{"promptTokenCount":6,"toolUsePromptTokenCount":5,
                         "candidatesTokenCount":149,"thoughtsTokenCount":12,
                         "totalTokenCount":172}})"));
@@ -306,7 +303,7 @@ TEST(ExtractGeminiTest, ToolUseAndThoughtsAccounting) {
 TEST(ExtractAnthropicTest, CanonicalInclusiveAccounting) {
   // Reviewer merge-gate case: input 100 + cache-creation 20 + cache-read 30
   // yields canonical input 150 and (with output 10) total 160.
-  auto usage = extractUsage(ApiFormat::Anthropic, *parse(R"(
+  auto usage = extractUsage(ApiFormat::Anthropic, parse(R"(
       {"type":"message","usage":{"input_tokens":100,"cache_creation_input_tokens":20,
        "cache_read_input_tokens":30,"output_tokens":10}})"));
   usage.finalize();
@@ -322,11 +319,11 @@ TEST(ExtractAnthropicTest, PartialInputUpdatePreservesCacheBuckets) {
   // cache buckets must not regress the canonical inclusive input -- native
   // components accumulate independently and are summed only at finalize.
   TokenUsage accumulated;
-  accumulated.merge(extractUsage(ApiFormat::Anthropic, *parse(R"(
+  accumulated.merge(extractUsage(ApiFormat::Anthropic, parse(R"(
       {"type":"message_start","message":{"usage":{"input_tokens":100,
        "cache_read_input_tokens":30,"cache_creation_input_tokens":20,
        "output_tokens":1}}})")));
-  accumulated.merge(extractUsage(ApiFormat::Anthropic, *parse(R"(
+  accumulated.merge(extractUsage(ApiFormat::Anthropic, parse(R"(
       {"type":"message_delta","delta":{"stop_reason":"end_turn"},
        "usage":{"input_tokens":100,"output_tokens":50}})")));
   accumulated.finalize();
@@ -339,10 +336,10 @@ TEST(ExtractAnthropicTest, PartialInputUpdatePreservesCacheBuckets) {
 
 TEST(ExtractGeminiTest, CumulativeChunksLastWins) {
   TokenUsage accumulated;
-  accumulated.merge(extractUsage(ApiFormat::Gemini, *parse(R"(
+  accumulated.merge(extractUsage(ApiFormat::Gemini, parse(R"(
       {"candidates":[{"content":{"parts":[{"text":"a"}]}}],
        "usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":16,"totalTokenCount":22}})")));
-  accumulated.merge(extractUsage(ApiFormat::Gemini, *parse(R"(
+  accumulated.merge(extractUsage(ApiFormat::Gemini, parse(R"(
       {"candidates":[{"content":{"parts":[{"text":"b"}]},"finishReason":"STOP"}],
        "usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":149,"totalTokenCount":155},
        "modelVersion":"gemini-2.5-flash"})")));
@@ -354,7 +351,7 @@ TEST(ExtractGeminiTest, CumulativeChunksLastWins) {
 
 TEST(ExtractGeminiTest, ChunkWithoutUsageMetadataYieldsNothing) {
   const auto usage = extractUsage(
-      ApiFormat::Gemini, *parse(R"({"candidates":[{"content":{"parts":[{"text":"a"}]}}]})"));
+      ApiFormat::Gemini, parse(R"({"candidates":[{"content":{"parts":[{"text":"a"}]}}]})"));
   EXPECT_FALSE(usage.hasAny());
 }
 
@@ -364,7 +361,7 @@ TEST(ExtractGeminiTest, ChunkWithoutUsageMetadataYieldsNothing) {
 TEST(TokenUsageTest, PresentButInvalidFieldsAreFlaggedMalformed) {
   // A missing key is not malformed...
   EXPECT_FALSE(
-      TokenUsageExtractor::extract(ApiFormat::Anthropic, *parse(R"({"usage":{"output_tokens":5}})"))
+      TokenUsageExtractor::extract(ApiFormat::Anthropic, parse(R"({"usage":{"output_tokens":5}})"))
           .malformed);
   // ...but a known field that is present with an unusable value is: wrong
   // scalar type, wrong container type, negative, fractional, out of range,
@@ -376,36 +373,36 @@ TEST(TokenUsageTest, PresentButInvalidFieldsAreFlaggedMalformed) {
                                   std::string(R"({"usage":{"output_tokens":5.5}})"),
                                   std::string(R"({"usage":{"output_tokens":9007199254740992}})"),
                                   std::string(R"({"usage":"not-an-object"})")}) {
-    EXPECT_TRUE(TokenUsageExtractor::extract(ApiFormat::Anthropic, *parse(body)).malformed) << body;
+    EXPECT_TRUE(TokenUsageExtractor::extract(ApiFormat::Anthropic, parse(body)).malformed) << body;
   }
   // Null handling is specific to the position. OpenAI documents `"usage": null` as the
   // placeholder on non-terminal chunks (and failed responses): benignly
   // absent, not malformed, and not degraded.
   EXPECT_FALSE(
-      TokenUsageExtractor::extract(ApiFormat::OpenAi, *parse(R"({"usage":null})")).malformed);
-  EXPECT_FALSE(TokenUsageExtractor::extract(
-                   ApiFormat::OpenAi,
-                   *parse(R"({"usage":{"prompt_tokens":3,"prompt_tokens_details":null}})"))
-                   .malformed);
+      TokenUsageExtractor::extract(ApiFormat::OpenAi, parse(R"({"usage":null})")).malformed);
+  EXPECT_FALSE(
+      TokenUsageExtractor::extract(
+          ApiFormat::OpenAi, parse(R"({"usage":{"prompt_tokens":3,"prompt_tokens_details":null}})"))
+          .malformed);
   // A null in a *count* position is malformed in every dialect (the counters
   // are required integers): a corrupt final cumulative update must not leave
   // an earlier value published as complete.
   EXPECT_TRUE(TokenUsageExtractor::extract(ApiFormat::Anthropic,
-                                           *parse(R"({"usage":{"output_tokens":null}})"))
+                                           parse(R"({"usage":{"output_tokens":null}})"))
                   .malformed);
   EXPECT_TRUE(
-      TokenUsageExtractor::extract(ApiFormat::OpenAi, *parse(R"({"usage":{"prompt_tokens":null}})"))
+      TokenUsageExtractor::extract(ApiFormat::OpenAi, parse(R"({"usage":{"prompt_tokens":null}})"))
           .malformed);
   // Null in a required structural position is malformed structure.
   EXPECT_TRUE(TokenUsageExtractor::extract(
-                  ApiFormat::OpenAi, *parse(R"({"type":"response.completed","response":null})"))
+                  ApiFormat::OpenAi, parse(R"({"type":"response.completed","response":null})"))
                   .malformed);
   EXPECT_TRUE(TokenUsageExtractor::extract(ApiFormat::Anthropic,
-                                           *parse(R"({"type":"message_start","message":null})"))
+                                           parse(R"({"type":"message_start","message":null})"))
                   .malformed);
   // Valid fields alongside a malformed one still extract.
   const auto result = TokenUsageExtractor::extract(
-      ApiFormat::Anthropic, *parse(R"({"usage":{"input_tokens":7,"output_tokens":"nope"}})"));
+      ApiFormat::Anthropic, parse(R"({"usage":{"input_tokens":7,"output_tokens":"nope"}})"));
   EXPECT_TRUE(result.malformed);
   EXPECT_EQ(result.usage.input_tokens, 7);
 }
@@ -417,7 +414,7 @@ TEST(TokenUsageTest, NullCountRegressionScenario) {
   TokenUsage accumulated;
   bool degraded = false;
   auto merge = [&](const std::string& body) {
-    const auto result = TokenUsageExtractor::extract(ApiFormat::Anthropic, *parse(body));
+    const auto result = TokenUsageExtractor::extract(ApiFormat::Anthropic, parse(body));
     accumulated.merge(result.usage);
     degraded |= result.malformed;
   };
@@ -433,14 +430,14 @@ TEST(TokenUsageTest, CanonicalizationOverflowIsSurfaced) {
   // Individually valid fields summing above 2^53-1: the component is dropped
   // rather than published imprecisely, and the record is flagged so the
   // caller publishes partial instead of a silently non-canonical complete.
-  auto usage = extractUsage(ApiFormat::Anthropic, *parse(R"(
+  auto usage = extractUsage(ApiFormat::Anthropic, parse(R"(
       {"usage":{"input_tokens":9007199254740991,"cache_read_input_tokens":1,
                 "output_tokens":0}})"));
   usage.finalize();
   EXPECT_FALSE(usage.input_tokens.has_value());
   EXPECT_TRUE(usage.canonicalizationOverflow());
 
-  auto fine = extractUsage(ApiFormat::Anthropic, *parse(R"(
+  auto fine = extractUsage(ApiFormat::Anthropic, parse(R"(
       {"usage":{"input_tokens":100,"cache_read_input_tokens":1,"output_tokens":0}})"));
   fine.finalize();
   EXPECT_FALSE(fine.canonicalizationOverflow());
@@ -548,7 +545,7 @@ TEST(TokenUsageTest, ReportedTotalMismatchSurfacedSeparately) {
 TEST(TokenUsageTest, NumericEdgeCases) {
   // Counts serialized as JSON doubles are accepted; negatives are ignored.
   const auto usage = extractUsage(ApiFormat::Anthropic,
-                                  *parse(R"({"usage":{"input_tokens":12.0,"output_tokens":-5}})"));
+                                  parse(R"({"usage":{"input_tokens":12.0,"output_tokens":-5}})"));
   EXPECT_EQ(usage.input_tokens, 12);
   EXPECT_FALSE(usage.output_tokens.has_value());
 }
@@ -557,7 +554,7 @@ TEST(TokenUsageTest, UntrustedNumericValuesRejected) {
   // Fractional, astronomically large, out-of-double-precision, and wrong-typed
   // values are rejected rather than coerced: these feed billing/accounting
   // metadata, and casting e.g. 1e300 to an integer is undefined behavior.
-  const auto usage = extractUsage(ApiFormat::Anthropic, *parse(R"(
+  const auto usage = extractUsage(ApiFormat::Anthropic, parse(R"(
       {"usage":{"input_tokens":12.5,
                 "output_tokens":1e300,
                 "cache_read_input_tokens":9007199254740992,
@@ -605,8 +602,8 @@ TEST(TokenUsageTest, OversizedModelNameOmitted) {
   // The response-reported model is upstream-controlled: values beyond a small
   // bound are dropped so metadata and access-log entries stay small.
   const auto usage = extractUsage(
-      ApiFormat::Anthropic, *parse("{\"type\":\"message\",\"model\":\"" + std::string(5000, 'm') +
-                                   "\",\"usage\":{\"input_tokens\":5,\"output_tokens\":7}}"));
+      ApiFormat::Anthropic, parse("{\"type\":\"message\",\"model\":\"" + std::string(5000, 'm') +
+                                  "\",\"usage\":{\"input_tokens\":5,\"output_tokens\":7}}"));
   EXPECT_TRUE(usage.model.empty());
   EXPECT_EQ(usage.input_tokens, 5); // Counts are unaffected.
 }
@@ -614,7 +611,7 @@ TEST(TokenUsageTest, OversizedModelNameOmitted) {
 TEST(TokenUsageTest, SecondaryOnlyCountsStillPublish) {
   // A usage object carrying only cache/reasoning counts is still a result.
   const auto usage =
-      extractUsage(ApiFormat::Anthropic, *parse(R"({"usage":{"cache_read_input_tokens":64}})"));
+      extractUsage(ApiFormat::Anthropic, parse(R"({"usage":{"cache_read_input_tokens":64}})"));
   EXPECT_TRUE(usage.hasAny());
   EXPECT_EQ(usage.cached_input_tokens, 64);
 }

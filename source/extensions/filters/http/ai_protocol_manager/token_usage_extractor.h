@@ -4,9 +4,8 @@
 #include <optional>
 #include <string>
 
-#include "envoy/json/json_object.h"
-
 #include "absl/strings/string_view.h"
+#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -85,25 +84,28 @@ struct ExtractionResult {
   bool malformed{false};
 };
 
-// Stateless extraction of token usage from a parsed response document -- one SSE
-// event's data payload, one streamed-array element, or a whole JSON body.
+// Stateless extraction of token usage from a parsed response document (the
+// nlohmann DOM produced by JsonWithExtBufParser) -- one SSE event's data
+// payload, one streamed-array element, or a whole JSON body. Oversized string
+// values may appear as external-reference binary nodes; the extractor never
+// reads large strings, so they are simply skipped.
 class TokenUsageExtractor {
 public:
   // Detect the API dialect from a response document's shape. Detection is
   // stream-global once locked, so only strongly shaped, value-validated
   // markers decide; anything else stays Unknown for a later document.
-  static ApiFormat detectFormat(const Json::Object& json);
+  static ApiFormat detectFormat(const nlohmann::json& json);
 
   // Extract the partial *native* usage this document carries (see the
   // TokenUsage lifecycle comment). Absent fields stay unset; the caller
   // accumulates via TokenUsage::merge() with canonicalization in finalize().
-  static ExtractionResult extract(ApiFormat format, const Json::Object& json);
+  static ExtractionResult extract(ApiFormat format, const nlohmann::json& json);
 
   // True when this document marks the dialect's logical end of extraction
   // (Anthropic `message_stop`, OpenAI Responses terminal lifecycle events).
   // Callers must extract() first: terminal Responses events also carry the
   // usage. Chat Completions' non-JSON `[DONE]` is handled before parsing.
-  static bool isTerminalEvent(ApiFormat format, const Json::Object& json);
+  static bool isTerminalEvent(ApiFormat format, const nlohmann::json& json);
 };
 
 } // namespace AiProtocolManager
