@@ -60,15 +60,6 @@ public:
   virtual void updateOnDemand(const std::string& alias) PURE;
 
   /**
-   * Clears the flag returned by vhdsConfigurationChanged(). Called once the VHDS configuration
-   * change has been acted on, i.e. once the VHDS subscription has been (re)started, so that the
-   * publishing of a later update - in particular of a VHDS update, which publishes through the
-   * same path - doesn't act on it a second time and tear down the VHDS subscription that is
-   * delivering it.
-   */
-  virtual void clearVhdsConfigurationChanged() PURE;
-
-  /**
    * @return the union of all resource names and aliases (if any) received with the last VHDS
    * update.
    */

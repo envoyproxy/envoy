@@ -75,21 +75,6 @@ public:
   virtual bool configWarming() const PURE;
 
   /**
-   * Sets the observer of updates to the RouteConfiguration.
-   * @param observer supplies the observer. This should have a lifetime that is at least as long as
-   * the lifetime of this receiver.
-   */
-  virtual void setObserver(RouteConfigUpdateObserver& observer) PURE;
-
-  /**
-   * @return bool whether the RouteConfiguration built by a previous RDS update is still warming up,
-   * i.e. whether the observer hasn't been notified about it yet. An update that turns out to be a
-   * no-op leaves such an update alone, so this may be true even if the last onRdsUpdate() call
-   * returned false.
-   */
-  virtual bool configWarming() const PURE;
-
-  /**
    * @return uint64_t the hash value of RouteConfiguration.
    */
   virtual uint64_t configHash() const PURE;
