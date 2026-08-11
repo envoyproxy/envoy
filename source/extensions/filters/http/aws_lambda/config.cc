@@ -136,10 +136,9 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
 
 absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-    Server::Configuration::ServerFactoryContext& server_context,
-    Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactoryFromProtoHelper(proto_config, extra_context.stats_prefix,
-                                            server_context, server_context.scope(), false);
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+  return createFilterFactoryFromProtoHelper(proto_config, stats_prefix, server_context,
+                                            server_context.scope(), false);
 }
 
 /*

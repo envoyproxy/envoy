@@ -26,8 +26,8 @@ private:
                                     Server::Configuration::ServerFactoryContext& context) override;
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
-      const ProtoConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
-      Server::Configuration::ExtraFactoryContext& extra_context) override;
+      const ProtoConfig& proto_config, const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const PerRouteProtoConfig& proto_config,

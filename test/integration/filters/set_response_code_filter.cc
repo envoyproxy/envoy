@@ -97,8 +97,7 @@ private:
   }
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const test::integration::filters::SetResponseCodeFilterConfig& proto_config,
-      Server::Configuration::ServerFactoryContext& context,
-      Server::Configuration::ExtraFactoryContext&) override {
+      const std::string&, Server::Configuration::ServerFactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
         proto_config.prefix(), proto_config.code(), proto_config.body(), context);
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -139,8 +138,7 @@ private:
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const test::integration::filters::SetResponseCodeFilterConfigDual& proto_config,
-      Server::Configuration::ServerFactoryContext& context,
-      Server::Configuration::ExtraFactoryContext&) override {
+      const std::string&, Server::Configuration::ServerFactoryContext& context) override {
     auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
         proto_config.prefix(), proto_config.code(), proto_config.body(), context);
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

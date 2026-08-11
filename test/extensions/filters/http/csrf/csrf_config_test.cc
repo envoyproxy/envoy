@@ -36,10 +36,8 @@ TEST(CsrfFilterConfigTest, ServerContextOnlyFactory) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   CsrfFilterFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
 
-  auto cb = factory.createHttpFilterFactoryFromProto(proto_config, context, extra_context).value();
+  auto cb = factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
   EXPECT_NE(cb, nullptr);
 
   Http::MockFilterChainFactoryCallbacks filter_callback;

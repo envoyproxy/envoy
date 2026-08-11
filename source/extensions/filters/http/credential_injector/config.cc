@@ -59,10 +59,9 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb>
 CredentialInjectorFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector&
         proto_config,
-    Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactoryFromProtoHelper(proto_config, extra_context.stats_prefix, context,
-                                            context.scope(), context.initManager());
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactoryFromProtoHelper(proto_config, stats_prefix, context, context.scope(),
+                                            context.initManager());
 }
 
 REGISTER_FACTORY(CredentialInjectorFilterFactory,

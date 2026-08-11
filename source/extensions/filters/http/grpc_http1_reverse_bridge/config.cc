@@ -22,7 +22,7 @@ absl::StatusOr<Http::FilterFactoryCb> Config::createFilterFactoryFromProtoTyped(
 
 absl::StatusOr<Http::FilterFactoryCb> Config::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig& config,
-    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
+    const std::string&, Server::Configuration::ServerFactoryContext&) {
   return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(
         config.content_type(), config.withhold_grpc_frames(), config.response_size_header()));

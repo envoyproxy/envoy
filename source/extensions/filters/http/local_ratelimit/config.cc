@@ -28,8 +28,7 @@ absl::StatusOr<Http::FilterFactoryCb> LocalRateLimitFilterConfig::createFilterFa
 absl::StatusOr<Http::FilterFactoryCb>
 LocalRateLimitFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
-    Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext&) {
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
 
   absl::Status creation_status = absl::OkStatus();
   FilterConfigSharedPtr filter_config =

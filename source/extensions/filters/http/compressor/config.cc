@@ -52,10 +52,9 @@ absl::StatusOr<Http::FilterFactoryCb> CompressorFilterFactory::createFilterFacto
 absl::StatusOr<Http::FilterFactoryCb>
 CompressorFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-    Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext& extra_context) {
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
   Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
-  return createFilterFactory(proto_config, extra_context.stats_prefix, generic_context);
+  return createFilterFactory(proto_config, stats_prefix, generic_context);
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

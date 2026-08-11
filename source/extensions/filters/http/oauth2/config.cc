@@ -178,9 +178,8 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
 
 absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
-    Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactory(proto, extra_context.stats_prefix, context, context.scope(), {});
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(proto, stats_prefix, context, context.scope(), {});
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

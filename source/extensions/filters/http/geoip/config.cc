@@ -57,10 +57,9 @@ absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createFilterFactoryFro
 
 absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
-    Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext& extra_context) {
+    const std::string& stat_prefix, Server::Configuration::ServerFactoryContext& context) {
   Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
-  return createFilterFactory(proto_config, extra_context.stats_prefix, generic_context);
+  return createFilterFactory(proto_config, stat_prefix, generic_context);
 }
 
 /**

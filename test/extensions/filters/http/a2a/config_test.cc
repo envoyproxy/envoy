@@ -37,11 +37,9 @@ TEST_F(A2aFilterConfigFactoryTest, CreateFilterFactory) {
 TEST_F(A2aFilterConfigFactoryTest, CreateFilterWithServerContext) {
   envoy::extensions::filters::http::a2a::v3::A2a config;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
-  Server::Configuration::ExtraFactoryContext extra_context{
-      server_context.messageValidationVisitor(), "stats"};
 
   Http::FilterFactoryCb cb =
-      factory_.createHttpFilterFactoryFromProto(config, server_context, extra_context).value();
+      factory_.createHttpFilterFactoryFromProto(config, "stats", server_context).value();
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));

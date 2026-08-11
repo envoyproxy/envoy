@@ -51,8 +51,7 @@ absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createFilterFactory
 
 absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
-    Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext&) {
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
   return createFilterFactory(proto_config, context, context.scope());
 }
 

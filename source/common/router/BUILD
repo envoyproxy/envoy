@@ -115,7 +115,6 @@ envoy_cc_library(
     deps = [
         "//envoy/server:factory_context_interface",
         "//envoy/server:filter_config_interface",
-        "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/status:statusor",

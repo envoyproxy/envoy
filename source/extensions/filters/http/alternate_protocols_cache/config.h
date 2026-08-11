@@ -30,8 +30,8 @@ private:
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
           proto_config,
-      Server::Configuration::ServerFactoryContext& context,
-      Server::Configuration::ExtraFactoryContext& extra_context) override;
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(AlternateProtocolsCacheFilterFactory);

@@ -25,8 +25,8 @@ public:
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cors::v3::Cors& proto_config,
-      Server::Configuration::ServerFactoryContext& context,
-      Server::Configuration::ExtraFactoryContext& extra_context) override;
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

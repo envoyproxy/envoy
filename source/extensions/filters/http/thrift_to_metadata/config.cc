@@ -29,8 +29,7 @@ absl::StatusOr<Http::FilterFactoryCb> ThriftToMetadataConfig::createFilterFactor
 
 absl::StatusOr<Http::FilterFactoryCb> ThriftToMetadataConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata& proto_config,
-    Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext&) {
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
   absl::Status creation_status = absl::OkStatus();
   std::shared_ptr<FilterConfig> config =
       std::make_shared<FilterConfig>(proto_config, context.scope(), creation_status);

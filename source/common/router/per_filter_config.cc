@@ -2,7 +2,6 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "source/common/common/empty_string.h"
 #include "source/common/config/utility.h"
 
 namespace Envoy {
@@ -43,10 +42,8 @@ PerFilterConfigs::createRouteSpecificFilterConfig(
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
   RETURN_IF_NOT_OK(
       Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config));
-  // There is no stat prefix for the route specific filter configuration.
-  Server::Configuration::ExtraFactoryContext extra_context{validator, EMPTY_STRING};
   auto object_status_or_error =
-      factory->createHttpFilterRouteConfig(*proto_config, factory_context, extra_context);
+      factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
   RETURN_IF_NOT_OK(object_status_or_error.status());
   auto object = std::move(*object_status_or_error);
   if (object == nullptr) {

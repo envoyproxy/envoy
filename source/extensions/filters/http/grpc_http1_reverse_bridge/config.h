@@ -25,8 +25,8 @@ public:
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfig& config,
-      Envoy::Server::Configuration::ServerFactoryContext& context,
-      Server::Configuration::ExtraFactoryContext& extra_context) override;
+      const std::string& stat_prefix,
+      Envoy::Server::Configuration::ServerFactoryContext& context) override;
 
 private:
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

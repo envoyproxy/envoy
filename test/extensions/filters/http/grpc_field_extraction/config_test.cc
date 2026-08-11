@@ -45,11 +45,9 @@ TEST_F(GrpcFieldExtractionFilterFactoryTest, CreateFilterFactoryFromProto) {
 TEST_F(GrpcFieldExtractionFilterFactoryTest, CreateFilterFactoryFromProtoWithServerContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   FilterFactoryCreator factory;
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
 
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(config_, context, extra_context).value();
+      factory.createHttpFilterFactoryFromProto(config_, "stats", context).value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);

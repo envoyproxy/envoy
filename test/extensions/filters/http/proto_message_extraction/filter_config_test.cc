@@ -512,11 +512,9 @@ TEST(FilterFactoryCreatorTest, CreateFilterFactoryFromProtoWithServerContext) {
       api->fileSystem()
           .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
           .value();
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
 
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(config, context, extra_context).value();
+      factory.createHttpFilterFactoryFromProto(config, "stats", context).value();
   testing::NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(testing::_));
   cb(filter_callback);

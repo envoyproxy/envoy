@@ -47,8 +47,7 @@ absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactoryFro
 
 absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
-    Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext&) {
+    const std::string& /*stats_prefix*/, Server::Configuration::ServerFactoryContext& context) {
   return createFilterFactory(config, context);
 }
 

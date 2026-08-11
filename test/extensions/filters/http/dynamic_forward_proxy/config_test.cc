@@ -41,10 +41,8 @@ TEST(DynamicForwardProxyFilterFactoryTest, ServerFactoryContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(proto_config, context, extra_context).value();
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
 
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));

@@ -24,11 +24,11 @@ StatefulSessionFactoryConfig::createFilterFactoryFromProtoTyped(
 
 absl::StatusOr<Http::FilterFactoryCb>
 StatefulSessionFactoryConfig::createHttpFilterFactoryFromProtoTyped(
-    const ProtoConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext& extra_context) {
+    const ProtoConfig& proto_config, const std::string& stats_prefix,
+    Server::Configuration::ServerFactoryContext& context) {
   Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
-  auto filter_config(std::make_shared<StatefulSessionConfig>(
-      proto_config, generic_context, extra_context.stats_prefix, context.scope()));
+  auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, generic_context,
+                                                             stats_prefix, context.scope()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(Http::StreamFilterSharedPtr{new StatefulSession(filter_config)});
   };

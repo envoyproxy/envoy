@@ -32,12 +32,10 @@ TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFailWithServerContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
   EXPECT_THAT(GrpcJsonReverseTranscoderFactory().createHttpFilterFactoryFromProto(
                   envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
                       GrpcJsonReverseTranscoder(),
-                  context, extra_context),
+                  "stats", context),
               Not(IsOk()));
 }
 
@@ -72,11 +70,9 @@ TEST_F(GrpcJsonReverseTranscoderFilterFactoryTest, CreateFilterFactoryFromProto)
 TEST_F(GrpcJsonReverseTranscoderFilterFactoryTest, CreateFilterFactoryFromProtoWithServerContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   GrpcJsonReverseTranscoderFactory factory;
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
 
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(config_, context, extra_context).value();
+      factory.createHttpFilterFactoryFromProto(config_, "stats", context).value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

@@ -43,9 +43,9 @@ absl::StatusOr<Http::FilterFactoryCb> GcpAuthnFilterFactory::createFilterFactory
 }
 
 absl::StatusOr<Http::FilterFactoryCb> GcpAuthnFilterFactory::createHttpFilterFactoryFromProtoTyped(
-    const GcpAuthnFilterConfig& config, Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactory(config, extra_context.stats_prefix, context, context.scope());
+    const GcpAuthnFilterConfig& config, const std::string& stats_prefix,
+    Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(config, stats_prefix, context, context.scope());
 }
 
 /**

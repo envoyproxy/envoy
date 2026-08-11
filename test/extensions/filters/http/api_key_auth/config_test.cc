@@ -119,11 +119,9 @@ TEST(ApiKeyAuthFilterFactoryTest, CreateFilterWithServerContext) {
 
   ApiKeyAuthFilterFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
-  Server::Configuration::ExtraFactoryContext extra_context{
-      server_context.messageValidationVisitor(), "stats"};
 
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(proto_config, server_context, extra_context).value();
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).value();
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));

@@ -30,8 +30,7 @@ private:
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
           proto_config,
-      Server::Configuration::ServerFactoryContext&,
-      Server::Configuration::ExtraFactoryContext& extra_context) override;
+      const std::string&, Server::Configuration::ServerFactoryContext&) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

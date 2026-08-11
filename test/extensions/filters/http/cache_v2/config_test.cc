@@ -29,11 +29,8 @@ protected:
 TEST_F(CacheFilterFactoryTest, BasicWithServerFactoryContext) {
   std::ignore = config_.mutable_typed_config()->PackFrom(
       envoy::extensions::http::cache_v2::simple_http_cache::v3::SimpleHttpCacheV2Config());
-  Server::Configuration::ExtraFactoryContext extra_context{
-      context_.serverFactoryContext().messageValidationVisitor(), "stats"};
   Http::FilterFactoryCb cb =
-      factory_
-          .createHttpFilterFactoryFromProto(config_, context_.serverFactoryContext(), extra_context)
+      factory_.createHttpFilterFactoryFromProto(config_, "stats", context_.serverFactoryContext())
           .value();
   Http::StreamFilterSharedPtr filter;
   EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));

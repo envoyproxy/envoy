@@ -56,12 +56,9 @@ TEST(OriginalSrcHttpConfigFactoryTest, CreateFilterWithServerContext) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
-  Server::Configuration::ExtraFactoryContext extra_context{
-      server_context.messageValidationVisitor(), ""};
 
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(*proto_config, server_context, extra_context)
-          .value();
+      factory.createHttpFilterFactoryFromProto(*proto_config, "", server_context).value();
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   Http::StreamDecoderFilterSharedPtr added_filter;

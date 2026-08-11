@@ -31,8 +31,7 @@ private:
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::proto_message_extraction::v3::
           ProtoMessageExtractionConfig& proto_config,
-      Envoy::Server::Configuration::ServerFactoryContext&,
-      Server::Configuration::ExtraFactoryContext& extra_context) override;
+      const std::string&, Envoy::Server::Configuration::ServerFactoryContext&) override;
 };
 } // namespace ProtoMessageExtraction
 } // namespace HttpFilters

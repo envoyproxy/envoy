@@ -23,11 +23,9 @@ absl::StatusOr<Http::FilterFactoryCb> McpFilterConfigFactory::createFilterFactor
 
 absl::StatusOr<Http::FilterFactoryCb> McpFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
-    Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext& extra_context) {
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
 
-  auto config =
-      std::make_shared<McpFilterConfig>(proto_config, extra_context.stats_prefix, context.scope());
+  auto config = std::make_shared<McpFilterConfig>(proto_config, stats_prefix, context.scope());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<McpFilter>(config));

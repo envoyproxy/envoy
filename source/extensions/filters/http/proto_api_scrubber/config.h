@@ -30,8 +30,7 @@ private:
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
           proto_config,
-      Envoy::Server::Configuration::ServerFactoryContext&,
-      Server::Configuration::ExtraFactoryContext& extra_context) override;
+      const std::string&, Envoy::Server::Configuration::ServerFactoryContext&) override;
 
   // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
   // (ServerFactoryContext) paths. Stats are scoped to the given scope.

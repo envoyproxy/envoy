@@ -1255,11 +1255,8 @@ ip_tags:
 
   IpTaggingFilterFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
-  Server::Configuration::ExtraFactoryContext extra_context{
-      server_context.messageValidationVisitor(), "prefix."};
 
-  auto cb_or =
-      factory.createHttpFilterFactoryFromProto(proto_config, server_context, extra_context);
+  auto cb_or = factory.createHttpFilterFactoryFromProto(proto_config, "prefix.", server_context);
   ASSERT_OK(cb_or);
   auto cb = std::move(cb_or.value());
 

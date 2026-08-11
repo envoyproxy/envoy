@@ -148,10 +148,8 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceWithoutInitManagerReturnsError
 
   // The ServerFactoryContext path has no init manager, so remote sources should be rejected.
   DynamicModuleConfigFactory factory;
-  Server::Configuration::ExtraFactoryContext extra_context{
-      context_.server_factory_context_.messageValidationVisitor(), "stats"};
-  EXPECT_THAT(factory.createHttpFilterFactoryFromProto(
-                  proto_config, context_.server_factory_context_, extra_context),
+  EXPECT_THAT(factory.createHttpFilterFactoryFromProto(proto_config, "stats",
+                                                       context_.server_factory_context_),
               HasStatus(absl::StatusCode::kInvalidArgument,
                         "Remote module sources require an init manager"));
 }

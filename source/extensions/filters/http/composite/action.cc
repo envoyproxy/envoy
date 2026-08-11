@@ -160,10 +160,8 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionDown
   // If above failed, for downstream case, try to create the filter factory creation function
   // from server factory context if exists.
   if (callback == nullptr && context.server_factory_context_.has_value()) {
-    Server::Configuration::ExtraFactoryContext extra_context{validation_visitor,
-                                                             context.stat_prefix_};
     auto callback_or_status = factory.createHttpFilterFactoryFromProto(
-        *message, context.server_factory_context_.value(), extra_context);
+        *message, context.stat_prefix_, context.server_factory_context_.value());
     THROW_IF_NOT_OK_REF(callback_or_status.status());
     callback = callback_or_status.value();
   }
@@ -228,10 +226,8 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainActio
 
       // If above failed, try server factory context.
       if (callback == nullptr && context.server_factory_context_.has_value()) {
-        Server::Configuration::ExtraFactoryContext extra_context{validation_visitor,
-                                                                 context.stat_prefix_};
         auto callback_or_status = factory.createHttpFilterFactoryFromProto(
-            *message, context.server_factory_context_.value(), extra_context);
+            *message, context.stat_prefix_, context.server_factory_context_.value());
         THROW_IF_NOT_OK_REF(callback_or_status.status());
         callback = callback_or_status.value();
       }

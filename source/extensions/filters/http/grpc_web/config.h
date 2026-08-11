@@ -23,8 +23,8 @@ private:
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_web::v3::GrpcWeb& proto_config,
-      Server::Configuration::ServerFactoryContext& factory_context,
-      Server::Configuration::ExtraFactoryContext& extra_context) override;
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& factory_context) override;
 };
 
 } // namespace GrpcWeb

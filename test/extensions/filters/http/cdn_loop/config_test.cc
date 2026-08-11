@@ -44,11 +44,9 @@ TEST(CdnLoopFilterFactoryTest, CreateFilterWithServerContext) {
   envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig config;
   config.set_cdn_id("cdn");
   CdnLoopFilterFactory factory;
-  Server::Configuration::ExtraFactoryContext extra_context{
-      server_context.messageValidationVisitor(), "stats"};
 
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(config, server_context, extra_context).value();
+      factory.createHttpFilterFactoryFromProto(config, "stats", server_context).value();
   cb(filter_callbacks);
   EXPECT_NE(filter.get(), nullptr);
   EXPECT_NE(dynamic_cast<CdnLoopFilter*>(filter.get()), nullptr);

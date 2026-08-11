@@ -42,8 +42,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb>
 FilterFactoryCreator::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
         proto_config,
-    Envoy::Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext&) {
+    const std::string&, Envoy::Server::Configuration::ServerFactoryContext& context) {
   return createFilterFactory(proto_config, context, context.scope());
 }
 

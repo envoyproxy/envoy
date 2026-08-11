@@ -162,11 +162,8 @@ TEST(Factory, ValidConfigWithServerContext) {
   TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
 
-  auto callback =
-      factory.createHttpFilterFactoryFromProto(proto_config, context, extra_context).value();
+  auto callback = factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   callback(filter_callback);

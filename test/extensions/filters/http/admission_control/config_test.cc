@@ -241,11 +241,9 @@ success_criteria:
   TestUtility::loadFromYamlAndValidate(yaml, proto);
 
   // createHttpFilterFactoryFromProto returns a StatusOr<FilterFactoryCb>; unwrap with value().
-  Server::Configuration::ExtraFactoryContext extra_context{
-      context_.serverFactoryContext().messageValidationVisitor(), "stats_prefix"};
   auto cb =
       admission_control_filter_factory
-          .createHttpFilterFactoryFromProto(proto, context_.serverFactoryContext(), extra_context)
+          .createHttpFilterFactoryFromProto(proto, "stats_prefix", context_.serverFactoryContext())
           .value();
 
   EXPECT_TRUE(cb != nullptr);

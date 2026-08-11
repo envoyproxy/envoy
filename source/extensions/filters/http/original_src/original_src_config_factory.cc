@@ -16,16 +16,14 @@ absl::StatusOr<Http::FilterFactoryCb> OriginalSrcConfigFactory::createFilterFact
     const envoy::extensions::filters::http::original_src::v3::OriginalSrc& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   // This filter does not use the factory context, so delegate to the server-context variant.
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           stats_prefix};
-  return createHttpFilterFactoryFromProtoTyped(proto_config, context.serverFactoryContext(),
-                                               extra_context);
+  return createHttpFilterFactoryFromProtoTyped(proto_config, stats_prefix,
+                                               context.serverFactoryContext());
 }
 
 absl::StatusOr<Http::FilterFactoryCb>
 OriginalSrcConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::original_src::v3::OriginalSrc& proto_config,
-    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
+    const std::string&, Server::Configuration::ServerFactoryContext&) {
   Config config(proto_config);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<OriginalSrcFilter>(config));

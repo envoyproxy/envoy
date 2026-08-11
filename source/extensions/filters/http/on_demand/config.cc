@@ -24,8 +24,7 @@ absl::StatusOr<Http::FilterFactoryCb> OnDemandFilterFactory::createFilterFactory
 
 absl::StatusOr<Http::FilterFactoryCb> OnDemandFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-    Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext&) {
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
   absl::Status creation_status = absl::OkStatus();
   OnDemandFilterConfigSharedPtr config = std::make_shared<OnDemandFilterConfig>(
       proto_config, context.clusterManager(), context.messageValidationVisitor(), creation_status);

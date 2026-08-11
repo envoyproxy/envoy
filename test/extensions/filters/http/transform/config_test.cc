@@ -130,11 +130,8 @@ clear_route_cache: true
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config, proto_config);
-  Server::Configuration::ExtraFactoryContext extra_context{
-      server_context.messageValidationVisitor(), "test"};
 
-  auto cb = factory->createHttpFilterFactoryFromProto(proto_config, server_context, extra_context)
-                .value();
+  auto cb = factory->createHttpFilterFactoryFromProto(proto_config, "test", server_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);

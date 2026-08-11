@@ -28,10 +28,8 @@ TEST(CorsFilterConfigTest, CorsFilterWithServerContext) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   CorsFilterFactory factory;
   envoy::extensions::filters::http::cors::v3::Cors config;
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(config, context, extra_context).value();
+      factory.createHttpFilterFactoryFromProto(config, "stats", context).value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

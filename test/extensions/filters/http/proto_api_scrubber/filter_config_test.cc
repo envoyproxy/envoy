@@ -621,11 +621,8 @@ TEST_F(ProtoApiScrubberFilterConfigTest, StatsInitialization) {
 // used for route/vhost level factory support.
 TEST_F(ProtoApiScrubberFilterConfigTest, CreateFilterWithServerContext) {
   FilterFactoryCreator factory;
-  Server::Configuration::ExtraFactoryContext extra_context{
-      server_factory_context_.messageValidationVisitor(), "stats"};
   Envoy::Http::FilterFactoryCb cb =
-      factory
-          .createHttpFilterFactoryFromProto(proto_config_, server_factory_context_, extra_context)
+      factory.createHttpFilterFactoryFromProto(proto_config_, "stats", server_factory_context_)
           .value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(testing::_));

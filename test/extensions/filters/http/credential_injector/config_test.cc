@@ -51,12 +51,8 @@ TEST(Factory, UnregisteredExtensionWithServerContext) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   CredentialInjectorFilterFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
   EXPECT_THAT(
-      factory.createHttpFilterFactoryFromProto(proto_config, context, extra_context)
-          .status()
-          .message(),
+      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).status().message(),
       testing::HasSubstr("Didn't find a registered implementation for 'undefined_credential' with "
                          "type URL: 'test.mock_credential.Unregistered'"));
 }

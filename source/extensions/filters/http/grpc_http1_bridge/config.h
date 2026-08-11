@@ -27,8 +27,8 @@ public:
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config,
-      Server::Configuration::ServerFactoryContext& factory_context,
-      Server::Configuration::ExtraFactoryContext& extra_context) override;
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& factory_context) override;
 };
 
 } // namespace GrpcHttp1Bridge

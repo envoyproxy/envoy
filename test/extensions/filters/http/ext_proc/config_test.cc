@@ -109,12 +109,9 @@ TEST(HttpExtProcConfigTest, CorrectGrpcServiceConfigServerContext) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  // Built before the expectation below so that only the factory's own calls are counted.
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
   EXPECT_CALL(context, messageValidationVisitor());
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
+      factory.createHttpFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -140,10 +137,8 @@ TEST(HttpExtProcConfigTest, CorrectHttpServiceConfigServerContext) {
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor()).Times(testing::AtLeast(1));
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
+      factory.createHttpFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -335,9 +330,7 @@ TEST(HttpExtProcConfigTest, InvalidServiceConfigServerContext) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
-  auto result = factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context);
+  auto result = factory.createHttpFilterFactoryFromProto(*proto_config, "stats", context);
   EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
                                 "One and only one of grpc_service or http_service must be "
                                 "configured"));
@@ -407,12 +400,9 @@ TEST(HttpExtProcConfigTest, UpstreamConfig) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  // Built before the expectation below so that only the factory's own calls are counted.
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           "stats"};
   EXPECT_CALL(context, messageValidationVisitor());
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
+      factory.createHttpFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
