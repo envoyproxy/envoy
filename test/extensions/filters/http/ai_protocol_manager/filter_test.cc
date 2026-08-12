@@ -14,6 +14,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -69,6 +70,9 @@ public:
           ++local_reply_calls_;
         }));
   }
+
+  // Run at trace so debug/trace-log argument expressions execute too.
+  LogLevelSetter log_level_setter_{spdlog::level::trace};
 
   // A test wanting a different filter-level config calls this again first.
   void createFilter(bool parse_unconfigured_routes = false) {
@@ -473,6 +477,9 @@ public:
     }
     return typed;
   }
+
+  // Run at trace so debug/trace-log argument expressions execute too.
+  LogLevelSetter log_level_setter_{spdlog::level::trace};
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   InMemoryExternalBufferFactory factory_;
@@ -1030,6 +1037,68 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentEncodingMatrix) {
   }
 }
 
+// Cache-read and cache-write input breakdowns publish as the nested
+// input_token_details message and its Struct mirror.
+TEST_F(AiProtocolManagerFilterResponseTest, InputTokenDetailsPublished) {
+  setup();
+  sendHeaders("application/json");
+  sendData("{\"type\":\"message\",\"model\":\"claude-opus-5\","
+           "\"usage\":{\"input_tokens\":100,\"output_tokens\":7,"
+           "\"cache_read_input_tokens\":30,\"cache_creation_input_tokens\":20}}",
+           true);
+
+  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
+  ASSERT_NE(metadata, nullptr);
+  const auto& details = metadata->fields().at("input_token_details").struct_value().fields();
+  EXPECT_EQ(details.at("cached_tokens").number_value(), 30);
+  EXPECT_EQ(details.at("cache_creation_tokens").number_value(), 20);
+  // Canonical inclusive input: 100 uncached + 30 cache reads + 20 cache writes.
+  EXPECT_EQ(metadata->fields().at("input_tokens").number_value(), 150);
+
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->input_token_details().cached_tokens().value(), 30);
+  EXPECT_EQ(typed->input_token_details().cache_creation_tokens().value(), 20);
+  EXPECT_FALSE(typed->input_token_details().has_tool_use_tokens());
+}
+
+// Tool-use prompt tokens publish in the input breakdown too.
+TEST_F(AiProtocolManagerFilterResponseTest, ToolUseInputDetailPublished) {
+  setup();
+  sendHeaders("application/json");
+  sendData("{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hi\"}]}}],"
+           "\"usageMetadata\":{\"promptTokenCount\":6,\"toolUsePromptTokenCount\":5,"
+           "\"candidatesTokenCount\":10,\"totalTokenCount\":21}}",
+           true);
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->input_token_details().tool_use_tokens().value(), 5);
+  // Canonical inclusive input: 6 prompt + 5 tool-use.
+  EXPECT_EQ(typed->input_tokens().value(), 11);
+}
+
+// A JSON body over the cap whose content-length is absent is only caught in
+// onData: extraction fails with no protocol ever locked, and the status-only
+// record publishes an unspecified protocol.
+TEST_F(AiProtocolManagerFilterResponseTest, OversizedBodyWithoutContentLengthFailsUnspecified) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+  auto* token_usage = proto_config.mutable_response_handling()->mutable_token_usage();
+  token_usage->set_include_unconfigured_routes(true);
+  token_usage->mutable_limits()->mutable_max_json_body_size()->set_value(64);
+  setupWithProto(proto_config);
+
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"content-type", "application/json"}};
+  EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
+  sendData(std::string(100, 'x'), true);
+
+  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
+  ASSERT_NE(metadata, nullptr);
+  EXPECT_EQ(metadata->fields().at("api_protocol").string_value(), "API_PROTOCOL_UNSPECIFIED");
+  EXPECT_EQ(metadata->fields().at("extraction_status").string_value(), "FAILED");
+  EXPECT_EQ(counterValue("response_body_too_large"), 1);
+  EXPECT_EQ(counterValue("token_usage_failed"), 1);
+}
+
 // Without a token_usage config the encode path is fully inert -- whether
 // response_handling itself is absent or empty.
 TEST_F(AiProtocolManagerFilterResponseTest, DisabledWithoutConfig) {
@@ -1052,6 +1121,21 @@ TEST_F(AiProtocolManagerFilterResponseTest, DisabledWithoutConfig) {
   EXPECT_TRUE(metadata_writes_.empty());
   EXPECT_EQ(counterValue("token_usage_found"), 0);
   EXPECT_EQ(counterValue("token_usage_missing"), 0);
+}
+
+// Trailers arriving after a mid-upload rejection are held: the stream has
+// already been terminated by the local reply, so nothing may continue it.
+TEST_F(AiProtocolManagerFilterTest, TrailersAfterRejectionAreHeld) {
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model" "gpt-4")");
+  EXPECT_EQ(filter_->decodeData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  EXPECT_EQ(local_reply_calls_, 1);
+
+  Http::TestRequestTrailerMapImpl trailers{{"x-req", "1"}};
+  EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
+  EXPECT_EQ(continue_calls_, 0);
 }
 
 // A declared endpoint's payload is parsed as it is offloaded and still replayed

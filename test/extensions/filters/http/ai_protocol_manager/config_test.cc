@@ -192,7 +192,7 @@ TEST(AiProtocolManagerConfigTest, RouteConfigResponseFallsBackToRequestProtocol)
   {
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
         proto_config;
-    proto_config.mutable_response()->set_api_protocol(envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+    proto_config.mutable_response()->set_api_protocol(envoy::type::ai::v3::OPENAI_RESPONSES);
     auto route_config = factory
                             .createRouteSpecificFilterConfig(
                                 proto_config, context, ProtobufMessage::getNullValidationVisitor())
@@ -200,7 +200,7 @@ TEST(AiProtocolManagerConfigTest, RouteConfigResponseFallsBackToRequestProtocol)
     EXPECT_THAT(route_config.get(), testing::WhenDynamicCastTo<const RouteConfig*>(testing::AllOf(
                                         testing::Property(&RouteConfig::hasRequest, false),
                                         testing::Property(&RouteConfig::effectiveResponseProtocol,
-                                                          ApiProtocol::GeminiGenerateContent))));
+                                                          ApiProtocol::OpenAiResponses))));
   }
 }
 

@@ -86,6 +86,7 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:response_handler_lib",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -102,6 +103,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",

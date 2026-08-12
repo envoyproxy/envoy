@@ -55,6 +55,30 @@ TEST(DetectFormatTest, Anthropic) {
   EXPECT_EQ(
       TokenUsageExtractor::detectFormat(parse(R"({"type":"message","usage":{"input_tokens":1}})")),
       ApiProtocol::AnthropicMessages);
+  // A mid-stream join: the first observed event is a usage-less message_delta,
+  // identified by its `delta` object.
+  EXPECT_EQ(TokenUsageExtractor::detectFormat(
+                parse(R"({"type":"message_delta","delta":{"stop_reason":"end_turn"}})")),
+            ApiProtocol::AnthropicMessages);
+}
+
+// The human-readable protocol names match the proto enum value names, so log
+// lines and metadata agree.
+TEST(ApiProtocolNameTest, NamesMatchProtoEnumValueNames) {
+  EXPECT_EQ(apiProtocolName(ApiProtocol::OpenAiChatCompletions), "OPENAI_CHAT_COMPLETIONS");
+  EXPECT_EQ(apiProtocolName(ApiProtocol::OpenAiResponses), "OPENAI_RESPONSES");
+  EXPECT_EQ(apiProtocolName(ApiProtocol::AnthropicMessages), "ANTHROPIC_MESSAGES");
+  EXPECT_EQ(apiProtocolName(ApiProtocol::GeminiGenerateContent), "GEMINI_GENERATE_CONTENT");
+  EXPECT_EQ(apiProtocolName(ApiProtocol::Unspecified), "API_PROTOCOL_UNSPECIFIED");
+}
+
+// An unspecified wire API extracts nothing: extraction requires a concrete
+// dialect (callers detect one first).
+TEST(ExtractTest, UnspecifiedFormatExtractsNothing) {
+  const auto result = TokenUsageExtractor::extract(
+      ApiProtocol::Unspecified, parse(R"({"usage":{"input_tokens":1,"output_tokens":2}})"));
+  EXPECT_FALSE(result.usage.hasAny());
+  EXPECT_FALSE(result.malformed);
 }
 
 TEST(DetectFormatTest, StructurelessAnthropicShapedTypesDoNotLock) {
@@ -172,6 +196,15 @@ TEST(ExtractOpenAiTest, ResponsesApiCompletedEvent) {
   EXPECT_EQ(usage.model, "gpt-5.4");
   // Terminal lifecycle events end extraction.
   EXPECT_TRUE(TokenUsageExtractor::isTerminalEvent(ApiProtocol::OpenAiResponses, json));
+}
+
+// Chat Completions and Gemini have no in-band JSON terminator: a `type`
+// field never ends their extraction.
+TEST(ExtractOpenAiTest, TypeKeyedDocumentsNotTerminalForOtherDialects) {
+  EXPECT_FALSE(TokenUsageExtractor::isTerminalEvent(ApiProtocol::OpenAiChatCompletions,
+                                                    parse(R"({"type":"response.completed"})")));
+  EXPECT_FALSE(TokenUsageExtractor::isTerminalEvent(ApiProtocol::GeminiGenerateContent,
+                                                    parse(R"({"type":"message_stop"})")));
 }
 
 TEST(ExtractOpenAiTest, ResponsesApiFailedAndIncompleteAreTerminal) {

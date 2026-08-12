@@ -4,6 +4,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/response_handler.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
 
@@ -36,6 +37,9 @@ public:
   ResponseHandlerTest()
       : stats_(AiProtocolManagerStats{
             ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(*store_.rootScope(), "test."))}) {}
+
+  // Run at trace so debug-log argument expressions execute too.
+  LogLevelSetter log_level_setter_{spdlog::level::trace};
 
   // Feed `body` to the handler in frames of `frame_size` bytes, then signal
   // end-of-stream. Exercises reassembly across arbitrary boundaries.
@@ -502,6 +506,52 @@ TEST_F(ResponseHandlerTest, SseSplitCarriageReturnResolvedAtEndOfStream) {
   EXPECT_FALSE(handler.usage().hasAny()); // Still pending without EOS.
   handler.onEndStream();
   EXPECT_EQ(handler.usage().output_tokens, 9);
+}
+
+// Bare-CR line terminators throughout: a comment line ended by a lone CR
+// followed by a content byte, a blank line ended by CR right after a CR
+// terminator, and a next event's first byte arriving straight after that
+// blank line (the boundary byte is re-scanned as next-event input).
+TEST_F(ResponseHandlerTest, SseBareCarriageReturnTerminators) {
+  SseResponseHandler handler(ApiProtocol::Unspecified, TestMaxEventSize, TestMaxParsedEvents,
+                             stats_);
+  feed(handler,
+       ": ping\rdata: {\"usageMetadata\":{\"promptTokenCount\":1,\"candidatesTokenCount\":2,"
+       "\"totalTokenCount\":3}}\r\r"
+       "data: {\"usageMetadata\":{\"promptTokenCount\":6,\"candidatesTokenCount\":16,"
+       "\"totalTokenCount\":22}}\n\n",
+       4096);
+  TokenUsage usage = handler.usage();
+  usage.finalize();
+  EXPECT_EQ(usage.input_tokens, 6);
+  EXPECT_EQ(usage.output_tokens, 16);
+  EXPECT_EQ(usage.provider_total_tokens, 22);
+  EXPECT_EQ(stats_.response_parse_error_.value(), 0);
+  EXPECT_FALSE(handler.degraded());
+}
+
+// A terminal sentinel completing inside one slice stops the scan before the
+// buffer's later slices: nothing after it is parsed.
+TEST_F(ResponseHandlerTest, SseTerminalSentinelStopsMultiSliceScan) {
+  SseResponseHandler handler(ApiProtocol::OpenAiChatCompletions, TestMaxEventSize,
+                             TestMaxParsedEvents, stats_);
+  Buffer::OwnedImpl buffer;
+  buffer.appendSliceForTest("data: [DONE]\n\n");
+  buffer.appendSliceForTest("data: not-json\n\n");
+  handler.onData(buffer);
+  handler.onEndStream();
+  EXPECT_TRUE(handler.parsingComplete());
+  EXPECT_EQ(stats_.response_parse_error_.value(), 0);
+}
+
+// A body that stays a valid JSON prefix through every frame but is truncated
+// at end of stream fails the parser's final close, not a mid-stream feed.
+TEST_F(ResponseHandlerTest, JsonTruncatedBodyCountedAtEndOfStream) {
+  JsonResponseHandler handler(ApiProtocol::Unspecified, TestMaxBodySize, stats_);
+  feed(handler, R"({"usage":{"input_tokens":1)", 4096);
+  EXPECT_FALSE(handler.usage().hasAny());
+  EXPECT_TRUE(handler.degraded());
+  EXPECT_EQ(stats_.response_parse_error_.value(), 1);
 }
 
 TEST_F(ResponseHandlerTest, IncompleteTerminalSseEventMarksPartial) {
