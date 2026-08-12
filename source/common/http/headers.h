@@ -146,6 +146,7 @@ public:
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
   const LowerCaseString ContentLength{"content-length"};
+  const LowerCaseString ContentLocation{"content-location"};
   const LowerCaseString ContentRange{"content-range"};
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
