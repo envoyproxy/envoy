@@ -91,12 +91,25 @@ message PriorityGroupClusterSpecifier {
   // uses the first element of the list, the first retry uses the second element, and so on,
   // wrapping around when the attempt count exceeds the size of the list.
   //
-  // Every element of the list must be a struct that overrides one priority group. Only the
-  // ``name`` field is supported for now and it selects the configured priority group with the
-  // same :ref:`name
-  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup.name>`.
-  // More fields may be supported in the future, for example to also override the weighted
-  // clusters of the group.
+  // Every element of the list must be a struct that overrides one priority group and that has the
+  // same shape as a :ref:`priority group
+  // <envoy_v3_api_msg_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup>`:
+  //
+  // * The ``name`` field is required and must be a non-empty string.
+  // * The ``clusters`` field is optional and, if it is a non-empty list, then every element of it
+  //   must be a struct with a non-empty string ``name`` field and a numeric ``weight`` field in
+  //   the range [1, 4294967295].
+  //
+  // If the ``clusters`` of an element are provided, then they replace the :ref:`clusters
+  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup.clusters>`
+  // of the group and the target cluster is selected from them based on their weights. Note these
+  // clusters are not validated when the configuration is loaded and the request fails with a
+  // ``no cluster`` response if the selected cluster does not exist.
+  //
+  // If the ``clusters`` of an element are omitted or empty, then the ``name`` selects the
+  // configured priority group with the same :ref:`name
+  // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup.name>`
+  // and the configured clusters and weights of that group are used.
   //
   // The dynamic metadata is typically set by a filter that runs before the router filter, for
   // example the :ref:`header to metadata filter
@@ -109,11 +122,19 @@ message PriorityGroupClusterSpecifier {
   //   envoy.my_filter:
   //     priority_groups:
   //     - name: remote
+  //       clusters:
+  //       - name: remote_primary
+  //         weight: 20
+  //       - name: remote_secondary
+  //         weight: 80
   //     - name: local
   //
+  // With the metadata value above, the initial attempt uses the group ``remote`` with the clusters
+  // and the weights of the metadata, and the first retry uses the configured group ``local`` with
+  // its configured clusters and weights.
+  //
   // If the metadata is missing, is not a list, is an empty list, or the element of the current
-  // attempt does not select a configured priority group, then the default order of
-  // :ref:`priority_groups
+  // attempt is not a valid group override, then the default order of :ref:`priority_groups
   // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.priority_groups>`
   // is used instead.
   type.metadata.v3.MetadataKey group_override_metadata = 2;

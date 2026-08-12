@@ -2,18 +2,39 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
 #include "source/common/router/delegating_route_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Router {
 namespace PriorityGroup {
+namespace {
+
+constexpr absl::string_view NameField = "name";
+constexpr absl::string_view ClustersField = "clusters";
+constexpr absl::string_view WeightField = "weight";
+
+// Get the string value of the given field. Returns nullopt if the field is missing or is not a
+// non-empty string.
+std::optional<std::string> stringField(const Protobuf::Map<std::string, Protobuf::Value>& fields,
+                                       absl::string_view name) {
+  const auto iter = fields.find(name);
+  if (iter == fields.end() || iter->second.kind_case() != Protobuf::Value::kStringValue ||
+      iter->second.string_value().empty()) {
+    return std::nullopt;
+  }
+  return iter->second.string_value();
+}
+
+} // namespace
 
 PriorityGroupEntry::PriorityGroupEntry(const PriorityGroupProto& proto) : name_(proto.name()) {
   clusters_.reserve(proto.clusters().size());
@@ -26,8 +47,79 @@ PriorityGroupEntry::PriorityGroupEntry(const PriorityGroupProto& proto) : name_(
   ASSERT(total_weight_ > 0);
 }
 
+PriorityGroupEntry::PriorityGroupEntry(std::string name,
+                                       std::vector<std::pair<std::string, uint64_t>> clusters)
+    : name_(std::move(name)), clusters_(std::move(clusters)) {
+  for (const auto& cluster : clusters_) {
+    total_weight_ += cluster.second;
+  }
+}
+
+std::optional<PriorityGroupEntry>
+PriorityGroupEntry::parseFromMetadata(const Protobuf::Value& value) {
+  if (value.kind_case() != Protobuf::Value::kStructValue) {
+    return std::nullopt;
+  }
+  const auto& fields = value.struct_value().fields();
+
+  // The group name is always required. It is used to select the configured group that provides
+  // the clusters if the clusters are not overridden by the metadata.
+  std::optional<std::string> name = stringField(fields, NameField);
+  if (!name.has_value()) {
+    return std::nullopt;
+  }
+
+  const auto clusters_iter = fields.find(ClustersField);
+  if (clusters_iter == fields.end()) {
+    // Only the group name is overridden by the metadata.
+    return PriorityGroupEntry(std::move(*name), {});
+  }
+  if (clusters_iter->second.kind_case() != Protobuf::Value::kListValue) {
+    return std::nullopt;
+  }
+
+  const auto& cluster_values = clusters_iter->second.list_value().values();
+  std::vector<std::pair<std::string, uint64_t>> clusters;
+  clusters.reserve(cluster_values.size());
+  for (const auto& cluster_value : cluster_values) {
+    if (cluster_value.kind_case() != Protobuf::Value::kStructValue) {
+      return std::nullopt;
+    }
+    const auto& cluster_fields = cluster_value.struct_value().fields();
+
+    std::optional<std::string> cluster_name = stringField(cluster_fields, NameField);
+    if (!cluster_name.has_value()) {
+      return std::nullopt;
+    }
+
+    const auto weight_iter = cluster_fields.find(WeightField);
+    if (weight_iter == cluster_fields.end() ||
+        weight_iter->second.kind_case() != Protobuf::Value::kNumberValue) {
+      return std::nullopt;
+    }
+    // The comparison also rejects NaN. The weight of a cluster must be in the same range as the
+    // weight of a configured cluster.
+    const double weight = weight_iter->second.number_value();
+    if (!(weight >= 1.0) || weight > std::numeric_limits<uint32_t>::max()) {
+      return std::nullopt;
+    }
+
+    clusters.emplace_back(std::move(*cluster_name), static_cast<uint64_t>(weight));
+  }
+
+  // An empty cluster list is treated the same way as a missing cluster list: only the group name
+  // is overridden by the metadata.
+  return PriorityGroupEntry(std::move(*name), std::move(clusters));
+}
+
 const std::string& PriorityGroupEntry::selectCluster(uint64_t random_value) const {
-  ASSERT(total_weight_ > 0);
+  // The group has no cluster at all or all the cluster weights are 0. Both the proto validation
+  // rules and the metadata parsing reject these cases, so this should never happen.
+  if (total_weight_ == 0) {
+    IS_ENVOY_BUG("cluster selection on a priority group without any weighted cluster");
+    return EMPTY_STRING;
+  }
+
   const uint64_t selected_value = random_value % total_weight_;
 
   // Find the target cluster based on the interval in which the selected value falls. The
@@ -63,67 +155,63 @@ PriorityGroupClusterSpecifierPlugin::PriorityGroupClusterSpecifierPlugin(
   }
 }
 
-const PriorityGroupEntry* PriorityGroupClusterSpecifierPlugin::groupFromOverrideMetadata(
+std::optional<PriorityGroupEntry> PriorityGroupClusterSpecifierPlugin::groupOverrideForAttempt(
     const StreamInfo::StreamInfo& stream_info, uint64_t attempt_index) const {
   const auto& value = Envoy::Config::Metadata::metadataValue(&stream_info.dynamicMetadata(),
                                                              *group_override_metadata_);
   if (value.kind_case() != Protobuf::Value::kListValue) {
-    return nullptr;
+    return std::nullopt;
   }
 
   const auto& overrides = value.list_value().values();
   if (overrides.empty()) {
-    return nullptr;
+    return std::nullopt;
   }
 
   // Wrap around if there are more attempts than the group overrides in the metadata.
-  const auto& group_override = overrides.at(attempt_index % overrides.size());
-  if (group_override.kind_case() != Protobuf::Value::kStructValue) {
-    return nullptr;
-  }
-
-  // Only the group name is supported for now. More fields may be supported in the future, for
-  // example to also override the weighted clusters of the group.
-  const auto& fields = group_override.struct_value().fields();
-  const auto name_iter = fields.find("name");
-  if (name_iter == fields.end() || name_iter->second.kind_case() != Protobuf::Value::kStringValue) {
-    return nullptr;
-  }
-
-  const auto group_iter = groups_by_name_.find(name_iter->second.string_value());
-  if (group_iter == groups_by_name_.end()) {
-    ENVOY_LOG(debug,
-              "priority group cluster specifier: unknown group '{}' in the group override "
-              "metadata; falling back to the configured group order",
-              name_iter->second.string_value());
-    return nullptr;
-  }
-  return group_iter->second;
+  return PriorityGroupEntry::parseFromMetadata(overrides.at(attempt_index % overrides.size()));
 }
 
 const PriorityGroupEntry*
-PriorityGroupClusterSpecifierPlugin::groupForAttempt(const StreamInfo::StreamInfo& stream_info,
-                                                     uint64_t attempt_index) const {
-  // The groups may be overridden by the dynamic metadata on a per-request basis.
-  if (group_override_metadata_.has_value()) {
-    if (const auto* group = groupFromOverrideMetadata(stream_info, attempt_index);
-        group != nullptr) {
-      return group;
-    }
-  }
-
-  // Wrap around if there are more attempts than the configured groups.
-  return groups_[attempt_index % groups_.size()].get();
+PriorityGroupClusterSpecifierPlugin::configuredGroup(const std::string& name) const {
+  const auto group_iter = groups_by_name_.find(name);
+  return group_iter == groups_by_name_.end() ? nullptr : group_iter->second;
 }
 
-const std::string&
+std::string
 PriorityGroupClusterSpecifierPlugin::selectCluster(const StreamInfo::StreamInfo& stream_info,
                                                    uint64_t random_value) const {
   // The attempt count is 1 for the initial attempt, 2 for the first retry and so on. It may not
   // be set yet when the route is selected before the router filter starts the initial attempt, so
   // fall back to the initial attempt in that case.
   const uint32_t attempt_count = std::max<uint32_t>(stream_info.attemptCount().value_or(1), 1);
-  return groupForAttempt(stream_info, attempt_count - 1)->selectCluster(random_value);
+  const uint64_t attempt_index = attempt_count - 1;
+
+  // The groups may be overridden by the dynamic metadata on a per-request basis.
+  if (group_override_metadata_.has_value()) {
+    const auto group_override = groupOverrideForAttempt(stream_info, attempt_index);
+    if (group_override.has_value()) {
+      // The metadata also overrides the clusters of the group, so the clusters and the weights of
+      // the metadata are used directly. Note these clusters are not validated at the config load
+      // time and the request fails if the selected cluster doesn't exist.
+      if (!group_override->clusters().empty()) {
+        return group_override->selectCluster(random_value);
+      }
+
+      // Only the group name is overridden, so the clusters and the weights of the configured group
+      // with the same name are used.
+      if (const auto* group = configuredGroup(group_override->name()); group != nullptr) {
+        return group->selectCluster(random_value);
+      }
+      ENVOY_LOG(debug,
+                "priority group cluster specifier: unknown group '{}' in the group override "
+                "metadata; falling back to the configured group order",
+                group_override->name());
+    }
+  }
+
+  // Wrap around if there are more attempts than the configured groups.
+  return groups_[attempt_index % groups_.size()]->selectCluster(random_value);
 }
 
 /**

@@ -16,8 +16,10 @@ retry uses the second group, and so on. If the attempt count exceeds the number 
 groups, the selection wraps around to the beginning of the list.
 
 The groups can also be overridden on a per-request basis by an optional dynamic metadata entry
-that contains a list of group overrides. Only the group ``name`` is supported in an override for
-now, which selects one of the configured groups by name. See :ref:`group_override_metadata
+that contains a list of group overrides. An override that only provides a group ``name`` selects
+one of the configured groups by name and keeps the configured clusters and weights of that group.
+An override that also provides ``clusters`` replaces the clusters and the weights of the group for
+the current request. See :ref:`group_override_metadata
 <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.group_override_metadata>`
 for more details.
 
