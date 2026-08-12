@@ -321,8 +321,8 @@ policies:
         seconds: 1
 )EOF";
 
-// LoadAwareLocality enables OOB; the ClientSideWeightedRoundRobin child does not (enable_oob_load_report omitted,
-// defaults false). Used to prove fan-out: reports arriving on
+// LoadAwareLocality enables OOB; the ClientSideWeightedRoundRobin child does not
+// (enable_oob_load_report omitted, defaults false). Used to prove fan-out: reports arriving on
 // load_aware_locality's own stream still reach the ClientSideWeightedRoundRobin child's host data.
 constexpr absl::string_view kOobLalOnlyCswrrChildYaml = R"EOF(
 policies:
@@ -483,13 +483,10 @@ TEST_P(LoadAwareLocalityOobIntegrationTest, OobReportsDriveLocalityWeights) {
                                testing::Ge(1));
 }
 
-// Documentation-via-test for #45725 (r3658010538): when the child endpoint
-// policy ALSO enables OOB, each level runs its own manager, so every host
-// receives two independent streams (2 hosts x 2 managers = 4 sessions), and
-// the cluster-scoped lb_orca_oob.* stats compose across both managers. See
-// SingleOobStreamFeedsBothPolicies below for proof that report fan-out still
-// reaches both policies when only one level opens a stream -- the
-// configuration the docs recommend.
+// When the child endpoint policy also enables OOB, each level runs its own manager, so every
+// host receives two independent streams (2 hosts x 2 managers = 4 sessions) and the
+// cluster-scoped lb_orca_oob.* stats compose across both. SingleOobStreamFeedsBothPolicies
+// below covers the recommended single-level configuration.
 TEST_P(LoadAwareLocalityOobIntegrationTest, BothLevelsOpenIndependentStreams) {
   initializeConfig(kOobBothLevelsYaml, /*remote_zones=*/{});
 
@@ -503,31 +500,28 @@ TEST_P(LoadAwareLocalityOobIntegrationTest, BothLevelsOpenIndependentStreams) {
   test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.reports_received", testing::Ge(4));
 }
 
-// Fan-out proof: enabling OOB at ONE level (load_aware_locality) still feeds
-// BOTH consumers even though the ClientSideWeightedRoundRobin child opens no stream of its own --
-// this is also the configuration the docs recommend.
+// Fan-out proof: enabling OOB at one level (load_aware_locality) still feeds both consumers
+// even though the ClientSideWeightedRoundRobin child opens no stream of its own. This is the
+// configuration the docs recommend.
 TEST_P(LoadAwareLocalityOobIntegrationTest, SingleOobStreamFeedsBothPolicies) {
   initializeConfig(kOobLalOnlyCswrrChildYaml, /*remote_zones=*/{"zone-b"});
 
   // Upstreams 0-1 are local zone-a, 2-3 are remote zone-b. Reports carry only
-  // application_utilization (no rps_fractional): LAL's consumer accepts that,
-  // ClientSideWeightedRoundRobin's consumer does not.
+  // application_utilization (no rps_fractional): load_aware_locality's consumer accepts
+  // that, ClientSideWeightedRoundRobin's consumer does not.
   acceptOobStream(0, /*utilization=*/0.9);
   acceptOobStream(1, /*utilization=*/0.9);
   acceptOobStream(2, /*utilization=*/0.1);
   acceptOobStream(3, /*utilization=*/0.1);
 
-  // One manager x 4 hosts: proves the ClientSideWeightedRoundRobin child opened no streams of its own.
+  // One manager x 4 hosts: the ClientSideWeightedRoundRobin child opened no streams of its own.
   test_server_->waitForGauge("cluster.cluster_0.lb_orca_oob.active_sessions", testing::Eq(4));
 
-  // report_errors increments only when a recipient's onOrcaLoadReport() returns
-  // non-OK (orca_oob_manager.cc:396-404). LAL's LocalityLbHostData::
-  // onOrcaLoadReport always returns OkStatus (load_aware_locality_lb.cc:24-34).
-  // ClientSideWeightedRoundRobin's OrcaHostLbPolicyData::onOrcaLoadReport rejects any report with
-  // rps_fractional <= 0 ("QPS must be positive", orca_weight_manager.cc:81-84).
-  // So these errors can only be coming from the ClientSideWeightedRoundRobin child's consumer -- which
-  // proves reports that arrived on LAL's stream were fanned out to the ClientSideWeightedRoundRobin
-  // child's host data even though ClientSideWeightedRoundRobin opened no stream of its own.
+  // report_errors increments only when a recipient's onOrcaLoadReport() returns non-OK.
+  // LocalityLbHostData::onOrcaLoadReport always returns OkStatus, while
+  // ClientSideWeightedRoundRobin's OrcaHostLbPolicyData::onOrcaLoadReport rejects any report
+  // with rps_fractional <= 0 ("QPS must be positive"). So these errors can only come from the
+  // ClientSideWeightedRoundRobin child's consumer.
   test_server_->waitForCounter("cluster.cluster_0.lb_orca_oob.report_errors", testing::Ge(4));
 
   // Proves the load_aware_locality consumer received the same reports.
