@@ -54,10 +54,19 @@ TEST(OpenAiChatCompletionsTest, MultimodalContentParts) {
       {"messages",
        nlohmann::json::array(
            {{{"role", "user"},
-             {"content", nlohmann::json::array(
-                             {{{"type", "text"}, {"text", "What is in this image?"}},
-                              {{"type", "image_url"},
-                               {"image_url", {{"url", "https://example.com/image.png"}}}}})}}})},
+             {"content",
+              nlohmann::json::array(
+                  {{{"type", "text"}, {"text", "What is in this image?"}},
+                   {{"type", "image_url"},
+                    {"image_url", {{"url", "https://example.com/image.png"}}}},
+                   {{"type", "image_url"},
+                    {"image_url",
+                     {{"url", "data:image/jpeg;base64,/9j/4AAQSkZJRg..."}, {"detail", "high"}}}},
+                   {{"type", "image_url"},
+                    {"image_url",
+                     {{"url",
+                       JsonWithExtBuf::makeExternalRef(JsonWithExtBuf::ExternalRef{100, 50000})},
+                      {"detail", "auto"}}}}})}}})},
   };
   EXPECT_THAT(payload_schema.validateRequest(multimodal_req), IsOk());
 }
@@ -143,6 +152,22 @@ TEST(OpenAiChatCompletionsTest, MissingRequiredFields) {
   auto role_err = payload_schema.validateRequest(missing_role);
   EXPECT_THAT(role_err, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_EQ(role_err.message(), "missing required field: messages[0].role");
+
+  // Missing required url in image_url part.
+  nlohmann::json missing_image_url = {
+      {"model", "gpt-4o"},
+      {"messages",
+       nlohmann::json::array({
+           {{"role", "user"},
+            {"content", nlohmann::json::array({
+                            {{"type", "image_url"}, {"image_url", {{"detail", "high"}}}},
+                        })}},
+       })},
+  };
+  auto img_err = payload_schema.validateRequest(missing_image_url);
+  EXPECT_THAT(img_err, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(img_err.message(),
+              testing::HasSubstr("missing required field: messages[0].content[0].image_url.url"));
 }
 
 TEST(OpenAiChatCompletionsTest, CanonicalStreamableFieldOrder) {
@@ -150,10 +175,12 @@ TEST(OpenAiChatCompletionsTest, CanonicalStreamableFieldOrder) {
   const std::vector<std::string> expected_order = {
       "messages[].content",
       "messages[].content[].text",
+      "messages[].content[].image_url.url",
       "messages[].tool_calls[].function.arguments",
       "tools[].function.description",
   };
   EXPECT_EQ(payload_schema.requestStreamableFieldOrder(), expected_order);
+  EXPECT_EQ(payload_schema.requestOffloadableFieldPaths(), expected_order);
 }
 
 TEST(OpenAiChatCompletionsTest, InvalidFieldValuesAndTypes) {
@@ -189,6 +216,39 @@ TEST(OpenAiChatCompletionsTest, InvalidFieldValuesAndTypes) {
   };
   EXPECT_THAT(payload_schema.validateRequest(high_temp),
               StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Invalid image_url.url type (e.g., integer instead of string or ExternalRef).
+  nlohmann::json invalid_image_url_type = {
+      {"model", "gpt-4o"},
+      {"messages", nlohmann::json::array({
+                       {{"role", "user"},
+                        {"content", nlohmann::json::array({
+                                        {{"type", "image_url"}, {"image_url", {{"url", 12345}}}},
+                                    })}},
+                   })},
+  };
+  EXPECT_THAT(payload_schema.validateRequest(invalid_image_url_type),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Non-offloadable field in image_url (e.g. detail) cannot be an ExternalRef.
+  nlohmann::json offloaded_detail = {
+      {"model", "gpt-4o"},
+      {"messages", nlohmann::json::array({
+                       {{"role", "user"},
+                        {"content", nlohmann::json::array({
+                                        {{"type", "image_url"},
+                                         {"image_url",
+                                          {{"url", "https://example.com/image.png"},
+                                           {"detail", JsonWithExtBuf::makeExternalRef(
+                                                          JsonWithExtBuf::ExternalRef{0, 10})}}}},
+                                    })}},
+                   })},
+  };
+  auto detail_err = payload_schema.validateRequest(offloaded_detail);
+  EXPECT_THAT(detail_err, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(detail_err.message(),
+              testing::HasSubstr("field 'messages[0].content[0].image_url.detail' cannot be "
+                                 "offloaded to external buffer"));
 }
 
 TEST(OpenAiChatCompletionsTest, SubSchemasDirectValidation) {
@@ -218,6 +278,18 @@ TEST(OpenAiChatCompletionsTest, SubSchemasDirectValidation) {
   };
   EXPECT_THAT(chat_message_schema.validate(valid_msg), IsOk());
 
+  // Direct validation of chatMessageSchema with offloaded image_url.
+  nlohmann::json multimodal_msg = {
+      {"role", "user"},
+      {"content",
+       nlohmann::json::array({
+           {{"type", "image_url"},
+            {"image_url",
+             {{"url", JsonWithExtBuf::makeExternalRef(JsonWithExtBuf::ExternalRef{100, 5000})}}}},
+       })},
+  };
+  EXPECT_THAT(chat_message_schema.validate(multimodal_msg), IsOk());
+
   nlohmann::json msg_invalid_role = {
       {"role", "superadmin"},
   };
@@ -238,6 +310,72 @@ TEST(OpenAiChatCompletionsTest, SubSchemasDirectValidation) {
       {"type", "not_a_function"},
   };
   EXPECT_THAT(tool_schema.validate(invalid_tool), StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Test toolSchema with nullable optional fields.
+  nlohmann::json null_fields_tool = {
+      {"type", "function"},
+      {"function", {{"name", "fetch_info"}, {"description", nullptr}, {"strict", nullptr}}},
+  };
+  EXPECT_THAT(tool_schema.validate(null_fields_tool), IsOk());
+}
+
+TEST(OpenAiChatCompletionsTest, NullableFieldsValidation) {
+  PayloadSchema payload_schema = createPayloadSchema();
+
+  // Full request payload with all optional fields explicitly set to null.
+  nlohmann::json null_fields_req = {
+      {"model", "gpt-4o"},
+      {"messages", nlohmann::json::array({
+                       {{"role", "user"},
+                        {"content", nullptr},
+                        {"name", nullptr},
+                        {"tool_call_id", nullptr},
+                        {"tool_calls", nullptr}},
+                   })},
+      {"temperature", nullptr},
+      {"top_p", nullptr},
+      {"n", nullptr},
+      {"stream", nullptr},
+      {"stop", nullptr},
+      {"max_tokens", nullptr},
+      {"max_completion_tokens", nullptr},
+      {"presence_penalty", nullptr},
+      {"frequency_penalty", nullptr},
+      {"logit_bias", nullptr},
+      {"user", nullptr},
+      {"tools", nullptr},
+      {"tool_choice", nullptr},
+      {"response_format", nullptr},
+      {"seed", nullptr},
+      {"service_tier", nullptr},
+  };
+  EXPECT_THAT(payload_schema.validateRequest(null_fields_req), IsOk());
+
+  // Non-nullable fields set to null must be rejected.
+  nlohmann::json null_model = {
+      {"model", nullptr},
+      {"messages", nlohmann::json::array({
+                       {{"role", "user"}, {"content", "Hi"}},
+                   })},
+  };
+  EXPECT_THAT(payload_schema.validateRequest(null_model),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  nlohmann::json null_messages = {
+      {"model", "gpt-4o"},
+      {"messages", nullptr},
+  };
+  EXPECT_THAT(payload_schema.validateRequest(null_messages),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  nlohmann::json null_role = {
+      {"model", "gpt-4o"},
+      {"messages", nlohmann::json::array({
+                       {{"role", nullptr}, {"content", "Hi"}},
+                   })},
+  };
+  EXPECT_THAT(payload_schema.validateRequest(null_role),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }
 
 } // namespace

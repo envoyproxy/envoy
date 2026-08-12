@@ -229,11 +229,18 @@ TEST(SchemaTest, OffloadableFieldPathsDiscovery) {
 }
 
 TEST(SchemaTest, SchemaReflectionAndAccessors) {
-  Schema enum_schema = Schema::enumString({"a", "b"}).required(true).offloadable(true);
+  Schema enum_schema =
+      Schema::enumString({"a", "b"}).required(true).offloadable(true).nullable(true);
   EXPECT_EQ(enum_schema.type(), Schema::Type::String);
   EXPECT_TRUE(enum_schema.isRequired());
   EXPECT_TRUE(enum_schema.isOffloadable());
+  EXPECT_TRUE(enum_schema.isNullable());
   EXPECT_EQ(enum_schema.allowedValues(), (std::vector<std::string>{"a", "b"}));
+
+  Schema non_nullable_schema = Schema::string();
+  EXPECT_FALSE(non_nullable_schema.isNullable());
+  non_nullable_schema.nullable(false);
+  EXPECT_FALSE(non_nullable_schema.isNullable());
 
   Schema arr_schema = Schema::array(Schema::number());
   ASSERT_NE(arr_schema.elementSchema(), nullptr);
@@ -241,6 +248,83 @@ TEST(SchemaTest, SchemaReflectionAndAccessors) {
 
   Schema obj_schema = Schema::object({}).allowUnknownFields(false);
   EXPECT_FALSE(obj_schema.allowsUnknownFields());
+}
+
+TEST(SchemaTest, NullableValidation) {
+  // Nullable string.
+  Schema non_null_str = Schema::string();
+  Schema null_str = Schema::string().nullable();
+  EXPECT_THAT(non_null_str.validate(nlohmann::json("hello")), IsOk());
+  EXPECT_THAT(non_null_str.validate(nlohmann::json(nullptr)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(null_str.validate(nlohmann::json("hello")), IsOk());
+  EXPECT_THAT(null_str.validate(nlohmann::json(nullptr)), IsOk());
+  EXPECT_THAT(null_str.validate(nlohmann::json(123)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Nullable number with range constraint.
+  Schema null_num = Schema::number().range(0.0, 2.0).nullable();
+  EXPECT_THAT(null_num.validate(nlohmann::json(1.0)), IsOk());
+  EXPECT_THAT(null_num.validate(nlohmann::json(nullptr)), IsOk());
+  EXPECT_THAT(null_num.validate(nlohmann::json(3.0)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(null_num.validate(nlohmann::json("text")),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Nullable integer with min/max constraint.
+  Schema null_int = Schema::integer().min(0).max(10).nullable();
+  EXPECT_THAT(null_int.validate(nlohmann::json(5)), IsOk());
+  EXPECT_THAT(null_int.validate(nlohmann::json(nullptr)), IsOk());
+  EXPECT_THAT(null_int.validate(nlohmann::json(-1)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(null_int.validate(nlohmann::json(15)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Nullable boolean.
+  Schema null_bool = Schema::boolean().nullable();
+  EXPECT_THAT(null_bool.validate(nlohmann::json(true)), IsOk());
+  EXPECT_THAT(null_bool.validate(nlohmann::json(false)), IsOk());
+  EXPECT_THAT(null_bool.validate(nlohmann::json(nullptr)), IsOk());
+  EXPECT_THAT(null_bool.validate(nlohmann::json("true")),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Nullable object.
+  Schema null_obj = Schema::object({{"key", Schema::string()}}).nullable();
+  EXPECT_THAT(null_obj.validate(nlohmann::json{{"key", "val"}}), IsOk());
+  EXPECT_THAT(null_obj.validate(nlohmann::json(nullptr)), IsOk());
+  EXPECT_THAT(null_obj.validate(nlohmann::json("not_an_object")),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Nullable array and array with nullable elements.
+  Schema null_arr = Schema::array(Schema::string()).nullable();
+  EXPECT_THAT(null_arr.validate(nlohmann::json{"a", "b"}), IsOk());
+  EXPECT_THAT(null_arr.validate(nlohmann::json(nullptr)), IsOk());
+  EXPECT_THAT(null_arr.validate(nlohmann::json(123)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  Schema arr_with_null_elems = Schema::array(Schema::string().nullable());
+  EXPECT_THAT(arr_with_null_elems.validate(nlohmann::json{"a", nullptr, "b"}), IsOk());
+  EXPECT_THAT(arr_with_null_elems.validate(nlohmann::json{"a", 123}),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Nullable oneOf.
+  Schema null_one_of = Schema::oneOf({Schema::string(), Schema::integer()}).nullable();
+  EXPECT_THAT(null_one_of.validate(nlohmann::json("hello")), IsOk());
+  EXPECT_THAT(null_one_of.validate(nlohmann::json(42)), IsOk());
+  EXPECT_THAT(null_one_of.validate(nlohmann::json(nullptr)), IsOk());
+  EXPECT_THAT(null_one_of.validate(nlohmann::json(true)),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+
+  // Required and nullable property in object.
+  Schema req_null_obj = Schema::object({
+      {"req_null", Schema::string().required().nullable()},
+  });
+  EXPECT_THAT(req_null_obj.validate(nlohmann::json{{"req_null", "val"}}), IsOk());
+  EXPECT_THAT(req_null_obj.validate(nlohmann::json{{"req_null", nullptr}}), IsOk());
+  EXPECT_THAT(req_null_obj.validate(nlohmann::json::object()),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(req_null_obj.validate(nlohmann::json{{"req_null", 123}}),
+              StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(SchemaTest, RequestResponseAndPayloadSchema) {

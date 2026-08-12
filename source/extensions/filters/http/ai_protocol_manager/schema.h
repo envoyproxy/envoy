@@ -80,6 +80,12 @@ public:
   }
   bool isRequired() const { return is_required_; }
 
+  Schema& nullable(bool is_nullable = true) {
+    is_nullable_ = is_nullable;
+    return *this;
+  }
+  bool isNullable() const { return is_nullable_; }
+
   Schema& offloadable(bool off = true) {
     is_offloadable_ = off;
     return *this;
@@ -141,6 +147,7 @@ private:
 
   Type type_{Type::Any};
   bool is_required_{false};
+  bool is_nullable_{false};
   bool is_offloadable_{false};
   bool allow_unknown_fields_{true};
 

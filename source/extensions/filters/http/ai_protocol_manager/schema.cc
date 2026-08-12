@@ -298,6 +298,10 @@ absl::Status Schema::validateOneOf(const nlohmann::json& json, absl::string_view
 }
 
 absl::Status Schema::validate(const nlohmann::json& json, absl::string_view path) const {
+  if (is_nullable_ && json.is_null()) {
+    return absl::OkStatus();
+  }
+
   absl::Status status = absl::OkStatus();
   switch (type_) {
   case Type::String:
