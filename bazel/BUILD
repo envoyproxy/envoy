@@ -683,6 +683,8 @@ config_setting(
     values = {"cpu": "darwin"},
 )
 
+# Match the target platform selected by --platforms. Legacy --cpu settings can otherwise fall
+# through to the default branch in platform-based builds.
 config_setting(
     name = "darwin_x86_64",
     constraint_values = [
