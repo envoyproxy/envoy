@@ -192,9 +192,9 @@ TEST_F(OrcaOobManagerLifecycleTest, DestructionDisarmsActiveSessions) {
   manager.reset();
 }
 
-// Two managers sharing one stats scope (e.g. load_aware_locality and its child CSWRR policy
-// each enabling OOB) must compose deltas on the shared active_sessions gauge rather than clobber
-// each other via absolute set().
+// Two managers sharing one stats scope (e.g. load_aware_locality and its child
+// ClientSideWeightedRoundRobin policy each enabling OOB) must compose deltas on the shared
+// active_sessions gauge rather than clobber each other via absolute set().
 TEST_F(OrcaOobManagerLifecycleTest, ActiveSessionsGaugeComposesAcrossManagers) {
   auto manager1 = makeManager();
   ASSERT_OK(manager1->initialize());
