@@ -142,6 +142,9 @@ public:
 
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
   const LowerCaseString ProxyAuthorization{"proxy-authorization"};
+  // Registered by RFC 10008 Section 3. The value is a Structured Fields list of media ranges, not
+  // a plain comma-separated list, so it must be parsed as a Structured Field.
+  const LowerCaseString AcceptQuery{"accept-query"};
   const LowerCaseString CapsuleProtocol{"capsule-protocol"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
