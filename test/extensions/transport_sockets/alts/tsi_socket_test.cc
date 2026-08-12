@@ -160,16 +160,18 @@ public:
 class TsiSocketTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   TsiSocketTest() : version_(GetParam()) {
-    server_.handshaker_factory_ = [this](Event::Dispatcher& dispatcher,
+    server_.handshaker_factory_ = [this](<Event::Dispatcher& dispatcher,
                                          const Network::Address::InstanceConstSharedPtr&,
-                                         const Network::Address::InstanceConstSharedPtr&) {
+                                         const Network::Address::InstanceConstSharedPtr&,
+                                         absl::string_view>) {
       auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
       return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
     };
-    client_.handshaker_factory_ = [this](Event::Dispatcher& dispatcher,
+    client_.handshaker_factory_ = [this](<Event::Dispatcher& dispatcher,
                                          const Network::Address::InstanceConstSharedPtr&,
-                                         const Network::Address::InstanceConstSharedPtr&) {
-      auto handshaker = AltsTsiHandshaker::createForClient(getChannel());
+                                         const Network::Address::InstanceConstSharedPtr&,
+                                         absl::string_view target_name>) {
+      auto handshaker = AltsTsiHandshaker::createForClient(getChannel(), target_name);
       return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
     };
   }
@@ -860,6 +862,51 @@ TEST_P(TsiSocketTest, DoReadDrainBuffer) {
                  server_.tsi_socket_->doRead(server_.read_buffer_),
                  "While the server is reading application data.");
   EXPECT_EQ(server_.read_buffer_.toString(), ApplicationData);
+}
+
+TEST_P(TsiSocketTest, TsiSocketFactoryTargetNamePrecedenceAndFallback) {
+  std::string captured_target_name;
+  HandshakerFactory capturing_factory =
+      [&captured_target_name](<Event::Dispatcher&,
+                              const Network::Address::InstanceConstSharedPtr&,
+                              const Network::Address::InstanceConstSharedPtr&,
+                              absl::string_view target_name>) -> TsiHandshakerPtr {
+    captured_target_name = std::string(target_name);
+    return nullptr;
+  };
+
+  TsiSocketFactory factory(capturing_factory, nullptr);
+
+  // Case 1: options->serverNameOverride() takes precedence over host_description->hostname()
+  auto options_with_override =
+      std::make_shared<Network::TransportSocketOptionsImpl>("override.domain.com");
+  auto host_with_name = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  ON_CALL(*host_with_name, hostname()).WillByDefault(ReturnRefOfCopy(std::string("host.domain.com")));
+
+  auto socket1 = factory.createTransportSocket(options_with_override, host_with_name);
+  EXPECT_NE(nullptr, socket1);
+  NiceMock<Network::MockTransportSocketCallbacks> callbacks1;
+  socket1->setTransportSocketCallbacks(callbacks1);
+  socket1->onConnected();
+  EXPECT_EQ("override.domain.com", captured_target_name);
+
+  // Case 2: Fallback to host_description->hostname() when options is nullptr
+  captured_target_name.clear();
+  auto socket2 = factory.createTransportSocket(nullptr, host_with_name);
+  EXPECT_NE(nullptr, socket2);
+  NiceMock<Network::MockTransportSocketCallbacks> callbacks2;
+  socket2->setTransportSocketCallbacks(callbacks2);
+  socket2->onConnected();
+  EXPECT_EQ("host.domain.com", captured_target_name);
+
+  // Case 3: Empty target name when neither options nor host_description provides hostname
+  captured_target_name.clear();
+  auto socket3 = factory.createTransportSocket(nullptr, nullptr);
+  EXPECT_NE(nullptr, socket3);
+  NiceMock<Network::MockTransportSocketCallbacks> callbacks3;
+  socket3->setTransportSocketCallbacks(callbacks3);
+  socket3->onConnected();
+  EXPECT_EQ("", captured_target_name);
 }
 
 } // namespace

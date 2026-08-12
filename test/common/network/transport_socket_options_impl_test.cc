@@ -251,6 +251,56 @@ TEST_F(TransportSocketOptionsImplTest, Http11ProxyInfoInvalidEncodingsAreRejecte
   EXPECT_FALSE(transport_socket_options->http11ProxyInfo().has_value());
 }
 
+TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingAllFieldsDelegation) {
+  // Populate full inner options: SANs, ProxyProtocol, FilterState, ALPN, Http11Proxy
+  setFilterStateObject(UpstreamServerName::key(), "inner.example.com");
+  setFilterStateObject(ApplicationProtocols::key(), "h2,http/1.1");
+  setFilterStateObject(UpstreamSubjectAltNames::key(), "inner.example.com,inner-alt.example.com");
+  setFilterStateObject(Http11ProxyInfoFilterState::key(), "inner.example.com:443,127.0.0.1:15002");
+  filter_state_.setData("shared_key", std::make_unique<UpstreamServerName>("inner.example.com"),
+                        StreamInfo::FilterState::LifeSpan::FilterChain,
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto inner_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  ASSERT_NE(nullptr, inner_options);
+  auto decorated_options = std::make_shared<ServerNameDecoratingTransportSocketOptions>(
+      "override.example.com", inner_options);
+  EXPECT_EQ(std::make_optional<std::string>("override.example.com"),
+            decorated_options->serverNameOverride());
+  std::vector<std::string> expected_alpns{"h2", "http/1.1"};
+  EXPECT_EQ(expected_alpns, decorated_options->applicationProtocolListOverride());
+  std::vector<std::string> expected_sans{"inner.example.com", "inner-alt.example.com"};
+  EXPECT_EQ(expected_sans, decorated_options->verifySubjectAltNameListOverride());
+  ASSERT_TRUE(decorated_options->http11ProxyInfo().has_value());
+  EXPECT_EQ("inner.example.com:443", decorated_options->http11ProxyInfo()->hostname);
+  EXPECT_EQ(1, decorated_options->downstreamSharedFilterStateObjects().size());
+}
+
+TEST_F(TransportSocketOptionsImplTest, ServerNameAndAlpnDecoratingChaining) {
+  // Test chaining: ServerNameDecorator wrapping AlpnDecorator
+  auto base_options = std::make_shared<TransportSocketOptionsImpl>("base.example.com");
+  std::vector<std::string> custom_alpns{"custom-alpn"};
+  auto alpn_decorated =
+      std::make_shared<AlpnDecoratingTransportSocketOptions>(custom_alpns, base_options);
+  auto full_decorated = std::make_shared<ServerNameDecoratingTransportSocketOptions>(
+      "overridden.example.com", alpn_decorated);
+  EXPECT_EQ(std::make_optional<std::string>("overridden.example.com"),
+            full_decorated->serverNameOverride());
+  EXPECT_EQ(custom_alpns, full_decorated->applicationProtocolListOverride());
+}
+
+TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingNullInnerOptions) {
+  auto null_decorated =
+      std::make_shared<ServerNameDecoratingTransportSocketOptions>("standalone.example.com", nullptr);
+  EXPECT_EQ(std::make_optional<std::string>("standalone.example.com"),
+            null_decorated->serverNameOverride());
+  EXPECT_TRUE(null_decorated->verifySubjectAltNameListOverride().empty());
+  EXPECT_TRUE(null_decorated->applicationProtocolListOverride().empty());
+  EXPECT_TRUE(null_decorated->applicationProtocolFallback().empty());
+  EXPECT_FALSE(null_decorated->proxyProtocolOptions().has_value());
+  EXPECT_FALSE(null_decorated->http11ProxyInfo().has_value());
+  EXPECT_TRUE(null_decorated->downstreamSharedFilterStateObjects().empty());
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

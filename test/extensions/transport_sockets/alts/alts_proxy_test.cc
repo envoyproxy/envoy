@@ -222,6 +222,66 @@ TEST_P(AltsProxyTest, ClientFullHandshakeSuccess) {
   EXPECT_TRUE(TestUtility::protoEqual(handshaker_resp, expectedNextResponse()));
 }
 
+// Verify that StartClientHandshakeReq includes target_name when set.
+TEST_P(AltsProxyTest, ClientStartWithTargetNameSuccess) {
+  HandshakerReq expected_request;
+  StartClientHandshakeReq* expected_client_start = expected_request.mutable_client_start();
+  expected_client_start->set_handshake_security_protocol(grpc::gcp::ALTS);
+  expected_client_start->add_application_protocols(ApplicationProtocol);
+  expected_client_start->add_record_protocols(RecordProtocol);
+  expected_client_start->mutable_rpc_versions()->mutable_max_rpc_version()->set_major(
+      MaxMajorRpcVersion);
+  expected_client_start->mutable_rpc_versions()->mutable_max_rpc_version()->set_minor(
+      MaxMinorRpcVersion);
+  expected_client_start->mutable_rpc_versions()->mutable_min_rpc_version()->set_major(
+      MinMajorRpcVersion);
+  expected_client_start->mutable_rpc_versions()->mutable_min_rpc_version()->set_minor(
+      MinMinorRpcVersion);
+  expected_client_start->set_max_frame_size(MaxFrameSize);
+  expected_client_start->set_target_name("custom.service.target");
+  startFakeHandshakerService({expected_request}, grpc::Status::OK);
+
+  auto alts_proxy = AltsProxy::create(getChannel(), "custom.service.target");
+  EXPECT_OK(alts_proxy.status());
+  EXPECT_TRUE(TestUtility::protoEqual((*alts_proxy)->sendStartClientHandshakeReq().value(),
+                                      expectedClientStartResponse()));
+}
+
+// Verify full client-side ALTS handshake when target_name is set.
+TEST_P(AltsProxyTest, ClientFullHandshakeWithTargetNameSuccess) {
+  HandshakerReq expected_request_1;
+  StartClientHandshakeReq* expected_client_start = expected_request_1.mutable_client_start();
+  expected_client_start->set_handshake_security_protocol(grpc::gcp::ALTS);
+  expected_client_start->add_application_protocols(ApplicationProtocol);
+  expected_client_start->add_record_protocols(RecordProtocol);
+  expected_client_start->mutable_rpc_versions()->mutable_max_rpc_version()->set_major(
+      MaxMajorRpcVersion);
+  expected_client_start->mutable_rpc_versions()->mutable_max_rpc_version()->set_minor(
+      MaxMinorRpcVersion);
+  expected_client_start->mutable_rpc_versions()->mutable_min_rpc_version()->set_major(
+      MinMajorRpcVersion);
+  expected_client_start->mutable_rpc_versions()->mutable_min_rpc_version()->set_minor(
+      MinMinorRpcVersion);
+  expected_client_start->set_max_frame_size(MaxFrameSize);
+  expected_client_start->set_target_name("custom.service.target");
+
+  HandshakerReq expected_request_2;
+  expected_request_2.mutable_next()->set_in_bytes(ServerStartResponse);
+  startFakeHandshakerService({expected_request_1, expected_request_2}, grpc::Status::OK);
+
+  auto alts_proxy = AltsProxy::create(getChannel(), "custom.service.target");
+  EXPECT_OK(alts_proxy.status());
+  auto resp = (*alts_proxy)->sendStartClientHandshakeReq();
+  EXPECT_OK(resp);
+  EXPECT_TRUE(TestUtility::protoEqual(resp.value(), expectedClientStartResponse()));
+
+  resp = (*alts_proxy)->sendNextHandshakeReq(
+      absl::MakeSpan(reinterpret_cast<const uint8_t*>(ServerStartResponse.data()),
+                     ServerStartResponse.size()));
+  EXPECT_OK(resp);
+  EXPECT_TRUE(TestUtility::protoEqual(resp.value(), expectedNextResponse()));
+}
+
 // Verify that a StartServerHandshakeReq can successfully be created, sent to
 // the handshaker service, and the correct response is received.
 TEST_P(AltsProxyTest, ServerStartSuccess) {

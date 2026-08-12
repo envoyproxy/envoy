@@ -99,11 +99,11 @@ TransportSocketFactoryPtr createTransportSocketFactoryHelper(
       [handshaker_service_address, is_upstream,
        alts_shared_state](Event::Dispatcher& dispatcher,
                           const Network::Address::InstanceConstSharedPtr& local_address,
-                          const Network::Address::InstanceConstSharedPtr&) -> TsiHandshakerPtr {
+                          const Network::Address::InstanceConstSharedPtr&, absl::string_view target_name) -> TsiHandshakerPtr {
     ASSERT(local_address != nullptr);
     std::unique_ptr<AltsTsiHandshaker> tsi_handshaker;
     if (is_upstream) {
-      tsi_handshaker = AltsTsiHandshaker::createForClient(alts_shared_state->getChannel());
+      tsi_handshaker = AltsTsiHandshaker::createForClient(alts_shared_state->getChannel(), target_name);
     } else {
       tsi_handshaker = AltsTsiHandshaker::createForServer(alts_shared_state->getChannel());
     }

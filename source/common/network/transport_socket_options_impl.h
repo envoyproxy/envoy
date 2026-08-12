@@ -42,6 +42,45 @@ private:
   const TransportSocketOptionsConstSharedPtr inner_options_;
 };
 
+// A wrapper around another TransportSocketOptions that overrides the server name (SNI / target name).
+class ServerNameDecoratingTransportSocketOptions : public TransportSocketOptions {
+public:
+  ServerNameDecoratingTransportSocketOptions(
+      std::string server_name,
+      TransportSocketOptionsConstSharedPtr inner_options)
+      : server_name_(std::move(server_name)),
+        inner_options_(std::move(inner_options)) {}
+
+  // Network::TransportSocketOptions
+  const std::optional<std::string>& serverNameOverride() const override {
+    return server_name_;
+  }
+  const std::vector<std::string>& verifySubjectAltNameListOverride() const override {
+    return inner_options_ ? inner_options_->verifySubjectAltNameListOverride() : empty_vector_;
+  }
+  const std::vector<std::string>& applicationProtocolListOverride() const override {
+    return inner_options_ ? inner_options_->applicationProtocolListOverride() : empty_vector_;
+  }
+  const std::vector<std::string>& applicationProtocolFallback() const override {
+    return inner_options_ ? inner_options_->applicationProtocolFallback() : empty_vector_;
+  }
+  std::optional<Network::ProxyProtocolData> proxyProtocolOptions() const override {
+    return inner_options_ ? inner_options_->proxyProtocolOptions() : std::nullopt;
+  }
+  OptRef<const Http11ProxyInfo> http11ProxyInfo() const override {
+    return inner_options_ ? inner_options_->http11ProxyInfo() : OptRef<const Http11ProxyInfo>{};
+  }
+  const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const override {
+    return inner_options_ ? inner_options_->downstreamSharedFilterStateObjects() : empty_objects_;
+  }
+
+private:
+  const std::optional<std::string> server_name_;
+  const TransportSocketOptionsConstSharedPtr inner_options_;
+  static const inline std::vector<std::string> empty_vector_{};
+  static const inline StreamInfo::FilterState::Objects empty_objects_{};
+};
+
 class TransportSocketOptionsImpl : public TransportSocketOptions {
 public:
   TransportSocketOptionsImpl(
