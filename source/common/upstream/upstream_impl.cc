@@ -1995,8 +1995,11 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
 void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {
   ASSERT(!health_checker_);
   health_checker_ = health_checker;
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.health_check_after_cluster_warming")) {
+  const bool defer =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.health_check_after_cluster_warming") &&
+      (!hasZeroInitialFetchTimeout() || init_manager_.uninitializedCount() > 0);
+  if (!defer) {
     health_checker_->start();
   }
   health_checker_->addHostCheckCompleteCb(
