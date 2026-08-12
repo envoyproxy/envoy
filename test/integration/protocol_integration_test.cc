@@ -130,6 +130,47 @@ TEST_P(DownstreamProtocolIntegrationTest, QueryMethodRuntimeGuardDisabled) {
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_protocol_error")->value());
 }
 
+// RFC 10008 Section 2 requires servers to fail a QUERY request whose Content-Type is missing. The
+// check lives in the connection manager rather than a codec, so it applies to every downstream
+// protocol.
+TEST_P(DownstreamProtocolIntegrationTest, QueryMethodMissingContentType) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "QUERY"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+// With the runtime guard disabled, a QUERY request without a Content-Type is forwarded as it was
+// before the RFC 10008 check was added.
+TEST_P(DownstreamProtocolIntegrationTest, QueryMethodMissingContentTypeRuntimeGuardDisabled) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.reject_query_method_without_content_type", "false");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "QUERY"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"}});
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("QUERY", upstream_request_->headers().getMethodValue());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   auto response = makeHeaderOnlyRequest(nullptr, 0);
   // Shut down the server with active connection pool connections.
