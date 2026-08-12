@@ -167,9 +167,11 @@ TEST(CompressorFilterFactoryTests, CreateFilterWithServerContext) {
   Envoy::Registry::InjectFactory<
       Envoy::Compression::Compressor::NamedCompressorLibraryConfigFactory>
       reg(factory_impl);
+  Server::Configuration::ExtraFactoryContext extra_context{
+      server_context.messageValidationVisitor(), "stats"};
 
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).value();
+      factory.createHttpFilterFactoryFromProto(proto_config, server_context, extra_context).value();
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);

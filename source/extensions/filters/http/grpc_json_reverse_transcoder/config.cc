@@ -31,7 +31,8 @@ absl::StatusOr<Http::FilterFactoryCb>
 GrpcJsonReverseTranscoderFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
         GrpcJsonReverseTranscoder& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
   absl::Status creation_status = absl::OkStatus();
   std::shared_ptr<GrpcJsonReverseTranscoderConfig> filter_config =
       std::make_shared<GrpcJsonReverseTranscoderConfig>(proto_config, context.api(),

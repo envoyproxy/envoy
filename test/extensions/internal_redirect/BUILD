@@ -17,7 +17,9 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/set_filter_state:config",
         "//source/extensions/internal_redirect/allow_listed_routes:config",
+        "//source/extensions/internal_redirect/filter_state:config",
         "//source/extensions/internal_redirect/previous_routes:config",
         "//source/extensions/internal_redirect/safe_cross_scheme:config",
         "//test/integration:http_protocol_integration_lib",
@@ -25,6 +27,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/internal_redirect/filter_state/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/internal_redirect/previous_routes/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg_cc_proto",
     ],

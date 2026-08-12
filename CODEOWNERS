@@ -1,4 +1,3 @@
-# TODO(zuercher): determine how we want to deal with auto-assignment
 # By default, @envoyproxy/maintainers own everything.
 #*       @envoyproxy/maintainers
 # ci
@@ -13,7 +12,7 @@
 /changelogs/ @envoyproxy/docs-shepherds
 
 # access loggers
-/*/extensions/access_loggers/common @auni53 @zuercher
+/*/extensions/access_loggers/common @auni53 @UNOWNED
 /*/extensions/access_loggers/dynamic_modules @agrawroh @wbpcode @mathetake
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
 /*/extensions/access_loggers/stats @ggreenway @wbpcode @kyessenov
@@ -45,7 +44,7 @@
 # proto_api_scrubber http filter extension
 /*/extensions/filters/http/proto_api_scrubber @sumitkmr2 @adisuissa @pranavrautgoogle
 # grpc_http1_reverse_bridge http filter extension
-/*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
+/*/extensions/filters/http/grpc_http1_reverse_bridge @mattklein123 @UNOWNED
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @adisuissa @matthewstevenson88
 # tcp_stats transport socket extension
@@ -171,10 +170,10 @@
 /*/extensions/retry/host @ravenblackx @mattklein123
 /*/extensions/filters/network/http_connection_manager @yanavlasov @mattklein123
 /*/extensions/filters/network/tcp_bandwidth_limit @yanavlasov @nezdolik @antonkanug
-/*/extensions/filters/network/tcp_proxy @zuercher @ggreenway
+/*/extensions/filters/network/tcp_proxy @ggreenway @UNOWNED
 /*/extensions/filters/network/echo @yanavlasov @adisuissa
 /*/extensions/filters/udp/dns_filter @mattklein123 @yanjunxiang-google
-/*/extensions/filters/network/direct_response @kyessenov @zuercher
+/*/extensions/filters/network/direct_response @kyessenov @UNOWNED
 /*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
 /*/extensions/clusters/aggregate @yxue @mattklein123
 /*/extensions/clusters/composite @agrawroh @yanavlasov @wbpcode
@@ -353,14 +352,14 @@
 # Header Validators
 /*/extensions/http/header_validators/envoy_default @yanavlasov @wbpcode
 # Thrift
-/*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
-/*/extensions/health_checkers/thrift @zuercher @JuniorHsu
+/*/extensions/filters/network/thrift_proxy @JuniorHsu @UNOWNED
+/*/extensions/health_checkers/thrift @JuniorHsu @UNOWNED
 # Thrift to metadata
-/*/extensions/filters/http/thrift_to_metadata @JuniorHsu @zuercher
+/*/extensions/filters/http/thrift_to_metadata @JuniorHsu @UNOWNED
 # IP tagging
-/*/extensions/filters/http/ip_tagging @zuercher @JuniorHsu @nezdolik
+/*/extensions/filters/http/ip_tagging @JuniorHsu @nezdolik
 # Header to metadata
-/*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
+/*/extensions/filters/http/header_to_metadata @JuniorHsu @UNOWNED
 # Json to metadata
 /*/extensions/filters/http/json_to_metadata @cqi1217 @JuniorHsu @kbaichoo
 # SSE to metadata
@@ -388,8 +387,8 @@
 /*/extensions/load_balancing_policies/round_robin @wbpcode @tonya11en @nezdolik
 /*/extensions/load_balancing_policies/ring_hash @wbpcode @nezdolik
 /*/extensions/load_balancing_policies/maglev @wbpcode @nezdolik
-/*/extensions/load_balancing_policies/subset @wbpcode @zuercher @nezdolik
-/*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
+/*/extensions/load_balancing_policies/subset @wbpcode @nezdolik
+/*/extensions/load_balancing_policies/cluster_provided @wbpcode @UNOWNED
 /*/extensions/load_balancing_policies/client_side_weighted_round_robin @wbpcode @adisuissa @efimki
 /*/extensions/load_balancing_policies/override_host @yanavlasov @tonya11en
 /*/extensions/load_balancing_policies/wrr_locality @wbpcode @adisuissa @efimki
@@ -405,10 +404,10 @@
 # Body transform
 /*/extensions/filters/http/transform @wbpcode @yanavlasov @adisuissa
 # Health checkers
-/*/extensions/health_checkers/grpc @zuercher @botengyao
-/*/extensions/health_checkers/http @zuercher @botengyao
-/*/extensions/health_checkers/tcp @zuercher @botengyao
-/*/extensions/health_checkers/common @zuercher @botengyao
+/*/extensions/health_checkers/grpc @botengyao @UNOWNED
+/*/extensions/health_checkers/http @botengyao @UNOWNED
+/*/extensions/health_checkers/tcp @botengyao @UNOWNED
+/*/extensions/health_checkers/common @botengyao @UNOWNED
 # Health check event sinks
 /*/extensions/health_check/event_sinks/file @botengyao @yanavlasov
 # IP Geolocation

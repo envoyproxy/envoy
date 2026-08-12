@@ -42,10 +42,13 @@ public:
    * createRdsRouteConfigProvider above. This method always creates a new RouteConfigProvider.
    * @param route_config supplies the RouteConfiguration for this route
    * @param factory_context is the context to use for the route config provider.
+   * @param init_manager the Init::Manager that the resources owned by the route configuration
+   * should use to warm up. The route configuration inherits the init manager of its owner.
    */
-  virtual RouteConfigProviderPtr createStaticRouteConfigProvider(
-      const RouteConfiguration& route_config,
-      Server::Configuration::ServerFactoryContext& factory_context) PURE;
+  virtual RouteConfigProviderPtr
+  createStaticRouteConfigProvider(const RouteConfiguration& route_config,
+                                  Server::Configuration::ServerFactoryContext& factory_context,
+                                  Init::Manager& init_manager) PURE;
 };
 
 } // namespace Common

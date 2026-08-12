@@ -25,7 +25,8 @@ private:
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig& proto_config,
-      const std::string&, Server::Configuration::ServerFactoryContext&) override;
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 } // namespace ConnectGrpcBridge
