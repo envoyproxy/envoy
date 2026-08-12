@@ -426,12 +426,11 @@ min_rtt_calc_params:
   verifyMinRTTValue(std::chrono::milliseconds(13));
 }
 
-TEST_F(GradientControllerTest, ExplicitMinConcurrencyLimitDisablesMinRTTProbeClamp) {
+TEST_F(GradientControllerTest, MinRTTProbeConcurrencyCanBeHigherThanMinimumLimit) {
   const std::string yaml = R"EOF(
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
-  max_concurrency_limit: 100
   min_concurrency_limit: 2
   concurrency_update_interval: 0.1s
 min_rtt_calc_params:
@@ -443,33 +442,30 @@ min_rtt_calc_params:
 )EOF";
 
   auto controller = makeController(yaml);
+  const auto min_rtt = std::chrono::milliseconds(13);
 
   verifyMinRTTActive();
+  EXPECT_EQ(controller->concurrencyLimit(), 7);
+  for (int i = 0; i < 7; ++i) {
+    tryForward(controller, true);
+  }
+  tryForward(controller, false);
+  time_system_.advanceTimeAndRun(min_rtt, *dispatcher_, Event::Dispatcher::RunType::Block);
+  for (int i = 0; i < 7; ++i) {
+    sampleLatency(controller, min_rtt);
+  }
+
+  driveSampleRTTWindows(controller, std::chrono::milliseconds(200), 10);
+
   EXPECT_EQ(controller->concurrencyLimit(), 2);
-  advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(13));
-  verifyMinRTTInactive();
-
-  driveSampleRTTWindows(controller, std::chrono::milliseconds(5), 3);
-  const auto limit_before_probe = controller->concurrencyLimit();
-  EXPECT_GT(limit_before_probe, 2);
-
-  time_system_.advanceTimeAndRun(std::chrono::seconds(31), *dispatcher_,
-                                 Event::Dispatcher::RunType::Block);
-  verifyMinRTTActive();
-  EXPECT_EQ(controller->concurrencyLimit(), limit_before_probe);
-
-  time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
-                                 Event::Dispatcher::RunType::Block);
-  advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(13));
-  verifyMinRTTInactive();
-  EXPECT_EQ(controller->concurrencyLimit(), limit_before_probe);
 }
 
-TEST_F(GradientControllerTest, MinRTTProbePinsConcurrencyWhenMinimumLimitUsesLegacyFallback) {
+TEST_F(GradientControllerTest, MinRTTProbeDoesNotIncreaseLimitWhenAlreadyBelowProbeConcurrency) {
   const std::string yaml = R"EOF(
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
+  min_concurrency_limit: 2
   concurrency_update_interval: 0.1s
 min_rtt_calc_params:
   jitter:
@@ -482,13 +478,15 @@ min_rtt_calc_params:
   auto controller = makeController(yaml);
   advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
 
-  driveSampleRTTWindows(controller, std::chrono::milliseconds(2), 3);
-  EXPECT_GT(controller->concurrencyLimit(), 7);
+  driveSampleRTTWindows(controller, std::chrono::milliseconds(200), 10);
+  EXPECT_EQ(controller->concurrencyLimit(), 2);
 
-  time_system_.advanceTimeAndRun(std::chrono::seconds(31), *dispatcher_,
-                                 Event::Dispatcher::RunType::Block);
+  if (!controller->inMinRTTSamplingWindow()) {
+    time_system_.advanceTimeAndRun(std::chrono::seconds(31), *dispatcher_,
+                                   Event::Dispatcher::RunType::Block);
+  }
   verifyMinRTTActive();
-  EXPECT_EQ(controller->concurrencyLimit(), 7);
+  EXPECT_EQ(controller->concurrencyLimit(), 2);
 }
 
 TEST_F(GradientControllerTest, FixedMinRTT) {

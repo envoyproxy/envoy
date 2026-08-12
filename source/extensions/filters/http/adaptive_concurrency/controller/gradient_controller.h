@@ -98,8 +98,6 @@ public:
                                           min_concurrency_limit_);
   }
 
-  bool minRTTCalcAdjustsConcurrency() const { return !min_concurrency_limit_configured_; }
-
   std::chrono::milliseconds fixedValue() const { return fixed_value_; }
 
   // True if minRTT is sampled.

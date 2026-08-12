@@ -28,10 +28,8 @@ time (minRTT) for an upstream.
 Calculating the minRTT
 ^^^^^^^^^^^^^^^^^^^^^^
 
-By default, the minRTT is periodically measured by pinning the concurrency limit to the configured
-``min_concurrency`` and measuring the latency under these ideal conditions. If
-``min_concurrency_limit`` is configured separately, the minRTT measurement does not change the
-current concurrency limit and only records latency samples from live traffic. The calculation is also
+The minRTT is periodically measured by pinning the concurrency limit to the configured
+``min_concurrency`` and measuring the latency under these ideal conditions. The calculation is also
 triggered in scenarios where the concurrency limit is determined to be the minimum configured value
 for 5 consecutive sampling windows. The length of this minRTT calculation window is variable
 depending on the number of requests the filter is configured to aggregate to represent the expected
@@ -45,9 +43,9 @@ calculation on the downstream success rate if retries are enabled.
 
 It is possible that there is a noticeable increase in request 503s during the minRTT measurement
 window because of the potentially significant drop in the concurrency limit. This is expected and it
-is recommended to enable retries for resets/503s. To avoid changing the concurrency limit during
-minRTT measurements while still allowing the controller to clamp more aggressively during overload,
-configure ``min_concurrency_limit`` separately from ``min_concurrency``.
+is recommended to enable retries for resets/503s. To reduce the impact of minRTT measurements while
+still allowing the controller to clamp more aggressively during overload, configure
+``min_concurrency_limit`` separately from ``min_concurrency``.
 
 .. note::
 
@@ -65,10 +63,11 @@ The calculated concurrency limit will not be reduced below the configured minimu
 If ``min_concurrency_limit`` is not configured, this lower bound defaults to the minRTT calculation
 concurrency to preserve the historical behavior where ``min_concurrency`` controlled both values.
 
-When configured separately, ``min_concurrency_limit`` controls how far the controller can clamp the
-calculated concurrency limit during normal operation, and minRTT measurements no longer pin the
-concurrency limit to ``min_concurrency``. This lets deployments measure minRTT from live traffic
-without periodically shedding otherwise healthy requests only to calculate a new baseline.
+When configured separately, ``min_concurrency`` controls the concurrency used while measuring
+minRTT, and ``min_concurrency_limit`` controls how far the controller can clamp the calculated
+concurrency limit during normal operation. If the current concurrency limit is already lower than
+the minRTT calculation concurrency when a minRTT measurement starts, the controller will keep the
+lower current limit rather than raising it for the measurement window.
 
 The Gradient
 ^^^^^^^^^^^^
@@ -153,9 +152,8 @@ The above configuration can be understood as follows:
 * The calculated concurrency limit will not be reduced below 25.
 * Recalculate the minRTT every 60s and add a jitter (random delay) of 0s-6s to the start of the
   minRTT recalculation. The delay is dictated by the jitter value.
-* Because ``min_concurrency_limit`` is configured separately, do not pin concurrency while
-  calculating minRTT. Collect 50 request samples from live traffic and use the p90 to summarize
-  them.
+* Pin concurrency to 50 while calculating minRTT, collect 50 request samples, and use the p90 to
+  summarize them.
 * The filter is enabled by default.
 
 .. note::
@@ -200,13 +198,13 @@ adaptive_concurrency.gradient_controller.sample_aggregate_percentile
     clamped to the range [0,100].
 
 adaptive_concurrency.gradient_controller.min_concurrency
-    Overrides the concurrency that is pinned while measuring the minRTT. This only applies when
-    ``min_concurrency_limit`` is not configured. If ``min_concurrency_limit`` is not configured,
-    this value is also used as the minimum calculated concurrency limit.
+    Overrides the concurrency that is pinned while measuring the minRTT. If
+    ``min_concurrency_limit`` is not configured, this value is also used as the minimum calculated
+    concurrency limit.
 
 adaptive_concurrency.gradient_controller.min_concurrency_limit
-    Overrides the minimum calculated concurrency limit. When configured, minRTT measurements do not
-    change the current concurrency limit.
+    Overrides the minimum calculated concurrency limit. This does not affect the concurrency that is
+    pinned while measuring the minRTT.
 
 Statistics
 ----------

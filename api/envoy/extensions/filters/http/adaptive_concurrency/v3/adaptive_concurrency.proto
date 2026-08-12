@@ -49,8 +49,7 @@ message GradientControllerConfig {
     // :ref:`min_concurrency
     // <envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams.min_concurrency>`
     // to preserve the existing behavior where the same value controls both the minimum calculated
-    // limit and the limit used while measuring minRTT. When this value is configured separately,
-    // minRTT measurements do not change the current concurrency limit.
+    // limit and the limit used while measuring minRTT.
     google.protobuf.UInt32Value min_concurrency_limit = 4 [(validate.rules).uint32 = {gt: 0}];
   }
 
