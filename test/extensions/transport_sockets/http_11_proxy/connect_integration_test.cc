@@ -140,16 +140,18 @@ typed_config:
         Network::Utility::addressToProtobufAddress(*host_metadata_proxy_address_, addr_proto);
         Protobuf::Any addr_any;
         std::ignore = addr_any.PackFrom(addr_proto);
-        (*md->mutable_typed_filter_metadata())
-            [Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR] = addr_any;
+        (*md->mutable_typed_filter_metadata())[Config::MetadataFilters::get()
+                                                   .ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR] =
+            addr_any;
 
         if (!host_metadata_proxy_authorization_.empty()) {
           Protobuf::StringValue auth_value;
           auth_value.set_value(host_metadata_proxy_authorization_);
           Protobuf::Any auth_any;
           std::ignore = auth_any.PackFrom(auth_value);
-          (*md->mutable_typed_filter_metadata())
-              [Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH] = auth_any;
+          (*md->mutable_typed_filter_metadata())[Config::MetadataFilters::get()
+                                                     .ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH] =
+              auth_any;
         }
       }
 
