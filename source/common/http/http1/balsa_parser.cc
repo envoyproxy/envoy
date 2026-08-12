@@ -57,10 +57,6 @@ static_assert(isValidTokenCharacter('-'));
 static_assert(!isValidTokenCharacter(':'));
 static_assert(!isValidTokenCharacter(' '));
 
-// The QUERY method, registered by RFC 10008. Recognized only when
-// `envoy.reloadable_features.http1_allow_query_method` is enabled.
-constexpr absl::string_view kQueryMethod = "QUERY";
-
 // TODO(#21245): Skip method validation altogether when UHV method validation is
 // enabled.
 bool isMethodValid(absl::string_view method, bool allow_custom_methods, bool allow_query_method) {
@@ -85,9 +81,10 @@ bool isMethodValid(absl::string_view method, bool allow_custom_methods, bool all
     return false;
   }
 
-  // Recognizing QUERY makes Envoy forward requests it previously rejected with a 400, so the
-  // previous behavior remains available by disabling the runtime guard.
-  return allow_query_method || method != kQueryMethod;
+  // Recognizing QUERY (registered by RFC 10008) makes Envoy forward requests it previously
+  // rejected with a 400, so the previous behavior remains available by disabling the runtime
+  // guard `envoy.reloadable_features.http1_allow_query_method`.
+  return allow_query_method || method != Headers::get().MethodValues.Query;
 }
 
 // This function is crafted to match the URL validation behavior of the http-parser library.

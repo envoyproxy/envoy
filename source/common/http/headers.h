@@ -332,6 +332,8 @@ public:
     const std::string Patch{"PATCH"};
     const std::string Post{"POST"};
     const std::string Put{"PUT"};
+    // Registered by RFC 10008.
+    const std::string Query{"QUERY"};
     const std::string Trace{"TRACE"};
   } MethodValues;
 
