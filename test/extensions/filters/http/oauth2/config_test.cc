@@ -545,8 +545,10 @@ config:
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   auto& validation_visitor = ProtobufMessage::getNullValidationVisitor();
+  const std::string empty_stats_prefix;
+  Server::Configuration::ExtraFactoryContext extra_context{validation_visitor, empty_stats_prefix};
   const auto result =
-      factory.createRouteSpecificFilterConfigTyped(route_config, context, validation_visitor);
+      factory.createHttpFilterRouteConfigTyped(route_config, context, extra_context);
   EXPECT_OK(result);
 }
 

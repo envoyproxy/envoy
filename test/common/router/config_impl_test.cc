@@ -26,6 +26,7 @@
 #include "test/common/router/route_fuzz.pb.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/fuzz/utility.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/retry_priority.h"
@@ -70,7 +71,7 @@ public:
                  Server::Configuration::ServerFactoryContext& factory_context,
                  bool validate_clusters_default, absl::Status& creation_status)
       : ConfigImpl(config, factory_context, ProtobufMessage::getNullValidationVisitor(),
-                   validate_clusters_default, creation_status),
+                   factory_context.initManager(), validate_clusters_default, creation_status),
         config_(config) {}
 
   void setupRouteConfig(const Http::RequestHeaderMap& headers, uint64_t random_value) const {
@@ -11703,6 +11704,92 @@ virtual_hosts:
                                            true, creation_status_);
                             , EnvoyException,
                             ":-prefixed headers or Hosts may not be specified here.");
+}
+
+// Verifies that the init manager of a route configuration is handed to the route level filter
+// configuration factories, so that they can warm up their own resources.
+class PerFilterConfigsInitManagerTest : public testing::Test, public ConfigImplTestBase {
+public:
+  PerFilterConfigsInitManagerTest() : registered_factory_(factory_) {}
+
+  struct EmptyRouteSpecificFilterConfig : public RouteSpecificFilterConfig {};
+
+  class TestFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+  public:
+    TestFilterConfig() : EmptyHttpFilterConfig("test.filter") {}
+
+    absl::StatusOr<Http::FilterFactoryCb>
+    createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
+      PANIC("not implemented");
+    }
+    ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+      return ProtobufTypes::MessagePtr{new Protobuf::Timestamp()};
+    }
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return ProtobufTypes::MessagePtr{new Protobuf::Timestamp()};
+    }
+    std::set<std::string> configTypes() override { return {"google.protobuf.Timestamp"}; }
+    absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr> createHttpFilterRouteConfig(
+        const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
+        Server::Configuration::ExtraFactoryContext& extra_context) override {
+      init_managers_.push_back(extra_context.init_manager.ptr());
+      return std::make_shared<EmptyRouteSpecificFilterConfig>();
+    }
+
+    // The init manager that every created route level filter configuration was given.
+    std::vector<Init::Manager*> init_managers_;
+  };
+
+  NiceMock<Init::MockManager> init_manager_;
+  TestFilterConfig factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_factory_;
+};
+
+TEST_F(PerFilterConfigsInitManagerTest, InitManagerIsPropagatedToEveryLevel) {
+  const std::string yaml = R"EOF(
+typed_per_filter_config:
+  test.filter:
+    "@type": type.googleapis.com/google.protobuf.Timestamp
+    value:
+      seconds: 1
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    typed_per_filter_config:
+      test.filter:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+        value:
+          seconds: 2
+    routes:
+      - match: { prefix: "/" }
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/google.protobuf.Timestamp
+            value:
+              seconds: 3
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+                typed_per_filter_config:
+                  test.filter:
+                    "@type": type.googleapis.com/google.protobuf.Timestamp
+                    value:
+                      seconds: 4
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+
+  EXPECT_TRUE(ConfigImpl::create(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                 ProtobufMessage::getNullValidationVisitor(), init_manager_, true)
+                  .ok());
+
+  // The route configuration, the virtual host, the route and the weighted cluster each have a route
+  // level filter configuration, and all of them are given the init manager of the route
+  // configuration rather than the one of the server factory context.
+  EXPECT_THAT(factory_.init_managers_,
+              ElementsAre(&init_manager_, &init_manager_, &init_manager_, &init_manager_));
 }
 
 class PerFilterConfigsTest : public testing::Test, public ConfigImplTestBase {

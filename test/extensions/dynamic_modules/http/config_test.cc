@@ -146,7 +146,8 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceWithoutInitManagerReturnsError
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  // The ServerFactoryContext path has no init manager, so remote sources should be rejected.
+  // An extra factory context without an init manager cannot warm anything up, so remote sources
+  // should be rejected.
   DynamicModuleConfigFactory factory;
   Server::Configuration::ExtraFactoryContext extra_context{
       context_.server_factory_context_.messageValidationVisitor(), "stats"};
@@ -154,6 +155,53 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceWithoutInitManagerReturnsError
                   proto_config, context_.server_factory_context_, extra_context),
               HasStatus(absl::StatusCode::kInvalidArgument,
                         "Remote module sources require an init manager"));
+}
+
+// The init manager carried by the extra factory context must be handed to the module loader, so
+// that an asynchronously fetched module gates the initialization of whatever owns this filter
+// configuration.
+TEST_F(DynamicModuleFilterConfigTest, RemoteSourceUsesExtraContextInitManager) {
+  const std::string yaml = R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: "abc123"
+        retry_policy:
+          num_retries: 0
+    do_not_close: true
+  filter_name: "test_filter"
+  )EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  // Same config as the test above, but this time an init manager is available, so the remote
+  // source is accepted instead of rejected.
+  DynamicModuleConfigFactory factory;
+  Server::Configuration::ExtraFactoryContext extra_context{
+      context_.server_factory_context_.messageValidationVisitor(), "stats", init_manager_};
+  auto cb_or_error = factory.createHttpFilterFactoryFromProto(
+      proto_config, context_.server_factory_context_, extra_context);
+  EXPECT_OK(cb_or_error);
+
+  // The fetch is registered as a target on that very init manager: it has not started yet, and it
+  // only runs once the init manager is initialized. Cluster "cluster_1" is not set up in the mock,
+  // so the fetch fails immediately with num_retries=0.
+  EXPECT_EQ(init_manager_.state(), Init::Manager::State::Uninitialized);
+  EXPECT_CALL(init_watcher_, ready());
+  init_manager_.initialize(init_watcher_);
+  EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.scope(), "remote_fetch_error",
+                               "test_filter"));
+
+  // Fail-open: no filter is installed when the fetch failed.
+  NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(testing::_)).Times(0);
+  cb_or_error.value()(filter_callbacks);
 }
 
 TEST_F(DynamicModuleFilterConfigTest, RemoteSourceRegistersInitTarget) {

@@ -11,10 +11,11 @@ namespace Router {
 absl::StatusOr<std::unique_ptr<PerFilterConfigs>>
 PerFilterConfigs::create(const Protobuf::Map<std::string, Protobuf::Any>& typed_configs,
                          Server::Configuration::ServerFactoryContext& factory_context,
-                         ProtobufMessage::ValidationVisitor& validator) {
+                         ProtobufMessage::ValidationVisitor& validator,
+                         Init::Manager& init_manager) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<PerFilterConfigs>(
-      new PerFilterConfigs(typed_configs, factory_context, validator, creation_status));
+  auto ret = std::unique_ptr<PerFilterConfigs>(new PerFilterConfigs(
+      typed_configs, factory_context, validator, init_manager, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -23,7 +24,7 @@ absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr>
 PerFilterConfigs::createRouteSpecificFilterConfig(
     const std::string& name, const Protobuf::Any& typed_config, bool is_optional,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator) {
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager) {
   Server::Configuration::NamedHttpFilterConfigFactory* factory =
       Envoy::Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
           typed_config);
@@ -43,8 +44,10 @@ PerFilterConfigs::createRouteSpecificFilterConfig(
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
   RETURN_IF_NOT_OK(
       Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config));
-  // There is no stat prefix for the route specific filter configuration.
-  Server::Configuration::ExtraFactoryContext extra_context{validator, EMPTY_STRING};
+  // There is no stat prefix for the route specific filter configuration. The init manager is always
+  // available on this path, so it is converted to a non-empty optional reference here.
+  Server::Configuration::ExtraFactoryContext extra_context{validator, EMPTY_STRING,
+                                                           makeOptRef(init_manager)};
   auto object_status_or_error =
       factory->createHttpFilterRouteConfig(*proto_config, factory_context, extra_context);
   RETURN_IF_NOT_OK(object_status_or_error.status());
@@ -67,7 +70,7 @@ PerFilterConfigs::createRouteSpecificFilterConfig(
 PerFilterConfigs::PerFilterConfigs(const Protobuf::Map<std::string, Protobuf::Any>& typed_configs,
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    ProtobufMessage::ValidationVisitor& validator,
-                                   absl::Status& creation_status) {
+                                   Init::Manager& init_manager, absl::Status& creation_status) {
 
   static const std::string filter_config_type(
       envoy::config::route::v3::FilterConfig::default_instance().GetTypeName());
@@ -105,11 +108,12 @@ PerFilterConfigs::PerFilterConfigs(const Protobuf::Map<std::string, Protobuf::An
         continue;
       }
 
-      config_or_error = createRouteSpecificFilterConfig(
-          name, filter_config.config(), filter_config.is_optional(), factory_context, validator);
+      config_or_error =
+          createRouteSpecificFilterConfig(name, filter_config.config(), filter_config.is_optional(),
+                                          factory_context, validator, init_manager);
     } else {
       config_or_error = createRouteSpecificFilterConfig(name, per_filter_config.second, false,
-                                                        factory_context, validator);
+                                                        factory_context, validator, init_manager);
     }
     SET_AND_RETURN_IF_NOT_OK(config_or_error.status(), creation_status);
 

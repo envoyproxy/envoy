@@ -180,15 +180,19 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createHttpFilterFactoryFromP
     const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactory(proto, extra_context.stats_prefix, context, context.scope(), {});
+  return createFilterFactory(proto, extra_context.stats_prefix, context, context.scope(),
+                             extra_context.init_manager);
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-OAuth2Config::createRouteSpecificFilterConfigTyped(
+OAuth2Config::createHttpFilterRouteConfigTyped(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute& proto,
-    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  // The init manager of the enclosing route configuration, if any, is used to warm up the SDS
+  // secrets that the route level configuration references.
   auto config_or_error =
-      createFilterConfig(proto.config(), context, std::nullopt, context.scope(), "");
+      createFilterConfig(proto.config(), context, extra_context.init_manager, context.scope(), "");
   if (!config_or_error.ok()) {
     return config_or_error.status();
   }

@@ -68,34 +68,35 @@ public:
   createAndValidateRoute(const envoy::config::route::v3::Route& route_config,
                          const CommonVirtualHostSharedPtr& vhost,
                          Server::Configuration::ServerFactoryContext& factory_context,
-                         ProtobufMessage::ValidationVisitor& validator, bool validate_clusters) {
+                         ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                         bool validate_clusters) {
 
     absl::Status creation_status = absl::OkStatus();
     RouteEntryImplBaseConstSharedPtr route;
     switch (route_config.match().path_specifier_case()) {
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
       route = std::make_shared<PrefixRouteEntryImpl>(vhost, route_config, factory_context,
-                                                     validator, creation_status);
+                                                     validator, init_manager, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
       route = std::make_shared<PathRouteEntryImpl>(vhost, route_config, factory_context, validator,
-                                                   creation_status);
+                                                   init_manager, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex:
       route = std::make_shared<RegexRouteEntryImpl>(vhost, route_config, factory_context, validator,
-                                                    creation_status);
+                                                    init_manager, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher:
       route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, factory_context,
-                                                      validator, creation_status);
+                                                      validator, init_manager, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
       route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(
-          vhost, route_config, factory_context, validator, creation_status);
+          vhost, route_config, factory_context, validator, init_manager, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy:
       route = std::make_shared<UriTemplateMatcherRouteEntryImpl>(
-          vhost, route_config, factory_context, validator, creation_status);
+          vhost, route_config, factory_context, validator, init_manager, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
       break; // return the error below.
@@ -489,7 +490,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator,
-                                       absl::Status& creation_status)
+                                       Init::Manager& init_manager, absl::Status& creation_status)
     : path_matcher_(
           THROW_OR_RETURN_VALUE(buildPathMatcher(route, validator), PathMatcherSharedPtr)),
       prefix_rewrite_(route.route().prefix_rewrite()),
@@ -555,8 +556,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       match_grpc_(route.match().has_grpc()),
       case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
 
-  auto config_or_error =
-      PerFilterConfigs::create(route.typed_per_filter_config(), factory_context, validator);
+  auto config_or_error = PerFilterConfigs::create(route.typed_per_filter_config(), factory_context,
+                                                  validator, init_manager);
   SET_AND_RETURN_IF_NOT_OK(config_or_error.status(), creation_status);
   per_filter_configs_ = std::move(config_or_error.value());
 
@@ -634,7 +635,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   if (route.route().has_weighted_clusters()) {
     cluster_specifier_plugin_ = std::make_shared<WeightedClusterSpecifierPlugin>(
         route.route().weighted_clusters(), metadata_match_criteria_.get(), route_name_,
-        factory_context, creation_status);
+        factory_context, init_manager, creation_status);
     RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   } else if (route.route().has_inline_cluster_specifier_plugin()) {
     auto plugin_or_error = getClusterSpecifierPluginByTheProto(
@@ -1393,8 +1394,9 @@ const Envoy::Config::TypedMetadata& RouteEntryImplBase::typedMetadata() const {
 UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+    absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status),
       uri_template_(path_matcher_->uriTemplate()) {};
 
 void UriTemplateMatcherRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1423,8 +1425,9 @@ UriTemplateMatcherRouteEntryImpl::matches(const RouteMatchContext& route_match_c
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+    absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive(),
                                                         factory_context)) {
   // The createPrefix function never returns nullptr.
@@ -1457,8 +1460,8 @@ PathRouteEntryImpl::PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator,
-                                       absl::Status& creation_status)
-    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
+                                       Init::Manager& init_manager, absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status),
       path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive(),
                                                        factory_context)) {
   // The createExact function never returns nullptr.
@@ -1491,8 +1494,9 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const RouteMatchContext& route_m
 RegexRouteEntryImpl::RegexRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+    absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status),
       path_matcher_(
           Matchers::PathMatcher::createSafeRegex(route.match().safe_regex(), factory_context)) {
   ASSERT(route.match().path_specifier_case() ==
@@ -1532,8 +1536,9 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const RouteMatchContext& route_
 ConnectRouteEntryImpl::ConnectRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status) {}
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+    absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status) {}
 
 void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                               bool insert_envoy_original_path) const {
@@ -1564,8 +1569,9 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const RouteMatchContext& rout
 PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
     const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+    absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, init_manager, creation_status),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().path_separated_prefix(),
                                                         !case_sensitive(), factory_context)) {
   // The createPrefix function never returns nullptr.
@@ -1604,13 +1610,14 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
     const envoy::config::route::v3::VirtualHost& virtual_host,
     const CommonConfigSharedPtr& global_route_config,
     Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+    absl::Status& creation_status)
     : name_(virtual_host.name()),
       stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
       global_route_config_(global_route_config),
       per_filter_configs_(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(virtual_host.typed_per_filter_config(),
-                                                         factory_context, validator),
+                                                         factory_context, validator, init_manager),
                                 std::unique_ptr<PerFilterConfigs>)),
       per_request_buffer_limit_(
           PROTOBUF_GET_OPTIONAL_WRAPPED(virtual_host, per_request_buffer_limit_bytes)),
@@ -1757,10 +1764,12 @@ absl::StatusOr<std::shared_ptr<CommonVirtualHostImpl>>
 CommonVirtualHostImpl::create(const envoy::config::route::v3::VirtualHost& virtual_host,
                               const CommonConfigSharedPtr& global_route_config,
                               Server::Configuration::ServerFactoryContext& factory_context,
-                              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator) {
+                              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
+                              Init::Manager& init_manager) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::shared_ptr<CommonVirtualHostImpl>(new CommonVirtualHostImpl(
-      virtual_host, global_route_config, factory_context, scope, validator, creation_status));
+  auto ret = std::shared_ptr<CommonVirtualHostImpl>(
+      new CommonVirtualHostImpl(virtual_host, global_route_config, factory_context, scope,
+                                validator, init_manager, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -1769,10 +1778,11 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
                                  const CommonConfigSharedPtr& global_route_config,
                                  Server::Configuration::ServerFactoryContext& factory_context,
                                  Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
-                                 bool validate_clusters, absl::Status& creation_status) {
+                                 Init::Manager& init_manager, bool validate_clusters,
+                                 absl::Status& creation_status) {
 
-  auto host_or_error = CommonVirtualHostImpl::create(virtual_host, global_route_config,
-                                                     factory_context, scope, validator);
+  auto host_or_error = CommonVirtualHostImpl::create(
+      virtual_host, global_route_config, factory_context, scope, validator, init_manager);
   SET_AND_RETURN_IF_NOT_OK(host_or_error.status(), creation_status);
   shared_virtual_host_ = std::move(host_or_error.value());
 
@@ -1791,7 +1801,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
   ssl_redirect_route_ = std::make_shared<SslRedirectRoute>(shared_virtual_host_);
 
   if (virtual_host.has_matcher()) {
-    RouteActionContext context{shared_virtual_host_, factory_context};
+    RouteActionContext context{shared_virtual_host_, factory_context, init_manager};
     RouteActionValidationVisitor validation_visitor;
     Matcher::MatchTreeFactory<Http::HttpMatchingData, RouteActionContext> factory(
         context, factory_context, validation_visitor);
@@ -1809,7 +1819,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
     routes_.reserve(virtual_host.routes().size());
     for (const auto& route : virtual_host.routes()) {
       auto route_or_error = RouteCreator::createAndValidateRoute(
-          route, shared_virtual_host_, factory_context, validator, validate_clusters);
+          route, shared_virtual_host_, factory_context, validator, init_manager, validate_clusters);
       SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
       routes_.emplace_back(route_or_error.value());
     }
@@ -1938,18 +1948,20 @@ absl::StatusOr<std::unique_ptr<RouteMatcher>>
 RouteMatcher::create(const envoy::config::route::v3::RouteConfiguration& route_config,
                      const CommonConfigSharedPtr& global_route_config,
                      Server::Configuration::ServerFactoryContext& factory_context,
-                     ProtobufMessage::ValidationVisitor& validator, bool validate_clusters) {
+                     ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                     bool validate_clusters) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<RouteMatcher>{new RouteMatcher(route_config, global_route_config,
-                                                            factory_context, validator,
-                                                            validate_clusters, creation_status)};
+  auto ret = std::unique_ptr<RouteMatcher>{
+      new RouteMatcher(route_config, global_route_config, factory_context, validator, init_manager,
+                       validate_clusters, creation_status)};
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& route_config,
                            const CommonConfigSharedPtr& global_route_config,
                            Server::Configuration::ServerFactoryContext& factory_context,
-                           ProtobufMessage::ValidationVisitor& validator, bool validate_clusters,
+                           ProtobufMessage::ValidationVisitor& validator,
+                           Init::Manager& init_manager, bool validate_clusters,
                            absl::Status& creation_status)
     : vhost_scope_(factory_context.scope().scopeFromStatName(
           factory_context.routerContext().virtualClusterStatNames().vhost_)),
@@ -1958,7 +1970,7 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostImplSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
         virtual_host_config, global_route_config, factory_context, *vhost_scope_, validator,
-        validate_clusters, creation_status);
+        init_manager, validate_clusters, creation_status);
     SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const Http::LowerCaseString lower_case_domain_name(domain_name);
@@ -2096,10 +2108,11 @@ CommonVirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers)
 absl::StatusOr<std::shared_ptr<CommonConfigImpl>>
 CommonConfigImpl::create(const envoy::config::route::v3::RouteConfiguration& config,
                          Server::Configuration::ServerFactoryContext& factory_context,
-                         ProtobufMessage::ValidationVisitor& validator) {
+                         ProtobufMessage::ValidationVisitor& validator,
+                         Init::Manager& init_manager) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::shared_ptr<CommonConfigImpl>(
-      new CommonConfigImpl(config, factory_context, validator, creation_status));
+      new CommonConfigImpl(config, factory_context, validator, init_manager, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -2107,11 +2120,12 @@ CommonConfigImpl::create(const envoy::config::route::v3::RouteConfiguration& con
 CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    ProtobufMessage::ValidationVisitor& validator,
-                                   absl::Status& creation_status)
+                                   Init::Manager& init_manager, absl::Status& creation_status)
     : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
-      per_filter_configs_(THROW_OR_RETURN_VALUE(
-          PerFilterConfigs::create(config.typed_per_filter_config(), factory_context, validator),
-          std::unique_ptr<PerFilterConfigs>)),
+      per_filter_configs_(
+          THROW_OR_RETURN_VALUE(PerFilterConfigs::create(config.typed_per_filter_config(),
+                                                         factory_context, validator, init_manager),
+                                std::unique_ptr<PerFilterConfigs>)),
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)),
@@ -2184,8 +2198,8 @@ const Envoy::Config::TypedMetadata& CommonConfigImpl::typedMetadata() const {
 absl::StatusOr<std::shared_ptr<CommonConfigImpl>>
 create(const envoy::config::route::v3::RouteConfiguration& config,
        Server::Configuration::ServerFactoryContext& factory_context,
-       ProtobufMessage::ValidationVisitor& validator) {
-  auto config_or_error = CommonConfigImpl::create(config, factory_context, validator);
+       ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager) {
+  auto config_or_error = CommonConfigImpl::create(config, factory_context, validator, init_manager);
   RETURN_IF_NOT_OK(config_or_error.status());
   return config_or_error.value();
 }
@@ -2193,24 +2207,26 @@ create(const envoy::config::route::v3::RouteConfiguration& config,
 absl::StatusOr<std::shared_ptr<ConfigImpl>>
 ConfigImpl::create(const envoy::config::route::v3::RouteConfiguration& config,
                    Server::Configuration::ServerFactoryContext& factory_context,
-                   ProtobufMessage::ValidationVisitor& validator, bool validate_clusters_default) {
+                   ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                   bool validate_clusters_default) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::shared_ptr<ConfigImpl>(new ConfigImpl(
-      config, factory_context, validator, validate_clusters_default, creation_status));
+  auto ret =
+      std::shared_ptr<ConfigImpl>(new ConfigImpl(config, factory_context, validator, init_manager,
+                                                 validate_clusters_default, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                        Server::Configuration::ServerFactoryContext& factory_context,
-                       ProtobufMessage::ValidationVisitor& validator,
+                       ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
                        bool validate_clusters_default, absl::Status& creation_status) {
-  auto config_or_error = CommonConfigImpl::create(config, factory_context, validator);
+  auto config_or_error = CommonConfigImpl::create(config, factory_context, validator, init_manager);
   SET_AND_RETURN_IF_NOT_OK(config_or_error.status(), creation_status);
   shared_config_ = std::move(config_or_error.value());
 
   auto matcher_or_error = RouteMatcher::create(
-      config, shared_config_, factory_context, validator,
+      config, shared_config_, factory_context, validator, init_manager,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));
   SET_AND_RETURN_IF_NOT_OK(matcher_or_error.status(), creation_status);
   route_matcher_ = std::move(matcher_or_error.value());
@@ -2237,7 +2253,7 @@ RouteMatchActionFactory::createAction(const Protobuf::Message& config, RouteActi
                                                                                validation_visitor);
   auto route = THROW_OR_RETURN_VALUE(
       RouteCreator::createAndValidateRoute(route_config, context.vhost, context.factory_context,
-                                           validation_visitor, false),
+                                           validation_visitor, context.init_manager, false),
       RouteEntryImplBaseConstSharedPtr);
   return route;
 }
@@ -2255,7 +2271,7 @@ RouteListMatchActionFactory::createAction(const Protobuf::Message& config,
   for (const auto& route : route_config.routes()) {
     routes.emplace_back(THROW_OR_RETURN_VALUE(
         RouteCreator::createAndValidateRoute(route, context.vhost, context.factory_context,
-                                             validation_visitor, false),
+                                             validation_visitor, context.init_manager, false),
         RouteEntryImplBaseConstSharedPtr));
   }
   return std::make_shared<RouteListMatchAction>(std::move(routes));

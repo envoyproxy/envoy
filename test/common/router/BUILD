@@ -57,6 +57,7 @@ envoy_cc_test_library(
         "//source/extensions/formatter/cel:config",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
+        "//test/mocks/init:init_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:retry_priority_mocks",

@@ -157,13 +157,14 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb>
 DynamicModuleConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const FilterConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactory(proto_config, extra_context.stats_prefix, context, context.scope());
+  return createFilterFactory(proto_config, extra_context.stats_prefix, context, context.scope(),
+                             extra_context.init_manager);
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
+DynamicModuleConfigFactory::createHttpFilterRouteConfigTyped(
     const RouteConfigProto& proto_config, Server::Configuration::ServerFactoryContext& context,
-    ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::ExtraFactoryContext&) {
 
   const auto& module_config = proto_config.dynamic_module_config();
 

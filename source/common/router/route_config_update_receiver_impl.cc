@@ -40,18 +40,14 @@ Rds::ConfigConstSharedPtr ConfigTraitsImpl::createNullConfig() const {
   return std::make_shared<NullConfigImpl>();
 }
 
-// TODO(wbpcode): the route configuration doesn't own any resource that needs to be warmed up yet,
-// so the init manager is ignored. Once the resources of a route configuration, such as the
-// route-level filter configurations, can be warmed up, the init manager should be passed down to
-// them.
 Rds::ConfigConstSharedPtr
 ConfigTraitsImpl::createConfig(const Protobuf::Message& rc,
                                Server::Configuration::ServerFactoryContext& factory_context,
-                               Init::Manager&, bool validate_clusters_default) const {
+                               Init::Manager& init_manager, bool validate_clusters_default) const {
   ASSERT(Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::RouteConfiguration>(&rc));
   return THROW_OR_RETURN_VALUE(
       ConfigImpl::create(static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc),
-                         factory_context, validator_, validate_clusters_default),
+                         factory_context, validator_, init_manager, validate_clusters_default),
       std::shared_ptr<ConfigImpl>);
 }
 

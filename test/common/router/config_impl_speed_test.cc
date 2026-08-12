@@ -212,9 +212,9 @@ static void bmRouteTableSize(benchmark::State& state, RouteMatch::PathSpecifierC
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
 
   // Create router config.
-  std::shared_ptr<ConfigImpl> config =
-      *ConfigImpl::create(genRouteConfig(state, match_type), factory_context,
-                          ProtobufMessage::getNullValidationVisitor(), true);
+  std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
+      genRouteConfig(state, match_type), factory_context,
+      ProtobufMessage::getNullValidationVisitor(), factory_context.initManager(), true);
 
   for (auto _ : state) { // NOLINT
     // Do the actual timing here.
@@ -270,9 +270,9 @@ static void bmRouteTableSizeWithExactMatcherTree(benchmark::State& state) {
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
 
   // Create router config with matcher tree
-  std::shared_ptr<ConfigImpl> config =
-      *ConfigImpl::create(genMatcherTreeRouteConfig(state), factory_context,
-                          ProtobufMessage::getNullValidationVisitor(), true);
+  std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
+      genMatcherTreeRouteConfig(state), factory_context,
+      ProtobufMessage::getNullValidationVisitor(), factory_context.initManager(), true);
 
   for (auto _ : state) {
     // Match against the last route in the config
@@ -299,9 +299,9 @@ static void bmRouteTableSizeWithPrefixMatcherTree(benchmark::State& state) {
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
 
   // Create router config with matcher tree
-  std::shared_ptr<ConfigImpl> config =
-      *ConfigImpl::create(genPrefixMatcherTreeRouteConfig(state), factory_context,
-                          ProtobufMessage::getNullValidationVisitor(), true);
+  std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
+      genPrefixMatcherTreeRouteConfig(state), factory_context,
+      ProtobufMessage::getNullValidationVisitor(), factory_context.initManager(), true);
 
   for (auto _ : state) {
     // Match against the last route in the last shelf
@@ -366,7 +366,8 @@ static void bmPlainRoutes(benchmark::State& state) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
   std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
-      genPlainRouteConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(), true);
+      genPlainRouteConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(),
+      factory_context.initManager(), true);
   const std::string path = absl::StrCat("/api/v", n - 1, "/foo");
   Http::TestRequestHeaderMapImpl headers{{":authority", "www.example.com"},
                                          {":method", "GET"},
@@ -385,7 +386,8 @@ static void bmMixedRoutes(benchmark::State& state) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
   std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
-      genMixedRouteConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(), true);
+      genMixedRouteConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(),
+      factory_context.initManager(), true);
   Http::TestRequestHeaderMapImpl headers{{":authority", "www.example.com"},
                                          {":method", "GET"},
                                          {":path", "/api/foo?id=target"},
@@ -424,7 +426,8 @@ static void bmVirtualHostLookup(benchmark::State& state) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
   std::shared_ptr<ConfigImpl> config = *ConfigImpl::create(
-      genVirtualHostConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(), true);
+      genVirtualHostConfig(n), factory_context, ProtobufMessage::getNullValidationVisitor(),
+      factory_context.initManager(), true);
   Http::TestRequestHeaderMapImpl headers{
       {":authority", absl::StrCat("service-", n - 1, ".team.svc.cluster.local")},
       {":method", "GET"},
