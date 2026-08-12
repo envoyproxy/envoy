@@ -1515,14 +1515,11 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
       // overwriting hosts_added.
       if (!update.hosts_removed_.empty()) {
         // Remove all hosts to be removed from the old host_added.
-        auto& host_added = priority_state.hosts_added_;
-        auto removed_section = std::remove_if(
-            host_added.begin(), host_added.end(),
-            [hosts_removed = std::cref(update.hosts_removed_)](const HostSharedPtr& ptr) {
-              return std::find(hosts_removed.get().begin(), hosts_removed.get().end(), ptr) !=
-                     hosts_removed.get().end();
-            });
-        priority_state.hosts_added_.erase(removed_section, priority_state.hosts_added_.end());
+        std::erase_if(priority_state.hosts_added_,
+                      [hosts_removed = std::cref(update.hosts_removed_)](const HostSharedPtr& ptr) {
+                        return std::find(hosts_removed.get().begin(), hosts_removed.get().end(),
+                                         ptr) != hosts_removed.get().end();
+                      });
       }
 
       // Add updated host_added.

@@ -116,9 +116,7 @@ void XdsFuzzTest::close() {
  */
 bool XdsFuzzTest::eraseListener(const std::string& listener_name) {
   const auto orig_size = listeners_.size();
-  listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
-                                  [&](auto& listener) { return listener.name() == listener_name; }),
-                   listeners_.end());
+  std::erase_if(listeners_, [&](auto& listener) { return listener.name() == listener_name; });
   return orig_size != listeners_.size();
 }
 

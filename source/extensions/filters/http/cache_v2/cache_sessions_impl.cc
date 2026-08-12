@@ -414,27 +414,23 @@ void CacheSession::abortBodyOutOfRangeSubscribers() {
   // real size receive null body rather than reset.
   EndStream end_stream = endStreamAfterBody();
   auto cache_sessions = cache_sessions_.lock();
-  body_subscribers_.erase(
-      std::remove_if(body_subscribers_.begin(), body_subscribers_.end(),
-                     [this, end_stream, &cache_sessions](BodySubscriber& bs)
-                         ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
-                           if (bs.range_.begin() >= body_length_available_) {
-                             if (bs.range_.begin() == body_length_available_) {
-                               auto cb = std::move(bs.callback_);
-                               bs.dispatcher().post([cb = std::move(cb), end_stream]() mutable {
-                                 cb(nullptr, end_stream);
-                               });
-                             } else {
-                               bs.callback_(nullptr, EndStream::Reset);
-                             }
-                             if (cache_sessions) {
-                               cache_sessions->stats().subCacheSessionsSubscribers(1);
-                             }
-                             return true;
-                           }
-                           return false;
-                         }),
-      body_subscribers_.end());
+  std::erase_if(body_subscribers_, [this, end_stream, &cache_sessions](
+                                       BodySubscriber& bs) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+    if (bs.range_.begin() >= body_length_available_) {
+      if (bs.range_.begin() == body_length_available_) {
+        auto cb = std::move(bs.callback_);
+        bs.dispatcher().post(
+            [cb = std::move(cb), end_stream]() mutable { cb(nullptr, end_stream); });
+      } else {
+        bs.callback_(nullptr, EndStream::Reset);
+      }
+      if (cache_sessions) {
+        cache_sessions->stats().subCacheSessionsSubscribers(1);
+      }
+      return true;
+    }
+    return false;
+  });
 }
 
 void CacheSession::maybeTriggerBodyReadForWaitingSubscriber() {
