@@ -56,6 +56,15 @@ to forward selected dynamic metadata namespaces to the external processor:
 * ``untyped`` namespaces are sent as ``google.protobuf.Struct``.
 * ``typed`` namespaces are sent as ``google.protobuf.Any``.
 
+Connection attributes
+---------------------
+
+Use
+:ref:`connection_attributes <envoy_v3_api_field_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor.connection_attributes>`
+to evaluate CEL expressions against the connection's stream info and filter state (e.g. ``connection.id``, ``connection.mtls``, ``filter_state['authority']``).
+The evaluated attributes will be included in the initial
+:ref:`ProcessingRequest.attributes <envoy_v3_api_field_service.network_ext_proc.v3.ProcessingRequest.attributes>` message.
+
 Example
 -------
 

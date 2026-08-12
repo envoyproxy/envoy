@@ -38,6 +38,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/dns_utils.h"
+#include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
@@ -145,9 +146,9 @@ parseExtensionProtocolOptions(
 // Recovers the per-cluster upstream (client) codec factory from the parsed protocol options. Any
 // options object may expose one via ProtocolOptionsConfig::upstreamHttpClientCodecFactory(); at
 // most one is allowed across all configured options.
-absl::StatusOr<std::shared_ptr<const Http::ClientCodecFactory>> findUpstreamHttpClientCodecFactory(
+absl::StatusOr<const Http::ClientCodecFactory*> findUpstreamHttpClientCodecFactory(
     const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>& options) {
-  std::shared_ptr<const Http::ClientCodecFactory> found;
+  const Http::ClientCodecFactory* found = nullptr;
   for (const auto& [name, option] : options) {
     OptRef<const Http::ClientCodecFactory> factory = option->upstreamHttpClientCodecFactory();
     if (!factory.has_value()) {
@@ -158,9 +159,7 @@ absl::StatusOr<std::shared_ptr<const Http::ClientCodecFactory>> findUpstreamHttp
           "multiple upstream HTTP client codec factories configured on a single cluster via "
           "typed_extension_protocol_options; at most one is allowed");
     }
-    // Aliasing shared_ptr: shares ownership with the options object (the factory and the options
-    // object are the same instance) while exposing it as a ClientCodecFactory.
-    found = std::shared_ptr<const Http::ClientCodecFactory>(option, &factory.ref());
+    found = &factory.ref();
   }
   return found;
 }
@@ -248,6 +247,23 @@ buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_con
   return cluster_options;
 }
 
+void appendBindAddressNoPortOption(UpstreamLocalAddress& upstream_local_address) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_bind_config_fix_port_exhaustion")) {
+    return;
+  }
+  if (!ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT.hasValue()) {
+    return;
+  }
+  if (upstream_local_address.address_ != nullptr &&
+      upstream_local_address.address_->ip() != nullptr &&
+      upstream_local_address.address_->ip()->port() == 0) {
+    ::Envoy::Network::Socket::appendOptions(
+        upstream_local_address.socket_options_,
+        ::Envoy::Network::SocketOptionFactory::buildBindAddressNoPort());
+  }
+}
+
 absl::StatusOr<std::vector<::Envoy::Upstream::UpstreamLocalAddress>>
 parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_config,
                 const std::optional<std::string>& cluster_name,
@@ -271,7 +287,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
                                             base_socket_options);
     ::Envoy::Network::Socket::appendOptions(upstream_local_address.socket_options_,
                                             cluster_socket_options);
-
+    appendBindAddressNoPortOption(upstream_local_address);
     upstream_local_addresses.push_back(upstream_local_address);
 
     for (const auto& extra_source_address : bind_config->extra_source_addresses()) {
@@ -295,6 +311,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
         ::Envoy::Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
                                                 cluster_socket_options);
       }
+      appendBindAddressNoPortOption(extra_upstream_local_address);
       upstream_local_addresses.push_back(extra_upstream_local_address);
     }
 
@@ -310,6 +327,7 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
                                               base_socket_options);
       ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
                                               cluster_socket_options);
+      appendBindAddressNoPortOption(additional_upstream_local_address);
       upstream_local_addresses.push_back(additional_upstream_local_address);
     }
   } else {
@@ -448,11 +466,14 @@ generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
   auto& stats = server_context.serverScope().store();
   Stats::StatsMatcherSharedPtr scope_matcher;
 
-  // Check for a per-cluster stats matcher in typed_filter_metadata under the specific key. If
-  // present, unpack it as StatsMatcher and use it to restrict which stats are created for this
-  // cluster's scope.
-  const auto& typed_meta = config.metadata().typed_filter_metadata();
-  if (auto it = typed_meta.find(StatsMatcherMetadataKey); it != typed_meta.end()) {
+  if (config.has_stats_matcher()) {
+    scope_matcher = std::make_shared<Stats::StatsMatcherImpl>(config.stats_matcher(),
+                                                              stats.symbolTable(), server_context);
+  } else if (auto it = config.metadata().typed_filter_metadata().find(StatsMatcherMetadataKey);
+             it != config.metadata().typed_filter_metadata().end()) {
+    // Check for a per-cluster stats matcher in typed_filter_metadata under the specific key. If
+    // present, unpack it as StatsMatcher and use it to restrict which stats are created for this
+    // cluster's scope.
     envoy::config::metrics::v3::StatsMatcher stats_matcher_proto;
     if (auto status = MessageUtil::unpackTo(it->second, stats_matcher_proto); status.ok()) {
       MessageUtil::validate(stats_matcher_proto, server_context.messageValidationVisitor());
@@ -516,6 +537,7 @@ HostDescriptionImpl::HostDescriptionImpl(
     uint32_t priority, const AddressVector& address_list, absl::string_view stat_name)
     : HostDescriptionImplBase(cluster, hostname, dest_address, endpoint_metadata, locality_metadata,
                               locality, health_check_config, priority, creation_status),
+      sorted_address_list_or_null_(makeSortedAddressListOrNull(*cluster, address_list)),
       address_(dest_address),
       address_list_or_null_(makeAddressListOrNull(dest_address, address_list)),
       health_check_address_(resolveHealthCheckAddress(health_check_config, dest_address)),
@@ -562,6 +584,20 @@ HostDescription::SharedConstAddressVector HostDescriptionImplBase::makeAddressLi
   return std::make_shared<AddressVector>(address_list);
 }
 
+HostDescription::SharedConstAddressVector
+HostDescriptionImplBase::makeSortedAddressListOrNull(const ClusterInfo& cluster,
+                                                     const AddressVector& address_list) {
+  if (address_list.size() <= 1) {
+    return {};
+  }
+  const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+      happy_eyeballs_config =
+          cluster.happyEyeballsConfig().has_value() ? *cluster.happyEyeballsConfig()
+                                                    : defaultHappyEyeballsConfig();
+  return std::make_shared<AddressVector>(
+      Network::HappyEyeballsConnectionProvider::sortAddresses(address_list, happy_eyeballs_config));
+}
+
 Network::UpstreamTransportSocketFactory& HostDescriptionImplBase::resolveTransportSocketFactory(
     const Network::Address::InstanceConstSharedPtr& dest_address,
     const envoy::config::core::v3::Metadata* endpoint_metadata,
@@ -587,8 +623,8 @@ Host::CreateConnectionData HostImplBase::createConnection(
           ? resolveTransportSocketFactory(address(), metadata().get(), transport_socket_options)
           : transportSocketFactory();
 
-  return createConnection(dispatcher, cluster(), address(), addressListOrNull(), factory, options,
-                          transport_socket_options, shared_from_this());
+  return createConnection(dispatcher, cluster(), address(), sortedAddressListOrNull(), factory,
+                          options, transport_socket_options, shared_from_this());
 }
 
 void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status) {
@@ -634,7 +670,7 @@ Host::CreateConnectionData HostImplBase::createOrcaReportingConnection(
     Network::UpstreamTransportSocketFactory& factory,
     Network::Address::InstanceConstSharedPtr orca_address) const {
   return createOrcaConnection(dispatcher, std::move(transport_socket_options), factory,
-                              std::move(orca_address), address(), addressListOrNull(),
+                              std::move(orca_address), address(), sortedAddressListOrNull(),
                               shared_from_this());
 }
 
@@ -644,13 +680,13 @@ Host::CreateConnectionData HostImplBase::createOrcaConnection(
     Network::UpstreamTransportSocketFactory& factory,
     Network::Address::InstanceConstSharedPtr orca_address,
     const Network::Address::InstanceConstSharedPtr& host_address,
-    const SharedConstAddressVector& address_list, HostDescriptionConstSharedPtr host) const {
+    const SharedConstAddressVector& sorted_address_list, HostDescriptionConstSharedPtr host) const {
   // The original-port address list applies only when dialing the host's own address. Compare
   // by value: pointer identity doesn't survive LogicalHost re-resolution.
   const bool use_address_list = *orca_address == *host_address;
   return createConnection(dispatcher, cluster(), orca_address,
-                          use_address_list ? address_list : SharedConstAddressVector{}, factory,
-                          /*options=*/nullptr, transport_socket_options, std::move(host));
+                          use_address_list ? sorted_address_list : SharedConstAddressVector{},
+                          factory, /*options=*/nullptr, transport_socket_options, std::move(host));
 }
 
 std::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetProxyRedirectAddress(
@@ -710,7 +746,7 @@ std::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetPr
 Host::CreateConnectionData HostImplBase::createConnection(
     Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
     const Network::Address::InstanceConstSharedPtr& address,
-    const SharedConstAddressVector& address_list_or_null,
+    const SharedConstAddressVector& sorted_address_list,
     Network::UpstreamTransportSocketFactory& socket_factory,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
@@ -733,15 +769,11 @@ Host::CreateConnectionData HostImplBase::createConnection(
         proxy_address.value(), upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
-  } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
+  } else if (sorted_address_list != nullptr && sorted_address_list->size() > 1) {
     ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
-    const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
-        happy_eyeballs_config =
-            cluster.happyEyeballsConfig().has_value() ? *cluster.happyEyeballsConfig()
-                                                      : defaultHappyEyeballsConfig();
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
-        dispatcher, *address_list_or_null, source_address_selector, socket_factory,
-        transport_socket_options, host, options, happy_eyeballs_config);
+        dispatcher, sorted_address_list, source_address_selector, socket_factory,
+        transport_socket_options, host, options);
   } else {
     auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(
         address, options, makeOptRefFromPtr(transport_socket_options.get()));
@@ -749,6 +781,15 @@ Host::CreateConnectionData HostImplBase::createConnection(
         address, upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
+  }
+
+  // `createClientConnection` can return nullptr, for example when binding the upstream connection
+  // to a configured network namespace fails (e.g. the namespace was removed at runtime). Returning
+  // a null connection lets the caller (connection pools) treat this as a connection failure rather
+  // than crashing on a null dereference below.
+  if (connection == nullptr) {
+    ENVOY_LOG(debug, "Failed to create upstream connection to host {}", address->asString());
+    return {nullptr, host};
   }
 
   connection->connectionInfoSetter().enableSettingInterfaceName(
@@ -944,7 +985,8 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
     uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
-    std::optional<uint32_t> overprovisioning_factor) {
+    std::optional<uint32_t> overprovisioning_factor,
+    HostMapConstSharedPtr cross_priority_host_map) {
   // We assume that each call updates a different priority.
   ASSERT(priorities_.find(priority) == priorities_.end());
   priorities_.insert(priority);
@@ -958,7 +1000,8 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
   }
 
   parent_.updateHosts(priority, std::move(update_hosts_params), locality_weights, hosts_added,
-                      hosts_removed, weighted_priority_health, overprovisioning_factor);
+                      hosts_removed, weighted_priority_health, overprovisioning_factor,
+                      std::move(cross_priority_host_map));
 }
 
 void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
@@ -1182,7 +1225,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           parseExtensionProtocolOptions(config, factory_context), ProtocolOptionsHashMap)),
       upstream_client_codec_factory_(
           THROW_OR_RETURN_VALUE(findUpstreamHttpClientCodecFactory(extension_protocol_options_),
-                                std::shared_ptr<const Http::ClientCodecFactory>)),
+                                const Http::ClientCodecFactory*)),
       http_protocol_options_(THROW_OR_RETURN_VALUE(
           createOptions(config,
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
@@ -1200,6 +1243,12 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.preconnect_policy(), per_upstream_preconnect_ratio, 1.0)),
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
                                                        predictive_preconnect_ratio, 0)),
+      preconnect_enabled_matcher_(
+          config.preconnect_policy().has_preconnect_enabled_metadata()
+              ? std::make_unique<const Matchers::MetadataMatcher>(
+                    config.preconnect_policy().preconnect_enabled_metadata(),
+                    factory_context.serverFactoryContext())
+              : nullptr),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       traffic_stats_(generateStats(
           stats_scope_, factory_context.serverFactoryContext().clusterManager().clusterStatNames(),
@@ -1403,6 +1452,16 @@ ClusterInfoImpl::ClusterInfoImpl(
   // early validation of sanity of fields that we should catch at config ingestion.
   DurationUtil::durationToMilliseconds(common_lb_config_->update_merge_window());
 
+  // stats_prefix passed to the upstream HTTP filter chain. upstream_context_ is already scoped to
+  // "cluster.<name>.", so with the correct-stats-prefix flag enabled pass an empty prefix and the
+  // filter stats land under "cluster.<name>.*". With the flag disabled, reproduce the legacy
+  // stringified scope prefix, which repeats the scope prefix and preserves existing stat names.
+  const std::string http_stats_prefix =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
+          ? EMPTY_STRING
+          : stats_scope_->symbolTable().toString(stats_scope_->prefix());
+
   // Create upstream network filter factories
   const auto& filters = config.filters();
   ASSERT(filter_factories_.empty());
@@ -1451,12 +1510,11 @@ ClusterInfoImpl::ClusterInfoImpl(
         return;
       }
 
-      std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
       Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
           helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
                  factory_context.serverFactoryContext().clusterManager(), upstream_context_,
-                 prefix);
+                 http_stats_prefix);
       SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
                                                      "upstream http", "upstream http",
                                                      http_filter_factories_),
@@ -1786,6 +1844,16 @@ ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
 
 bool ClusterInfoImpl::maintenanceMode() const {
   return runtime_.snapshot().featureEnabled(maintenance_mode_runtime_key_, 0);
+}
+
+bool ClusterInfoImpl::shouldPreconnect(const Host& host) const {
+  // No matcher means every host is eligible (default behavior).
+  if (preconnect_enabled_matcher_ == nullptr) {
+    return true;
+  }
+  static const auto empty_metadata = envoy::config::core::v3::Metadata::default_instance();
+  const auto metadata = host.metadata();
+  return preconnect_enabled_matcher_->match(metadata != nullptr ? *metadata : empty_metadata);
 }
 
 ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) const {

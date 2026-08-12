@@ -100,7 +100,7 @@ maintain data continuity as scopes are re-created during operation.
 Stat names are replicated in several places in various forms.
 
  * Held with the stat values, in `CounterImpl`, `GaugeImpl` and `TextReadoutImpl`, which are defined in
-   [allocator_impl.cc](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/allocator_impl.cc)
+   [allocator.cc](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/allocator.cc)
  * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/main/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
  * In static strings across the codebase where stats are referenced
@@ -190,7 +190,7 @@ showing the memory layout for a few scenarios of constructing and joining symbol
 
 There are several ways to create hot-path contention looking up stats by name,
 and there is no bulletproof way to prevent it from occurring.
- * The [stats macros](https://github.com/envoyproxy/envoy/blob/main/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests. In this
+ * The [stats macros](https://github.com/envoyproxy/envoy/blob/main/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests. In this
    scenario, consider factoring out the symbolization phase using MAKE_STAT_NAMES_STRUCT
    in a factory or context during startup, and using MAKE_STATS_STRUCT in the hot-path and during
    control-plane updates, so that we do not need to take symbol-table locks. As an example, see

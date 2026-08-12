@@ -101,8 +101,9 @@ paths:
     - source/common/rds/common/route_config_provider_manager_impl.h
     - source/common/rds/route_config_provider_manager.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
-    # StausOr where possible.
+    # StatusOr where possible.
     - source/common/watchdog/abort_action_config.cc
+    - source/extensions/watchdog/backtrace_action/config.cc
     - source/extensions/watchdog/profile_action/config.cc
     - source/common/router/route_config_update_receiver_impl.cc
     - source/common/upstream/upstream_impl.cc
@@ -111,7 +112,6 @@ paths:
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
     - source/common/formatter/http_specific_formatter.cc
-    - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.cc
     - source/common/stats/tag_extractor_impl.cc
     - source/common/protobuf/yaml_utility.cc
@@ -119,6 +119,7 @@ paths:
     - source/common/grpc/google_grpc_utils.cc
     - source/common/tcp_proxy/tcp_proxy.cc
     - source/common/listener_manager/lds_api.cc
+    - source/common/listener_manager/filter_chain_manager_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
     - source/common/router/config_impl.cc
@@ -175,42 +176,12 @@ paths:
     - source/extensions/content_parsers/json/config.cc
     - source/extensions/content_parsers/json/json_content_parser_impl.cc
     - source/extensions/compression/zstd/common/dictionary_manager.h
-    - source/extensions/filters/http/adaptive_concurrency/controller
-    - source/extensions/filters/http/admission_control/config.cc
-    - source/extensions/filters/http/basic_auth
-    - source/extensions/filters/http/cache
-    - source/extensions/filters/http/common
-    - source/extensions/filters/http/composite
-    - source/extensions/filters/http/dynamic_modules/factory.cc
-    - source/extensions/filters/http/ext_authz
-    - source/extensions/filters/http/ext_proc
-    - source/extensions/filters/http/file_system_buffer
-    - source/extensions/filters/http/filter_chain/filter.cc
-    - source/extensions/filters/http/gcp_authn
-    - source/extensions/filters/http/grpc_field_extraction
-    - source/extensions/filters/http/grpc_json_reverse_transcoder
-    - source/extensions/filters/http/grpc_json_transcoder
-    - source/extensions/filters/http/grpc_stats
-    - source/extensions/filters/http/header_mutation/config.cc
-    - source/extensions/filters/http/health_check
-    - source/extensions/filters/http/json_to_metadata
-    - source/extensions/filters/http/jwt_authn
-    - source/extensions/filters/http/local_ratelimit
-    - source/extensions/filters/http/file_system_buffer
-    - source/extensions/filters/http/on_demand
-    - source/extensions/filters/http/json_to_metadata
-    - source/extensions/filters/http/json_to_metadata
-    - source/extensions/filters/http/thrift_to_metadata
-    - source/extensions/filters/http/lua
-    - source/extensions/filters/http/proto_message_extraction
-    - source/extensions/filters/http/rate_limit_quota
-    - source/extensions/filters/http/oauth2
-    - source/extensions/filters/http/wasm
+    - source/extensions/filters/http/composite/action.cc
+    - source/extensions/filters/http/json_to_metadata/filter.cc
+    - source/extensions/filters/http/oauth2/filter.h
     - source/extensions/filters/network/dubbo_proxy
-    - source/extensions/filters/network/rbac
     - source/extensions/filters/network/common
     - source/extensions/filters/network/redis_proxy
-    - source/extensions/filters/network/zookeeper_proxy
     - source/extensions/filters/network/ext_authz
     - source/extensions/filters/network/ext_proc
     - source/extensions/filters/network/mongo_proxy

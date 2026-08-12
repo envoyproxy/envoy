@@ -361,6 +361,12 @@ protected:
     io_handle_->conn_wrapper_to_host_map_[wrapper] = host_address;
   }
 
+  // Transfer ownership of a wrapper into the io handle so onConnectionDone() can find and remove
+  // it.
+  void pushConnectionWrapper(std::unique_ptr<RCConnectionWrapper> wrapper) {
+    io_handle_->connection_wrappers_.push_back(std::move(wrapper));
+  }
+
   void cleanup() { io_handle_->cleanup(); }
 
   void removeStaleHostAndCloseConnections(const std::string& host) {
@@ -691,8 +697,8 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsValidHosts) {
   // Verify that hosts were added to the mapping.
   const auto& host_to_conn_info_map = getHostToConnInfoMap();
   EXPECT_EQ(host_to_conn_info_map.size(), 2);
-  EXPECT_NE(host_to_conn_info_map.find("192.168.1.1"), host_to_conn_info_map.end());
-  EXPECT_NE(host_to_conn_info_map.find("192.168.1.2"), host_to_conn_info_map.end());
+  EXPECT_TRUE(host_to_conn_info_map.contains("192.168.1.1"));
+  EXPECT_TRUE(host_to_conn_info_map.contains("192.168.1.2"));
 }
 
 // Test maybeUpdateHostsMappingsAndConnections with no new hosts.
@@ -733,9 +739,9 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsNoNewHosts) {
   // Verify that all three host entries exist after maintainClusterConnections.
   const auto& host_to_conn_info_map = getHostToConnInfoMap();
   EXPECT_EQ(host_to_conn_info_map.size(), 3);
-  EXPECT_NE(host_to_conn_info_map.find("192.168.1.1"), host_to_conn_info_map.end());
-  EXPECT_NE(host_to_conn_info_map.find("192.168.1.2"), host_to_conn_info_map.end());
-  EXPECT_NE(host_to_conn_info_map.find("192.168.1.3"), host_to_conn_info_map.end());
+  EXPECT_TRUE(host_to_conn_info_map.contains("192.168.1.1"));
+  EXPECT_TRUE(host_to_conn_info_map.contains("192.168.1.2"));
+  EXPECT_TRUE(host_to_conn_info_map.contains("192.168.1.3"));
 
   // Now test partial host removal by calling maybeUpdateHostsMappingsAndConnections with fewer.
   // hosts
@@ -745,10 +751,10 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsNoNewHosts) {
   // Verify that the removed host was cleaned up but others remain.
   const auto& updated_host_to_conn_info_map = getHostToConnInfoMap();
   EXPECT_EQ(updated_host_to_conn_info_map.size(), 2);
-  EXPECT_NE(updated_host_to_conn_info_map.find("192.168.1.1"), updated_host_to_conn_info_map.end());
+  EXPECT_TRUE(updated_host_to_conn_info_map.contains("192.168.1.1"));
   EXPECT_EQ(updated_host_to_conn_info_map.find("192.168.1.2"),
             updated_host_to_conn_info_map.end()); // Should be removed
-  EXPECT_NE(updated_host_to_conn_info_map.find("192.168.1.3"), updated_host_to_conn_info_map.end());
+  EXPECT_TRUE(updated_host_to_conn_info_map.contains("192.168.1.3"));
 }
 
 // Test shouldAttemptConnectionToHost with valid host and no existing connections.
@@ -1145,11 +1151,11 @@ TEST_F(ReverseConnectionIOHandleTest, HostMappingAndBackoffIntegration) {
   const auto& host_to_conn_info_map_initial = getHostToConnInfoMap();
   EXPECT_EQ(host_to_conn_info_map_initial.size(),
             5); // 192.168.1.1, 192.168.1.2, 192.168.1.3, 192.168.2.1, 192.168.2.2
-  EXPECT_NE(host_to_conn_info_map_initial.find("192.168.1.1"), host_to_conn_info_map_initial.end());
-  EXPECT_NE(host_to_conn_info_map_initial.find("192.168.1.2"), host_to_conn_info_map_initial.end());
-  EXPECT_NE(host_to_conn_info_map_initial.find("192.168.1.3"), host_to_conn_info_map_initial.end());
-  EXPECT_NE(host_to_conn_info_map_initial.find("192.168.2.1"), host_to_conn_info_map_initial.end());
-  EXPECT_NE(host_to_conn_info_map_initial.find("192.168.2.2"), host_to_conn_info_map_initial.end());
+  EXPECT_TRUE(host_to_conn_info_map_initial.contains("192.168.1.1"));
+  EXPECT_TRUE(host_to_conn_info_map_initial.contains("192.168.1.2"));
+  EXPECT_TRUE(host_to_conn_info_map_initial.contains("192.168.1.3"));
+  EXPECT_TRUE(host_to_conn_info_map_initial.contains("192.168.2.1"));
+  EXPECT_TRUE(host_to_conn_info_map_initial.contains("192.168.2.2"));
 
   // Step 3: Put some hosts in backoff.
   trackConnectionFailure("192.168.1.1", "cluster-A"); // 192.168.1.1 in backoff
@@ -1666,10 +1672,10 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateMultipleConnectionsMixedResults) {
   for (const auto& [wrapper, host] : wrapper_to_host_map) {
     mapped_hosts.insert(host);
   }
-  EXPECT_EQ(mapped_hosts.size(), 2);                               // Should have 2 successful hosts
-  EXPECT_NE(mapped_hosts.find("192.168.1.1"), mapped_hosts.end()); // Success
-  EXPECT_EQ(mapped_hosts.find("192.168.1.2"), mapped_hosts.end()); // Failed - not in map
-  EXPECT_NE(mapped_hosts.find("192.168.1.3"), mapped_hosts.end()); // Success
+  EXPECT_EQ(mapped_hosts.size(), 2);                  // Should have 2 successful hosts
+  EXPECT_TRUE(mapped_hosts.contains("192.168.1.1"));  // Success
+  EXPECT_FALSE(mapped_hosts.contains("192.168.1.2")); // Failed - not in map
+  EXPECT_TRUE(mapped_hosts.contains("192.168.1.3"));  // Success
 }
 
 // Test removeStaleHostAndCloseConnections removes host and closes connections.
@@ -1745,8 +1751,8 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
 
   // Verify both hosts are initially present.
   EXPECT_EQ(getHostToConnInfoMap().size(), 2);
-  EXPECT_NE(getHostToConnInfoMap().find("192.168.1.1"), getHostToConnInfoMap().end());
-  EXPECT_NE(getHostToConnInfoMap().find("192.168.1.2"), getHostToConnInfoMap().end());
+  EXPECT_TRUE(getHostToConnInfoMap().contains("192.168.1.1"));
+  EXPECT_TRUE(getHostToConnInfoMap().contains("192.168.1.2"));
 
   // Verify that connection wrappers were created by maintainClusterConnections.
   const auto& connection_wrappers = getConnectionWrappers();
@@ -1759,8 +1765,8 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
   // Verify that host 192.168.1.1 is still in host_to_conn_info_map_
   // (removeStaleHostAndCloseConnections doesn't remove it)
   EXPECT_EQ(getHostToConnInfoMap().size(), 2);
-  EXPECT_NE(getHostToConnInfoMap().find("192.168.1.1"), getHostToConnInfoMap().end());
-  EXPECT_NE(getHostToConnInfoMap().find("192.168.1.2"), getHostToConnInfoMap().end());
+  EXPECT_TRUE(getHostToConnInfoMap().contains("192.168.1.1"));
+  EXPECT_TRUE(getHostToConnInfoMap().contains("192.168.1.2"));
 
   // Verify that connection wrappers for the removed host are removed.
   EXPECT_EQ(getConnectionWrappers().size(), 1);   // Only host 192.168.1.2's wrapper remains
@@ -2240,7 +2246,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneFailureAndRecovery) {
   // Verify host info is still present (should not be removed)
   const auto& host_to_conn_info_map = getHostToConnInfoMap();
   EXPECT_EQ(host_to_conn_info_map.size(), 1);
-  EXPECT_NE(host_to_conn_info_map.find("192.168.1.1"), host_to_conn_info_map.end());
+  EXPECT_TRUE(host_to_conn_info_map.contains("192.168.1.1"));
 }
 
 // Test downstream connection closure and re-initiation.
@@ -2342,12 +2348,12 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   }
 
   // Step 4: Simulate downstream connection closure.
-  io_handle_->onDownstreamConnectionClosed(connection_key);
+  io_handle_->onDownstreamConnectionClosed(connection_key, /*connection_id=*/12345);
 
   // Verify connection key is removed from host tracking.
   host_it = getHostToConnInfoMap().find("192.168.1.1");
   EXPECT_NE(host_it, getHostToConnInfoMap().end());
-  EXPECT_EQ(host_it->second.connection_keys.count(connection_key), 0);
+  EXPECT_FALSE(host_it->second.connection_keys.contains(connection_key));
 
   // Step 5: Set up expectation for new connection attempts.
   auto mock_connection2 = setupMockConnection();
@@ -2382,6 +2388,51 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   auto stat_map = extension_->getCrossWorkerStatMap();
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.connecting"], 1);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connecting"], 1);
+}
+
+// For a host that needs N>1 connections, the establishment episode timestamp must survive the
+// 2..N-1 handshake completions and only clear once the target connection count is reached.
+TEST_F(ReverseConnectionIOHandleTest, EpisodeInitiationTimeClearedOnlyAtTargetCount) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+  createTriggerPipe();
+
+  // Host wants two connections; simulate the first dial already having stamped the episode time.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 2);
+  getMutableHostConnectionInfo("192.168.1.1").episode_initiation_time_ms = 1000;
+
+  // Completes one handshake with a distinct local address (so it yields a distinct connection key).
+  auto complete_one_handshake = [&](uint32_t local_port) {
+    auto mock_connection = setupMockConnection();
+    auto local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", local_port);
+    auto remote = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+    auto provider = std::make_shared<Network::ConnectionInfoSetterImpl>(local, remote);
+    EXPECT_CALL(*mock_connection, connectionInfoProvider())
+        .WillRepeatedly(
+            Invoke([provider]() -> const Network::ConnectionInfoProvider& { return *provider; }));
+
+    auto host = createMockHost("192.168.1.1");
+    auto wrapper = std::make_unique<RCConnectionWrapper>(*io_handle_, std::move(mock_connection),
+                                                         host, "test-cluster");
+    RCConnectionWrapper* wrapper_ptr = wrapper.get();
+    addWrapperToHostMap(wrapper_ptr, "192.168.1.1");
+    pushConnectionWrapper(std::move(wrapper));
+    io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr, false);
+  };
+
+  // First handshake completes: still below target, timestamp must remain.
+  complete_one_handshake(11111);
+  ASSERT_EQ(getHostConnectionInfo("192.168.1.1").connection_keys.size(), 1u);
+  EXPECT_TRUE(getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms.has_value());
+  EXPECT_EQ(*getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms, 1000);
+
+  // Second handshake reaches the target: timestamp is cleared, ending the episode.
+  complete_one_handshake(22222);
+  ASSERT_EQ(getHostConnectionInfo("192.168.1.1").connection_keys.size(), 2u);
+  EXPECT_FALSE(getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms.has_value());
 }
 
 TEST_F(ReverseConnectionIOHandleTest, SkipNewConnectionIfAttemptInProgress) {
@@ -2648,7 +2699,7 @@ TEST_F(ReverseConnectionIOHandleTest, ShouldAttemptConnectionCreatesHostEntry) {
 
   EXPECT_TRUE(shouldAttemptConnectionToHost("10.0.0.5", "cluster-x"));
   const auto& map = getHostToConnInfoMap();
-  EXPECT_NE(map.find("10.0.0.5"), map.end());
+  EXPECT_TRUE(map.contains("10.0.0.5"));
 }
 
 // Test maybeUpdateHostsMappingsAndConnections removes stale hosts.
@@ -2666,8 +2717,8 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsRemovesStaleHosts) {
   // Updated set: only a → b should be removed.
   maybeUpdateHostsMappingsAndConnections("c1", std::vector<std::string>{"a"});
   const auto& map = getHostToConnInfoMap();
-  EXPECT_NE(map.find("a"), map.end());
-  EXPECT_EQ(map.find("b"), map.end());
+  EXPECT_TRUE(map.contains("a"));
+  EXPECT_FALSE(map.contains("b"));
 }
 
 // Lightly exercise read/write/connect wrappers for coverage.
@@ -3341,7 +3392,7 @@ TEST_F(ReverseConnectionIOHandleTest, MarkTunnelDrainingDropsKeyAndDialsReplacem
   io_handle_->markTunnelDrainingAndDialReplacement(connection_key);
 
   // The draining tunnel is no longer tracked, leaving a deficit for the maintenance loop to fill.
-  EXPECT_EQ(getHostConnectionInfo(host).connection_keys.count(connection_key), 0);
+  EXPECT_FALSE(getHostConnectionInfo(host).connection_keys.contains(connection_key));
 }
 
 // Draining an unknown connection key is a benign no-op: nothing is dropped and no immediate
@@ -3375,7 +3426,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedUnknownKeyIsNo
   io_handle_ = createTestIOHandle(config);
   ASSERT_NE(io_handle_, nullptr);
 
-  io_handle_->onDownstreamConnectionClosed("203.0.113.9:9999");
+  io_handle_->onDownstreamConnectionClosed("203.0.113.9:9999", /*connection_id=*/0);
   EXPECT_TRUE(getHostToConnInfoMap().empty());
 }
 

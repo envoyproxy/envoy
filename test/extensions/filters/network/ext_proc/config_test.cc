@@ -186,6 +186,47 @@ TEST(NetworkExtProcConfigFactoryTest, DefaultProcessingMode) {
   EXPECT_NO_THROW(auto cb = factory.createFilterFactoryFromProto(proto_config, context));
 }
 
+// Test config with valid connection_attributes.
+TEST(NetworkExtProcConfigTest, ConfigWithConnectionAttributes) {
+  const std::string yaml_string = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  stat_prefix: "test_ext_proc"
+  connection_attributes:
+  - "connection.id"
+  - "filter_state['authority']"
+  )EOF";
+
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NetworkExtProcConfigFactory factory;
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
+  Network::MockFilterManager filter_manager;
+  EXPECT_CALL(filter_manager, addFilter(_));
+  cb(filter_manager);
+}
+
+// Test config with invalid CEL expression in connection_attributes.
+TEST(NetworkExtProcConfigTest, ConfigWithInvalidConnectionAttributes) {
+  const std::string yaml_string = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  stat_prefix: "test_ext_proc"
+  connection_attributes:
+  - "invalid syntax && =="
+  )EOF";
+
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NetworkExtProcConfigFactory factory;
+  EXPECT_THROW_WITH_REGEX(auto cb = factory.createFilterFactoryFromProto(proto_config, context),
+                          EnvoyException, "Unable to parse descriptor expression");
+}
+
 } // namespace
 } // namespace ExtProc
 } // namespace NetworkFilters

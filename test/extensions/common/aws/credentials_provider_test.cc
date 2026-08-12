@@ -5,6 +5,7 @@
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -200,7 +201,7 @@ TEST_F(AsyncCredentialHandlingTest, ChainCallbackCalledWhenCredentialsReturned) 
   timer_->invokeCallback();
   // We now have credentials so sign should complete immediately
   auto result = signer->sign(*message_, false, "");
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
 }
 
 TEST_F(AsyncCredentialHandlingTest, ExpirationWithGracePeriod) {
@@ -393,7 +394,7 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
   timer_->invokeCallback();
   // We now have credentials so sign should complete immediately
   auto result = signer->sign(*message_, false, "");
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
 }
 
 // Mock WebIdentityCredentialsProvider to track refresh calls

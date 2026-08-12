@@ -81,6 +81,17 @@ std::optional<std::string> HeaderFormatter::format(OptRef<const Http::HeaderMap>
   return std::string(val);
 }
 
+bool HeaderFormatter::formatTo(std::string& sink, OptRef<const Http::HeaderMap> headers) const {
+  const Http::HeaderEntry* header = findHeader(headers);
+  if (!header) {
+    return false;
+  }
+
+  absl::string_view val = header->value().getStringView();
+  sink.append(SubstitutionFormatUtils::truncateStringView(val, max_length_));
+  return true;
+}
+
 Protobuf::Value HeaderFormatter::formatValue(OptRef<const Http::HeaderMap> headers) const {
   const Http::HeaderEntry* header = findHeader(headers);
   if (!header) {
@@ -102,6 +113,11 @@ std::optional<std::string> ResponseHeaderFormatter::format(const Context& contex
   return HeaderFormatter::format(context.responseHeaders());
 }
 
+bool ResponseHeaderFormatter::formatTo(std::string& sink, const Context& context,
+                                       const StreamInfo::StreamInfo&) const {
+  return HeaderFormatter::formatTo(sink, context.responseHeaders());
+}
+
 Protobuf::Value ResponseHeaderFormatter::formatValue(const Context& context,
                                                      const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(context.responseHeaders());
@@ -117,6 +133,11 @@ std::optional<std::string> RequestHeaderFormatter::format(const Context& context
   return HeaderFormatter::format(context.requestHeaders());
 }
 
+bool RequestHeaderFormatter::formatTo(std::string& sink, const Context& context,
+                                      const StreamInfo::StreamInfo&) const {
+  return HeaderFormatter::formatTo(sink, context.requestHeaders());
+}
+
 Protobuf::Value RequestHeaderFormatter::formatValue(const Context& context,
                                                     const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(context.requestHeaders());
@@ -130,6 +151,11 @@ ResponseTrailerFormatter::ResponseTrailerFormatter(absl::string_view main_header
 std::optional<std::string> ResponseTrailerFormatter::format(const Context& context,
                                                             const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::format(context.responseTrailers());
+}
+
+bool ResponseTrailerFormatter::formatTo(std::string& sink, const Context& context,
+                                        const StreamInfo::StreamInfo&) const {
+  return HeaderFormatter::formatTo(sink, context.responseTrailers());
 }
 
 Protobuf::Value ResponseTrailerFormatter::formatValue(const Context& context,
@@ -485,49 +511,55 @@ BuiltInHttpCommandParser::getKnownFormatters() {
       FormatterProviderLookupTbl,
       {{"REQ", // Same as REQUEST_HEADER and used for backward compatibility.
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
-         [](absl::string_view format, std::optional<size_t> max_length) {
+         [](absl::string_view format,
+            std::optional<size_t> max_length) -> absl::StatusOr<FormatterProviderPtr> {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
-           THROW_IF_NOT_OK_REF(result.status());
+           RETURN_IF_NOT_OK(result.status());
            return std::make_unique<RequestHeaderFormatter>(result.value().first,
                                                            result.value().second, max_length);
          }}},
        {"REQUEST_HEADER",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
-         [](absl::string_view format, std::optional<size_t> max_length) {
+         [](absl::string_view format,
+            std::optional<size_t> max_length) -> absl::StatusOr<FormatterProviderPtr> {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
-           THROW_IF_NOT_OK_REF(result.status());
+           RETURN_IF_NOT_OK(result.status());
            return std::make_unique<RequestHeaderFormatter>(result.value().first,
                                                            result.value().second, max_length);
          }}},
        {"RESP", // Same as RESPONSE_HEADER and used for backward compatibility.
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
-         [](absl::string_view format, std::optional<size_t> max_length) {
+         [](absl::string_view format,
+            std::optional<size_t> max_length) -> absl::StatusOr<FormatterProviderPtr> {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
-           THROW_IF_NOT_OK_REF(result.status());
+           RETURN_IF_NOT_OK(result.status());
            return std::make_unique<ResponseHeaderFormatter>(result.value().first,
                                                             result.value().second, max_length);
          }}},
        {"RESPONSE_HEADER",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
-         [](absl::string_view format, std::optional<size_t> max_length) {
+         [](absl::string_view format,
+            std::optional<size_t> max_length) -> absl::StatusOr<FormatterProviderPtr> {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
-           THROW_IF_NOT_OK_REF(result.status());
+           RETURN_IF_NOT_OK(result.status());
            return std::make_unique<ResponseHeaderFormatter>(result.value().first,
                                                             result.value().second, max_length);
          }}},
        {"TRAILER", // Same as RESPONSE_TRAILER and used for backward compatibility.
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
-         [](absl::string_view format, std::optional<size_t> max_length) {
+         [](absl::string_view format,
+            std::optional<size_t> max_length) -> absl::StatusOr<FormatterProviderPtr> {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
-           THROW_IF_NOT_OK_REF(result.status());
+           RETURN_IF_NOT_OK(result.status());
            return std::make_unique<ResponseTrailerFormatter>(result.value().first,
                                                              result.value().second, max_length);
          }}},
        {"RESPONSE_TRAILER",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
-         [](absl::string_view format, std::optional<size_t> max_length) {
+         [](absl::string_view format,
+            std::optional<size_t> max_length) -> absl::StatusOr<FormatterProviderPtr> {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
-           THROW_IF_NOT_OK_REF(result.status());
+           RETURN_IF_NOT_OK(result.status());
            return std::make_unique<ResponseTrailerFormatter>(result.value().first,
                                                              result.value().second, max_length);
          }}},
@@ -543,10 +575,11 @@ BuiltInHttpCommandParser::getKnownFormatters() {
          }}},
        {"GRPC_STATUS",
         {CommandSyntaxChecker::PARAMS_OPTIONAL,
-         [](absl::string_view format, std::optional<size_t>) {
+         [](absl::string_view format,
+            std::optional<size_t>) -> absl::StatusOr<FormatterProviderPtr> {
            auto result =
                GrpcStatusFormatter::create("grpc-status", "", std::optional<size_t>(), format);
-           THROW_IF_NOT_OK_REF(result.status());
+           RETURN_IF_NOT_OK(result.status());
            return std::move(result).value();
          }}},
        {"GRPC_STATUS_NUMBER",
@@ -575,9 +608,10 @@ BuiltInHttpCommandParser::getKnownFormatters() {
          }}},
        {"STREAM_INFO_REQ",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
-         [](absl::string_view format, std::optional<size_t> max_length) {
+         [](absl::string_view format,
+            std::optional<size_t> max_length) -> absl::StatusOr<FormatterProviderPtr> {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
-           THROW_IF_NOT_OK_REF(result.status());
+           RETURN_IF_NOT_OK(result.status());
            return std::make_unique<RequestHeaderFormatter>(result.value().first,
                                                            result.value().second, max_length);
          }}},
@@ -599,8 +633,7 @@ BuiltInHttpCommandParser::getKnownFormatters() {
        {"QUERY_PARAMS",
         {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view decoding, std::optional<size_t> max_length) {
-           return THROW_OR_RETURN_VALUE(QueryParametersFormatter::create(decoding, max_length),
-                                        FormatterProviderPtr);
+           return QueryParametersFormatter::create(decoding, max_length);
          }}},
        {"PATH",
         {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
@@ -608,14 +641,12 @@ BuiltInHttpCommandParser::getKnownFormatters() {
            absl::string_view query;
            absl::string_view option;
            SubstitutionFormatUtils::parseSubcommand(format, ':', query, option);
-           return THROW_OR_RETURN_VALUE(PathFormatter::create(query, option, max_length),
-                                        FormatterProviderPtr);
+           return PathFormatter::create(query, option, max_length);
          }}},
        {"COALESCE",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view format, std::optional<size_t> max_length) {
-           return THROW_OR_RETURN_VALUE(CoalesceFormatter::create(format, max_length),
-                                        FormatterProviderPtr);
+           return CoalesceFormatter::create(format, max_length);
          }}}});
 }
 
@@ -631,7 +662,7 @@ BuiltInHttpCommandParser::parse(absl::string_view command, absl::string_view sub
   }
 
   // Check flags for the command.
-  THROW_IF_NOT_OK(
+  RETURN_IF_NOT_OK(
       CommandSyntaxChecker::verifySyntax((*it).second.first, command, subcommand, max_length));
 
   // Create a pointer to the formatter by calling a function

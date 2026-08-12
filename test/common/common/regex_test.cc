@@ -4,6 +4,7 @@
 #include "source/common/common/regex.h"
 
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -53,7 +54,7 @@ TEST(Utility, ParseRegex) {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
-    EXPECT_TRUE(Utility::parseRegex(matcher, engine).status().ok());
+    EXPECT_OK(Utility::parseRegex(matcher, engine).status());
   }
 
   // Positive case to ensure matcher can be created by config without google_re2 field.
@@ -61,7 +62,7 @@ TEST(Utility, ParseRegex) {
     TestScopedRuntime scoped_runtime;
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
-    EXPECT_TRUE(Utility::parseRegex(matcher, engine).status().ok());
+    EXPECT_OK(Utility::parseRegex(matcher, engine).status());
   }
 
   // Verify max program size with the deprecated field codepath plus runtime.
@@ -124,7 +125,7 @@ TEST(Utility, ParseRegex) {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
-    EXPECT_TRUE(Utility::parseRegex(matcher, engine).status().ok());
+    EXPECT_OK(Utility::parseRegex(matcher, engine).status());
     EXPECT_LOG_CONTAINS("warn", "> max program size of 1 set for the warn level threshold",
                         *Utility::parseRegex(matcher, engine));
   }
@@ -135,7 +136,7 @@ TEST(Utility, ParseRegex) {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.set_regex("/asdf/.*");
     matcher.mutable_google_re2();
-    EXPECT_TRUE(Utility::parseRegex(matcher, engine).status().ok());
+    EXPECT_OK(Utility::parseRegex(matcher, engine).status());
     EXPECT_LOG_NOT_CONTAINS("warn", "> max program size", *Utility::parseRegex(matcher, engine));
   }
 }

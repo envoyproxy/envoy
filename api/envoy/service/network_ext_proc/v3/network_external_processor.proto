@@ -87,7 +87,7 @@ message Data {
 
 // ProcessingRequest contains data sent from Envoy to the external processing server.
 // Each request contains either read data (from client), write data (to client),
-// or a new connection event along with optional metadata.
+// or a new connection event along with optional metadata and attributes.
 message ProcessingRequest {
   // ReadData contains the network data intercepted in the request path (client to server).
   // This is sent to the external processor when data arrives from the downstream client.
@@ -107,10 +107,15 @@ message ProcessingRequest {
   // The external processor must include any needed metadata in its response.
   config.core.v3.Metadata metadata = 3;
 
+  // The values of properties selected by the ``connection_attributes``
+  // list in the configuration. Each entry in the list is populated
+  // from the standard :ref:`attributes <arch_overview_attributes>` supported in the data plane.
+  map<string, google.protobuf.Struct> attributes = 4;
+
   // NewConnection contains the connection event intercepted when a new connection is established.
   // This is sent to the external processor when onNewConnection is called on the downstream connection.
   // If this is set, read_data and write_data should not be set.
-  NewConnection new_connection = 4;
+  NewConnection new_connection = 5;
 }
 
 // ProcessingResponse contains the response from the external processing server to Envoy.

@@ -35,6 +35,7 @@ ARRAYSIZE
 ARN
 ASAN
 ASCII
+ASLR
 ASM
 ASN
 ASSERTed
@@ -509,6 +510,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIGUSR
 SIMD
 SIO
 SSE
@@ -658,6 +660,9 @@ auths
 authz
 automata
 autoscale
+awaitable
+awaitables
+awaiter
 backend
 backends
 backgrounded
@@ -752,6 +757,7 @@ combinatorial
 comparator
 compat
 completable
+computable
 cond
 condvar
 conf
@@ -762,6 +768,7 @@ conns
 const
 constexpr
 constructible
+cooldown
 copyable
 coroutine
 coroutines
@@ -1163,6 +1170,7 @@ netmask
 netns
 NLB
 NLMSG
+nodiscard
 nonblocking
 noncopyable
 nonresponsive
@@ -1423,6 +1431,7 @@ serializable
 serializer
 serv
 servercert
+setarch
 setenv
 SETNAME
 setsockopt
@@ -1499,6 +1508,7 @@ submatch
 submessages
 subnet
 subnets
+subobject
 suboptimal
 subprocess
 subsecond
@@ -1552,6 +1562,7 @@ testcase
 testcases
 testdata
 testee
+tgkill
 threadsafe
 thru
 timespan
@@ -1594,6 +1605,7 @@ udpa
 uint
 un-
 unacked
+uname
 unary
 unconfigurable
 undef
@@ -1679,6 +1691,9 @@ xid
 xmodem
 xxhash
 xxs
+xxxx
+xxxxxxxx
+xxxxxxxxxxxx
 xyz
 xyzwebservices
 yml

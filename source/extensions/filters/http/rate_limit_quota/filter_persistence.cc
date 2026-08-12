@@ -24,7 +24,7 @@ using TlsStore = GlobalTlsStores::TlsStore;
 
 // Helper to initialize a new TLS store based on a rate_limit_quota config's
 // settings.
-std::shared_ptr<TlsStore>
+absl::StatusOr<std::shared_ptr<TlsStore>>
 initTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
              Server::Configuration::FactoryContext& context, absl::string_view target_address,
              absl::string_view domain) {
@@ -46,16 +46,17 @@ initTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
 
   // Create the global client resource to be shared via TLS to all worker
   // threads (accessed through a filter-specific LocalRateLimitClient).
-  std::unique_ptr<GlobalRateLimitClientImpl> tl_global_client = createGlobalRateLimitClientImpl(
+  auto tl_global_client_or = createGlobalRateLimitClientImpl(
       context, domain, reporting_interval, tls_store->buckets_tls, config_with_hash_key);
-  tls_store->global_client = std::move(tl_global_client);
+  RETURN_IF_NOT_OK_REF(tl_global_client_or.status());
+  tls_store->global_client = std::move(tl_global_client_or.value());
 
   return tls_store;
 }
 
 // References a statically shared map. This is not thread-safe so it should
 // only be called during RLQS filter factory creation on the main thread.
-std::shared_ptr<TlsStore>
+absl::StatusOr<std::shared_ptr<TlsStore>>
 GlobalTlsStores::getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                              Server::Configuration::FactoryContext& context,
                              absl::string_view target_address, absl::string_view domain) {
@@ -69,8 +70,9 @@ GlobalTlsStores::getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_wi
   }
   ENVOY_LOG(debug, "Creating a new cache & RLQS client for target ({}) and domain ({}).",
             index.first, index.second);
-  std::shared_ptr<TlsStore> tls_store =
-      initTlsStore(config_with_hash_key, context, index.first, index.second);
+  auto tls_store_or = initTlsStore(config_with_hash_key, context, index.first, index.second);
+  RETURN_IF_NOT_OK_REF(tls_store_or.status());
+  std::shared_ptr<TlsStore> tls_store = std::move(tls_store_or.value());
   // Save weak_ptr as an unowned reference.
   stores()[index] = tls_store;
   return tls_store;

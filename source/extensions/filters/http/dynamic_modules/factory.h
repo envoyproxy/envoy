@@ -27,8 +27,8 @@ public:
                                dual_info.init_manager);
   }
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
-      const FilterConfig& proto_config, const std::string& stat_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      const FilterConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactory(const FilterConfig& proto_config, const std::string& stat_prefix,

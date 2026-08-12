@@ -23,15 +23,45 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "matching_utils_lib",
+    srcs = ["matching_utils.cc"],
+    hdrs = ["matching_utils.h"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    tags = ["skip_on_windows"],
+    deps = [
+        "//envoy/local_info:local_info_interface",
+        "//source/common/protobuf",
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status",
+        "@cel-cpp//eval/public:cel_expr_builder_factory",
+    ] + select(
+        {
+            "//bazel:windows_x86_64": [],
+            "//conditions:default": [
+                "@cel-cpp//parser",
+            ],
+        },
+    ),
+)
+
+envoy_cc_library(
     name = "ext_proc_lib",
     srcs = ["ext_proc.cc"],
     hdrs = ["ext_proc.h"],
     deps = [
         ":client_lib",
+        ":matching_utils_lib",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/network:utility_lib",
+        "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/ext_proc/v3:pkg_cc_proto",
@@ -45,7 +75,9 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":client_lib",
+        ":matching_utils_lib",
         "//envoy/registry",
+        "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/ext_proc:ext_proc_lib",

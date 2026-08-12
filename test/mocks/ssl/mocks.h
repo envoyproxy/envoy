@@ -94,6 +94,11 @@ public:
   MOCK_METHOD(std::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
   MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCertChainInformation, (), (const));
+  MOCK_METHOD(const TlsContext&, getTlsContext, (), (const));
+
+private:
+  // Default return value for getTlsContext(): an empty context with no certificate.
+  std::unique_ptr<TlsContext> default_tls_context_;
 };
 
 class MockClientContextConfig : public ClientContextConfig {

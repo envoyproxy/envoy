@@ -35,8 +35,10 @@ class Client : public Event::DeferredDeletable {
 public:
   /**
    * Initialize the connection.
+   * @return false if the underlying connection could not be created (e.g. a network namespace
+   *         binding failure), in which case the client is unusable; true otherwise.
    */
-  virtual void start() PURE;
+  virtual bool start() PURE;
 
   /**
    * Send the health check request.
