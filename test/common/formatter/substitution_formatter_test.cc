@@ -6290,7 +6290,7 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterErrorCases) {
   // The command parser rejects the empty parameter before the formatter is created, so the
   // empty configuration is checked by creating the formatter directly.
   {
-    EXPECT_THAT(CoalesceFormatter::create("", absl::nullopt),
+    EXPECT_THAT(CoalesceFormatter::create("", std::nullopt),
                 HasStatus(absl::StatusCode::kInvalidArgument,
                           "COALESCE requires a JSON configuration parameter"));
   }
@@ -6434,7 +6434,7 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterFormatValue) {
 
   // A non-string value is returned as is and is not subject to the max length.
   {
-    EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(Return(absl::optional<uint32_t>(503)));
+    EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(Return(std::optional<uint32_t>(503)));
 
     auto providers =
         *SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["RESPONSE_CODE"]}):1%)");
