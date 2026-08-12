@@ -66,6 +66,26 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "sdk_integration_test",
+    srcs = ["sdk_integration_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/go:udp_listener_integration_test",
+    ],
+    env = {"GODEBUG": "cgocheck=0"},
+    deps = [
+        "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/filters/udp/dynamic_modules:config",
+        "//source/extensions/filters/udp/udp_proxy:config",
+        "//test/integration:integration_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/udp/dynamic_modules/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "udp_dynamic_modules_integration_test",
     srcs = ["udp_dynamic_modules_integration_test.cc"],
     data = [
