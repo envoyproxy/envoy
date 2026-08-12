@@ -64,8 +64,7 @@ GradientController::GradientController(GradientControllerConfig config,
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
       stats_(generateStats(scope_, stats_prefix)), random_(random), time_source_(time_source),
       deferred_limit_value_(0), num_rq_outstanding_(0),
-      concurrency_limit_(config_.isMinRTTSamplingEnabled() ? config_.minRTTCalcConcurrency()
-                                                           : config_.minConcurrencyLimit()),
+      concurrency_limit_(config_.minConcurrencyLimit()),
       latency_sample_hist_(hist_fast_alloc(), hist_free) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
 
@@ -122,8 +121,9 @@ void GradientController::enterMinRTTSamplingWindow() {
   // prevent the sample window from resetting until enough requests are gathered to complete the
   // recalculation.
   deferred_limit_value_.store(GradientController::concurrencyLimit());
-  updateConcurrencyLimit(
-      std::min(GradientController::concurrencyLimit(), config_.minRTTCalcConcurrency()));
+  if (config_.minRTTCalcAdjustsConcurrency()) {
+    updateConcurrencyLimit(config_.minRTTCalcConcurrency());
+  }
 
   // Throw away any latency samples from before the recalculation window as it may not represent
   // the minRTT.
@@ -147,7 +147,9 @@ void GradientController::updateMinRTT() {
   min_rtt_ = processLatencySamplesAndClear();
   stats_.min_rtt_msecs_.set(
       std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
-  updateConcurrencyLimit(deferred_limit_value_.load());
+  if (config_.minRTTCalcAdjustsConcurrency()) {
+    updateConcurrencyLimit(deferred_limit_value_.load());
+  }
   deferred_limit_value_.store(0);
   stats_.min_rtt_calculation_active_.set(0);
 
