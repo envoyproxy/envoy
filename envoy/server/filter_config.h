@@ -252,7 +252,7 @@ struct ExtraFactoryContext {
   // configurations. The init manager is only guaranteed to be alive until the configuration that
   // owns the filter configuration is warmed up, so factories may register init targets with it but
   // must never store the reference.
-  OptRef<Init::Manager> init_manager;
+  OptRef<Init::Manager> init_manager = std::nullopt;
 };
 
 /**
