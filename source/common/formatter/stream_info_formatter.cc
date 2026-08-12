@@ -2879,7 +2879,7 @@ public:
       return nullptr;
     }
     // Check flags for the command.
-    THROW_IF_NOT_OK(Envoy::Formatter::CommandSyntaxChecker::verifySyntax(
+    RETURN_IF_NOT_OK(Envoy::Formatter::CommandSyntaxChecker::verifySyntax(
         (*it).second.first, command, sub_command, max_length));
 
     StreamInfoFormatterResult result = (*it).second.second(sub_command, max_length);

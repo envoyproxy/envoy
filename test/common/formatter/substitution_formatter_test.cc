@@ -5936,8 +5936,8 @@ TEST(SubstitutionFormatterTest, PercentEscapingEdgeCase) {
 
 TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%ENVIRONMENT()%").IgnoreError(),
-                              EnvoyException, "ENVIRONMENT requires parameters");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%ENVIRONMENT()%"),
+                HasStatus(absl::StatusCode::kInvalidArgument, "ENVIRONMENT requires parameters"));
   }
 
   {
