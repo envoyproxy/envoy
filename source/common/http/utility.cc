@@ -1508,6 +1508,10 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
 }
 
 bool Utility::isSafeRequest(const Http::RequestHeaderMap& request_headers) {
+  // TODO(guy-with-a-why): consider QUERY here. RFC 10008 Section 2 makes QUERY safe and
+  // idempotent, but callers of this function additionally rely on a safe request having no
+  // content: it gates sending a request over 0-RTT early data and auto-enables retry on 425.
+  // QUERY always has content, so adding it changes both behaviors and needs its own change.
   absl::string_view method = request_headers.getMethodValue();
   return method == Http::Headers::get().MethodValues.Get ||
          method == Http::Headers::get().MethodValues.Head ||

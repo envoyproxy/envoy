@@ -673,6 +673,10 @@ convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_
  * @param request_headers the request header to be looked into.
  * @return true if the request method is safe as defined in
  * https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1
+ *
+ * This is narrower than the RFC definition: callers also rely on a safe request having no
+ * content, so a method that is safe but always carries content is excluded. See the TODO in the
+ * implementation.
  */
 bool isSafeRequest(const Http::RequestHeaderMap& request_headers);
 
