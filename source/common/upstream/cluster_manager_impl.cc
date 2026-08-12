@@ -1939,7 +1939,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(
         parent_.deferred_cluster_creation_,
         fmt::format("Cannot find ThreadLocalCluster {}, but deferred cluster creation is disabled.",
                     name));
-    ASSERT(thread_local_deferred_clusters_.find(name) != thread_local_deferred_clusters_.end(),
+    ASSERT(thread_local_deferred_clusters_.contains(name),
            "Cluster with removed host is neither deferred or inflated!");
     return;
   }
@@ -1957,7 +1957,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, bool weighted_priority_health,
     uint64_t overprovisioning_factor, HostMapConstSharedPtr cross_priority_host_map) {
-  ASSERT(thread_local_clusters_.find(name) != thread_local_clusters_.end());
+  ASSERT(thread_local_clusters_.contains(name));
   const auto& cluster_entry = thread_local_clusters_[name];
   cluster_entry->updateHosts(name, priority, std::move(update_hosts_params),
                              std::move(locality_weights), hosts_added, hosts_removed,

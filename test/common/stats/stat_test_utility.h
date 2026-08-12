@@ -176,7 +176,7 @@ class TestSinkPredicates : public SinkPredicates {
 public:
   ~TestSinkPredicates() override = default;
 
-  bool has(StatName name) { return sinked_stat_names_.find(name) != sinked_stat_names_.end(); }
+  bool has(StatName name) { return sinked_stat_names_.contains(name); }
 
   // Note: The backing store for the StatName needs to live longer than the
   // TestSinkPredicates object.
@@ -184,16 +184,16 @@ public:
 
   // SinkPredicates
   bool includeCounter(const Counter& counter) override {
-    return sinked_stat_names_.find(counter.statName()) != sinked_stat_names_.end();
+    return sinked_stat_names_.contains(counter.statName());
   }
   bool includeGauge(const Gauge& gauge) override {
-    return sinked_stat_names_.find(gauge.statName()) != sinked_stat_names_.end();
+    return sinked_stat_names_.contains(gauge.statName());
   }
   bool includeTextReadout(const TextReadout& text_readout) override {
-    return sinked_stat_names_.find(text_readout.statName()) != sinked_stat_names_.end();
+    return sinked_stat_names_.contains(text_readout.statName());
   }
   bool includeHistogram(const Histogram& histogram) override {
-    return sinked_stat_names_.find(histogram.statName()) != sinked_stat_names_.end();
+    return sinked_stat_names_.contains(histogram.statName());
   }
 
 private:
