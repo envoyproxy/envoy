@@ -387,6 +387,11 @@ public:
   static bool isConnect(const RequestHeaderMap& headers);
 
   /**
+   * @brief a helper function to determine if the headers represent a QUERY request (RFC 10008).
+   */
+  static bool isQuery(const RequestHeaderMap& headers);
+
+  /**
    * @brief a helper function to determine if the headers represent a CONNECT-UDP request.
    */
   static bool isConnectUdpRequest(const RequestHeaderMap& headers);
