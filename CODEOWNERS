@@ -458,7 +458,7 @@
 
 # Queue policy
 /*/extensions/queue_policy/common @nezdolik @yanavlasov @tonya11en @balrawi-figma
-/*/extensions/queue_policy/fifo   @nezdolik @yanavlasov @tonya11en @balrawi-figma
+/*/extensions/queue_policy/fifo @nezdolik @yanavlasov @tonya11en @balrawi-figma
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
