@@ -81,6 +81,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
     // requests even though the retry policy isn't configured to do so. Since 0-RTT safe requests
     // traditionally shouldn't have body, automatically retrying them will not cause extra
     // buffering. This will also enable retry if they are reset during connect.
+    // This no-body assumption is why isSafeRequest() excludes QUERY (RFC 10008) despite the
+    // method being safe: a QUERY always has content, so auto-retrying one would buffer it.
     retry_on_ |= RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
     retriable_status_codes_.push_back(static_cast<uint32_t>(Http::Code::TooEarly));
   }
