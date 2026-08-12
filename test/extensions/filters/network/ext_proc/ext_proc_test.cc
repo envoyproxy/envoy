@@ -1646,7 +1646,6 @@ TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataNotAllowed) {
   filter_->onReceiveMessage(std::move(response));
 }
 
-
 TEST_F(NetworkExtProcFilterTest, SendRequestWithConnectionAttributes) {
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
   config.set_failure_mode_allow(false);
