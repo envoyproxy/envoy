@@ -268,7 +268,7 @@ public:
   const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() {
     return transport_socket_options_;
   }
-  bool hasPendingStreams() const { return !pending_streams_->empty(); }
+  bool hasPendingStreams() const { return pendingStreamCount() != 0; }
 
   void decrClusterStreamCapacity(uint32_t delta) {
     ASSERT(connecting_and_connected_stream_capacity_ >= delta);
@@ -285,7 +285,7 @@ public:
        << DUMP_MEMBER(busy_clients_.size()) << DUMP_MEMBER(connecting_clients_.size())
        << DUMP_MEMBER(connecting_stream_capacity_)
        << DUMP_MEMBER(connecting_and_connected_stream_capacity_) << DUMP_MEMBER(num_active_streams_)
-       << DUMP_MEMBER(pending_streams_->size())
+       << DUMP_MEMBER(pending_streams_.size())
        << " per upstream preconnect ratio: " << perUpstreamPreconnectRatio();
   }
 
@@ -340,11 +340,13 @@ protected:
 
   ConnectionPool::Cancellable*
   addPendingStream(Envoy::ConnectionPool::PendingStreamPtr&& pending_stream) {
-    const auto stream_added = pending_streams_->add(std::move(pending_stream),
-                                                    {dispatcher_.timeSource().monotonicTime()});
+    PendingStream& stream = *pending_stream;
+    LinkedList::moveIntoListBack(std::move(pending_stream), pending_streams_);
+    pending_stream_queue_->add(stream, {dispatcher_.timeSource().monotonicTime()});
+    ASSERT(pending_stream_queue_->size() == pending_streams_.size());
     cluster_connectivity_state_.incrPendingStreams(1);
     updateQueueOverloadedGauge();
-    return stream_added;
+    return &stream;
   }
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
@@ -392,10 +394,16 @@ private:
   void assertCapacityCountsAreCorrect();
   void updateQueueOverloadedGauge();
   void clearQueueOverloadedGauge();
+  size_t pendingStreamCount() const;
+  PendingStreamPtr popPendingStream();
+  PendingStreamPtr removePendingStream(PendingStream& stream);
 
   Upstream::ClusterConnectivityState& cluster_connectivity_state_;
 
-  PendingStreamQueuePtr pending_streams_;
+  // Owns every stream represented in pending_stream_queue_.
+  std::list<PendingStreamPtr> pending_streams_;
+  // Non-owning policy that determines the order in which pending streams are dispatched.
+  PendingStreamQueuePtr pending_stream_queue_;
   bool queue_overloaded_{false};
 
   // The number of streams that can be immediately dispatched from the current

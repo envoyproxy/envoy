@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <list>
+
 #include "envoy/extensions/queue_policy/fifo/v3/fifo.pb.h"
 
 #include "source/common/conn_pool/conn_pool_base.h"
@@ -87,22 +90,28 @@ public:
 
 class TestPendingStreamQueue : public Extensions::QueuePolicy::QueueBase<PendingStream> {
 public:
-  using ItemPtrType = std::unique_ptr<PendingStream>;
-
   size_t size() const override { return items_.size(); }
 
   bool empty() const override { return items_.empty(); }
 
-  ConnectionPool::Cancellable* add(ItemPtrType&& item,
-                                   Extensions::QueuePolicy::QueueItemMetadata) override {
-    LinkedList::moveIntoListBack(std::move(item), items_);
-    return items_.back().get();
+  void add(PendingStream& item, Extensions::QueuePolicy::QueueItemMetadata) override {
+    items_.push_back(&item);
   }
 
-  ItemPtrType remove(PendingStream& item) override { return item.removeFromList(items_); }
+  void remove(PendingStream& item) override {
+    const auto entry = std::find(items_.begin(), items_.end(), &item);
+    ASSERT(entry != items_.end());
+    items_.erase(entry);
+  }
 
   // Use LIFO ordering so connection-pool tests exercise policy-defined ordering.
-  PendingStream& next() const override { return *items_.back(); }
+  PendingStream& peek() const override { return *items_.back(); }
+
+  void pop() override {
+    ASSERT(!items_.empty());
+    items_.pop_back();
+  }
+
   bool isOverloaded() const override { return items_.size() > 1; }
 
   void forEach(absl::FunctionRef<bool(PendingStream&)> cb) override {
@@ -116,7 +125,7 @@ public:
   }
 
 private:
-  std::list<ItemPtrType> items_;
+  std::list<PendingStream*> items_;
 };
 
 class TestPendingStreamQueueFactory
@@ -268,13 +277,13 @@ TEST_F(ConnPoolImplBaseQueuePolicyTest, QueueOverloadedGaugeTracksTransitions) {
   auto* third = pool_.newPendingStream(third_context, /*can_send_early_data=*/false);
   EXPECT_EQ(1, cluster_->trafficStats()->upstream_queue_overloaded_.value());
 
-  third->cancel(ConnectionPool::CancelPolicy::Default);
+  first->cancel(ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(1, cluster_->trafficStats()->upstream_queue_overloaded_.value());
 
-  second->cancel(ConnectionPool::CancelPolicy::Default);
+  third->cancel(ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
 
-  first->cancel(ConnectionPool::CancelPolicy::Default);
+  second->cancel(ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
 }
 

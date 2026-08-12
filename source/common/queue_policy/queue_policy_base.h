@@ -1,9 +1,7 @@
 #pragma once
 
 #include <memory>
-#include <type_traits>
 
-#include "envoy/common/conn_pool.h"
 #include "envoy/common/time.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
@@ -24,25 +22,25 @@ struct QueueItemMetadata {
 // container; the interface is intentionally container-agnostic.
 template <class ItemType> class QueueBase {
 
-  static_assert(std::is_base_of_v<ConnectionPool::Cancellable, ItemType>,
-                "Queue item type must inherit from ConnectionPool::Cancellable");
-
 public:
-  using ItemPtrType = std::unique_ptr<ItemType>;
-
   virtual ~QueueBase() = default;
 
   virtual size_t size() const PURE;
 
   virtual bool empty() const PURE;
 
-  virtual ConnectionPool::Cancellable* add(ItemPtrType&& item, QueueItemMetadata metadata) PURE;
+  // Adds an item to the queue. The caller retains ownership and must keep the item alive until it
+  // is removed with pop() or remove().
+  virtual void add(ItemType& item, QueueItemMetadata metadata) PURE;
 
-  virtual ItemPtrType remove(ItemType& item) PURE;
+  // Returns the next item to be dequeued. It is illegal to call this on an empty queue.
+  virtual ItemType& peek() const PURE;
 
-  // Returns the next item to be dequeued. It is illegal to call this on an empty queue. The
-  // returned reference is valid until the item is removed and destroyed.
-  virtual ItemType& next() const PURE;
+  // Removes the next item from the queue without destroying it.
+  virtual void pop() PURE;
+
+  // Removes a specific item from the queue without destroying it.
+  virtual void remove(ItemType& item) PURE;
 
   virtual bool isOverloaded() const PURE;
 

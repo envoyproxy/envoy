@@ -3,7 +3,7 @@
 #include "envoy/extensions/queue_policy/fifo/v3/fifo.pb.h"
 #include "envoy/extensions/queue_policy/fifo/v3/fifo.pb.validate.h"
 
-#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/queue_policy/fifo_queue_policy.h"
 #include "source/common/queue_policy/queue_policy_base.h"
 

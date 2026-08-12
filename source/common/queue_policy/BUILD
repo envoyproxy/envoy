@@ -15,12 +15,11 @@ envoy_cc_library(
         "queue_policy_base.h",
     ],
     deps = [
-        "//envoy/common:conn_pool_interface",
         "//envoy/common:time_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/protobuf:message_validator_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:linked_object",
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/functional:function_ref",
         "@abseil-cpp//absl/status:statusor",
     ],

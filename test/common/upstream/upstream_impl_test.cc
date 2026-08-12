@@ -28,6 +28,7 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/queue_policy/fifo_queue_policy.h"
 #include "source/common/queue_policy/queue_policy_base.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
@@ -6907,6 +6908,23 @@ public:
   std::string stat_prefix_;
 };
 
+class SuccessfulQueuePolicyFactory : public PendingStreamQueueFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<ConnectionPool::PendingStream>>
+  createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
+                    ProtobufMessage::ValidationVisitor&) override {
+    stat_prefix_ = stat_prefix;
+    return std::make_unique<Extensions::QueuePolicy::FifoQueue<ConnectionPool::PendingStream>>();
+  }
+
+  std::string name() const override { return "envoy.queue_policy.successful"; }
+  std::string stat_prefix_;
+};
+
 TEST_F(ClusterInfoImplTest, InvalidQueuePolicyConfig) {
   const std::string yaml = R"EOF(
   name: cluster1
@@ -6941,6 +6959,31 @@ TEST_F(ClusterInfoImplTest, QueuePolicyCreationFailure) {
 
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException, "queue policy creation failed");
   EXPECT_EQ("cluster.cluster1.envoy.queue_policy.rejecting", factory.stat_prefix_);
+}
+
+TEST_F(ClusterInfoImplTest, QueuePolicyCreationSuccess) {
+  SuccessfulQueuePolicyFactory factory;
+  Registry::InjectFactory<PendingStreamQueueFactory> registered_factory(factory);
+
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.successful
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+  const auto policy = cluster->info()->pendingRqQueuePolicy();
+  ASSERT_TRUE(policy.has_value());
+  EXPECT_EQ(&factory, policy->factory_);
+  ASSERT_NE(nullptr, policy->config_);
+  EXPECT_EQ("google.protobuf.Struct", policy->config_->GetTypeName());
+  EXPECT_EQ("cluster.cluster1.envoy.queue_policy.successful", policy->stat_prefix_);
+  EXPECT_EQ(policy->stat_prefix_, factory.stat_prefix_);
 }
 
 TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
