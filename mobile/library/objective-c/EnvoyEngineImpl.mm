@@ -421,7 +421,7 @@ static envoy_data ios_get_string(const void *context) {
       // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool
       // block is necessary to act as a breaker for any Objective-C allocation that happens.
       @autoreleasepool {
-        logger((Envoy::Logger::Levels)level, @(message.c_str()));
+        logger((long)level, @(message.c_str()));
       }
     };
   }
