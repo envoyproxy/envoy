@@ -2185,7 +2185,7 @@ envoy.load_balancing_policies.load_aware_locality:
   categories:
   - envoy.load_balancing_policies
   security_posture: unknown
-  status: wip
+  status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality
 envoy.load_balancing_policies.random:
