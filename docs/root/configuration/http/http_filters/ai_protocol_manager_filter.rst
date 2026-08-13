@@ -52,12 +52,14 @@ than after the whole upload. Oversized string values are left in the external
 buffer and referenced by offset, so a large prompt does not reappear in
 per-stream memory.
 
-Upon stream completion, the parsed document is validated against the route's declared
-:ref:`schema <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.schema>`
-(such as ``OPENAI_CHAT_COMPLETIONS``). Validation checks required fields, data types, enum values,
-and offload rules -- ensuring metadata fields (like ``model`` and ``role``) remain inline in the DOM
-while permitting large message content to reside in external buffers. Any schema validation failure
-triggers an immediate HTTP 400 response.
+Upon stream completion, the parsed document is validated against the payload
+schema of the route's declared :ref:`wire API
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.api_protocol>`,
+for APIs with a defined schema (currently ``OPENAI_CHAT_COMPLETIONS``).
+Validation checks required fields, data types, enum values, and offload rules
+-- ensuring metadata fields (like ``model`` and ``role``) remain inline in the
+DOM while permitting large message content to reside in external buffers. Any
+schema validation failure triggers an immediate HTTP 400 response.
 
 .. note::
 
