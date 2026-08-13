@@ -1,11 +1,15 @@
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
+#include "source/common/common/hex.h"
+#include "source/common/ssl/ssl.h"
+
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,6 +56,57 @@ std::vector<uint8_t> buildExtensionsWithSigAlgs(const std::vector<uint8_t>& sig_
   exts.push_back(static_cast<uint8_t>(ext_len & 0xff));
   exts.insert(exts.end(), sig_algs_body.begin(), sig_algs_body.end());
   return exts;
+}
+
+// End-to-end wire-format regression test for the GREASE-in-signature_algorithms
+// bug. Parses a captured TLS record + handshake header + ClientHello body from
+// hex using BoringSSL's SSL_parse_client_hello (the same code path Envoy hits
+// when it feeds ClientHello bytes into JA4Fingerprinter::create through the
+// listener filter), then asserts the resulting JA4 fingerprint matches the
+// expected spec-conformant value.
+//
+// The vector is Browser-1's captured ClientHello from tls_inspector_ja4_test.cc
+// with a single GREASE codepoint (0x0a0a) injected into the signature_algorithms
+// extension body and the padding extension shrunk by the same 2 bytes to keep
+// outer record/handshake lengths intact. Post-fix, JA4_c must match Browser-1's
+// exactly, because GREASE stripping makes the sig-alg preimage identical.
+TEST(JA4Fingerprinter, EndToEndGreaseSigAlgProducesExpectedFingerprint) {
+  // TLS record header (5 bytes) + handshake header (4 bytes) + ClientHello body.
+  const std::string wire_hex =
+      "1603010200010001fc0303528b4e00213672e534980dfed836dd5b375ab164dcc65ba6a3c87e7e2a1f9d61201bf29c9"
+      "dffaa31ed2df524d3a113edb4e6fd3b7fb3d6d57d5d9aafb213e83c420020aaaa130113021303c02bc02fc02cc030cc"
+      "a9cca8c013c014009c009d002f0035010001936a6a0000000d001400120a0a040308040401050308050501080606010"
+      "00000170015000012656467652e6d6963726f736f66742e636f6d000a000a00084a4a001d0017001800050005010000"
+      "0000000b00020100002b0007069a9a03040303001b0003020002ff010001000033002b00294a4a000100001d0020c4c"
+      "e4268d58f0c703855163f4754b883742487a5ce87a6016a30208c18e07f69446900050003026832002d000201010023"
+      "000000170000001200000010000e000c02683208687474702f312e310a0a000100001500c3000000000000000000000"
+      "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+  const std::vector<uint8_t> wire = Hex::decode(wire_hex);
+
+  // ClientHello body starts after the 5-byte TLS record header and 4-byte
+  // handshake header. SSL_parse_client_hello expects the body starting at the
+  // legacy_version field.
+  ASSERT_GT(wire.size(), 9u);
+  const uint8_t* body = wire.data() + 9;
+  const size_t body_len = wire.size() - 9;
+
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_TRUE(ctx != nullptr);
+  bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
+  ASSERT_TRUE(ssl != nullptr);
+
+  SSL_CLIENT_HELLO client_hello;
+  ASSERT_EQ(1, SSL_parse_client_hello(ssl.get(), &client_hello, body, body_len));
+
+  const std::string fingerprint = JA4Fingerprinter::create(&client_hello);
+
+  // Same expected fingerprint as Browser-1 in tls_inspector_ja4_test.cc: the
+  // injected GREASE codepoint must not affect JA4_c.
+  EXPECT_EQ(fingerprint, SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1",
+                                    "t13d1515h2_8daaf6152771_de4a06bb82e3"));
 }
 
 // Regression test for the JA4 spec's requirement that GREASE values be excluded
