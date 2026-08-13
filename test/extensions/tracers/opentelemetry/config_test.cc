@@ -105,12 +105,12 @@ public:
   OpenTelemetryTraceExporterPtr
   createExporter(const Protobuf::Message& config,
                  Server::Configuration::TracerFactoryContext& /*context*/) const override {
-    EXPECT_NE(dynamic_cast<const ProtobufWkt::Empty*>(&config), nullptr);
+    EXPECT_NE(dynamic_cast<const Protobuf::Empty*>(&config), nullptr);
     return std::make_unique<DummyTraceExporter>();
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Empty>();
+    return std::make_unique<Protobuf::Empty>();
   }
 
   std::string name() const override {
