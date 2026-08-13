@@ -197,10 +197,6 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
       try {
         exporter = custom_exporter_factory->createExporter(
             *shared_unpacked_config, *worker_factory_context);
-      } catch (const EnvoyException& e) {
-        ENVOY_LOG(error,
-                  "Failed to create custom OpenTelemetry trace exporter: {}",
-                  e.what());
       } catch (const std::exception& e) {
         ENVOY_LOG(error,
                   "Failed to create custom OpenTelemetry trace exporter: {}",
