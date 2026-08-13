@@ -19,8 +19,7 @@ ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t con
     : ActiveListenerImplBase(parent, config), worker_index_(worker_index),
       concurrency_(concurrency), parent_(parent), listen_socket_(listen_socket),
       udp_listener_(std::move(listener)),
-      udp_stats_({ALL_UDP_LISTENER_STATS(POOL_COUNTER_PREFIX(config->listenerScope(), "udp"),
-                                         POOL_GAUGE_PREFIX(config->listenerScope(), "udp"))}),
+      udp_stats_({ALL_UDP_LISTENER_STATS(POOL_COUNTER_PREFIX(config->listenerScope(), "udp"))}),
       udp_listener_worker_router_(config_->udpListenerConfig()->listenerWorkerRouter(
           *listen_socket.connectionInfoProvider().localAddress())) {
   ASSERT(worker_index_ < concurrency_);
@@ -94,7 +93,9 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
       flow_sweep_timer_(udp_listener_->dispatcher().createTimer([this] { sweepIdleFlows(); })),
       flow_idle_timeout_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
           config.udpListenerConfig()->config(), flow_idle_timeout, 60000))),
-      flow_limit_(std::move(flow_limit)) {
+      flow_limit_(std::move(flow_limit)),
+      raw_udp_stats_(
+          {ALL_RAW_UDP_LISTENER_STATS(POOL_GAUGE_PREFIX(config.listenerScope(), "udp"))}) {
   // Create the filter chain on creating a new udp listener.
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
@@ -127,7 +128,7 @@ void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
   } else if (flow_limit_->canCreate()) {
     flow_last_activity_.emplace(data.addresses_, now);
     flow_limit_->inc();
-    udp_stats_.downstream_flows_active_.inc();
+    raw_udp_stats_.downstream_flows_active_.inc();
     if (flow_last_activity_.size() == 1) {
       flow_sweep_timer_->enableTimer(flow_idle_timeout_);
     }
@@ -154,7 +155,7 @@ void ActiveRawUdpListener::sweepIdleFlows() {
   }
   const uint64_t erased = before - flow_last_activity_.size();
   flow_limit_->decBy(erased);
-  udp_stats_.downstream_flows_active_.sub(erased);
+  raw_udp_stats_.downstream_flows_active_.sub(erased);
   if (!flow_last_activity_.empty()) {
     flow_sweep_timer_->enableTimer(flow_idle_timeout_);
   }
