@@ -92,7 +92,6 @@ public:
 
 REGISTER_FACTORY(NullTraceExporterFactory, OpenTelemetryTraceExporterFactory);
 
-
 } // namespace
 
 class OpenTelemetryDriverTest : public testing::Test {
@@ -504,7 +503,6 @@ TEST_F(OpenTelemetryDriverTest, NullCustomExporterIncrementsSpansDropped) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_dropped").value());
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
-
 
 // Verifies that the tracer cannot be configured with two exporters at the same time
 TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {
