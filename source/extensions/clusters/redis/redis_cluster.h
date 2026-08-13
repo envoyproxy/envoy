@@ -280,6 +280,10 @@ private:
     // Start discovery against a random host from existing hosts
     void startResolveRedis();
 
+    // Re-arms the resolve timer to fire immediately. Requested by the cluster refresh manager;
+    // no-op once the session has been shut down.
+    void requestImmediateRefresh();
+
     // Zone discovery methods
     void startZoneDiscovery(ClusterSlotsSharedPtr slots);
     void onZoneResponse(std::string address, bool is_primary,
@@ -349,6 +353,7 @@ private:
         zone_requests_;
     HostZoneMap discovered_zones_; // address -> zone mapping from INFO responses
 
+  private:
     // In-flight hostname resolutions for CLUSTER SLOTS entries that returned hostnames instead
     // of IP addresses (e.g. AWS ElastiCache). The resolve() handles are tracked so shutdown()
     // can cancel them; completed queries unregister themselves by id.

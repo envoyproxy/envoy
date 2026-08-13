@@ -1662,6 +1662,7 @@ TEST_F(RedisClusterTest, DestructionWithHeldSessionClosesClientsAndDisarmsTimer)
 // resolution must be cancelled at teardown; before the resolve() handles were tracked, the
 // pending callback fired into the destroyed session (use-after-free).
 TEST_F(RedisClusterTest, DestructionCancelsInFlightHostnameResolution) {
+  hold_client_configs_ = true;
   setupFromV3Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{"127.0.0.1"};
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
@@ -1674,13 +1675,20 @@ TEST_F(RedisClusterTest, DestructionCancelsInFlightHostnameResolution) {
 
   // Deliver a CLUSTER SLOTS response whose primary is a hostname and leave its DNS
   // resolution in flight.
+  Network::DnsResolver::ResolveCb hostname_resolve_cb;
   EXPECT_CALL(*dns_resolver_, resolve("primary.com", Network::DnsLookupFamily::V4Only, _))
-      .WillOnce(Return(&active_dns_query_));
+      .WillOnce(DoAll(SaveArg<2>(&hostname_resolve_cb), Return(&active_dns_query_)));
   pool_callbacks_->onResponse(singleSlotPrimary("primary.com", 22120));
 
   // Destroying the cluster must cancel the outstanding query.
   EXPECT_CALL(active_dns_query_, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
   cluster_.reset();
+
+  // The session survives via the held client config reference. A resolution that still
+  // completes despite the cancellation request must be ignored by the shutdown guard instead
+  // of dereferencing the destroyed cluster.
+  hostname_resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
+                      TestUtility::makeDnsResponse(resolved_addresses));
 }
 
 // Destroying the cluster while zone-discovery INFO requests are in flight must cancel them.

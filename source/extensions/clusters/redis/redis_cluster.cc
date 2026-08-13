@@ -101,15 +101,14 @@ RedisCluster::RedisCluster(
 
   // Register the cluster callback using weak_ptr to avoid use-after-free. Locking the weak_ptr
   // alone is not sufficient: the session briefly outlives its cluster (discovery clients keep
-  // it alive until their deferred deletion runs), so also gate on the session-owned shutdown
-  // flag before touching the resolve timer.
+  // it alive until their deferred deletion runs), so requestImmediateRefresh() is a no-op once
+  // the session has been shut down.
   std::weak_ptr<RedisDiscoverySession> weak_session = redis_discovery_session_;
   registration_handle_ = refresh_manager_->registerCluster(
       cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
       failure_refresh_threshold_, host_degraded_refresh_threshold_, [weak_session]() {
-        auto session = weak_session.lock();
-        if (session && !session->shutdown_ && session->resolve_timer_) {
-          session->resolve_timer_->enableTimer(std::chrono::milliseconds(0));
+        if (auto session = weak_session.lock()) {
+          session->requestImmediateRefresh();
         }
       });
 }
@@ -353,10 +352,17 @@ void RedisCluster::RedisDiscoverySession::shutdown() {
     resolve_timer_->disableTimer();
   }
 
-  // close() synchronously raises LocalClose, whose handler erases the entry from client_map_
-  // and defers deletion of the client itself.
+  // Extract each entry before closing it so that loop progress does not depend on close()
+  // synchronously raising LocalClose (whose handler would erase the entry). onEvent()
+  // tolerates the already-removed entry and the client is handed to deferred deletion here.
   while (!client_map_.empty()) {
-    client_map_.begin()->second->client_->close();
+    auto client_to_close = client_map_.extract(client_map_.begin());
+    if (client_to_close.mapped() == nullptr || client_to_close.mapped()->client_ == nullptr) {
+      // Zone discovery leaves a null placeholder behind when client creation fails.
+      continue;
+    }
+    client_to_close.mapped()->client_->close();
+    dispatcher_.deferredDelete(std::move(client_to_close.mapped()->client_));
   }
 }
 
@@ -364,7 +370,10 @@ void RedisCluster::RedisDiscoveryClient::onEvent(Network::ConnectionEvent event)
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     auto client_to_delete = parent_.client_map_.find(host_);
-    ASSERT(client_to_delete != parent_.client_map_.end());
+    if (client_to_delete == parent_.client_map_.end()) {
+      // shutdown() extracted the entry before closing it and disposes of the client itself.
+      return;
+    }
     parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second->client_));
     parent_.client_map_.erase(client_to_delete);
   }
@@ -430,6 +439,12 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   }
   ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());
   current_request_ = client->client_->makeRequest(ClusterSlotsRequest::instance_, *this);
+}
+
+void RedisCluster::RedisDiscoverySession::requestImmediateRefresh() {
+  if (!shutdown_ && resolve_timer_) {
+    resolve_timer_->enableTimer(std::chrono::milliseconds(0));
+  }
 }
 
 void RedisCluster::RedisDiscoverySession::updateDnsStats(
