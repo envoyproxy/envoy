@@ -47,7 +47,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "//third_party/opentelemetry/cpp/api",
+        "@opentelemetry-cpp//api",
     ],
 )
 

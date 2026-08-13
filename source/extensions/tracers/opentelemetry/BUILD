@@ -5,7 +5,7 @@ load(
     "envoy_extension_package",
 )
 
-licenses(["notice"]) # Apache 2
+licenses(["notice"])  # Apache 2
 
 # Trace driver for OpenTelemetry: https://opentelemetry.io/
 
@@ -51,9 +51,8 @@ envoy_cc_library(
         "//source/extensions/tracers/common:factory_base_lib",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
-        "//third_party/fmtlib",
-        "//third_party/opentelemetry/cpp/api",
-        "//third_party/opentelemetry/proto/collector/trace/v1:trace_service_cc_proto",
+        "@opentelemetry-cpp//api",
+        "//opentelemetry/proto/collector/trace/v1:trace_service_cc_proto",
     ],
 )
 
@@ -89,7 +88,7 @@ envoy_cc_library(
         "//source/common/tracing:tracer_config_lib",
         "//source/common/version:version_lib",
         "//source/server:generic_factory_context_lib",
-        "//third_party/opentelemetry/cpp/api",
-        "//third_party/opentelemetry/proto/collector/trace/v1:trace_service_cc_proto",
+        "@opentelemetry-cpp//api",
+        "//opentelemetry/proto/collector/trace/v1:trace_service_cc_proto",
     ],
 )

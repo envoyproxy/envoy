@@ -3,7 +3,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/server/tracer_config.h"
 #include "source/common/common/logger.h"
-#include "third_party/opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse;

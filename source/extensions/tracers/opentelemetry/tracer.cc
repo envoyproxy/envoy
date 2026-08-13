@@ -14,8 +14,8 @@
 #include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/otlp_utils.h"
 
-#include "third_party/opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
-#include "third_party/opentelemetry/proto/trace/v1/trace.pb.h"
+#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+#include "opentelemetry/proto/trace/v1/trace.pb.h"
 
 namespace Envoy {
 namespace Extensions {

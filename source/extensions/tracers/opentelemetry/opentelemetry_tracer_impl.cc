@@ -20,9 +20,9 @@
 #include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 #include "source/extensions/tracers/opentelemetry/trace_exporter.h"
 #include "source/extensions/tracers/opentelemetry/tracer.h"
-#include "third_party/fmtlib/src/include/fmt/format.h"
-#include "third_party/opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
-#include "third_party/opentelemetry/proto/trace/v1/trace.pb.h"
+#include "fmt/format.h"
+#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+#include "opentelemetry/proto/trace/v1/trace.pb.h"
 
 namespace Envoy {
 namespace Extensions {
