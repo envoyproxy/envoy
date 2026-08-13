@@ -2,14 +2,13 @@ syntax = "proto3";
 
 package envoy.config.trace.v3;
 
-import "envoy/config/core/v3/extension.proto";
-import "envoy/config/core/v3/grpc_service.proto";
-import "envoy/config/core/v3/http_service.proto";
-
 import "google/protobuf/wrappers.proto";
-
-import "udpa/annotations/migrate.proto";
-import "udpa/annotations/status.proto";
+import "third_party/envoy/src/api/envoy/config/core/v3/extension.proto";
+import "third_party/envoy/src/api/envoy/config/core/v3/grpc_service.proto";
+import "third_party/envoy/src/api/envoy/config/core/v3/http_service.proto";
+import "third_party/protoc_gen_validate/validate/validate.proto";
+import "third_party/udpa/udpa/annotations/migrate.proto";
+import "third_party/udpa/udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "OpentelemetryProto";
@@ -21,29 +20,39 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message OpenTelemetryConfig {
-  // The upstream gRPC cluster that will receive OTLP traces.
-  // Note that the tracer drops traces if the server does not read data fast enough.
-  // This field can be left empty to disable reporting traces to the gRPC service.
-  // Only one of ``grpc_service``, ``http_service`` may be used.
-  core.v3.GrpcService grpc_service = 1
-      [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
+  // OTLP exporter specification. Exactly one of ``grpc_service``,
+  // ``http_service``, or ``exporter`` must be used.
+  oneof otlp_exporter {
+    option (validate.required) = true;
 
-  // The upstream HTTP cluster that will receive OTLP traces.
-  // This field can be left empty to disable reporting traces to the HTTP service.
-  // Only one of ``grpc_service``, ``http_service`` may be used.
-  //
-  // .. note::
-  //
-  //   The ``request_headers_to_add`` property in the OTLP HTTP exporter service supports
-  //   substitution formatters. The formatters cannot access any HTTP or connection properties, but
-  //   can load content such as environment variables or files or secrets.
-  core.v3.HttpService http_service = 3
-      [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
+    // The upstream gRPC cluster that will receive OTLP traces.
+    // Note that the tracer drops traces if the server does not read data fast
+    // enough. Only one of ``grpc_service``, ``http_service``, ``exporter`` may
+    // be used.
+    core.v3.GrpcService grpc_service = 1;
 
-  // The name for the service. This will be populated in the ResourceSpan Resource attributes.
-  // If it is not provided, it will default to "unknown_service:envoy".
+    // The upstream HTTP cluster that will receive OTLP traces.
+    // Only one of ``grpc_service``, ``http_service``, ``exporter`` may be used.
+    //
+    // .. note::
+    //
+    //   The ``request_headers_to_add`` property in the OTLP HTTP exporter
+    //   service supports substitution formatters. The formatters cannot access
+    //   any HTTP or connection properties, but can load content such as
+    //   environment variables or files or secrets.
+    core.v3.HttpService http_service = 3;
+
+    // Specifies the custom exporter to be used by the OpenTelemetry tracer.
+    // Only one of ``grpc_service``, ``http_service``, ``exporter`` may be used.
+    // [#extension-category: envoy.tracers.opentelemetry.exporters]
+    core.v3.TypedExtensionConfig exporter = 10;
+  }
+
+  // The name for the service. This will be populated in the ResourceSpan
+  // Resource attributes. If it is not provided, it will default to
+  // "unknown_service:envoy".
   string service_name = 2;
 
   // An ordered list of resource detectors

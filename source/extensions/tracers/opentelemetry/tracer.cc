@@ -1,21 +1,21 @@
-#include "source/extensions/tracers/opentelemetry/tracer.h"
+#include "third_party/envoy/src/source/extensions/tracers/opentelemetry/tracer.h"
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
 #include <string>
 
-#include "envoy/config/trace/v3/opentelemetry.pb.h"
+#include "third_party/envoy/src/api/envoy/config/trace/v3/opentelemetry.pb.h"
 
-#include "source/common/common/empty_string.h"
-#include "source/common/common/hex.h"
-#include "source/common/tracing/common_values.h"
-#include "source/common/tracing/trace_context_impl.h"
-#include "source/common/version/version.h"
-#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
+#include "third_party/envoy/src/source/common/common/empty_string.h"
+#include "third_party/envoy/src/source/common/common/hex.h"
+#include "third_party/envoy/src/source/common/tracing/common_values.h"
+#include "third_party/envoy/src/source/common/tracing/trace_context_impl.h"
+#include "third_party/envoy/src/source/common/version/version.h"
+#include "third_party/envoy/src/source/extensions/tracers/opentelemetry/otlp_utils.h"
 
-#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
-#include "opentelemetry/proto/trace/v1/trace.pb.h"
+#include "third_party/opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+#include "third_party/opentelemetry/proto/trace/v1/trace.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -232,6 +232,16 @@ void Tracer::flushSpans() {
     return;
   }
 
+  if (!exporter_) {
+    ENVOY_LOG_EVERY_POW_2(warn,
+                          "Skipping log request to OpenTelemetry: no exporter "
+                          "configured; dropping {} spans",
+                          span_buffer_.size());
+    tracing_stats_.spans_dropped_.add(span_buffer_.size());
+    span_buffer_.clear();
+    return;
+  }
+
   ExportTraceServiceRequest request;
   // A request consists of ResourceSpans.
   ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
@@ -260,14 +270,11 @@ void Tracer::flushSpans() {
   for (const auto& pending_span : span_buffer_) {
     (*scope_span->add_spans()) = pending_span;
   }
-  if (exporter_) {
-    tracing_stats_.spans_sent_.add(span_buffer_.size());
-    if (!exporter_->log(request)) {
-      // TODO: should there be any sort of retry or reporting here?
-      ENVOY_LOG(trace, "Unsuccessful log request to OpenTelemetry trace collector.");
-    }
-  } else {
-    ENVOY_LOG(info, "Skipping log request to OpenTelemetry: no exporter configured");
+  tracing_stats_.spans_sent_.add(span_buffer_.size());
+  if (!exporter_->log(request)) {
+    // TODO: should there be any sort of retry or reporting here?
+    ENVOY_LOG(trace,
+              "Unsuccessful log request to OpenTelemetry trace collector.");
   }
   span_buffer_.clear();
 }

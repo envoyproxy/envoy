@@ -1,8 +1,9 @@
 #pragma once
 
-#include "source/common/common/logger.h"
-
-#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+#include "third_party/envoy/src/envoy/config/typed_config.h"
+#include "third_party/envoy/src/envoy/server/tracer_config.h"
+#include "third_party/envoy/src/source/common/common/logger.h"
+#include "third_party/opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse;
@@ -46,6 +47,40 @@ public:
 };
 
 using OpenTelemetryTraceExporterPtr = std::unique_ptr<OpenTelemetryTraceExporter>;
+
+/**
+ * A factory for creating an OpenTelemetryTraceExporter.
+ *
+ * `createExporter` is invoked concurrently from multiple worker threads during
+ * TLS initialization. Implementations MUST be stateless, re-entrant, and
+ * thread-safe.
+ */
+class OpenTelemetryTraceExporterFactory : public Envoy::Config::TypedFactory {
+ public:
+  ~OpenTelemetryTraceExporterFactory() override = default;
+
+  /**
+   * @brief Creates an OpenTelemetryTraceExporter.
+   *
+   * `createExporter` is invoked concurrently from multiple worker threads
+   * during TLS initialization and implementations MUST be stateless,
+   * re-entrant, and thread-safe.
+   *
+   * @param config The exporter protobuf config.
+   * @param context The TracerFactoryContext.
+   * @return OpenTelemetryTraceExporterPtr A trace exporter.
+   */
+  virtual OpenTelemetryTraceExporterPtr createExporter(
+      const Protobuf::Message& config,
+      Server::Configuration::TracerFactoryContext& context) const PURE;
+
+  std::string category() const override {
+    return "envoy.tracers.opentelemetry.exporters";
+  }
+};
+
+using OpenTelemetryTraceExporterFactoryPtr =
+    std::unique_ptr<OpenTelemetryTraceExporterFactory>;
 
 } // namespace OpenTelemetry
 } // namespace Tracers
