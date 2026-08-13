@@ -37,6 +37,10 @@ public:
   std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override {
     return str_.string_value();
   }
+  bool formatTo(std::string& sink, const Context&, const StreamInfo::StreamInfo&) const override {
+    sink.append(str_.string_value());
+    return true;
+  }
   Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override {
     return str_;
   }
@@ -90,17 +94,28 @@ public:
   // Formatter
   std::string format(const Context& context,
                      const StreamInfo::StreamInfo& stream_info) const override;
+  void formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
   FormatterImpl(absl::Status& creation_status, absl::string_view format,
                 bool omit_empty_values = false, const CommandParsers& command_parsers = {})
       : omit_empty_values_(omit_empty_values) {
+    // Substitution commands are always introduced by a '%', so a format string without one is a
+    // constant that is known at configuration time. Parsing it would only ever produce a single
+    // string literal provider that format() and formatTo() would then never consult, so fold the
+    // value here and skip the parse entirely.
+    if (format.find('%') == absl::string_view::npos) {
+      constant_value_.emplace(format);
+      return;
+    }
     auto providers_or_error = SubstitutionFormatParser::parse(format, command_parsers);
     SET_AND_RETURN_IF_NOT_OK(providers_or_error.status(), creation_status);
     providers_ = std::move(*providers_or_error);
   }
 
 private:
+  std::optional<std::string> constant_value_;
   const bool omit_empty_values_;
   std::vector<FormatterProviderPtr> providers_;
 };
@@ -120,10 +135,39 @@ public:
 
   // Formatter
   std::string format(const Context& context, const StreamInfo::StreamInfo& info) const override;
+  void formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& info) const override;
 
 private:
   const bool omit_empty_values_;
   const std::vector<ParsedFormatElement> parsed_elements_;
+};
+
+// Node of the JSON format template tree. Defined in the implementation file because its type
+// is an internal detail of the tree-structured omitting JSON formatter.
+struct JsonFormatMapNode;
+
+// JSON formatter that honors `omit_empty_values` by omitting keys whose value evaluates to
+// null and collapsing nested objects that become empty. Unlike JsonFormatterImpl, which
+// pre-serializes the whole template for maximum speed, this implementation keeps the template
+// as a tree so that the structural decision to omit a key can be made at format time. It is
+// only used when `omit_empty_values` is set, so users that do not need omission continue to
+// use the faster pre-serialized formatter.
+class OmitEmptyJsonFormatterImpl : public Formatter {
+public:
+  using CommandParsers = std::vector<CommandParserPtr>;
+
+  static absl::StatusOr<std::unique_ptr<OmitEmptyJsonFormatterImpl>>
+  create(const Protobuf::Struct& struct_format, const CommandParsers& commands = {});
+
+  explicit OmitEmptyJsonFormatterImpl(std::unique_ptr<JsonFormatMapNode> root);
+  ~OmitEmptyJsonFormatterImpl() override;
+
+  // Formatter
+  std::string format(const Context& context, const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const std::unique_ptr<JsonFormatMapNode> root_;
 };
 
 } // namespace Formatter

@@ -115,6 +115,36 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
   cb(filter_callback);
 }
 
+TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto2) {
+  TestScopedRuntime scoped_runtime;
+  Geolocation::DummyGeoipProviderFactory dummy_factory;
+  Registry::InjectFactory<Geolocation::GeoipProviderFactory> registered(dummy_factory);
+  std::string filter_config_yaml = R"EOF(
+    xff_config:
+      xff_num_trusted_hops: 1
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
+  )EOF";
+  GeoipFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  GeoipFilterFactory factory;
+  // Built before the expectation below so that only the factory's own calls are counted.
+  Server::Configuration::ExtraFactoryContext extra_context{
+      context.server_factory_context_.messageValidationVisitor(), "geoip"};
+  EXPECT_CALL(context.server_factory_context_, messageValidationVisitor()).Times(2);
+  Http::FilterFactoryCb cb = factory
+                                 .createHttpFilterFactoryFromProto(
+                                     filter_config, context.server_factory_context_, extra_context)
+                                 .value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback,
+              addStreamDecoderFilter(AllOf(HasUseXff(true), HasXffNumTrustedHops(1))));
+  cb(filter_callback);
+}
+
 TEST(GeoipFilterConfigTest, GeoipFilterConfigMissingProvider) {
   TestScopedRuntime scoped_runtime;
   Geolocation::DummyGeoipProviderFactory dummy_factory;

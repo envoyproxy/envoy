@@ -650,24 +650,15 @@ FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
     Server::Configuration::CommonFactoryContext& context,
     std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
-    const std::string& stats_prefix)
+    const std::string& stats_prefix, absl::Status& creation_status)
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
       end_session_endpoint_(proto_config.end_session_endpoint()),
-      post_logout_redirect_uri_formatter_(
-          (proto_config.post_logout_redirect_uri().uri().empty() ||
-           proto_config.end_session_endpoint().empty())
-              ? nullptr
-              : THROW_OR_RETURN_VALUE(
-                    Formatter::FormatterImpl::create(proto_config.post_logout_redirect_uri().uri()),
-                    Formatter::FormatterPtr)),
       disable_post_logout_redirect_uri_(proto_config.post_logout_redirect_uri().disabled()),
       authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
-      redirect_uri_(proto_config.redirect_uri()),
       allowed_redirect_domains_(proto_config.allowed_redirect_domains().begin(),
                                 proto_config.allowed_redirect_domains().end()),
-      original_request_uri_(proto_config.original_request_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher(), context),
       signout_path_(proto_config.signout_path(), context), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
@@ -737,6 +728,28 @@ FilterConfig::FilterConfig(
            proto_config.cookie_configs().has_code_verifier_cookie_config())
               ? CookieSettings(proto_config.cookie_configs().code_verifier_cookie_config())
               : CookieSettings()) {
+
+  {
+    // Create the redirect URI formatter unconditionally.
+    auto formatter_or_error = Formatter::FormatterImpl::create(proto_config.redirect_uri());
+    SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
+    redirect_uri_formatter_ = std::move(formatter_or_error.value());
+  }
+
+  if (!proto_config.end_session_endpoint().empty()) {
+    if (!proto_config.post_logout_redirect_uri().uri().empty()) {
+      auto formatter_or_error =
+          Formatter::FormatterImpl::create(proto_config.post_logout_redirect_uri().uri());
+      SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
+      post_logout_redirect_uri_formatter_ = std::move(formatter_or_error.value());
+    }
+  }
+  if (!proto_config.original_request_uri().empty()) {
+    auto formatter_or_error = Formatter::FormatterImpl::create(proto_config.original_request_uri());
+    SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
+    original_request_uri_formatter_ = std::move(formatter_or_error.value());
+  }
+
   if (!context.clusterManager().hasCluster(oauth_token_endpoint_.cluster())) {
     // This is not necessarily a configuration error — sometimes cluster is sent later than the
     // listener in the xDS stream.
@@ -745,9 +758,10 @@ FilterConfig::FilterConfig(
   }
   if (!authorization_endpoint_url_.initialize(authorization_endpoint_,
                                               /*is_connect_request=*/false)) {
-    throw EnvoyException(
+    creation_status = absl::InvalidArgumentError(
         fmt::format("OAuth2 filter: invalid authorization endpoint URL '{}' in config.",
                     authorization_endpoint_));
+    return;
   }
   if (!end_session_endpoint_.empty()) {
     bool is_oidc = false;
@@ -758,8 +772,9 @@ FilterConfig::FilterConfig(
       }
     }
     if (!is_oidc) {
-      throw EnvoyException(
+      creation_status = absl::InvalidArgumentError(
           "OAuth2 filter: end session endpoint is only supported for OpenID Connect.");
+      return;
     }
   }
 
@@ -770,7 +785,7 @@ FilterConfig::FilterConfig(
     // been validated during the config load.
     auto parsed_policy_or_error = Router::RetryPolicyImpl::create(
         retry_policy, ProtobufMessage::getNullValidationVisitor(), context);
-    THROW_IF_NOT_OK_REF(parsed_policy_or_error.status());
+    SET_AND_RETURN_IF_NOT_OK(parsed_policy_or_error.status(), creation_status);
     retry_policy_ = std::move(parsed_policy_or_error.value());
   }
 }
@@ -1005,8 +1020,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // Check if we can update the access token via a refresh token.
     if (config_->useRefreshToken() && validator_->canUpdateTokenByRefreshToken()) {
 
-      ENVOY_STREAM_LOG(debug, "Trying to update the access token using the refresh token",
-                       *decoder_callbacks_);
+      ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                              "Trying to update the access token using the refresh token");
 
       // try to update access token by refresh token
       auto client_credential = getClientCredential();
@@ -1037,7 +1052,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
           "Unauthorized, and redirecting to OAuth server is not allowed: {}", path_str));
       return Http::FilterHeadersStatus::StopIteration;
     } else {
-      ENVOY_STREAM_LOG(debug, "redirecting to OAuth server: {}", *decoder_callbacks_, path_str);
+      ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                              "redirecting to OAuth server: {}", path_str);
       redirectToOAuthServer(headers);
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -1055,9 +1071,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   original_request_url_ = result.original_request_url_;
   auth_code_ = result.auth_code_;
-  Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
-      Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
-  const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
+  const auto redirect_uri =
+      config_->redirectUri().format({&headers}, decoder_callbacks_->streamInfo());
 
   std::optional<std::string> encrypted_code_verifier =
       readCookieValueWithSuffix(headers, config_->cookieNames().code_verifier_, result.flow_id_);
@@ -1134,10 +1149,12 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     if (config_->forwardIdToken() && !validator_->idToken().empty()) {
       forwardIdToken(headers, validator_->idToken());
     }
-    ENVOY_STREAM_LOG(debug, "skipping oauth flow due to valid hmac cookie", *decoder_callbacks_);
+    ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                            "skipping oauth flow due to valid hmac cookie");
     return true;
   }
-  ENVOY_STREAM_LOG(debug, "can not skip oauth flow", *decoder_callbacks_);
+  ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "can not skip oauth flow");
   return false;
 }
 
@@ -1211,9 +1228,9 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
                               !Http::HeaderUtility::headerValueIsValid(decrypt_result.plaintext);
 
   if (decrypt_failed) {
-    ENVOY_STREAM_LOG(error, "failed to decrypt token: {}, error: {}", *decoder_callbacks_,
-                     encrypted_token,
-                     decrypt_result.error.value_or("plaintext is not a valid header value"));
+    ENVOY_TAGGED_STREAM_LOG(error, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                            "failed to decrypt token: {}, error: {}", encrypted_token,
+                            decrypt_result.error.value_or("plaintext is not a valid header value"));
     // There are two cases:
     // 1. The token is a legacy unencrypted token.
     // In this case, we return the token as-is to allow the request to proceed.
@@ -1245,10 +1262,8 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 
   auto base_path = absl::StrCat(scheme, "://", host_);
 
-  if (!config_->originalRequestUri().empty()) {
-    Formatter::FormatterPtr base_path_formatter = THROW_OR_RETURN_VALUE(
-        Formatter::FormatterImpl::create(config_->originalRequestUri()), Formatter::FormatterPtr);
-    base_path = base_path_formatter->format({&headers}, decoder_callbacks_->streamInfo());
+  if (config_->originalRequestUri() != nullptr) {
+    base_path = config_->originalRequestUri()->format({&headers}, decoder_callbacks_->streamInfo());
   }
 
   if (!isHostAllowedDomain(base_path, config_->allowedRedirectDomains())) {
@@ -1290,11 +1305,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
 
-  // Format redirect_uri — needed for the query param sent to the identity provider
-  Formatter::FormatterPtr redirect_uri_formatter = THROW_OR_RETURN_VALUE(
-      Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
+  // Format redirect_uri — needed for the query param sent to the identity provider.
   const auto redirect_uri =
-      redirect_uri_formatter->format({&headers}, decoder_callbacks_->streamInfo());
+      config_->redirectUri().format({&headers}, decoder_callbacks_->streamInfo());
   if (!isHostAllowedDomain(redirect_uri, config_->allowedRedirectDomains())) {
     sendUnauthorizedResponse(
         fmt::format("redirect_uri failed domain allow-list validation: {}", redirect_uri));
@@ -1409,11 +1422,11 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 
     if (!config_->disablePostLogoutRedirectUri()) {
       std::string redirect_uri;
-      if (config_->postLogoutRedirectUriFormatter() == nullptr) {
+      if (config_->postLogoutRedirectUri() == nullptr) {
         redirect_uri = default_post_logout_redirect_url;
       } else {
-        redirect_uri = config_->postLogoutRedirectUriFormatter()->format(
-            {&headers}, decoder_callbacks_->streamInfo());
+        redirect_uri =
+            config_->postLogoutRedirectUri()->format({&headers}, decoder_callbacks_->streamInfo());
       }
       absl::StrAppend(&oidc_logout_url,
                       fmt::format(OIDCLogoutUrlPostLogoutRedirectFormatString,
@@ -1494,16 +1507,16 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
         const auto expiration_epoch = expiration_from_jwt - now;
         return std::to_string(expiration_epoch.count());
       } else {
-        ENVOY_STREAM_LOG(debug,
-                         "The expiration time in the refresh token is less than the current time",
-                         *decoder_callbacks_);
+        ENVOY_TAGGED_STREAM_LOG(
+            debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+            "The expiration time in the refresh token is less than the current time");
         return "0";
       }
     }
-    ENVOY_STREAM_LOG(debug,
-                     "The refresh token is not a JWT or exp claim is omitted. The lifetime of the "
-                     "refresh token will be taken from filter configuration",
-                     *decoder_callbacks_);
+    ENVOY_TAGGED_STREAM_LOG(
+        debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+        "The refresh token is not a JWT or exp claim is omitted. The lifetime of the "
+        "refresh token will be taken from filter configuration");
     const std::chrono::seconds default_refresh_token_expires_in =
         config_->defaultRefreshTokenExpiresIn();
     return std::to_string(default_refresh_token_expires_in.count());
@@ -1529,16 +1542,16 @@ std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
         const auto expiration_epoch = expiration_from_jwt - now;
         return std::to_string(expiration_epoch.count());
       } else {
-        ENVOY_STREAM_LOG(debug, "The expiration time in the id token is less than the current time",
-                         *decoder_callbacks_);
+        ENVOY_TAGGED_STREAM_LOG(
+            debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+            "The expiration time in the id token is less than the current time");
         return "0";
       }
     }
-    ENVOY_STREAM_LOG(debug,
-                     "The id token is not a JWT or exp claim is omitted, even though it is "
-                     "required by the OpenID Connect 1.0 specification. "
-                     "The lifetime of the id token will be aligned with the access token",
-                     *decoder_callbacks_);
+    ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                            "The id token is not a JWT or exp claim is omitted, even though it is "
+                            "required by the OpenID Connect 1.0 specification. "
+                            "The lifetime of the id token will be aligned with the access token");
     return std::to_string(expires_in.count());
   }
   return std::to_string(expires_in.count());
@@ -1754,8 +1767,8 @@ void OAuth2Filter::addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers
 }
 
 void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
-  ENVOY_STREAM_LOG(warn, "Responding with 401 Unauthorized. Cause: {}", *decoder_callbacks_,
-                   details);
+  ENVOY_TAGGED_STREAM_LOG(warn, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "Responding with 401 Unauthorized. Cause: {}", details);
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(
       Http::Code::Unauthorized, UnauthorizedBodyMessage,
@@ -1771,8 +1784,8 @@ void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
 }
 
 void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
-  ENVOY_STREAM_LOG(warn, "Responding with 503 Service Unavailable. Cause: {}", *decoder_callbacks_,
-                   details);
+  ENVOY_TAGGED_STREAM_LOG(warn, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "Responding with 503 Service Unavailable. Cause: {}", details);
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, ServiceUnavailableBodyMessage,
                                      nullptr, std::nullopt, details);
@@ -1805,8 +1818,9 @@ void OAuth2Filter::continueWithFailedOAuth(const std::string& reason,
   config_->stats().oauth_allow_failed_passthrough_.inc();
   const std::string log_details =
       extra_details.empty() ? reason : absl::StrCat(reason, ": ", extra_details);
-  ENVOY_STREAM_LOG(debug, "allow_failed_matcher matched, continuing as unauthorized: {}",
-                   *decoder_callbacks_, log_details);
+  ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "allow_failed_matcher matched, continuing as unauthorized: {}",
+                          log_details);
 }
 
 Http::FilterHeadersStatus OAuth2Filter::handleOAuthFailure(const std::string& reason,

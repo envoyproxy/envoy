@@ -98,7 +98,7 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
 }
 
 void GrpcClientImpl::onSuccess(
-    std::unique_ptr<envoy::service::ratelimit::v3::RateLimitResponse>&& response,
+    Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse>&& response,
     Tracing::Span& span) {
   LimitStatus status = LimitStatus::OK;
   ASSERT(response->overall_code() != envoy::service::ratelimit::v3::RateLimitResponse::UNKNOWN);

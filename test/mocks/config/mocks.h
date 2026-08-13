@@ -62,6 +62,21 @@ public:
               (const absl::string_view type_url, absl::string_view resource), (override));
 };
 
+class MockXdsConfigTrackerFactory : public XdsConfigTrackerFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Empty>();
+  }
+
+  std::string name() const override { return "envoy.xds_config_tracker.mock"; };
+
+  XdsConfigTrackerPtr createXdsConfigTracker(const Protobuf::Any&,
+                                             ProtobufMessage::ValidationVisitor&, Api::Api&,
+                                             Event::Dispatcher&) override {
+    return std::make_unique<testing::NiceMock<MockXdsConfigTracker>>();
+  }
+};
+
 class MockXdsResourcesDelegate : public XdsResourcesDelegate {
 public:
   MockXdsResourcesDelegate();
@@ -85,7 +100,8 @@ public:
   MockOpaqueResourceDecoder();
   ~MockOpaqueResourceDecoder() override;
 
-  MOCK_METHOD(ProtobufTypes::MessagePtr, decodeResource, (const Protobuf::Any& resource));
+  MOCK_METHOD(ArenaWrappedProto<Protobuf::Message>, decodeResource,
+              (const Protobuf::Any& resource));
   MOCK_METHOD(std::string, resourceName, (const Protobuf::Message& resource));
 };
 
@@ -202,7 +218,7 @@ public:
   MOCK_METHOD(void, onStreamEstablished, ());
   MOCK_METHOD(void, onEstablishmentFailure, (bool));
   MOCK_METHOD(void, onDiscoveryResponse,
-              (std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> && message,
+              (ResponseProtoPtr<envoy::service::discovery::v3::DiscoveryResponse> && message,
                ControlPlaneStats& control_plane_stats));
   MOCK_METHOD(void, onWriteable, ());
 };

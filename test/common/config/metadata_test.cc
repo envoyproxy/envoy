@@ -143,7 +143,7 @@ public:
   public:
     // Throws EnvoyException (conversion failure) if d is empty.
     std::unique_ptr<const TypedMetadata::Object> parse(const Protobuf::Struct& d) const override {
-      if (d.fields().find("name") != d.fields().end()) {
+      if (d.fields().contains("name")) {
         return std::make_unique<Foo>(d.fields().at("name").string_value());
       }
       throw EnvoyException("Cannot create a Foo when Struct metadata is empty.");

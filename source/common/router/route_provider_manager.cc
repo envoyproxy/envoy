@@ -42,12 +42,13 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
 
 RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigProvider(
     const envoy::config::route::v3::RouteConfiguration& route_config,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
     ProtobufMessage::ValidationVisitor& validator) {
-  auto provider = manager_.addStaticProvider([&factory_context, &validator, &route_config, this]() {
+  auto provider = manager_.addStaticProvider([&factory_context, &init_manager, &validator,
+                                              &route_config, this]() {
     ConfigTraitsImpl config_traits(validator);
     return std::make_unique<StaticRouteConfigProviderImpl>(route_config, config_traits,
-                                                           factory_context, manager_);
+                                                           factory_context, init_manager, manager_);
   });
   ASSERT(dynamic_cast<RouteConfigProvider*>(provider.get()));
   return RouteConfigProviderPtr(static_cast<RouteConfigProvider*>(provider.release()));

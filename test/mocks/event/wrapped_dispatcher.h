@@ -25,8 +25,12 @@ public:
     impl_.registerWatchdog(watchdog, min_touch_interval);
   }
 
-  Evwatch::ObserverHandlePtr registerEvwatchObserver(Evwatch::ObserverPtr observer) override {
-    return impl_.registerEvwatchObserver(std::move(observer));
+  void registerEvwatchObserver(Evwatch::Observer& observer) override {
+    impl_.registerEvwatchObserver(observer);
+  }
+
+  void unregisterEvwatchObserver(Evwatch::Observer& observer) override {
+    impl_.unregisterEvwatchObserver(observer);
   }
 
   TimeSource& timeSource() override { return impl_.timeSource(); }

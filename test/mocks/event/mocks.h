@@ -9,6 +9,7 @@
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/evwatch_observer_manager.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/signal.h"
@@ -114,14 +115,11 @@ public:
     return SignalEventPtr{listenForSignal_(signal_num, cb)};
   }
 
-  Evwatch::ObserverHandlePtr registerEvwatchObserver(Evwatch::ObserverPtr observer) override {
-    return Evwatch::ObserverHandlePtr{registerEvwatchObserver_(observer.get())};
-  }
-
   // Event::Dispatcher
   MOCK_METHOD(void, registerWatchdog,
               (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
-  MOCK_METHOD(Evwatch::ObserverHandle*, registerEvwatchObserver_, (Evwatch::Observer * observer));
+  MOCK_METHOD(void, registerEvwatchObserver, (Evwatch::Observer & observer));
+  MOCK_METHOD(void, unregisterEvwatchObserver, (Evwatch::Observer & observer));
   MOCK_METHOD(void, initializeStats, (Stats::Scope&, const std::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
   MOCK_METHOD(Network::ServerConnection*, createServerConnection_, (StreamInfo::StreamInfo & info));
@@ -198,6 +196,15 @@ public:
 
   // If not nullptr, will be set on dtor. This can help to verify that the timer was destroyed.
   bool* timer_destroyed_{};
+};
+
+class MockEvwatchObserverManager : public EvwatchObserverManager {
+public:
+  MockEvwatchObserverManager();
+  ~MockEvwatchObserverManager() override;
+
+  MOCK_METHOD(void, registerObserver, (Evwatch::Observer & observer), (override));
+  MOCK_METHOD(void, unregisterObserver, (Evwatch::Observer & observer), (override));
 };
 
 class MockScaledRangeTimerManager : public ScaledRangeTimerManager {

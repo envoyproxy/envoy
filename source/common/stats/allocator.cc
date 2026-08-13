@@ -297,8 +297,8 @@ private:
 CounterSharedPtr Allocator::makeCounter(StatName name, StatName tag_extracted_name,
                                         StatNameTagSpan stat_name_tags) {
   Thread::LockGuard lock(mutex_);
-  ASSERT(gauges_.find(name) == gauges_.end());
-  ASSERT(text_readouts_.find(name) == text_readouts_.end());
+  ASSERT(!gauges_.contains(name));
+  ASSERT(!text_readouts_.contains(name));
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
     return {*iter};
@@ -316,8 +316,8 @@ CounterSharedPtr Allocator::makeCounter(StatName name, StatName tag_extracted_na
 GaugeSharedPtr Allocator::makeGauge(StatName name, StatName tag_extracted_name,
                                     StatNameTagSpan stat_name_tags, Gauge::ImportMode import_mode) {
   Thread::LockGuard lock(mutex_);
-  ASSERT(counters_.find(name) == counters_.end());
-  ASSERT(text_readouts_.find(name) == text_readouts_.end());
+  ASSERT(!counters_.contains(name));
+  ASSERT(!text_readouts_.contains(name));
   auto iter = gauges_.find(name);
   if (iter != gauges_.end()) {
     return {*iter};
@@ -336,8 +336,8 @@ GaugeSharedPtr Allocator::makeGauge(StatName name, StatName tag_extracted_name,
 TextReadoutSharedPtr Allocator::makeTextReadout(StatName name, StatName tag_extracted_name,
                                                 StatNameTagSpan stat_name_tags) {
   Thread::LockGuard lock(mutex_);
-  ASSERT(counters_.find(name) == counters_.end());
-  ASSERT(gauges_.find(name) == gauges_.end());
+  ASSERT(!counters_.contains(name));
+  ASSERT(!gauges_.contains(name));
   auto iter = text_readouts_.find(name);
   if (iter != text_readouts_.end()) {
     return {*iter};
