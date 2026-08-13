@@ -108,13 +108,13 @@ public:
    * name by tag extraction, meaning they cannot be re-derived from the flat name (relevant for
    * hot restart, where the parent must transmit such tags to the child explicitly).
    */
-  virtual bool noTagExtraction() const { return false; }
+  virtual bool noTagExtraction() const PURE;
 
   /**
    * Marks this metric's tags as not derived from tag extraction. Called at creation time by
    * stores that create stats from caller-supplied tags.
    */
-  virtual void markAsNoTagExtraction() {}
+  virtual void markAsNoTagExtraction() PURE;
 
   /**
    * Flags:

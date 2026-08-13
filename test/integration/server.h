@@ -107,6 +107,20 @@ public:
     return wrapped_scope_->counterFromTaggedName(base_name, name_tags, tagged_name);
   }
 
+  Counter& counterFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                     std::optional<StatNameTagSpan> tags) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->counterFromMergedStatName(full_name, tag_extracted_name, tags);
+  }
+
+  Gauge& gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                 std::optional<StatNameTagSpan> tags,
+                                 Gauge::ImportMode import_mode) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->gaugeFromMergedStatName(full_name, tag_extracted_name, tags,
+                                                   import_mode);
+  }
+
   Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                              StatName tagged_name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
@@ -210,6 +224,8 @@ public:
   uint64_t latch() override { return counter_->latch(); }
   void reset() override { return counter_->reset(); }
   uint64_t value() const override { return counter_->value(); }
+  bool noTagExtraction() const override { return counter_->noTagExtraction(); }
+  void markAsNoTagExtraction() override { counter_->markAsNoTagExtraction(); }
   void incRefCount() override { counter_->incRefCount(); }
   bool decRefCount() override { return counter_->decRefCount(); }
   uint32_t use_count() const override { return counter_->use_count(); }

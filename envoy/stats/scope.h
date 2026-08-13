@@ -256,10 +256,10 @@ public:
    * which would otherwise win the central-cache slot and permanently strip the programmatic
    * tags.
    *
-   * The default delegates to counterFromTaggedName, which retains the metadata on tag-aware
-   * scope implementations. Legacy scope implementations intentionally drop tag metadata on that
-   * path (they cannot compose tag-extracted names with their prefix in general), so they
-   * override this to honor the components, which arrive fully resolved.
+   * Tag-aware scope implementations implement this by delegating to counterFromTaggedName,
+   * which retains the metadata. Legacy scope implementations intentionally drop tag metadata on
+   * that path (they cannot compose tag-extracted names with their prefix in general), so they
+   * instead honor the components, which arrive fully resolved.
    *
    * This assumes the parent and child processes use the same scope implementation across the hot
    * restart: full_name is taken verbatim as the child's cache key rather than being re-derived,
@@ -271,14 +271,7 @@ public:
    * @return a counter within the scope's namespace.
    */
   virtual Counter& counterFromMergedStatName(StatName full_name, StatName tag_extracted_name,
-                                             std::optional<StatNameTagSpan> tags) {
-    if (!tags.has_value() || tags->empty()) {
-      // Without tags the flat name is the only meaningful component; tags may be re-derived from
-      // it by extraction as usual.
-      return counterFromTaggedName(full_name, std::nullopt, StatName());
-    }
-    return counterFromTaggedName(tag_extracted_name, tags, full_name);
-  }
+                                             std::optional<StatNameTagSpan> tags) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
@@ -314,7 +307,7 @@ public:
    * Re-materializes a Gauge during hot restart stat merging from a fully-resolved stat name
    * together with the tag-extracted name and tags captured from the parent process, WITHOUT
    * re-deriving tags from the name. See counterFromMergedStatName for the rationale and the
-   * default/override contract.
+   * implementation contract.
    * @param full_name the complete flat stat name (with tag values) recovered from the parent.
    * @param tag_extracted_name the stat name with tag values removed.
    * @param tags the tag name/value pairs.
@@ -323,14 +316,7 @@ public:
    */
   virtual Gauge& gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
                                          std::optional<StatNameTagSpan> tags,
-                                         Gauge::ImportMode import_mode) {
-    if (!tags.has_value() || tags->empty()) {
-      // Without tags the flat name is the only meaningful component; tags may be re-derived from
-      // it by extraction as usual.
-      return gaugeFromTaggedName(full_name, std::nullopt, StatName(), import_mode);
-    }
-    return gaugeFromTaggedName(tag_extracted_name, tags, full_name, import_mode);
-  }
+                                         Gauge::ImportMode import_mode) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use gaugeFromStatName.

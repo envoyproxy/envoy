@@ -336,10 +336,10 @@ public:
     const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
                                                base_name, name_tags.value_or(StatNameTagSpan{}),
                                                tagged_name, symbolTable());
-    Counter& counter = store_.counters_.get(joiner, matcher).value_or(store_.null_counter_);
-    markIfTagged(counter, name_tags);
-    return counter;
+    return store_.counters_.get(joiner, matcher).value_or(store_.null_counter_);
   }
+  Counter& counterFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                     std::optional<StatNameTagSpan> tags) override;
   Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                              StatName tagged_name, Gauge::ImportMode import_mode) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
@@ -351,9 +351,11 @@ public:
       return store_.null_gauge_;
     }
     gauge->mergeImportMode(import_mode);
-    markIfTagged(*gauge, name_tags);
     return *gauge;
   }
+  Gauge& gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                 std::optional<StatNameTagSpan> tags,
+                                 Gauge::ImportMode import_mode) override;
   Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                                      StatName tagged_name, Histogram::Unit unit) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
@@ -369,11 +371,8 @@ public:
     const TagUtility::TagStatNameJoiner joiner(prefix_.statName(), {}, prefix_.statName(),
                                                base_name, name_tags.value_or(StatNameTagSpan{}),
                                                tagged_name, symbolTable());
-    TextReadout& text_readout =
-        store_.text_readouts_.get(joiner, TextReadout::Type::Default, matcher)
-            .value_or(store_.null_text_readout_);
-    markIfTagged(text_readout, name_tags);
-    return text_readout;
+    return store_.text_readouts_.get(joiner, TextReadout::Type::Default, matcher)
+        .value_or(store_.null_text_readout_);
   }
 
   ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name, TagStringViewSpan name_tags,
@@ -432,14 +431,6 @@ public:
 
 protected:
   void addScopeToStore(const ScopeSharedPtr& scope) { store_.scopes_.push_back(scope); }
-
-  // The isolated store performs no tag extraction, so any caller-supplied tags are by definition
-  // not derivable from the stat name.
-  static void markIfTagged(Metric& metric, const std::optional<StatNameTagSpan>& name_tags) {
-    if (name_tags.has_value() && !name_tags->empty()) {
-      metric.markAsNoTagExtraction();
-    }
-  }
 
   template <class StatType> IterateFn<StatType> iterFilter(const IterateFn<StatType>& fn) const {
     // We determine here what's in the scope by looking at name

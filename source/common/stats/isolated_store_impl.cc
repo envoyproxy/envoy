@@ -23,16 +23,32 @@ static StatNameTagSpan tagSpanFromOpt(std::optional<StatNameTagSpan> tags) {
   return tags ? tags.value() : StatNameTagSpan{};
 }
 
+// The isolated store performs no tag extraction, so any effective tags on the joiner were
+// supplied by the caller and are by definition not derivable from the stat name. Called at
+// creation time only, so the flag is set exactly once per stat.
+static void markIfTagged(Metric& metric, const TagUtility::TagStatNameJoiner& joiner) {
+  const std::optional<StatNameTagSpan> tags = joiner.effectiveTags();
+  if (tags.has_value() && !tags->empty()) {
+    metric.markAsNoTagExtraction();
+  }
+}
+
 IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
     : alloc_(symbol_table),
       counters_([this](const TagUtility::TagStatNameJoiner& joiner) -> CounterSharedPtr {
-        return alloc_.makeCounter(joiner.nameWithTags(), joiner.tagExtractedName(),
-                                  tagSpanFromOpt(joiner.effectiveTags()));
+        CounterSharedPtr counter =
+            alloc_.makeCounter(joiner.nameWithTags(), joiner.tagExtractedName(),
+                               tagSpanFromOpt(joiner.effectiveTags()));
+        markIfTagged(*counter, joiner);
+        return counter;
       }),
       gauges_([this](const TagUtility::TagStatNameJoiner& joiner,
                      Gauge::ImportMode import_mode) -> GaugeSharedPtr {
-        return alloc_.makeGauge(joiner.nameWithTags(), joiner.tagExtractedName(),
-                                tagSpanFromOpt(joiner.effectiveTags()), import_mode);
+        GaugeSharedPtr gauge =
+            alloc_.makeGauge(joiner.nameWithTags(), joiner.tagExtractedName(),
+                             tagSpanFromOpt(joiner.effectiveTags()), import_mode);
+        markIfTagged(*gauge, joiner);
+        return gauge;
       }),
       histograms_([this](const TagUtility::TagStatNameJoiner& joiner,
                          Histogram::Unit unit) -> HistogramSharedPtr {
@@ -41,8 +57,11 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       }),
       text_readouts_([this](const TagUtility::TagStatNameJoiner& joiner,
                             TextReadout::Type) -> TextReadoutSharedPtr {
-        return alloc_.makeTextReadout(joiner.nameWithTags(), joiner.tagExtractedName(),
-                                      tagSpanFromOpt(joiner.effectiveTags()));
+        TextReadoutSharedPtr text_readout =
+            alloc_.makeTextReadout(joiner.nameWithTags(), joiner.tagExtractedName(),
+                                   tagSpanFromOpt(joiner.effectiveTags()));
+        markIfTagged(*text_readout, joiner);
+        return text_readout;
       }),
       null_counter_(symbol_table), null_gauge_(symbol_table), null_histogram_(symbol_table),
       null_text_readout_(symbol_table) {}
@@ -112,6 +131,28 @@ ScopeSharedPtr IsolatedScopeImpl::scopeFromTaggedName(StatName base_name, StatNa
 
 ScopeSharedPtr IsolatedStoreImpl::makeScope(StatName name, StatsMatcherSharedPtr matcher) {
   return std::make_shared<IsolatedScopeImpl>(name, *this, std::move(matcher));
+}
+
+Counter& IsolatedScopeImpl::counterFromMergedStatName(StatName full_name,
+                                                      StatName tag_extracted_name,
+                                                      std::optional<StatNameTagSpan> tags) {
+  if (!tags.has_value() || tags->empty()) {
+    // Without tags the flat name is the only meaningful component; tags may be re-derived from
+    // it by extraction as usual.
+    return counterFromTaggedName(full_name, std::nullopt, StatName());
+  }
+  return counterFromTaggedName(tag_extracted_name, tags, full_name);
+}
+
+Gauge& IsolatedScopeImpl::gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+                                                  std::optional<StatNameTagSpan> tags,
+                                                  Gauge::ImportMode import_mode) {
+  if (!tags.has_value() || tags->empty()) {
+    // Without tags the flat name is the only meaningful component; tags may be re-derived from
+    // it by extraction as usual.
+    return gaugeFromTaggedName(full_name, std::nullopt, StatName(), import_mode);
+  }
+  return gaugeFromTaggedName(tag_extracted_name, tags, full_name, import_mode);
 }
 
 } // namespace Stats
