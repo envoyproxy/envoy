@@ -35,6 +35,7 @@ ARRAYSIZE
 ARN
 ASAN
 ASCII
+ASLR
 ASM
 ASN
 ASSERTed
@@ -659,6 +660,9 @@ auths
 authz
 automata
 autoscale
+awaitable
+awaitables
+awaiter
 backend
 backends
 backgrounded
@@ -1166,6 +1170,7 @@ netmask
 netns
 NLB
 NLMSG
+nodiscard
 nonblocking
 noncopyable
 nonresponsive
@@ -1426,6 +1431,7 @@ serializable
 serializer
 serv
 servercert
+setarch
 setenv
 SETNAME
 setsockopt
@@ -1502,6 +1508,7 @@ submatch
 submessages
 subnet
 subnets
+subobject
 suboptimal
 subprocess
 subsecond
@@ -1598,6 +1605,7 @@ udpa
 uint
 un-
 unacked
+uname
 unary
 unconfigurable
 undef
@@ -1683,6 +1691,9 @@ xid
 xmodem
 xxhash
 xxs
+xxxx
+xxxxxxxx
+xxxxxxxxxxxx
 xyz
 xyzwebservices
 yml

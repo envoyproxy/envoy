@@ -480,6 +480,22 @@ const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointG
            }
            return {};
          }},
+        {DownstreamHandshakeStart,
+         [](const StreamInfo::StreamInfo& stream_info) -> std::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->downstreamHandshakeStart();
+           }
+           return {};
+         }},
+        {DownstreamHandshakeEnd,
+         [](const StreamInfo::StreamInfo& stream_info) -> std::optional<MonotonicTime> {
+           const auto downstream_timing = stream_info.downstreamTiming();
+           if (downstream_timing.has_value()) {
+             return downstream_timing->downstreamHandshakeComplete();
+           }
+           return {};
+         }},
     };
 
 CommonDurationFormatter::TimePointGetter
@@ -1116,6 +1132,21 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                      [](const StreamInfo::StreamInfo& stream_info) {
                                        StreamInfo::TimingUtility timing(stream_info);
                                        return timing.lastDownstreamAckReceived();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_CX_RTT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<StreamInfoDurationFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<std::chrono::nanoseconds> {
+                                       const auto& rtt =
+                                           stream_info.downstreamAddressProvider().roundTripTime();
+                                       if (!rtt.has_value()) {
+                                         return std::nullopt;
+                                       }
+                                       return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                           rtt.value());
                                      });
                                }}},
                              {"BYTES_RECEIVED",
@@ -2633,7 +2664,7 @@ public:
       return nullptr;
     }
     // Check flags for the command.
-    THROW_IF_NOT_OK(Envoy::Formatter::CommandSyntaxChecker::verifySyntax(
+    RETURN_IF_NOT_OK(Envoy::Formatter::CommandSyntaxChecker::verifySyntax(
         (*it).second.first, command, sub_command, max_length));
 
     StreamInfoFormatterResult result = (*it).second.second(sub_command, max_length);

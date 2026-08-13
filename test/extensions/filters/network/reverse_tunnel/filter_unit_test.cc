@@ -1,11 +1,12 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
+#include "envoy/extensions/filters/common/jwks/v3/jwt_handshake.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/network/utility.h"
-#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
@@ -18,7 +19,10 @@
 namespace ReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
 #include "test/common/tls/mock_ssl_handshaker.h"
+#include "test/extensions/filters/http/common/mock.h"
+#include "test/extensions/filters/network/reverse_tunnel/jwt_test_data.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
@@ -122,6 +126,19 @@ public:
     }
   }
 
+  // Undo setupUpstreamExtension()'s mutation of the process-wide acceptor singleton.
+  void clearRegisteredUpstreamExtension() {
+    auto* registered_upstream_interface =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+    if (registered_upstream_interface == nullptr) {
+      return;
+    }
+    if (auto* registered_acceptor = dynamic_cast<ReverseConnection::ReverseTunnelAcceptor*>(
+            const_cast<Network::SocketInterface*>(registered_upstream_interface))) {
+      registered_acceptor->extension_ = nullptr;
+    }
+  }
+
   // Helper method to set up upstream thread local slot for testing.
   void setupUpstreamThreadLocalSlot() {
     // Call onServerInitialized to set up the extension references properly.
@@ -186,6 +203,22 @@ public:
     headers +=
         "x-envoy-reverse-tunnel-initiation-time: " + std::to_string(initiation_time_ms) + "\r\n";
     return headers;
+  }
+
+  // Helper to craft an HTTP request that also carries the initiator worker-id and connection-id
+  // handshake headers.
+  std::string makeHttpRequestWithInitiatorIds(const std::string& method, const std::string& path,
+                                              const std::string& node, const std::string& cluster,
+                                              const std::string& tenant,
+                                              const std::string& initiator_worker_id,
+                                              const std::string& initiator_connection_id) {
+    std::string req = fmt::format("{} {} HTTP/1.1\r\n", method, path);
+    req += "Host: localhost\r\n";
+    req += makeRtHeaders(node, cluster, tenant);
+    req += "x-envoy-reverse-tunnel-worker-id: " + initiator_worker_id + "\r\n";
+    req += "x-envoy-reverse-tunnel-connection-id: " + initiator_connection_id + "\r\n";
+    req += "Content-Length: 0\r\n\r\n";
+    return req;
   }
 
   // Helper to craft HTTP request with initiation time header.
@@ -286,6 +319,7 @@ public:
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
 
   void TearDown() override {
+    clearRegisteredUpstreamExtension();
     // Clean up thread local components to avoid issues during destruction.
     upstream_tls_slot_.reset();
     upstream_thread_local_registry_.reset();
@@ -1649,6 +1683,48 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
 }
 
+// The initiator worker-id and connection-id headers are parsed and threaded into the accepted
+// socket's lifecycle info, so lifecycle access logs can surface them.
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionPropagatesInitiatorIds) {
+  const std::string node_id = "node-ids";
+  const std::string cluster_id = "cluster";
+  const std::string tenant_id = "tenant";
+  const int duped_fd = 100;
+
+  setupUpstreamExtension();
+  setupUpstreamThreadLocalSlot();
+
+  auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
+  auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
+  auto dup_io_handle = std::make_unique<Network::MockIoHandle>();
+
+  EXPECT_CALL(*dup_io_handle, resetFileEvents());
+  EXPECT_CALL(*dup_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(duped_fd));
+  EXPECT_CALL(*dup_io_handle, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mock_io_handle, duplicate())
+      .WillOnce(testing::Return(testing::ByMove(std::move(dup_io_handle))));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(testing::ReturnRef(*mock_io_handle));
+  EXPECT_CALL(*mock_socket, isOpen()).WillRepeatedly(testing::Return(true));
+
+  static Network::ConnectionSocketPtr stored_mock_socket_ids;
+  static std::unique_ptr<Network::MockIoHandle> stored_io_handle_ids;
+  stored_io_handle_ids = std::move(mock_io_handle);
+  stored_mock_socket_ids = std::move(mock_socket);
+
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_mock_socket_ids));
+
+  Buffer::OwnedImpl request(makeHttpRequestWithInitiatorIds(
+      "GET", "/reverse_connections/request", node_id, cluster_id, tenant_id, "worker_9", "314159"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
+
+  const auto* lifecycle =
+      upstream_thread_local_registry_->socketManager()->getLifecycleInfo(duped_fd);
+  ASSERT_NE(lifecycle, nullptr);
+  EXPECT_EQ(lifecycle->initiator_worker_id, "worker_9");
+  EXPECT_EQ(lifecycle->initiator_connection_id, "314159");
+}
+
 TEST_F(ReverseTunnelFilterWithUpstreamTest,
        ProcessAcceptedConnectionReportsZeroWhenInitiationTimeAbsent) {
   auto* reporter_cfg = upstream_config_.mutable_reporter_config();
@@ -2484,6 +2560,806 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest, ConnectionLimitScopedPerTenan
 
   EXPECT_FALSE(cfg->validateConnectionLimit("node", "tenant-a"));
   EXPECT_TRUE(cfg->validateConnectionLimit("node", "tenant-b"));
+}
+
+// jwt_validator handshake authentication.
+
+class ReverseTunnelJwtTest : public ReverseTunnelFilterUnitTest {
+protected:
+  void SetUp() override {
+    ReverseTunnelFilterUnitTest::SetUp();
+    // Mock setDynamicMetadata is a no-op by default; store it so %DYNAMIC_METADATA% can read back
+    // claims published during the handshake.
+    auto& stream_info = callbacks_.connection_.stream_info_;
+    ON_CALL(stream_info, setDynamicMetadata(testing::_, testing::_))
+        .WillByDefault(
+            testing::Invoke([&stream_info](const std::string& ns, const Protobuf::Struct& value) {
+              (*stream_info.metadata_.mutable_filter_metadata())[ns].MergeFrom(value);
+            }));
+  }
+
+  // Configures inline JWT auth on `cfg` with the shared test JWKS.
+  void setJwt(envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& cfg,
+              absl::string_view issuer, const std::vector<std::string>& audiences = {},
+              bool allow_missing_or_failed = false) {
+    auto* jwt = cfg.mutable_jwt_validator();
+    jwt->mutable_local_jwks()->set_inline_string(std::string(kTestJwks));
+    jwt->set_issuer(std::string(issuer));
+    for (const auto& audience : audiences) {
+      jwt->add_audiences(audience);
+    }
+    jwt->set_allow_missing_or_failed(allow_missing_or_failed);
+  }
+
+  // Builds a handshake request with optional authorization header value.
+  std::string makeJwtRequest(const std::string& node, const std::string& cluster,
+                             const std::string& tenant, const std::string& authorization) {
+    std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+    req += "Host: localhost\r\n";
+    req += makeRtHeaders(node, cluster, tenant);
+    if (!authorization.empty()) {
+      req += "authorization: " + authorization + "\r\n";
+    }
+    req += "Content-Length: 0\r\n\r\n";
+    return req;
+  }
+
+  // Builds a filter from `cfg` (optionally injecting a JwksFetcher factory for remote_jwks tests),
+  // drives `request_str` through it, and returns the response bytes.
+  std::string
+  runHandshake(const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& cfg,
+               const std::string& request_str, JwksFetcherFactory fetcher_factory = nullptr) {
+    auto config_or_error =
+        ReverseTunnelFilterConfig::create(cfg, factory_context_, std::move(fetcher_factory));
+    EXPECT_TRUE(config_or_error.ok());
+    return driveHandshake(config_or_error.value(), request_str);
+  }
+
+  // Drives `request_str` through a filter built from an existing `config`, returning the response.
+  std::string driveHandshake(const ReverseTunnelFilterConfigSharedPtr& config,
+                             const std::string& request_str) {
+    ReverseTunnelFilter filter(config, *stats_store_.rootScope(), overload_manager_);
+    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+    filter.initializeReadFilterCallbacks(callbacks_);
+
+    std::string written;
+    EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+        .WillRepeatedly(testing::Invoke([&written](Buffer::Instance& data, bool) {
+          written.append(data.toString());
+          data.drain(data.length());
+        }));
+    Buffer::OwnedImpl request(request_str);
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+    return written;
+  }
+
+  uint64_t counter(absl::string_view name) {
+    auto c = TestUtility::findCounter(stats_store_, std::string(name));
+    return c == nullptr ? 0 : c->value();
+  }
+
+  // Drives a handshake carrying `authorization` and asserts it is rejected before registration:
+  // 401, counted by jwt_denied, and no socket registered (accepted stays 0).
+  void expectRejectedBeforeRegistration(
+      const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& cfg,
+      const std::string& authorization) {
+    const std::string written = runHandshake(cfg, makeJwtRequest("n", "c", "t", authorization));
+    EXPECT_THAT(written, testing::HasSubstr("401 Unauthorized"));
+    EXPECT_EQ(1, counter("reverse_tunnel.handshake.jwt_denied"));
+    EXPECT_EQ(0, counter("reverse_tunnel.handshake.accepted"));
+  }
+
+  // Configures remote_jwks handshake auth on `cfg`. `fast_listener` makes the background fetch run
+  // synchronously in the config constructor, so an injected fetcher's result is applied before the
+  // handshake is driven.
+  void setRemoteJwt(envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& cfg,
+                    absl::string_view issuer, bool allow_missing_or_failed = false,
+                    bool fast_listener = true) {
+    auto* jwt = cfg.mutable_jwt_validator();
+    jwt->set_issuer(std::string(issuer));
+    jwt->set_allow_missing_or_failed(allow_missing_or_failed);
+    auto* remote = jwt->mutable_remote_jwks();
+    if (fast_listener) {
+      remote->mutable_async_fetch()->set_fast_listener(true);
+    }
+    auto* http_uri = remote->mutable_http_uri();
+    http_uri->set_uri("https://example.com/jwks");
+    http_uri->set_cluster("jwks_cluster");
+    http_uri->mutable_timeout()->set_seconds(1);
+  }
+};
+
+TEST_F(ReverseTunnelJwtTest, ValidTokenAccepted) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  const std::string written =
+      runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken)));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.accepted"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.jwt_denied"));
+}
+
+TEST_F(ReverseTunnelJwtTest, MissingTokenRejectedBeforeRegistration) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  // expectRejectedBeforeRegistration asserts accepted == 0, proving the flow returned before
+  // processAcceptedConnection, so no socket is registered for a missing token.
+  expectRejectedBeforeRegistration(cfg, /*authorization=*/"");
+}
+
+TEST_F(ReverseTunnelJwtTest, ExpiredTokenRejected) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  expectRejectedBeforeRegistration(cfg, absl::StrCat("Bearer ", kExpiredToken));
+}
+
+TEST_F(ReverseTunnelJwtTest, MalformedTokenRejected) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  expectRejectedBeforeRegistration(cfg, "Bearer not.a.valid.jwt");
+}
+
+TEST_F(ReverseTunnelJwtTest, WrongIssuerRejected) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, "https://attacker.example.com");
+  expectRejectedBeforeRegistration(cfg, absl::StrCat("Bearer ", kGoodToken));
+}
+
+TEST_F(ReverseTunnelJwtTest, AudienceEnforced) {
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    setJwt(cfg, kIssuer, {"other_service"});
+    const std::string written =
+        runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken)));
+    EXPECT_THAT(written, testing::HasSubstr("401 Unauthorized"));
+  }
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    setJwt(cfg, kIssuer, {"example_service"});
+    const std::string written =
+        runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken)));
+    EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  }
+}
+
+TEST_F(ReverseTunnelJwtTest, VerifiedClaimBindsIdentifier) {
+  // Matching node-id (== verified `sub`) is accepted.
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    setJwt(cfg, kIssuer);
+    cfg.mutable_validation()->set_node_id_format(
+        "%DYNAMIC_METADATA(envoy.filters.network.reverse_tunnel.jwt:sub)%");
+    const std::string written = runHandshake(
+        cfg, makeJwtRequest("test@example.com", "c", "t", absl::StrCat("Bearer ", kGoodToken)));
+    EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  }
+  // A node-id that does not match the verified `sub` claim is rejected with 403.
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    setJwt(cfg, kIssuer);
+    cfg.mutable_validation()->set_node_id_format(
+        "%DYNAMIC_METADATA(envoy.filters.network.reverse_tunnel.jwt:sub)%");
+    const std::string written = runHandshake(
+        cfg, makeJwtRequest("attacker", "c", "t", absl::StrCat("Bearer ", kGoodToken)));
+    EXPECT_THAT(written, testing::HasSubstr("403 Forbidden"));
+    EXPECT_EQ(1, counter("reverse_tunnel.handshake.validation_failed"));
+  }
+}
+
+TEST_F(ReverseTunnelJwtTest, ValidationReqCommandMatchesRequestHeader) {
+  // Regression: before the formatter context carried the request headers, %REQ(...)% rendered empty
+  // and both the match and mismatch cases passed silently. This test fails if that plumbing breaks.
+  // Builds a handshake whose node-id header is `node`, also carrying the x-expected-node-id header
+  // that node_id_format references.
+  auto make_request = [this](const std::string& node, const std::string& expected) {
+    std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+    req += "Host: localhost\r\n";
+    req += makeRtHeaders(node, "c", "t");
+    req += "x-expected-node-id: " + expected + "\r\n";
+    req += "Content-Length: 0\r\n\r\n";
+    return req;
+  };
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.mutable_validation()->set_node_id_format("%REQ(x-expected-node-id)%");
+
+  // Node-id equals the referenced header -> accepted.
+  EXPECT_THAT(runHandshake(cfg, make_request("node-a", "node-a")), testing::HasSubstr("200 OK"));
+  // Node-id differs from the referenced header -> rejected with 403.
+  EXPECT_THAT(runHandshake(cfg, make_request("node-b", "node-a")),
+              testing::HasSubstr("403 Forbidden"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.validation_failed"));
+}
+
+// Fail-closed regression: when the configured formatter renders EMPTY (here a %REQ(...)% header
+// that is present with an empty value), the binding could not be evaluated and the handshake must
+// be rejected. Previously the empty render silently skipped the check and the handshake was
+// accepted with any node id.
+TEST_F(ReverseTunnelJwtTest, ValidationEmptyRenderFailsClosed) {
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+  req += "Host: localhost\r\n";
+  req += makeRtHeaders("node-b", "c", "t");
+  req += "x-expected-node-id:\r\n";
+  req += "Content-Length: 0\r\n\r\n";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.mutable_validation()->set_node_id_format("%REQ(x-expected-node-id)%");
+
+  EXPECT_THAT(runHandshake(cfg, req), testing::HasSubstr("403 Forbidden"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.validation_failed"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.accepted"));
+}
+
+// Fail-closed regression for the formatter's absent-value placeholder: with the referenced header
+// missing, %REQ(...)% renders "-", which must reject the handshake even if the claimed node id is
+// itself "-".
+TEST_F(ReverseTunnelJwtTest, ValidationPlaceholderRenderFailsClosed) {
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+  req += "Host: localhost\r\n";
+  req += makeRtHeaders("-", "c", "t");
+  req += "Content-Length: 0\r\n\r\n";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.mutable_validation()->set_node_id_format("%REQ(x-expected-node-id)%");
+
+  EXPECT_THAT(runHandshake(cfg, req), testing::HasSubstr("403 Forbidden"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.validation_failed"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.accepted"));
+}
+
+// A present-but-empty tenant-id header is rejected like a missing one: an empty tenant silently
+// disables tenant scoping when the socket is registered, while empty node and cluster ids are
+// already rejected at registration by addConnectionSocket.
+TEST_F(ReverseTunnelJwtTest, EmptyTenantIdRejected) {
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+  req += "Host: localhost\r\n";
+  req += "x-envoy-reverse-tunnel-node-id: n\r\n";
+  req += "x-envoy-reverse-tunnel-cluster-id: c\r\n";
+  req += "x-envoy-reverse-tunnel-tenant-id:\r\n";
+  req += "Content-Length: 0\r\n\r\n";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+
+  EXPECT_THAT(runHandshake(cfg, req), testing::HasSubstr("400 Bad Request"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.parse_error"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.accepted"));
+}
+
+TEST_F(ReverseTunnelJwtTest, BareTokenWithoutBearerPrefixAccepted) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  const std::string written =
+      runHandshake(cfg, makeJwtRequest("n", "c", "t", std::string(kGoodToken)));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+}
+
+TEST_F(ReverseTunnelJwtTest, CustomTokenHeaderAccepted) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  cfg.mutable_jwt_validator()->set_token_header("x-jwt-assertion");
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+  req += "Host: localhost\r\n";
+  req += makeRtHeaders("n", "c", "t");
+  req += absl::StrCat("x-jwt-assertion: Bearer ", kGoodToken, "\r\n");
+  req += "Content-Length: 0\r\n\r\n";
+  const std::string written = runHandshake(cfg, req);
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.accepted"));
+}
+
+TEST_F(ReverseTunnelJwtTest, MultipleTokenHeadersUsesFirst) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+  req += "Host: localhost\r\n";
+  req += makeRtHeaders("n", "c", "t");
+  // Two token headers: verification uses the first (valid) one and ignores the rest.
+  req += absl::StrCat("authorization: Bearer ", kGoodToken, "\r\n");
+  req += "authorization: Bearer second\r\n";
+  req += "Content-Length: 0\r\n\r\n";
+  const std::string written = runHandshake(cfg, req);
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.accepted"));
+}
+
+TEST_F(ReverseTunnelJwtTest, AuditModeAllowsMissingToken) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer, {}, /*allow_missing_or_failed=*/true);
+  const std::string written = runHandshake(cfg, makeJwtRequest("n", "c", "t", ""));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.jwt_denied"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.jwt_would_deny"));
+}
+
+TEST_F(ReverseTunnelJwtTest, AuditModeCountsWouldDenyOnInvalidToken) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer, {}, /*allow_missing_or_failed=*/true);
+  const std::string written =
+      runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kExpiredToken)));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.accepted"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.jwt_denied"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.jwt_would_deny"));
+}
+
+TEST_F(ReverseTunnelJwtTest, ForgedSignatureRejected) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  // Flip the last base64url char of the signature so it fails verification.
+  std::string forged(kGoodToken);
+  forged.back() = (forged.back() == 'A') ? 'B' : 'A';
+  expectRejectedBeforeRegistration(cfg, absl::StrCat("Bearer ", forged));
+}
+
+TEST_F(ReverseTunnelJwtTest, TokenWithoutExpirationRejected) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setJwt(cfg, kIssuer);
+  expectRejectedBeforeRegistration(cfg, absl::StrCat("Bearer ", kNonExpiringToken));
+}
+
+TEST_F(ReverseTunnelJwtTest, IssuerRequiredAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->mutable_local_jwks()->set_inline_string(std::string(kTestJwks));
+  // issuer intentionally left empty.
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, InvalidJwksRejectedAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->mutable_local_jwks()->set_inline_string("this is not a jwks");
+  jwt->set_issuer(std::string(kIssuer));
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, JwksSourceRequiredAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->set_issuer(std::string(kIssuer));
+  // No JWKS source (local_jwks) is set.
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
+// Canned fetch outcomes, so remote_jwks tests run without a real upstream.
+enum class FetchOutcome { Success, Error, NeverCompletes };
+
+Extensions::HttpFilters::Common::JwksFetcherPtr makeMockFetcher(FetchOutcome outcome,
+                                                                absl::string_view jwks) {
+  using Receiver = Extensions::HttpFilters::Common::JwksFetcher::JwksReceiver;
+  auto fetcher = std::make_unique<NiceMock<Extensions::HttpFilters::Common::MockJwksFetcher>>();
+  if (outcome == FetchOutcome::Success) {
+    ON_CALL(*fetcher, fetch(testing::_, testing::_))
+        .WillByDefault(
+            testing::Invoke([jwks = std::string(jwks)](Tracing::Span&, Receiver& receiver) {
+              receiver.onJwksSuccess(JwtVerify::Jwks::createFrom(jwks, JwtVerify::Jwks::JWKS));
+            }));
+  } else if (outcome == FetchOutcome::Error) {
+    ON_CALL(*fetcher, fetch(testing::_, testing::_))
+        .WillByDefault(testing::Invoke([](Tracing::Span&, Receiver& receiver) {
+          receiver.onJwksError(Receiver::Failure::Network);
+        }));
+  }
+  // NeverCompletes leaves fetch() a no-op, so the handshake sees no cached keys.
+  return fetcher;
+}
+
+JwksFetcherFactory makeFetcherFactory(FetchOutcome outcome, absl::string_view jwks = kTestJwks) {
+  return [outcome, jwks = std::string(jwks)](
+             Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr,
+             const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks&)
+             -> Extensions::HttpFilters::Common::JwksFetcherPtr {
+    return makeMockFetcher(outcome, jwks);
+  };
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksValidTokenAccepted) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setRemoteJwt(cfg, kIssuer);
+  const std::string written =
+      runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken)),
+                   makeFetcherFactory(FetchOutcome::Success));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.accepted"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.jwt_denied"));
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksFetchFailureRejectsToken) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setRemoteJwt(cfg, kIssuer);
+  const std::string written =
+      runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken)),
+                   makeFetcherFactory(FetchOutcome::Error));
+  EXPECT_THAT(written, testing::HasSubstr("401 Unauthorized"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.jwt_denied"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.accepted"));
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksNotYetFetchedRejectsToken) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setRemoteJwt(cfg, kIssuer);
+  // NeverCompletes with fast_listener (set by setRemoteJwt) leaves the initial fetch outstanding,
+  // so the handshake runs with no keys cached yet.
+  const std::string written =
+      runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken)),
+                   makeFetcherFactory(FetchOutcome::NeverCompletes));
+  EXPECT_THAT(written, testing::HasSubstr("401 Unauthorized"));
+  EXPECT_EQ(0, counter("reverse_tunnel.handshake.accepted"));
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksAuditModeAllowsWhenKeysUnavailable) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setRemoteJwt(cfg, kIssuer, /*allow_missing_or_failed=*/true);
+  const std::string written =
+      runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken)),
+                   makeFetcherFactory(FetchOutcome::Error));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.jwt_would_deny"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.accepted"));
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksConfigLoads) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* http_uri = jwt->mutable_remote_jwks()->mutable_http_uri();
+  http_uri->set_uri("https://example.com/jwks");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_TRUE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksInvalidRetryPolicyRejectedAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* remote = jwt->mutable_remote_jwks();
+  auto* http_uri = remote->mutable_http_uri();
+  http_uri->set_uri("https://example.com/jwks");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  auto* backoff = remote->mutable_retry_policy()->mutable_retry_back_off();
+  backoff->mutable_base_interval()->set_seconds(10);
+  backoff->mutable_max_interval()->set_seconds(1);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksInvalidUriRejectedAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* http_uri = jwt->mutable_remote_jwks()->mutable_http_uri();
+  http_uri->set_uri("not a valid url");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksNegativeCacheDurationRejectedAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* remote = jwt->mutable_remote_jwks();
+  auto* http_uri = remote->mutable_http_uri();
+  http_uri->set_uri("https://example.com/jwks");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  remote->mutable_cache_duration()->set_seconds(-1);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksNegativeFailedRefetchRejectedAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* remote = jwt->mutable_remote_jwks();
+  auto* http_uri = remote->mutable_http_uri();
+  http_uri->set_uri("https://example.com/jwks");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  remote->mutable_async_fetch()->mutable_failed_refetch_duration()->set_seconds(-1);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksWrongIssuerRejected) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setRemoteJwt(cfg, "https://attacker.example.com");
+  const std::string written =
+      runHandshake(cfg, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken)),
+                   makeFetcherFactory(FetchOutcome::Success));
+  EXPECT_THAT(written, testing::HasSubstr("401 Unauthorized"));
+  EXPECT_EQ(1, counter("reverse_tunnel.handshake.jwt_denied"));
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksVerifiedClaimBindsIdentifier) {
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    setRemoteJwt(cfg, kIssuer);
+    cfg.mutable_validation()->set_node_id_format(
+        "%DYNAMIC_METADATA(envoy.filters.network.reverse_tunnel.jwt:sub)%");
+    const std::string written = runHandshake(
+        cfg, makeJwtRequest("test@example.com", "c", "t", absl::StrCat("Bearer ", kGoodToken)),
+        makeFetcherFactory(FetchOutcome::Success));
+    EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  }
+  {
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+    setRemoteJwt(cfg, kIssuer);
+    cfg.mutable_validation()->set_node_id_format(
+        "%DYNAMIC_METADATA(envoy.filters.network.reverse_tunnel.jwt:sub)%");
+    const std::string written =
+        runHandshake(cfg, makeJwtRequest("attacker", "c", "t", absl::StrCat("Bearer ", kGoodToken)),
+                     makeFetcherFactory(FetchOutcome::Success));
+    EXPECT_THAT(written, testing::HasSubstr("403 Forbidden"));
+    EXPECT_EQ(1, counter("reverse_tunnel.handshake.validation_failed"));
+  }
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksRefreshReplacesKeys) {
+  // Capture the refetch timer so it can be fired by hand.
+  auto* refetch_timer =
+      new NiceMock<Event::MockTimer>(&factory_context_.server_factory_context_.dispatcher_);
+
+  // Fetch a non-matching key set first, then the matching one.
+  int calls = 0;
+  JwksFetcherFactory factory =
+      [&calls](Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr,
+               const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks&)
+      -> Extensions::HttpFilters::Common::JwksFetcherPtr {
+    const absl::string_view jwks = (calls++ == 0) ? kOtherJwks : kTestJwks;
+    return makeMockFetcher(FetchOutcome::Success, jwks);
+  };
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setRemoteJwt(cfg, kIssuer);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_, factory);
+  ASSERT_TRUE(config_or_error.ok());
+  auto config = config_or_error.value();
+
+  // The first key set does not match the token's signature.
+  EXPECT_THAT(
+      driveHandshake(config, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken))),
+      testing::HasSubstr("401 Unauthorized"));
+
+  // The refetch installs the matching key set in place of the first.
+  ASSERT_TRUE(refetch_timer->enabled());
+  refetch_timer->invokeCallback();
+
+  EXPECT_THAT(
+      driveHandshake(config, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken))),
+      testing::HasSubstr("200 OK"));
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksInitTargetFetchesOnInit) {
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(factory_context_.init_manager_, add(testing::_))
+      .WillOnce(testing::Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setRemoteJwt(cfg, kIssuer, /*allow_missing_or_failed=*/false, /*fast_listener=*/false);
+  auto config_or_error = ReverseTunnelFilterConfig::create(
+      cfg, factory_context_, makeFetcherFactory(FetchOutcome::Success));
+  ASSERT_TRUE(config_or_error.ok());
+  auto config = config_or_error.value();
+
+  // No fetch has run yet.
+  EXPECT_THAT(
+      driveHandshake(config, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken))),
+      testing::HasSubstr("401 Unauthorized"));
+
+  // Initializing the target runs the fetch and marks the target ready.
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  init_watcher.expectReady();
+  init_target_handle->initialize(init_watcher);
+
+  EXPECT_THAT(
+      driveHandshake(config, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken))),
+      testing::HasSubstr("200 OK"));
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksInitTargetReadyOnFetchFailure) {
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(factory_context_.init_manager_, add(testing::_))
+      .WillOnce(testing::Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setRemoteJwt(cfg, kIssuer, /*allow_missing_or_failed=*/false, /*fast_listener=*/false);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_,
+                                                           makeFetcherFactory(FetchOutcome::Error));
+  ASSERT_TRUE(config_or_error.ok());
+  auto config = config_or_error.value();
+
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  init_watcher.expectReady();
+  init_target_handle->initialize(init_watcher);
+
+  EXPECT_THAT(
+      driveHandshake(config, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken))),
+      testing::HasSubstr("401 Unauthorized"));
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksRetryPolicyPassedToFetcher) {
+  Router::RetryPolicyConstSharedPtr captured_retry_policy;
+  JwksFetcherFactory factory =
+      [&captured_retry_policy](Upstream::ClusterManager&,
+                               Router::RetryPolicyConstSharedPtr retry_policy,
+                               const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks&)
+      -> Extensions::HttpFilters::Common::JwksFetcherPtr {
+    captured_retry_policy = retry_policy;
+    return makeMockFetcher(FetchOutcome::Success, kTestJwks);
+  };
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* remote = jwt->mutable_remote_jwks();
+  remote->mutable_async_fetch()->set_fast_listener(true);
+  auto* http_uri = remote->mutable_http_uri();
+  http_uri->set_uri("https://example.com/jwks");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  auto* backoff = remote->mutable_retry_policy()->mutable_retry_back_off();
+  backoff->mutable_base_interval()->set_seconds(1);
+  backoff->mutable_max_interval()->set_seconds(10);
+  remote->mutable_retry_policy()->mutable_num_retries()->set_value(3);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_, factory);
+  ASSERT_TRUE(config_or_error.ok());
+  ASSERT_NE(captured_retry_policy, nullptr);
+  EXPECT_EQ(3, captured_retry_policy->numRetries());
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksCacheDurationHonored) {
+  auto* refetch_timer =
+      new NiceMock<Event::MockTimer>(&factory_context_.server_factory_context_.dispatcher_);
+  // Refetch happens 5 seconds before the 300 second cache expires.
+  EXPECT_CALL(*refetch_timer, enableTimer(std::chrono::milliseconds(295000), testing::_));
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* remote = jwt->mutable_remote_jwks();
+  remote->mutable_cache_duration()->set_seconds(300);
+  remote->mutable_async_fetch()->set_fast_listener(true);
+  auto* http_uri = remote->mutable_http_uri();
+  http_uri->set_uri("https://example.com/jwks");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  auto config_or_error = ReverseTunnelFilterConfig::create(
+      cfg, factory_context_, makeFetcherFactory(FetchOutcome::Success));
+  ASSERT_TRUE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksFailedRefetchDurationHonored) {
+  auto* refetch_timer =
+      new NiceMock<Event::MockTimer>(&factory_context_.server_factory_context_.dispatcher_);
+  EXPECT_CALL(*refetch_timer, enableTimer(std::chrono::milliseconds(2000), testing::_));
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* remote = jwt->mutable_remote_jwks();
+  remote->mutable_async_fetch()->set_fast_listener(true);
+  remote->mutable_async_fetch()->mutable_failed_refetch_duration()->set_seconds(2);
+  auto* http_uri = remote->mutable_http_uri();
+  http_uri->set_uri("https://example.com/jwks");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_,
+                                                           makeFetcherFactory(FetchOutcome::Error));
+  ASSERT_TRUE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksCacheDurationClampedToOneSecond) {
+  auto* refetch_timer =
+      new NiceMock<Event::MockTimer>(&factory_context_.server_factory_context_.dispatcher_);
+  EXPECT_CALL(*refetch_timer, enableTimer(std::chrono::milliseconds(1000), testing::_));
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* remote = jwt->mutable_remote_jwks();
+  // 1ms is the smallest value the proto allows.
+  remote->mutable_cache_duration()->set_nanos(1000000);
+  remote->mutable_async_fetch()->set_fast_listener(true);
+  auto* http_uri = remote->mutable_http_uri();
+  http_uri->set_uri("https://example.com/jwks");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  auto config_or_error = ReverseTunnelFilterConfig::create(
+      cfg, factory_context_, makeFetcherFactory(FetchOutcome::Success));
+  ASSERT_TRUE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksFailedRefetchDurationClampedToOneSecond) {
+  auto* refetch_timer =
+      new NiceMock<Event::MockTimer>(&factory_context_.server_factory_context_.dispatcher_);
+  EXPECT_CALL(*refetch_timer, enableTimer(std::chrono::milliseconds(1000), testing::_));
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->set_issuer(std::string(kIssuer));
+  auto* remote = jwt->mutable_remote_jwks();
+  remote->mutable_async_fetch()->set_fast_listener(true);
+  remote->mutable_async_fetch()->mutable_failed_refetch_duration();
+  auto* http_uri = remote->mutable_http_uri();
+  http_uri->set_uri("https://example.com/jwks");
+  http_uri->set_cluster("jwks_cluster");
+  http_uri->mutable_timeout()->set_seconds(1);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_,
+                                                           makeFetcherFactory(FetchOutcome::Error));
+  ASSERT_TRUE(config_or_error.ok());
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksRepeatedFetchFailure) {
+  auto* refetch_timer =
+      new NiceMock<Event::MockTimer>(&factory_context_.server_factory_context_.dispatcher_);
+  int fetch_calls = 0;
+  JwksFetcherFactory factory =
+      [&fetch_calls](Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr,
+                     const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks&)
+      -> Extensions::HttpFilters::Common::JwksFetcherPtr {
+    ++fetch_calls;
+    return makeMockFetcher(FetchOutcome::Error, kTestJwks);
+  };
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setRemoteJwt(cfg, kIssuer);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_, factory);
+  ASSERT_TRUE(config_or_error.ok());
+  EXPECT_EQ(1, fetch_calls);
+
+  ASSERT_TRUE(refetch_timer->enabled());
+  refetch_timer->invokeCallback();
+  EXPECT_EQ(2, fetch_calls);
+  // Both failed fetches are counted.
+  EXPECT_EQ(
+      2, factory_context_.store_.counter("reverse_tunnel.handshake.jwt_jwks_fetch_failed").value());
+
+  EXPECT_THAT(driveHandshake(config_or_error.value(),
+                             makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken))),
+              testing::HasSubstr("401 Unauthorized"));
+}
+
+TEST_F(ReverseTunnelJwtTest, RemoteJwksOutageKeepsPreviousKeys) {
+  auto* refetch_timer =
+      new NiceMock<Event::MockTimer>(&factory_context_.server_factory_context_.dispatcher_);
+  int calls = 0;
+  JwksFetcherFactory factory =
+      [&calls](Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr,
+               const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks&)
+      -> Extensions::HttpFilters::Common::JwksFetcherPtr {
+    return makeMockFetcher(calls++ == 0 ? FetchOutcome::Success : FetchOutcome::Error, kTestJwks);
+  };
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  setRemoteJwt(cfg, kIssuer);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_, factory);
+  ASSERT_TRUE(config_or_error.ok());
+  auto config = config_or_error.value();
+
+  EXPECT_THAT(
+      driveHandshake(config, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken))),
+      testing::HasSubstr("200 OK"));
+
+  ASSERT_TRUE(refetch_timer->enabled());
+  refetch_timer->invokeCallback();
+  EXPECT_THAT(
+      driveHandshake(config, makeJwtRequest("n", "c", "t", absl::StrCat("Bearer ", kGoodToken))),
+      testing::HasSubstr("200 OK"));
+}
+
+TEST_F(ReverseTunnelJwtTest, LocalJwksEmptyRejectedAtConfigLoad) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto* jwt = cfg.mutable_jwt_validator();
+  jwt->set_issuer(std::string(kIssuer));
+  jwt->mutable_local_jwks()->set_inline_string("");
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  EXPECT_FALSE(config_or_error.ok());
 }
 
 } // namespace

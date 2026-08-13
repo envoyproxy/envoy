@@ -54,6 +54,26 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() { config_update_info_.release(); }
 
+// TODO(wbpcode): most of this can go away now that every RDS update gets its own init manager.
+// maybeCreateInitManager() and the noop init manager plus Cleanup only exist to work around
+// local_init_manager_ possibly being Initialized, which makes Init::Manager::add() illegal. A
+// per-update init manager is always freshly created and Uninitialized, so registering the VHDS
+// init target with it is always legal and the initial VHDS fetch warms up together with the rest
+// of the route configuration.
+//
+// This hook can't use the per-update init manager though, it runs after that manager has been
+// initialized and add() would assert. The VHDS subscription has to be created in the build step
+// instead, i.e. inside Router::RouteConfigUpdateReceiverImpl::onRdsUpdate(), which is where the
+// per-update init manager lives now. Better yet, move the VhdsSubscription into
+// Router::RouteConfigUpdateReceiverImpl and manage its whole lifecycle there: that also folds in
+// the duplicate creation site in StaticRouteConfigProviderImpl::VhdsContext, and it fixes
+// vhds_configuration_changed_ being latched in onRdsUpdate() but consumed here, which loses the
+// VHDS subscription entirely if the update that set it is superseded while still warming up.
+//
+// To sort out first: the receiver needs a late-bound Rds::RouteConfigProvider* (same pattern as
+// Rds::RdsRouteConfigSubscription::routeConfigProvider()), onRdsUpdate() needs a StatusOr return
+// to propagate createVhdsSubscription() failures, and vhds_lib's unused dependency on
+// route_config_update_impl_lib has to be dropped to avoid a build cycle.
 absl::Status RdsRouteConfigSubscription::beforeProviderUpdate(
     std::unique_ptr<Init::ManagerImpl>& noop_init_manager, std::unique_ptr<Cleanup>& resume_rds) {
   if (config_update_info_->protobufConfigurationCast().has_vhds() &&
@@ -64,13 +84,20 @@ absl::Status RdsRouteConfigSubscription::beforeProviderUpdate(
     ASSERT(config_update_info_->configInfo().has_value());
     maybeCreateInitManager(routeConfigUpdate()->configInfo().value().version_, noop_init_manager,
                            resume_rds);
+    // The VHDS subscription will use the provided route config provider to update the route
+    // configuration when it receives a VHDS update. But for RDS subscription, it's unnecessary
+    // because the RouteConfigUpdateObserver will be used.
     auto subscription_or_error = VhdsSubscription::createVhdsSubscription(
-        config_update_info_, factory_context_, stat_prefix_, route_config_provider_);
+        config_update_info_, factory_context_, stat_prefix_, nullptr);
     RETURN_IF_NOT_OK_REF(subscription_or_error.status());
     vhds_subscription_ = std::move(subscription_or_error.value());
     vhds_subscription_->registerInitTargetWithInitManager(
         noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);
   }
+  // A VHDS update publishes through this same path, so the change has to be consumed here.
+  // Otherwise the next VHDS update would re-create vhds_subscription_ and destroy the
+  // VhdsSubscription whose onConfigUpdate() is delivering that very update.
+  config_update_info_->clearVhdsConfigurationChanged();
   return absl::OkStatus();
 }
 

@@ -10,8 +10,8 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
 #include "source/common/common/json_escape_string.h"
-#include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -185,8 +185,8 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
     return BridgeStatusValues::REQUEST_NOT_POST;
   case BridgeStatus::RequestTooLarge:
     return BridgeStatusValues::REQUEST_TOO_LARGE;
-  case BridgeStatus::RequestParseError:
-    return BridgeStatusValues::REQUEST_PARSE_ERROR;
+  case BridgeStatus::RequestFailedToParseJsonRpc:
+    return BridgeStatusValues::REQUEST_FAILED_TO_PARSE_JSON_RPC;
   case BridgeStatus::RequestUnsupportedProtocolVersion:
     return BridgeStatusValues::REQUEST_UNSUPPORTED_PROTOCOL_VERSION;
   case BridgeStatus::RequestInitializeNotValid:
@@ -217,8 +217,8 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
     return BridgeStatusValues::RESPONSE_INVALID_UTF8;
   case BridgeStatus::ResponseBackendError:
     return BridgeStatusValues::RESPONSE_BACKEND_ERROR;
-  case BridgeStatus::ResponseParseError:
-    return BridgeStatusValues::RESPONSE_PARSE_ERROR;
+  case BridgeStatus::ResponseFailedToParseJsonRpc:
+    return BridgeStatusValues::RESPONSE_FAILED_TO_PARSE_JSON_RPC;
   }
   return "UNKNOWN";
 }
@@ -481,6 +481,11 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   const auto* per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
           decoder_callbacks_);
+  if (config_->perRouteOnly() && per_route_config == nullptr) {
+    mcp_operation_ = McpOperation::Unspecified;
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   bool has_endpoint = false;
   if (per_route_config != nullptr) {
     has_endpoint = per_route_config->hasEndpoint(server_name, path);
@@ -547,7 +552,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
 
   if (request_body_json.is_discarded()) {
     ENVOY_STREAM_LOG(error, "Failed to parse JSON-RPC request body.", *decoder_callbacks_);
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestParseError,
+    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestFailedToParseJsonRpc,
                       generateErrorJsonResponse(-32700, "JSON parse error").dump());
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
@@ -583,24 +588,64 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
     break;
   }
 
+  const int response_code = getResponseCode(response_headers);
   // Streaming mode: pre-build the JSON-RPC prefix/suffix, strip Content-Length
   // (final size is unknown), and let the headers flow through immediately so
   // the client can start receiving data without waiting for the full body.
   if (mcp_operation_ == McpOperation::ToolsCall && text_content_streaming_enabled_) {
-    buildStreamingPrefixAndSuffix(getResponseCode(response_headers) >=
-                                  static_cast<int>(Http::Code::BadRequest));
+    // Overwrite response code to 200 OK unless it is 401 or 403. Non-200 responses
+    // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
+    // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
+    // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+    // Note on 400 Bad Request: While the MCP authorization spec also includes HTTP 400 for
+    // certain authorization errors, we assume authorization checks (e.g., OAuth token
+    // validation) occur in filters before MCP transcoding, so any 400 error from the REST
+    // backend is assumed to be an API error and is transformed into a standard JSON-RPC error.
+    if (response_code != static_cast<int>(Http::Code::Unauthorized) &&
+        response_code != static_cast<int>(Http::Code::Forbidden)) {
+      response_headers.setStatus(enumToInt(Http::Code::OK));
+    }
+    buildStreamingPrefixAndSuffix(response_code >= static_cast<int>(Http::Code::BadRequest));
     response_headers.removeContentLength();
     response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // TODO(guoyilin42): Handle headers-only upstream responses (e.g., 204 No Content).
-  // Currently, these cases bypass transcoding, which can cause MCP SDKs to timeout
-  // or throw exceptions because they expect a valid JSON-RPC response with a
-  // matching ID. Envoy should generate a synthetic JSON-RPC response (e.g., an
-  // empty ToolResult or a generic error) to ensure client stability.
-  return end_stream ? Http::FilterHeadersStatus::Continue
-                    : Http::FilterHeadersStatus::StopIteration;
+  if (end_stream) {
+    // Backend returned a headers-only response (e.g., 204 No Content). Synthesize a JSON-RPC
+    // response body so MCP clients don't hang waiting for a body that will never arrive.
+    const bool is_error = response_code >= static_cast<int>(Http::Code::BadRequest);
+    std::string synthetic;
+    if (mcp_operation_ == McpOperation::ToolsCall) {
+      synthetic = translateJsonRestResponseToJsonRpc("", *session_id_, is_error).dump();
+    } else if (mcp_operation_ == McpOperation::ToolsList) {
+      // headers-only means no tools list is available; return a server error.
+      json ret = {
+          {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+          {McpConstants::ID_FIELD, *session_id_},
+          {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, "Server error")},
+      };
+      synthetic = ret.dump();
+    }
+    // Overwrite response code to 200 OK unless it is 401 or 403. Non-200 responses
+    // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
+    // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
+    // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+    // Note on 400 Bad Request: While the MCP authorization spec also includes HTTP 400 for
+    // certain authorization errors, we assume authorization checks (e.g., OAuth token
+    // validation) occur in filters before MCP transcoding, so any 400 error from the REST
+    // backend is assumed to be an API error and is transformed into a standard JSON-RPC error.
+    if (response_code != static_cast<int>(Http::Code::Unauthorized) &&
+        response_code != static_cast<int>(Http::Code::Forbidden)) {
+      response_headers.setStatus(enumToInt(Http::Code::OK));
+    }
+    response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+    response_headers.setContentLength(synthetic.size());
+    Buffer::OwnedImpl body_buffer(synthetic);
+    encoder_callbacks_->addEncodedData(body_buffer, false);
+    return Http::FilterHeadersStatus::Continue;
+  }
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& data,
@@ -664,7 +709,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
                         getResponseCode(encoder_callbacks_->responseHeaders()));
     mcp_operation_ = McpOperation::OperationFailed;
     decoder_callbacks_->sendLocalReply(
-        Http::Code::InternalServerError, error_json.dump(),
+        Http::Code::OK, error_json.dump(),
         [](Http::ResponseHeaderMap& headers) {
           headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
         },
@@ -825,7 +870,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
   std::string method = json_rpc[McpConstants::METHOD_FIELD];
   if (!validateRequestMcpVersion(method, request_headers, config_->fallbackProtocolVersion())) {
     sendErrorResponse(
-        Http::Code::BadRequest, BridgeStatus::RequestUnsupportedProtocolVersion,
+        Http::Code::OK, BridgeStatus::RequestUnsupportedProtocolVersion,
         generateErrorJsonResponse(-32602, "Unsupported protocol version").dump(), nullptr, method,
         json_rpc.contains(McpConstants::PARAMS_FIELD) ? json_rpc[McpConstants::PARAMS_FIELD]
                                                       : json::object());
@@ -905,7 +950,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
       return;
     }
     sendErrorResponse(
-        Http::Code::BadRequest, BridgeStatus::RequestInitializeNotValid,
+        Http::Code::OK, BridgeStatus::RequestInitializeNotValid,
         generateErrorJsonResponse(-32602, "Missing valid protocolVersion in initialize "
                                           "request")
             .dump(),
@@ -933,7 +978,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
     mapMcpToolToApiBackend(json_rpc, per_route_config);
   } else {
     sendErrorResponse(
-        Http::Code::BadRequest, BridgeStatus::RequestMethodNotSupported,
+        Http::Code::OK, BridgeStatus::RequestMethodNotSupported,
         generateErrorJsonResponse(-32601, absl::StrCat("Method ", method, " is not supported"))
             .dump(),
         nullptr, method,
@@ -965,7 +1010,7 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
       setResponseMetadata(getResponseCode(response_headers) >=
                                   static_cast<int>(Http::Code::BadRequest)
                               ? BridgeStatus::ResponseBackendError
-                              : BridgeStatus::ResponseParseError,
+                              : BridgeStatus::ResponseFailedToParseJsonRpc,
                           getResponseCode(response_headers));
       break;
     }
@@ -1024,6 +1069,21 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
   }
 
   if (response_headers.has_value()) {
+    if (mcp_operation_ == McpOperation::ToolsCall || mcp_operation_ == McpOperation::ToolsList) {
+      const int status_code = getResponseCode(response_headers);
+      // Overwrite response code to 200 OK unless it is 401 or 403. Non-200 responses
+      // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
+      // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
+      // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+      // Note on 400 Bad Request: While the MCP authorization spec also includes HTTP 400 for
+      // certain authorization errors, we assume authorization checks (e.g., OAuth token
+      // validation) occur in filters before MCP transcoding, so any 400 error from the REST
+      // backend is assumed to be an API error and is transformed into a standard JSON-RPC error.
+      if (status_code != static_cast<int>(Http::Code::Unauthorized) &&
+          status_code != static_cast<int>(Http::Code::Forbidden)) {
+        response_headers->setStatus(enumToInt(Http::Code::OK));
+      }
+    }
     const auto transfer_encoding = response_headers->TransferEncoding();
     const bool is_chunked =
         transfer_encoding != nullptr &&
@@ -1045,7 +1105,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
     ENVOY_STREAM_LOG(error,
                      "The tool call request is missing 'params' field or it's not an object.",
                      *decoder_callbacks_);
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestToolParamsNotFound,
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestToolParamsNotFound,
                       generateErrorJsonResponse(-32602, "Invalid params").dump(), nullptr,
                       McpConstants::Methods::TOOLS_CALL, json::object());
     return;
@@ -1056,7 +1116,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   if (name_it == params.end() || !name_it->is_string()) {
     ENVOY_STREAM_LOG(error, "Failed to get the name of the tool call request.",
                      *decoder_callbacks_);
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestToolNameNotFound,
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestToolNameNotFound,
                       generateErrorJsonResponse(-32602, "Tool name not found").dump(), nullptr,
                       McpConstants::Methods::TOOLS_CALL, params);
     return;
@@ -1070,7 +1130,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   if (!http_rule.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to get http rule for method: {}", *decoder_callbacks_,
                      tool_name);
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestUnknownTool,
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestUnknownTool,
                       generateErrorJsonResponse(-32602, "Unknown tool").dump(), nullptr,
                       McpConstants::Methods::TOOLS_CALL, params);
     return;
@@ -1086,7 +1146,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   if (arguments_it != params.end() && !arguments_it->is_object()) {
     ENVOY_STREAM_LOG(error, "The arguments of the tool call request must be an object.",
                      *decoder_callbacks_);
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestToolArgumentsInvalid,
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestToolArgumentsInvalid,
                       generateErrorJsonResponse(-32602, "Tool arguments must be an object").dump(),
                       nullptr, McpConstants::Methods::TOOLS_CALL, params);
     return;
@@ -1099,9 +1159,9 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   if (!http_request.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to build HTTP request for method: {} with status: {}",
                      *decoder_callbacks_, tool_name, http_request.status());
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestToolTranscodingFailure,
-                      generateErrorJsonResponse(-32602, "Failed to build HTTP request").dump(),
-                      nullptr, McpConstants::Methods::TOOLS_CALL, params);
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestToolTranscodingFailure,
+                      generateErrorJsonResponse(-32602, "Invalid tool arguments").dump(), nullptr,
+                      McpConstants::Methods::TOOLS_CALL, params);
     return;
   }
 
@@ -1211,19 +1271,19 @@ absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann:
     session_id_ = *session_id;
   }
   if (!json_rpc.contains(McpConstants::METHOD_FIELD)) {
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestMethodNotFound,
-                      generateErrorJsonResponse(-32601, "Missing method field").dump());
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestMethodNotFound,
+                      generateErrorJsonResponse(-32600, "Missing method field").dump());
     return absl::InvalidArgumentError("Missing method field");
   } else if (!json_rpc[McpConstants::METHOD_FIELD].is_string()) {
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestMethodNotString,
-                      generateErrorJsonResponse(-32601, "Method field is not a string").dump());
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestMethodNotString,
+                      generateErrorJsonResponse(-32600, "Method field is not a string").dump());
     return absl::InvalidArgumentError("Method field is not a string");
   } else if (json_rpc[McpConstants::METHOD_FIELD] ==
              McpConstants::Methods::NOTIFICATION_INITIALIZED) {
     // The notifications/initialized request is not required to have an ID
     // field.
   } else if (!session_id.ok()) {
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestIdNotFound,
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestIdNotFound,
                       generateErrorJsonResponse(-32600, "Missing ID field").dump(), nullptr,
                       json_rpc[McpConstants::METHOD_FIELD].get<std::string>(),
                       json_rpc.contains(McpConstants::PARAMS_FIELD)

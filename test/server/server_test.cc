@@ -4,6 +4,7 @@
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/network/exception.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/fatal_action_config.h"
@@ -28,6 +29,7 @@
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
@@ -1316,6 +1318,19 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
   options_.service_node_name_ = "some_node_name";
   EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/runtime_bootstrap_ads_eds.yaml"),
                           EnvoyException, "Unknown gRPC client cluster");
+}
+
+// Verify that RTDS over ADS initializes successfully and doesn't crash on shutdown.
+TEST_P(ServerInstanceImplTest, RtdsOverAdsShutdown) {
+  Config::MockXdsConfigTrackerFactory factory;
+  Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
+
+  options_.service_cluster_name_ = "some_service";
+  options_.service_node_name_ = "some_node_name";
+  auto server_thread =
+      startTestServer("test/server/test_data/server/runtime_bootstrap_rtds_ads.yaml", false);
+  server_->shutdown();
+  server_thread->join();
 }
 
 // Validate invalid runtime in bootstrap is rejected.

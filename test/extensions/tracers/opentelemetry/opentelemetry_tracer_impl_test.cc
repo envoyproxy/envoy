@@ -271,6 +271,66 @@ TEST_F(OpenTelemetryDriverTest, PassSetServiceNameResourceAttributeDefaultTrue) 
   driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
 }
 
+// Verifies that set_instrumentation_scope=false omits scope name and version
+TEST_F(OpenTelemetryDriverTest, SetInstrumentationScopeFalse) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    set_instrumentation_scope: false
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  setup(opentelemetry_config);
+
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             "test", {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span, nullptr);
+
+  constexpr absl::string_view request_yaml = R"(
+resource_spans:
+  resource:
+    attributes:
+      key: "service.name"
+      value:
+        string_value: "unknown_service:envoy"
+      key: "key1"
+      value:
+        string_value: "val1"
+  scope_spans:
+    scope: {{}}
+    spans:
+      name: "test"
+      kind: SPAN_KIND_SERVER
+      start_time_unix_nano: {}
+      end_time_unix_nano: {}
+  )";
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
+  SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
+
+  int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
+  expected_span->set_trace_id(absl::HexStringToBytes(span->getTraceId()));
+  expected_span->set_span_id(absl::HexStringToBytes(span->getSpanId()));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(
+      *mock_client_,
+      sendRaw(_, _, Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(request_proto), _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
 // Verifies that the tracer cannot be configured with two exporters at the same time
 TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {
   const std::string yaml_string = R"EOF(

@@ -57,6 +57,10 @@ build --action_env=BAZEL_VOLATILE_DIRTY --host_action_env=BAZEL_VOLATILE_DIRTY
 
 build --test_summary=terse
 
+# rules_external_jvm triggers unwanted android toolchain setup if this is set
+# if you actually require this you should override it (see mobile/.bazelrc)
+common --repo_env=ANDROID_HOME=
+
 # TODO(keith): Remove once these 2 are the default
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
@@ -70,6 +74,9 @@ common --incompatible_allow_tags_propagation
 # Python
 common --@rules_python//python/config_settings:bootstrap_impl=script
 build --incompatible_default_to_explicit_init_py
+
+# Protobuf
+common --@com_google_protobuf//bazel/flags:prefer_prebuilt_protoc=true
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -116,6 +123,7 @@ build:macos --@toolchains_llvm//toolchain/config:libunwind=false
 
 # Common flags for Clang (shared between all clang variants)
 common:clang-common --linkopt=-fuse-ld=lld
+common:clang-common --cxxopt=-Wno-nullability-completeness
 common:clang-common --@toolchains_llvm//toolchain/config:compiler-rt=false
 common:clang-common --@toolchains_llvm//toolchain/config:libunwind=false
 
@@ -264,7 +272,7 @@ build:asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 build:asan --action_env=ENVOY_UBSAN_VPTR=1
 build:asan --copt=-fsanitize=vptr,function
 build:asan --linkopt=-fsanitize=vptr,function
-build:asan --linkopt='-L/opt/llvm/lib/clang/18/lib/x86_64-unknown-linux-gnu'
+build:asan --linkopt='-L/opt/llvm/lib/clang/22/lib/x86_64-unknown-linux-gnu'
 
 # Basic ASAN/UBSAN that works for gcc or llvm
 build:asan-common --config=sanitizer
@@ -306,6 +314,7 @@ build:msan --test_tag_filters=-no_san
 build:msan --define ENVOY_CONFIG_MSAN=1
 build:msan --copt -fsanitize=memory
 build:msan --linkopt -fsanitize=memory
+build:msan --linkopt=-Wl,--allow-multiple-definition
 build:msan --copt -fsanitize-memory-track-origins=2
 build:msan --copt -DMEMORY_SANITIZER=1
 build:msan --test_env=MSAN_SYMBOLIZER_PATH
@@ -319,6 +328,7 @@ build:tsan --config=sanitizer
 build:tsan --define ENVOY_CONFIG_TSAN=1
 build:tsan --copt -fsanitize=thread
 build:tsan --linkopt -fsanitize=thread
+build:tsan --linkopt=-Wl,--allow-multiple-definition
 build:tsan --copt -DTHREAD_SANITIZER=1
 build:tsan --build_tag_filters=-no_san,-no_tsan
 build:tsan --test_tag_filters=-no_san,-no_tsan

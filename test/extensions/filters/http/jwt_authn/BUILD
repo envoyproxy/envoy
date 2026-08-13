@@ -82,6 +82,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/jwt_authn:jwks_async_fetcher_lib",
+        "//source/extensions/filters/http/jwt_authn:stats_lib",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/mocks/server:factory_context_mocks",
     ],
