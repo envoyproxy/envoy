@@ -29,7 +29,7 @@
                           __VA_ARGS__)
 
 /**
- * Evaluates `rexpr` (producing `absl::StatusOr<T>`), `co_return`s early if `!statusor.ok()`,
+ * Evaluates `expr` (producing `absl::StatusOr<T>`), `co_return`s early if `!statusor.ok()`,
  * or unpacks the value into `lhs`.
  *
  * Examples:
