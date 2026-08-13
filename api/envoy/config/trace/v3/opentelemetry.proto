@@ -46,7 +46,7 @@ message OpenTelemetryConfig {
 
     // Specifies the custom exporter to be used by the OpenTelemetry tracer.
     // Only one of ``grpc_service``, ``http_service``, ``exporter`` may be used.
-    // [#extension-category: envoy.tracers.opentelemetry.exporters]
+    // This extension category is envoy.tracers.opentelemetry.exporters
     core.v3.TypedExtensionConfig exporter = 10;
   }
 

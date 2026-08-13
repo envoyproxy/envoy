@@ -92,24 +92,6 @@ public:
 
 REGISTER_FACTORY(NullTraceExporterFactory, OpenTelemetryTraceExporterFactory);
 
-class ThrowingTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
-public:
-  OpenTelemetryTraceExporterPtr
-  createExporter(const Protobuf::Message& /*config*/,
-                 Server::Configuration::TracerFactoryContext& /*context*/) const override {
-    throw EnvoyException("Custom exporter creation failed");
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Protobuf::Any>();
-  }
-
-  std::string name() const override {
-    return "envoy.tracers.opentelemetry.exporters.throwing_tracer_test";
-  }
-};
-
-REGISTER_FACTORY(ThrowingTraceExporterFactory, OpenTelemetryTraceExporterFactory);
 
 } // namespace
 
@@ -523,37 +505,6 @@ TEST_F(OpenTelemetryDriverTest, NullCustomExporterIncrementsSpansDropped) {
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
-// Verifies that when custom exporter factory creation throws an exception,
-// spans are dropped gracefully and spans_dropped metric is incremented.
-TEST_F(OpenTelemetryDriverTest, ThrowingCustomExporterIncrementsSpansDropped) {
-  const std::string yaml_string = R"EOF(
-    exporter:
-      name: envoy.tracers.opentelemetry.exporters.throwing_tracer_test
-      typed_config:
-        "@type": type.googleapis.com/google.protobuf.Any
-    )EOF";
-  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
-
-  setup(opentelemetry_config);
-
-  Tracing::TestTraceContextImpl request_headers{
-      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
-  SystemTime timestamp = time_system_.systemTime();
-  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
-
-  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
-                                             operation_name_, {Tracing::Reason::Sampling, true});
-  EXPECT_NE(span.get(), nullptr);
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
-      .WillRepeatedly(Return(1));
-
-  span->finishSpan();
-
-  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_dropped").value());
-  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
-}
 
 // Verifies that the tracer cannot be configured with two exporters at the same time
 TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {

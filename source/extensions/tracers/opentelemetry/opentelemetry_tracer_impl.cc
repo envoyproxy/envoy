@@ -180,12 +180,8 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
           factory_context.clusterManager(), *http_service, headers_applicator);
     } else if (custom_exporter_factory != nullptr && shared_unpacked_config != nullptr &&
                worker_factory_context != nullptr) {
-      try {
-        exporter = custom_exporter_factory->createExporter(*shared_unpacked_config,
-                                                           *worker_factory_context);
-      } catch (const std::exception& e) {
-        ENVOY_LOG(error, "Failed to create custom OpenTelemetry trace exporter: {}", e.what());
-      }
+      exporter =
+          custom_exporter_factory->createExporter(*shared_unpacked_config, *worker_factory_context);
     }
     if (exporter == nullptr) {
       ENVOY_LOG(warn, "OpenTelemetry tracer initialized without a valid exporter; "
