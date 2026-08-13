@@ -39,7 +39,8 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb>
 FilterFactoryCreator::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::proto_message_extraction::v3::
         ProtoMessageExtractionConfig& proto_config,
-    const std::string&, Envoy::Server::Configuration::ServerFactoryContext& context) {
+    Envoy::Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
   absl::Status creation_status = absl::OkStatus();
   auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::make_unique<ExtractorFactoryImpl>(), context.api(), creation_status);

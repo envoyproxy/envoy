@@ -1,5 +1,6 @@
 #include "source/common/router/route_config_update_receiver_impl.h"
 
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -39,10 +40,14 @@ Rds::ConfigConstSharedPtr ConfigTraitsImpl::createNullConfig() const {
   return std::make_shared<NullConfigImpl>();
 }
 
+// TODO(wbpcode): the route configuration doesn't own any resource that needs to be warmed up yet,
+// so the init manager is ignored. Once the resources of a route configuration, such as the
+// route-level filter configurations, can be warmed up, the init manager should be passed down to
+// them.
 Rds::ConfigConstSharedPtr
 ConfigTraitsImpl::createConfig(const Protobuf::Message& rc,
                                Server::Configuration::ServerFactoryContext& factory_context,
-                               bool validate_clusters_default) const {
+                               Init::Manager&, bool validate_clusters_default) const {
   ASSERT(Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::RouteConfiguration>(&rc));
   return THROW_OR_RETURN_VALUE(
       ConfigImpl::create(static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc),
@@ -76,12 +81,14 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
       rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, *vhds_virtual_hosts_, *new_route_config);
     }
   }
-  base_.updateConfig(std::move(new_route_config));
-  base_.updateHash(new_hash);
+  base_.updateConfig(std::move(new_route_config), new_hash, version_info);
+  // No exception, new_route_config is valid, can update the state. This has to happen before the
+  // update is warmed up and published, because publishing runs the subscription's
+  // beforeProviderUpdate() hook, which reads vhdsConfigurationChanged() to decide whether to
+  // (re)start VHDS.
   vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
   last_vhds_config_hash_ = new_vhds_config_hash;
-
-  base_.onUpdateCommon(version_info);
+  base_.startWarming();
   return true;
 }
 
@@ -101,19 +108,32 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   const bool removed = removeVhosts(*vhosts_after_this_update, removed_resources);
   const bool updated = updateVhosts(*vhosts_after_this_update, added_vhosts);
 
+  const bool vhosts_changed = removed || updated || !added_resource_ids.empty();
+  if (!vhosts_changed) {
+    // Nothing to rebuild, so the currently published route configuration stays in place. An update
+    // that is still warming up is deliberately left alone. This update still carried no resource
+    // ids, so record that, otherwise the ids of the previous update would be resolved against a
+    // later publish.
+    resource_ids_in_last_update_ = std::move(added_resource_ids);
+    return false;
+  }
+
   auto route_config_after_this_update =
       std::make_unique<envoy::config::route::v3::RouteConfiguration>();
-  route_config_after_this_update->CheckTypeAndMergeFrom(base_.protobufConfiguration());
+  // Merge the latest RouteConfiguration with the updated VHDS. That is the one an update that is
+  // still warming up built, if any, so that this update supersedes it instead of losing it.
+  route_config_after_this_update->CheckTypeAndMergeFrom(latestProtobufConfiguration());
   rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, *vhosts_after_this_update,
                                  *route_config_after_this_update);
 
-  base_.updateConfig(std::move(route_config_after_this_update));
-  // No exception, route_config_after_this_update is valid, can update the state.
+  base_.updateConfig(std::move(route_config_after_this_update), std::nullopt, version_info);
+  // No exception, the new route configuration is valid, can update the state. This has to happen
+  // before the update is published, because publishing runs the on-demand VHDS callbacks against
+  // resourceIdsInLastVhdsUpdate().
   vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
   resource_ids_in_last_update_ = std::move(added_resource_ids);
-  base_.onUpdateCommon(version_info);
-
-  return removed || updated || !resource_ids_in_last_update_.empty();
+  base_.startWarming();
+  return true;
 }
 
 bool RouteConfigUpdateReceiverImpl::removeVhosts(

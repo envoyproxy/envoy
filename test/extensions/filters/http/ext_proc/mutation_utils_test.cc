@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"

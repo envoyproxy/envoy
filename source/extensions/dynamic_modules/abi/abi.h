@@ -987,6 +987,9 @@ envoy_dynamic_module_on_http_filter_response_trailers(
  * envoy_dynamic_module_on_http_filter_stream_complete is called when the HTTP stream is complete.
  * This is called before envoy_dynamic_module_on_http_filter_destroy and access logs are flushed.
  *
+ * Unlike envoy_dynamic_module_on_http_filter_destroy, this can run while another event hook of the
+ * same filter is on the stack, because a hook that ends the stream completes it inline.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
@@ -999,6 +1002,15 @@ void envoy_dynamic_module_on_http_filter_stream_complete(
 /**
  * envoy_dynamic_module_on_http_filter_destroy is called when the HTTP filter is destroyed for each
  * HTTP stream.
+ *
+ * Envoy runs this from the worker dispatcher's deferred deletion list, so it is never called while
+ * another event hook of the same filter is on the stack. A hook can end the stream, for example via
+ * envoy_dynamic_module_callback_http_filter_recreate_stream, which tears the filter chain down
+ * before the hook returns. Envoy does not destroy the in-module filter before that hook returns,
+ * and the callbacks the module makes after the teardown are safe.
+ *
+ * By the time this is called the filter is already detached from the HTTP stream, so the callbacks
+ * that need it are no-ops.
  *
  * @param filter_module_ptr is the pointer to the in-module HTTP filter.
  */
@@ -1630,6 +1642,94 @@ envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value);
 
+// ----------------------------- Secret callbacks ------------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe is called by the module
+ * during initialization to subscribe to a generic secret so that its value can later be read via
+ * envoy_dynamic_module_callback_http_filter_get_generic_secret or
+ * envoy_dynamic_module_callback_http_filter_config_get_generic_secret.
+ *
+ * The subscription is resolved the same way as any other Envoy extension resolves an
+ * ``SdsSecretConfig``: when sds_config_source is empty the secret is looked up among the statically
+ * configured secrets by name, and otherwise an SDS subscription is created (or shared with an
+ * existing identical one) so that the value is updated whenever the SDS server pushes a new
+ * version.
+ *
+ * This can only be called during envoy_dynamic_module_on_http_filter_config_new. Calling it after
+ * the configuration has been loaded fails, since creating a subscription is only safe on the main
+ * thread before any worker observes the configuration.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig for which the
+ * secret will be subscribed.
+ * @param name is the name of the generic secret. For a static secret this is the name of the
+ * secret in the bootstrap configuration, and for a dynamic secret this is the resource name
+ * requested from the SDS server. This must not be empty.
+ * @param sds_config_source is the JSON serialized ``envoy.config.core.v3.ConfigSource`` describing
+ * where to fetch the secret from. When the length is 0 the secret is looked up among the static
+ * secrets instead.
+ * @return size_t the opaque ID that represents the subscribed secret, which can be passed to
+ * envoy_dynamic_module_callback_http_filter_get_generic_secret together with a filter_envoy_ptr
+ * created from filter_config_envoy_ptr, or to
+ * envoy_dynamic_module_callback_http_filter_config_get_generic_secret together with
+ * filter_config_envoy_ptr. Returning 0 indicates a failure to subscribe, e.g. the name is empty,
+ * the static secret does not exist, or sds_config_source is not a valid ConfigSource.
+ */
+size_t envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer sds_config_source);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_get_generic_secret is called by the module to read the
+ * current value of a previously subscribed generic secret.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param id is the ID of the secret previously subscribed using the config that created
+ * filter_envoy_ptr.
+ * @param result is the buffer where the current value of the secret will be stored. The value is
+ * empty (length 0) when the secret has been subscribed but not yet delivered by the SDS server.
+ * @return true if the operation is successful, false if the id does not correspond to a subscribed
+ * secret.
+ *
+ * The value is read from thread local storage, so this must be called on the worker thread running
+ * the stream, not on a thread created by the module.
+ *
+ * OWNERSHIP: Envoy owns the returned buffer. It is only valid until the module returns from the
+ * current event hook, since a secret rotation replaces the value in between events. The module must
+ * copy the value if it needs to retain it.
+ */
+bool envoy_dynamic_module_callback_http_filter_get_generic_secret(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_get_generic_secret is called by the module to
+ * read the current value of a previously subscribed generic secret from the filter config context.
+ * Unlike envoy_dynamic_module_callback_http_filter_get_generic_secret, this does not require a
+ * per-stream filter and can be called outside of the request lifecycle, e.g. from a scheduled
+ * background task.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig that
+ * subscribed the secret.
+ * @param id is the ID of the secret previously subscribed using filter_config_envoy_ptr.
+ * @param result is the buffer where the current value of the secret will be stored. The value is
+ * empty (length 0) when the secret has been subscribed but not yet delivered by the SDS server.
+ * @return true if the operation is successful, false if the id does not correspond to a subscribed
+ * secret.
+ *
+ * The value is read from thread local storage, so this must be called on an Envoy thread, i.e.
+ * during envoy_dynamic_module_on_http_filter_config_new or from an event hook such as
+ * envoy_dynamic_module_on_http_filter_config_scheduled, not on a thread created by the module.
+ *
+ * OWNERSHIP: Envoy owns the returned buffer. It is only valid until the module returns from the
+ * current event hook, since a secret rotation replaces the value in between events. The module must
+ * copy the value if it needs to retain it.
+ */
+bool envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
 // ---------------------- HTTP Header/Trailer callbacks ------------------------
 
 /**
@@ -2067,6 +2167,38 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns,
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_struct is called by the module to set an
+ * entire dynamic metadata namespace from a serialized google.protobuf.Struct. The struct is merged
+ * into the namespace and existing entries with the same key are overwritten. If the buffer does not
+ * parse as a google.protobuf.Struct, this is a no-op.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct value to set.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_typed_metadata is called by the module to set an
+ * entire typed dynamic metadata namespace from a serialized google.protobuf.Any. The Any is merged
+ * into the namespace's typed_filter_metadata entry. If the buffer does not parse as a
+ * google.protobuf.Any, this is a no-op.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_any is the serialized google.protobuf.Any value to set.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
 
 /**
  * envoy_dynamic_module_callback_http_get_metadata_string is called by the module to get
@@ -3323,7 +3455,9 @@ void envoy_dynamic_module_callback_http_filter_send_go_away_and_close(
  * with new headers. This is useful for implementing internal redirects or request retries.
  *
  * After calling this function successfully, the current filter chain will be destroyed and a new
- * stream will be created. The filter should return StopIteration from the current event hook.
+ * stream will be created. The filter should return StopIteration from the current event hook. The
+ * in-module filter stays valid until the hook returns, and the callbacks the module makes after
+ * the teardown are safe and do not affect the recreated stream.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
@@ -9795,6 +9929,33 @@ void envoy_dynamic_module_on_cluster_worker_timer_fired(
 bool envoy_dynamic_module_callback_cluster_add_hosts(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
     const envoy_dynamic_module_type_module_buffer* addresses, const uint32_t* weights,
+    const envoy_dynamic_module_type_module_buffer* regions,
+    const envoy_dynamic_module_type_module_buffer* zones,
+    const envoy_dynamic_module_type_module_buffer* sub_zones,
+    const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
+    size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs);
+
+/**
+ * envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames is equivalent to
+ * envoy_dynamic_module_callback_cluster_add_hosts, but additionally assigns each host a logical
+ * hostname.
+ *
+ * A non-empty logical hostname is available to upstream features such as automatic SNI and SAN
+ * validation. An empty hostname entry uses the same synthesized hostname behavior as
+ * envoy_dynamic_module_callback_cluster_add_hosts.
+ *
+ * @param hostnames is the optional array of logical hostnames corresponding to ``addresses``. Each
+ * entry is owned by the module. An entry with length 0 uses the same synthesized hostname behavior
+ * as envoy_dynamic_module_callback_cluster_add_hosts. The entire array can be nullptr to use that
+ * behavior for all hosts.
+ *
+ * See envoy_dynamic_module_callback_cluster_add_hosts for all other parameters and return
+ * semantics.
+ */
+bool envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
+    const envoy_dynamic_module_type_module_buffer* addresses,
+    const envoy_dynamic_module_type_module_buffer* hostnames, const uint32_t* weights,
     const envoy_dynamic_module_type_module_buffer* regions,
     const envoy_dynamic_module_type_module_buffer* zones,
     const envoy_dynamic_module_type_module_buffer* sub_zones,

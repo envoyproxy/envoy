@@ -459,6 +459,18 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_cluster_add_hosts(
   return false;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+    envoy_dynamic_module_type_cluster_envoy_ptr, uint32_t,
+    const envoy_dynamic_module_type_module_buffer*, const envoy_dynamic_module_type_module_buffer*,
+    const uint32_t*, const envoy_dynamic_module_type_module_buffer*,
+    const envoy_dynamic_module_type_module_buffer*, const envoy_dynamic_module_type_module_buffer*,
+    const envoy_dynamic_module_type_module_buffer*, size_t, size_t,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) size_t envoy_dynamic_module_callback_cluster_remove_hosts(
     envoy_dynamic_module_type_cluster_envoy_ptr,
     const envoy_dynamic_module_type_cluster_host_envoy_ptr*, size_t) {
@@ -4278,6 +4290,20 @@ __attribute__((weak)) void envoy_dynamic_module_callback_http_set_dynamic_metada
     envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
     const envoy_dynamic_module_type_module_key_value_pair*, size_t) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_set_dynamic_metadata_struct: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_set_dynamic_typed_metadata: not "
                "implemented in this context");
 }
 
