@@ -68,8 +68,7 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
   defer_listener_finalization_ = true;
   memset(&last_stream_final_intel_, 0, sizeof(envoy_final_stream_intel));
 
-  builder_.setLogLevel(
-      static_cast<Logger::Logger::Levels>(TestEnvironment::getOptions().logLevel()));
+  builder_.setLogLevel(static_cast<Logger::Levels>(TestEnvironment::getOptions().logLevel()));
   // The admin interface gets added by default in the ConfigHelper's constructor. Since the admin
   // interface gets compiled out by default in Envoy Mobile, remove it from the ConfigHelper's
   // bootstrap config.

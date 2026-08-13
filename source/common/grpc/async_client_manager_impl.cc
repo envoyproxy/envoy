@@ -200,7 +200,7 @@ AsyncClientManagerImpl::RawAsyncClientCache::RawAsyncClientCache(
 void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
     const GrpcServiceConfigWithHashKey& config_with_hash_key,
     const RawAsyncClientSharedPtr& client) {
-  ASSERT(lru_map_.find(config_with_hash_key) == lru_map_.end());
+  ASSERT(!lru_map_.contains(config_with_hash_key));
   // Create a new cache entry at the beginning of the list.
   lru_list_.emplace_front(config_with_hash_key, client, dispatcher_.timeSource().monotonicTime());
   lru_map_[config_with_hash_key] = lru_list_.begin();

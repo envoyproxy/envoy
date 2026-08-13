@@ -35,11 +35,19 @@ than after the whole upload. Oversized string values are left in the external
 buffer and referenced by offset, so a large prompt does not reappear in
 per-stream memory.
 
+Upon stream completion, the parsed document is validated against the route's declared
+:ref:`schema <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.schema>`
+(such as ``OPENAI_CHAT_COMPLETIONS``). Validation checks required fields, data types, enum values,
+and offload rules -- ensuring metadata fields (like ``model`` and ``role``) remain inline in the DOM
+while permitting large message content to reside in external buffers. Any schema validation failure
+triggers an immediate HTTP 400 response.
+
 .. note::
 
   Only the request (decode) path is wired today, and the body is offloaded to an
-  in-memory store. Schema validation and transcoding are not implemented yet;
-  the parsed payload is not consumed by anything downstream so far.
+  in-memory store. Request schema validation is supported for declared schemas
+  (such as OpenAI Chat Completions). Response path handling and schema transcoding
+  are not implemented yet.
 
 The filter is a dual filter: besides the downstream HTTP filter chain shown
 below, it can also be placed in a cluster's upstream HTTP filter chain via
@@ -72,7 +80,7 @@ Which routes are AI endpoints is declared per route, with
 <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`.
 A route that carries one names the :ref:`schema
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.schema>`
-its payload follows, and its payload is parsed strictly: a malformed body is
+its payload follows, and its payload is parsed and validated strictly: a malformed or invalid body is
 rejected with a 400. This is normally attached to a route matching the
 provider's REST path, such as ``/chat/completions``:
 
