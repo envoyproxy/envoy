@@ -395,7 +395,7 @@ std::vector<envoy::config::route::v3::RouteConfiguration> XdsFuzzTest::getRoutes
   auto map = test_server_->server().admin()->getConfigTracker().getCallbacksMap();
 
   // There is no route config dump before envoy has a route.
-  if (map.find("routes") == map.end()) {
+  if (!map.contains("routes")) {
     return {};
   }
 
