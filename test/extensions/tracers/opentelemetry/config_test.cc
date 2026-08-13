@@ -2,9 +2,9 @@
 
 #include "testing/base/public/gmock.h"
 #include "testing/base/public/gunit.h"
-#include "api/envoy/config/trace/v3/http_tracer.pb.h"
-#include "api/envoy/config/trace/v3/opentelemetry.pb.h"
-#include "api/envoy/config/trace/v3/opentelemetry.pb.validate.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
+#include "envoy/config/trace/v3/opentelemetry.pb.h"
+#include "envoy/config/trace/v3/opentelemetry.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "source/extensions/tracers/opentelemetry/trace_exporter.h"
 #include "test/mocks/server/tracer_factory.h"

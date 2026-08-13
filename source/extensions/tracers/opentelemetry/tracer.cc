@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <string>
 
-#include "api/envoy/config/trace/v3/opentelemetry.pb.h"
+#include "envoy/config/trace/v3/opentelemetry.pb.h"
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
