@@ -2,9 +2,10 @@
 
 #include <string>
 
-#include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/optref.h"
+#include "envoy/config/trace/v3/opentelemetry.pb.h"
+
 #include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
@@ -20,6 +21,7 @@
 #include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 #include "source/extensions/tracers/opentelemetry/trace_exporter.h"
 #include "source/extensions/tracers/opentelemetry/tracer.h"
+
 #include "fmt/format.h"
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
@@ -94,18 +96,15 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
                              (opentelemetry_config.has_http_service() ? 1 : 0) +
                              (opentelemetry_config.has_exporter() ? 1 : 0);
   if (exporter_count != 1) {
-    throw EnvoyException(
-        "OpenTelemetry Tracer must have exactly one of gRPC, HTTP, or custom "
-        "exporter configured.");
+    throw EnvoyException("OpenTelemetry Tracer must have exactly one of gRPC, HTTP, or custom "
+                         "exporter configured.");
   }
 
   std::shared_ptr<Grpc::AsyncClientFactory> grpc_client_factory;
   if (opentelemetry_config.has_grpc_service()) {
     auto factory_or_error =
-        factory_context.clusterManager()
-            .grpcAsyncClientManager()
-            .factoryForGrpcService(opentelemetry_config.grpc_service(),
-                                   factory_context.scope(), true);
+        factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
+            opentelemetry_config.grpc_service(), factory_context.scope(), true);
     THROW_IF_NOT_OK_REF(factory_or_error.status());
     grpc_client_factory = std::move(factory_or_error.value());
   }
@@ -116,97 +115,81 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
   if (opentelemetry_config.has_exporter()) {
     auto& exporter_config = opentelemetry_config.exporter();
     custom_exporter_factory =
-        Envoy::Config::Utility::getFactory<OpenTelemetryTraceExporterFactory>(
-            exporter_config);
+        Envoy::Config::Utility::getFactory<OpenTelemetryTraceExporterFactory>(exporter_config);
     if (!custom_exporter_factory) {
-      throw EnvoyException(
-          fmt::format("OpenTelemetry trace exporter factory not found: '{}'",
-                      exporter_config.name()));
+      throw EnvoyException(fmt::format("OpenTelemetry trace exporter factory not found: '{}'",
+                                       exporter_config.name()));
     }
-    ProtobufTypes::MessagePtr unpacked_config =
-        custom_exporter_factory->createEmptyConfigProto();
+    ProtobufTypes::MessagePtr unpacked_config = custom_exporter_factory->createEmptyConfigProto();
     if (unpacked_config == nullptr) {
-      throw EnvoyException(
-          fmt::format("OpenTelemetry trace exporter factory '{}' returned "
-                      "nullptr from createEmptyConfigProto()",
-                      exporter_config.name()));
+      throw EnvoyException(fmt::format("OpenTelemetry trace exporter factory '{}' returned "
+                                       "nullptr from createEmptyConfigProto()",
+                                       exporter_config.name()));
     }
     const absl::Status status = Envoy::Config::Utility::translateOpaqueConfig(
-        exporter_config.typed_config(), context.messageValidationVisitor(),
-        *unpacked_config);
+        exporter_config.typed_config(), context.messageValidationVisitor(), *unpacked_config);
     if (!status.ok()) {
-      throw EnvoyException(
-          fmt::format("Failed to translate opaque config for OpenTelemetry "
-                      "trace exporter factory '{}': {}",
-                      exporter_config.name(), status.message()));
+      throw EnvoyException(fmt::format("Failed to translate opaque config for OpenTelemetry "
+                                       "trace exporter factory '{}': {}",
+                                       exporter_config.name(), status.message()));
     }
     shared_unpacked_config = std::move(unpacked_config);
     // Main-thread validation occurred during translateOpaqueConfig above.
     // Use NullValidationVisitor for worker-thread context to ensure
     // thread-safety.
-    worker_factory_context =
-        std::make_shared<Tracing::TracerFactoryContextImpl>(
-            factory_context, ProtobufMessage::getNullValidationVisitor());
+    worker_factory_context = std::make_shared<Tracing::TracerFactoryContextImpl>(
+        factory_context, ProtobufMessage::getNullValidationVisitor());
   }
 
   // Create the sampler if configured
   SamplerSharedPtr sampler = tryCreateSamper(opentelemetry_config, context);
 
-  const uint64_t max_cache_size = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      opentelemetry_config, max_cache_size, DEFAULT_MAX_CACHE_SIZE);
-  const bool set_instrumentation_scope = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      opentelemetry_config, set_instrumentation_scope, true);
+  const uint64_t max_cache_size =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(opentelemetry_config, max_cache_size, DEFAULT_MAX_CACHE_SIZE);
+  const bool set_instrumentation_scope =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(opentelemetry_config, set_instrumentation_scope, true);
 
   std::shared_ptr<const envoy::config::core::v3::HttpService> http_service;
   std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator;
   if (opentelemetry_config.has_http_service()) {
     http_service = std::make_shared<const envoy::config::core::v3::HttpService>(
         opentelemetry_config.http_service());
-    headers_applicator = Http::HttpServiceHeadersApplicator::createOrThrow(
-        *http_service, factory_context);
+    headers_applicator =
+        Http::HttpServiceHeadersApplicator::createOrThrow(*http_service, factory_context);
   }
 
   // Create the tracer in Thread Local Storage.
-  tls_slot_ptr_->set([http_service, max_cache_size, set_instrumentation_scope,
-                      &factory_context, this, resource_ptr, sampler,
-                      headers_applicator, grpc_client_factory,
+  tls_slot_ptr_->set([http_service, max_cache_size, set_instrumentation_scope, &factory_context,
+                      this, resource_ptr, sampler, headers_applicator, grpc_client_factory,
                       custom_exporter_factory, shared_unpacked_config,
                       worker_factory_context](Event::Dispatcher& dispatcher) {
     OpenTelemetryTraceExporterPtr exporter;
     if (grpc_client_factory != nullptr) {
-      auto async_client_or_error =
-          grpc_client_factory->createUncachedRawAsyncClient();
+      auto async_client_or_error = grpc_client_factory->createUncachedRawAsyncClient();
       if (async_client_or_error.ok()) {
         Grpc::RawAsyncClientSharedPtr async_client_shared_ptr =
             std::move(async_client_or_error.value());
-        exporter = std::make_unique<OpenTelemetryGrpcTraceExporter>(
-            async_client_shared_ptr);
+        exporter = std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr);
       } else {
-        ENVOY_LOG(
-            error,
-            "Failed to create gRPC async client for OpenTelemetry tracer: {}",
-            async_client_or_error.status());
+        ENVOY_LOG(error, "Failed to create gRPC async client for OpenTelemetry tracer: {}",
+                  async_client_or_error.status());
       }
     } else if (http_service != nullptr) {
       ASSERT(headers_applicator != nullptr);
       exporter = std::make_unique<OpenTelemetryHttpTraceExporter>(
           factory_context.clusterManager(), *http_service, headers_applicator);
-    } else if (custom_exporter_factory != nullptr &&
-               shared_unpacked_config != nullptr &&
+    } else if (custom_exporter_factory != nullptr && shared_unpacked_config != nullptr &&
                worker_factory_context != nullptr) {
       try {
-        exporter = custom_exporter_factory->createExporter(
-            *shared_unpacked_config, *worker_factory_context);
+        exporter = custom_exporter_factory->createExporter(*shared_unpacked_config,
+                                                           *worker_factory_context);
       } catch (const std::exception& e) {
-        ENVOY_LOG(error,
-                  "Failed to create custom OpenTelemetry trace exporter: {}",
-                  e.what());
+        ENVOY_LOG(error, "Failed to create custom OpenTelemetry trace exporter: {}", e.what());
       }
     }
     if (exporter == nullptr) {
-      ENVOY_LOG(warn,
-                "OpenTelemetry tracer initialized without a valid exporter; "
-                "spans will be dropped.");
+      ENVOY_LOG(warn, "OpenTelemetry tracer initialized without a valid exporter; "
+                      "spans will be dropped.");
     }
     TracerPtr tracer = std::make_unique<Tracer>(
         std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),

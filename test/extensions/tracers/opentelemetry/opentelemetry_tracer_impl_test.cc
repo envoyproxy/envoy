@@ -1,21 +1,23 @@
-#include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
-
 #include <sys/types.h>
 
-#include "testing/base/public/gmock.h"
-#include "testing/base/public/gunit.h"
 #include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
+
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/version/version.h"
+#include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 #include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 #include "source/extensions/tracers/opentelemetry/trace_exporter.h"
+
 #include "test/mocks/common.h"
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,7 +44,7 @@ public:
 namespace {
 
 class DummyTraceExporter : public OpenTelemetryTraceExporter {
- public:
+public:
   bool log(const ExportTraceServiceRequest& /*request*/) override {
     logged_count_++;
     return true;
@@ -52,10 +54,10 @@ class DummyTraceExporter : public OpenTelemetryTraceExporter {
 };
 
 class DummyTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
- public:
-  OpenTelemetryTraceExporterPtr createExporter(
-      const Protobuf::Message& config,
-      Server::Configuration::TracerFactoryContext& /*context*/) const override {
+public:
+  OpenTelemetryTraceExporterPtr
+  createExporter(const Protobuf::Message& config,
+                 Server::Configuration::TracerFactoryContext& /*context*/) const override {
     EXPECT_NE(dynamic_cast<const ProtobufWkt::Empty*>(&config), nullptr);
     return std::make_unique<DummyTraceExporter>();
   }
@@ -72,10 +74,10 @@ class DummyTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
 REGISTER_FACTORY(DummyTraceExporterFactory, OpenTelemetryTraceExporterFactory);
 
 class NullTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
- public:
-  OpenTelemetryTraceExporterPtr createExporter(
-      const Protobuf::Message& /*config*/,
-      Server::Configuration::TracerFactoryContext& /*context*/) const override {
+public:
+  OpenTelemetryTraceExporterPtr
+  createExporter(const Protobuf::Message& /*config*/,
+                 Server::Configuration::TracerFactoryContext& /*context*/) const override {
     return nullptr;
   }
 
@@ -91,10 +93,10 @@ class NullTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
 REGISTER_FACTORY(NullTraceExporterFactory, OpenTelemetryTraceExporterFactory);
 
 class ThrowingTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
- public:
-  OpenTelemetryTraceExporterPtr createExporter(
-      const Protobuf::Message& /*config*/,
-      Server::Configuration::TracerFactoryContext& /*context*/) const override {
+public:
+  OpenTelemetryTraceExporterPtr
+  createExporter(const Protobuf::Message& /*config*/,
+                 Server::Configuration::TracerFactoryContext& /*context*/) const override {
     throw EnvoyException("Custom exporter creation failed");
   }
 
@@ -107,10 +109,9 @@ class ThrowingTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
   }
 };
 
-REGISTER_FACTORY(ThrowingTraceExporterFactory,
-                 OpenTelemetryTraceExporterFactory);
+REGISTER_FACTORY(ThrowingTraceExporterFactory, OpenTelemetryTraceExporterFactory);
 
-}  // namespace
+} // namespace
 
 class OpenTelemetryDriverTest : public testing::Test {
 public:
@@ -233,13 +234,11 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanCustomExporter) {
   Tracing::TestTraceContextImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .WillRepeatedly(Return(1));
 
-  Tracing::SpanPtr span =
-      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
-                         operation_name_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span, nullptr);
 
   span->finishSpan();
@@ -458,38 +457,32 @@ TEST_F(OpenTelemetryDriverTest, UnconfiguredExporterIncrementsSpansDropped) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  auto mock_client_factory =
-      std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+  auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
   EXPECT_CALL(*mock_client_factory, createUncachedRawAsyncClient())
       .WillOnce(Return(absl::InternalError("gRPC client creation failed")));
 
   auto& factory_context = context_.server_factory_context_;
   ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
-  ON_CALL(factory_context.cluster_manager_.async_client_manager_,
-          factoryForGrpcService(_, _, _))
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
       .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
   ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 
   Resource resource;
   auto mock_resource_provider = NiceMock<MockResourceProvider>();
-  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, _))
-      .WillRepeatedly(Return(resource));
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, _)).WillRepeatedly(Return(resource));
 
-  driver_ = std::make_unique<Driver>(opentelemetry_config, context_,
-                                     mock_resource_provider);
+  driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
 
   Tracing::TestTraceContextImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
   SystemTime timestamp = time_system_.systemTime();
   ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
 
-  Tracing::SpanPtr span =
-      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
-                         operation_name_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .WillRepeatedly(Return(1));
 
   span->finishSpan();
@@ -517,13 +510,11 @@ TEST_F(OpenTelemetryDriverTest, NullCustomExporterIncrementsSpansDropped) {
   SystemTime timestamp = time_system_.systemTime();
   ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
 
-  Tracing::SpanPtr span =
-      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
-                         operation_name_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .WillRepeatedly(Return(1));
 
   span->finishSpan();
@@ -551,13 +542,11 @@ TEST_F(OpenTelemetryDriverTest, ThrowingCustomExporterIncrementsSpansDropped) {
   SystemTime timestamp = time_system_.systemTime();
   ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
 
-  Tracing::SpanPtr span =
-      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
-                         operation_name_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .WillRepeatedly(Return(1));
 
   span->finishSpan();
@@ -580,9 +569,8 @@ TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {
         timeout: 0.250s
     )EOF";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-  EXPECT_THROW_WITH_REGEX(
-      TestUtility::loadFromYaml(yaml_string, opentelemetry_config),
-      EnvoyException, ".*oneof.*");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, opentelemetry_config),
+                          EnvoyException, ".*oneof.*");
   EXPECT_EQ(driver_, nullptr);
 }
 
@@ -600,9 +588,8 @@ TEST_F(OpenTelemetryDriverTest, CustomExporterAndGrpcExporterConfigured) {
         "@type": type.googleapis.com/google.protobuf.Empty
     )EOF";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-  EXPECT_THROW_WITH_REGEX(
-      TestUtility::loadFromYaml(yaml_string, opentelemetry_config),
-      EnvoyException, ".*oneof.*");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, opentelemetry_config),
+                          EnvoyException, ".*oneof.*");
   EXPECT_EQ(driver_, nullptr);
 }
 
@@ -621,9 +608,8 @@ TEST_F(OpenTelemetryDriverTest, CustomExporterAndHttpExporterConfigured) {
         "@type": type.googleapis.com/google.protobuf.Empty
     )EOF";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-  EXPECT_THROW_WITH_REGEX(
-      TestUtility::loadFromYaml(yaml_string, opentelemetry_config),
-      EnvoyException, ".*oneof.*");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, opentelemetry_config),
+                          EnvoyException, ".*oneof.*");
   EXPECT_EQ(driver_, nullptr);
 }
 
@@ -650,17 +636,14 @@ TEST_F(OpenTelemetryDriverTest, CustomExporterFactoryNotFound) {
 TEST_F(OpenTelemetryDriverTest, CustomExporterInvalidOpaqueConfig) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   auto* exporter = opentelemetry_config.mutable_exporter();
-  exporter->set_name(
-      "envoy.tracers.opentelemetry.exporters.dummy_tracer_impl_test");
-  exporter->mutable_typed_config()->set_type_url(
-      "type.googleapis.com/google.protobuf.Empty");
+  exporter->set_name("envoy.tracers.opentelemetry.exporters.dummy_tracer_impl_test");
+  exporter->mutable_typed_config()->set_type_url("type.googleapis.com/google.protobuf.Empty");
   exporter->mutable_typed_config()->set_value("invalid_protobuf_data_\xff\xff");
 
-  EXPECT_THROW_WITH_REGEX(
-      setup(opentelemetry_config), EnvoyException,
-      ".*Failed to translate opaque config for "
-      "OpenTelemetry trace exporter factory "
-      "'envoy.tracers.opentelemetry.exporters.dummy_tracer_impl_test'.*");
+  EXPECT_THROW_WITH_REGEX(setup(opentelemetry_config), EnvoyException,
+                          ".*Failed to translate opaque config for "
+                          "OpenTelemetry trace exporter factory "
+                          "'envoy.tracers.opentelemetry.exporters.dummy_tracer_impl_test'.*");
   EXPECT_EQ(driver_, nullptr);
 }
 
@@ -1748,10 +1731,9 @@ TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
   const std::string yaml_string = "{}";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
-  EXPECT_THROW_WITH_MESSAGE(
-      setup(opentelemetry_config), EnvoyException,
-      "OpenTelemetry Tracer must have exactly one of gRPC, HTTP, or custom "
-      "exporter configured.");
+  EXPECT_THROW_WITH_MESSAGE(setup(opentelemetry_config), EnvoyException,
+                            "OpenTelemetry Tracer must have exactly one of gRPC, HTTP, or custom "
+                            "exporter configured.");
   EXPECT_EQ(driver_, nullptr);
 }
 
@@ -1863,4 +1845,3 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
 } // namespace Tracers
 } // namespace Extensions
 } // namespace Envoy
-

@@ -2,7 +2,9 @@
 
 #include "envoy/config/typed_config.h"
 #include "envoy/server/tracer_config.h"
+
 #include "source/common/common/logger.h"
+
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
@@ -56,7 +58,7 @@ using OpenTelemetryTraceExporterPtr = std::unique_ptr<OpenTelemetryTraceExporter
  * thread-safe.
  */
 class OpenTelemetryTraceExporterFactory : public Envoy::Config::TypedFactory {
- public:
+public:
   ~OpenTelemetryTraceExporterFactory() override = default;
 
   /**
@@ -70,17 +72,14 @@ class OpenTelemetryTraceExporterFactory : public Envoy::Config::TypedFactory {
    * @param context The TracerFactoryContext.
    * @return OpenTelemetryTraceExporterPtr A trace exporter.
    */
-  virtual OpenTelemetryTraceExporterPtr createExporter(
-      const Protobuf::Message& config,
-      Server::Configuration::TracerFactoryContext& context) const PURE;
+  virtual OpenTelemetryTraceExporterPtr
+  createExporter(const Protobuf::Message& config,
+                 Server::Configuration::TracerFactoryContext& context) const PURE;
 
-  std::string category() const override {
-    return "envoy.tracers.opentelemetry.exporters";
-  }
+  std::string category() const override { return "envoy.tracers.opentelemetry.exporters"; }
 };
 
-using OpenTelemetryTraceExporterFactoryPtr =
-    std::unique_ptr<OpenTelemetryTraceExporterFactory>;
+using OpenTelemetryTraceExporterFactoryPtr = std::unique_ptr<OpenTelemetryTraceExporterFactory>;
 
 } // namespace OpenTelemetry
 } // namespace Tracers
