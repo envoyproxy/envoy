@@ -1,15 +1,15 @@
-#include "third_party/envoy/src/source/extensions/tracers/opentelemetry/config.h"
+#include "source/extensions/tracers/opentelemetry/config.h"
 
 #include "testing/base/public/gmock.h"
 #include "testing/base/public/gunit.h"
-#include "third_party/envoy/src/api/envoy/config/trace/v3/http_tracer.pb.h"
-#include "third_party/envoy/src/api/envoy/config/trace/v3/opentelemetry.pb.h"
-#include "third_party/envoy/src/api/envoy/config/trace/v3/opentelemetry.pb.validate.h"
-#include "third_party/envoy/src/envoy/registry/registry.h"
-#include "third_party/envoy/src/source/extensions/tracers/opentelemetry/trace_exporter.h"
-#include "third_party/envoy/src/test/mocks/server/tracer_factory.h"
-#include "third_party/envoy/src/test/mocks/server/tracer_factory_context.h"
-#include "third_party/envoy/src/test/test_common/utility.h"
+#include "api/envoy/config/trace/v3/http_tracer.pb.h"
+#include "api/envoy/config/trace/v3/opentelemetry.pb.h"
+#include "api/envoy/config/trace/v3/opentelemetry.pb.validate.h"
+#include "envoy/registry/registry.h"
+#include "source/extensions/tracers/opentelemetry/trace_exporter.h"
+#include "test/mocks/server/tracer_factory.h"
+#include "test/mocks/server/tracer_factory_context.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {

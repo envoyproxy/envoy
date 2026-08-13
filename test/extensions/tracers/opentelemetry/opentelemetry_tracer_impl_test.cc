@@ -1,21 +1,21 @@
-#include "third_party/envoy/src/source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
+#include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 
 #include <sys/types.h>
 
 #include "testing/base/public/gmock.h"
 #include "testing/base/public/gunit.h"
-#include "third_party/envoy/src/envoy/common/exception.h"
-#include "third_party/envoy/src/envoy/registry/registry.h"
-#include "third_party/envoy/src/source/common/tracing/http_tracer_impl.h"
-#include "third_party/envoy/src/source/common/version/version.h"
-#include "third_party/envoy/src/source/extensions/tracers/opentelemetry/span_context_extractor.h"
-#include "third_party/envoy/src/source/extensions/tracers/opentelemetry/trace_exporter.h"
-#include "third_party/envoy/src/test/mocks/common.h"
-#include "third_party/envoy/src/test/mocks/server/tracer_factory_context.h"
-#include "third_party/envoy/src/test/mocks/stats/mocks.h"
-#include "third_party/envoy/src/test/mocks/stream_info/mocks.h"
-#include "third_party/envoy/src/test/mocks/tracing/mocks.h"
-#include "third_party/envoy/src/test/test_common/utility.h"
+#include "envoy/common/exception.h"
+#include "envoy/registry/registry.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/common/version/version.h"
+#include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
+#include "source/extensions/tracers/opentelemetry/trace_exporter.h"
+#include "test/mocks/common.h"
+#include "test/mocks/server/tracer_factory_context.h"
+#include "test/mocks/stats/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/tracing/mocks.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {

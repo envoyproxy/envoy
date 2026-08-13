@@ -1,18 +1,18 @@
-#include "third_party/envoy/src/source/extensions/tracers/opentelemetry/tracer.h"
+#include "source/extensions/tracers/opentelemetry/tracer.h"
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
 #include <string>
 
-#include "third_party/envoy/src/api/envoy/config/trace/v3/opentelemetry.pb.h"
+#include "api/envoy/config/trace/v3/opentelemetry.pb.h"
 
-#include "third_party/envoy/src/source/common/common/empty_string.h"
-#include "third_party/envoy/src/source/common/common/hex.h"
-#include "third_party/envoy/src/source/common/tracing/common_values.h"
-#include "third_party/envoy/src/source/common/tracing/trace_context_impl.h"
-#include "third_party/envoy/src/source/common/version/version.h"
-#include "third_party/envoy/src/source/extensions/tracers/opentelemetry/otlp_utils.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/hex.h"
+#include "source/common/tracing/common_values.h"
+#include "source/common/tracing/trace_context_impl.h"
+#include "source/common/version/version.h"
+#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
 
 #include "third_party/opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "third_party/opentelemetry/proto/trace/v1/trace.pb.h"

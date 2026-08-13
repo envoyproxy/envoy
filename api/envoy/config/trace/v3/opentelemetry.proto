@@ -2,13 +2,13 @@ syntax = "proto3";
 
 package envoy.config.trace.v3;
 
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/config/core/v3/http_service.proto";
 import "google/protobuf/wrappers.proto";
-import "third_party/envoy/src/api/envoy/config/core/v3/extension.proto";
-import "third_party/envoy/src/api/envoy/config/core/v3/grpc_service.proto";
-import "third_party/envoy/src/api/envoy/config/core/v3/http_service.proto";
-import "third_party/protoc_gen_validate/validate/validate.proto";
-import "third_party/udpa/udpa/annotations/migrate.proto";
-import "third_party/udpa/udpa/annotations/status.proto";
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "OpentelemetryProto";
@@ -50,9 +50,8 @@ message OpenTelemetryConfig {
     core.v3.TypedExtensionConfig exporter = 10;
   }
 
-  // The name for the service. This will be populated in the ResourceSpan
-  // Resource attributes. If it is not provided, it will default to
-  // "unknown_service:envoy".
+  // The name for the service. This will be populated in the ResourceSpan Resource attributes.
+  // If it is not provided, it will default to "unknown_service:envoy".
   string service_name = 2;
 
   // An ordered list of resource detectors

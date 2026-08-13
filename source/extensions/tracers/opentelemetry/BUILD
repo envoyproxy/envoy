@@ -1,11 +1,11 @@
 load(
-    "//third_party/envoy/src/bazel:envoy_build_system.bzl",
+    "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
 )
 
-licenses(["notice"])
+licenses(["notice"]) # Apache 2
 
 # Trace driver for OpenTelemetry: https://opentelemetry.io/
 
@@ -15,12 +15,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    compatible_with = ["//buildenv/target:non_prod"],
-    visibility = ["//third_party/envoy:envoy_extensions_visible"],
     deps = [
         ":opentelemetry_tracer_lib",
-        "//third_party/envoy/src/api/envoy/config/trace/v3:pkg_cc_proto",
-        "//third_party/envoy/src/source/extensions/tracers/common:factory_base_lib",
+        "//source/extensions/tracers/common:factory_base_lib",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -37,7 +35,6 @@ envoy_cc_library(
         "span_context_extractor.h",
         "tracer.h",
     ],
-    compatible_with = ["//buildenv/target:non_prod"],
     copts = [
         # Make sure that headers included from opentelemetry-api use Abseil from Envoy
         # https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.14.0/api/BUILD#L32
@@ -45,15 +42,15 @@ envoy_cc_library(
     ],
     deps = [
         ":trace_exporter",
-        "//third_party/envoy/src/api/envoy/config/trace/v3:pkg_cc_proto",
-        "//third_party/envoy/src/envoy/thread_local:thread_local_interface",
-        "//third_party/envoy/src/source/common/config:utility_lib",
-        "//third_party/envoy/src/source/common/http:http_service_headers_lib",
-        "//third_party/envoy/src/source/common/tracing:http_tracer_lib",
-        "//third_party/envoy/src/source/common/tracing:tracer_config_lib",
-        "//third_party/envoy/src/source/extensions/tracers/common:factory_base_lib",
-        "//third_party/envoy/src/source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
-        "//third_party/envoy/src/source/extensions/tracers/opentelemetry/samplers:sampler_lib",
+        "//api/envoy/config/trace/v3:pkg_cc_proto",
+        "//envoy/thread_local:thread_local_interface",
+        "//source/common/config:utility_lib",
+        "//source/common/http:http_service_headers_lib",
+        "//source/common/tracing:http_tracer_lib",
+        "//source/common/tracing:tracer_config_lib",
+        "//source/extensions/tracers/common:factory_base_lib",
+        "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
+        "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
         "//third_party/fmtlib",
         "//third_party/opentelemetry/cpp/api",
         "//third_party/opentelemetry/proto/collector/trace/v1:trace_service_cc_proto",
@@ -75,23 +72,23 @@ envoy_cc_library(
     ],
     compatible_with = ["//buildenv/target:non_prod"],
     deps = [
-        "//third_party/envoy/src/api/envoy/config/core/v3:pkg_cc_proto",
-        "//third_party/envoy/src/envoy/config:typed_config_interface",
-        "//third_party/envoy/src/envoy/grpc:async_client_manager_interface",
-        "//third_party/envoy/src/envoy/server:factory_context_interface",
-        "//third_party/envoy/src/envoy/server:tracer_config_interface",
-        "//third_party/envoy/src/envoy/upstream:cluster_manager_interface",
-        "//third_party/envoy/src/source/common/grpc:typed_async_client_lib",
-        "//third_party/envoy/src/source/common/http:async_client_utility_lib",
-        "//third_party/envoy/src/source/common/http:header_map_lib",
-        "//third_party/envoy/src/source/common/http:http_service_headers_lib",
-        "//third_party/envoy/src/source/common/http:message_lib",
-        "//third_party/envoy/src/source/common/http:utility_lib",
-        "//third_party/envoy/src/source/common/protobuf",
-        "//third_party/envoy/src/source/common/tracing:trace_context_lib",
-        "//third_party/envoy/src/source/common/tracing:tracer_config_lib",
-        "//third_party/envoy/src/source/common/version:version_lib",
-        "//third_party/envoy/src/source/server:generic_factory_context_lib",
+        "//api/envoy/config/core/v3:pkg_cc_proto",
+        "//envoy/config:typed_config_interface",
+        "//envoy/grpc:async_client_manager_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/server:tracer_config_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/grpc:typed_async_client_lib",
+        "//source/common/http:async_client_utility_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:http_service_headers_lib",
+        "//source/common/http:message_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/protobuf",
+        "//source/common/tracing:trace_context_lib",
+        "//source/common/tracing:tracer_config_lib",
+        "//source/common/version:version_lib",
+        "//source/server:generic_factory_context_lib",
         "//third_party/opentelemetry/cpp/api",
         "//third_party/opentelemetry/proto/collector/trace/v1:trace_service_cc_proto",
     ],
