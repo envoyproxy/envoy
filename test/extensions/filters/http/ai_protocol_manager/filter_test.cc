@@ -384,7 +384,8 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
-  const std::string payload = R"({"model":"gpt-4","stream":true,"max_tokens":256})";
+  const std::string payload =
+      R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}],"stream":true,"max_tokens":256})";
   Buffer::OwnedImpl body(payload);
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();
@@ -493,22 +494,56 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJsonMidUpload) {
   EXPECT_EQ(inject_calls_, 0);
 }
 
+// A payload that is valid JSON syntax but fails schema validation is answered
+// with a 400 and never reaches the upstream.
+TEST_F(AiProtocolManagerFilterTest, RejectsPayloadFailingSchemaValidation) {
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  // Missing required "messages" field.
+  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
+  EXPECT_EQ(inject_calls_, 0);
+}
+
+// Unknown fields are permitted and pass through untouched.
+TEST_F(AiProtocolManagerFilterTest, PassesThroughUnknownFields) {
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string payload =
+      R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}],"custom_tag":"blue"})";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(injected_.toString(), payload);
+  EXPECT_TRUE(injected_end_stream_);
+}
+
 // A body ending on an empty terminal frame still gets its document closed, so a
 // complete payload split that way is not mistaken for a truncated one.
 TEST_F(AiProtocolManagerFilterTest, ChunkedBodyWithEmptyTerminalFrame) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
-  Buffer::OwnedImpl chunk1(R"({"model":"gpt)");
+  Buffer::OwnedImpl chunk1(R"({"model":"gpt-4","messages":[{"role":")");
   EXPECT_EQ(filter_->decodeData(chunk1, false), Http::FilterDataStatus::StopIterationNoBuffer);
-  Buffer::OwnedImpl chunk2(R"(-4"})");
+  Buffer::OwnedImpl chunk2(R"(user","content":"hi"}]})");
   EXPECT_EQ(filter_->decodeData(chunk2, false), Http::FilterDataStatus::StopIterationNoBuffer);
   Buffer::OwnedImpl terminal;
   EXPECT_EQ(filter_->decodeData(terminal, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4"})");
+  EXPECT_EQ(injected_.toString(),
+            R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
 }
 
 // With trailers, no data frame carries end_stream, so the trailers close it.
@@ -516,14 +551,15 @@ TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedJsonIsParsed) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
-  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
   EXPECT_EQ(filter_->decodeData(body, false), Http::FilterDataStatus::StopIterationNoBuffer);
   Http::TestRequestTrailerMapImpl trailers{{"x-trailer", "1"}};
   EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4"})");
+  EXPECT_EQ(injected_.toString(),
+            R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
   EXPECT_EQ(continue_calls_, 1);
 }
 
@@ -673,18 +709,48 @@ TEST_F(AiProtocolManagerFilterTest, RouteConfigIsStrictEvenWithBestEffortConfigu
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// A pass-through endpoint (no normalization) is parsed and forwarded just the
-// same; normalization only governs the transcoding a later change adds.
+// A pass-through endpoint (normalization is not yet supported) is parsed,
+// validated against its schema, and forwarded upstream.
 TEST_F(AiProtocolManagerFilterTest, PassThroughEndpointIsParsedAndForwarded) {
   setRouteConfig(/*normalize=*/false);
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
-  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4"})");
+  EXPECT_EQ(injected_.toString(),
+            R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+}
+
+// A payload with valid JSON syntax but violating the route's schema is rejected with 400.
+TEST_F(AiProtocolManagerFilterTest, SchemaValidationRejectsInvalidPayload) {
+  setRouteConfig(/*normalize=*/false);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  // Missing required "messages" array.
+  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+  EXPECT_EQ(inject_calls_, 0);
+}
+
+// Trailers arriving after a stream was rejected are dropped with StopIteration.
+TEST_F(AiProtocolManagerFilterTest, TrailersDroppedAfterPayloadRejection) {
+  setRouteConfig(/*normalize=*/false);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  // Send malformed payload chunk that fails the stream.
+  Buffer::OwnedImpl bad_chunk(R"({"model" "gpt-4"})");
+  EXPECT_EQ(filter_->decodeData(bad_chunk, false), Http::FilterDataStatus::StopIterationNoBuffer);
+
+  // Send trailers on the dying stream.
+  Http::TestRequestTrailerMapImpl trailers;
+  EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
 }
 
 } // namespace
