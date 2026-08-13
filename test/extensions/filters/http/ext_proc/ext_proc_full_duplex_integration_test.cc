@@ -1124,6 +1124,46 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionWithTra
   EXPECT_THAT(response->headers(), ContainsHeader("x-new-header_1", "new_1"));
 }
 
+TEST_P(ExtProcIntegrationTest, ModeOverrideEmptyBodyBeforeHeadersResponse) {
+  // Set default mode to STREAMED for request body.
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  // Start request, headers only, end_stream = false
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+
+  // Send empty data with end_stream = true
+  codec_client_->sendData(*request_encoder_, 0, true);
+
+  // Process request header message.
+  // The server responds normally (no mode override).
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [](const ProcessingRequest&, ProcessingResponse& resp) {
+                          resp.mutable_request_headers();
+                          return true;
+                        });
+
+  // The server should receive the empty body chunk.
+  processRequestBodyMessage(*grpc_upstreams_[0], false,
+                            [](const HttpBody& body, BodyResponse& resp) {
+                              EXPECT_TRUE(body.end_of_stream());
+                              EXPECT_TRUE(body.body().empty());
+                              resp.mutable_response();
+                              return true;
+                            });
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions
