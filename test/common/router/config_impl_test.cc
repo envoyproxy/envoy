@@ -6672,7 +6672,7 @@ public:
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
   parse(const Protobuf::Struct& d) const override {
-    if (d.fields().find("name") != d.fields().end()) {
+    if (d.fields().contains("name")) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
     throw EnvoyException("Cannot create a Baz when metadata is empty.");
@@ -8836,7 +8836,7 @@ virtual_hosts:
   std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
   const Tracing::CustomTagMap& map = route3->tracingConfig()->getCustomTags();
   for (const std::string& custom_tag : custom_tags) {
-    EXPECT_NE(map.find(custom_tag), map.end());
+    EXPECT_TRUE(map.contains(custom_tag));
   }
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -10375,7 +10375,7 @@ virtual_hosts:
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const RouteEntry::UpgradeMap& upgrade_map = config.route(headers, 0)->routeEntry()->upgradeMap();
   EXPECT_TRUE(upgrade_map.find("websocket")->second);
-  EXPECT_TRUE(upgrade_map.find("foo") == upgrade_map.end());
+  EXPECT_FALSE(upgrade_map.contains("foo"));
   EXPECT_FALSE(upgrade_map.find("disabled")->second);
 }
 

@@ -508,7 +508,7 @@ public:
  */
 
 #define ENVOY_SPDLOG_LEVEL(LEVEL)                                                                  \
-  (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL))
+  (static_cast<spdlog::level::level_enum>(Envoy::Logger::Levels::LEVEL))
 
 #define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) (ENVOY_SPDLOG_LEVEL(LEVEL) >= (LOGGER).level())
 

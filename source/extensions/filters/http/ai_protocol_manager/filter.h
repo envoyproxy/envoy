@@ -84,7 +84,8 @@ using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
 // Per-route configuration. Its presence declares the route an AI endpoint.
 // The request and response wire APIs are declared separately (protocol
 // translation can make them differ); either may be Unspecified when the
-// route left it undeclared.
+// route left it undeclared. A declared request API with a registered payload
+// schema (schema/schema_registry.h) is validated strictly.
 class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
   explicit RouteConfig(const PerRouteProto& proto)
@@ -153,8 +154,8 @@ private:
 // a parsed body on ordinary routes, never a reason to fail a request -- and is
 // otherwise untouched.
 //
-// The declared wire API is not acted on yet: validation against it and
-// normalization both come later.
+// A declared wire API with a registered payload schema is validated at end of
+// payload (schema/schema_registry.h); normalization comes later.
 //
 // Encode (response) path: observe-only token-usage extraction. When
 // response_handling.token_usage is configured, 2xx SSE/JSON responses on

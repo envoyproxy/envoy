@@ -9936,6 +9936,33 @@ bool envoy_dynamic_module_callback_cluster_add_hosts(
     size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs);
 
 /**
+ * envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames is equivalent to
+ * envoy_dynamic_module_callback_cluster_add_hosts, but additionally assigns each host a logical
+ * hostname.
+ *
+ * A non-empty logical hostname is available to upstream features such as automatic SNI and SAN
+ * validation. An empty hostname entry uses the same synthesized hostname behavior as
+ * envoy_dynamic_module_callback_cluster_add_hosts.
+ *
+ * @param hostnames is the optional array of logical hostnames corresponding to ``addresses``. Each
+ * entry is owned by the module. An entry with length 0 uses the same synthesized hostname behavior
+ * as envoy_dynamic_module_callback_cluster_add_hosts. The entire array can be nullptr to use that
+ * behavior for all hosts.
+ *
+ * See envoy_dynamic_module_callback_cluster_add_hosts for all other parameters and return
+ * semantics.
+ */
+bool envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
+    const envoy_dynamic_module_type_module_buffer* addresses,
+    const envoy_dynamic_module_type_module_buffer* hostnames, const uint32_t* weights,
+    const envoy_dynamic_module_type_module_buffer* regions,
+    const envoy_dynamic_module_type_module_buffer* zones,
+    const envoy_dynamic_module_type_module_buffer* sub_zones,
+    const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
+    size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs);
+
+/**
  * envoy_dynamic_module_callback_cluster_remove_hosts removes multiple hosts from the cluster in a
  * single batch operation. This triggers only one priority set update regardless of how many hosts
  * are removed.

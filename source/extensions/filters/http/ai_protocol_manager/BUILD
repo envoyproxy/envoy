@@ -117,6 +117,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "schema_lib",
+    srcs = ["schema.cc"],
+    hdrs = ["schema.h"],
+    deps = [
+        ":json_with_ext_buf_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
@@ -127,6 +139,7 @@ envoy_cc_library(
         ":json_with_ext_buf_lib",
         ":json_with_ext_buf_parser_lib",
         ":response_handler_lib",
+        ":schema_lib",
         "//envoy/http:codes_interface",
         "//envoy/router:router_interface",
         "//envoy/stats:stats_interface",
@@ -135,6 +148,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/schema:schema_registry_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",

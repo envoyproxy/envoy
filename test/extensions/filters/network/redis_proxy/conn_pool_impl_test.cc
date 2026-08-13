@@ -1105,8 +1105,8 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndRemovedWithDraining) {
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
   EXPECT_EQ(host_address_map[host2->address()->asString()], host2);
   EXPECT_EQ(clientMap().size(), 2);
-  EXPECT_NE(clientMap().find(host1), clientMap().end());
-  EXPECT_NE(clientMap().find(host2), clientMap().end());
+  EXPECT_TRUE(clientMap().contains(host1));
+  EXPECT_TRUE(clientMap().contains(host2));
   void* host1_active_client = clientMap(host1);
   EXPECT_EQ(createdViaRedirectHosts().size(), 2);
   EXPECT_EQ(clientsToDrain().size(), 0);
@@ -1204,8 +1204,8 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithNoDraining) {
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
   EXPECT_EQ(host_address_map[host2->address()->asString()], host2);
   EXPECT_EQ(clientMap().size(), 2);
-  EXPECT_NE(clientMap().find(host1), clientMap().end());
-  EXPECT_NE(clientMap().find(host2), clientMap().end());
+  EXPECT_TRUE(clientMap().contains(host1));
+  EXPECT_TRUE(clientMap().contains(host2));
   EXPECT_EQ(createdViaRedirectHosts().size(), 2);
   EXPECT_EQ(clientsToDrain().size(), 0);
   EXPECT_EQ(drainTimer()->enabled(), false);
@@ -1282,8 +1282,8 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
   EXPECT_EQ(host_address_map[host1->address()->asString()], host1);
   EXPECT_EQ(host_address_map[host2->address()->asString()], host2);
   EXPECT_EQ(clientMap().size(), 2);
-  EXPECT_NE(clientMap().find(host1), clientMap().end());
-  EXPECT_NE(clientMap().find(host2), clientMap().end());
+  EXPECT_TRUE(clientMap().contains(host1));
+  EXPECT_TRUE(clientMap().contains(host2));
   EXPECT_EQ(createdViaRedirectHosts().size(), 2);
   EXPECT_EQ(clientsToDrain().size(), 0);
   EXPECT_EQ(drainTimer()->enabled(), false);

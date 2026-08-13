@@ -52,11 +52,19 @@ than after the whole upload. Oversized string values are left in the external
 buffer and referenced by offset, so a large prompt does not reappear in
 per-stream memory.
 
+Upon stream completion, the parsed document is validated against the route's declared
+:ref:`schema <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.schema>`
+(such as ``OPENAI_CHAT_COMPLETIONS``). Validation checks required fields, data types, enum values,
+and offload rules -- ensuring metadata fields (like ``model`` and ``role``) remain inline in the DOM
+while permitting large message content to reside in external buffers. Any schema validation failure
+triggers an immediate HTTP 400 response.
+
 .. note::
 
-  Only the request (decode) path is wired today, and the body is offloaded to an
-  in-memory store. Schema validation and transcoding are not implemented yet;
-  the parsed payload is not consumed by anything downstream so far.
+  On the request path the body is offloaded to an in-memory store. Request
+  schema validation is supported for declared APIs with a defined schema
+  (currently OpenAI Chat Completions); schema transcoding is not implemented
+  yet.
 
 The filter is a dual filter: besides the downstream HTTP filter chain shown
 below, it can also be placed in a cluster's upstream HTTP filter chain via
@@ -91,9 +99,11 @@ A route carrying a :ref:`request
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.request>`
 declaration names the :ref:`wire API
 <envoy_v3_api_enum_type.ai.v3.ApiProtocol>` its request payload follows, and
-(when ``request_handling`` is enabled) its payload is parsed strictly: a
-malformed body is rejected with a 400. This is normally attached to a route
-matching the provider's REST path, such as ``/chat/completions``:
+(when ``request_handling`` is enabled) its payload is parsed and validated
+strictly: a malformed body — or one violating the declared API's payload
+schema, for APIs with a defined schema — is rejected with a 400. This is
+normally attached to a route matching the provider's REST path, such as
+``/chat/completions``:
 
 .. code-block:: yaml
 

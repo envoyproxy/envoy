@@ -11,6 +11,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
+#include "source/extensions/filters/http/ai_protocol_manager/schema/schema_registry.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
@@ -306,6 +307,19 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
   if (end_stream) {
     request_json_ = request_parser_->takeDocument();
     request_parser_.reset();
+
+    if (isAiEndpoint()) {
+      // TODO(penguingao): Support validating payload schema on the fly as the Wuffs parser
+      // streams and parses chunks, rejecting invalid fields early before end_stream.
+      if (const PayloadSchema* payload_schema = SchemaRegistry::getSchema(route_request_protocol_);
+          payload_schema != nullptr) {
+        const absl::Status validation_status = payload_schema->validateRequest(request_json_);
+        if (!validation_status.ok()) {
+          rejectInvalidPayload(validation_status);
+          return false;
+        }
+      }
+    }
   }
   return true;
 }
@@ -314,7 +328,7 @@ void AiProtocolManagerFilter::rejectInvalidPayload(const absl::Status& status) {
   ENVOY_LOG(debug, "ai_protocol_manager: rejecting request: {}", status.message());
   payload_rejected_ = true;
   request_parser_.reset();
-  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "invalid JSON payload", nullptr,
+  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, status.message(), nullptr,
                                      std::nullopt, "ai_protocol_manager_invalid_json");
 }
 

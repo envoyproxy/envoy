@@ -25,7 +25,7 @@ bool isImplemented(absl::string_view alg) {
       {"RS384"}, {"RS512"}, {"PS256"}, {"PS384"}, {"PS512"}, {"EdDSA"},
   };
 
-  return implemented_algs.find(alg) != implemented_algs.end();
+  return implemented_algs.contains(alg);
 }
 
 } // namespace

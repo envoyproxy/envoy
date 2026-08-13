@@ -178,10 +178,13 @@ message RequestPerRoute {
   // ``API_PROTOCOL_UNSPECIFIED`` declares the endpoint without naming its
   // API.
   //
-  // [#comment: Schema validation and normalization against the declared API
-  // are not implemented yet; the choice is recorded and carried. A
-  // normalization knob will be added here once the transformation and its
-  // output contract exist.]
+  // Payloads are validated against the declared API's schema when one is
+  // defined (currently OpenAI Chat Completions); a schema-invalid payload is
+  // rejected with a 400.
+  //
+  // [#comment: Normalization is not implemented yet; a normalization knob
+  // will be added here once the transformation and its output contract
+  // exist.]
   type.ai.v3.ApiProtocol api_protocol = 1 [(validate.rules).enum = {defined_only: true}];
 }
 

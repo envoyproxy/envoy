@@ -192,7 +192,7 @@ HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
   net_hosts.reserve(hosts.size());
 
   for (const auto& host : hosts) {
-    if (excluded_hosts.find(host) == excluded_hosts.end()) {
+    if (!excluded_hosts.contains(host)) {
       net_hosts.emplace_back(host);
     }
   }
@@ -988,7 +988,7 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
     std::optional<uint32_t> overprovisioning_factor,
     HostMapConstSharedPtr cross_priority_host_map) {
   // We assume that each call updates a different priority.
-  ASSERT(priorities_.find(priority) == priorities_.end());
+  ASSERT(!priorities_.contains(priority));
   priorities_.insert(priority);
 
   for (const auto& host : hosts_added) {
@@ -2385,8 +2385,7 @@ void PriorityStateManager::updateClusterPrioritySet(
 
   // Do we have hosts for the local locality?
   const bool non_empty_local_locality =
-      local_info_node_.has_locality() &&
-      hosts_per_locality.find(local_locality) != hosts_per_locality.end();
+      local_info_node_.has_locality() && hosts_per_locality.contains(local_locality);
 
   // As per HostsPerLocality::get(), the per_locality vector must have the local locality hosts
   // first if non_empty_local_locality.
