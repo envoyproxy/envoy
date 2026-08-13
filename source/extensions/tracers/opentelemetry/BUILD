@@ -46,6 +46,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http:http_service_headers_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/tracing:tracer_config_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
@@ -53,7 +54,6 @@ envoy_cc_library(
         "@opentelemetry-cpp//api",
         "@opentelemetry-proto//:trace_proto_cc",
         "@opentelemetry-proto//:trace_service_proto_cc",
-        "//source/common/tracing:tracer_config_lib",
     ],
 )
 
@@ -71,8 +71,10 @@ envoy_cc_library(
         "trace_exporter.h",
     ],
     deps = [
+        "//envoy/config:typed_config_interface",
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/server:factory_context_interface",
+        "//envoy/server:tracer_config_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/http:async_client_utility_lib",
@@ -88,7 +90,5 @@ envoy_cc_library(
         "@opentelemetry-cpp//api",
         "@opentelemetry-proto//:trace_proto_cc",
         "@opentelemetry-proto//:trace_service_proto_cc",
-        "//envoy/config:typed_config_interface",
-        "//envoy/server:tracer_config_interface",
     ],
 )

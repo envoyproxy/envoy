@@ -58,11 +58,11 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
+        "//source/extensions/tracers/opentelemetry:trace_exporter",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/server:tracer_factory_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
-        "//source/extensions/tracers/opentelemetry:trace_exporter",
     ],
 )
 
