@@ -446,6 +446,8 @@ resource_spans:
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies that when a gRPC async client fails to initialize, spans are dropped
+// gracefully and spans_dropped metric is incremented.
 TEST_F(OpenTelemetryDriverTest, UnconfiguredExporterIncrementsSpansDropped) {
   const std::string yaml_string = R"EOF(
     grpc_service:
@@ -496,6 +498,8 @@ TEST_F(OpenTelemetryDriverTest, UnconfiguredExporterIncrementsSpansDropped) {
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies that when custom exporter factory returns nullptr, spans are dropped
+// gracefully and spans_dropped metric is incremented.
 TEST_F(OpenTelemetryDriverTest, NullCustomExporterIncrementsSpansDropped) {
   const std::string yaml_string = R"EOF(
     exporter:
@@ -528,6 +532,8 @@ TEST_F(OpenTelemetryDriverTest, NullCustomExporterIncrementsSpansDropped) {
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies that when custom exporter factory creation throws an exception,
+// spans are dropped gracefully and spans_dropped metric is incremented.
 TEST_F(OpenTelemetryDriverTest, ThrowingCustomExporterIncrementsSpansDropped) {
   const std::string yaml_string = R"EOF(
     exporter:
@@ -639,6 +645,8 @@ TEST_F(OpenTelemetryDriverTest, CustomExporterFactoryNotFound) {
   EXPECT_EQ(driver_, nullptr);
 }
 
+// Verifies that an exception is thrown when an invalid opaque configuration is
+// provided to a custom exporter factory.
 TEST_F(OpenTelemetryDriverTest, CustomExporterInvalidOpaqueConfig) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   auto* exporter = opentelemetry_config.mutable_exporter();
@@ -1855,3 +1863,4 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
 } // namespace Tracers
 } // namespace Extensions
 } // namespace Envoy
+
