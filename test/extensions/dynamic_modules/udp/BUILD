@@ -74,6 +74,7 @@ envoy_cc_test(
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/udp/dynamic_modules:config",
         "//source/extensions/filters/udp/udp_proxy:config",
         "//test/integration:integration_lib",

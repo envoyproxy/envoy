@@ -59,6 +59,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter
   dynamic_module_config:
     name: "udp_listener_integration_test"
+    do_not_close: true
   filter_name: "{}"
 )EOF",
                                                  filter_name));
@@ -115,7 +116,8 @@ TEST_P(DynamicModulesUdpListenerSdkIntegrationTest, RewriteDatagram) {
 
   // The UDP filter config scopes its metrics as "<namespace>.<filter_name>.", defaulting the
   // namespace to DefaultMetricsNamespace. See DynamicModuleUdpListenerFilterConfig's constructor.
-  test_server_->waitForCounterEq("dynamicmodulescustom.rewrite_datagram.datagrams_rewritten", 1);
+  test_server_->waitForCounter("dynamicmodulescustom.rewrite_datagram.datagrams_rewritten",
+                               testing::Eq(1));
   EXPECT_EQ(
       request.size(),
       test_server_->gauge("dynamicmodulescustom.rewrite_datagram.last_datagram_size")->value());
