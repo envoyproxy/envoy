@@ -81,6 +81,17 @@ std::optional<std::string> HeaderFormatter::format(OptRef<const Http::HeaderMap>
   return std::string(val);
 }
 
+bool HeaderFormatter::formatTo(std::string& sink, OptRef<const Http::HeaderMap> headers) const {
+  const Http::HeaderEntry* header = findHeader(headers);
+  if (!header) {
+    return false;
+  }
+
+  absl::string_view val = header->value().getStringView();
+  sink.append(SubstitutionFormatUtils::truncateStringView(val, max_length_));
+  return true;
+}
+
 Protobuf::Value HeaderFormatter::formatValue(OptRef<const Http::HeaderMap> headers) const {
   const Http::HeaderEntry* header = findHeader(headers);
   if (!header) {
@@ -102,6 +113,11 @@ std::optional<std::string> ResponseHeaderFormatter::format(const Context& contex
   return HeaderFormatter::format(context.responseHeaders());
 }
 
+bool ResponseHeaderFormatter::formatTo(std::string& sink, const Context& context,
+                                       const StreamInfo::StreamInfo&) const {
+  return HeaderFormatter::formatTo(sink, context.responseHeaders());
+}
+
 Protobuf::Value ResponseHeaderFormatter::formatValue(const Context& context,
                                                      const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(context.responseHeaders());
@@ -117,6 +133,11 @@ std::optional<std::string> RequestHeaderFormatter::format(const Context& context
   return HeaderFormatter::format(context.requestHeaders());
 }
 
+bool RequestHeaderFormatter::formatTo(std::string& sink, const Context& context,
+                                      const StreamInfo::StreamInfo&) const {
+  return HeaderFormatter::formatTo(sink, context.requestHeaders());
+}
+
 Protobuf::Value RequestHeaderFormatter::formatValue(const Context& context,
                                                     const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(context.requestHeaders());
@@ -130,6 +151,11 @@ ResponseTrailerFormatter::ResponseTrailerFormatter(absl::string_view main_header
 std::optional<std::string> ResponseTrailerFormatter::format(const Context& context,
                                                             const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::format(context.responseTrailers());
+}
+
+bool ResponseTrailerFormatter::formatTo(std::string& sink, const Context& context,
+                                        const StreamInfo::StreamInfo&) const {
+  return HeaderFormatter::formatTo(sink, context.responseTrailers());
 }
 
 Protobuf::Value ResponseTrailerFormatter::formatValue(const Context& context,

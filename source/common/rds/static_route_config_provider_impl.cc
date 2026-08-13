@@ -7,11 +7,11 @@ namespace Rds {
 
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     const Protobuf::Message& route_config_proto, ConfigTraits& config_traits,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
     RouteConfigProviderManager& route_config_provider_manager)
     : route_config_proto_(
           cloneProto(route_config_provider_manager.protoTraits(), route_config_proto)),
-      config_(config_traits.createConfig(*route_config_proto_, factory_context,
+      config_(config_traits.createConfig(*route_config_proto_, factory_context, init_manager,
                                          true /* validate unknown cluster */)),
       last_updated_(factory_context.timeSource().systemTime()),
       config_info_(ConfigInfo{*route_config_proto_, ""}),

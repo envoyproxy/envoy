@@ -217,7 +217,7 @@ public:
   }
 
 protected:
-  Logger::Logger::Levels log_level_ = Logger::Logger::info;
+  Logger::Levels log_level_ = Logger::Levels::info;
   std::unique_ptr<test::SystemHelperPeer::Handle> helper_handle_;
   bool add_quic_hints_ = false;
   bool add_fake_dns_ = false;
@@ -296,13 +296,12 @@ TEST_P(ClientIntegrationTest, Basic) {
 #if not defined(__APPLE__)
 TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   std::atomic<bool> found_cache_miss{false};
-  LogExpectation log_expect(
-      Envoy::GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
-        if (msg.find("ignoring failed address cache hit for miss for host 'doesnotexist") !=
-            std::string::npos) {
-          found_cache_miss = true;
-        }
-      });
+  LogExpectation log_expect(Envoy::GetLogSink(), [&](Logger::Levels, const std::string& msg) {
+    if (msg.find("ignoring failed address cache hit for miss for host 'doesnotexist") !=
+        std::string::npos) {
+      found_cache_miss = true;
+    }
+  });
 
   // Configure MockDnsResolver with "doesnotexist" as a non-existent domain
   envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
@@ -313,7 +312,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   builder_.setDnsResolver(dns_resolver_config);
 
   builder_.setDisableDnsRefreshOnFailure(true);
-  log_level_ = Logger::Logger::debug;
+  log_level_ = Logger::Levels::debug;
   initialize();
 
   default_request_headers_.setHost("doesnotexist");
@@ -333,14 +332,13 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
 
 TEST_P(ClientIntegrationTest, DisableDnsRefreshOnNetworkChange) {
   std::atomic<bool> found_force_dns_refresh{false};
-  LogExpectation log_expect(
-      Envoy::GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
-        if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
-          found_force_dns_refresh = true;
-        }
-      });
+  LogExpectation log_expect(Envoy::GetLogSink(), [&](Logger::Levels, const std::string& msg) {
+    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+      found_force_dns_refresh = true;
+    }
+  });
   builder_.setDisableDnsRefreshOnNetworkChange(true);
-  log_level_ = Logger::Logger::debug;
+  log_level_ = Logger::Levels::debug;
   initialize();
 
   internalEngine()->onDefaultNetworkChanged(1);
@@ -352,16 +350,15 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
   std::atomic<bool> found_force_dns_refresh{false};
   std::vector<absl::Notification> handled_network_changes(5);
   std::atomic<int> current_change_event{0};
-  LogExpectation log_expect(
-      Envoy::GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
-        if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
-          found_force_dns_refresh = true;
-        } else if (msg.find("Finished the network changed callback") != std::string::npos) {
-          handled_network_changes[current_change_event].Notify();
-        }
-      });
+  LogExpectation log_expect(Envoy::GetLogSink(), [&](Logger::Levels, const std::string& msg) {
+    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+      found_force_dns_refresh = true;
+    } else if (msg.find("Finished the network changed callback") != std::string::npos) {
+      handled_network_changes[current_change_event].Notify();
+    }
+  });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
-  log_level_ = Logger::Logger::trace;
+  log_level_ = Logger::Levels::trace;
   initialize();
 
   // Set the network type to WIFI. This should trigger a network change.
@@ -411,18 +408,17 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
 TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
   absl::Notification found_force_dns_refresh;
   std::atomic<bool> handled_network_change{false};
-  LogExpectation log_expect(
-      Envoy::GetLogSink(), [&](Logger::Logger::Levels, const std::string& msg) {
-        if (msg.find("Default network state has been changed. Current net configuration key") !=
-            std::string::npos) {
-          handled_network_change = true;
-        }
-        if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
-          found_force_dns_refresh.Notify();
-        }
-      });
+  LogExpectation log_expect(Envoy::GetLogSink(), [&](Logger::Levels, const std::string& msg) {
+    if (msg.find("Default network state has been changed. Current net configuration key") !=
+        std::string::npos) {
+      handled_network_change = true;
+    }
+    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+      found_force_dns_refresh.Notify();
+    }
+  });
   builder_.setDisableDnsRefreshOnNetworkChange(false);
-  log_level_ = Logger::Logger::trace;
+  log_level_ = Logger::Levels::trace;
   initialize();
 
   // A new WIFI network appears and becomes the default network. Even though

@@ -1,6 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stream_info/filter_state.h"
 
@@ -54,6 +55,25 @@ class DynamicModuleClusterIntegrationTest
       public HttpIntegrationTest {
 public:
   DynamicModuleClusterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void configureUpstreamTlsForLogicalHostname() {
+    upstream_tls_ = true;
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+      auto* validation_context =
+          tls_context.mutable_common_tls_context()->mutable_validation_context();
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      tls_context.set_auto_host_sni(true);
+      tls_context.set_auto_sni_san_validation(true);
+
+      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+      std::ignore =
+          cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+    });
+  }
 
   void initializeWithDecCluster(const std::string& cluster_name,
                                 const std::string& cluster_config = "") {
@@ -125,6 +145,24 @@ TEST_P(DynamicModuleClusterIntegrationTest, SyncHostSelectionMultipleRequests) {
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
+}
+
+// Verifies that a logical hostname supplied separately from the connection address is available
+// to upstream TLS for automatic SNI and SAN validation.
+TEST_P(DynamicModuleClusterIntegrationTest, LogicalHostnameDrivesUpstreamTls) {
+  configureUpstreamTlsForLogicalHostname();
+  initializeWithDecCluster("logical_hostname");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(upstream_request_->complete());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_NE(fake_upstream_connection_, nullptr);
+  ASSERT_NE(fake_upstream_connection_->connection().ssl(), nullptr);
+  EXPECT_EQ("test.lyft.com", fake_upstream_connection_->connection().ssl()->sni());
 }
 
 // Verifies that a cluster with asynchronous host selection correctly routes requests.

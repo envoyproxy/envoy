@@ -87,8 +87,7 @@ void MockClusterManager::initializeClusters(const std::vector<std::string>& acti
       }));
   ON_CALL(*this, hasCluster(_))
       .WillByDefault(Invoke([this](absl::string_view cluster_name) -> bool {
-        return active_clusters_.find(cluster_name) != active_clusters_.end() ||
-               warming_clusters_.find(cluster_name) != warming_clusters_.end();
+        return active_clusters_.contains(cluster_name) || warming_clusters_.contains(cluster_name);
       }));
   ON_CALL(*this, hasActiveClusters()).WillByDefault(Return(!active_cluster_names.empty()));
 }

@@ -1,4 +1,5 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.validate.h"
 
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
@@ -8,7 +9,9 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -376,6 +379,92 @@ providers:
   absl::Status creation_status = absl::OkStatus();
   FilterConfigImpl filter_config(proto_config, "", context, creation_status);
   EXPECT_TRUE(creation_status.ok());
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, ClaimToHeaderWithClaimPathOnly) {
+  // claim_name has no PGV min_len, so a claim_path-only entry must reach the filter's own check.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    claim_to_headers:
+    - header_name: x-jwt-claim
+      claim_path:
+      - key: "a.b"
+      - key: "c.d"
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context, creation_status);
+  EXPECT_TRUE(creation_status.ok());
+}
+
+// A segment with no key set and a segment with an explicitly empty key are the same message on the
+// wire, and PGV rejects both: an unset proto3 scalar string reads back as "", which fails min_len.
+TEST(HttpJwtAuthnFilterConfigTest, ClaimToHeaderWithEmptyClaimPathSegment) {
+  for (absl::string_view segment : {"- {}", R"(- key: "")"}) {
+    const std::string config = absl::StrCat(R"(
+providers:
+  provider1:
+    issuer: issuer1
+    claim_to_headers:
+    - header_name: x-jwt-claim
+      claim_path:
+      )",
+                                            segment);
+
+    JwtAuthentication proto_config;
+    TestUtility::loadFromYaml(config, proto_config);
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(proto_config), ProtoValidationException,
+                            "value length must be at least 1");
+  }
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, ClaimToHeaderWithBothClaimNameAndClaimPath) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    claim_to_headers:
+    - header_name: x-jwt-claim
+      claim_name: sub
+      claim_path:
+      - key: sub
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context, creation_status);
+  EXPECT_THAT(creation_status,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("does not set exactly one of claim_name and claim_path")));
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, ClaimToHeaderWithNeitherClaimNameNorClaimPath) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    claim_to_headers:
+    - header_name: x-jwt-claim
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigImpl filter_config(proto_config, "", context, creation_status);
+  EXPECT_THAT(creation_status,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("does not set exactly one of claim_name and claim_path")));
 }
 
 TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksAsyncFetchRefetchDurationVeryBig) {

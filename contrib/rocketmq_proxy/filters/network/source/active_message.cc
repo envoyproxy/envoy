@@ -122,7 +122,7 @@ void ActiveMessage::fillBrokerData(std::vector<BrokerData>& list, const std::str
   for (auto& entry : list) {
     if (entry.cluster() == cluster && entry.brokerName() == broker_name) {
       found = true;
-      if (entry.brokerAddresses().find(broker_id) != entry.brokerAddresses().end()) {
+      if (entry.brokerAddresses().contains(broker_id)) {
         ENVOY_LOG(warn, "Duplicate broker_id found. Broker ID: {}, address: {}", broker_id,
                   address);
         continue;

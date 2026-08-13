@@ -83,22 +83,13 @@ protected:
     EXPECT_EQ(socket_manager_->cluster_to_node_info_map_.size(), 0);
   }
 
-  bool verifyFDToNodeMap(int fd) {
-    return socket_manager_->fd_to_node_map_.find(fd) != socket_manager_->fd_to_node_map_.end();
-  }
+  bool verifyFDToNodeMap(int fd) { return socket_manager_->fd_to_node_map_.contains(fd); }
 
-  bool verifyFDToClusterMap(int fd) {
-    return socket_manager_->fd_to_cluster_map_.find(fd) !=
-           socket_manager_->fd_to_cluster_map_.end();
-  }
+  bool verifyFDToClusterMap(int fd) { return socket_manager_->fd_to_cluster_map_.contains(fd); }
 
-  bool verifyFDToEventMap(int fd) {
-    return socket_manager_->fd_to_event_map_.find(fd) != socket_manager_->fd_to_event_map_.end();
-  }
+  bool verifyFDToEventMap(int fd) { return socket_manager_->fd_to_event_map_.contains(fd); }
 
-  bool verifyFDToTimerMap(int fd) {
-    return socket_manager_->fd_to_timer_map_.find(fd) != socket_manager_->fd_to_timer_map_.end();
-  }
+  bool verifyFDToTimerMap(int fd) { return socket_manager_->fd_to_timer_map_.contains(fd); }
 
   size_t getFDToEventMapSize() { return socket_manager_->fd_to_event_map_.size(); }
   size_t getFDToTimerMapSize() { return socket_manager_->fd_to_timer_map_.size(); }

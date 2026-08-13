@@ -67,7 +67,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   std::unique_ptr<Envoy::EnvoyLogger> logger = std::make_unique<Envoy::EnvoyLogger>();
   if (envoy_logger != nullptr) {
     jobject envoy_logger_global_ref = env->NewGlobalRef(envoy_logger);
-    logger->on_log_ = [envoy_logger_global_ref](Envoy::Logger::Logger::Levels level,
+    logger->on_log_ = [envoy_logger_global_ref](Envoy::Logger::Levels level,
                                                 const std::string& message) {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
       Envoy::JNI::LocalRefUniquePtr<jstring> java_message =

@@ -203,6 +203,27 @@ envoy_benchmark_test(
     benchmark_binary = "codes_speed_test",
 )
 
+envoy_cc_benchmark_binary(
+    name = "filter_manager_benchmark",
+    srcs = ["filter_manager_benchmark.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/http:filter_manager_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_reply:local_reply_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:overload_manager_mocks",
+        "//test/test_common:test_runtime_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "filter_manager_benchmark_test",
+    benchmark_binary = "filter_manager_benchmark",
+)
+
 envoy_cc_test_library(
     name = "common_lib",
     srcs = ["common.cc"],

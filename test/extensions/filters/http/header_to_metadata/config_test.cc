@@ -143,9 +143,11 @@ request_rules:
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   HeaderToMetadataConfig factory;
+  Server::Configuration::ExtraFactoryContext extra_context{
+      server_context.messageValidationVisitor(), "stats"};
 
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).value();
+      factory.createHttpFilterFactoryFromProto(proto_config, server_context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);

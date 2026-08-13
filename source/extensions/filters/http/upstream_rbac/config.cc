@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/empty_string.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 #include "source/extensions/filters/http/upstream_rbac/upstream_rbac_filter.h"
 
@@ -13,18 +14,24 @@ namespace UpstreamRBACFilter {
 
 absl::StatusOr<Http::FilterFactoryCb>
 UpstreamRoleBasedAccessControlFilterConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& proto_config, const std::string&,
+    const Protobuf::Message& proto_config, const std::string& stats_prefix,
     Server::Configuration::UpstreamFactoryContext& context) {
   auto& server_context = context.serverFactoryContext();
   const auto& typed_config =
       MessageUtil::downcastAndValidate<const envoy::extensions::filters::http::rbac::v3::RBAC&>(
           proto_config, server_context.messageValidationVisitor());
 
-  // The stats prefix supplied for an upstream filter is the owning cluster's scope prefix (e.g.
-  // "cluster.<name>."), which context.scope() already applies. Use an empty prefix so the RBAC
-  // stats land under "cluster.<name>.rbac." instead of being prefixed twice.
+  // stats_prefix carries the parent's namespace ("http.<stat_prefix>." from a router,
+  // "cluster.<name>." from a cluster) so RBAC counters land in the right place. This is a behavior
+  // change, so it is guarded by the runtime flag; when disabled we fall back to the previous empty
+  // prefix.
+  const std::string& rbac_stats_prefix =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
+          ? stats_prefix
+          : EMPTY_STRING;
   auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(
-      typed_config, EMPTY_STRING, context.scope(), server_context,
+      typed_config, rbac_stats_prefix, context.scope(), server_context,
       server_context.messageValidationVisitor());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

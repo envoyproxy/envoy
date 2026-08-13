@@ -111,7 +111,7 @@ void vclInterfaceRegisterEpollEvent(Envoy::Event::Dispatcher& dispatcher) {
   MqFileEventsMap& mq_fevts_map = mqFileEventsMap();
   const int wrk_index = vppcom_worker_index();
   RELEASE_ASSERT(wrk_index != -1, "");
-  if (mq_fevts_map.find(wrk_index) != mq_fevts_map.end()) {
+  if (mq_fevts_map.contains(wrk_index)) {
     return;
   }
   mq_fevts_map[wrk_index] = dispatcher.createFileEvent(

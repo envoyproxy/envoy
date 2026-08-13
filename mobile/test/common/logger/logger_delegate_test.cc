@@ -30,7 +30,7 @@ TEST_F(LambdaDelegateTest, LogCb) {
   std::string actual_msg;
 
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Levels, const std::string& message) { actual_msg = message; };
+  logger->on_log_ = [&](Levels, const std::string& message) { actual_msg = message; };
   LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
   ENVOY_LOG_MISC(error, expected_msg);
@@ -43,7 +43,7 @@ TEST_F(LambdaDelegateTest, LogCbWithLevels) {
   std::string actual_msg;
 
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Levels, const std::string& message) { actual_msg = message; };
+  logger->on_log_ = [&](Levels, const std::string& message) { actual_msg = message; };
   LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
   // Set the log to critical. The message should not be logged.
@@ -75,50 +75,50 @@ TEST_F(LambdaDelegateTest, ReleaseCb) {
 }
 
 class LambdaDelegateWithLevelTest
-    : public testing::TestWithParam<std::tuple<Logger::Levels, spdlog::level::level_enum>> {};
+    : public testing::TestWithParam<std::tuple<Levels, spdlog::level::level_enum>> {};
 
-INSTANTIATE_TEST_SUITE_P(
-    LogLevel, LambdaDelegateWithLevelTest,
-    testing::Values(std::make_tuple<>(Logger::Levels::trace, spdlog::level::trace),
-                    std::make_tuple<>(Logger::Levels::debug, spdlog::level::debug),
-                    std::make_tuple<>(Logger::Levels::info, spdlog::level::info),
-                    std::make_tuple<>(Logger::Levels::warn, spdlog::level::warn),
-                    std::make_tuple<>(Logger::Levels::error, spdlog::level::err),
-                    std::make_tuple<>(Logger::Levels::critical, spdlog::level::critical)));
+INSTANTIATE_TEST_SUITE_P(LogLevel, LambdaDelegateWithLevelTest,
+                         testing::Values(std::make_tuple<>(Levels::trace, spdlog::level::trace),
+                                         std::make_tuple<>(Levels::debug, spdlog::level::debug),
+                                         std::make_tuple<>(Levels::info, spdlog::level::info),
+                                         std::make_tuple<>(Levels::warn, spdlog::level::warn),
+                                         std::make_tuple<>(Levels::error, spdlog::level::err),
+                                         std::make_tuple<>(Levels::critical,
+                                                           spdlog::level::critical)));
 
 TEST_P(LambdaDelegateWithLevelTest, Log) {
   std::string expected_msg = "Hello LambdaDelegate";
-  Logger::Levels actual_level;
+  Levels actual_level;
   std::string actual_msg;
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Levels level, const std::string& message) {
+  logger->on_log_ = [&](Levels level, const std::string& message) {
     actual_level = level;
     actual_msg = message;
   };
 
   LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
-  Logger::Levels envoy_log_level = std::get<0>(GetParam());
+  Levels envoy_log_level = std::get<0>(GetParam());
   spdlog::level::level_enum spd_log_level = std::get<1>(GetParam());
 
   Context::changeAllLogLevels(spd_log_level);
   switch (envoy_log_level) {
-  case Logger::Levels::trace:
+  case Levels::trace:
     ENVOY_LOG_MISC(trace, expected_msg);
     break;
-  case Logger::Levels::debug:
+  case Levels::debug:
     ENVOY_LOG_MISC(debug, expected_msg);
     break;
-  case Logger::Levels::info:
+  case Levels::info:
     ENVOY_LOG_MISC(info, expected_msg);
     break;
-  case Logger::Levels::warn:
+  case Levels::warn:
     ENVOY_LOG_MISC(warn, expected_msg);
     break;
-  case Logger::Levels::error:
+  case Levels::error:
     ENVOY_LOG_MISC(error, expected_msg);
     break;
-  case Logger::Levels::critical:
+  case Levels::critical:
     ENVOY_LOG_MISC(critical, expected_msg);
     break;
   default:

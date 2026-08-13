@@ -341,14 +341,14 @@ void JsonRpcFieldExtractor::checkEarlyStop() {
     if (is_notification_ && field == "id") {
       continue;
     }
-    if (collected_fields_.count(field) == 0) {
+    if (!collected_fields_.contains(field)) {
       return;
     }
   }
 
   const auto& required_fields = config_.getFieldsForMethod(method_);
   for (const auto& field : required_fields) {
-    if (collected_fields_.count(field.path) == 0) {
+    if (!collected_fields_.contains(field.path)) {
       return;
     }
   }
@@ -451,7 +451,7 @@ void JsonRpcFieldExtractor::copyFieldByPath(const std::string& path) {
 void JsonRpcFieldExtractor::validateRequiredFields() {
   const auto& fields = config_.getFieldsForMethod(method_);
   for (const auto& field : fields) {
-    if (extracted_fields_.count(field.path) == 0) {
+    if (!extracted_fields_.contains(field.path)) {
       missing_required_fields_.push_back(field.path);
       ENVOY_LOG(debug, "missing required field for {}: {}", method_, field.path);
     }

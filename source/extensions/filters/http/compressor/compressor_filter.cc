@@ -715,7 +715,7 @@ bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
   if (content_type != nullptr && !content_type_values_.empty()) {
     const absl::string_view value =
         StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
-    return content_type_values_.find(value) != content_type_values_.end();
+    return content_type_values_.contains(value);
   }
 
   return true;

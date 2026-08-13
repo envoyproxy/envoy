@@ -307,7 +307,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
 }
 
 void ConnectionManager::setLocalResponseSent(absl::string_view transaction_id) {
-  if (transactions_.find(transaction_id) != transactions_.end()) {
+  if (transactions_.contains(transaction_id)) {
     transactions_[transaction_id]->setLocalResponseSent(true);
   }
 }
@@ -357,7 +357,7 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSh
 
   std::string&& k = std::string(metadata->transactionId().value());
   // if (metadata->methodType() == MethodType::Ack) {
-  if (transactions_.find(k) != transactions_.end()) {
+  if (transactions_.contains(k)) {
     // ACK_4XX metadata will updated later.
     return *transactions_.at(k);
   }

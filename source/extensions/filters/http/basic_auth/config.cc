@@ -82,8 +82,8 @@ absl::StatusOr<Http::FilterFactoryCb> BasicAuthFilterFactory::createFilterFactor
 }
 
 absl::StatusOr<Http::FilterFactoryCb> BasicAuthFilterFactory::createHttpFilterFactoryFromProtoTyped(
-    const BasicAuth& proto_config, const std::string& stats_prefix,
-    Server::Configuration::ServerFactoryContext& context) {
+    const BasicAuth& proto_config, Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   auto htpasswd_or = Config::DataSource::read(proto_config.users(), false, context.api());
   RETURN_IF_NOT_OK_REF(htpasswd_or.status());
   auto users_or = readHtpasswd(htpasswd_or.value());
@@ -91,7 +91,7 @@ absl::StatusOr<Http::FilterFactoryCb> BasicAuthFilterFactory::createHttpFilterFa
   FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
       std::move(users_or.value()), proto_config.forward_username_header(),
       proto_config.authentication_header(), proto_config.allow_missing(),
-      proto_config.emit_dynamic_metadata(), stats_prefix, context.scope());
+      proto_config.emit_dynamic_metadata(), extra_context.stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<BasicAuthFilter>(config));
   };

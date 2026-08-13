@@ -274,7 +274,7 @@ bool GrpcStatusFilter::evaluate(const Formatter::Context& context,
     status = optional_status.value();
   }
 
-  const bool found = statuses_.find(status) != statuses_.end();
+  const bool found = statuses_.contains(status);
   return exclude_ ? !found : found;
 }
 

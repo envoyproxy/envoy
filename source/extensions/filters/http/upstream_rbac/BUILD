@@ -16,6 +16,8 @@ envoy_cc_extension(
     deps = [
         ":upstream_rbac_filter_lib",
         "//envoy/registry",
+        "//source/common/common:empty_string",
+        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",

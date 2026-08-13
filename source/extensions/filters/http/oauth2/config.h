@@ -23,10 +23,10 @@ public:
                                     const std::string&,
                                     Server::Configuration::FactoryContext&) override;
 
-  absl::StatusOr<Http::FilterFactoryCb>
-  createHttpFilterFactoryFromProtoTyped(const envoy::extensions::filters::http::oauth2::v3::OAuth2&,
-                                        const std::string&,
-                                        Server::Configuration::ServerFactoryContext&) override;
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::oauth2::v3::OAuth2&,
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactory(const envoy::extensions::filters::http::oauth2::v3::OAuth2& config,

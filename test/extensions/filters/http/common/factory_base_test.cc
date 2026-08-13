@@ -92,11 +92,14 @@ TEST(FactoryBaseTest, ServerContextNotSupported) {
   EXPECT_THROW_WITH_MESSAGE(
       factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", server_context),
       EnvoyException, "Creating filter factory from server factory context is not supported");
+  Server::Configuration::ExtraFactoryContext extra_context{
+      server_context.messageValidationVisitor(), "stats"};
 
   // createHttpFilterFactoryFromProto delegates to the typed variant, which in turn delegates to the
   // (throwing) server-context implementation.
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).IgnoreError(),
+      factory.createHttpFilterFactoryFromProto(proto_config, server_context, extra_context)
+          .IgnoreError(),
       EnvoyException, "Creating filter factory from server factory context is not supported");
 }
 
@@ -118,8 +121,11 @@ TEST(FactoryBaseTest, ExceptionFreeServerContextNotSupported) {
   RouterProto proto_config;
 
   EXPECT_EQ("test.exception_free_factory_base", factory.name());
+  Server::Configuration::ExtraFactoryContext extra_context{
+      server_context.messageValidationVisitor(), "stats"};
 
-  auto result = factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context);
+  auto result =
+      factory.createHttpFilterFactoryFromProto(proto_config, server_context, extra_context);
   EXPECT_THAT(
       result,
       HasStatus(absl::StatusCode::kInvalidArgument,
@@ -164,9 +170,12 @@ TEST(FactoryBaseTest, DualServerContextNotSupported) {
       factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", server_context),
       EnvoyException,
       "DualFactoryBase: creating filter factory from server factory context is not supported");
+  Server::Configuration::ExtraFactoryContext extra_context{
+      server_context.messageValidationVisitor(), "stats"};
 
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).IgnoreError(),
+      factory.createHttpFilterFactoryFromProto(proto_config, server_context, extra_context)
+          .IgnoreError(),
       EnvoyException,
       "DualFactoryBase: creating filter factory from server factory context is not supported");
 }

@@ -383,36 +383,43 @@ FormatterImpl::create(absl::string_view format, bool omit_empty_values,
 std::string FormatterImpl::format(const Context& context,
                                   const StreamInfo::StreamInfo& stream_info) const {
   std::string log_line;
-  log_line.reserve(256);
+  log_line.reserve(constant_value_.has_value() ? constant_value_->size() : 256);
+  formatTo(log_line, context, stream_info);
+  return log_line;
+}
 
-  for (const auto& provider : providers_) {
-    const std::optional<std::string> bit = provider->format(context, stream_info);
-    // Add the formatted value if there is one. Otherwise add a default value
-    // of "-" if omit_empty_values_ is not set.
-    if (bit.has_value()) {
-      log_line += bit.value();
-    } else if (!omit_empty_values_) {
-      log_line += DefaultUnspecifiedValueStringView;
-    }
+void FormatterImpl::formatTo(std::string& sink, const Context& context,
+                             const StreamInfo::StreamInfo& stream_info) const {
+  if (constant_value_.has_value()) {
+    sink.append(*constant_value_);
+    return;
   }
 
-  return log_line;
+  for (const auto& provider : providers_) {
+    // Add the formatted value if there is one. Otherwise add a default value
+    // of "-" if omit_empty_values_ is not set.
+    if (!provider->formatTo(sink, context, stream_info) && !omit_empty_values_) {
+      sink.append(DefaultUnspecifiedValueStringView);
+    }
+  }
 }
 
 void stringValueToLogLine(const JsonFormatterImpl::Formatters& formatters, const Context& context,
                           const StreamInfo::StreamInfo& info, std::string& log_line,
-                          std::string& sanitize, bool omit_empty_values) {
+                          std::string& value, std::string& sanitize, bool omit_empty_values) {
   log_line.push_back('"'); // Start the JSON string.
   for (const JsonFormatterImpl::Formatter& formatter : formatters) {
-    const std::optional<std::string> value = formatter->format(context, info);
-    if (!value.has_value()) {
+    // 'value' is owned by the caller and reused for every provider of every field in the line,
+    // so formatting a value stops allocating once it has grown to fit the widest one.
+    value.clear();
+    if (!formatter->formatTo(value, context, info)) {
       // Add the empty value. This needn't be sanitized.
       log_line.append(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueStringView);
       continue;
     }
     // Sanitize the string value and add it to the buffer. The string value will not be quoted
     // since we handle the quoting by ourselves at the outer level.
-    log_line.append(Json::sanitize(sanitize, value.value()));
+    log_line.append(Json::sanitize(sanitize, value));
   }
   log_line.push_back('"'); // End the JSON string.
 }
@@ -442,6 +449,13 @@ std::string JsonFormatterImpl::format(const Context& context,
                                       const StreamInfo::StreamInfo& info) const {
   std::string log_line;
   log_line.reserve(2048);
+  formatTo(log_line, context, info);
+  return log_line;
+}
+
+void JsonFormatterImpl::formatTo(std::string& sink, const Context& context,
+                                 const StreamInfo::StreamInfo& info) const {
+  std::string value;    // Helper to hold the formatted value of a single provider.
   std::string sanitize; // Helper to serialize the value to log line.
 
   for (const ParsedFormatElement& element : parsed_elements_) {
@@ -449,7 +463,7 @@ std::string JsonFormatterImpl::format(const Context& context,
     if (absl::holds_alternative<std::string>(element)) {
       // The raw string element will be added to the buffer directly.
       // It is sanitized when loading the configuration.
-      log_line.append(absl::get<std::string>(element));
+      sink.append(absl::get<std::string>(element));
       continue;
     }
 
@@ -459,17 +473,16 @@ std::string JsonFormatterImpl::format(const Context& context,
 
     if (formatters.size() != 1) {
       // 2. Handle the formatter element with multiple or zero providers.
-      stringValueToLogLine(formatters, context, info, log_line, sanitize, omit_empty_values_);
+      stringValueToLogLine(formatters, context, info, sink, value, sanitize, omit_empty_values_);
     } else {
       // 3. Handle the formatter element with a single provider and value
       //    type needs to be kept.
-      const auto value = formatters[0]->formatValue(context, info);
-      Json::Utility::appendValueToString(value, log_line);
+      const auto json_value = formatters[0]->formatValue(context, info);
+      Json::Utility::appendValueToString(json_value, sink);
     }
   }
 
-  log_line.push_back('\n');
-  return log_line;
+  sink.push_back('\n');
 }
 
 // A JSON array node in the format template tree used by OmitEmptyJsonFormatterImpl.
@@ -579,7 +592,7 @@ buildJsonFormatMapNode(const ProtoDict& fields, const std::vector<CommandParserP
 
 bool serializeJsonFormatValue(const JsonFormatValue& value, const Context& context,
                               const StreamInfo::StreamInfo& info, JsonStringSerializer& serializer,
-                              std::string& buffer, std::string& sanitize);
+                              std::string& buffer, std::string& scratch, std::string& sanitize);
 
 // Serializes a map node into the output buffer. Returns true if the node produced any output. A
 // node whose fields are all omitted produces no output and returns false so that its parent (or
@@ -587,7 +600,7 @@ bool serializeJsonFormatValue(const JsonFormatValue& value, const Context& conte
 bool serializeJsonFormatMapNode(const JsonFormatMapNode& node, const Context& context,
                                 const StreamInfo::StreamInfo& info,
                                 JsonStringSerializer& serializer, std::string& buffer,
-                                std::string& sanitize) {
+                                std::string& scratch, std::string& sanitize) {
   const size_t node_start = buffer.size();
   serializer.addMapBeginDelimiter();
   bool object_is_empty = true;
@@ -598,7 +611,8 @@ bool serializeJsonFormatMapNode(const JsonFormatMapNode& node, const Context& co
     }
     serializer.addString(field.first);
     serializer.addKeyValueDelimiter();
-    if (!serializeJsonFormatValue(field.second, context, info, serializer, buffer, sanitize)) {
+    if (!serializeJsonFormatValue(field.second, context, info, serializer, buffer, scratch,
+                                  sanitize)) {
       // The value was omitted; roll back the element delimiter, key and any partial output.
       buffer.resize(field_start);
       continue;
@@ -619,7 +633,7 @@ bool serializeJsonFormatMapNode(const JsonFormatMapNode& node, const Context& co
 void serializeJsonFormatListNode(const JsonFormatListNode& node, const Context& context,
                                  const StreamInfo::StreamInfo& info,
                                  JsonStringSerializer& serializer, std::string& buffer,
-                                 std::string& sanitize) {
+                                 std::string& scratch, std::string& sanitize) {
   serializer.addArrayBeginDelimiter();
   bool array_is_empty = true;
   for (const JsonFormatValue& element : node.values_) {
@@ -627,7 +641,7 @@ void serializeJsonFormatListNode(const JsonFormatListNode& node, const Context& 
     if (!array_is_empty) {
       serializer.addElementsDelimiter();
     }
-    if (!serializeJsonFormatValue(element, context, info, serializer, buffer, sanitize)) {
+    if (!serializeJsonFormatValue(element, context, info, serializer, buffer, scratch, sanitize)) {
       buffer.resize(element_start);
       continue;
     }
@@ -638,7 +652,7 @@ void serializeJsonFormatListNode(const JsonFormatListNode& node, const Context& 
 
 bool serializeJsonFormatValue(const JsonFormatValue& value, const Context& context,
                               const StreamInfo::StreamInfo& info, JsonStringSerializer& serializer,
-                              std::string& buffer, std::string& sanitize) {
+                              std::string& buffer, std::string& scratch, std::string& sanitize) {
   // A pre-serialized constant scalar is emitted directly.
   if (absl::holds_alternative<std::string>(value)) {
     serializer.addRawString(absl::get<std::string>(value));
@@ -647,12 +661,12 @@ bool serializeJsonFormatValue(const JsonFormatValue& value, const Context& conte
   // A nested object; it is dropped if all of its fields are omitted.
   if (absl::holds_alternative<JsonFormatMapNode>(value)) {
     return serializeJsonFormatMapNode(absl::get<JsonFormatMapNode>(value), context, info,
-                                      serializer, buffer, sanitize);
+                                      serializer, buffer, scratch, sanitize);
   }
   // A nested array; it is always kept, even when empty.
   if (absl::holds_alternative<JsonFormatListNode>(value)) {
     serializeJsonFormatListNode(absl::get<JsonFormatListNode>(value), context, info, serializer,
-                                buffer, sanitize);
+                                buffer, scratch, sanitize);
     return true;
   }
 
@@ -674,7 +688,8 @@ bool serializeJsonFormatValue(const JsonFormatValue& value, const Context& conte
 
   // Multiple providers force a string output which is always kept, even if empty. Missing values
   // contribute an empty string because omit_empty_values is set.
-  stringValueToLogLine(formatters, context, info, buffer, sanitize, /*omit_empty_values=*/true);
+  stringValueToLogLine(formatters, context, info, buffer, scratch, sanitize,
+                       /*omit_empty_values=*/true);
   return true;
 }
 
@@ -699,9 +714,10 @@ std::string OmitEmptyJsonFormatterImpl::format(const Context& context,
                                                const StreamInfo::StreamInfo& info) const {
   std::string log_line;
   log_line.reserve(2048);
+  std::string scratch;  // Helper to hold the formatted value of a single provider.
   std::string sanitize; // Helper to serialize the value to log line.
   JsonStringSerializer serializer(log_line);
-  if (!serializeJsonFormatMapNode(*root_, context, info, serializer, log_line, sanitize)) {
+  if (!serializeJsonFormatMapNode(*root_, context, info, serializer, log_line, scratch, sanitize)) {
     // Every field was omitted; the root object is always emitted as an empty object.
     serializer.addMapBeginDelimiter();
     serializer.addMapEndDelimiter();

@@ -166,7 +166,7 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots,
 
   for (const ClusterSlot& slot : *slots) {
     const std::string primary_address = slot.primary()->asString();
-    if (all_new_hosts.count(primary_address) == 0) {
+    if (!all_new_hosts.contains(primary_address)) {
       // Pass zone from map to set host's locality.zone
       new_hosts.emplace_back(THROW_OR_RETURN_VALUE(
           RedisHost::create(info(), "", slot.primary(), *this, true, get_zone(primary_address)),
@@ -174,7 +174,7 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots,
       all_new_hosts.emplace(primary_address);
     }
     for (auto const& replica : slot.replicas()) {
-      if (all_new_hosts.count(replica.first) == 0) {
+      if (!all_new_hosts.contains(replica.first)) {
         // Pass zone from map to set host's locality.zone
         new_hosts.emplace_back(THROW_OR_RETURN_VALUE(
             RedisHost::create(info(), "", replica.second, *this, false, get_zone(replica.first)),

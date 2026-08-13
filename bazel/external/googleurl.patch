@@ -115,6 +115,15 @@ diff --git a/polyfills/third_party/perfetto/include/perfetto/tracing/traced_valu
 index 6d059f7..6339fa5 100644
 --- a/polyfills/third_party/perfetto/include/perfetto/tracing/traced_value.h
 +++ b/polyfills/third_party/perfetto/include/perfetto/tracing/traced_value.h
+@@ -5,6 +5,8 @@
+ #ifndef POLYFILLS_THIRD_PARTY_PERFETTO_INCLUDE_PERFETTO_TRACING_TRACED_VALUE_H_
+ #define POLYFILLS_THIRD_PARTY_PERFETTO_INCLUDE_PERFETTO_TRACING_TRACED_VALUE_H_
+
++#include <string>
++
+ namespace perfetto {
+
+ class TracedValue {
 @@ -13,7 +13,7 @@ class TracedValue {
  };
 

@@ -45,7 +45,7 @@ Factory::routeConfigProviderFromProto(const ProxyConfig& config,
         context.initManager());
   } else {
     return route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), context.serverFactoryContext());
+        config.route_config(), context.serverFactoryContext(), context.initManager());
   }
 }
 

@@ -39,9 +39,12 @@ TEST_F(CacheFilterFactoryTest, Disabled) {
 
 TEST_F(CacheFilterFactoryTest, DisabledWithServerFactoryContext) {
   config_.mutable_disabled()->set_value(true);
-  Http::FilterFactoryCb cb =
-      factory_.createHttpFilterFactoryFromProto(config_, "stats", context_.server_factory_context_)
-          .value();
+  Server::Configuration::ExtraFactoryContext extra_context{
+      context_.server_factory_context_.messageValidationVisitor(), "stats"};
+  Http::FilterFactoryCb cb = factory_
+                                 .createHttpFilterFactoryFromProto(
+                                     config_, context_.server_factory_context_, extra_context)
+                                 .value();
   Http::StreamFilterSharedPtr filter;
   EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
   cb(filter_callback_);

@@ -1,0 +1,888 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
+
+#include "test/common/grpc/grpc_client_integration.h"
+#include "test/config/v2_link_hacks.h"
+#include "test/integration/http_integration.h"
+#include "test/test_common/resources.h"
+#include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace {
+
+using testing::Eq;
+using testing::Ge;
+
+class ListenerFcdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
+                                    public HttpIntegrationTest {
+public:
+  ListenerFcdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
+    skip_tag_extraction_rule_check_ = true;
+  }
+
+  ~ListenerFcdsIntegrationTest() override {
+    if (fcds_connection_ != nullptr) {
+      AssertionResult result = fcds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fcds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      fcds_connection_.reset();
+    }
+    if (lds_connection_ != nullptr) {
+      AssertionResult result = lds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = lds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      lds_connection_.reset();
+    }
+  }
+
+  void addFcdsCluster(const std::string& cluster_name) {
+    config_helper_.addConfigModifier(
+        [cluster_name](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* fcds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+          fcds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+          fcds_cluster->set_name(cluster_name);
+          ConfigHelper::setHttp2(*fcds_cluster);
+        });
+  }
+
+  void initialize() override {
+    defer_listener_finalization_ = true;
+    setUpstreamCount(1);
+
+    addFcdsCluster("fcds_cluster");
+    use_lds_ = false;
+
+    // Add LDS cluster.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      lds_cluster->set_name("lds_cluster");
+      ConfigHelper::setHttp2(*lds_cluster);
+    });
+
+    // Setup dynamic LDS config.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      const bool is_delta = (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+                             this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta);
+      auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+      ads_config->set_api_type(is_delta ? envoy::config::core::v3::ApiConfigSource::DELTA_GRPC
+                                        : envoy::config::core::v3::ApiConfigSource::GRPC);
+      auto* grpc_service = ads_config->add_grpc_services();
+      setGrpcService(*grpc_service, "fcds_cluster", getFcdsFakeUpstream().localAddress());
+
+      listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+      listener_config_.set_name(listener_name_);
+
+      // Setup dynamic FCDS config on the listener template via ADS.
+      auto* fcds_config = listener_config_.mutable_fcds_config();
+      fcds_config->mutable_config_source()->mutable_ads();
+
+      // Add a dynamic filter chain reference.
+      listener_config_.mutable_filter_chains()->Clear();
+
+      const std::string matcher_yaml = R"EOF(
+        matcher_tree:
+          input:
+            name: port
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+          exact_match_map:
+            map:
+              "10000":
+                action:
+                  name: filter-chain-name
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: dynamic_filter_chain_1
+        on_no_match:
+          action:
+            name: filter-chain-name
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: dynamic_filter_chain_1
+      )EOF";
+      TestUtility::loadFromYaml(matcher_yaml, *listener_config_.mutable_filter_chain_matcher());
+
+      if (two_listeners_) {
+        listener_config2_ = listener_config_;
+        listener_config2_.set_name("testing-listener-1");
+      }
+
+      bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+      lds_api_config_source->set_api_type(is_delta
+                                              ? envoy::config::core::v3::ApiConfigSource::DELTA_GRPC
+                                              : envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+      auto* lds_grpc_service = lds_api_config_source->add_grpc_services();
+      setGrpcService(*lds_grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    // Create the LDS upstream (fake_upstreams_[1]).
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // Create the FCDS upstream (fake_upstreams_[2]).
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+
+  FakeUpstream& getLdsFakeUpstream() const { return *fake_upstreams_[2]; }
+  FakeUpstream& getFcdsFakeUpstream() const { return *fake_upstreams_[1]; }
+
+  void waitXdsStream(const std::vector<envoy::config::listener::v3::Listener>& listeners) {
+    // Wait for LDS connection.
+    auto& lds_upstream = getLdsFakeUpstream();
+    AssertionResult result = lds_upstream.waitForHttpConnection(*dispatcher_, lds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = lds_connection_->waitForNewStream(*dispatcher_, lds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    lds_stream_->startGrpcStream();
+
+    // Send LDS response pointing to dynamic filter chains.
+    sendLdsResponse(listeners, "1");
+
+    // Wait for FCDS connection.
+    auto& fcds_upstream = getFcdsFakeUpstream();
+    result = fcds_upstream.waitForHttpConnection(*dispatcher_, fcds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fcds_connection_->waitForNewStream(*dispatcher_, fcds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    fcds_stream_->startGrpcStream();
+    if (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+        this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+      RELEASE_ASSERT(fcds_stream_->waitForGrpcMessage(*dispatcher_, request), "");
+    } else {
+      envoy::service::discovery::v3::DiscoveryRequest request;
+      RELEASE_ASSERT(fcds_stream_->waitForGrpcMessage(*dispatcher_, request), "");
+    }
+  }
+
+  void waitXdsStream() { waitXdsStream({listener_config_}); }
+
+  void sendLdsResponse(const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
+                       const std::vector<std::string>& removed, const std::string& version) {
+    if (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+        this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      sendDeltaDiscoveryResponse(Config::TestTypeUrl::get().Listener, added_or_updated, removed,
+                                 version, lds_stream_.get());
+    } else {
+      envoy::service::discovery::v3::DiscoveryResponse response;
+      response.set_version_info(version);
+      response.set_type_url(Config::TestTypeUrl::get().Listener);
+      for (const auto& listener : added_or_updated) {
+        std::ignore = response.add_resources()->PackFrom(listener);
+      }
+      lds_stream_->sendGrpcMessage(response);
+    }
+  }
+
+  void sendLdsResponse(const std::vector<envoy::config::listener::v3::Listener>& listeners,
+                       const std::string& version) {
+    sendLdsResponse(listeners, {}, version);
+  }
+
+  void sendLdsResponse(const std::string& version) { sendLdsResponse({listener_config_}, version); }
+
+  envoy::config::listener::v3::FilterChain buildFilterChain(const std::string& name,
+                                                            int direct_response_status) {
+    envoy::config::listener::v3::FilterChain filter_chain;
+    filter_chain.set_name(name);
+    auto* filter = filter_chain.add_filters();
+    filter->set_name("envoy.filters.network.http_connection_manager");
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
+    hcm.set_stat_prefix("fcds_test");
+    auto* virtual_host = hcm.mutable_route_config()->add_virtual_hosts();
+    virtual_host->set_name("fcds_vhost");
+    virtual_host->add_domains("*");
+    auto* route = virtual_host->add_routes();
+    route->mutable_match()->set_prefix("/");
+    route->mutable_direct_response()->set_status(direct_response_status);
+    route->mutable_direct_response()->mutable_body()->set_inline_string("fcds body");
+
+    auto* router = hcm.add_http_filters();
+    router->set_name("envoy.filters.http.router");
+    std::ignore = router->mutable_typed_config()->PackFrom(
+        envoy::extensions::filters::http::router::v3::Router());
+    std::ignore = filter->mutable_typed_config()->PackFrom(hcm);
+    return filter_chain;
+  }
+
+  envoy::config::listener::v3::FilterChain buildInvalidFilterChain(const std::string& name) {
+    envoy::config::listener::v3::FilterChain filter_chain;
+    filter_chain.set_name(name);
+    auto* filter = filter_chain.add_filters();
+    filter->set_name("envoy.filters.network.does_not_exist");
+    return filter_chain;
+  }
+
+  void
+  sendFcdsResponse(const std::vector<envoy::config::listener::v3::FilterChain>& added_or_updated,
+                   const std::vector<std::string>& removed, const std::string& version) {
+    if (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+        this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      sendDeltaDiscoveryResponse(Config::TestTypeUrl::get().FilterChain, added_or_updated, removed,
+                                 version, fcds_stream_.get());
+    } else {
+      envoy::service::discovery::v3::DiscoveryResponse response;
+      response.set_version_info(version);
+      response.set_type_url(Config::TestTypeUrl::get().FilterChain);
+      for (const auto& filter_chain : added_or_updated) {
+        std::ignore = response.add_resources()->PackFrom(filter_chain);
+      }
+      fcds_stream_->sendGrpcMessage(response);
+    }
+  }
+
+  void sendFcdsResponse(const std::vector<envoy::config::listener::v3::FilterChain>& filter_chains,
+                        const std::string& version) {
+    sendFcdsResponse(filter_chains, {}, version);
+  }
+
+  envoy::config::listener::v3::Listener listener_config_;
+  envoy::config::listener::v3::Listener listener_config2_;
+  bool two_listeners_{false};
+  std::string listener_name_{"testing-listener-0"};
+  FakeHttpConnectionPtr lds_connection_;
+  FakeHttpConnectionPtr fcds_connection_;
+  FakeStreamPtr lds_stream_;
+  FakeStreamPtr fcds_stream_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerFcdsIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Tests that the listener successfully warms using FCDS dynamic filter chains
+// and performs in-place updates when the filter chain is modified.
+TEST_P(ListenerFcdsIntegrationTest, BasicFcdsInPlaceUpdate) {
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    // Resolve warming by sending FCDS response with 200 direct response config.
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
+  };
+  initialize();
+
+  // Wait for the listener to be active and listening on workers.
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+
+  // Verify dynamic filter chain serves HTTP 200 correctly.
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response = codec_client->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("fcds body", response->body());
+  codec_client->close();
+
+  // Perform in-place FCDS update modifying the direct response status code to 404!
+  sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404)}, "2");
+
+  // Wait for Envoy's local stats to increment indicating FCDS update has completed
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  // Wait for the new config to take effect. Since there's no listener reconstruction,
+  // we just make a new connection.
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort(listener_name_));
+  IntegrationStreamDecoderPtr response2 = codec_client2->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("404", response2->headers().getStatusValue());
+  codec_client2->close();
+
+  // Assert that the listener was NOT added or created again (meaning no reconstruction).
+  // Total added must remain 1.
+  EXPECT_EQ(1, test_server_->counter("listener_manager.listener_added")->value());
+}
+
+TEST_P(ListenerFcdsIntegrationTest, TwoListenersSharedFilterChain) {
+  two_listeners_ = true;
+  on_server_init_function_ = [&]() {
+    waitXdsStream({listener_config_, listener_config2_});
+    // Resolve warming by sending FCDS response with 200 direct response config.
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
+  };
+  initialize();
+
+  // Wait for BOTH listeners to be active and listening.
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
+  registerTestServerPorts({listener_name_, "testing-listener-1"});
+
+  // Verify both listeners serve HTTP 200 correctly.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+
+  IntegrationCodecClientPtr codec_client1 = makeHttpConnection(lookupPort(listener_name_));
+  IntegrationStreamDecoderPtr response1 = codec_client1->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+  codec_client1->close();
+
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("testing-listener-1"));
+  IntegrationStreamDecoderPtr response2 = codec_client2->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+  codec_client2->close();
+
+  // Perform in-place FCDS update modifying the direct response status code to 404!
+  sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404)}, "2");
+
+  // Wait for Envoy's local stats to increment indicating FCDS update has completed
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+
+  // Verify both listeners serve HTTP 404 correctly.
+  IntegrationCodecClientPtr codec_client1_updated = makeHttpConnection(lookupPort(listener_name_));
+  IntegrationStreamDecoderPtr response1_updated =
+      codec_client1_updated->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response1_updated->waitForEndStream());
+  EXPECT_EQ("404", response1_updated->headers().getStatusValue());
+  codec_client1_updated->close();
+
+  IntegrationCodecClientPtr codec_client2_updated =
+      makeHttpConnection(lookupPort("testing-listener-1"));
+  IntegrationStreamDecoderPtr response2_updated =
+      codec_client2_updated->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response2_updated->waitForEndStream());
+  EXPECT_EQ("404", response2_updated->headers().getStatusValue());
+  codec_client2_updated->close();
+
+  // Total listeners added must be 2.
+  EXPECT_EQ(2, test_server_->counter("listener_manager.listener_added")->value());
+}
+
+TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
+  // SotW gRPC subscriptions do not support dynamic resource deletion notifications
+  // from empty discovery responses. Skip the test case for SotW runs.
+  if (this->sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+      this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw) {
+    GTEST_SKIP();
+  }
+
+  // Use HTTP2 to test GOAWAY behavior.
+  downstream_protocol_ = Http::CodecType::HTTP2;
+
+  // Set a very short drain time so the test doesn't take long.
+  setDrainTime(std::chrono::seconds(5));
+
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    // Resolve warming by sending FCDS response with 200 direct response config.
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
+  };
+  initialize();
+
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+
+  // Make an active connection.
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response = codec_client->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Validate that the stat prefix for HCM listener stats is
+  // "filter_chain.dynamic_filter_chain_1.http.fcds_test".
+  test_server_->waitForCounter(
+      "filter_chain.dynamic_filter_chain_1.http.fcds_test.downstream_rq_2xx", Ge(1));
+
+  // Now perform in-place FCDS update removing the filter chain.
+  // We send an empty list of filter chains, which means dynamic_filter_chain_1 is removed.
+  sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
+
+  // Wait for Envoy's local stats to increment indicating FCDS update has completed.
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+
+  // Check that the filter chain is now in draining state!
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
+
+  // Make a second request on the same connection. This should trigger the GOAWAY frame.
+  IntegrationStreamDecoderPtr response2 = codec_client->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+
+  // Verify that the client saw the GOAWAY frame!
+  EXPECT_TRUE(codec_client->sawGoAway());
+
+  // Wait for the client connection to be disconnected (which happens after GOAWAY is processed and
+  // drain timer fires).
+  ASSERT_TRUE(codec_client->waitForDisconnect());
+
+  // Wait for the draining filter chain count to drop to 0.
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+
+  // Try to connect after removal. We expect it to be rejected.
+  IntegrationCodecClientPtr codec_client2 = makeRawHttpConnection(
+      makeClientConnection(lookupPort(listener_name_)), std::nullopt, std::nullopt, false);
+
+  // Wait for the no_filter_chain_match counter to increment.
+  test_server_->waitForCounter(listenerStatPrefix("no_filter_chain_match"), Ge(1));
+
+  // The connection should be closed.
+  ASSERT_TRUE(codec_client2->waitForDisconnect(std::chrono::seconds(5)));
+}
+
+// Tests that FCDS update failure during warming completes LDS warming
+// and new connections are rejected because there are no filter chains.
+TEST_P(ListenerFcdsIntegrationTest, FcdsUpdateFailureAndLdsUnwarming) {
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    // Resolve warming by sending FCDS response with invalid filter chain.
+    // This should cause validation failure and trigger onConfigUpdateFailed.
+    sendFcdsResponse({buildInvalidFilterChain("dynamic_filter_chain_1")}, "1");
+  };
+  initialize();
+
+  // Wait for the listener to be created. It should succeed despite FCDS failure
+  // because FCDS ready() is called on failure.
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+
+  // Try to connect. We expect it to be rejected because there are no filter chains.
+  IntegrationCodecClientPtr codec_client = makeRawHttpConnection(
+      makeClientConnection(lookupPort(listener_name_)), std::nullopt, std::nullopt, false);
+
+  // Wait for the no_filter_chain_match counter to increment.
+  test_server_->waitForCounter(listenerStatPrefix("no_filter_chain_match"), Ge(1));
+
+  // The connection should be closed.
+  ASSERT_TRUE(codec_client->waitForDisconnect(std::chrono::seconds(5)));
+}
+
+// Tests that adding, removing, and then re-adding the same filter chain
+// results in a working listener.
+TEST_P(ListenerFcdsIntegrationTest, FcdsAddRemoveAdd) {
+  // SotW gRPC subscriptions do not support dynamic resource deletion notifications
+  // from empty discovery responses. Skip the test case for SotW runs.
+  if (this->sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+      this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw) {
+    GTEST_SKIP();
+  }
+
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    // 1. Add filter chain.
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
+  };
+  initialize();
+
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+
+  // Verify connection works.
+  {
+    IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+    IntegrationStreamDecoderPtr response = codec_client->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    codec_client->close();
+  }
+
+  // 2. Remove filter chain.
+  sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
+
+  // Wait for update.
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+
+  // Verify connection is rejected.
+  {
+    IntegrationCodecClientPtr codec_client = makeRawHttpConnection(
+        makeClientConnection(lookupPort(listener_name_)), std::nullopt, std::nullopt, false);
+    test_server_->waitForCounter(listenerStatPrefix("no_filter_chain_match"), Ge(1));
+    ASSERT_TRUE(codec_client->waitForDisconnect(std::chrono::seconds(5)));
+  }
+
+  // 3. Add the same filter chain again.
+  sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "3");
+
+  // Wait for update.
+  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(3));
+
+  // Verify connection works again.
+  {
+    IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+    IntegrationStreamDecoderPtr response = codec_client->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    codec_client->close();
+  }
+}
+
+// Tests that a listener update via LDS (which triggers a full listener update)
+// preserves existing warmed FCDS subscriptions.
+TEST_P(ListenerFcdsIntegrationTest, LdsUpdateWithFcds) {
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    // Resolve warming by sending FCDS response with 200 direct response config.
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
+  };
+  initialize();
+
+  // Wait for the listener to be active and listening on workers.
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+
+  // Verify dynamic filter chain serves HTTP 200 correctly.
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response = codec_client->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("fcds body", response->body());
+  codec_client->close();
+
+  // Perform LDS update by adding a new field (e.g. metadata) to trigger listener update.
+  auto* metadata = listener_config_.mutable_metadata();
+  (*metadata->mutable_filter_metadata())["envoy.lb"].mutable_fields()->insert(
+      {"some_key", ValueUtil::stringValue("some_value")});
+
+  // Send the updated LDS response.
+  sendLdsResponse({listener_config_}, "2");
+
+  // Wait for LDS update success.
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(2));
+
+  // The listener is updated. Since FCDS config is present, this causes full listener update.
+  // We expect a new listener created and old one destroyed.
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
+  test_server_->waitForCounter("listener_manager.listener_modified", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("listener_manager.listener_added")->value());
+
+  // Verify dynamic filter chain STILL serves HTTP 200 correctly after LDS update!
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort(listener_name_));
+  IntegrationStreamDecoderPtr response2 = codec_client2->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+  EXPECT_EQ("fcds body", response2->body());
+  codec_client2->close();
+}
+
+TEST_P(ListenerFcdsIntegrationTest, LdsRemovalWithSharedFcds) {
+  // Use HTTP2 to test GOAWAY behavior.
+  downstream_protocol_ = Http::CodecType::HTTP2;
+
+  // Set a very short drain time so the test doesn't take long.
+  setDrainTime(std::chrono::seconds(2));
+
+  two_listeners_ = true;
+  on_server_init_function_ = [&]() {
+    waitXdsStream({listener_config_, listener_config2_});
+    // Resolve warming by sending FCDS response with 200 direct response config.
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
+  };
+  initialize();
+
+  // Wait for BOTH listeners to be active and listening.
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
+  registerTestServerPorts({listener_name_, "testing-listener-1"});
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+
+  // Establish connection to Listener A (listener_name_).
+  IntegrationCodecClientPtr codec_client_a = makeHttpConnection(lookupPort(listener_name_));
+  IntegrationStreamDecoderPtr response_a = codec_client_a->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response_a->waitForEndStream());
+  EXPECT_EQ("200", response_a->headers().getStatusValue());
+
+  // Establish connection to Listener B (testing-listener-1).
+  IntegrationCodecClientPtr codec_client_b = makeHttpConnection(lookupPort("testing-listener-1"));
+  IntegrationStreamDecoderPtr response_b = codec_client_b->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response_b->waitForEndStream());
+  EXPECT_EQ("200", response_b->headers().getStatusValue());
+
+  const bool is_delta = (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+                         this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta);
+
+  // Perform LDS update removing Listener A (listener_name_).
+  if (is_delta) {
+    sendLdsResponse({}, {listener_config_.name()}, "2");
+  } else {
+    sendLdsResponse({listener_config2_}, {}, "2");
+  }
+
+  // Wait for LDS update success.
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(2));
+
+  // In both SotW and Delta, only Listener A is removed (or omitted).
+  // Listener B is untouched because its config is identical and blockLdsUpdate now blocks it.
+  // So only Listener A goes to draining.
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(1));
+
+  // Make a second request on Listener A's connection.
+  // Without the fix, this request should succeed and we should NOT see GOAWAY
+  // because the FCDS filter chain's shared context is not set to draining.
+  IntegrationStreamDecoderPtr response_a2 = codec_client_a->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response_a2->waitForEndStream());
+  EXPECT_EQ("200", response_a2->headers().getStatusValue());
+  EXPECT_FALSE(codec_client_a->sawGoAway());
+
+  // Eventually, after 2s drain timeout, the listener is destroyed and connection is closed.
+  // We wait up to 10s to be safe.
+  ASSERT_TRUE(codec_client_a->waitForDisconnect(std::chrono::seconds(10)));
+
+  // Make a second request on Listener B's connection.
+  IntegrationStreamDecoderPtr response_b2 = codec_client_b->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response_b2->waitForEndStream());
+  EXPECT_EQ("200", response_b2->headers().getStatusValue());
+  EXPECT_FALSE(codec_client_b->sawGoAway());
+
+  // Wait for draining listeners to drop to 0.
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(0));
+
+  // Connection B must still be connected.
+  EXPECT_TRUE(codec_client_b->connected());
+
+  if (codec_client_b->connected()) {
+    codec_client_b->close();
+  }
+}
+
+class ListenerFcdsRdsIntegrationTest : public ListenerFcdsIntegrationTest {
+public:
+  ~ListenerFcdsRdsIntegrationTest() override {
+    if (rds_connection_ != nullptr) {
+      AssertionResult result = rds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = rds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      rds_connection_.reset();
+    }
+  }
+
+  void createUpstreams() override {
+    ListenerFcdsIntegrationTest::createUpstreams();
+    // Create the RDS upstream (fake_upstreams_[3]).
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+
+  FakeUpstream& getRdsFakeUpstream() const { return *fake_upstreams_[3]; }
+
+  void initialize() override {
+    defer_listener_finalization_ = true;
+    setUpstreamCount(1);
+
+    addFcdsCluster("fcds_cluster");
+    use_lds_ = false;
+
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      lds_cluster->set_name("lds_cluster");
+      ConfigHelper::setHttp2(*lds_cluster);
+    });
+
+    // Setup dynamic LDS config.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      const bool is_delta = (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+                             this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta);
+      auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+      ads_config->set_api_type(is_delta ? envoy::config::core::v3::ApiConfigSource::DELTA_GRPC
+                                        : envoy::config::core::v3::ApiConfigSource::GRPC);
+      auto* grpc_service = ads_config->add_grpc_services();
+      setGrpcService(*grpc_service, "fcds_cluster", getFcdsFakeUpstream().localAddress());
+
+      listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+      listener_config_.set_name(listener_name_);
+
+      // Setup dynamic FCDS config on the listener template via ADS.
+      auto* fcds_config = listener_config_.mutable_fcds_config();
+      fcds_config->mutable_config_source()->mutable_ads();
+
+      // Add a dynamic filter chain reference.
+      listener_config_.mutable_filter_chains()->Clear();
+
+      const std::string matcher_yaml = R"EOF(
+        matcher_tree:
+          input:
+            name: port
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+          exact_match_map:
+            map:
+              "10000":
+                action:
+                  name: filter-chain-name
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: dynamic_filter_chain_1
+        on_no_match:
+          action:
+            name: filter-chain-name
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: dynamic_filter_chain_1
+      )EOF";
+      TestUtility::loadFromYaml(matcher_yaml, *listener_config_.mutable_filter_chain_matcher());
+
+      if (two_listeners_) {
+        listener_config2_ = listener_config_;
+        listener_config2_.set_name("testing-listener-1");
+      }
+
+      bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+      lds_api_config_source->set_api_type(is_delta
+                                              ? envoy::config::core::v3::ApiConfigSource::DELTA_GRPC
+                                              : envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* lds_grpc_service = lds_api_config_source->add_grpc_services();
+      setGrpcService(*lds_grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
+    });
+
+    // Add RDS cluster.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* rds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      rds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      rds_cluster->set_name("rds_cluster");
+      ConfigHelper::setHttp2(*rds_cluster);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  void waitRdsStream() {
+    auto& rds_upstream = getRdsFakeUpstream();
+    AssertionResult result = rds_upstream.waitForHttpConnection(*dispatcher_, rds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = rds_connection_->waitForNewStream(*dispatcher_, rds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    rds_stream_->startGrpcStream();
+    if (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+        this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+      RELEASE_ASSERT(rds_stream_->waitForGrpcMessage(*dispatcher_, request), "");
+    } else {
+      envoy::service::discovery::v3::DiscoveryRequest request;
+      RELEASE_ASSERT(rds_stream_->waitForGrpcMessage(*dispatcher_, request), "");
+    }
+  }
+
+  void sendRdsResponse(const std::string& route_config_name, const std::string& cluster_name,
+                       const std::string& version) {
+    constexpr absl::string_view route_config_tmpl = R"EOF(
+        name: {}
+        virtual_hosts:
+        - name: integration
+          domains: ["*"]
+          routes:
+          - match: {{ prefix: "/" }}
+            route: {{ cluster: {} }}
+  )EOF";
+    auto route_config_yaml = fmt::format(route_config_tmpl, route_config_name, cluster_name);
+    envoy::config::route::v3::RouteConfiguration route_config;
+    TestUtility::loadFromYaml(route_config_yaml, route_config);
+
+    if (sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      sendDeltaDiscoveryResponse(
+          Config::TestTypeUrl::get().RouteConfiguration,
+          std::vector<envoy::config::route::v3::RouteConfiguration>{route_config}, {}, version,
+          rds_stream_.get());
+    } else {
+      envoy::service::discovery::v3::DiscoveryResponse response;
+      response.set_version_info(version);
+      response.set_type_url(Config::TestTypeUrl::get().RouteConfiguration);
+      std::ignore = response.add_resources()->PackFrom(route_config);
+      rds_stream_->sendGrpcMessage(response);
+    }
+  }
+
+  envoy::config::listener::v3::FilterChain
+  buildRdsFilterChain(const std::string& name, const std::string& route_config_name) {
+    envoy::config::listener::v3::FilterChain filter_chain;
+    filter_chain.set_name(name);
+    auto* filter = filter_chain.add_filters();
+    filter->set_name("envoy.filters.network.http_connection_manager");
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
+    hcm.set_stat_prefix("fcds_hcm");
+
+    auto* rds = hcm.mutable_rds();
+    rds->set_route_config_name(route_config_name);
+    rds->mutable_config_source()->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* api_config_source = rds->mutable_config_source()->mutable_api_config_source();
+    api_config_source->set_api_type((sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+                                     sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                                        ? envoy::config::core::v3::ApiConfigSource::DELTA_GRPC
+                                        : envoy::config::core::v3::ApiConfigSource::GRPC);
+    api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+
+    auto* router = hcm.add_http_filters();
+    router->set_name("envoy.filters.http.router");
+    std::ignore = router->mutable_typed_config()->PackFrom(
+        envoy::extensions::filters::http::router::v3::Router());
+
+    std::ignore = filter->mutable_typed_config()->PackFrom(hcm);
+    return filter_chain;
+  }
+
+  FakeHttpConnectionPtr rds_connection_;
+  FakeStreamPtr rds_stream_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypesRds, ListenerFcdsRdsIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(ListenerFcdsRdsIntegrationTest, FcdsRdsWarming) {
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    // Resolve FCDS warming by sending FCDS response with RDS config.
+    sendFcdsResponse({buildRdsFilterChain("dynamic_filter_chain_1", "route_config_1")}, "1");
+    // FCDS warming is NOT complete yet because RDS is not fetched!
+    // We should wait for RDS connection.
+    waitRdsStream();
+    // Send RDS response. This will complete RDS warming, which completes FCDS warming,
+    // which completes listener initialization!
+    sendRdsResponse("route_config_1", "cluster_0", "1");
+  };
+
+  initialize();
+
+  // Wait for the listener to be active and listening on workers.
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+
+  // Verify traffic works (routed to cluster_0 backend).
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = codec_client->makeHeaderOnlyRequest(request_headers);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Send back response.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  codec_client->close();
+}
+
+} // namespace
+} // namespace Envoy

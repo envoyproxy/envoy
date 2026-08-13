@@ -65,7 +65,7 @@ TEST(RegistryTest, DefaultFactoryPublished) {
   const auto& factories = Envoy::Registry::FactoryCategoryRegistry::registeredFactories();
 
   // Expect that the category is present.
-  ASSERT_NE(factories.find("testing.published"), factories.end());
+  ASSERT_TRUE(factories.contains("testing.published"));
 
   // Expect that the factory is listed in the right category.
   const auto& names = factories.find("testing.published")->second->registeredNames();
@@ -94,7 +94,7 @@ TEST(RegistryTest, VersionedFactory) {
   const auto& factories = Envoy::Registry::FactoryCategoryRegistry::registeredFactories();
 
   // Expect that the category is present.
-  ASSERT_NE(factories.find("testing.published"), factories.end());
+  ASSERT_TRUE(factories.contains("testing.published"));
 
   // Expect that the factory is listed in the right category.
   const auto& names = factories.find("testing.published")->second->registeredNames();

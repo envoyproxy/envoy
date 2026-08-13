@@ -657,7 +657,7 @@ bool McpFieldExtractor::requiredFieldsCollected() const {
     if (!has_method_ && (has_result_ || has_error_) && field == "method") {
       continue;
     }
-    if (collected_fields_.count(field) == 0) {
+    if (!collected_fields_.contains(field)) {
       return false;
     }
   }
@@ -668,7 +668,7 @@ bool McpFieldExtractor::requiredFieldsCollected() const {
   }
 
   for (const auto& field : required_fields_) {
-    if (collected_fields_.count(field) == 0) {
+    if (!collected_fields_.contains(field)) {
       return false;
     }
   }
@@ -789,7 +789,7 @@ void McpFieldExtractor::copyFieldByPath(absl::string_view path) {
 void McpFieldExtractor::validateRequiredFields() {
   updateFieldRequirements();
   for (const auto& field : required_fields_) {
-    if (extracted_fields_.count(field) == 0) {
+    if (!extracted_fields_.contains(field)) {
       missing_required_fields_.push_back(field);
       ENVOY_LOG(debug, "missing required field for {}: {}", method_, field);
     }

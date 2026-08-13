@@ -100,9 +100,11 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTestWithServerContext) {
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   StatefulSessionFactoryConfig factory;
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
 
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
+      factory.createHttpFilterFactoryFromProto(proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);

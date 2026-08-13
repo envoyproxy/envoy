@@ -19,6 +19,7 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = [
         "//source/common/common:hex_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 

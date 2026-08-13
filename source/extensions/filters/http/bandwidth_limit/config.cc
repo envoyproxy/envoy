@@ -32,7 +32,8 @@ absl::StatusOr<Http::FilterFactoryCb> BandwidthLimitFilterConfig::createFilterFa
 absl::StatusOr<Http::FilterFactoryCb>
 BandwidthLimitFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
   return createFilterFactory(proto_config, context, context.scope());
 }
 

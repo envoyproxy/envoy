@@ -28,6 +28,12 @@ fn new_cluster_config(
   match name {
     "sync_host_selection" => Some(Box::new(SyncHostSelectionClusterConfig {
       upstream_address: config_str.to_string(),
+      logical_hostname: None,
+      metrics: envoy_cluster_metrics,
+    })),
+    "logical_hostname" => Some(Box::new(SyncHostSelectionClusterConfig {
+      upstream_address: config_str.to_string(),
+      logical_hostname: Some("test.lyft.com".to_string()),
       metrics: envoy_cluster_metrics,
     })),
     "async_host_selection" => Some(Box::new(AsyncHostSelectionClusterConfig {
@@ -93,6 +99,7 @@ fn new_cluster_config(
 
 struct SyncHostSelectionClusterConfig {
   upstream_address: String,
+  logical_hostname: Option<String>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
@@ -101,6 +108,7 @@ impl ClusterConfig for SyncHostSelectionClusterConfig {
     let counter_id = self.metrics.define_counter("requests_routed").ok();
     Box::new(SyncHostSelectionCluster {
       upstream_address: self.upstream_address.clone(),
+      logical_hostname: self.logical_hostname.clone(),
       hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
       counter_id,
       metrics: self.metrics.clone(),
@@ -110,6 +118,7 @@ impl ClusterConfig for SyncHostSelectionClusterConfig {
 
 struct SyncHostSelectionCluster {
   upstream_address: String,
+  logical_hostname: Option<String>,
   hosts: SharedHostList,
   counter_id: Option<EnvoyCounterId>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
@@ -119,7 +128,13 @@ impl Cluster for SyncHostSelectionCluster {
   fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
     let addresses = vec![self.upstream_address.clone()];
     let weights = vec![1u32];
-    if let Some(host_ptrs) = envoy_cluster.add_hosts(&addresses, &weights) {
+    let host_ptrs = match &self.logical_hostname {
+      Some(hostname) => {
+        envoy_cluster.add_hosts_with_hostnames(&addresses, std::slice::from_ref(hostname), &weights)
+      },
+      None => envoy_cluster.add_hosts(&addresses, &weights),
+    };
+    if let Some(host_ptrs) = host_ptrs {
       self.hosts.lock().unwrap().0 = host_ptrs;
     }
     envoy_cluster.pre_init_complete();

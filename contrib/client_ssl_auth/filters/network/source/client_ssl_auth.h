@@ -55,7 +55,7 @@ public:
     }
   }
   bool allowed(const std::string& sha256_digest) const {
-    return allowed_sha256_digests_.count(sha256_digest) != 0;
+    return allowed_sha256_digests_.contains(sha256_digest);
   }
   size_t size() const { return allowed_sha256_digests_.size(); }
 

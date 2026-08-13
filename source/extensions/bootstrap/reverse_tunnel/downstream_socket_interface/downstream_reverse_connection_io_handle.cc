@@ -64,6 +64,10 @@ Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close() {
     return Api::ioCallUint64ResultNoError();
   }
 
+  // Similar to the IoSocketHandleImpl::close().
+  // TODO(aakugan): Implement logic for pings from the downstream side too.
+  resetFileEvents();
+
   // Notify the parent that this downstream connection has been closed.
   // This can trigger re-initiation of the reverse connection if needed.
   if (parent_) {

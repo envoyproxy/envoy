@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "test/extensions/filters/http/ext_proc/ext_proc_grpc_fuzz_helper.h"
 
 #include "envoy/config/core/v3/base.pb.h"

@@ -215,10 +215,19 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
   // earlier in the handshake.
   const Formatter::Context context(&request_headers);
 
+  // Each check fails closed: an empty render, or the formatter's "-" placeholder for an absent
+  // value, means the configured binding could not be evaluated and must reject the handshake
+  // rather than skip the check. This mirrors the consumer side, where
+  // RevConCluster::LoadBalancer::chooseHost treats both values as underivable and returns
+  // nullptr.
+  auto binding_failed = [](const std::string& expected, absl::string_view actual) {
+    return expected.empty() || expected == "-" || expected != actual;
+  };
+
   // Validate node_id if formatter is configured.
   if (node_id_formatter_) {
     const std::string expected_node_id = node_id_formatter_->format(context, stream_info);
-    if (!expected_node_id.empty() && expected_node_id != node_id) {
+    if (binding_failed(expected_node_id, node_id)) {
       ENVOY_LOG(debug, "reverse_tunnel: node_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_node_id, node_id);
       return false;
@@ -228,7 +237,7 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
   // Validate cluster_id if formatter is configured.
   if (cluster_id_formatter_) {
     const std::string expected_cluster_id = cluster_id_formatter_->format(context, stream_info);
-    if (!expected_cluster_id.empty() && expected_cluster_id != cluster_id) {
+    if (binding_failed(expected_cluster_id, cluster_id)) {
       ENVOY_LOG(debug, "reverse_tunnel: cluster_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_cluster_id, cluster_id);
       return false;
@@ -238,7 +247,7 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
   // Validate tenant_id if formatter is configured.
   if (tenant_id_formatter_) {
     const std::string expected_tenant_id = tenant_id_formatter_->format(context, stream_info);
-    if (!expected_tenant_id.empty() && expected_tenant_id != tenant_id) {
+    if (binding_failed(expected_tenant_id, tenant_id)) {
       ENVOY_LOG(debug, "reverse_tunnel: tenant_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_tenant_id, tenant_id);
       return false;
@@ -449,6 +458,21 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   const absl::string_view node_id = node_vals[0]->value().getStringView();
   const absl::string_view cluster_id = cluster_vals[0]->value().getStringView();
   const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
+
+  // Reject a present-but-empty tenant id the same way as a missing header. An empty tenant
+  // silently disables tenant scoping when the socket is registered, since
+  // maybeBuildTenantScopedIdentifier returns the bare identifier for an empty tenant, while
+  // empty node and cluster ids are already rejected at registration by
+  // UpstreamSocketManager::addConnectionSocket.
+  if (tenant_id.empty()) {
+    parent_.stats_.parse_error_.inc();
+    ENVOY_CONN_LOG(debug, "reverse_tunnel: empty tenant-id header value",
+                   parent_.read_callbacks_->connection());
+    sendLocalReply(Http::Code::BadRequest, "Empty tenant-id header value", nullptr, std::nullopt,
+                   "reverse_tunnel_empty_tenant_id");
+    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    return;
+  }
 
   // Get tenant isolation setting from socket manager (configured at bootstrap level).
   bool tenant_isolation_enabled = false;

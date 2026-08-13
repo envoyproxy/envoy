@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 

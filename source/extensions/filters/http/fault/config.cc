@@ -25,9 +25,10 @@ absl::StatusOr<Http::FilterFactoryCb> FaultFilterFactory::createFilterFactoryFro
 
 absl::StatusOr<Http::FilterFactoryCb> FaultFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+    Server::Configuration::ServerFactoryContext& server_context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   FaultFilterConfigSharedPtr filter_config(std::make_shared<FaultFilterConfig>(
-      config, stats_prefix, server_context.scope(), server_context));
+      config, extra_context.stats_prefix, server_context.scope(), server_context));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
   };

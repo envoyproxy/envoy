@@ -1,21 +1,24 @@
 #pragma once
 
 #include "envoy/extensions/load_balancing_policies/load_aware_locality/v3/load_aware_locality.pb.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "source/common/upstream/load_balancer_factory_base.h"
+#include "source/extensions/load_balancing_policies/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
 namespace LoadAwareLocality {
 
-using LoadAwareLocalityProto =
+using LoadAwareLocalityLbProto =
     envoy::extensions::load_balancing_policies::load_aware_locality::v3::LoadAwareLocality;
 
-class Factory : public Upstream::TypedLoadBalancerFactoryBase<LoadAwareLocalityProto> {
+class Factory : public Upstream::TypedLoadBalancerFactoryBase<LoadAwareLocalityLbProto> {
 public:
-  Factory() : TypedLoadBalancerFactoryBase("envoy.load_balancing_policies.load_aware_locality") {}
+  Factory()
+      : Upstream::TypedLoadBalancerFactoryBase<LoadAwareLocalityLbProto>(
+            "envoy.load_balancing_policies.load_aware_locality") {}
 
   Upstream::ThreadAwareLoadBalancerPtr create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
                                               const Upstream::ClusterInfo& cluster_info,

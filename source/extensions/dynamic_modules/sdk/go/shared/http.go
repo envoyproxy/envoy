@@ -163,6 +163,17 @@ type HttpFilterHandle interface {
 	// SetMetadata sets the dynamic metadata value of the stream.
 	SetMetadata(metadataNamespace, key string, value any)
 
+	// SetMetadataStruct sets an entire dynamic metadata namespace from a serialized
+	// google.protobuf.Struct. The struct is merged into the namespace and existing entries with the
+	// same key are overwritten. A buffer that does not parse as a google.protobuf.Struct is a no-op.
+	SetMetadataStruct(metadataNamespace string, serializedStruct []byte)
+
+	// SetTypedMetadata sets an entire typed dynamic metadata namespace from a serialized
+	// google.protobuf.Any. The Any is merged into the namespace's typed_filter_metadata entry,
+	// preserving the exact message type via the Any type_url. A buffer that does not parse as a
+	// google.protobuf.Any is a no-op.
+	SetTypedMetadata(metadataNamespace string, serializedAny []byte)
+
 	// GetMetadataKeys retrieves all keys in the given metadata namespace.
 	// Returns list of keys in the namespace, or nil if the namespace does not exist.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
@@ -365,8 +376,10 @@ type HttpFilterHandle interface {
 	// RecreateStream recreates the HTTP stream, optionally with new headers (or with the original
 	// headers if headers is nil). Useful for internal redirects or request retries. After a
 	// successful call, the current filter chain is destroyed and the filter SHOULD return Stop
-	// from the current callback. Returns false if recreation could not be initiated (e.g., the
-	// request body has not been fully received yet).
+	// from the current callback. The filter itself stays valid until the callback returns, and the
+	// methods it calls after the teardown are safe and do not affect the recreated stream.
+	// Returns false if recreation could not be initiated (e.g., the request body has not been fully
+	// received yet).
 	RecreateStream(headers [][2]string) bool
 
 	// RequestHeaders retrieves the request headers.

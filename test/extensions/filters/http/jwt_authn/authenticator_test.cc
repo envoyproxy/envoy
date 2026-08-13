@@ -226,6 +226,58 @@ TEST_F(AuthenticatorTest, TestClaimToHeader) {
             Envoy::Base64::encode(expected_json.data(), expected_json.size()));
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/33603: a claim whose name is a
+// URL is a single claim_path segment, not a "."-separated path into nested objects.
+TEST_F(AuthenticatorTest, TestClaimPathWithUrlClaimName) {
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(UrlClaimNameToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  EXPECT_EQ(headers.get_("x-jwt-claim-url-name"), "xyz");
+  // The sibling claim named "parent_token" is a separate claim and resolves independently.
+  EXPECT_EQ(headers.get_("x-jwt-claim-parent-token"), "abc");
+  EXPECT_EQ(headers.get_("x-jwt-claim-sub"), "johndoe@example.org");
+  EXPECT_EQ(headers.get_("x-jwt-claim-url-value"), "http://example.org/about");
+  // Claims configured as nested paths but absent from this token are still skipped.
+  EXPECT_FALSE(headers.has("x-jwt-claim-nested"));
+}
+
+// A dotted claim name nested inside another dotted claim name, which no "."-joined claim_name can
+// address however it is split.
+TEST_F(AuthenticatorTest, TestClaimPathWithNestedDottedClaimNames) {
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(DottedClaimNameToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  EXPECT_EQ(headers.get_("x-jwt-claim-dotted-nested"), "x.y.z");
+  EXPECT_EQ(headers.get_("x-jwt-claim-sub"), "test@example.com");
+
+  // A path which stops on an object or an array yields its base64-encoded JSON.
+  const std::string expected_object = R"({"c.d":"x.y.z"})";
+  EXPECT_EQ(headers.get_("x-jwt-claim-dotted-object"),
+            Envoy::Base64::encode(expected_object.data(), expected_object.size()));
+  const std::string expected_list = R"(["str1","str2"])";
+  EXPECT_EQ(headers.get_("x-jwt-claim-dotted-list"),
+            Envoy::Base64::encode(expected_list.data(), expected_list.size()));
+
+  // A path whose last segment is absent adds no header.
+  EXPECT_FALSE(headers.has("x-jwt-claim-dotted-unresolvable"));
+}
+
 // This test verifies whether the claim is successfully added to header or not
 TEST_F(AuthenticatorTest, TestClaimToHeaderWithClearRouteCache) {
   TestUtility::loadFromYaml(ClaimToHeadersConfig, proto_config_);

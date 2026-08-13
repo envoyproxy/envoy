@@ -206,11 +206,13 @@ const Buffer::Instance* getBufferByType(DynamicModuleHttpFilter* filter,
   case envoy_dynamic_module_type_http_body_type_ReceivedRequestBody:
     return filter->current_request_body_;
   case envoy_dynamic_module_type_http_body_type_BufferedRequestBody:
-    return filter->decoder_callbacks_->decodingBuffer();
+    return filter->decoder_callbacks_ != nullptr ? filter->decoder_callbacks_->decodingBuffer()
+                                                 : nullptr;
   case envoy_dynamic_module_type_http_body_type_ReceivedResponseBody:
     return filter->current_response_body_;
   case envoy_dynamic_module_type_http_body_type_BufferedResponseBody:
-    return filter->encoder_callbacks_->encodingBuffer();
+    return filter->encoder_callbacks_ != nullptr ? filter->encoder_callbacks_->encodingBuffer()
+                                                 : nullptr;
   default:
     return nullptr;
   }
@@ -1132,6 +1134,9 @@ bool envoy_dynamic_module_callback_http_append_body(
     return false;
   }
   case envoy_dynamic_module_type_http_body_type_BufferedRequestBody: {
+    if (filter->decoder_callbacks_ == nullptr) {
+      return false;
+    }
     if (auto buffer = filter->decoder_callbacks_->decodingBuffer(); buffer != nullptr) {
       filter->decoder_callbacks_->modifyDecodingBuffer(
           [data_view](Buffer::Instance& buffer) { buffer.add(data_view); });
@@ -1150,6 +1155,9 @@ bool envoy_dynamic_module_callback_http_append_body(
     return false;
   }
   case envoy_dynamic_module_type_http_body_type_BufferedResponseBody: {
+    if (filter->encoder_callbacks_ == nullptr) {
+      return false;
+    }
     if (auto buffer = filter->encoder_callbacks_->encodingBuffer(); buffer != nullptr) {
       filter->encoder_callbacks_->modifyEncodingBuffer(
           [data_view](Buffer::Instance& buffer) { buffer.add(data_view); });
@@ -1179,6 +1187,9 @@ bool envoy_dynamic_module_callback_http_drain_body(
     return false;
   }
   case envoy_dynamic_module_type_http_body_type_BufferedRequestBody: {
+    if (filter->decoder_callbacks_ == nullptr) {
+      return false;
+    }
     if (auto buffer = filter->decoder_callbacks_->decodingBuffer(); buffer != nullptr) {
       filter->decoder_callbacks_->modifyDecodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
         auto size = std::min<uint64_t>(buffer.length(), number_of_bytes);
@@ -1197,6 +1208,9 @@ bool envoy_dynamic_module_callback_http_drain_body(
     return false;
   }
   case envoy_dynamic_module_type_http_body_type_BufferedResponseBody: {
+    if (filter->encoder_callbacks_ == nullptr) {
+      return false;
+    }
     if (auto buffer = filter->encoder_callbacks_->encodingBuffer(); buffer != nullptr) {
       filter->encoder_callbacks_->modifyEncodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
         auto size = std::min<uint64_t>(buffer.length(), number_of_bytes);
@@ -1213,7 +1227,7 @@ bool envoy_dynamic_module_callback_http_drain_body(
 bool envoy_dynamic_module_callback_http_received_buffered_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  if (filter->current_request_body_ == nullptr) {
+  if (filter->current_request_body_ == nullptr || filter->decoder_callbacks_ == nullptr) {
     return false;
   }
   return filter->current_request_body_ == filter->decoder_callbacks_->decodingBuffer();
@@ -1222,7 +1236,7 @@ bool envoy_dynamic_module_callback_http_received_buffered_request_body(
 bool envoy_dynamic_module_callback_http_received_buffered_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  if (filter->current_response_body_ == nullptr) {
+  if (filter->current_response_body_ == nullptr || filter->encoder_callbacks_ == nullptr) {
     return false;
   }
   return filter->current_response_body_ == filter->encoder_callbacks_->encodingBuffer();
@@ -1304,6 +1318,47 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
     (*fields)[key_view].set_string_value(value_view);
   }
   metadata_namespace->MergeFrom(metadata_value);
+}
+
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct) {
+  Protobuf::Struct metadata_value;
+  if (!metadata_value.ParseFromArray(serialized_struct.ptr,
+                                     static_cast<int>(serialized_struct.length))) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "envoy_dynamic_module_callback_http_set_dynamic_metadata_struct: failed to "
+                        "parse serialized google.protobuf.Struct");
+    return;
+  }
+  auto metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, ns);
+  if (!metadata_namespace) {
+    // If stream info is not available, we cannot guarantee that the namespace is created.
+    return;
+  }
+  metadata_namespace->MergeFrom(metadata_value);
+}
+
+void envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any) {
+  Protobuf::Any typed_value;
+  if (!typed_value.ParseFromArray(serialized_any.ptr, static_cast<int>(serialized_any.length))) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "envoy_dynamic_module_callback_http_set_dynamic_typed_metadata: failed to "
+                        "parse serialized google.protobuf.Any");
+    return;
+  }
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto stream_info = filter->streamInfo();
+  if (!stream_info) {
+    // If stream info is not available, we cannot set the typed metadata.
+    return;
+  }
+  auto& typed_metadata = *stream_info->dynamicMetadata().mutable_typed_filter_metadata();
+  typed_metadata[std::string(ns.ptr, ns.length)].MergeFrom(typed_value);
 }
 
 bool envoy_dynamic_module_callback_http_get_metadata_string(
@@ -1731,6 +1786,9 @@ envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
 envoy_dynamic_module_callback_get_most_specific_route_config(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return nullptr;
+  }
   const auto* config =
       Http::Utility::resolveMostSpecificPerFilterConfig<DynamicModuleHttpPerRouteFilterConfig>(
           filter->decoder_callbacks_);

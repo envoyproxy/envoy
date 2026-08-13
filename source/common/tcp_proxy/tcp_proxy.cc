@@ -1554,7 +1554,7 @@ UpstreamDrainManager::~UpstreamDrainManager() {
 
       // cancelDrain() should cause that drainer to be removed from drainers_.
       // ASSERT so that we don't end up in an infinite loop.
-      ASSERT(drainers_.find(key) == drainers_.end());
+      ASSERT(!drainers_.contains(key));
     }
 
     // This destructor is run when shutting down `ThreadLocal`. The destructor of some objects use

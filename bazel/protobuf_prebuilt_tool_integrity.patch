@@ -1,0 +1,26 @@
+--- a/bazel/private/oss/toolchains/prebuilt/tool_integrity.bzl
++++ b/bazel/private/oss/toolchains/prebuilt/tool_integrity.bzl
+@@ -9,13 +9,18 @@
+ # An arbitrary version of protobuf that includes pre-built binaries.
+ # See /examples/example_without_cc_toolchain which uses this for testing.
+ # TODO: add some automation to update this version occasionally.
+-_TEST_VERSION = "v33.0"
++_TEST_VERSION = "v35.1"
+ _TEST_SHAS = dict()
+ 
+-# Add a couple platforms which are commonly used for testing.
+-_TEST_SHAS["protoc-33.0-linux-x86_64.zip"] = "d99c011b799e9e412064244f0be417e5d76c9b6ace13a2ac735330fa7d57ad8f"
+-_TEST_SHAS["protoc-33.0-osx-aarch_64.zip"] = "3cf55dd47118bd2efda9cd26b74f8bbbfcf5beb1bf606bc56ad4c001b543f6d3"
+-_TEST_SHAS["protoc-33.0-win64.zip"] = "3742cd49c8b6bd78b6760540367eb0ff62fa70a1032e15dafe131bfaf296986a"
++_TEST_SHAS["protoc-35.1-linux-aarch_64.zip"] = "01bf9d08808c7f96678b63f4bd8efa559bb4f83d5a7a270d5edaf507f9d5d9cf"
++_TEST_SHAS["protoc-35.1-linux-ppcle_64.zip"] = "92da6d454ca3c30b0acf9bd3613dde973a179855742b1ca2859f30a4555cd6e5"
++_TEST_SHAS["protoc-35.1-linux-s390_64.zip"] = "5e18c78635ebc1fe7c0929754d5a8718b8e1cc05c1365a1a31ed6231b59e7f9f"
++_TEST_SHAS["protoc-35.1-linux-x86_32.zip"] = "5bc75055633c906881c2c32de927d160ec415d0de70ed0a3acc3dd4fed0427b8"
++_TEST_SHAS["protoc-35.1-linux-x86_64.zip"] = "6930ebf62bd4ea607b98fff052596c6ee564b9835b4ce172c75a3f53ae9d91b7"
++_TEST_SHAS["protoc-35.1-osx-aarch_64.zip"] = "193289af0470c6a1aada357d4fba0bbf8d78bfaac8b5e42ca30af2ef75583de2"
++_TEST_SHAS["protoc-35.1-osx-x86_64.zip"] = "537d73604a344ded6fc94e98e07e529d4fe3e4a0b09e59905353950fafc2a1f7"
++_TEST_SHAS["protoc-35.1-win32.zip"] = "e0c1b5be94c0de8ecd1f4d509bdfb344e6464e68ada27c039113dd474b318c51"
++_TEST_SHAS["protoc-35.1-win64.zip"] = "5d3ff218d7d91eea95f7569bcb5a98f3030f8996d44151279d9772edcff76082"
+ 
+ RELEASE_VERSION = _TEST_VERSION
+ RELEASED_BINARY_INTEGRITY = _TEST_SHAS

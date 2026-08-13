@@ -46,14 +46,13 @@ public:
         stats_prefix, context, context.serverFactoryContext());
   }
 
-  absl::StatusOr<Envoy::Http::FilterFactoryCb>
-  createHttpFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                   const std::string& stats_prefix,
-                                   Server::Configuration::ServerFactoryContext& context) override {
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProto(
+      const Protobuf::Message& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override {
     return createFilterFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const envoy::extensions::filters::http::wasm::v3::Wasm&>(
             proto_config, context.messageValidationVisitor()),
-        stats_prefix, context, context);
+        extra_context.stats_prefix, context, context);
   }
 
 private:

@@ -2518,6 +2518,98 @@ TEST_P(IntegrationTest, Preconnect) {
   }
 }
 
+// Configures cluster 0 with per-upstream preconnect and a matcher that only accepts hosts with
+// test.preconnect.eligible == true.
+static void addPreconnectEligibilityMatcher(envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  auto* preconnect =
+      bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_preconnect_policy();
+  preconnect->mutable_per_upstream_preconnect_ratio()->set_value(2.0);
+  auto* matcher = preconnect->mutable_preconnect_enabled_metadata();
+  matcher->set_filter("test.preconnect");
+  matcher->add_path()->set_key("eligible");
+  matcher->mutable_value()->set_bool_match(true);
+}
+
+// An ineligible host (no matching metadata) is served on demand only; the preconnect is skipped.
+TEST_P(IntegrationTest, PreconnectSkipsIneligibleHost) {
+  config_helper_.addConfigModifier(&addPreconnectEligibilityMatcher);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_preconnect_skipped", testing::Ge(1));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+
+  codec_client_->close();
+}
+
+// A host stamped with matching metadata is eligible; the preconnect proceeds and nothing is
+// skipped.
+TEST_P(IntegrationTest, PreconnectAllowsEligibleHost) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    addPreconnectEligibilityMatcher(bootstrap);
+    auto* lb_endpoint = bootstrap.mutable_static_resources()
+                            ->mutable_clusters(0)
+                            ->mutable_load_assignment()
+                            ->mutable_endpoints(0)
+                            ->mutable_lb_endpoints(0);
+    Protobuf::Struct metadata;
+    (*metadata.mutable_fields())["eligible"].set_bool_value(true);
+    (*lb_endpoint->mutable_metadata()->mutable_filter_metadata())["test.preconnect"] = metadata;
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  FakeHttpConnectionPtr preconnect_connection;
+  waitForNextUpstreamConnection(std::vector<uint64_t>({0}), TestUtility::DefaultTimeout,
+                                preconnect_connection);
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_preconnect_skipped")->value());
+  // One on-demand connection plus one preconnect.
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", testing::Eq(2));
+
+  ASSERT_TRUE(preconnect_connection->close());
+  ASSERT_TRUE(preconnect_connection->waitForDisconnect());
+  codec_client_->close();
+}
+
+// Without a preconnect ratio no connection is ever anticipated, so no skips are recorded.
+TEST_P(IntegrationTest, PreconnectSkipNotCountedWithoutRatio) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* matcher = bootstrap.mutable_static_resources()
+                        ->mutable_clusters(0)
+                        ->mutable_preconnect_policy()
+                        ->mutable_preconnect_enabled_metadata();
+    matcher->set_filter("test.preconnect");
+    matcher->add_path()->set_key("eligible");
+    matcher->mutable_value()->set_bool_match(true);
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_preconnect_skipped")->value());
+
+  codec_client_->close();
+}
+
 TEST_P(IntegrationTest, RandomPreconnect) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_static_resources()

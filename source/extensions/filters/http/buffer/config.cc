@@ -29,10 +29,10 @@ absl::StatusOr<Http::FilterFactoryCb> BufferFilterFactory::createFilterFactoryFr
 absl::StatusOr<Envoy::Http::FilterFactoryCb>
 BufferFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext&) {
+    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
   ASSERT(proto_config.has_max_request_bytes());
   BufferFilterConfigSharedPtr filter_config(new BufferFilterConfig(proto_config));
-  return [filter_config, stats_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<BufferFilter>(filter_config));
   };
 }

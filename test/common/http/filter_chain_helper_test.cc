@@ -47,8 +47,8 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabled) {
 
     // 'filter_1' and 'filter_2' should be added.
     FilterChainUtility::createFilterChainForFactories(callbacks, filter_factories);
-    EXPECT_TRUE(added_filters.find("filter_1") != added_filters.end());
-    EXPECT_TRUE(added_filters.find("filter_2") != added_filters.end());
+    EXPECT_TRUE(added_filters.contains("filter_1"));
+    EXPECT_TRUE(added_filters.contains("filter_2"));
     EXPECT_EQ(added_filters.size(), 2);
   }
 }
@@ -84,7 +84,7 @@ TEST(FilterChainUtilityTest, CreateFilterChainForFactoriesWithRouteDisabledAndDe
 
     // Only filter_1 should be added.
     FilterChainUtility::createFilterChainForFactories(callbacks, filter_factories);
-    EXPECT_TRUE(added_filters.find("filter_1") != added_filters.end());
+    EXPECT_TRUE(added_filters.contains("filter_1"));
     EXPECT_EQ(added_filters.size(), 1);
   }
 }

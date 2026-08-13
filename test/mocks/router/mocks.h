@@ -679,7 +679,7 @@ public:
   MOCK_METHOD(RouteConfigProviderPtr, createStaticRouteConfigProvider,
               (const envoy::config::route::v3::RouteConfiguration& route_config,
                Server::Configuration::ServerFactoryContext& factory_context,
-               ProtobufMessage::ValidationVisitor& validator));
+               Init::Manager& init_manager, ProtobufMessage::ValidationVisitor& validator));
 };
 
 class MockScopedConfig : public ScopedConfig {

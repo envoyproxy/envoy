@@ -119,6 +119,10 @@ public:
               (override));
   MOCK_METHOD(void, setMetadata, (std::string_view ns, std::string_view key, bool value),
               (override));
+  MOCK_METHOD(void, setMetadataStruct, (std::string_view ns, std::string_view serialized_struct),
+              (override));
+  MOCK_METHOD(void, setTypedMetadata, (std::string_view ns, std::string_view serialized_any),
+              (override));
   MOCK_METHOD(bool, addMetadataList, (std::string_view ns, std::string_view key, double value),
               (override));
   MOCK_METHOD(bool, addMetadataList,

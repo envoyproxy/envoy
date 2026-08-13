@@ -24,7 +24,8 @@ private:
       const std::string&, Server::Configuration::FactoryContext&) override;
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata&,
-      const std::string&, Server::Configuration::ServerFactoryContext&) override;
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
   // (ServerFactoryContext) paths. Stats are scoped to the given scope.

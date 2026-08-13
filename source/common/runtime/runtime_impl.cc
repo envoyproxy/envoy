@@ -469,8 +469,8 @@ absl::Status ProtoLayer::walkProtoValue(const Protobuf::Value& v, const std::str
     break;
   case Protobuf::Value::kStructValue: {
     const Protobuf::Struct& s = v.struct_value();
-    if (s.fields().empty() || s.fields().find("numerator") != s.fields().end() ||
-        s.fields().find("denominator") != s.fields().end()) {
+    if (s.fields().empty() || s.fields().contains("numerator") ||
+        s.fields().contains("denominator")) {
       SnapshotImpl::addEntry(values_, prefix, v, "");
       break;
     }

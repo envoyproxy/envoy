@@ -75,7 +75,7 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
   RELEASE_ASSERT(
       GetFileInformationByHandleEx(dir_handle, FileIdInfo, &fii_key[0], sizeof(FILE_ID_INFO)),
       fmt::format("unable to identify directory {}: {}", result.directory_, GetLastError()));
-  if (callback_map_.find(fii_key) != callback_map_.end()) {
+  if (callback_map_.contains(fii_key)) {
     CloseHandle(dir_handle);
   } else {
     callback_map_[fii_key] = std::make_unique<DirectoryWatch>();

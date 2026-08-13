@@ -21,8 +21,8 @@ private:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
   // (ServerFactoryContext) paths.

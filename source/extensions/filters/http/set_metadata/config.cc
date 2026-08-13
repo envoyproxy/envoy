@@ -28,9 +28,10 @@ absl::StatusOr<Http::FilterFactoryCb> SetMetadataConfig::createFilterFactoryFrom
 
 absl::StatusOr<Http::FilterFactoryCb> SetMetadataConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+    Server::Configuration::ServerFactoryContext& server_context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   ConfigSharedPtr filter_config(
-      std::make_shared<Config>(proto_config, server_context.scope(), stats_prefix));
+      std::make_shared<Config>(proto_config, server_context.scope(), extra_context.stats_prefix));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(

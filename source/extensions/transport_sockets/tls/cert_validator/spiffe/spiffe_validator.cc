@@ -20,7 +20,9 @@
 #include "source/common/config/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
@@ -309,8 +311,8 @@ absl::StatusOr<int> SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>
 
 bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
     X509& leaf_cert, STACK_OF(X509)* cert_chain, X509_VERIFY_PARAM* verify_param,
-    absl::string_view workload_trust_domain, std::string& error_details,
-    std::vector<bssl::UniquePtr<X509>>& validated_chain) {
+    absl::string_view workload_trust_domain, absl::Span<const std::string> verify_san_list,
+    std::string& error_details, std::vector<bssl::UniquePtr<X509>>& validated_chain) {
   if (!SPIFFEValidator::certificatePrecheck(&leaf_cert)) {
     error_details = "verify cert failed: cert precheck";
     stats_.fail_verify_error_.inc();
@@ -353,12 +355,25 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
   }
 
   // Do SAN matching.
-  const bool san_match = subject_alt_name_matchers_.empty() ? true : matchSubjectAltName(leaf_cert);
-  if (!san_match) {
-    error_details = "verify cert failed: SAN match";
-    stats_.fail_verify_san_.inc();
+  if (!verify_san_list.empty()) {
+    bool san_match = DefaultCertValidator::verifySubjectAltName(&leaf_cert, verify_san_list);
+    if (!san_match) {
+      error_details =
+          absl::StrCat("verify cert failed: URI SAN peer identity mismatches, expected SANs: ",
+                       absl::StrJoin(verify_san_list, ", "));
+      stats_.fail_verify_san_.inc();
+      return false;
+    }
   }
-  return san_match;
+  if (!subject_alt_name_matchers_.empty()) {
+    bool san_match = matchSubjectAltName(leaf_cert);
+    if (!san_match) {
+      error_details = "verify cert failed: SAN match";
+      stats_.fail_verify_san_.inc();
+      return false;
+    }
+  }
+  return true;
 }
 
 constexpr absl::string_view WorkloadTrustDomainKey =
@@ -377,6 +392,7 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
   }
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
   const Router::StringAccessor* obj = nullptr;
+  absl::Span<const std::string> verify_san_list;
   if (is_server) {
     if (auto* cb = validation_context.callbacks; cb) {
       const StreamInfo::StreamInfo& info = cb->connection().streamInfo();
@@ -390,14 +406,18 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
           break;
         }
       }
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.spiffe_validator_use_upstream_subject_alt_names")) {
+        verify_san_list = transport_socket_options->verifySubjectAltNameListOverride();
+      }
     }
   }
   absl::string_view workload_trust_domain = obj ? obj->asString() : "";
   std::string error_details;
   std::vector<bssl::UniquePtr<X509>> validated_chain;
-  bool verified =
-      verifyCertChainUsingTrustBundleStore(*leaf_cert, &cert_chain, SSL_CTX_get0_param(&ssl_ctx),
-                                           workload_trust_domain, error_details, validated_chain);
+  bool verified = verifyCertChainUsingTrustBundleStore(
+      *leaf_cert, &cert_chain, SSL_CTX_get0_param(&ssl_ctx), workload_trust_domain, verify_san_list,
+      error_details, validated_chain);
   return verified ? ValidationResults{ValidationResults::ValidationStatus::Successful,
                                       Envoy::Ssl::ClientValidationStatus::Validated, std::nullopt,
                                       std::nullopt, std::move(validated_chain)}
