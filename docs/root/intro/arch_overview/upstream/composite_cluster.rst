@@ -62,6 +62,21 @@ The composite cluster uses a sequential selection strategy based on retry attemp
 When retry attempts exceed the number of configured clusters, requests fail with no host available.
 Configure the number of retries in your retry policy to match your cluster configuration.
 
+Hosts availability
+~~~~~~~~~~~~~~~~~~
+
+If the cluster selected for an attempt has no host available, for example because its endpoint
+list is empty after a DNS resolution failure or because all of its hosts have been ejected by
+outlier detection, the composite cluster fails over to the next cluster in the list within the
+**same** attempt. The clusters after it are tried in order until one of them provides a host. If
+none of the remaining clusters can provide a host, the request fails with
+``no_healthy_upstream``.
+
+This behavior is guarded by the
+``envoy.reloadable_features.composite_cluster_skip_clusters_without_hosts`` runtime feature which
+is enabled by default. When it is disabled, an attempt that maps to a cluster without an available
+host fails immediately instead of failing over.
+
 Retry policy coordination
 -------------------------
 
@@ -71,34 +86,29 @@ For the composite cluster to function correctly, configure an appropriate
 .. code-block:: yaml
 
   retry_policy:
-    retry_on: "5xx,gateway-error,connect-failure,refused-stream,no-healthy-upstream"
+    retry_on: "5xx,gateway-error,connect-failure,refused-stream"
     num_retries: 2  # Enables attempts 1, 2, and 3 (3 total attempts)
-
-The ``no-healthy-upstream`` condition is critical for composite cluster failover. Without it,
-if a sub-cluster has zero endpoints (e.g., DNS resolution returns empty or all hosts are ejected),
-the request fails immediately with a 503 instead of retrying to the next sub-cluster.
 
 Important considerations
 ------------------------
 
 * **Sub-cluster independence**: Each sub-cluster maintains its own health checking, load balancing,
-  and outlier detection. If a selected sub-cluster has no healthy hosts available, the request will
-  fail according to that sub-cluster's load balancing behavior, potentially triggering another retry
-  attempt if configured.
+  and outlier detection. If a selected sub-cluster has no healthy hosts available, the next
+  sub-cluster in the list is used for the same attempt.
 * **Deterministic routing**: The same retry attempt will always target the same cluster given
-  identical configuration. Cluster selection is based solely on retry attempt count, not on the
-  health status of sub-clusters.
+  identical configuration and identical host availability. Cluster selection is based on the retry
+  attempt count, and only fails over to the following clusters when the selected cluster has no
+  host available.
 * **Thread-local clustering**: Cluster selection occurs at the thread-local level for optimal
   performance.
-* **Sub-cluster health**: Unlike the aggregate cluster, the composite cluster does not consider
-  sub-cluster health when selecting which cluster to use. Each retry attempt targets a specific
-  cluster based on attempt count, regardless of whether that cluster has healthy endpoints available.
-* **No-healthy-upstream retry condition**: When a sub-cluster has zero healthy endpoints (e.g., DNS
-  resolution returns empty), the load balancer cannot select a host and the request fails immediately
-  with ``no_healthy_upstream``. By default, this response is **not** retried. To enable failover to
-  the next sub-cluster in this scenario, include ``no-healthy-upstream`` in the retry policy's
-  ``retry_on`` field. Without this condition, the composite cluster cannot fail over when a
-  sub-cluster's endpoint list is empty.
+* **Sub-cluster health**: Unlike the aggregate cluster, the composite cluster does not use
+  sub-cluster health to spread load across sub-clusters. Health is only used to skip sub-clusters
+  that cannot provide a host at all, so each attempt still targets the cluster that matches the
+  attempt count whenever that cluster is usable.
+* **Attempt progression after a failover**: Because selection is driven by the attempt count, an
+  attempt that failed over to a later cluster does not shift the mapping of the following attempts.
+  For example, with ``[primary, secondary, fallback]`` and an empty ``primary``, attempt 1 uses
+  ``secondary``, and attempt 2 also maps to ``secondary``. Size the retry policy accordingly.
 
 Comparison with aggregate cluster
 ---------------------------------

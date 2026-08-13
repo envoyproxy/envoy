@@ -202,8 +202,6 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config)
       ret |= RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Http3PostConnectFailure) {
       ret |= RetryPolicy::RETRY_ON_HTTP3_POST_CONNECT_FAILURE;
-    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.NoHealthyUpstream) {
-      ret |= RetryPolicy::RETRY_ON_NO_HEALTHY_UPSTREAM;
     } else {
       all_fields_valid = false;
     }
@@ -349,11 +347,6 @@ RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callba
   return shouldRetry(RetryState::RetryDecision::RetryWithBackoff, callback);
 }
 
-RetryStatus RetryStateImpl::shouldRetryNoHealthyUpstream(DoRetryCallback callback) {
-  const RetryDecision retry_decision = wouldRetryFromNoHealthyUpstream();
-  return shouldRetry(retry_decision, callback);
-}
-
 RetryState::RetryDecision
 RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers,
                                       const Http::RequestHeaderMap& original_request,
@@ -492,13 +485,6 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
     return RetryDecision::RetryWithBackoff;
   }
 
-  return RetryDecision::NoRetry;
-}
-
-RetryState::RetryDecision RetryStateImpl::wouldRetryFromNoHealthyUpstream() {
-  if (retry_on_ & RetryPolicy::RETRY_ON_NO_HEALTHY_UPSTREAM) {
-    return RetryDecision::RetryWithBackoff;
-  }
   return RetryDecision::NoRetry;
 }
 

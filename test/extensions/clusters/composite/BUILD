@@ -34,6 +34,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/clusters/composite/v3:pkg_cc_proto",
     ],
 )
@@ -54,6 +55,7 @@ envoy_extension_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/composite/v3:pkg_cc_proto",

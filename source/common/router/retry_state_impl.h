@@ -76,7 +76,6 @@ public:
                                DoRetryResetCallback callback,
                                bool upstream_request_started) override;
   RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) override;
-  RetryStatus shouldRetryNoHealthyUpstream(DoRetryCallback callback) override;
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) override {
     std::for_each(retry_host_predicates_.begin(), retry_host_predicates_.end(),
@@ -125,8 +124,6 @@ private:
                                     Http3Used http3_used, bool& disable_http3,
                                     bool upstream_request_started);
   RetryStatus shouldRetry(RetryDecision would_retry, DoRetryCallback callback);
-
-  RetryDecision wouldRetryFromNoHealthyUpstream();
 
   const Upstream::ClusterInfo& cluster_;
   Runtime::Loader& runtime_;
