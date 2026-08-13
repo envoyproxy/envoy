@@ -19,10 +19,12 @@ envoy_package()
 envoy_cc_test(
     name = "ja4_fingerprint_test",
     srcs = ["ja4_fingerprint_test.cc"],
+    external_deps = ["ssl"],
     rbe_pool = "6gig",
     deps = [
         ":tls_utility_lib",
         "//source/common/common:hex_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/extensions/filters/listener/tls_inspector:ja4_fingerprint_lib",
     ],
 )
