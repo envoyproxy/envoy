@@ -98,7 +98,7 @@ message PriorityGroupClusterSpecifier {
   // * The ``name`` field is required and must be a non-empty string.
   // * The ``clusters`` field is optional and, if it is a non-empty list, then every element of it
   //   must be a struct with a non-empty string ``name`` field and a numeric ``weight`` field in
-  //   the range [1, 4294967295].
+  //   the range [1, 4294967295]. The ``weight`` is interpreted as an integer by truncating.
   //
   // If the ``clusters`` of an element are provided, then they replace the :ref:`clusters
   // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup.clusters>`
