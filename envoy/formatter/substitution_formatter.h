@@ -67,6 +67,13 @@ class JsonStringSerializer;
  */
 class ValueSink {
 public:
+  // Non-copyable and non-moveable to ensure the sink is strictly one-time stack-allocated and
+  // consumed at most once.
+  ValueSink(ValueSink&&) = delete;
+  ValueSink& operator=(ValueSink&&) = delete;
+  ValueSink(const ValueSink&) = delete;
+  ValueSink& operator=(const ValueSink&) = delete;
+
   ValueSink(JsonStringSerializer& serializer);
 
   /**
