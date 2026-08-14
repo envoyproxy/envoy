@@ -246,9 +246,7 @@ protected:
           auto& values_vec = map_it->second;
           ASSERT(!values_vec.empty());
           // The following call to absl::erase_if removes the elements that satisfy the
-          // UnaryPredicate and shifts the vector elements, but does not resize the vector.
-          // The call to erase that follows erases the unneeded cells (from remove_pos to the
-          // end) and modifies the vector's size.
+          // UnaryPredicate and resizes the vector.
           absl::erase_if(values_vec, [&](HeaderNode it) {
             if (p(*(it->entry_))) {
               // Remove the element from the list.
