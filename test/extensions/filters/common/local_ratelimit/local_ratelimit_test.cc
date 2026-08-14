@@ -333,6 +333,10 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitSmallFillInterval)
 
 // Verify that max_tokens=0 always rejects for both default and per-descriptor token buckets.
 TEST_F(LocalRateLimiterDescriptorImplTest, AlwaysRejectWithZeroMaxTokens) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.local_ratelimit_local_cluster_minimum_one_token", "true"}});
+
   // Default bucket: max_tokens=0 always rejects regardless of time advancing.
   initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 0, 1);
   EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
@@ -471,6 +475,42 @@ TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFillWithShare
 
   // 2 -> 0 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+}
+
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketKeepsOneTokenWithSmallShare) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.local_ratelimit_local_cluster_minimum_one_token", "true"}});
+  auto share_provider = std::make_shared<MockShareProvider>();
+  EXPECT_CALL(*share_provider, getTokensShareFactor())
+      .WillRepeatedly(testing::Invoke([]() -> double { return 0.125; }));
+
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 4, 4, share_provider);
+
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+}
+
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketRejectsSmallShareWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.local_ratelimit_local_cluster_minimum_one_token", "false"}});
+  auto share_provider = std::make_shared<MockShareProvider>();
+  EXPECT_CALL(*share_provider, getTokensShareFactor())
+      .WillRepeatedly(testing::Invoke([]() -> double { return 0.125; }));
+
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 4, 4, share_provider);
+
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
   EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 }
 
