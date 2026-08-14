@@ -295,9 +295,6 @@ void WatcherImpl::watchLoop() {
   }
 }
 
-} // namespace Filesystem
-} // namespace Envoy
-
 void WatcherImpl::callAndLogOnError(const OnChangedCb& cb, uint32_t events,
                                     const std::string& file) {
   TRY_ASSERT_MAIN_THREAD {
@@ -318,5 +315,8 @@ void WatcherImpl::callAndLogOnError(const OnChangedCb& cb, uint32_t events,
       {
         ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw unknown exception",
                               file);
-      })
+      });
 }
+
+} // namespace Filesystem
+} // namespace Envoy
