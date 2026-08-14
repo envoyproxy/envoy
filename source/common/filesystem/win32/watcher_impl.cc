@@ -210,7 +210,7 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
     {
       absl::ReaderMutexLock lock(&dir_watch->watches_mutex_);
       for (FileWatch& watch : dir_watch->watches_) {
-        // Windows filesystems are case-insensitive.
+        // Windows file systems are case-insensitive.
         // An empty watch.file_ matches any file change in the watched directory.
         if ((watch.file_.empty() || _wcsicmp(watch.file_.c_str(), file.c_str()) == 0) &&
             (watch.events_ & events)) {
