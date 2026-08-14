@@ -1,5 +1,7 @@
 #include "source/common/filesystem/watcher_impl.h"
 
+#include "envoy/common/exception.h"
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
