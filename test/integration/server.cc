@@ -44,7 +44,7 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
   test_options.setServiceClusterName(service_cluster);
   test_options.setServiceNodeName(service_node);
   test_options.setServiceZone(service_zone);
-  test_options.setLogLevel(spdlog::level::info);
+  test_options.setLogLevel(Logger::Levels::info);
 
   test_options.setConfigPath(config_path);
   test_options.setConfigYaml(config_yaml);

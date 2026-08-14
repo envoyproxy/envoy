@@ -9,6 +9,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 
+#include "source/common/common/base_logger.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
 #include "source/server/options_impl_base.h"
@@ -34,8 +35,11 @@ public:
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
+  [[deprecated("Use constructor with Logger::Levels")]] OptionsImpl(
+      int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
+      spdlog::level::level_enum default_log_level);
   OptionsImpl(int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
-              spdlog::level::level_enum default_log_level);
+              Logger::Levels default_log_level);
 
   /**
    * @throw NoServingException if Envoy has already done everything specified by the args (e.g.
@@ -44,13 +48,19 @@ public:
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
+  [[deprecated("Use constructor with Logger::Levels")]] OptionsImpl(
+      std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
+      spdlog::level::level_enum default_log_level);
   OptionsImpl(std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
-              spdlog::level::level_enum default_log_level);
+              Logger::Levels default_log_level);
 
   // Default constructor; creates "reasonable" defaults, but desired values should be set
   // explicitly.
+  [[deprecated("Use constructor with Logger::Levels")]] OptionsImpl(
+      const std::string& service_cluster, const std::string& service_node,
+      const std::string& service_zone, spdlog::level::level_enum log_level);
   OptionsImpl(const std::string& service_cluster, const std::string& service_node,
-              const std::string& service_zone, spdlog::level::level_enum log_level);
+              const std::string& service_zone, Logger::Levels log_level);
 
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);

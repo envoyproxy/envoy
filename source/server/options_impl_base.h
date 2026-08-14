@@ -9,6 +9,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 
+#include "source/common/common/base_logger.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
 
@@ -55,7 +56,13 @@ public:
     parent_shutdown_time_ = parent_shutdown_time;
   }
   void setDrainStrategy(Server::DrainStrategy drain_strategy) { drain_strategy_ = drain_strategy; }
-  void setLogLevel(spdlog::level::level_enum log_level) { log_level_ = log_level; }
+  [[deprecated("Use setLogLevel(Logger::Levels)")]] void
+  setLogLevel(spdlog::level::level_enum log_level) {
+    log_level_ = log_level;
+  }
+  void setLogLevel(Logger::Levels log_level) {
+    log_level_ = static_cast<spdlog::level::level_enum>(log_level);
+  }
   absl::Status setLogLevel(absl::string_view log_level);
   void setLogFormat(const std::string& log_format) {
     log_format_ = log_format;

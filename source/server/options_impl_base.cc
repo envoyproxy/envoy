@@ -48,7 +48,7 @@ absl::Status OptionsImplBase::setLogLevel(absl::string_view log_level) {
   if (!status_or_level.status().ok()) {
     return status_or_level.status();
   }
-  setLogLevel(status_or_level.value());
+  // setLogLevel(status_or_level.value());
   return absl::OkStatus();
 }
 
