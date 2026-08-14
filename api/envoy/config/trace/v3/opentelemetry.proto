@@ -5,8 +5,9 @@ package envoy.config.trace.v3;
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/core/v3/http_service.proto";
+
 import "google/protobuf/wrappers.proto";
-import "udpa/annotations/migrate.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -46,7 +47,9 @@ message OpenTelemetryConfig {
 
     // Specifies the custom exporter to be used by the OpenTelemetry tracer.
     // Only one of ``grpc_service``, ``http_service``, ``exporter`` may be used.
-    // This extension category is envoy.tracers.opentelemetry.exporters
+    //
+    // [#extension-category: envoy.tracers.opentelemetry.exporters]
+    // [#not-implemented-hide:]
     core.v3.TypedExtensionConfig exporter = 10;
   }
 
