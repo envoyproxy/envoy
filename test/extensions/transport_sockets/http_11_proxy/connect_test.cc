@@ -632,31 +632,100 @@ TEST(ParseTest, ContentLengthZeroHttp11) {
   EXPECT_FALSE(parser.parser().hasTransferEncoding());
 }
 
-// Test the formatConnectRequest() utility method with various inputs.
-TEST(FormatConnectRequestTest, FormatConnectRequestWithVariousInputs) {
+// Test the formatConnectRequest() utility method with various inputs, with the Host header
+// included.
+TEST(FormatConnectRequestTest, FormatConnectRequestWithHostHeader) {
   // Test with hostname without port.
   EXPECT_EQ("CONNECT example.com HTTP/1.1\r\nHost: example.com\r\n\r\n",
-            UpstreamHttp11ConnectSocket::formatConnectRequest("example.com"));
+            UpstreamHttp11ConnectSocket::formatConnectRequest("example.com",
+                                                              true /* include_host_header */));
 
   // Test with hostname with port.
   EXPECT_EQ("CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n",
-            UpstreamHttp11ConnectSocket::formatConnectRequest("example.com:443"));
+            UpstreamHttp11ConnectSocket::formatConnectRequest("example.com:443",
+                                                              true /* include_host_header */));
 
   // Test with IPv4 address without port.
   EXPECT_EQ("CONNECT 192.168.1.1 HTTP/1.1\r\nHost: 192.168.1.1\r\n\r\n",
-            UpstreamHttp11ConnectSocket::formatConnectRequest("192.168.1.1"));
+            UpstreamHttp11ConnectSocket::formatConnectRequest("192.168.1.1",
+                                                              true /* include_host_header */));
 
   // Test with IPv4 address with port.
   EXPECT_EQ("CONNECT 192.168.1.1:8080 HTTP/1.1\r\nHost: 192.168.1.1:8080\r\n\r\n",
-            UpstreamHttp11ConnectSocket::formatConnectRequest("192.168.1.1:8080"));
+            UpstreamHttp11ConnectSocket::formatConnectRequest("192.168.1.1:8080",
+                                                              true /* include_host_header */));
 
   // Test with IPv6 address without port.
   EXPECT_EQ("CONNECT [2001:db8::1] HTTP/1.1\r\nHost: [2001:db8::1]\r\n\r\n",
-            UpstreamHttp11ConnectSocket::formatConnectRequest("[2001:db8::1]"));
+            UpstreamHttp11ConnectSocket::formatConnectRequest("[2001:db8::1]",
+                                                              true /* include_host_header */));
 
   // Test with IPv6 address with port.
   EXPECT_EQ("CONNECT [2001:db8::1]:443 HTTP/1.1\r\nHost: [2001:db8::1]:443\r\n\r\n",
-            UpstreamHttp11ConnectSocket::formatConnectRequest("[2001:db8::1]:443"));
+            UpstreamHttp11ConnectSocket::formatConnectRequest("[2001:db8::1]:443",
+                                                              true /* include_host_header */));
+}
+
+// Test that the formatConnectRequest() utility method omits the Host header when
+// include_host_header is false.
+TEST(FormatConnectRequestTest, FormatConnectRequestWithoutHostHeader) {
+  // Test with hostname without port.
+  EXPECT_EQ("CONNECT example.com HTTP/1.1\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("example.com",
+                                                              false /* include_host_header */));
+  // Test with hostname with port.
+  EXPECT_EQ("CONNECT example.com:443 HTTP/1.1\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("example.com:443",
+                                                              false /* include_host_header */));
+
+  // Test with IPv4 address without port.
+  EXPECT_EQ("CONNECT 192.168.1.1 HTTP/1.1\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("192.168.1.1",
+                                                              false /* include_host_header */));
+
+  // Test with IPv4 address with port.
+  EXPECT_EQ("CONNECT 192.168.1.1:8080 HTTP/1.1\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("192.168.1.1:8080",
+                                                              false /* include_host_header */));
+
+  // Test with IPv6 address without port.
+  EXPECT_EQ("CONNECT [2001:db8::1] HTTP/1.1\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("[2001:db8::1]",
+                                                              false /* include_host_header */));
+
+  // Test with IPv6 address with port.
+  EXPECT_EQ("CONNECT [2001:db8::1]:443 HTTP/1.1\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("[2001:db8::1]:443",
+                                                              false /* include_host_header */));
+}
+
+// Test that the formatConnectRequest() utility method with an empty authorization value
+// (the default) does not add a Proxy-Authorization header.
+TEST(FormatConnectRequestTest, FormatConnectRequestWithEmptyAuthorization) {
+  // Test with the default parameter value.
+  EXPECT_EQ("CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("example.com:443",
+                                                              true /* include_host_header */));
+
+  // Explicitly pass an empty authorization value.
+  EXPECT_EQ("CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest("example.com:443",
+                                                              true /* include_host_header */, ""));
+}
+
+// Test that the formatConnectRequest() utility method with a non-empty authorization value
+// adds a Proxy-Authorization header.
+TEST(FormatConnectRequestTest, FormatConnectRequestWithAuthorization) {
+  // Test with Host header.
+  EXPECT_EQ("CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n"
+            "Proxy-Authorization: Basic dXNlcjpwYXNz\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest(
+                "example.com:443", true /* include_host_header */, "Basic dXNlcjpwYXNz"));
+
+  // Test with no Host header.
+  EXPECT_EQ("CONNECT example.com:443 HTTP/1.1\r\nProxy-Authorization: Basic dXNlcjpwYXNz\r\n\r\n",
+            UpstreamHttp11ConnectSocket::formatConnectRequest(
+                "example.com:443", false /* include_host_header */, "Basic dXNlcjpwYXNz"));
 }
 
 // Test runtime guard for legacy behavior with transport socket options.
