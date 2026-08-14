@@ -258,7 +258,8 @@ public:
   bool disableTokenEncryption() const { return disable_token_encryption_; }
   const std::string& jwtSigningAlgorithm() const { return jwt_signing_algorithm_; }
   std::chrono::seconds jwtAssertionLifetime() const { return jwt_assertion_lifetime_; }
-  const std::string& tokenEndpointUrl() const { return oauth_token_endpoint_.uri(); }
+  const std::string& jwtAssertionAudience() const { return jwt_assertion_audience_; }
+  const std::string& jwtKeyId() const { return jwt_key_id_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix,
@@ -292,9 +293,11 @@ private:
   const std::chrono::seconds default_refresh_token_expires_in_;
   const std::chrono::seconds csrf_token_expires_in_;
   const std::chrono::seconds code_verifier_token_expires_in_;
-  // Always initialized even for non-JWT auth types; minimal overhead (a string + 8 bytes).
+  // Always initialized even for non-JWT auth types; minimal overhead (three strings + 8 bytes).
   const std::string jwt_signing_algorithm_;
   const std::chrono::seconds jwt_assertion_lifetime_;
+  const std::string jwt_assertion_audience_;
+  const std::string jwt_key_id_;
   const bool forward_bearer_token_ : 1;
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;

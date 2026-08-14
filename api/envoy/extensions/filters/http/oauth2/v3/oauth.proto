@@ -184,6 +184,26 @@ message PrivateKeyJwtConfig {
   // The value is truncated to whole seconds, so it must be at least ``1s`` when set.
   // Default: ``60s``.
   google.protobuf.Duration assertion_lifetime = 2 [(validate.rules).duration = {gte {seconds: 1}}];
+
+  // The value to use as the ``aud`` (audience) claim in the JWT client assertion.
+  //
+  // `OIDC Core 1.0 Section 9 <https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication>`_
+  // recommends the token endpoint URL, but this is vulnerable to replay attacks when the
+  // authorization server does not track ``jti`` claims.
+  // `RFC 9126 Section 2.1 <https://datatracker.ietf.org/doc/html/rfc9126#section-2.1>`_ and
+  // `FAPI 2.0 <https://openid.net/specs/fapi-security-profile-2_0.html>`_ recommend using
+  // the authorization server's issuer identifier instead.
+  // If not set, defaults to the configured ``token_endpoint`` URI.
+  string assertion_audience = 3;
+
+  // Optional Key ID (kid) to include in the JWT header per
+  // `RFC 7515 Section 4.1.4 <https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.4>`_.
+  // This is a hint to the identity provider indicating which key was used to sign
+  // the client assertion. Required by
+  // `OpenID Connect Core Section 10.1 <https://openid.net/specs/openid-connect-core-1_0.html#Signing>`_
+  // when the client has multiple keys registered with the provider. The value is typically stable
+  // and changes only when the signing key is rotated.
+  string key_id = 4;
 }
 
 // Defines how an OAuth token is forwarded upstream.

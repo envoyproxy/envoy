@@ -79,7 +79,7 @@ absl::StatusOr<std::string>
 ClientAssertion::create(absl::string_view client_id, absl::string_view audience,
                         absl::string_view private_key_pem, absl::string_view algorithm,
                         std::chrono::seconds lifetime, TimeSource& time_source,
-                        Random::RandomGenerator& random) {
+                        Random::RandomGenerator& random, absl::string_view kid) {
   const auto hash_func = getHashFunction(algorithm);
   if (!hash_func.ok()) {
     return hash_func.status();
@@ -120,7 +120,11 @@ ClientAssertion::create(absl::string_view client_id, absl::string_view audience,
 
   // Build JWT header. The algorithm is a canonical value from PrivateKeyJwtConfig.SigningAlgorithm,
   // so it needs no sanitization.
-  const std::string header = absl::StrCat(R"({"alg":")", algorithm, R"(","typ":"JWT"})");
+  std::string kid_buf;
+  const std::string header =
+      kid.empty() ? absl::StrCat(R"({"alg":")", algorithm, R"(","typ":"JWT"})")
+                  : absl::StrCat(R"({"alg":")", algorithm, R"(","typ":"JWT","kid":")",
+                                 Json::sanitize(kid_buf, kid), R"("})");
   const std::string encoded_header = base64UrlEncode(header);
 
   // Build JWT payload with required claims per RFC 7523 Section 3.
