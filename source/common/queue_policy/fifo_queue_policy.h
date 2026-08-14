@@ -26,7 +26,12 @@ public:
     item_index_.emplace(&item, items_.insert(items_.end(), &item));
   }
 
-  ItemType& peek() const override {
+  const ItemType& peek() const override {
+    ASSERT(!items_.empty());
+    return *items_.front();
+  }
+
+  ItemType& peek() override {
     ASSERT(!items_.empty());
     return *items_.front();
   }

@@ -105,7 +105,8 @@ public:
   }
 
   // Use LIFO ordering so connection-pool tests exercise policy-defined ordering.
-  PendingStream& peek() const override { return *items_.back(); }
+  const PendingStream& peek() const override { return *items_.back(); }
+  PendingStream& peek() override { return *items_.back(); }
 
   void pop() override {
     ASSERT(!items_.empty());

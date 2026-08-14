@@ -1,3 +1,4 @@
+#include <type_traits>
 #include <vector>
 
 #include "source/common/protobuf/message_validator_impl.h"
@@ -34,6 +35,11 @@ TEST(FifoQueueTest, TestQueueFunctions) {
   EXPECT_FALSE(queue.isOverloaded());
   EXPECT_EQ(queue.size(), 3);
   EXPECT_EQ(queue.peek().value(), 11);
+
+  static_assert(std::is_same_v<decltype(queue.peek()), FifoQueueItemType&>);
+  const FifoQueue<FifoQueueItemType>& const_queue = queue;
+  static_assert(std::is_same_v<decltype(const_queue.peek()), const FifoQueueItemType&>);
+  EXPECT_EQ(const_queue.peek().value(), 11);
 
   // forEach visits items in dequeue (FIFO) order.
   std::vector<int> visited;

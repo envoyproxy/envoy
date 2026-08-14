@@ -34,7 +34,8 @@ public:
   virtual void add(ItemType& item, QueueItemMetadata metadata) PURE;
 
   // Returns the next item to be dequeued. It is illegal to call this on an empty queue.
-  virtual ItemType& peek() const PURE;
+  virtual const ItemType& peek() const PURE;
+  virtual ItemType& peek() PURE;
 
   // Removes the next item from the queue without destroying it.
   virtual void pop() PURE;
