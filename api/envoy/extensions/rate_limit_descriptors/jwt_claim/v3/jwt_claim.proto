@@ -83,7 +83,8 @@ message Descriptor {
   // If true, Envoy skips this descriptor entry (rather than aborting the
   // whole descriptor for this action list) when the header is absent, the
   // JWT cannot be parsed, or the named claim is absent/non-string, and
-  // ``default_value`` is also empty. An empty string-valued claim is present
-  // and produces an entry with an empty value regardless of this setting.
+  // ``default_value`` is not specified. An empty string-valued claim is
+  // present and produces an entry with an empty value regardless of this
+  // setting.
   bool skip_if_absent = 6;
 }
