@@ -35,6 +35,7 @@ ARRAYSIZE
 ARN
 ASAN
 ASCII
+ASLR
 ASM
 ASN
 ASSERTed
@@ -1190,6 +1191,7 @@ oauth
 observability
 observations
 ocagent
+offloadable
 offsetof
 oneof
 oneway
@@ -1430,6 +1432,7 @@ serializable
 serializer
 serv
 servercert
+setarch
 setenv
 SETNAME
 setsockopt
@@ -1603,6 +1606,7 @@ udpa
 uint
 un-
 unacked
+uname
 unary
 unconfigurable
 undef

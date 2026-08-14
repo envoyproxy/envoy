@@ -27,10 +27,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "status_macros_lib",
+    hdrs = ["status_macros.h"],
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
     name = "task_lib",
     hdrs = ["task.h"],
     deps = [
         ":context_lib",
+        ":status_macros_lib",
         "//source/common/common:assert_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
@@ -81,6 +91,7 @@ envoy_cc_library(
         ":executor_lib",
         ":launch_lib",
         ":leaf_awaitable_lib",
+        ":status_macros_lib",
         ":task_lib",
     ],
 )

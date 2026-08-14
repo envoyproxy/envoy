@@ -561,6 +561,11 @@ pub struct EnvoyHistogramId(pub usize);
 #[repr(transparent)]
 pub struct EnvoyHistogramVecId(pub usize);
 
+/// The identifier for a generic secret subscribed to by the module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct EnvoyGenericSecretId(pub usize);
+
 impl From<envoy_dynamic_module_type_metrics_result>
   for Result<(), envoy_dynamic_module_type_metrics_result>
 {

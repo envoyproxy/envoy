@@ -163,17 +163,17 @@ public:
   envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
       ClientSideWeightedRoundRobin client_side_weighted_round_robin_config_;
 
-  std::shared_ptr<PrioritySetImpl> local_priority_set_;
-  std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancerFriend> lb_;
-  HostsPerLocalityConstSharedPtr empty_locality_;
-  HostVector empty_host_vector_;
-
   NiceMock<MockLoadBalancerContext> lb_context_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Envoy::ThreadLocal::MockInstance> mock_tls_;
   NiceMock<MockClusterInfo> cluster_info_;
   ClientSideWeightedRoundRobinLbConfig lb_config_ = ClientSideWeightedRoundRobinLbConfig(
       client_side_weighted_round_robin_config_, dispatcher_, mock_tls_);
+
+  std::shared_ptr<PrioritySetImpl> local_priority_set_;
+  std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancerFriend> lb_;
+  HostsPerLocalityConstSharedPtr empty_locality_;
+  HostVector empty_host_vector_;
 };
 
 //////////////////////////////////////////////////////

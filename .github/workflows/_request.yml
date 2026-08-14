@@ -56,14 +56,14 @@ jobs:
       caches: ${{ steps.caches.outputs.value }}
       config: ${{ steps.config.outputs.config }}
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/jq@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/actions/github/checkout@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/github/checkout@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       id: checkout
       name: Checkout Envoy repository (requested)
       with:
@@ -77,7 +77,7 @@ jobs:
     # *ALL* variables collected should be treated as untrusted and should be sanitized before
     # use
     - name: Generate environment variables from commit
-      uses: envoyproxy/toolshed/actions/envoy/ci/request@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      uses: envoyproxy/toolshed/actions/envoy/ci/request@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       id: env
       with:
         branch-name: ${{ steps.checkout.outputs.branch-name }}
@@ -88,7 +88,7 @@ jobs:
         vars: ${{ toJSON(vars) }}
         working-directory: requested
 
-    - uses: envoyproxy/toolshed/actions/github/checkout@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/github/checkout@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       id: checkout-target
       name: Checkout Envoy repository (target branch)
       with:
@@ -96,7 +96,7 @@ jobs:
         config: |
           fetch-depth: 1
           path: target
-    - uses: envoyproxy/toolshed/actions/hashfiles@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/hashfiles@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       id: bazel-cache-hash
       name: Bazel cache hash
       with:
@@ -105,7 +105,7 @@ jobs:
 
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/actions/github/env/summary@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      uses: envoyproxy/toolshed/actions/github/env/summary@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
@@ -121,28 +121,28 @@ jobs:
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
 
     - id: cache-id-bazel-x64
-      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       with:
         name: ${{ steps.bazel-cache-hash.outputs.value }}-x64
         wf-path: .github/workflows/request.yml
     - id: cache-id-bazel-arm64
-      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       with:
         name: ${{ steps.bazel-cache-hash.outputs.value }}-arm64
         wf-path: .github/workflows/request.yml
     - id: cache-id-bazel-docs-x64
-      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       with:
         name: ${{ steps.bazel-cache-hash.outputs.value }}-docs-x64
         wf-path: .github/workflows/request.yml
     - id: cache-id-bazel-external-x64
-      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      uses: envoyproxy/toolshed/actions/github/artifact/cache/id@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       with:
         name: ${{ steps.bazel-cache-hash.outputs.value }}-external-x64
         wf-path: .github/workflows/request.yml
 
     - name: Environment data
-      uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      uses: envoyproxy/toolshed/actions/jq@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       id: data
       with:
         input: |
@@ -177,20 +177,20 @@ jobs:
     # TODO(phlax): shift this to ci/request action above
     - name: Check Docker cache (x64)
       id: cache-exists-docker-x64
-      uses: actions/cache/restore@2c8a9bd7457de244a408f35966fab2fb45fda9c8  # v6.0.0
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         lookup-only: true
         path: /tmp/cache
         key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}
     - name: Check Docker cache (arm64)
       id: cache-exists-docker-arm64
-      uses: actions/cache/restore@2c8a9bd7457de244a408f35966fab2fb45fda9c8  # v6.0.0
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         lookup-only: true
         path: /tmp/cache
         key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}-arm64
     - name: Caches
-      uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+      uses: envoyproxy/toolshed/actions/jq@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       id: caches
       with:
         input-format: yaml

@@ -28,14 +28,14 @@ PYBIND11_MODULE(envoy_engine, m) {
 
   // -- Enums --
 
-  py::enum_<Envoy::Logger::Logger::Levels>(m, "LogLevel")
-      .value("trace", Envoy::Logger::Logger::Levels::trace)
-      .value("debug", Envoy::Logger::Logger::Levels::debug)
-      .value("info", Envoy::Logger::Logger::Levels::info)
-      .value("warn", Envoy::Logger::Logger::Levels::warn)
-      .value("error", Envoy::Logger::Logger::Levels::error)
-      .value("critical", Envoy::Logger::Logger::Levels::critical)
-      .value("off", Envoy::Logger::Logger::Levels::off);
+  py::enum_<Envoy::Logger::Levels>(m, "LogLevel")
+      .value("trace", Envoy::Logger::Levels::trace)
+      .value("debug", Envoy::Logger::Levels::debug)
+      .value("info", Envoy::Logger::Levels::info)
+      .value("warn", Envoy::Logger::Levels::warn)
+      .value("error", Envoy::Logger::Levels::error)
+      .value("critical", Envoy::Logger::Levels::critical)
+      .value("off", Envoy::Logger::Levels::off);
 
   py::enum_<envoy_status_t>(m, "EnvoyStatus")
       .value("success", ENVOY_SUCCESS)
@@ -178,7 +178,7 @@ PYBIND11_MODULE(envoy_engine, m) {
       .def(py::init<>())
       .def(
           "set_log_level",
-          [](Envoy::Platform::EngineBuilder& self, Envoy::Logger::Logger::Levels level)
+          [](Envoy::Platform::EngineBuilder& self, Envoy::Logger::Levels level)
               -> Envoy::Platform::EngineBuilder& { return self.setLogLevel(level); },
           py::arg("log_level"), py::return_value_policy::reference)
       .def(

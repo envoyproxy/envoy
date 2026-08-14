@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/codec.h"
@@ -10,14 +12,14 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
-#include "source/common/jwt/check_audience.h"
-#include "source/common/jwt/jwks.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
+#include "source/extensions/filters/network/reverse_tunnel/jwt_handshake_validator.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -45,7 +47,10 @@ class ReverseTunnelFilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   static absl::StatusOr<std::shared_ptr<ReverseTunnelFilterConfig>>
   create(const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
-         Server::Configuration::FactoryContext& context);
+         Server::Configuration::FactoryContext& context,
+         JwksFetcherFactory create_fetcher_fn = nullptr);
+
+  ~ReverseTunnelFilterConfig();
 
   std::chrono::milliseconds pingInterval() const { return ping_interval_; }
   bool autoCloseConnections() const { return auto_close_connections_; }
@@ -74,21 +79,19 @@ public:
                            const Http::RequestHeaderMap& request_headers,
                            const StreamInfo::StreamInfo& stream_info) const;
 
-  // Returns true if inline JWT handshake authentication is configured.
-  bool jwtEnabled() const { return jwt_enabled_; }
+  // Returns true if JWT handshake authentication is configured.
+  bool jwtEnabled() const { return jwt_validator_ != nullptr; }
 
   // Returns true if a missing/invalid token must reject the handshake (i.e. not audit mode).
-  bool jwtRequired() const { return jwt_required_; }
+  bool jwtRequired() const { return jwt_validator_ != nullptr && jwt_validator_->required(); }
 
-  // Verifies the handshake's bearer token against the configured JWKS, issuer, audiences and time
-  // constraints (a token without an ``exp`` claim is rejected). On success, publishes the verified
-  // claims as dynamic metadata under the configured namespace so the validation block can bind
-  // claimed ids to verified claims via %DYNAMIC_METADATA(namespace:claim)%. Returns true iff the
-  // token verified and its claims were published; returns false on any missing/invalid token. The
-  // caller decides enforcement (reject vs. audit) based on jwtRequired(). Must only be called when
-  // jwtEnabled() is true.
+  // Verifies the handshake's bearer token. Must only be called when jwtEnabled() is true. See
+  // JwtHandshakeValidator::verify.
   bool verifyHandshakeJwt(const Http::RequestHeaderMap& headers,
-                          StreamInfo::StreamInfo& stream_info) const;
+                          StreamInfo::StreamInfo& stream_info) const {
+    ASSERT(jwt_validator_ != nullptr);
+    return jwt_validator_->verify(headers, stream_info);
+  }
 
   // Emits validation results as dynamic metadata if configured.
   void emitValidationMetadata(absl::string_view node_id, absl::string_view cluster_id,
@@ -110,7 +113,7 @@ private:
       Formatter::FormatterConstSharedPtr node_id_formatter,
       Formatter::FormatterConstSharedPtr cluster_id_formatter,
       Formatter::FormatterConstSharedPtr tenant_id_formatter,
-      std::unique_ptr<JwtVerify::Jwks> jwt_jwks);
+      JwtHandshakeValidatorPtr jwt_validator);
 
   const std::chrono::milliseconds ping_interval_;
   const bool auto_close_connections_;
@@ -136,22 +139,8 @@ private:
   // socket interface bootstrap extension) before completing a reverse tunnel handshake.
   const bool enable_connection_limit_{false};
 
-  // Inline JWT handshake authentication (experimental). Enabled when `jwt_validation` is set.
-  const bool jwt_enabled_;
-  // Whether a missing/invalid token rejects the handshake (true unless allow_missing_or_failed).
-  const bool jwt_required_;
-  // Required expected issuer (`iss`); the token's issuer must equal this.
-  const std::string jwt_issuer_;
-  // Allowed audiences (`aud`), with jwt_authn-consistent normalization. Empty means any audience.
-  const JwtVerify::CheckAudience jwt_audiences_;
-  // Clock skew (seconds) applied to `exp`/`nbf` checks. Defaults to 60.
-  const uint64_t jwt_clock_skew_seconds_;
-  // Header carrying the token (default `authorization`, `Bearer ` prefix stripped when present).
-  const Http::LowerCaseString jwt_token_header_;
-  // Namespace under which verified claims are emitted as dynamic metadata.
-  const std::string jwt_claims_namespace_;
-  // Parsed JWKS used to verify the token signature. nullptr when JWT auth is not configured.
-  const std::unique_ptr<JwtVerify::Jwks> jwt_jwks_;
+  // JWT handshake authentication (experimental). nullptr when `jwt_validator` is not set.
+  const JwtHandshakeValidatorPtr jwt_validator_;
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;

@@ -13,13 +13,16 @@ absl::StatusOr<Http::FilterFactoryCb> SseToMetadataConfig::createFilterFactoryFr
     const envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   // This filter only uses the server factory context, so delegate to the server-context variant.
-  return createHttpFilterFactoryFromProtoTyped(proto_config, stats_prefix,
-                                               context.serverFactoryContext());
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           stats_prefix};
+  return createHttpFilterFactoryFromProtoTyped(proto_config, context.serverFactoryContext(),
+                                               extra_context);
 }
 
 absl::StatusOr<Http::FilterFactoryCb> SseToMetadataConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
 
   // Create shared config (which instantiates the parser from TypedExtensionConfig)
   // Note: content_parser is validated as required by proto validation rules

@@ -36,6 +36,7 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
+RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
 RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_fix_reentrancy);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_grid_early_return_on_teardown);
@@ -44,6 +45,14 @@ RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_re
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_direct_local_reply_flush_saved_response_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
+// When enabled, per-priority host updates that arrive during a main-thread batch host update are
+// posted to the worker threads as a single batched cross-thread update at the end of the batch,
+// instead of one post per priority. Combined with
+// `coalesce_lb_rebuilds_on_batch_update`, a thread-aware load balancer (e.g. ring hash, maglev)
+// then also defers its factory rebuild (refresh()) to the single end-of-batch MemberUpdateCb, so
+// the factory is rebuilt before the batched update is posted and a worker cannot snapshot a stale
+// factory after a transient health-check flap.
+RUNTIME_GUARD(envoy_reloadable_features_enable_batch_aware_update);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_regex_precompilation);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_response_path_matching);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
@@ -76,6 +85,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http_preserve_rst_no_error);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
+RUNTIME_GUARD(envoy_reloadable_features_ja4_alpn_hex_conversion_fix);
 RUNTIME_GUARD(envoy_reloadable_features_json_formatter_omit_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header);
 RUNTIME_GUARD(envoy_reloadable_features_limit_json_parser_nesting_depth);
@@ -95,9 +105,9 @@ RUNTIME_GUARD(envoy_reloadable_features_oauth2_legacy_cbc_decrypt_compat);
 RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_cluster_no_recreate_stream);
 RUNTIME_GUARD(envoy_reloadable_features_orca_weight_manager_use_named_metrics_first);
-RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_prefix_map_matcher_resume_after_subtree_miss);
 RUNTIME_GUARD(envoy_reloadable_features_preserve_downstream_keepalive);
+RUNTIME_GUARD(envoy_reloadable_features_propagate_downstream_rst_to_upstream);
 RUNTIME_GUARD(envoy_reloadable_features_propagate_upstream_rst_through_tunneled_tcp_proxy);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_allow_duplicate_tlvs);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_remove_too_long_tlvs);
@@ -121,6 +131,7 @@ RUNTIME_GUARD(envoy_reloadable_features_scope_upstream_tls_session_cache_by_sni)
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_skip_partition_original_dst_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_skip_pending_overflow_count_on_active_rq);
+RUNTIME_GUARD(envoy_reloadable_features_spiffe_validator_use_upstream_subject_alt_names);
 RUNTIME_GUARD(envoy_reloadable_features_ssl_socket_report_connection_reset);
 RUNTIME_GUARD(envoy_reloadable_features_strict_stats_matcher_unpacked);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_strip_upgrade_header_on_failed_websocket_upgrades);
@@ -131,9 +142,11 @@ RUNTIME_GUARD(envoy_reloadable_features_tls_inspector_enforce_client_tls_version
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_bind_config_fix_port_exhaustion);
+RUNTIME_GUARD(envoy_reloadable_features_upstream_http_filters_correct_stats_prefix);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_wasm_filter_uses_root_scope);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_match_on_asterisk);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_mixed_variable_literals);
+RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
 RUNTIME_GUARD(envoy_reloadable_features_use_migration_in_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
@@ -142,7 +155,6 @@ RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_resp
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
-RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
@@ -205,8 +217,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_support_web_transport);
 // TODO(danzh) re-enable it when the issue of preferring TCP over v6 rather than QUIC over v4 is
 // fixed.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
-// TODO(renjietang): Evaluate and make this a config knob or remove.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
 // TODO(abeyad): Evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_srtt);
 // TODO(abeyad): Evaluate and make this a config knob or remove.
@@ -240,9 +250,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_cl
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
-
-// See: `https://github.com/envoyproxy/envoy/issues/45212` for more details.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
 
 // Flag to remove legacy route formatter support in header parser
 // Flip to true after two release periods.
@@ -285,6 +292,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
 // validated in production. When disabled, QUIC retains zlib-only compression while TCP TLS has
 // no certificate compression.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
+
+// DnsFilter created resolver on the worker thread which could lead to race when sharing resolvers
+// Do not turn this on if DnsFilter is used or until the race is fixed
+FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

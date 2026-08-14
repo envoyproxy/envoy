@@ -132,8 +132,10 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProtoWithServerContext)
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   RoleBasedAccessControlFilterConfigFactory factory;
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(config, "stats", context).value();
+      factory.createHttpFilterFactoryFromProto(config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);

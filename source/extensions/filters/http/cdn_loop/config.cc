@@ -25,13 +25,16 @@ absl::StatusOr<Http::FilterFactoryCb> CdnLoopFilterFactory::createFilterFactoryF
     const envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   // This filter does not use the factory context, so delegate to the server-context variant.
-  return createHttpFilterFactoryFromProtoTyped(config, stats_prefix,
-                                               context.serverFactoryContext());
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           stats_prefix};
+  return createHttpFilterFactoryFromProtoTyped(config, context.serverFactoryContext(),
+                                               extra_context);
 }
 
 absl::StatusOr<Http::FilterFactoryCb> CdnLoopFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig& config,
-    const std::string& /*stats_prefix*/, Server::Configuration::ServerFactoryContext& /*context*/) {
+    Server::Configuration::ServerFactoryContext& /*context*/,
+    Server::Configuration::ExtraFactoryContext&) {
   StatusOr<ParsedCdnId> context = parseCdnId(ParseContext(config.cdn_id()));
   if (!context.ok() || !context->context().atEnd()) {
     return absl::InvalidArgumentError(

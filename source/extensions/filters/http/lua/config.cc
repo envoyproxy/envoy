@@ -29,11 +29,12 @@ absl::StatusOr<Http::FilterFactoryCb> LuaFilterConfig::createFilterFactoryFromPr
 
 absl::StatusOr<Envoy::Http::FilterFactoryCb> LuaFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   absl::Status creation_status = absl::OkStatus();
   FilterConfigConstSharedPtr filter_config(new FilterConfig{
       proto_config, context.threadLocal(), context.clusterManager(), context.api(), context.scope(),
-      stats_prefix, context.options().concurrency(), creation_status});
+      extra_context.stats_prefix, context.options().concurrency(), creation_status});
   RETURN_IF_NOT_OK_REF(creation_status);
   auto& time_source = context.mainThreadDispatcher().timeSource();
   return [filter_config, &time_source](Http::FilterChainFactoryCallbacks& callbacks) -> void {
