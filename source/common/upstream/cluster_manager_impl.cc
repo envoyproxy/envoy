@@ -1515,14 +1515,11 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
       // overwriting hosts_added.
       if (!update.hosts_removed_.empty()) {
         // Remove all hosts to be removed from the old host_added.
-        auto& host_added = priority_state.hosts_added_;
-        auto removed_section = std::remove_if(
-            host_added.begin(), host_added.end(),
-            [hosts_removed = std::cref(update.hosts_removed_)](const HostSharedPtr& ptr) {
-              return std::find(hosts_removed.get().begin(), hosts_removed.get().end(), ptr) !=
-                     hosts_removed.get().end();
-            });
-        priority_state.hosts_added_.erase(removed_section, priority_state.hosts_added_.end());
+        std::erase_if(priority_state.hosts_added_,
+                      [hosts_removed = std::cref(update.hosts_removed_)](const HostSharedPtr& ptr) {
+                        return std::find(hosts_removed.get().begin(), hosts_removed.get().end(),
+                                         ptr) != hosts_removed.get().end();
+                      });
       }
 
       // Add updated host_added.
@@ -1939,7 +1936,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(
         parent_.deferred_cluster_creation_,
         fmt::format("Cannot find ThreadLocalCluster {}, but deferred cluster creation is disabled.",
                     name));
-    ASSERT(thread_local_deferred_clusters_.find(name) != thread_local_deferred_clusters_.end(),
+    ASSERT(thread_local_deferred_clusters_.contains(name),
            "Cluster with removed host is neither deferred or inflated!");
     return;
   }
@@ -1957,7 +1954,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, bool weighted_priority_health,
     uint64_t overprovisioning_factor, HostMapConstSharedPtr cross_priority_host_map) {
-  ASSERT(thread_local_clusters_.find(name) != thread_local_clusters_.end());
+  ASSERT(thread_local_clusters_.contains(name));
   const auto& cluster_entry = thread_local_clusters_[name];
   cluster_entry->updateHosts(name, priority, std::move(update_hosts_params),
                              std::move(locality_weights), hosts_added, hosts_removed,
