@@ -138,4 +138,22 @@ message PriorityGroupClusterSpecifier {
   // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier.priority_groups>`
   // is used instead.
   type.metadata.v3.MetadataKey group_override_metadata = 2;
+
+  // The source of the random value that is used to select the target cluster of the selected
+  // priority group based on the cluster weights. If this is not configured, the internally
+  // generated random value of the request is used. The random value is only computed once for a
+  // request and the same value is reused for all the attempts of the request.
+  oneof random_value_specifier {
+    // Specifies the header name that is used to look up the random value passed in the request header.
+    // This is used to ensure consistent cluster picking across multiple proxy levels for weighted traffic.
+    // If header is not present or invalid, Envoy will fall back to use the internally generated random value.
+    // This header is expected to be single-valued header as we only want to have one selected value throughout
+    // the process for the consistency. And the value is a unsigned number between 0 and UINT64_MAX.
+    string header_name = 3
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+    // When set to true, the hash policies will be used to generate the random value for weighted cluster selection.
+    // This could ensure consistent cluster picking across multiple proxy levels for weighted traffic.
+    google.protobuf.BoolValue use_hash_policy = 4;
+  }
 }

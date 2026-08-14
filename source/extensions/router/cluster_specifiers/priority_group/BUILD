@@ -20,6 +20,7 @@ envoy_cc_library(
         "priority_group_cluster_specifier.h",
     ],
     deps = [
+        "//envoy/http:header_map_interface",
         "//envoy/router:cluster_specifier_plugin_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -27,6 +28,7 @@ envoy_cc_library(
         "//source/common/config:metadata_lib",
         "//source/common/protobuf",
         "//source/common/router:delegating_route_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/router/cluster_specifiers/priority_group/v3:pkg_cc_proto",
     ],
 )

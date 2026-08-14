@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/extensions/router/cluster_specifiers/priority_group/v3/priority_group.pb.h"
+#include "envoy/http/header_map.h"
 #include "envoy/router/cluster_specifier_plugin.h"
 
 #include "source/common/common/logger.h"
@@ -98,6 +99,13 @@ public:
   std::string selectCluster(const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
 
 private:
+  // Get the random value that is used for the weighted cluster selection of the request. The
+  // configured random value specifier is used first and the given internally generated random
+  // value is used as the fallback.
+  uint64_t randomValue(const Envoy::Router::RouteEntryAndRoute& parent,
+                       const Http::RequestHeaderMap& headers,
+                       const StreamInfo::StreamInfo& stream_info, uint64_t random) const;
+
   // Get the priority group override of the given attempt from the group override metadata. Returns
   // nullopt if the metadata is not available or the override of the attempt is not valid. The
   // returned entry may have no cluster at all if the metadata only overrides the group name.
@@ -112,6 +120,11 @@ private:
   absl::flat_hash_map<std::string, const PriorityGroupEntry*> groups_by_name_;
   // Optional dynamic metadata key that provides the per-request group override.
   std::optional<Envoy::Config::MetadataKey> group_override_metadata_;
+  // Optional request header that provides the random value of the weighted cluster selection.
+  const Http::LowerCaseString random_value_header_;
+  // True if the hash policies of the route are used to generate the random value of the weighted
+  // cluster selection.
+  const bool use_hash_policy_{};
 };
 
 using PriorityGroupClusterSpecifierPluginSharedPtr =
