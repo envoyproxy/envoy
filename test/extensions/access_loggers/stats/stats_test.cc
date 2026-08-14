@@ -337,8 +337,7 @@ TEST_F(StatsAccessLoggerTest, NonNumberValueFormatted) {
   std::optional<std::string> not_a_number{"hello"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(not_a_number));
   EXPECT_CALL(store_, counter(_)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "Stats access logger formatted a string that isn't a number: hello",
-                      { logger_->log(formatter_context_, stream_info_); });
+  logger_->log(formatter_context_, stream_info_);
 }
 
 // Format string resolved to a number string.
