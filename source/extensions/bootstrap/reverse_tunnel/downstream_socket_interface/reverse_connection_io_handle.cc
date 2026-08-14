@@ -518,12 +518,9 @@ void ReverseConnectionIOHandle::removeStaleHostAndCloseConnections(const std::st
     // Remove from wrapper-to-host map.
     conn_wrapper_to_host_map_.erase(wrapper);
     // Remove the wrapper from connection_wrappers_ vector.
-    connection_wrappers_.erase(
-        std::remove_if(connection_wrappers_.begin(), connection_wrappers_.end(),
-                       [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) {
-                         return w.get() == wrapper;
-                       }),
-        connection_wrappers_.end());
+    std::erase_if(connection_wrappers_, [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) {
+      return w.get() == wrapper;
+    });
   }
   // Clear connection keys from host info.
   auto host_it = host_to_conn_info_map_.find(host);
