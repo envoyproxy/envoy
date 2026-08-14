@@ -80,7 +80,7 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
   } else {
     callback_map_[fii_key] = std::make_unique<DirectoryWatch>();
     callback_map_[fii_key]->dir_handle_ = dir_handle;
-    callback_map_[fii_key]->buffer_.resize(1024);
+    callback_map_[fii_key]->buffer_.resize(16384);
     callback_map_[fii_key]->watcher_ = this;
 
     // According to Microsoft docs, "the hEvent member of the OVERLAPPED structure is not used by
