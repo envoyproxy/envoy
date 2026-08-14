@@ -205,7 +205,7 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   const auto* origin = getOriginFilterChainManager();
   if (origin != nullptr) {
     for (const auto& message_and_filter_chain : origin->fc_contexts_) {
-      if (fc_contexts_.find(message_and_filter_chain.first) == fc_contexts_.end()) {
+      if (!fc_contexts_.contains(message_and_filter_chain.first)) {
         origin->draining_filter_chains_.push_back(message_and_filter_chain.second);
       }
     }
@@ -415,7 +415,7 @@ absl::Status FilterChainManagerImpl::addFilterChainForDestinationPorts(
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
-  if (destination_ports_map.find(destination_port) == destination_ports_map.end()) {
+  if (!destination_ports_map.contains(destination_port)) {
     destination_ports_map[destination_port] =
         std::make_pair<DestinationIPsMap, DestinationIPsTriePtr>(DestinationIPsMap{}, nullptr);
   }

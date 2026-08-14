@@ -54,7 +54,7 @@ const re2::RE2& getSystemTimeFormatNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(re2::RE2, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 
-std::string detectedCloseTypeToString(StreamInfo::DetectedCloseType type) {
+absl::string_view detectedCloseTypeToString(StreamInfo::DetectedCloseType type) {
   switch (type) {
   case StreamInfo::DetectedCloseType::LocalReset:
     return "LocalReset";
@@ -677,8 +677,35 @@ SystemTimeFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
   return date_formatter_.fromTime(time_field.value());
 }
 
+bool SystemTimeFormatter::formatTo(std::string& sink,
+                                   const StreamInfo::StreamInfo& stream_info) const {
+  const auto time_field = (*time_field_extractor_)(stream_info);
+  if (!time_field.has_value()) {
+    return false;
+  }
+  if (date_formatter_.formatString().empty()) {
+    sink.append(AccessLogDateTimeFormatter::fromTime(time_field.value(), local_time_));
+  } else {
+    sink.append(date_formatter_.fromTime(time_field.value()));
+  }
+  return true;
+}
+
 Protobuf::Value SystemTimeFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
   return ValueUtil::optionalStringValue(format(stream_info));
+}
+
+void SystemTimeFormatter::formatValueTo(ValueSink& sink,
+                                        const StreamInfo::StreamInfo& stream_info) const {
+  const auto time_field = (*time_field_extractor_)(stream_info);
+  if (!time_field.has_value()) {
+    // Keep the sink unmodified if no value is extracted and the caller can decide how to
+    // handle the missing value.
+    return;
+  }
+  sink.addString(date_formatter_.formatString().empty()
+                     ? AccessLogDateTimeFormatter::fromTime(time_field.value(), local_time_)
+                     : date_formatter_.fromTime(time_field.value()));
 }
 
 EnvironmentFormatter::EnvironmentFormatter(absl::string_view key,
@@ -824,12 +851,83 @@ public:
   // StreamInfoFormatterProvider
   // Don't hide the other structure of format and formatValue.
   using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatTo;
   using StreamInfoFormatterProvider::formatValue;
+  using StreamInfoFormatterProvider::formatValueTo;
   std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
     return field_extractor_(stream_info);
   }
+  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override {
+    const auto value = field_extractor_(stream_info);
+    if (!value.has_value()) {
+      return false;
+    }
+    sink.append(*value);
+    return true;
+  }
   Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     return ValueUtil::optionalStringValue(field_extractor_(stream_info));
+  }
+  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override {
+    const auto value = field_extractor_(stream_info);
+    if (!value.has_value()) {
+      // Keep the sink unmodified if no value is extracted and the caller can decide how to
+      // handle the missing value.
+      return;
+    }
+    sink.addString(*value);
+  }
+
+private:
+  FieldExtractor field_extractor_;
+};
+
+// StreamInfo string view formatter provider.
+class StreamInfoStringViewFormatterProvider : public StreamInfoFormatterProvider {
+public:
+  // NOTE: the returned view must stay valid until the extractor is called again. Use
+  // StreamInfoStringFormatterProvider instead for any command that builds its value on the fly.
+  using FieldExtractor =
+      std::function<std::optional<absl::string_view>(const StreamInfo::StreamInfo&)>;
+
+  StreamInfoStringViewFormatterProvider(FieldExtractor f) : field_extractor_(std::move(f)) {}
+
+  // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatTo;
+  using StreamInfoFormatterProvider::formatValue;
+  using StreamInfoFormatterProvider::formatValueTo;
+  std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
+    const auto value = field_extractor_(stream_info);
+    if (!value.has_value()) {
+      return std::nullopt;
+    }
+    return std::string(*value);
+  }
+  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override {
+    const auto value = field_extractor_(stream_info);
+    if (!value.has_value()) {
+      return false;
+    }
+    sink.append(*value);
+    return true;
+  }
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+    const auto value = field_extractor_(stream_info);
+    if (!value.has_value()) {
+      return SubstitutionFormatUtils::unspecifiedValue();
+    }
+    return ValueUtil::stringValue(std::string(*value));
+  }
+  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override {
+    const auto value = field_extractor_(stream_info);
+    if (!value.has_value()) {
+      // Keep the sink unmodified if no value is extracted and the caller can decide how to
+      // handle the missing value.
+      return;
+    }
+    sink.addString(*value);
   }
 
 private:
@@ -847,7 +945,9 @@ public:
   // StreamInfoFormatterProvider
   // Don't hide the other structure of format and formatValue.
   using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatTo;
   using StreamInfoFormatterProvider::formatValue;
+  using StreamInfoFormatterProvider::formatValueTo;
   std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
     const auto millis = extractMillis(stream_info);
     if (!millis) {
@@ -856,6 +956,16 @@ public:
 
     return fmt::format_int(millis.value()).str();
   }
+  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override {
+    const auto millis = extractMillis(stream_info);
+    if (!millis) {
+      return false;
+    }
+
+    const fmt::format_int formatted(millis.value());
+    sink.append(formatted.data(), formatted.size());
+    return true;
+  }
   Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     const auto millis = extractMillis(stream_info);
     if (!millis) {
@@ -863,6 +973,16 @@ public:
     }
 
     return ValueUtil::numberValue(millis.value());
+  }
+  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override {
+    const auto millis = extractMillis(stream_info);
+    if (!millis) {
+      // Keep the sink unmodified if no value is extracted and the caller can decide how to
+      // handle the missing value.
+      return;
+    }
+
+    sink.addNumber(millis.value());
   }
 
 private:
@@ -887,12 +1007,23 @@ public:
   // StreamInfoFormatterProvider
   // Don't hide the other structure of format and formatValue.
   using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatTo;
   using StreamInfoFormatterProvider::formatValue;
+  using StreamInfoFormatterProvider::formatValueTo;
   std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
     return fmt::format_int(field_extractor_(stream_info)).str();
   }
+  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override {
+    const fmt::format_int formatted(field_extractor_(stream_info));
+    sink.append(formatted.data(), formatted.size());
+    return true;
+  }
   Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     return ValueUtil::numberValue(field_extractor_(stream_info));
+  }
+  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override {
+    // The extractor always yields a value, so the sink is always consumed.
+    sink.addNumber(field_extractor_(stream_info));
   }
 
 private:
@@ -934,7 +1065,9 @@ public:
   // StreamInfoFormatterProvider
   // Don't hide the other structure of format and formatValue.
   using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatTo;
   using StreamInfoFormatterProvider::formatValue;
+  using StreamInfoFormatterProvider::formatValueTo;
   std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
     Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
     if (!address) {
@@ -942,6 +1075,14 @@ public:
     }
 
     return toString(*address);
+  }
+  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override {
+    Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
+    if (!address) {
+      return false;
+    }
+    toSink(sink, *address);
+    return true;
   }
   Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
@@ -959,6 +1100,15 @@ public:
 
     return ValueUtil::stringValue(toString(*address));
   }
+  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override {
+    Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
+    if (!address) {
+      // Keep the sink unmodified if no value is extracted and the caller can decide how to
+      // handle the missing value.
+      return;
+    }
+    toValueSink(sink, *address);
+  }
 
 private:
   std::string toString(const Network::Address::Instance& address) const {
@@ -972,6 +1122,44 @@ private:
     case StreamInfoAddressFieldExtractionType::WithPort:
     default:
       return address.asString();
+    }
+  }
+  void toSink(std::string& sink, const Network::Address::Instance& address) const {
+    switch (extraction_type_) {
+    case StreamInfoAddressFieldExtractionType::WithoutPort:
+      sink.append(StreamInfo::Utility::formatDownstreamAddressNoPort(address, mask_prefix_len_));
+      return;
+    case StreamInfoAddressFieldExtractionType::JustPort:
+      sink.append(StreamInfo::Utility::formatDownstreamAddressJustPort(address));
+      return;
+    case StreamInfoAddressFieldExtractionType::JustEndpointId:
+      sink.append(StreamInfo::Utility::formatDownstreamAddressJustEndpointId(address));
+      return;
+    case StreamInfoAddressFieldExtractionType::WithPort:
+    default:
+      sink.append(address.asString());
+      return;
+    }
+  }
+  void toValueSink(ValueSink& sink, const Network::Address::Instance& address) const {
+    switch (extraction_type_) {
+    case StreamInfoAddressFieldExtractionType::WithoutPort:
+      sink.addString(StreamInfo::Utility::formatDownstreamAddressNoPort(address, mask_prefix_len_));
+      break;
+    case StreamInfoAddressFieldExtractionType::JustPort: {
+      const auto port = StreamInfo::Utility::extractDownstreamAddressJustPort(address);
+      if (port) {
+        sink.addNumber(static_cast<uint64_t>(*port));
+      }
+      break;
+    }
+    case StreamInfoAddressFieldExtractionType::JustEndpointId:
+      sink.addString(StreamInfo::Utility::formatDownstreamAddressJustEndpointId(address));
+      break;
+    case StreamInfoAddressFieldExtractionType::WithPort:
+    default:
+      sink.addString(address.asString());
+      break;
     }
   }
 
@@ -1240,8 +1428,11 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"PROTOCOL",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
-                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<absl::string_view> {
+                                       // The protocol strings are static, so they can be viewed
+                                       // directly.
                                        return SubstitutionFormatUtils::protocolToString(
                                            stream_info.protocol());
                                      });
@@ -1249,13 +1440,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"UPSTREAM_PROTOCOL",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
-                                     [](const StreamInfo::StreamInfo& stream_info) {
-                                       return stream_info.upstreamInfo()
-                                                  ? SubstitutionFormatUtils::protocolToString(
-                                                        stream_info.upstreamInfo()
-                                                            ->upstreamProtocol())
-                                                  : std::nullopt;
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<absl::string_view> {
+                                       if (!stream_info.upstreamInfo()) {
+                                         return std::nullopt;
+                                       }
+                                       // The protocol strings are static, so they can be viewed
+                                       // directly.
+                                       return SubstitutionFormatUtils::protocolToString(
+                                           stream_info.upstreamInfo()->upstreamProtocol());
                                      });
                                }}},
                              {"RESPONSE_CODE",
@@ -1285,9 +1479,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"CONNECTION_TERMINATION_DETAILS",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
-                                     [](const StreamInfo::StreamInfo& stream_info) {
-                                       return stream_info.connectionTerminationDetails();
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<absl::string_view> {
+                                       // Owned by the stream info.
+                                       const auto& details =
+                                           stream_info.connectionTerminationDetails();
+                                       if (!details.has_value()) {
+                                         return std::nullopt;
+                                       }
+                                       return *details;
                                      });
                                }}},
                              {"BYTES_SENT",
@@ -1378,9 +1579,11 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"CUSTOM_FLAGS",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
-                                     [](const StreamInfo::StreamInfo& stream_info) {
-                                       return std::string(stream_info.customFlags());
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<absl::string_view> {
+                                       // Owned by the stream info.
+                                       return stream_info.customFlags();
                                      });
                                }}},
                              {"RESPONSE_FLAGS",
@@ -1757,17 +1960,18 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"UPSTREAM_SERVER_NAME",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info)
-                                         -> std::optional<std::string> {
+                                         -> std::optional<absl::string_view> {
                                        if (stream_info.upstreamInfo() &&
                                            stream_info.upstreamInfo()->upstreamSslConnection() !=
                                                nullptr) {
-                                         auto sni = stream_info.upstreamInfo()
-                                                        ->upstreamSslConnection()
-                                                        ->sni();
+                                         // Owned by the SSL connection info.
+                                         absl::string_view sni = stream_info.upstreamInfo()
+                                                                     ->upstreamSslConnection()
+                                                                     ->sni();
                                          if (!sni.empty()) {
-                                           return std::string(sni);
+                                           return sni;
                                          }
                                        }
                                        return std::nullopt;
@@ -1812,9 +2016,9 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"DOWNSTREAM_DETECTED_CLOSE_TYPE",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info)
-                                         -> std::optional<std::string> {
+                                         -> std::optional<absl::string_view> {
                                        return detectedCloseTypeToString(
                                            stream_info.downstreamDetectedCloseType());
                                      });
@@ -1990,14 +2194,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"ROUTE_NAME",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
-                                     [](const StreamInfo::StreamInfo& stream_info) {
-                                       std::optional<std::string> result;
-                                       std::string route_name = stream_info.getRouteName();
-                                       if (!route_name.empty()) {
-                                         result = route_name;
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<absl::string_view> {
+                                       // Owned by the stream info.
+                                       absl::string_view route_name = stream_info.getRouteName();
+                                       if (route_name.empty()) {
+                                         return std::nullopt;
                                        }
-                                       return result;
+                                       return route_name;
                                      });
                                }}},
                              {"UPSTREAM_PEER_URI_SAN",
@@ -2364,9 +2569,9 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"UPSTREAM_DETECTED_CLOSE_TYPE",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info)
-                                         -> std::optional<std::string> {
+                                         -> std::optional<absl::string_view> {
                                        if (stream_info.upstreamInfo().has_value()) {
                                          return detectedCloseTypeToString(
                                              stream_info.upstreamInfo()
@@ -2403,22 +2608,29 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                [](absl::string_view, std::optional<size_t>) {
                                  std::optional<std::string> hostname =
                                      SubstitutionFormatUtils::getHostname();
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
-                                     [hostname](const StreamInfo::StreamInfo&) {
-                                       return hostname;
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
+                                     [hostname](const StreamInfo::StreamInfo&)
+                                         -> std::optional<absl::string_view> {
+                                       // Owned by the captured optional, which lives as long as
+                                       // the provider.
+                                       if (!hostname.has_value()) {
+                                         return std::nullopt;
+                                       }
+                                       return absl::string_view(*hostname);
                                      });
                                }}},
                              {"FILTER_CHAIN_NAME",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info)
-                                         -> std::optional<std::string> {
+                                         -> std::optional<absl::string_view> {
                                        if (const auto info = stream_info.downstreamAddressProvider()
                                                                  .filterChainInfo();
                                            info.has_value()) {
+                                         // Owned by the filter chain.
                                          if (!info->name().empty()) {
-                                           return std::string(info->name());
+                                           return info->name();
                                          }
                                        }
                                        return std::nullopt;
@@ -2427,13 +2639,14 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"LISTENER_NAME",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info)
-                                         -> std::optional<std::string> {
+                                         -> std::optional<absl::string_view> {
                                        const auto info =
                                            stream_info.downstreamAddressProvider().listenerInfo();
+                                       // Owned by the listener.
                                        if (info.has_value() && !info->name().empty()) {
-                                         return std::string(info->name());
+                                         return info->name();
                                        }
                                        return std::nullopt;
                                      });
@@ -2441,40 +2654,45 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"VIRTUAL_CLUSTER_NAME",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info)
-                                         -> std::optional<std::string> {
-                                       return stream_info.virtualClusterName();
+                                         -> std::optional<absl::string_view> {
+                                       // Owned by the stream info.
+                                       const auto& name = stream_info.virtualClusterName();
+                                       if (!name.has_value()) {
+                                         return std::nullopt;
+                                       }
+                                       return absl::string_view(*name);
                                      });
                                }}},
                              {"TLS_JA3_FINGERPRINT",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
-                                     [](const StreamInfo::StreamInfo& stream_info) {
-                                       std::optional<std::string> result;
-                                       if (!stream_info.downstreamAddressProvider()
-                                                .ja3Hash()
-                                                .empty()) {
-                                         result = std::string(
-                                             stream_info.downstreamAddressProvider().ja3Hash());
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<absl::string_view> {
+                                       // Owned by the downstream socket.
+                                       const absl::string_view hash =
+                                           stream_info.downstreamAddressProvider().ja3Hash();
+                                       if (hash.empty()) {
+                                         return std::nullopt;
                                        }
-                                       return result;
+                                       return hash;
                                      });
                                }}},
                              {"TLS_JA4_FINGERPRINT",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
-                                     [](const StreamInfo::StreamInfo& stream_info) {
-                                       std::optional<std::string> result;
-                                       if (!stream_info.downstreamAddressProvider()
-                                                .ja4Hash()
-                                                .empty()) {
-                                         result = std::string(
-                                             stream_info.downstreamAddressProvider().ja4Hash());
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<absl::string_view> {
+                                       // Owned by the downstream socket.
+                                       const absl::string_view hash =
+                                           stream_info.downstreamAddressProvider().ja4Hash();
+                                       if (hash.empty()) {
+                                         return std::nullopt;
                                        }
-                                       return result;
+                                       return hash;
                                      });
                                }}},
                              {"UNIQUE_ID",
@@ -2490,18 +2708,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"STREAM_ID",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
-                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info)
-                                         -> std::optional<std::string> {
+                                         -> std::optional<absl::string_view> {
                                        auto provider = stream_info.getStreamIdProvider();
                                        if (!provider.has_value()) {
                                          return {};
                                        }
-                                       auto id = provider->toStringView();
-                                       if (!id.has_value()) {
-                                         return {};
-                                       }
-                                       return std::make_optional<std::string>(id.value());
+                                       // Owned by the stream id provider.
+                                       return provider->toStringView();
                                      });
                                }}},
                              {"START_TIME",

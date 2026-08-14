@@ -441,7 +441,7 @@ scope_key_builder:
           TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
               fmt::format(route_config_tmpl, name));
       const auto decoded_resources = TestUtility::decodeResources({route_config});
-      if (rds_subscription_by_name_.find(name) == rds_subscription_by_name_.end()) {
+      if (!rds_subscription_by_name_.contains(name)) {
         continue;
       }
       EXPECT_OK(

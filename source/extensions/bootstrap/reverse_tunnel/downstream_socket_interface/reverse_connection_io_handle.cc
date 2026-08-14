@@ -455,7 +455,7 @@ void ReverseConnectionIOHandle::maybeUpdateHostsMappingsAndConnections(
     removed_hosts = cluster_to_resolved_hosts_itr->second;
   }
   for (const std::string& host : hosts) {
-    if (removed_hosts.find(host) != removed_hosts.end()) {
+    if (removed_hosts.contains(host)) {
       // Since the host still exists, we will remove it from removed_hosts.
       removed_hosts.erase(host);
     }
@@ -518,12 +518,9 @@ void ReverseConnectionIOHandle::removeStaleHostAndCloseConnections(const std::st
     // Remove from wrapper-to-host map.
     conn_wrapper_to_host_map_.erase(wrapper);
     // Remove the wrapper from connection_wrappers_ vector.
-    connection_wrappers_.erase(
-        std::remove_if(connection_wrappers_.begin(), connection_wrappers_.end(),
-                       [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) {
-                         return w.get() == wrapper;
-                       }),
-        connection_wrappers_.end());
+    std::erase_if(connection_wrappers_, [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) {
+      return w.get() == wrapper;
+    });
   }
   // Clear connection keys from host info.
   auto host_it = host_to_conn_info_map_.find(host);
@@ -843,7 +840,7 @@ ReverseConnectionIOHandle::dropTunnelFromTracking(const std::string& connection_
   std::string host_address;
   std::string cluster_name;
   for (const auto& [host, host_info] : host_to_conn_info_map_) {
-    if (host_info.connection_keys.find(connection_key) != host_info.connection_keys.end()) {
+    if (host_info.connection_keys.contains(connection_key)) {
       host_address = host;
       cluster_name = host_info.cluster_name;
       break;
