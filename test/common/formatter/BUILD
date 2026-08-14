@@ -53,6 +53,7 @@ envoy_cc_test(
     deps = [
         ":command_extension_lib",
         "//source/common/common:utility_lib",
+        "//source/common/formatter:coalesce_formatter_lib",
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",

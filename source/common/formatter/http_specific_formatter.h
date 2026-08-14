@@ -56,6 +56,7 @@ protected:
   std::optional<std::string> format(OptRef<const Http::HeaderMap> headers) const;
   bool formatTo(std::string& sink, OptRef<const Http::HeaderMap> headers) const;
   Protobuf::Value formatValue(OptRef<const Http::HeaderMap> headers) const;
+  void formatValueTo(ValueSink& sink, OptRef<const Http::HeaderMap> headers) const;
 
 private:
   const Http::HeaderEntry* findHeader(OptRef<const Http::HeaderMap> headers) const;
@@ -102,6 +103,8 @@ public:
                 const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 /**
@@ -119,6 +122,8 @@ public:
                 const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 /**
@@ -136,6 +141,8 @@ public:
                 const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 /**

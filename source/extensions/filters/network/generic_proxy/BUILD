@@ -160,6 +160,7 @@ envoy_cc_library(
         "//envoy/access_log:access_log_config_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//source/common/config:utility_lib",
+        "//source/common/formatter:serializer_lib",
         "//source/extensions/filters/network/generic_proxy/interface:stream_interface",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/generic_proxy/v3:pkg_cc_proto",
@@ -178,7 +179,9 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/common:pure_lib",
+        "//envoy/formatter:substitution_formatter_interface",
         "//envoy/tracing:trace_context_interface",
+        "//source/common/formatter:serializer_lib",
         "//source/extensions/filters/network/generic_proxy/interface:stream_interface",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
