@@ -162,6 +162,9 @@ RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
+// TODO: Flip to true after operators can migrate non-zero local rate-limit buckets used as total
+// blocks to max_tokens=0.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_local_cluster_minimum_one_token);
 // When true (and the stats config carries no custom tags), the stats store uses the explicit-tags
 // scope logic that propagates scope-level tags onto every stat. Evaluated once at startup.
 // TODO: flip to true after sufficient testing.
