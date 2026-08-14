@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_authz is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include <chrono>
 #include <memory>
 #include <string>
@@ -107,7 +110,7 @@ std::unique_ptr<FilterConfigPerRoute> makePerRouteConfig(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& config) {
   absl::Status creation_status = absl::OkStatus();
   auto per_route = std::make_unique<FilterConfigPerRoute>(config, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
   return per_route;
 }
 

@@ -5,10 +5,13 @@
 #include <chrono>
 #include <cstring>
 
+#include "envoy/registry/registry.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/common/thread.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -110,29 +113,22 @@ Envoy::Stats::StatNameTagVector buildTagsForClusterMetric(
   return tags;
 }
 
-} // namespace
-
-extern "C" {
-
-bool envoy_dynamic_module_callback_cluster_add_hosts(
-    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
-    const envoy_dynamic_module_type_module_buffer* addresses, const uint32_t* weights,
-    const envoy_dynamic_module_type_module_buffer* regions,
-    const envoy_dynamic_module_type_module_buffer* zones,
-    const envoy_dynamic_module_type_module_buffer* sub_zones,
-    const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
-    size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs) {
-  // `cluster_add_hosts` mutates `priority_set_` and runs member-update callbacks; both are
-  // main-thread-only. The previous `ASSERT_IS_MAIN_OR_TEST_THREAD` is compiled out under NDEBUG,
-  // so guard explicitly and fail closed.
-  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
-    IS_ENVOY_BUG(
-        "envoy_dynamic_module_callback_cluster_add_hosts must be called on the main thread");
-    return false;
-  }
+bool addHosts(envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
+              const envoy_dynamic_module_type_module_buffer* addresses,
+              const envoy_dynamic_module_type_module_buffer* hostnames, const uint32_t* weights,
+              const envoy_dynamic_module_type_module_buffer* regions,
+              const envoy_dynamic_module_type_module_buffer* zones,
+              const envoy_dynamic_module_type_module_buffer* sub_zones,
+              const envoy_dynamic_module_type_module_buffer* metadata_pairs,
+              size_t metadata_pairs_per_host, size_t count,
+              envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs) {
   auto* cluster = getCluster(cluster_envoy_ptr);
   std::vector<std::string> address_strings;
   address_strings.reserve(count);
+  std::vector<absl::string_view> hostname_views;
+  if (hostnames != nullptr) {
+    hostname_views.reserve(count);
+  }
   std::vector<uint32_t> weight_vec(weights, weights + count);
   std::vector<std::string> region_strings;
   region_strings.reserve(count);
@@ -142,6 +138,11 @@ bool envoy_dynamic_module_callback_cluster_add_hosts(
   sub_zone_strings.reserve(count);
   for (size_t i = 0; i < count; ++i) {
     address_strings.emplace_back(addresses[i].ptr, addresses[i].length);
+    if (hostnames != nullptr) {
+      hostname_views.emplace_back(hostnames[i].length == 0
+                                      ? absl::string_view()
+                                      : absl::string_view(hostnames[i].ptr, hostnames[i].length));
+    }
     region_strings.emplace_back(regions[i].ptr, regions[i].length);
     zone_strings.emplace_back(zones[i].ptr, zones[i].length);
     sub_zone_strings.emplace_back(sub_zones[i].ptr, sub_zones[i].length);
@@ -165,7 +166,7 @@ bool envoy_dynamic_module_callback_cluster_add_hosts(
   }
 
   std::vector<Envoy::Upstream::HostSharedPtr> result_hosts;
-  if (!cluster->addHosts(address_strings, weight_vec, region_strings, zone_strings,
+  if (!cluster->addHosts(address_strings, hostname_views, weight_vec, region_strings, zone_strings,
                          sub_zone_strings, metadata_vec, result_hosts, priority)) {
     return false;
   }
@@ -173,6 +174,48 @@ bool envoy_dynamic_module_callback_cluster_add_hosts(
     result_host_ptrs[i] = const_cast<Envoy::Upstream::Host*>(result_hosts[i].get());
   }
   return true;
+}
+
+} // namespace
+
+extern "C" {
+
+bool envoy_dynamic_module_callback_cluster_add_hosts(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
+    const envoy_dynamic_module_type_module_buffer* addresses, const uint32_t* weights,
+    const envoy_dynamic_module_type_module_buffer* regions,
+    const envoy_dynamic_module_type_module_buffer* zones,
+    const envoy_dynamic_module_type_module_buffer* sub_zones,
+    const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
+    size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs) {
+  // `cluster_add_hosts` mutates `priority_set_` and runs member-update callbacks; both are
+  // main-thread-only. The previous `ASSERT_IS_MAIN_OR_TEST_THREAD` is compiled out under NDEBUG,
+  // so guard explicitly and fail closed.
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(
+        "envoy_dynamic_module_callback_cluster_add_hosts must be called on the main thread");
+    return false;
+  }
+  return addHosts(cluster_envoy_ptr, priority, addresses, nullptr, weights, regions, zones,
+                  sub_zones, metadata_pairs, metadata_pairs_per_host, count, result_host_ptrs);
+}
+
+bool envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
+    const envoy_dynamic_module_type_module_buffer* addresses,
+    const envoy_dynamic_module_type_module_buffer* hostnames, const uint32_t* weights,
+    const envoy_dynamic_module_type_module_buffer* regions,
+    const envoy_dynamic_module_type_module_buffer* zones,
+    const envoy_dynamic_module_type_module_buffer* sub_zones,
+    const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
+    size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames must be called on "
+                 "the main thread");
+    return false;
+  }
+  return addHosts(cluster_envoy_ptr, priority, addresses, hostnames, weights, regions, zones,
+                  sub_zones, metadata_pairs, metadata_pairs_per_host, count, result_host_ptrs);
 }
 
 size_t envoy_dynamic_module_callback_cluster_remove_hosts(
@@ -913,6 +956,64 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
   return true;
 }
 
+bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
+  stream_info->filterState()->setData(
+      key_view, std::make_unique<Envoy::Router::StringAccessorImpl>(value_view),
+      Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
+
+  auto* factory =
+      Envoy::Registry::FactoryRegistry<Envoy::StreamInfo::FilterState::ObjectFactory>::getFactory(
+          key_view);
+  if (factory == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "no ObjectFactory registered for filter state key '{}'", key_view);
+    return false;
+  }
+
+  auto object = factory->createFromBytes(value_view);
+  if (object == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "ObjectFactory failed to create object for filter state key '{}'",
+                        key_view);
+    return false;
+  }
+
+  stream_info->filterState()->setData(key_view, std::move(object),
+                                      Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
+  return true;
+}
+
 uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
@@ -922,6 +1023,47 @@ uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
   }
   const auto* host = static_cast<const Envoy::Upstream::Host*>(host_envoy_ptr);
   return readHostStat(host->stats(), stat);
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  Envoy::Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key_view].set_number_value(value);
+  stream_info->setDynamicMetadata(std::string(ns.ptr, ns.length), metadata_value);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
+  Envoy::Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key_view].set_string_value(value_view);
+  stream_info->setDynamicMetadata(std::string(ns.ptr, ns.length), metadata_value);
+  return true;
 }
 
 envoy_dynamic_module_type_cluster_scheduler_module_ptr

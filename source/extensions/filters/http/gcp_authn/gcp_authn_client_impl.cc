@@ -135,8 +135,7 @@ void GcpAuthnClientImpl::makeTokenRequest(
 
   const std::string cluster =
       config_.cluster().empty() ? config_.http_uri().cluster() : config_.cluster();
-  const auto thread_local_cluster =
-      context_.serverFactoryContext().clusterManager().getThreadLocalCluster(cluster);
+  const auto thread_local_cluster = context_.clusterManager().getThreadLocalCluster(cluster);
 
   // Failed to fetch the token if the cluster is not configured.
   if (thread_local_cluster == nullptr) {
@@ -189,8 +188,8 @@ void GcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
   if (token_type_ == TokenType::Jwt || token_type_ == TokenType::BoundJwt) {
     token_or_error = parseJwtResponse(response_body, audience_, fingerprint_);
   } else {
-    token_or_error = parseAccessTokenResponse(response_body, audience_, fingerprint_,
-                                              context_.serverFactoryContext().timeSource());
+    token_or_error =
+        parseAccessTokenResponse(response_body, audience_, fingerprint_, context_.timeSource());
   }
 
   if (token_or_error.ok()) {

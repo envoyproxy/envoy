@@ -132,7 +132,8 @@ ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
 absl::StatusOr<Http::FilterFactoryCb>
 ExternalProcessingFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+    Server::Configuration::ServerFactoryContext& server_context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   // Verify configuration before creating FilterConfig
   RETURN_IF_NOT_OK(verifyFilterConfig(proto_config));
 
@@ -143,7 +144,7 @@ ExternalProcessingFilterConfig::createHttpFilterFactoryFromProtoTyped(
   absl::Status config_creation_status = absl::OkStatus();
   auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
-      server_context.scope(), stats_prefix, false,
+      server_context.scope(), extra_context.stats_prefix, false,
       Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context), server_context,
       config_creation_status);
   RETURN_IF_NOT_OK_REF(config_creation_status);

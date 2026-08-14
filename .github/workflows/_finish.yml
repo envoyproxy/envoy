@@ -12,6 +12,8 @@ on:
         required: true
       app-key:
         required: true
+      slack-bot-token:
+        required: false
     inputs:
       needs:
         type: string
@@ -24,6 +26,15 @@ on:
           ## The check run can be viewed here:
 
           # \($icon) \($run_link)
+      allowed-to-fail:
+        type: string
+        default:
+      slack-channel:
+        type: string
+        default: ''
+      slack-channel-allowed-failure:
+        type: string
+        default: ''
 
 env:
   CI_DEBUG: ${{ vars.CI_DEBUG && true || false }}
@@ -36,45 +47,75 @@ jobs:
       actions: read
       contents: read
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/jq@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       name: Incoming data
       id: needs
       with:
         input: |
-          check_name: ${{ fromJSON(inputs.needs).load.outputs.check-name }}
-          repo: ${{ github.repository }}
-          run_id: ${{ github.run_id }}
-          outcomes: ${{ toJSON(fromJSON(inputs.needs).*.result) }}
-          load: ${{ toJSON(fromJSON(inputs.needs).load.outputs) }}
-        input-format: yaml
+          {"check_name": ${{ toJSON(fromJSON(inputs.needs).load.outputs.check-name) }},
+           "repo": ${{ toJSON(github.repository) }},
+           "run_id": ${{ toJSON(github.run_id) }},
+           "branch": ${{ toJSON(github.event.workflow_run.head_branch) }},
+           "outcomes": ${{ toJSON(fromJSON(inputs.needs)) }},
+           "allowed_to_fail": ${{ toJSON(inputs.allowed-to-fail) }},
+           "load": ${{ toJSON(fromJSON(inputs.needs).load.outputs) }},
+           "slack_channel": ${{ toJSON(inputs.slack-channel) }},
+           "slack_channel_allowed_failure": ${{ toJSON(inputs.slack-channel-allowed-failure) }}}
         print-result: ${{ fromJSON(env.CI_DEBUG || 'false') && true || false }}
         filter: |
           .repo as $repo
           | .run_id as $run_id
-          | .needs as $result
+          | (.branch // "main") as $branch
+          | (.slack_channel // "") as $slack_channel
+          | (.slack_channel_allowed_failure // "") as $slack_channel_allowed_failure
           | .check_name as $check_name
           | .load as $load
           | $load["check-id"] as $check_id
           | $load["run-id"] as $workflow_id
           | (.load.request | fromjson) as $request
           | $request.config.envoy.icon as $icon
-          | .outcomes
-          | if any(. == "failure") then
+          | (.allowed_to_fail // "" | split("\n") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))) as $allowed_to_fail
+          | (.outcomes | to_entries | map({name: .key, result: .value.result})) as $outcomes
+          | ($outcomes
+             | map(select(.name as $name | ($allowed_to_fail | index($name) | not)))) as $required_outcomes
+          | ($outcomes
+             | map(select((.name as $name | ($allowed_to_fail | index($name))) and .result == "failure"))) as $allowed_failures
+          | ($required_outcomes | map(select(.result == "failure"))) as $required_failures
+          | ($required_failures | map(.name) | sort | join("`, `")) as $req_names
+          | ($allowed_failures | map(.name) | sort | join("`, `")) as $atf_names
+          | "https://github.com/\($repo)/actions/runs/\($run_id)" as $run_url
+          | if ($required_outcomes | any(.result == "failure")) then
               {name: "failure", icon: ":x:"}
-            elif any(. == "cancelled") then
+            elif ($required_outcomes | any(.result == "cancelled")) then
               {name: "cancelled", icon: ""}
-            elif all(. == "skipped") then
+            elif ($required_outcomes | all(.result == "skipped")) then
               {name: "skipped", icon: ""}
             else
               {name: "success", icon: ":heavy_check_mark:"}
             end
           | . as $outcome
+          | ($allowed_failures | map(.name) | sort | join(", ")) as $allowed_failure_names
           | "\($request.check.name) (\($request.summary.title))" as $run_link_text
           | "[\($run_link_text)](https://github.com/\($repo)/actions/runs/\($run_id))" as $run_link
           | "${{ inputs.template-check-text }}" as $text
+          | (if ($allowed_failures | length) > 0 then
+               "\n\n:warning: Allowed-to-fail checks failed: \($allowed_failure_names)"
+             else
+               ""
+             end) as $allowed_failure_text
+          | (if $slack_channel != "" and ($required_failures | length) > 0 then
+               {"channel": $slack_channel,
+                "text": ":x: *CI failed on `\($branch)`:* `\($req_names)`\\n<\($run_url)|View workflow run>"}
+             else null end) as $notify_required
+          | (if $slack_channel_allowed_failure != "" and ($allowed_failures | length) > 0 then
+               {"channel": $slack_channel_allowed_failure,
+                "text": ":x: *OpenSSL CI failed on `\($branch)`:* `\($atf_names)`\\n<\($run_url)|View workflow run>"}
+             else null end) as $notify_openssl
           | {"summary-title": "\($icon) \($request.check.name) complete (\($outcome.name))",
              "check-id": $check_id,
              conclusion: $outcome.name,
+             "notify-required": $notify_required,
+             "notify-openssl": $notify_openssl,
              checks: {
                ($check_name): {
                  name: $request.check.name,
@@ -85,9 +126,9 @@ jobs:
                  output: {
                    title: "\($request.check.name) (\($outcome.name))",
                    summary: "Check has finished",
-                   text: $text}}}}
+                   text: ($text + $allowed_failure_text)}}}}
 
-    - uses: envoyproxy/toolshed/actions/jq@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/jq@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       name: Print summary
       with:
         input: ${{ toJSON(steps.needs.outputs.value).summary-title }}
@@ -95,18 +136,55 @@ jobs:
           "## \(.)"
         options: -Rr
         output-path: GITHUB_STEP_SUMMARY
-    - uses: envoyproxy/toolshed/actions/appauth@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/appauth@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/actions/github/checks@1f5b552c6749502b885cb8cf23549b929e745547  # actions-v0.4.17
+    - uses: envoyproxy/toolshed/actions/github/checks@3a721916b4cf6338784230c7b940a249d6a64341  # actions-v0.4.21
       name: Update check
       with:
         action: update
         checks: ${{ toJSON(fromJSON(steps.needs.outputs.value).checks) }}
         token: ${{ steps.appauth.outputs.token }}
+
+    - name: Notify Slack (required failures)
+      if: >-
+        github.event.workflow_run.event == 'push'
+        && (github.event.workflow_run.head_branch == 'main' || startsWith(github.event.workflow_run.head_branch, 'release/v'))
+        && github.repository == 'envoyproxy/envoy'
+        && fromJSON(steps.needs.outputs.value)['notify-required'] != null
+      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
+      with:
+        method: chat.postMessage
+        token: ${{ secrets.slack-bot-token }}
+        payload: |
+          channel: "${{ fromJSON(steps.needs.outputs.value)['notify-required'].channel }}"
+          text: "${{ fromJSON(steps.needs.outputs.value)['notify-required'].text }}"
+          blocks:
+          - type: section
+            text:
+              type: mrkdwn
+              text: "${{ fromJSON(steps.needs.outputs.value)['notify-required'].text }}"
+    - name: Notify Slack (OpenSSL failures)
+      if: >-
+        github.event.workflow_run.event == 'push'
+        && (github.event.workflow_run.head_branch == 'main' || startsWith(github.event.workflow_run.head_branch, 'release/v'))
+        && github.repository == 'envoyproxy/envoy'
+        && fromJSON(steps.needs.outputs.value)['notify-openssl'] != null
+      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
+      with:
+        method: chat.postMessage
+        token: ${{ secrets.slack-bot-token }}
+        payload: |
+          channel: "${{ fromJSON(steps.needs.outputs.value)['notify-openssl'].channel }}"
+          text: "${{ fromJSON(steps.needs.outputs.value)['notify-openssl'].text }}"
+          blocks:
+          - type: section
+            text:
+              type: mrkdwn
+              text: "${{ fromJSON(steps.needs.outputs.value)['notify-openssl'].text }}"
 
     # This is necessary to ensure that any retests have their checks updated
     - name: Fail the job

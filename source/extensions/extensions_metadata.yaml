@@ -317,10 +317,13 @@ envoy.filters.http.admission_control:
 envoy.filters.http.ai_protocol_manager:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+  - envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute
 envoy.filters.http.alternate_protocols_cache:
   categories:
   - envoy.filters.http
@@ -452,8 +455,10 @@ envoy.filters.http.composite:
 envoy.filters.http.compressor:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: robust_to_untrusted_downstream
   status: stable
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.compressor.v3.Compressor
   - envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
@@ -739,7 +744,7 @@ envoy.filters.http.rate_limit_quota:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: wip
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig
   - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride
@@ -766,6 +771,15 @@ envoy.filters.http.set_metadata:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.set_metadata.v3.Config
+envoy.filters.http.body_size_limit:
+  categories:
+  - envoy.filters.http
+  - envoy.filters.http.upstream
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  status_upstream: alpha
+  type_urls:
+  - envoy.extensions.filters.http.body_size_limit.v3.BodySizeLimit
 envoy.filters.http.tap:
   categories:
   - envoy.filters.http
@@ -804,6 +818,13 @@ envoy.filters.http.sse_to_metadata:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.sse_to_metadata.v3.SseToMetadata
+envoy.filters.http.aws_eventstream_parser:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.aws_eventstream_parser.v3.AwsEventstreamParser
 envoy.filters.http.header_mutation:
   categories:
   - envoy.filters.http
@@ -1099,6 +1120,13 @@ envoy.filters.udp.session.dynamic_forward_proxy:
   status: alpha
   type_urls:
   - envoy.extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3.FilterConfig
+envoy.filters.udp.session.ext_authz:
+  categories:
+  - envoy.filters.udp.session
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.udp.udp_proxy.session.ext_authz.v3.FilterConfig
 envoy.filters.upstream_network.reverse_tunnel_lifecycle:
   categories:
   - envoy.filters.upstream_network
@@ -1264,6 +1292,13 @@ envoy.internal_redirect_predicates.allow_listed_routes:
   status: stable
   type_urls:
   - envoy.extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig
+envoy.internal_redirect_predicates.filter_state:
+  categories:
+  - envoy.internal_redirect_predicates
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.internal_redirect.filter_state.v3.FilterStateConfig
 envoy.internal_redirect_predicates.previous_routes:
   categories:
   - envoy.internal_redirect_predicates
@@ -1353,21 +1388,21 @@ envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.quic.proof_source.v3.ProofSourceConfig
 envoy.quic.server_preferred_address.fixed:
   categories:
   - envoy.quic.server_preferred_address
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig
 envoy.quic.server_preferred_address.datasource:
   categories:
   - envoy.quic.server_preferred_address
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.quic.server_preferred_address.v3.DataSourceServerPreferredAddressConfig
 envoy.udp_packet_writer.default:
@@ -1388,21 +1423,21 @@ envoy.quic.deterministic_connection_id_generator:
   categories:
   - envoy.quic.connection_id_generator
   security_posture: robust_to_untrusted_downstream_and_upstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.quic.connection_id_generator.v3.DeterministicConnectionIdGeneratorConfig
 envoy.quic.connection_id_generator.quic_lb:
   categories:
   - envoy.quic.connection_id_generator
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.quic.connection_id_generator.quic_lb.v3.Config
 envoy.quic.crypto_stream.server.quiche:
   categories:
   - envoy.quic.server.crypto_stream
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.quic.crypto_stream.v3.CryptoServerStreamConfig
 envoy.rate_limit_descriptors.expr:
@@ -1840,6 +1875,13 @@ envoy.wasm.runtime.wasmtime:
   # is updated to capture additional Wasm runtimes".
   security_posture: unknown
   status: alpha
+envoy.watchdog.backtrace_action:
+  categories:
+  - envoy.guarddog_actions
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.watchdog.backtrace_action.v3.BacktraceActionConfig
 envoy.watchdog.profile_action:
   categories:
   - envoy.guarddog_actions
@@ -2378,14 +2420,14 @@ envoy.quic.connection_debug_visitor.basic:
   categories:
   - envoy.quic.connection_debug_visitor
   security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.quic.connection_debug_visitor.v3.BasicConfig
 envoy.quic.connection_debug_visitor.quic_stats:
   categories:
   - envoy.quic.connection_debug_visitor
   security_posture: robust_to_untrusted_downstream_and_upstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.quic.connection_debug_visitor.quic_stats.v3.Config
 envoy.filters.network.generic_proxy:

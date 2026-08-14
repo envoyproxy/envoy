@@ -32,6 +32,32 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "json_with_ext_buf_lib",
+    srcs = ["json_with_ext_buf.cc"],
+    hdrs = ["json_with_ext_buf.h"],
+    deps = [
+        "//source/common/common:safe_memcpy_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
+    name = "json_with_ext_buf_parser_lib",
+    srcs = ["json_with_ext_buf_parser.cc"],
+    hdrs = ["json_with_ext_buf_parser.h"],
+    deps = [
+        ":json_with_ext_buf_lib",
+        "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
     name = "buffer_manager_lib",
     srcs = ["buffer_manager.cc"],
     hdrs = ["buffer_manager.h"],
@@ -59,6 +85,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "schema_lib",
+    srcs = ["schema.cc"],
+    hdrs = ["schema.h"],
+    deps = [
+        ":json_with_ext_buf_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
@@ -66,8 +104,17 @@ envoy_cc_library(
         ":buffer_manager_lib",
         ":external_buffer_interface",
         ":filter_chain_bridge_lib",
+        ":json_with_ext_buf_lib",
+        ":json_with_ext_buf_parser_lib",
+        ":schema_lib",
+        "//envoy/http:codes_interface",
+        "//envoy/router:router_interface",
         "//source/common/common:logger_lib",
+        "//source/common/http:utility_lib",
+        "//source/extensions/filters/http/ai_protocol_manager/schema:schema_registry_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@abseil-cpp//absl/status",
+        "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
     ],
 )
 

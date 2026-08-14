@@ -14,7 +14,7 @@ using ::testing::Invoke;
 MockConfigTracker::MockConfigTracker() {
   ON_CALL(*this, add_(_, _))
       .WillByDefault(Invoke([this](const std::string& key, Cb callback) -> EntryOwner* {
-        EXPECT_TRUE(config_tracker_callbacks_.find(key) == config_tracker_callbacks_.end());
+        EXPECT_FALSE(config_tracker_callbacks_.contains(key));
         config_tracker_callbacks_[key] = callback;
         return new MockEntryOwner();
       }));

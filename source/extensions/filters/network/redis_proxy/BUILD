@@ -19,8 +19,10 @@ envoy_cc_library(
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/stream_info:stream_info_interface",
+        "//source/common/singleton:const_singleton",
         "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -84,6 +86,10 @@ envoy_cc_library(
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -94,6 +100,8 @@ envoy_cc_library(
     deps = [
         ":config_interface",
         ":conn_pool_interface",
+        "//envoy/common:optref_lib",
+        "//envoy/event:dispatcher_interface",
         "//envoy/stats:stats_macros",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
@@ -111,6 +119,7 @@ envoy_cc_library(
         "//source/extensions/common/redis:cluster_refresh_manager_interface",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
+        "@abseil-cpp//absl/strings:string_view",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
@@ -137,16 +146,21 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = [
         ":command_splitter_interface",
+        ":command_splitter_lib",
         ":external_auth_lib",
         "//envoy/network:drain_decision_interface",
         "//envoy/network:filter_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/config:datasource_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
+        "//source/extensions/filters/network/common/redis:supported_commands_lib",
+        "//source/extensions/filters/network/common/redis:utility_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )

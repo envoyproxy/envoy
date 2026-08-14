@@ -19,6 +19,7 @@
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -61,7 +62,7 @@ public:
     config_ = std::make_shared<FilterConfig>(
         proto_config, factory_context_.local_info_, *factory_context_.store_.rootScope(),
         factory_context_.runtime_loader_, factory_context_, status);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(status);
 
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
@@ -79,7 +80,7 @@ public:
       absl::Status creation_status = absl::OkStatus();
       route_config_ =
           std::make_shared<FilterConfigPerRoute>(factory_context_, settings, creation_status);
-      EXPECT_TRUE(creation_status.ok());
+      EXPECT_OK(creation_status);
 
       EXPECT_CALL(filter_callbacks_, mostSpecificPerFilterConfig())
           .WillOnce(Return(route_config_.get()));
@@ -1873,7 +1874,7 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
   settings.clear_vh_rate_limits();
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1924,7 +1925,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) 
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1975,7 +1976,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
@@ -2026,7 +2027,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
@@ -2074,7 +2075,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -2124,7 +2125,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
@@ -2172,7 +2173,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
       envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
 
@@ -2207,7 +2208,7 @@ TEST_F(HttpRateLimitFilterTest, PerRouteDomainSet) {
   settings.set_domain(per_route_domain);
   absl::Status creation_status = absl::OkStatus();
   FilterConfigPerRoute per_route_config_(factory_context_, settings, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
