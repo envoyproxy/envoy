@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <envoy_v3_api_msg_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup>`.
 message ClusterWeight {
   // Name of the upstream cluster.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string cluster_name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Weight of the cluster relative to the other clusters of the same group.
   google.protobuf.UInt32Value weight = 2
@@ -53,10 +53,9 @@ message PriorityGroup {
 // exceeds the number of the available groups, the selection wraps around to the beginning of the
 // list.
 //
-// This plugin supports refreshing the target cluster of the returned route entry, so it could be
-// used together with the :ref:`refresh cluster on retry
-// <envoy_v3_api_field_config.route.v3.RetryPolicy.refresh_cluster_on_retry>` to retry the request in
-// a different priority group.
+// This plugin must be used together with the :ref:`refresh cluster on retry
+// <envoy_v3_api_field_config.route.v3.RetryPolicy.refresh_cluster_on_retry>` option of the retry
+// policy to ensure the reselecting of the cluster on every attempt.
 //
 // Example:
 //
@@ -66,13 +65,13 @@ message PriorityGroup {
 //   priority_groups:
 //   - name: local
 //     clusters:
-//     - name: local_primary
+//     - cluster_name: local_primary
 //       weight: 80
-//     - name: local_secondary
+//     - cluster_name: local_secondary
 //       weight: 20
 //   - name: remote
 //     clusters:
-//     - name: remote_primary
+//     - cluster_name: remote_primary
 //       weight: 100
 //
 // With the configuration above, the initial attempt will be routed to ``local_primary`` or
@@ -97,8 +96,8 @@ message PriorityGroupClusterSpecifier {
   //
   // * The ``name`` field is required and must be a non-empty string.
   // * The ``clusters`` field is optional and, if it is a non-empty list, then every element of it
-  //   must be a struct with a non-empty string ``name`` field and a numeric ``weight`` field in
-  //   the range [1, 4294967295].
+  //   must be a struct with a non-empty string ``cluster_name`` field and a numeric ``weight``
+  //   field in the range [1, 4294967295].
   //
   // If the ``clusters`` of an element are provided, then they replace the :ref:`clusters
   // <envoy_v3_api_field_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroup.clusters>`
@@ -123,9 +122,9 @@ message PriorityGroupClusterSpecifier {
   //     priority_groups:
   //     - name: remote
   //       clusters:
-  //       - name: remote_primary
+  //       - cluster_name: remote_primary
   //         weight: 20
-  //       - name: remote_secondary
+  //       - cluster_name: remote_secondary
   //         weight: 80
   //     - name: local
   //

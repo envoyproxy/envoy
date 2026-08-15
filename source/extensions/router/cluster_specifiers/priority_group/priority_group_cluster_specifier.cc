@@ -22,6 +22,7 @@ namespace {
 
 constexpr absl::string_view NameField = "name";
 constexpr absl::string_view ClustersField = "clusters";
+constexpr absl::string_view ClusterNameField = "cluster_name";
 constexpr absl::string_view WeightField = "weight";
 
 // Get the string value of the given field. Returns nullopt if the field is missing or is not a
@@ -41,7 +42,7 @@ std::optional<std::string> stringField(const Protobuf::Map<std::string, Protobuf
 PriorityGroupEntry::PriorityGroupEntry(const PriorityGroupProto& proto) : name_(proto.name()) {
   clusters_.reserve(proto.clusters().size());
   for (const ClusterWeightProto& cluster : proto.clusters()) {
-    clusters_.emplace_back(cluster.name(), cluster.weight().value());
+    clusters_.emplace_back(cluster.cluster_name(), cluster.weight().value());
     total_weight_ += cluster.weight().value();
   }
   // Every group has at least one cluster and every cluster weight is at least 1, so the total
@@ -89,7 +90,7 @@ PriorityGroupEntry::parseFromMetadata(const Protobuf::Value& value) {
     }
     const auto& cluster_fields = cluster_value.struct_value().fields();
 
-    std::optional<std::string> cluster_name = stringField(cluster_fields, NameField);
+    std::optional<std::string> cluster_name = stringField(cluster_fields, ClusterNameField);
     if (!cluster_name.has_value()) {
       return std::nullopt;
     }

@@ -52,7 +52,7 @@ public:
     auto& cluster_values = *(*group.mutable_fields())["clusters"].mutable_list_value();
     for (const auto& cluster : clusters) {
       auto& cluster_struct = *cluster_values.add_values()->mutable_struct_value();
-      (*cluster_struct.mutable_fields())["name"].set_string_value(cluster.first);
+      (*cluster_struct.mutable_fields())["cluster_name"].set_string_value(cluster.first);
       (*cluster_struct.mutable_fields())["weight"].set_number_value(cluster.second);
     }
     (*stream_info_.metadata_.mutable_filter_metadata())["envoy.test"] = value;
@@ -62,13 +62,13 @@ public:
 priority_groups:
 - name: local
   clusters:
-  - name: local_primary
+  - cluster_name: local_primary
     weight: 80
-  - name: local_secondary
+  - cluster_name: local_secondary
     weight: 20
 - name: remote
   clusters:
-  - name: remote_primary
+  - cluster_name: remote_primary
     weight: 100
   )EOF";
 
@@ -76,11 +76,11 @@ priority_groups:
 priority_groups:
 - name: local
   clusters:
-  - name: local_primary
+  - cluster_name: local_primary
     weight: 100
 - name: remote
   clusters:
-  - name: remote_primary
+  - cluster_name: remote_primary
     weight: 100
 group_override_metadata:
   key: envoy.test
@@ -248,9 +248,9 @@ TEST_F(PriorityGroupClusterSpecifierPluginTest, ClusterOverrideMetadata) {
 groups:
 - name: remote
   clusters:
-  - name: remote_override_primary
+  - cluster_name: remote_override_primary
     weight: 20
-  - name: remote_override_secondary
+  - cluster_name: remote_override_secondary
     weight: 80
 - name: local
   )EOF");
@@ -290,7 +290,7 @@ groups:
 groups:
 - name: unknown
   clusters:
-  - name: unknown_primary
+  - cluster_name: unknown_primary
     weight: 100
   )EOF");
     stream_info_.setAttemptCount(1);
@@ -328,7 +328,7 @@ groups:
 groups:
 - name: remote
   clusters:
-  - name: remote_override_primary
+  - cluster_name: remote_override_primary
     weight: 100
   )EOF");
     stream_info_.setAttemptCount(1);
@@ -383,7 +383,7 @@ groups:
   setGroupOverrideMetadata(R"EOF(
 groups:
 - clusters:
-  - name: remote_primary
+  - cluster_name: remote_primary
     weight: 100
 - name: 1
 - name: ""
@@ -398,7 +398,7 @@ groups:
 groups:
 - name: remote
   clusters:
-    name: remote_primary
+    cluster_name: remote_primary
   )EOF");
   expectDefaultGroupOrder();
 
@@ -419,11 +419,11 @@ groups:
   - weight: 100
 - name: remote
   clusters:
-  - name: ""
+  - cluster_name: ""
     weight: 100
 - name: remote
   clusters:
-  - name: 1
+  - cluster_name: 1
     weight: 100
   )EOF");
   expectDefaultGroupOrder();
@@ -436,10 +436,10 @@ groups:
 groups:
 - name: remote
   clusters:
-  - name: remote_primary
+  - cluster_name: remote_primary
 - name: remote
   clusters:
-  - name: remote_primary
+  - cluster_name: remote_primary
     weight: "100"
   )EOF");
   expectDefaultGroupOrder();
@@ -448,11 +448,11 @@ groups:
 groups:
 - name: remote
   clusters:
-  - name: remote_primary
+  - cluster_name: remote_primary
     weight: 0
 - name: remote
   clusters:
-  - name: remote_primary
+  - cluster_name: remote_primary
     weight: -1
   )EOF");
   expectDefaultGroupOrder();
@@ -481,11 +481,11 @@ TEST_F(PriorityGroupClusterSpecifierPluginTest, DuplicateGroupName) {
 priority_groups:
 - name: local
   clusters:
-  - name: local_primary
+  - cluster_name: local_primary
     weight: 100
 - name: local
   clusters:
-  - name: local_secondary
+  - cluster_name: local_secondary
     weight: 100
 group_override_metadata:
   key: envoy.test
