@@ -95,7 +95,8 @@ TEST_F(InternalClientConnectionImplTest, ConnectFailed) {
 
 TEST_F(InternalClientConnectionImplTest, AbortResetEmitsConnectionResetToPeerGuardEnabled) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
 
   client_ = std::make_unique<Network::ClientConnectionImpl>(
       *dispatcher_,
@@ -118,7 +119,8 @@ TEST_F(InternalClientConnectionImplTest, AbortResetEmitsConnectionResetToPeerGua
 
 TEST_F(InternalClientConnectionImplTest, AbortResetEmitsEofToPeerGuardDisabled) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"}});
 
   client_ = std::make_unique<Network::ClientConnectionImpl>(
       *dispatcher_,

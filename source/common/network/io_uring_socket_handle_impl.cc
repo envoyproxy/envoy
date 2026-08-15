@@ -53,7 +53,8 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::close(bool send_rst) {
-  ENVOY_LOG(trace, "close, fd = {}, type = {}, send_rst = {}", fd_, ioUringSocketTypeStr(), send_rst);
+  ENVOY_LOG(trace, "close, fd = {}, type = {}, send_rst = {}", fd_, ioUringSocketTypeStr(),
+            send_rst);
 
   ASSERT(SOCKET_VALID(fd_));
 

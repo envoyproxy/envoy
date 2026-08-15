@@ -72,9 +72,8 @@ Api::IoCallUint64Result IoHandleImpl::close(bool send_rst) {
     if (peer_handle_) {
       ENVOY_LOG(trace, "socket {} close before peer {} closes, send_rst = {}.",
                 static_cast<void*>(this), static_cast<void*>(peer_handle_), send_rst);
-      if (send_rst &&
-          Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.enable_send_rst_on_user_space_socket")) {
+      if (send_rst && Runtime::runtimeFeatureEnabled(
+                          "envoy.reloadable_features.enable_send_rst_on_user_space_socket")) {
         peer_handle_->setReset();
       } else {
         // Notify the peer that it will not receive more data. shutdown(WRITE).

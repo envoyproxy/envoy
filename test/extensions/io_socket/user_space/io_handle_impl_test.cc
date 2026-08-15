@@ -1298,7 +1298,8 @@ TEST(IoHandleFactoryTest, UseExistingPassthroughState) {
 
 TEST_F(IoHandleImplTest, ResetCloseEmitsConnectionResetErrorOnReadGuardEnabled) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
 
   EXPECT_TRUE(io_handle_->isOpen());
   EXPECT_TRUE(io_handle_peer_->isOpen());
@@ -1325,7 +1326,8 @@ TEST_F(IoHandleImplTest, ResetCloseEmitsConnectionResetErrorOnReadGuardEnabled) 
 
 TEST_F(IoHandleImplTest, ResetCloseEmitsEofOnReadGuardDisabled) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"}});
 
   EXPECT_TRUE(io_handle_->isOpen());
   EXPECT_TRUE(io_handle_peer_->isOpen());
