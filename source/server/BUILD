@@ -90,7 +90,6 @@ envoy_cc_library(
         "active_udp_listener.h",
     ],
     deps = [
-        "//envoy/common:resource_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_handler_interface",
         "//envoy/network:exception_interface",
