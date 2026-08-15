@@ -3612,6 +3612,53 @@ TEST_F(XdstpConfigsEdsTest, DeltaOnConfigUpdateSuccess) {
                      .get()
                      .value());
 }
+
+// EDS-only cluster with initialFetchTimeout: 0s.
+// Health checks must start immediately — deferring would block them forever.
+TEST_F(EdsTest, HealthCheckStartsImmediatelyWithZeroInitialFetchTimeout) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.health_check_after_cluster_warming", "true"}});
+
+  resetCluster(R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          initial_fetch_timeout: 0s
+          api_config_source:
+            api_type: GRPC
+            grpc_services:
+              envoy_grpc:
+                cluster_name: eds
+  )EOF",
+               Cluster::InitializePhase::Secondary);
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(1);
+  cluster_->setHealthChecker(health_checker);
+}
+
+// EDS cluster with non-zero initialFetchTimeout.
+// Health checks must be deferred until warming completes.
+TEST_F(EdsTest, HealthCheckDeferredWithNonZeroInitialFetchTimeout) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.health_check_after_cluster_warming", "true"}});
+
+  // Default cluster config has no explicit initialFetchTimeout, which defaults to 15s.
+  resetCluster();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start()).Times(0);
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(1);
+  cluster_->setHealthChecker(health_checker);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
