@@ -92,6 +92,8 @@ struct ReverseConnectionSocketConfig {
       additional_headers;       // Additional headers for the handshake request.
   bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
   std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
+  // How often to re-check each host and dial missing tunnels.
+  uint64_t maintain_interval_ms{ReverseConnectionUtility::kDefaultMaintainIntervalMs};
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress

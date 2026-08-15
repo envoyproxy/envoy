@@ -45,8 +45,6 @@ constexpr uint32_t kMaxBackoffExponent = 32;
 // ``Retry-After`` cool-off, and the maintenance re-check) so agents that fail together
 // de-synchronize their next attempt.
 constexpr uint64_t kReconnectJitterPercent = 15;
-// Steady-state maintenance re-check interval.
-constexpr uint64_t kMaintainIntervalMs = 10000;
 } // namespace
 
 // ReverseConnectionIOHandle implementation
@@ -603,7 +601,7 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
     uint32_t current_connections = host_to_conn_info_map_[key].connection_keys.size();
     uint32_t pending_connections = host_to_conn_info_map_[key].connecting_count;
 
-    ENVOY_LOG(info,
+    ENVOY_LOG(debug,
               "reverse_tunnel: Number of reverse connections to host {} of cluster {} from source "
               "node: {}: "
               "Current: {}, Pending: {}, Required: {}",
@@ -972,7 +970,7 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
   // Enable the retry timer to periodically check for missing connections (like maintainConnCount).
   if (rev_conn_retry_timer_) {
     const uint64_t retry_timeout_ms = ReverseConnectionUtility::addJitter(
-        kMaintainIntervalMs, kReconnectJitterPercent, extension_->randomGenerator());
+        config_.maintain_interval_ms, kReconnectJitterPercent, extension_->randomGenerator());
     rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(retry_timeout_ms));
     ENVOY_LOG(debug, "Enabled retry timer for next connection check in {}ms.", retry_timeout_ms);
   }
