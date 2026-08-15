@@ -1296,7 +1296,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, UseOriginalDstNullCallbacks) 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketWithDetails) {
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
-  EXPECT_CALL(io_handle, close())
+  EXPECT_CALL(io_handle, close(testing::_))
       .WillOnce(testing::Return(testing::ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
   EXPECT_CALL(callbacks_.stream_info_,
               setConnectionTerminationDetails(absl::string_view("connection_rejected")));
@@ -1309,7 +1309,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketWithDetails) {
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketEmptyDetails) {
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
-  EXPECT_CALL(io_handle, close())
+  EXPECT_CALL(io_handle, close(testing::_))
       .WillOnce(testing::Return(testing::ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
   // Empty details should not call setConnectionTerminationDetails.
   EXPECT_CALL(callbacks_.stream_info_, setConnectionTerminationDetails(testing::_)).Times(0);
