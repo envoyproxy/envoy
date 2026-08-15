@@ -132,7 +132,7 @@ VclIoHandle::~VclIoHandle() {
   }
 }
 
-Api::IoCallUint64Result VclIoHandle::close() {
+Api::IoCallUint64Result VclIoHandle::close(bool /*send_rst*/) {
   int wrk_index = vclWrkIndexOrRegister();
   int rc = 0;
 
