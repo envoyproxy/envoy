@@ -239,9 +239,8 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
     for (const auto& tlv : added_tlvs_) {
       if (!host_level_tlv_types.contains(tlv.type_)) {
         if (tlv.formatter_) {
-          const std::string formatted = tlv.formatter_->formatWithContext(
-              {&callbacks_->connection(), nullptr, nullptr, &callbacks_->connection().streamInfo()},
-              &callbacks_->connection().streamInfo());
+          const std::string formatted = tlv.formatter_->format(
+              {}, callbacks_->connection().streamInfo());
           custom_tlvs.push_back(Network::ProxyProtocolTLV{
               tlv.type_, std::vector<uint8_t>(formatted.begin(), formatted.end())});
         } else {
@@ -257,9 +256,8 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
         continue;
       }
       if (tlv.formatter_) {
-        const std::string formatted = tlv.formatter_->formatWithContext(
-            {&callbacks_->connection(), nullptr, nullptr, &callbacks_->connection().streamInfo()},
-            &callbacks_->connection().streamInfo());
+        const std::string formatted = tlv.formatter_->format(
+            {}, callbacks_->connection().streamInfo());
         custom_tlvs.push_back(Network::ProxyProtocolTLV{
             tlv.type_, std::vector<uint8_t>(formatted.begin(), formatted.end())});
       } else {

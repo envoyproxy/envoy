@@ -1095,7 +1095,7 @@ TEST_F(ProxyProtocolTest, V2FormatStringTlv) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
   auto tlv = config.add_added_tlvs();
   tlv->set_type(0x55);
-  tlv->set_format_string("%UPSTREAM_REMOTE_ADDRESS%");
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string("%UPSTREAM_REMOTE_ADDRESS%");
   
   // Set up mock remote address
   auto remote_address = Network::Utility::resolveUrl("tcp://10.0.0.1:8080");
