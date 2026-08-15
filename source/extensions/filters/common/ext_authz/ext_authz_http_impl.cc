@@ -172,7 +172,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
                               createRetryPolicy(config.http_service().retry_policy(), context),
                               Router::RetryPolicyConstSharedPtr)
                         : nullptr),
-      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)) {
+      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)),
+      strip_query_params_(config.http_service().strip_query_params()) {
   THROW_IF_NOT_OK(
       validateOnlyOneOfPathPrefixOrOverride(path_prefix, config.http_service().path_override()));
 }
@@ -208,7 +209,7 @@ ClientConfig::ClientConfig(
               ? THROW_OR_RETURN_VALUE(createRetryPolicy(http_service.retry_policy(), context),
                                       Router::RetryPolicyConstSharedPtr)
               : nullptr),
-      emit_client_span_(emit_client_span) {
+      emit_client_span_(emit_client_span), strip_query_params_(http_service.strip_query_params()) {
   THROW_IF_NOT_OK(validateOnlyOneOfPathPrefixOrOverride(http_service.path_prefix(),
                                                         http_service.path_override()));
 }
@@ -315,7 +316,20 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         if (!config_->pathOverride().empty()) {
           headers->addCopy(key, config_->pathOverride());
         } else if (!config_->pathPrefix().empty()) {
-          headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
+          if (config_->stripQueryParams()) {
+            const auto path = header.raw_value();
+            const auto query_pos = path.find('?');
+            const auto path_without_query =
+                query_pos == absl::string_view::npos ? path : path.substr(0, query_pos);
+            headers->addCopy(key, absl::StrCat(config_->pathPrefix(), path_without_query));
+          } else {
+            headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
+          }
+        } else if (config_->stripQueryParams()) {
+          const auto path = header.raw_value();
+          const auto query_pos = path.find('?');
+          headers->addCopy(key,
+                           query_pos == absl::string_view::npos ? path : path.substr(0, query_pos));
         } else {
           headers->addCopy(key, header.raw_value());
         }
@@ -336,7 +350,19 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         if (!config_->pathOverride().empty()) {
           headers->addCopy(key, config_->pathOverride());
         } else if (!config_->pathPrefix().empty()) {
-          headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+          if (config_->stripQueryParams()) {
+            const auto query_pos = header.second.find('?');
+            const auto path_without_query =
+                query_pos == std::string::npos ? header.second : header.second.substr(0, query_pos);
+            headers->addCopy(key, absl::StrCat(config_->pathPrefix(), path_without_query));
+          } else {
+            headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+          }
+        } else if (config_->stripQueryParams()) {
+          const auto query_pos = header.second.find('?');
+          headers->addCopy(key, query_pos == std::string::npos
+                                    ? header.second
+                                    : header.second.substr(0, query_pos));
         } else {
           headers->addCopy(key, header.second);
         }
