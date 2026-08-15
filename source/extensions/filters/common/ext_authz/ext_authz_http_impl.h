@@ -108,6 +108,11 @@ public:
    */
   const Router::RetryPolicyConstSharedPtr& retryPolicy() const { return retry_policy_; }
 
+  /**
+   * Returns whether or not to strip query params from the path when sending to the auth server.
+   */
+  bool stripQueryParams() const { return strip_query_params_; }
+
 private:
   static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
                                            Server::Configuration::CommonFactoryContext& context);
@@ -135,6 +140,7 @@ private:
   Router::HeaderParserPtr request_headers_parser_;
   const bool encode_raw_headers_;
   const Router::RetryPolicyConstSharedPtr retry_policy_;
+  const bool strip_query_params_;
 };
 
 using ClientConfigSharedPtr = std::shared_ptr<ClientConfig>;
