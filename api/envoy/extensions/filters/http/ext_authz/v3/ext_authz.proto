@@ -495,7 +495,7 @@ message BufferSettings {
 // metadata as well as body may be added to the client's response. See :ref:`allowed_client_headers
 // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationResponse.allowed_client_headers>`
 // for details.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message HttpService {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.HttpService";
@@ -525,6 +525,21 @@ message HttpService {
   // .. note::
   //   When this field is set, the ``ext_authz`` filter will buffer the request body for retry purposes.
   config.core.v3.RetryPolicy retry_policy = 9;
+
+  // When set to ``true``, the query string from the original request's ``:path`` header will be
+  // stripped before sending the authorization request to the HTTP service. This is useful when
+  // query parameters contain sensitive information that should not be forwarded to the
+  // authorization server.
+  //
+  // When set to ``false`` (default), the original full path, including query parameters, is
+  // forwarded to the authorization server. This preserves backward compatibility.
+  //
+  // .. note::
+  //   This field only affects the ``:path`` header sent in the HTTP authorization request.
+  //   It has no effect on the gRPC ext_authz service, which includes query parameters in the
+  //   :ref:`path <envoy_v3_api_field_service.auth.v3.AttributeContext.HttpRequest.path>`
+  //   field instead.
+  bool strip_query_params = 11;
 }
 
 message AuthorizationRequest {

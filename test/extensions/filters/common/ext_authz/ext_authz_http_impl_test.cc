@@ -1182,6 +1182,104 @@ TEST_F(ExtAuthzHttpClientTest, PathTransformationsWithEncodeRawHeaders) {
   }
 }
 
+// Test that strip_query_params: true strips the query string from the :path header.
+TEST_F(ExtAuthzHttpClientTest, StripQueryParamsDefault) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  )EOF";
+  initialize(yaml);
+  // By default, strip_query_params is false, so query params are retained.
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/hello?name=value&foo=bar"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/hello?name=value&foo=bar");
+}
+
+TEST_F(ExtAuthzHttpClientTest, StripQueryParamsTrue) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    strip_query_params: true
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/hello?name=value&foo=bar"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/hello");
+}
+
+// When strip_query_params: true and there are no query params in the path,
+// the path is unchanged.
+TEST_F(ExtAuthzHttpClientTest, StripQueryParamsTrueNoQueryString) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    strip_query_params: true
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/hello"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/hello");
+}
+
+// strip_query_params: true with encode_raw_headers.
+TEST_F(ExtAuthzHttpClientTest, StripQueryParamsTrueWithRawHeaders) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    strip_query_params: true
+  encode_raw_headers: true
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/foo?a=1&b=2"}}, SendRequestOpts{.encode_raw_headers = true});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/foo");
+}
+
+// strip_query_params: true with path_prefix strips query params before prepending the prefix.
+TEST_F(ExtAuthzHttpClientTest, StripQueryParamsWithPathPrefix) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_prefix: "/auth"
+    strip_query_params: true
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/hello?name=value"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/auth/hello");
+}
+
+// strip_query_params: true does not affect path_override.
+TEST_F(ExtAuthzHttpClientTest, StripQueryParamsWithPathOverride) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_override: "/auth"
+    strip_query_params: true
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/hello?name=value"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/auth");
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace Common
