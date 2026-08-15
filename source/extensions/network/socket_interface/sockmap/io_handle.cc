@@ -45,7 +45,7 @@ IoHandlePtr SockmapIoSocketHandle::duplicate() {
 
 SockmapIoSocketHandle::~SockmapIoSocketHandle() { removeRegistration(); }
 
-Api::IoCallUint64Result SockmapIoSocketHandle::close(bool send_rst = false) {
+Api::IoCallUint64Result SockmapIoSocketHandle::close(bool send_rst) {
   removeRegistration();
   return IoSocketHandleImpl::close(send_rst);
 }
