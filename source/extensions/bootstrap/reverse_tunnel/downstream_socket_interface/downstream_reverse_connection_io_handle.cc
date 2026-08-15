@@ -50,7 +50,7 @@ void DownstreamReverseConnectionIOHandle::onPingMessage() {
 }
 
 // DownstreamReverseConnectionIOHandle close() implementation.
-Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close() {
+Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close(bool /*send_rst*/) {
   ENVOY_LOG(
       debug,
       "DownstreamReverseConnectionIOHandle: closing handle for FD: {} with connection key: {}", fd_,

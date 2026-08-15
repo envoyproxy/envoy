@@ -60,7 +60,7 @@ public:
   /**
    * Clean up IoHandle resources
    */
-  virtual Api::IoCallUint64Result close() PURE;
+  virtual Api::IoCallUint64Result close(bool send_rst = false) PURE;
 
   /**
    * Return true if close() hasn't been called.

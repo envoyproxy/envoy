@@ -47,7 +47,7 @@ public:
     ASSERT(false, "not supported");
     return INVALID_SOCKET;
   }
-  Api::IoCallUint64Result close() override;
+  Api::IoCallUint64Result close(bool send_rst = false) override;
   bool isOpen() const override;
   bool wasConnected() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
@@ -109,6 +109,11 @@ public:
 
   // UserSpace::IoHandle
   void setEof() override {
+    receive_data_end_stream_ = true;
+    setNewDataAvailable();
+  }
+  void setReset() override {
+    receive_data_reset_ = true;
     receive_data_end_stream_ = true;
     setNewDataAvailable();
   }
@@ -175,6 +180,7 @@ private:
   // True if pending_received_data_ is not addable. Note that pending_received_data_ may have
   // pending data to drain.
   bool receive_data_end_stream_{false};
+  bool receive_data_reset_{false};
 
   // The buffer owned by this socket. This buffer is populated by the write operations of the peer
   // socket and drained by read operations of this socket.

@@ -131,7 +131,7 @@ public:
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
   MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const));
-  MOCK_METHOD(void, close, ());
+  MOCK_METHOD(void, close, (bool send_rst));
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion), (const));
   MOCK_METHOD(IoHandlePtr, socketForAddrPtr, (Socket::Type, const Address::InstanceConstSharedPtr),
@@ -402,7 +402,7 @@ public:
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
   MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const));
-  MOCK_METHOD(void, close, ());
+  MOCK_METHOD(void, close, (bool send_rst));
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD(void, addOptions_, (const Socket::OptionsSharedPtr& options));

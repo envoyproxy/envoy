@@ -30,7 +30,7 @@ public:
   MOCK_METHOD(Socket::Type, socketType, (), (const, override));
   MOCK_METHOD(Address::Type, addressType, (), (const, override));
   MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const, override));
-  MOCK_METHOD(void, close, (), (override));
+  MOCK_METHOD(void, close, (bool send_rst), (override));
   MOCK_METHOD(bool, isOpen, (), (const, override));
   MOCK_METHOD(const OptionsSharedPtr&, options, (), (const, override));
   MOCK_METHOD(Api::SysCallIntResult, bind, (const Address::InstanceConstSharedPtr), (override));

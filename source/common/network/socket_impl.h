@@ -145,9 +145,9 @@ public:
 
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
-  void close() override {
+  void close(bool send_rst = false) override {
     if (io_handle_ && io_handle_->isOpen()) {
-      io_handle_->close();
+      io_handle_->close(send_rst);
     }
   }
   bool isOpen() const override { return io_handle_ && io_handle_->isOpen(); }

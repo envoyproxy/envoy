@@ -19,7 +19,7 @@ public:
 
   // Network::IoHandle
   os_fd_t fdDoNotUse() const override { return io_handle_.fdDoNotUse(); }
-  Api::IoCallUint64Result close() override {
+  Api::IoCallUint64Result close(bool /*send_rst*/ = false) override {
     closed_ = true;
     return Api::ioCallUint64ResultNoError();
   }

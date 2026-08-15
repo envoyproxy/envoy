@@ -37,7 +37,7 @@ public:
   ~DownstreamReverseConnectionIOHandle() override;
 
   // Network::IoHandle overrides.
-  Api::IoCallUint64Result close() override;
+  Api::IoCallUint64Result close(bool send_rst = false) override;
   Api::SysCallIntResult shutdown(int how) override;
 
   // RPING Interceptor overrides.

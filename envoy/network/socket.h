@@ -448,7 +448,7 @@ public:
   /**
    * Close the underlying socket.
    */
-  virtual void close() PURE;
+  virtual void close(bool send_rst = false) PURE;
 
   /**
    * Return true if close() hasn't been called.

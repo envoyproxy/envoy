@@ -59,7 +59,20 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
   }
 }
 
-Api::IoCallUint64Result IoSocketHandleImpl::close() {
+Api::IoCallUint64Result IoSocketHandleImpl::close(bool send_rst) {
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
+  if (send_rst) {
+    struct linger l;
+    l.l_onoff = 1;
+    l.l_linger = 0;
+    auto res = setOption(SOL_SOCKET, SO_LINGER, &l, sizeof(l));
+    if (res.return_value_ < 0) {
+      ENVOY_LOG_EVERY_POW_2(error, "rst setting so_linger=0 failed on fd {}", fd_);
+    }
+  }
+#else
+  (void)send_rst;
+#endif
   if (file_event_) {
     file_event_.reset();
   }

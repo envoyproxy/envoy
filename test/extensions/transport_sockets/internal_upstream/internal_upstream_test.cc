@@ -29,6 +29,7 @@ class TestObject : public StreamInfo::FilterState::Object {};
 class MockUserSpaceIoHandle : public Network::MockIoHandle, public IoHandle {
 public:
   MOCK_METHOD(void, setEof, ());
+  MOCK_METHOD(void, setReset, ());
   MOCK_METHOD(bool, hasReceivedEof, (), (const));
   MOCK_METHOD(void, onPeerDestroy, ());
   MOCK_METHOD(void, setNewDataAvailable, ());

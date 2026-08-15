@@ -183,7 +183,7 @@ public:
    * Override of close method for reverse connections.
    * @return IoCallUint64Result indicating the result of the close operation.
    */
-  Api::IoCallUint64Result close() override;
+  Api::IoCallUint64Result close(bool send_rst = false) override;
 
   /**
    * Triggers the reverse connection workflow.

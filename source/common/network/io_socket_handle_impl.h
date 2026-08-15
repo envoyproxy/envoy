@@ -39,7 +39,7 @@ public:
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
 
-  Api::IoCallUint64Result close() override;
+  Api::IoCallUint64Result close(bool send_rst = false) override;
 
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
