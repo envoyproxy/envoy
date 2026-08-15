@@ -231,7 +231,7 @@ TEST_F(PostgresInspectorTest, MessageTooLarge) {
 
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
-  ON_CALL(io_handle, close()).WillByDefault(Invoke([]() -> Api::IoCallUint64Result {
+  ON_CALL(io_handle, close(_)).WillByDefault(Invoke([]() -> Api::IoCallUint64Result {
     return {0, Api::IoError::none()};
   }));
 
