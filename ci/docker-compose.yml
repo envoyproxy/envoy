@@ -61,6 +61,7 @@ x-envoy-build-base: &envoy-build-base
   - ENVOY_REPO
   - ENVOY_BUILD_ARCH
   - ENVOY_GEN_COMPDB_OPTIONS
+  - SKIP_REMOTE_DETECTION
 
   # Publishing and artifacts
   - ENVOY_DOCKER_SAVE_IMAGE
