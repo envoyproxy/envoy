@@ -203,7 +203,9 @@ TEST_F(DatadogTracerTest, SpanKindIngress) {
   const datadog::tracing::Span& dd_span = *maybe_dd_span;
 
   // Ingress traffic must produce span.kind=server.
-  EXPECT_EQ("server", dd_span.lookup_tag("span.kind")->get());
+  auto tag = dd_span.lookup_tag("span.kind");
+  ASSERT_TRUE(tag);
+  EXPECT_EQ("server", *tag);
 }
 
 TEST_F(DatadogTracerTest, SpanKindEgress) {
@@ -242,7 +244,9 @@ TEST_F(DatadogTracerTest, SpanKindEgress) {
   const datadog::tracing::Span& dd_span = *maybe_dd_span;
 
   // Egress traffic must produce span.kind=client.
-  EXPECT_EQ("client", dd_span.lookup_tag("span.kind")->get());
+  auto tag = dd_span.lookup_tag("span.kind");
+  ASSERT_TRUE(tag);
+  EXPECT_EQ("client", *tag);
 }
 
 TEST_F(DatadogTracerTest, ExtractionSuccess) {
