@@ -4,8 +4,8 @@ Specifically, tests that:
 1. TCP connections opened before hot restart begins continue to function during drain.
 2. TCP connections opened after hot restart begins while the old instance is still running
    go to the new instance.
-3. UDP flows established before hot restart keep being served by the old instance during
-   drain, while new UDP flows are forwarded to the new instance.
+3. UDP sessions established before hot restart keep being served by the old instance during
+   drain, while new UDP sessions are forwarded to the new instance.
 TODO(ravenblack): perform the same tests for QUIC connections once they will work as expected.
 """
 
@@ -339,7 +339,7 @@ class UdpUpstream(asyncio.DatagramProtocol):
         self.transport.sendto(data + self.tag, addr)
 
 
-class UdpFlow(asyncio.DatagramProtocol):
+class UdpSession(asyncio.DatagramProtocol):
 
     @classmethod
     async def open(cls) -> Self:
@@ -505,9 +505,9 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         log.info("waiting for responses to begin")
         for response in slow_responses:
             self.assertEqual(await response.line(), b"start\n")
-        log.info("establishing udp flow")
-        udp_flow_a = await UdpFlow.open()
-        response = await udp_flow_a.request(b"hello")
+        log.info("establishing udp session")
+        udp_session_a = await UdpSession.open()
+        response = await udp_session_a.request(b"hello")
         self.assertTrue(response.endswith(b" via-slow"), response)
         base_id = int(self.base_id_path.read_text())
         log.info(f"starting envoy hot restart for base id {base_id}")
@@ -534,13 +534,13 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
                 "new requests after hot restart begins should go to new cluster",
             )
 
-        # UDP flows established before hot restart stay on the old instance during drain,
-        # while new flows are forwarded to the new instance.
-        log.info("checking udp flows during drain")
-        udp_flow_b = await UdpFlow.open()
-        response = await udp_flow_a.request(b"hello")
+        # UDP sessions established before hot restart stay on the old instance during drain,
+        # while new sessions are forwarded to the new instance.
+        log.info("checking udp sessions during drain")
+        udp_session_b = await UdpSession.open()
+        response = await udp_session_a.request(b"hello")
         self.assertTrue(response.endswith(b" via-slow"), response)
-        response = await udp_flow_b.request(b"hello")
+        response = await udp_session_b.request(b"hello")
         self.assertTrue(response.endswith(b" via-fast"), response)
 
         # Now wait for the slow request to complete, and make sure it still gets the
@@ -568,13 +568,13 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
                 "fast instance",
                 "new requests after old instance terminates should go to new cluster",
             )
-        # The new udp flow is uninterrupted, the old flow re-establishes on the new instance
-        response = await udp_flow_b.request(b"hello")
+        # The new udp session is uninterrupted, the old session re-establishes on the new instance
+        response = await udp_session_b.request(b"hello")
         self.assertTrue(response.endswith(b" via-fast"), response)
-        response = await udp_flow_a.request(b"hello")
+        response = await udp_session_a.request(b"hello")
         self.assertTrue(response.endswith(b" via-fast"), response)
-        udp_flow_a.close()
-        udp_flow_b.close()
+        udp_session_a.close()
+        udp_session_b.close()
         log.info("shutting child instance down")
         envoy_process_2.terminate()
         await envoy_process_2.wait()
