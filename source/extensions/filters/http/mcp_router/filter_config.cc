@@ -3,9 +3,6 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/common/exception.h"
-
-#include "source/common/config/datasource.h"
 #include "source/extensions/filters/common/mcp/filter_state.h"
 
 #include "absl/strings/str_cat.h"
@@ -79,25 +76,14 @@ template <typename Config> std::vector<McpBackendConfig> parseBackends(const Con
 McpRouterConfigImpl::McpRouterConfigImpl(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope,
-    Server::Configuration::ServerFactoryContext& context)
+    Server::Configuration::ServerFactoryContext& context, std::string session_signing_key)
     : backends_(parseBackends(proto_config)),
       default_backend_name_(backends_.size() == 1 ? backends_[0].name : ""),
       factory_context_(context), lazy_initialization_(proto_config.lazy_initialization()),
       session_identity_(parseSessionIdentity(proto_config)),
       metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
-      stats_(generateStats(stats_prefix, scope)) {
-  if (proto_config.has_session_signing_key()) {
-    // An explicitly configured but unreadable or empty key is a config error: silently ignoring
-    // it would leave sessions unsigned while the operator believes tampering is rejected.
-    auto key_or_error =
-        Config::DataSource::read(proto_config.session_signing_key(), false, context.api());
-    if (!key_or_error.ok()) {
-      throw EnvoyException(absl::StrCat("mcp_router: failed to read session_signing_key: ",
-                                        key_or_error.status().message()));
-    }
-    session_signing_key_ = std::move(key_or_error.value());
-  }
-}
+      session_signing_key_(std::move(session_signing_key)),
+      stats_(generateStats(stats_prefix, scope)) {}
 
 const McpBackendConfig* McpRouterConfigImpl::findBackend(const std::string& name) const {
   for (const auto& backend : backends_) {

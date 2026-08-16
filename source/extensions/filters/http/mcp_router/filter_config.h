@@ -110,7 +110,8 @@ public:
   McpRouterConfigImpl(
       const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
       const std::string& stats_prefix, Stats::Scope& scope,
-      Server::Configuration::ServerFactoryContext& context);
+      Server::Configuration::ServerFactoryContext& context,
+      std::string session_signing_key = {});
 
   const std::vector<McpBackendConfig>& backends() const override { return backends_; }
   bool isMultiplexing() const override { return backends_.size() > 1; }

@@ -122,10 +122,9 @@ TEST(SessionCodecTest, IntegrityRejectsForgedSubject) {
   const size_t sep = token.rfind('.');
   ASSERT_NE(sep, std::string::npos);
   const std::string stale_mac = token.substr(sep + 1);
-  const std::string forged =
-      SessionCodec::encode(SessionCodec::buildCompositeSessionId("route1", "bob",
-                                                                 {{"backend1", "s1"}})) +
-      "." + stale_mac;
+  const std::string forged = SessionCodec::encode(SessionCodec::buildCompositeSessionId(
+                                 "route1", "bob", {{"backend1", "s1"}})) +
+                             "." + stale_mac;
 
   EXPECT_EQ("", SessionCodec::decodeWithIntegrity(forged, key));
 }

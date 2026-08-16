@@ -382,9 +382,9 @@ std::string McpRouterFilter::encodeCompositeSession(const std::string& composite
 
 bool McpRouterFilter::decodeAndParseSession() {
   const std::string& key = config_->sessionSigningKey();
-  const std::string decoded =
-      key.empty() ? SessionCodec::decode(encoded_session_id_)
-                  : SessionCodec::decodeWithIntegrity(encoded_session_id_, key);
+  const std::string decoded = key.empty()
+                                  ? SessionCodec::decode(encoded_session_id_)
+                                  : SessionCodec::decodeWithIntegrity(encoded_session_id_, key);
   if (decoded.empty()) {
     ENVOY_LOG(warn, "Failed to decode session ID");
     config_->stats().rq_session_invalid_.inc();

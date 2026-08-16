@@ -430,7 +430,7 @@ TEST_F(McpRouterConfigTest, SessionSigningKeyInline) {
   proto_config.mutable_session_signing_key()->set_inline_string("test-key");
 
   McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
-                             factory_context_.server_factory_context_);
+                             factory_context_.server_factory_context_, "test-key");
   EXPECT_EQ(config.sessionSigningKey(), "test-key");
 }
 

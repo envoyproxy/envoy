@@ -2292,7 +2292,7 @@ public:
   }
 
   // Builds a session ID exactly the way the filter mints it: the subject is Base64 encoded inside
-  // the composite, the composite is Base64 encoded, and the blob is MACed with the configured
+  // the composite, the composite is Base64 encoded, and the blob is HMAC-signed with the configured
   // signing key. (The previous version of this helper inserted the subject raw, so the parsed
   // subject decoded to the empty string and the ENFORCE accept path was never exercised.)
   std::string encodeSessionId(const std::string& route, const std::string& subject,
@@ -2401,8 +2401,8 @@ TEST_P(McpRouterSubjectValidationIntegrationTest, ForgedSessionSubjectRejected) 
   // The attacker rebinds the subject to "bob" and must reuse the MAC, which they cannot
   // recompute without the key.
   const std::string stale_mac = valid.substr(valid.rfind('.') + 1);
-  const std::string forged_composite = SessionCodec::buildCompositeSessionId(
-      "test_route", "bob", {{"time", "backend-session-123"}});
+  const std::string forged_composite =
+      SessionCodec::buildCompositeSessionId("test_route", "bob", {{"time", "backend-session-123"}});
   const std::string forged = SessionCodec::encode(forged_composite) + "." + stale_mac;
 
   const std::string request_body = R"({"jsonrpc":"2.0","method":"tools/list","id":1})";
