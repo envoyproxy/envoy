@@ -65,7 +65,6 @@ public:
   GlobalRateLimitClientImpl(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                             Server::Configuration::FactoryContext& context,
                             absl::string_view domain_name,
-                            std::chrono::milliseconds send_reports_interval,
                             ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
                             Envoy::Event::Dispatcher& main_dispatcher,
                             absl::Status& creation_status);
@@ -89,7 +88,9 @@ public:
   // threads and make unsafe changes by ensuring that all such changes are done
   // by the main thread. Pointer swaps to TLS make the resources readable to
   // worker threads' LocalRateLimitClientImpl instances.
-  void createBucket(const BucketId& bucket_id, size_t id, const BucketAction& default_bucket_action,
+  void createBucket(const BucketId& bucket_id, size_t id,
+                    std::chrono::milliseconds reporting_interval,
+                    const BucketAction& default_bucket_action,
                     std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                     std::chrono::milliseconds fallback_ttl, bool initial_request_allowed);
 
@@ -120,6 +121,7 @@ private:
   // Helpers to execute in the main thread, triggered by public interfaces or by
   // internal flows.
   void createBucketImpl(const BucketId& bucket_id, size_t id,
+                        std::chrono::milliseconds reporting_interval,
                         const BucketAction& default_bucket_action,
                         std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                         std::chrono::milliseconds fallback_ttl, bool initial_request_allowed);
@@ -130,6 +132,7 @@ private:
   // on the stream. If the stream isn't active (e.g. if aborted by the server),
   // it should be restarted.
   void startSendReportsTimerImpl();
+  void scheduleNextReportTimer();
   void onSendReportsTimer();
 
   // Optional callbacks to run after queued operations finish on the main
@@ -175,7 +178,6 @@ private:
   // source-of-truth should be CachedBucket pointer swaps.
   BucketsCache buckets_cache_;
 
-  std::chrono::milliseconds send_reports_interval_;
   TimeSource& time_source_;
   Envoy::Event::Dispatcher& main_dispatcher_;
 
@@ -192,14 +194,12 @@ private:
 inline absl::StatusOr<std::unique_ptr<GlobalRateLimitClientImpl>>
 createGlobalRateLimitClientImpl(Server::Configuration::FactoryContext& context,
                                 absl::string_view domain_name,
-                                std::chrono::milliseconds send_reports_interval,
                                 ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
                                 const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key) {
   Envoy::Event::Dispatcher& main_dispatcher = context.serverFactoryContext().mainThreadDispatcher();
   absl::Status creation_status = absl::OkStatus();
   auto client = std::make_unique<GlobalRateLimitClientImpl>(
-      config_with_hash_key, context, domain_name, send_reports_interval, buckets_tls,
-      main_dispatcher, creation_status);
+      config_with_hash_key, context, domain_name, buckets_tls, main_dispatcher, creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
   return client;
 }

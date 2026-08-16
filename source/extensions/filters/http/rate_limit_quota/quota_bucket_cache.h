@@ -48,13 +48,15 @@ struct QuotaUsage {
 // cache are in separate pointers to enable separate pointer-swapping.
 struct CachedBucket {
   CachedBucket(const BucketId& bucket_id, std::shared_ptr<QuotaUsage> quota_usage,
+               std::chrono::milliseconds reporting_interval,
                std::unique_ptr<BucketAction> cached_action,
                std::shared_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                std::chrono::milliseconds fallback_ttl, const BucketAction& default_action,
                std::shared_ptr<AtomicTokenBucketImpl> token_bucket_limiter)
-      : bucket_id(bucket_id), quota_usage(quota_usage), cached_action(std::move(cached_action)),
-        fallback_action(fallback_action), fallback_ttl(fallback_ttl),
-        default_action(default_action), token_bucket_limiter(token_bucket_limiter) {}
+      : bucket_id(bucket_id), quota_usage(quota_usage), reporting_interval(reporting_interval),
+        cached_action(std::move(cached_action)), fallback_action(fallback_action),
+        fallback_ttl(fallback_ttl), default_action(default_action),
+        token_bucket_limiter(token_bucket_limiter) {}
 
   // BucketId object that is associated with this bucket. It is part of the
   // report that is sent to RLQS server.
@@ -62,6 +64,9 @@ struct CachedBucket {
 
   // Aggregated usage of the ID'd bucket for the next report cycle.
   std::shared_ptr<QuotaUsage> quota_usage;
+
+  // The interval between usage reports for this bucket.
+  std::chrono::milliseconds reporting_interval;
 
   // Cached action from the RLQS server's last response that gave an updated
   // assignment for this ID'd bucket. Can be null if no assignment has been
@@ -103,6 +108,7 @@ public:
 
   // Safe creation & getting of global buckets.
   virtual void createBucket(const BucketId& bucket_id, size_t id,
+                            std::chrono::milliseconds reporting_interval,
                             const BucketAction& default_bucket_action,
                             std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                             std::chrono::milliseconds fallback_ttl,

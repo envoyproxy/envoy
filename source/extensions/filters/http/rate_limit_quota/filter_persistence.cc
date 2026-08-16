@@ -39,15 +39,10 @@ initTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
         return tl_buckets_cache;
       });
 
-  // TODO(bsurber): Implement report timing & usage aggregation based on each
-  // bucket's reporting_interval field. Currently this is not supported and all
-  // usage is reported on a hardcoded interval.
-  std::chrono::milliseconds reporting_interval(5000);
-
   // Create the global client resource to be shared via TLS to all worker
   // threads (accessed through a filter-specific LocalRateLimitClient).
   auto tl_global_client_or = createGlobalRateLimitClientImpl(
-      context, domain, reporting_interval, tls_store->buckets_tls, config_with_hash_key);
+      context, domain, tls_store->buckets_tls, config_with_hash_key);
   RETURN_IF_NOT_OK_REF(tl_global_client_or.status());
   tls_store->global_client = std::move(tl_global_client_or.value());
 

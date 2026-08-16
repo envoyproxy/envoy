@@ -455,7 +455,7 @@ TEST_F(FilterTest, DecodeHeaderWithValidOnNoMatchDenyWithSettings) {
   // matcher's `no_assignment_behavior` & `deny_response_settings`.
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(nullptr));
   EXPECT_CALL(*mock_local_client_, createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id),
-                                                bucket_id_hash, ProtoEq(no_assignment_action), _,
+                                                bucket_id_hash, _, ProtoEq(no_assignment_action), _,
                                                 std::chrono::milliseconds::zero(), false))
       .WillOnce(Return());
 
@@ -493,7 +493,7 @@ TEST_F(FilterTest, DecodeHeadersWithoutCachedAssignment) {
   // no-assignment-default action as neither is set in the BucketMatcher.
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(nullptr));
   EXPECT_CALL(*mock_local_client_,
-              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id), bucket_id_hash,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id), bucket_id_hash, _,
                            ProtoEq(expected_action), testing::IsNull(),
                            std::chrono::milliseconds::zero(), true))
       .WillOnce(Return());
@@ -529,8 +529,8 @@ TEST_F(FilterTest, DecodeHeaderWithCachedAllow) {
 
   std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
       bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
-      std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
-      nullptr);
+      std::chrono::seconds(5), std::move(cached_action), nullptr, std::chrono::milliseconds::zero(),
+      no_assignment_action, nullptr);
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
 
@@ -567,8 +567,8 @@ TEST_F(FilterTest, DecodeHeaderWithCachedDeny) {
 
   std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
       bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
-      std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
-      nullptr);
+      std::chrono::seconds(5), std::move(cached_action), nullptr, std::chrono::milliseconds::zero(),
+      no_assignment_action, nullptr);
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
 
@@ -613,8 +613,8 @@ TEST_F(FilterTest, DecodeHeaderWithTokenBucketAllow) {
 
   std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
       bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
-      std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
-      token_bucket_limiter);
+      std::chrono::seconds(5), std::move(cached_action), nullptr, std::chrono::milliseconds::zero(),
+      no_assignment_action, token_bucket_limiter);
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
 
@@ -660,8 +660,8 @@ TEST_F(FilterTest, DecodeHeaderWithTokenBucketDeny) {
 
   std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
       bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
-      std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
-      token_bucket_limiter);
+      std::chrono::seconds(5), std::move(cached_action), nullptr, std::chrono::milliseconds::zero(),
+      no_assignment_action, token_bucket_limiter);
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
 
@@ -713,11 +713,11 @@ TEST_F(FilterTest, DecodeHeaderWithPreviewBucket) {
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(nullptr));
   EXPECT_CALL(*mock_local_client_,
               createBucket(ProtoEqIgnoreRepeatedFieldOrdering(preview_bucket_id),
-                           preview_bucket_id_hash, ProtoEq(preview_expected_action),
+                           preview_bucket_id_hash, _, ProtoEq(preview_expected_action),
                            testing::IsNull(), std::chrono::milliseconds::zero(), true))
       .WillOnce(Return());
   EXPECT_CALL(*mock_local_client_,
-              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id), bucket_id_hash,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id), bucket_id_hash, _,
                            ProtoEq(expected_action), testing::IsNull(),
                            std::chrono::milliseconds::zero(), false))
       .WillOnce(Return());
@@ -781,13 +781,14 @@ TEST_F(FilterTest, DecodeHeaderWithPreviewTokenBucket) {
 
   std::shared_ptr<CachedBucket> cached_preview_bucket = std::make_shared<CachedBucket>(
       preview_bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
-      std::move(cached_preview_action), nullptr, std::chrono::milliseconds::zero(),
-      no_assignment_action, token_bucket_limiter);
+      std::chrono::seconds(5), std::move(cached_preview_action), nullptr,
+      std::chrono::milliseconds::zero(), no_assignment_action, token_bucket_limiter);
   // The actionable bucket has an allow-all no_assignment_action and no cached
   // assignment, so the traffic should be allowed regardless of the previewed TokenBucket.
   std::shared_ptr<CachedBucket> cached_allow_all_bucket = std::make_shared<CachedBucket>(
-      bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)), nullptr, nullptr,
-      std::chrono::milliseconds::zero(), no_assignment_action, nullptr);
+      bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
+      std::chrono::seconds(5), nullptr, nullptr, std::chrono::milliseconds::zero(),
+      no_assignment_action, nullptr);
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash))
       .WillOnce(Return(cached_allow_all_bucket));
@@ -839,8 +840,8 @@ TEST_F(FilterTest, UnsupportedRequestsPerTimeUnit) {
 
   std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
       bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
-      std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
-      nullptr);
+      std::chrono::seconds(5), std::move(cached_action), nullptr, std::chrono::milliseconds::zero(),
+      no_assignment_action, nullptr);
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
 
@@ -882,8 +883,8 @@ TEST_F(FilterTest, CachedBucketMissingStrategy) {
 
   std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
       bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
-      std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
-      nullptr);
+      std::chrono::seconds(5), std::move(cached_action), nullptr, std::chrono::milliseconds::zero(),
+      no_assignment_action, nullptr);
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
 
@@ -1011,8 +1012,8 @@ bucket_matchers:
 
   std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
       bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
-      std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
-      nullptr);
+      std::chrono::seconds(5), std::move(cached_action), nullptr, std::chrono::milliseconds::zero(),
+      no_assignment_action, nullptr);
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
 
@@ -1057,8 +1058,8 @@ TEST_F(FilterTest, DenyResponseDefaultBehavior) {
 
   std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
       bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
-      std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
-      nullptr);
+      std::chrono::seconds(5), std::move(cached_action), nullptr, std::chrono::milliseconds::zero(),
+      no_assignment_action, nullptr);
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
 
@@ -1186,8 +1187,8 @@ matcher_list:
 
   std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
       bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
-      std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
-      nullptr);
+      std::chrono::seconds(5), std::move(cached_action), nullptr, std::chrono::milliseconds::zero(),
+      no_assignment_action, nullptr);
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
 

@@ -43,7 +43,8 @@ public:
   ~MockRateLimitClient() override = default;
 
   MOCK_METHOD(void, createBucket,
-              (const BucketId& bucket_id, size_t id, const BucketAction& default_bucket_action,
+              (const BucketId& bucket_id, size_t id, std::chrono::milliseconds reporting_interval,
+               const BucketAction& default_bucket_action,
                std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                std::chrono::milliseconds fallback_ttl, bool initial_request_allowed),
               (override));
@@ -147,14 +148,7 @@ public:
       EXPECT_CALL(*timer_ptr, enableTimer(_, _))
           .WillOnce([&, report_interval, expiration_interval, expiration_count, fallback_interval,
                      fallback_count, timer_ptr](std::chrono::milliseconds period, Unused) {
-            if (period == report_interval) {
-              // Only one reporting timer should be created.
-              timer_ = timer_ptr;
-              // Repeated enable calls to the reporting timer are expected with
-              // each reporting cycle.
-              EXPECT_CALL(*timer_ptr, enableTimer(report_interval, _))
-                  .WillRepeatedly([&](Unused, Unused) { timer_->enabled_ = true; });
-            } else if (period == expiration_interval && expiration_count > 0) {
+            if (period == expiration_interval && expiration_count > 0) {
               // Count expiration timers as they're enabled for the sake of test
               // verification.
               expiration_timers_.insert(timer_ptr);
@@ -163,7 +157,14 @@ public:
               // verification.
               fallback_timers_.insert(timer_ptr);
             } else {
-              return;
+              // Only one reporting timer should be created.
+              EXPECT_EQ(period, report_interval);
+              timer_ = timer_ptr;
+              // Repeated enable calls to the reporting timer are expected with
+              // each reporting cycle, which may use a different bucket interval.
+              EXPECT_CALL(*timer_ptr, enableTimer(_, _)).WillRepeatedly([&](Unused, Unused) {
+                timer_->enabled_ = true;
+              });
             }
             timer_ptr->enabled_ = true;
           })
