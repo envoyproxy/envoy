@@ -314,7 +314,7 @@ public:
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+  virtual Gauge& gaugeFromMergedStatName(StatName tagged_name, StatName base_name,
                                          std::optional<StatNameTagSpan> tags,
                                          Gauge::ImportMode import_mode) PURE;
 
