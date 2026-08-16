@@ -537,8 +537,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "89d6d17edc0f0b79f38edf6fac9e5c8bf5f3cfd7",
-        sha256 = "d994da485d3e1821bcf20a0da5f38ee3d28bd8c0f00389a59adb7ce1196dbce7",
+        version = "90a1e2218164586d4dc711bb9639a313d95de9df",
+        sha256 = "42336ae13c29d687ad9458e230bc56cc7e36f5ffc02ee78541929e6e165c8c90",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),

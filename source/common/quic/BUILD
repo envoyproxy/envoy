@@ -317,6 +317,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:session_idle_list_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@quiche//:quic_server_http_spdy_session_lib",
     ]) + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",

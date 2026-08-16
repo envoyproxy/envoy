@@ -685,12 +685,18 @@ config_setting(
 
 config_setting(
     name = "darwin_x86_64",
-    values = {"cpu": "darwin_x86_64"},
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
     name = "darwin_arm64",
-    values = {"cpu": "darwin_arm64"},
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
