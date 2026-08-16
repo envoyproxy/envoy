@@ -338,7 +338,7 @@ public:
                                                tagged_name, symbolTable());
     return store_.counters_.get(joiner, matcher).value_or(store_.null_counter_);
   }
-  Counter& counterFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+  Counter& counterFromMergedStatName(StatName tagged_name, StatName base_name,
                                      std::optional<StatNameTagSpan> tags) override;
   Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                              StatName tagged_name, Gauge::ImportMode import_mode) override {
