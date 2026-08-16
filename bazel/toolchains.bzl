@@ -1,7 +1,6 @@
 load("@com_google_protobuf//bazel/private/oss/toolchains/prebuilt:protoc_toolchain.bzl", "prebuilt_protoc_repo")
 load("@com_google_protobuf//toolchain:platforms.bzl", "PROTOBUF_PLATFORMS")
 load("@envoy_repo//:compiler.bzl", "LLVM_LIB_DIR", "LLVM_PATH", "LLVM_VERSION_LOCAL", "USE_LIBSTDCPP", "USE_LOCAL_SYSROOT")
-load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
 load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
 _LLVM_VERSION_HERMETIC = "22.1.8"
@@ -46,12 +45,15 @@ filegroup(
 
 def envoy_toolchains():
     native.register_toolchains("@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-toolchain")
-    arch_alias(
+    native.alias(
         name = "clang_platform",
-        aliases = {
-            "amd64": "@envoy//bazel/platforms/rbe:linux_x64",
-            "aarch64": "@envoy//bazel/platforms/rbe:linux_arm64",
-        },
+        actual = select({
+            "@envoy//bazel:darwin_arm64": "@envoy//bazel/platforms:macos_arm64",
+            "@envoy//bazel:darwin_x86_64": "@envoy//bazel/platforms:macos_x86_64",
+            "@envoy//bazel:linux_aarch64": "@envoy//bazel/platforms/rbe:linux_arm64",
+            "@envoy//bazel:linux_x86_64": "@envoy//bazel/platforms/rbe:linux_x64",
+            "//conditions:default": "@envoy//bazel/platforms/rbe:linux_x64",
+        }),
     )
 
     if LLVM_PATH and "llvm_toolchain_llvm" not in native.existing_rules():
