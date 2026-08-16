@@ -330,9 +330,9 @@ private:
     // tag-extracted name and tags even on the legacy scope: hot restart stat merging supplies
     // fully-resolved components recovered from the parent process, so no prefix/tag composition
     // or re-derivation from the name is needed (or wanted).
-    Counter& counterFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+    Counter& counterFromMergedStatName(StatName tagged_name, StatName base_name,
                                        std::optional<StatNameTagSpan> tags) override;
-    Gauge& gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+    Gauge& gaugeFromMergedStatName(StatName tagged_name, StatName base_name,
                                    std::optional<StatNameTagSpan> tags,
                                    Gauge::ImportMode import_mode) override;
     ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name,

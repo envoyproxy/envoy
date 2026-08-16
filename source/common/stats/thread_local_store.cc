@@ -709,11 +709,12 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromTaggedName(
   return getOrCreateCounterBase(joiner);
 }
 
-Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromMergedStatName(
-    StatName full_name, StatName tag_extracted_name, std::optional<StatNameTagSpan> tags) {
+Counter&
+ThreadLocalStoreImpl::ScopeImpl::counterFromMergedStatName(StatName tagged_name, StatName base_name,
+                                                           std::optional<StatNameTagSpan> tags) {
   if (!tags.has_value() || tags->empty()) {
     // Without tags the full name is the only meaningful component; derive tags from it as usual.
-    return counterFromTaggedName(full_name, std::nullopt, StatName());
+    return counterFromTaggedName(tagged_name, std::nullopt, StatName());
   }
   if (scopeRejectsAll()) {
     return parent_.null_counter_;
@@ -723,8 +724,8 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromMergedStatName(
   // counterFromTaggedName, honor them as-is (via the tag-aware joiner; the merge scope has an
   // empty prefix) rather than re-deriving tags from the flat name, which would drop the
   // programmatic tags and poison the central-cache slot for the child's own tagged creation.
-  const TagUtility::TagStatNameJoiner joiner(prefix_, {}, prefix_, tag_extracted_name, *tags,
-                                             full_name, symbolTable());
+  const TagUtility::TagStatNameJoiner joiner(prefix_, {}, prefix_, base_name, *tags, tagged_name,
+                                             symbolTable());
   return getOrCreateCounterBase(joiner);
 }
 
@@ -802,13 +803,13 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromTaggedName(
   return getOrCreateGaugeBase(joiner, import_mode);
 }
 
-Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromMergedStatName(StatName full_name,
-                                                                StatName tag_extracted_name,
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromMergedStatName(StatName tagged_name,
+                                                                StatName base_name,
                                                                 std::optional<StatNameTagSpan> tags,
                                                                 Gauge::ImportMode import_mode) {
   if (!tags.has_value() || tags->empty()) {
     // Without tags the full name is the only meaningful component; derive tags from it as usual.
-    return gaugeFromTaggedName(full_name, std::nullopt, StatName(), import_mode);
+    return gaugeFromTaggedName(tagged_name, std::nullopt, StatName(), import_mode);
   }
   // If a gauge is "hidden" it should not be rejected as these are used for deferred stats.
   if (scopeRejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
@@ -816,8 +817,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromMergedStatName(StatName full_na
   }
   // See counterFromMergedStatName: honor the fully-resolved components recovered from the hot
   // restart parent instead of re-deriving tags from the flat name.
-  const TagUtility::TagStatNameJoiner joiner(prefix_, {}, prefix_, tag_extracted_name, *tags,
-                                             full_name, symbolTable());
+  const TagUtility::TagStatNameJoiner joiner(prefix_, {}, prefix_, base_name, *tags, tagged_name,
+                                             symbolTable());
   return getOrCreateGaugeBase(joiner, import_mode);
 }
 

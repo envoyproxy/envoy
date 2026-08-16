@@ -23,7 +23,7 @@ namespace {
 // default tag regexes), so re-transmitting those would only bloat the transfer. Tags supplied
 // programmatically at creation (whose values are embedded in the flat name) are the ones that
 // need the metadata.
-void recordTags(Protobuf::Map<std::string, HotRestartMessage::Reply::Stats::TaggedMetric>* tag_map,
+void recordTags(Protobuf::Map<std::string, HotRestartMessage::Reply::Stats::MetricTags>* tag_map,
                 const std::string& name, const Stats::Metric& metric) {
   if (!metric.noTagExtraction()) {
     return;
@@ -32,8 +32,8 @@ void recordTags(Protobuf::Map<std::string, HotRestartMessage::Reply::Stats::Tagg
   if (tags.empty()) {
     return;
   }
-  HotRestartMessage::Reply::Stats::TaggedMetric& tagged = (*tag_map)[name];
-  tagged.set_tag_extracted_name(metric.tagExtractedName());
+  HotRestartMessage::Reply::Stats::MetricTags& tagged = (*tag_map)[name];
+  tagged.set_base_name(metric.tagExtractedName());
   tagged.mutable_tags()->Reserve(tags.size());
   for (const Stats::Tag& tag : tags) {
     HotRestartMessage::Reply::Stats::Tag* tag_proto = tagged.add_tags();

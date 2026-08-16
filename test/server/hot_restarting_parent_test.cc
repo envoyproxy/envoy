@@ -457,14 +457,14 @@ TEST_F(HotRestartingParentTest, ExportsTagMetadataOnlyForProgrammaticTags) {
 
   auto counter_iter = stats.counter_tags().find(programmatic_counter.name());
   ASSERT_NE(stats.counter_tags().end(), counter_iter);
-  EXPECT_EQ("custom.requests_total", counter_iter->second.tag_extracted_name());
+  EXPECT_EQ("custom.requests_total", counter_iter->second.base_name());
   ASSERT_EQ(1, counter_iter->second.tags_size());
   EXPECT_EQ("source", counter_iter->second.tags(0).name());
   EXPECT_EQ("svc-a", counter_iter->second.tags(0).value());
 
   auto gauge_iter = stats.gauge_tags().find(programmatic_gauge.name());
   ASSERT_NE(stats.gauge_tags().end(), gauge_iter);
-  EXPECT_EQ("custom.active_connections", gauge_iter->second.tag_extracted_name());
+  EXPECT_EQ("custom.active_connections", gauge_iter->second.base_name());
   ASSERT_EQ(1, gauge_iter->second.tags_size());
 }
 

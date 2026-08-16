@@ -133,26 +133,25 @@ ScopeSharedPtr IsolatedStoreImpl::makeScope(StatName name, StatsMatcherSharedPtr
   return std::make_shared<IsolatedScopeImpl>(name, *this, std::move(matcher));
 }
 
-Counter& IsolatedScopeImpl::counterFromMergedStatName(StatName full_name,
-                                                      StatName tag_extracted_name,
+Counter& IsolatedScopeImpl::counterFromMergedStatName(StatName tagged_name, StatName base_name,
                                                       std::optional<StatNameTagSpan> tags) {
   if (!tags.has_value() || tags->empty()) {
     // Without tags the flat name is the only meaningful component; tags may be re-derived from
     // it by extraction as usual.
-    return counterFromTaggedName(full_name, std::nullopt, StatName());
+    return counterFromTaggedName(tagged_name, std::nullopt, StatName());
   }
-  return counterFromTaggedName(tag_extracted_name, tags, full_name);
+  return counterFromTaggedName(base_name, tags, tagged_name);
 }
 
-Gauge& IsolatedScopeImpl::gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+Gauge& IsolatedScopeImpl::gaugeFromMergedStatName(StatName tagged_name, StatName base_name,
                                                   std::optional<StatNameTagSpan> tags,
                                                   Gauge::ImportMode import_mode) {
   if (!tags.has_value() || tags->empty()) {
     // Without tags the flat name is the only meaningful component; tags may be re-derived from
     // it by extraction as usual.
-    return gaugeFromTaggedName(full_name, std::nullopt, StatName(), import_mode);
+    return gaugeFromTaggedName(tagged_name, std::nullopt, StatName(), import_mode);
   }
-  return gaugeFromTaggedName(tag_extracted_name, tags, full_name, import_mode);
+  return gaugeFromTaggedName(base_name, tags, tagged_name, import_mode);
 }
 
 } // namespace Stats

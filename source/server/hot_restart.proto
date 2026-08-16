@@ -100,8 +100,8 @@ message HotRestartMessage {
       // qualified stat name used in counter_deltas / gauges. Entries are absent for stats whose
       // tags (if any) are recoverable from the name via stats_tags regexes, so the maps stay
       // empty for deployments that don't use programmatic tags.
-      map<string, TaggedMetric> counter_tags = 6;
-      map<string, TaggedMetric> gauge_tags = 7;
+      map<string, MetricTags> counter_tags = 6;
+      map<string, MetricTags> gauge_tags = 7;
     }
     oneof reply {
       // When this oneof is of the PassListenSocketReply type, there is a special

@@ -262,11 +262,11 @@ public:
    * instead honor the components, which arrive fully resolved.
    *
    * This assumes the parent and child processes use the same scope implementation across the hot
-   * restart: full_name is taken verbatim as the child's cache key rather than being re-derived,
+   * restart: tagged_name is taken verbatim as the child's cache key rather than being re-derived,
    * so a mismatch in how the two processes compose flat names is not supported.
-   * @param full_name the complete flat stat name (with tag values) recovered from the parent,
+   * @param tagged_name the complete flat stat name (with tag values) recovered from the parent,
    *                  matching what the child independently creates for the same stat.
-   * @param tag_extracted_name the stat name with tag values removed.
+   * @param base_name the stat name with tag values removed.
    * @param tags the tag name/value pairs.
    * @return a counter within the scope's namespace.
    */
@@ -308,8 +308,8 @@ public:
    * together with the tag-extracted name and tags captured from the parent process, WITHOUT
    * re-deriving tags from the name. See counterFromMergedStatName for the rationale and the
    * implementation contract.
-   * @param full_name the complete flat stat name (with tag values) recovered from the parent.
-   * @param tag_extracted_name the stat name with tag values removed.
+   * @param tagged_name the complete flat stat name (with tag values) recovered from the parent.
+   * @param base_name the stat name with tag values removed.
    * @param tags the tag name/value pairs.
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.

@@ -107,18 +107,17 @@ public:
     return wrapped_scope_->counterFromTaggedName(base_name, name_tags, tagged_name);
   }
 
-  Counter& counterFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+  Counter& counterFromMergedStatName(StatName tagged_name, StatName base_name,
                                      std::optional<StatNameTagSpan> tags) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->counterFromMergedStatName(full_name, tag_extracted_name, tags);
+    return wrapped_scope_->counterFromMergedStatName(tagged_name, base_name, tags);
   }
 
-  Gauge& gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+  Gauge& gaugeFromMergedStatName(StatName tagged_name, StatName base_name,
                                  std::optional<StatNameTagSpan> tags,
                                  Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->gaugeFromMergedStatName(full_name, tag_extracted_name, tags,
-                                                   import_mode);
+    return wrapped_scope_->gaugeFromMergedStatName(tagged_name, base_name, tags, import_mode);
   }
 
   Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,

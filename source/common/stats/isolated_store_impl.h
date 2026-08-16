@@ -353,7 +353,7 @@ public:
     gauge->mergeImportMode(import_mode);
     return *gauge;
   }
-  Gauge& gaugeFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+  Gauge& gaugeFromMergedStatName(StatName tagged_name, StatName base_name,
                                  std::optional<StatNameTagSpan> tags,
                                  Gauge::ImportMode import_mode) override;
   Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,

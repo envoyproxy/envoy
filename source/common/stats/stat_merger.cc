@@ -90,15 +90,13 @@ void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& count
     if (tags_iter != tags_map.end()) {
       const ParentTags& parent_tags = tags_iter->second;
       StatNamePool pool(temp_scope_->symbolTable());
-      StatName tag_extracted_name = pool.add(parent_tags.tag_extracted_name_);
+      StatName base_name = pool.add(parent_tags.base_name_);
       StatNameTagVector stat_name_tags;
       stat_name_tags.reserve(parent_tags.tags_.size());
       for (const auto& tag : parent_tags.tags_) {
         stat_name_tags.emplace_back(pool.add(tag.first), pool.add(tag.second));
       }
-      temp_scope_
-          ->counterFromMergedStatName(stat_name, tag_extracted_name,
-                                      StatNameTagSpan(stat_name_tags))
+      temp_scope_->counterFromMergedStatName(stat_name, base_name, StatNameTagSpan(stat_name_tags))
           .add(counter.second);
     } else {
       temp_scope_->counterFromStatName(stat_name).add(counter.second);
@@ -151,13 +149,13 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
       }
       const ParentTags& parent_tags = tags_iter->second;
       StatNamePool pool(temp_scope_->symbolTable());
-      StatName tag_extracted_name = pool.add(parent_tags.tag_extracted_name_);
+      StatName base_name = pool.add(parent_tags.base_name_);
       StatNameTagVector stat_name_tags;
       stat_name_tags.reserve(parent_tags.tags_.size());
       for (const auto& tag : parent_tags.tags_) {
         stat_name_tags.emplace_back(pool.add(tag.first), pool.add(tag.second));
       }
-      return temp_scope_->gaugeFromMergedStatName(stat_name, tag_extracted_name,
+      return temp_scope_->gaugeFromMergedStatName(stat_name, base_name,
                                                   StatNameTagSpan(stat_name_tags), import_mode);
     };
     auto& gauge_ref = make_gauge();

@@ -362,7 +362,7 @@ TEST_F(StatMergerThreadLocalTest, NewStatFromParent) {
 
 // Builds a representative set of programmatic tags (modeled on a request-counting filter), with an
 // empty value to exercise that case.
-StatNameTagVector aetherTags(StatNamePool& pool) {
+StatNameTagVector requestFilterTags(StatNamePool& pool) {
   return StatNameTagVector{
       {pool.add("reporter"), pool.add("destination")},
       {pool.add("source_service"), pool.add("loadgen")},
@@ -385,12 +385,12 @@ TEST_F(StatMergerThreadLocalTest, ProgrammaticTagsSurviveMerge) {
   Allocator parent_alloc{parent_symbol_table};
   ThreadLocalStoreImpl parent_store{parent_alloc};
   StatNamePool parent_pool(parent_symbol_table);
-  StatNameTagVector parent_tags = aetherTags(parent_pool);
+  StatNameTagVector parent_tags = requestFilterTags(parent_pool);
   Counter& parent_counter = parent_store.rootScope()->counterFromStatNameWithTags(
-      parent_pool.add("aether.requests_total"), parent_tags);
+      parent_pool.add("custom.requests_total"), parent_tags);
   parent_counter.add(7);
   // The parent counter is clean: tags are labels, not baked into the metric name.
-  ASSERT_EQ(parent_counter.tagExtractedName(), "aether.requests_total");
+  ASSERT_EQ(parent_counter.tagExtractedName(), "custom.requests_total");
   ASSERT_EQ(parent_counter.tags().size(), 6);
   const std::string full_name = parent_counter.name();
 
@@ -399,7 +399,7 @@ TEST_F(StatMergerThreadLocalTest, ProgrammaticTagsSurviveMerge) {
   counter_deltas[full_name] = 7;
   StatMerger::TagsMap counter_tags;
   StatMerger::ParentTags& parent_tag_entry = counter_tags[full_name];
-  parent_tag_entry.tag_extracted_name_ = parent_counter.tagExtractedName();
+  parent_tag_entry.base_name_ = parent_counter.tagExtractedName();
   for (const auto& tag : parent_counter.tags()) {
     parent_tag_entry.tags_.emplace_back(tag.name_, tag.value_);
   }
@@ -412,18 +412,18 @@ TEST_F(StatMergerThreadLocalTest, ProgrammaticTagsSurviveMerge) {
   CounterSharedPtr merged = TestUtility::findCounter(store_, full_name);
   ASSERT_NE(merged, nullptr);
   EXPECT_EQ(merged->value(), 7);
-  EXPECT_EQ(merged->tagExtractedName(), "aether.requests_total");
+  EXPECT_EQ(merged->tagExtractedName(), "custom.requests_total");
   EXPECT_EQ(merged->tags().size(), 6);
 
   // The child independently recreating the counter via WithTags resolves to the SAME counter; the
   // merge did not poison the central-cache slot with a no-tags counter.
   StatNamePool child_pool(store_.symbolTable());
-  StatNameTagVector child_tags = aetherTags(child_pool);
+  StatNameTagVector child_tags = requestFilterTags(child_pool);
   Counter& child_counter = store_.rootScope()->counterFromStatNameWithTags(
-      child_pool.add("aether.requests_total"), child_tags);
+      child_pool.add("custom.requests_total"), child_tags);
   child_counter.add(3);
   EXPECT_EQ(&child_counter, merged.get());
-  EXPECT_EQ(child_counter.tagExtractedName(), "aether.requests_total");
+  EXPECT_EQ(child_counter.tagExtractedName(), "custom.requests_total");
   EXPECT_EQ(child_counter.tags().size(), 6);
   EXPECT_EQ(child_counter.value(), 10); // 7 merged + 3
 }
@@ -437,9 +437,9 @@ TEST_F(StatMergerThreadLocalTest, ProgrammaticTagsLostWithoutMetadata) {
   Allocator parent_alloc{parent_symbol_table};
   ThreadLocalStoreImpl parent_store{parent_alloc};
   StatNamePool parent_pool(parent_symbol_table);
-  StatNameTagVector parent_tags = aetherTags(parent_pool);
+  StatNameTagVector parent_tags = requestFilterTags(parent_pool);
   Counter& parent_counter = parent_store.rootScope()->counterFromStatNameWithTags(
-      parent_pool.add("aether.requests_total"), parent_tags);
+      parent_pool.add("custom.requests_total"), parent_tags);
   parent_counter.add(7);
   const std::string full_name = parent_counter.name();
 
@@ -465,18 +465,18 @@ TEST_F(StatMergerThreadLocalTest, ProgrammaticGaugeTagsSurviveMerge) {
   Allocator parent_alloc{parent_symbol_table};
   ThreadLocalStoreImpl parent_store{parent_alloc};
   StatNamePool parent_pool(parent_symbol_table);
-  StatNameTagVector parent_tags = aetherTags(parent_pool);
+  StatNameTagVector parent_tags = requestFilterTags(parent_pool);
   Gauge& parent_gauge = parent_store.rootScope()->gaugeFromStatNameWithTags(
-      parent_pool.add("aether.active_connections"), parent_tags, Gauge::ImportMode::Accumulate);
+      parent_pool.add("custom.active_connections"), parent_tags, Gauge::ImportMode::Accumulate);
   parent_gauge.set(11);
-  ASSERT_EQ(parent_gauge.tagExtractedName(), "aether.active_connections");
+  ASSERT_EQ(parent_gauge.tagExtractedName(), "custom.active_connections");
   const std::string full_name = parent_gauge.name();
 
   Protobuf::Map<std::string, uint64_t> gauges;
   gauges[full_name] = 11;
   StatMerger::TagsMap gauge_tags;
   StatMerger::ParentTags& parent_tag_entry = gauge_tags[full_name];
-  parent_tag_entry.tag_extracted_name_ = parent_gauge.tagExtractedName();
+  parent_tag_entry.base_name_ = parent_gauge.tagExtractedName();
   for (const auto& tag : parent_gauge.tags()) {
     parent_tag_entry.tags_.emplace_back(tag.name_, tag.value_);
   }
@@ -488,13 +488,13 @@ TEST_F(StatMergerThreadLocalTest, ProgrammaticGaugeTagsSurviveMerge) {
   GaugeSharedPtr merged = TestUtility::findGauge(store_, full_name);
   ASSERT_NE(merged, nullptr);
   EXPECT_EQ(merged->value(), 11);
-  EXPECT_EQ(merged->tagExtractedName(), "aether.active_connections");
+  EXPECT_EQ(merged->tagExtractedName(), "custom.active_connections");
   EXPECT_EQ(merged->tags().size(), 6);
 
   StatNamePool child_pool(store_.symbolTable());
-  StatNameTagVector child_tags = aetherTags(child_pool);
+  StatNameTagVector child_tags = requestFilterTags(child_pool);
   Gauge& child_gauge = store_.rootScope()->gaugeFromStatNameWithTags(
-      child_pool.add("aether.active_connections"), child_tags, Gauge::ImportMode::Accumulate);
+      child_pool.add("custom.active_connections"), child_tags, Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&child_gauge, merged.get());
   EXPECT_EQ(child_gauge.value(), 11);
 }

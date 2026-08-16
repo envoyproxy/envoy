@@ -272,13 +272,13 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
   // flag so the prior name-derived behavior can be restored; when disabled the maps stay empty and
   // StatMerger falls back to deriving tags from the name.
   const auto convert_tags =
-      [](const Protobuf::Map<std::string, HotRestartMessage::Reply::Stats::TaggedMetric>&
+      [](const Protobuf::Map<std::string, HotRestartMessage::Reply::Stats::MetricTags>&
              proto_tags) {
         Stats::StatMerger::TagsMap tags_map;
         tags_map.reserve(proto_tags.size());
         for (const auto& iter : proto_tags) {
           Stats::StatMerger::ParentTags& parent_tags = tags_map[iter.first];
-          parent_tags.tag_extracted_name_ = iter.second.tag_extracted_name();
+          parent_tags.base_name_ = iter.second.base_name();
           parent_tags.tags_.reserve(iter.second.tags_size());
           for (const auto& tag : iter.second.tags()) {
             parent_tags.tags_.emplace_back(tag.name(), tag.value());

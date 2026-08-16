@@ -20,11 +20,11 @@ class StatMerger {
 public:
   using DynamicsMap = absl::flat_hash_map<std::string, DynamicSpans>;
 
-  // The tag-extracted name and tags captured from the parent process for a single stat that was
-  // created with programmatic tags. Held in a store-neutral form (decoded from the hot restart
-  // protobuf by the caller) so this stats-layer class does not depend on the server proto.
+  // The base (tag-extracted) name and tags captured from the parent process for a single stat
+  // that was created with programmatic tags. Held in a store-neutral form (decoded from the hot
+  // restart protobuf by the caller) so this stats-layer class does not depend on the server proto.
   struct ParentTags {
-    std::string tag_extracted_name_;
+    std::string base_name_;
     std::vector<std::pair<std::string, std::string>> tags_;
   };
   // Maps a fully qualified stat name (the same key used in the counter/gauge delta maps) to its
