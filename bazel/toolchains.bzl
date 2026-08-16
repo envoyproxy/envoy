@@ -1,7 +1,6 @@
 load("@com_google_protobuf//bazel/private/oss/toolchains/prebuilt:protoc_toolchain.bzl", "prebuilt_protoc_repo")
 load("@com_google_protobuf//toolchain:platforms.bzl", "PROTOBUF_PLATFORMS")
 load("@envoy_repo//:compiler.bzl", "LLVM_LIB_DIR", "LLVM_PATH", "LLVM_VERSION_LOCAL", "USE_LIBSTDCPP", "USE_LOCAL_SYSROOT")
-load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
 load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
 _LLVM_VERSION_HERMETIC = "22.1.8"
