@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <optional>
@@ -184,6 +185,16 @@ public:
    * @return IoCallUint64Result indicating the result of the close operation.
    */
   Api::IoCallUint64Result close() override;
+
+  /**
+   * Stop reverse-connection maintenance when the listen socket's file events are torn down.
+   *
+   * During listener stop (LDS removal / drain), ``~TcpListenerImpl`` calls this on the worker
+   * thread before the main thread closes the listen socket. Resetting the retry timer here
+   * (on the owning dispatcher) prevents drain-aware re-dial and the maintenance loop from
+   * starting a new outbound handshake against a dying reverse-connection listener.
+   */
+  void resetFileEvents() override;
 
   /**
    * Triggers the reverse connection workflow.
@@ -528,6 +539,9 @@ private:
 
   bool is_reverse_conn_started_{
       false}; // Whether reverse connections have been started on worker thread
+  // Set when the listen socket is stopping (resetFileEvents / close). Stops maintenance and
+  // drain-aware replacement dials so LDS removal cannot start a new handshake.
+  std::atomic<bool> shutting_down_{false};
   Event::Dispatcher* worker_dispatcher_{nullptr}; // Dispatcher for the worker thread
 
   // Store original socket FD for cleanup.

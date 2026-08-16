@@ -3430,6 +3430,69 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedUnknownKeyIsNo
   EXPECT_TRUE(getHostToConnInfoMap().empty());
 }
 
+// Listener stop (LDS removal / drain) calls resetFileEvents() on the worker before the listen
+// socket is closed. That must destroy the retry timer and block drain-aware replacement dials so
+// a dying reverse_conn_listener cannot start a new outbound handshake.
+TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsStopsReplacementDialOnListenerStop) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, "remote-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+
+  // Simulate ~TcpListenerImpl during stopListeners: worker-thread resetFileEvents.
+  io_handle_->resetFileEvents();
+
+  // No immediate replacement dial after the listener has stopped accepting.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _)).Times(0);
+
+  io_handle_->markTunnelDrainingAndDialReplacement(connection_key);
+
+  // Tracking is still updated so accounting stays consistent; only the dial is suppressed.
+  EXPECT_EQ(getHostConnectionInfo(host).connection_keys.count(connection_key), 0);
+}
+
+// After resetFileEvents(), a subsequent initializeFileEvent() (socket reuse across a compatible
+// listener update) must be allowed to restart reverse-connection maintenance.
+TEST_F(ReverseConnectionIOHandleTest, InitializeFileEventRestartsAfterResetFileEvents) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* first_timer = new NiceMock<Event::MockTimer>();
+  auto* second_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(Return(first_timer))
+      .WillOnce(Return(second_timer));
+  EXPECT_CALL(*first_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*second_timer, enableTimer(_, _)).Times(testing::AtLeast(1));
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  io_handle_->resetFileEvents();
+
+  // Must create a new retry timer and resume maintenance.
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions
