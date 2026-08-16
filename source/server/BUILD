@@ -100,6 +100,7 @@ envoy_cc_library(
         "//source/common/network:listener_lib",
         "//source/common/network:utility_lib",
         "//source/server:active_listener_base",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
 

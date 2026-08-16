@@ -584,6 +584,10 @@ protected:
 
     const Network::UdpRecvData::LocalPeerAddresses& addresses() const { return addresses_; }
     ClusterInfo* cluster() const { return cluster_; }
+
+    // Registers the session so the listener keeps it on this instance during a hot restart, unless
+    // per-packet load balancing is enabled.
+    void maybeRegisterForHotRestart();
     std::optional<std::reference_wrapper<const Upstream::Host>> host() const {
       if (host_) {
         return *host_;
@@ -658,6 +662,8 @@ protected:
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
     Upstream::HostConstSharedPtr host_;
     ClusterInfo* cluster_{nullptr};
+    // Keeps this session on the same instance during a hot restart, unregisters on destruction.
+    Network::UdpHotRestartSessionHandlePtr hot_restart_session_handle_;
     uint64_t session_id_;
     // TODO(mattklein123): Consider replacing an idle timer for each session with a last used
     // time stamp and a periodic scan of all sessions to look for timeouts. This solution is simple,

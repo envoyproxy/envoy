@@ -719,6 +719,9 @@ public:
   ~MockUdpReadFilterCallbacks() override;
 
   MOCK_METHOD(UdpListener&, udpListener, ());
+  MOCK_METHOD(UdpHotRestartSessionHandlePtr, registerHotRestartSession,
+              (const Address::InstanceConstSharedPtr& local_address,
+               const Address::InstanceConstSharedPtr& peer_address));
 
   testing::NiceMock<MockUdpListener> udp_listener_;
 };

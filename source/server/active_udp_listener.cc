@@ -1,5 +1,7 @@
 #include "source/server/active_udp_listener.h"
 
+#include <functional>
+
 #include "envoy/network/exception.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
@@ -11,6 +13,18 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
+class UdpHotRestartSessionHandleImpl : public Network::UdpHotRestartSessionHandle {
+public:
+  explicit UdpHotRestartSessionHandleImpl(std::function<void()> on_destroy)
+      : on_destroy_(std::move(on_destroy)) {}
+  ~UdpHotRestartSessionHandleImpl() override { on_destroy_(); }
+
+private:
+  const std::function<void()> on_destroy_;
+};
+} // namespace
+
 ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t concurrency,
                                              Network::UdpConnectionHandler& parent,
                                              Network::Socket& listen_socket,
@@ -86,10 +100,7 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Network::UdpListenerPtr&& listener,
                                            Network::ListenerConfig& config)
     : ActiveUdpListenerBase(worker_index, concurrency, parent, listen_socket, std::move(listener),
-                            &config),
-      flow_sweep_timer_(udp_listener_->dispatcher().createTimer([this] { sweepIdleFlows(); })),
-      flow_idle_timeout_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
-          config.udpListenerConfig()->config(), flow_idle_timeout, 60000))) {
+                            &config) {
   // Create the filter chain on creating a new udp listener.
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
@@ -111,24 +122,11 @@ void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
     return;
   }
 
-  const MonotonicTime now = udp_listener_->dispatcher().approximateMonotonicTime();
-  if (non_dispatched_udp_packet_handler_.has_value()) {
-    auto flow_it = flow_last_activity_.find(data.addresses_);
-    if (flow_it == flow_last_activity_.end()) {
-      // Draining for hot restart: this flow isn't ours, hand it to the child instance.
-      non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
-      return;
-    }
-    flow_it->second = now;
-  } else {
-    auto [flow_it, inserted] = flow_last_activity_.try_emplace(data.addresses_, now);
-    if (inserted) {
-      if (flow_last_activity_.size() == 1) {
-        flow_sweep_timer_->enableTimer(flow_idle_timeout_);
-      }
-    } else {
-      flow_it->second = now;
-    }
+  if (non_dispatched_udp_packet_handler_.has_value() &&
+      !active_sessions_.contains(data.addresses_)) {
+    // Draining for hot restart: this session isn't ours, hand it to the child instance.
+    non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
+    return;
   }
 
   for (auto& read_filter : read_filters_) {
@@ -136,21 +134,6 @@ void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
     if (status == Network::FilterStatus::StopIteration) {
       return;
     }
-  }
-}
-
-void ActiveRawUdpListener::sweepIdleFlows() {
-  const MonotonicTime cutoff =
-      udp_listener_->dispatcher().approximateMonotonicTime() - flow_idle_timeout_;
-  for (auto it = flow_last_activity_.begin(); it != flow_last_activity_.end();) {
-    if (it->second < cutoff) {
-      flow_last_activity_.erase(it++);
-    } else {
-      ++it;
-    }
-  }
-  if (!flow_last_activity_.empty()) {
-    flow_sweep_timer_->enableTimer(flow_idle_timeout_);
   }
 }
 
@@ -179,6 +162,18 @@ void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& fil
 }
 
 Network::UdpListener& ActiveRawUdpListener::udpListener() { return *udp_listener_; }
+
+Network::UdpHotRestartSessionHandlePtr ActiveRawUdpListener::registerHotRestartSession(
+    const Network::Address::InstanceConstSharedPtr& local_address,
+    const Network::Address::InstanceConstSharedPtr& peer_address) {
+  Network::UdpRecvData::LocalPeerAddresses key{local_address, peer_address};
+  const bool inserted = active_sessions_.insert(key).second;
+  ASSERT(inserted, "hot restart session registered twice");
+  return std::make_unique<UdpHotRestartSessionHandleImpl>([this, key = std::move(key)]() {
+    const size_t erased = active_sessions_.erase(key);
+    ASSERT(erased == 1, "hot restart session unregistered while unknown");
+  });
+}
 
 } // namespace Server
 } // namespace Envoy

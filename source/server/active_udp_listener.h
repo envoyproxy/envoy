@@ -109,8 +109,6 @@ public:
     // after deletion.
     read_filters_.clear();
     udp_listener_.reset();
-    flow_last_activity_.clear();
-    flow_sweep_timer_.reset();
   }
   // These two are unreachable because a config will be rejected if it configures both this listener
   // and any L4 filter chain.
@@ -130,18 +128,18 @@ public:
 
   // Network::UdpReadFilterCallbacks
   Network::UdpListener& udpListener() override;
+  Network::UdpHotRestartSessionHandlePtr
+  registerHotRestartSession(const Network::Address::InstanceConstSharedPtr& local_address,
+                            const Network::Address::InstanceConstSharedPtr& peer_address) override;
 
 private:
-  // Erases flows idle for longer than flow_idle_timeout_ and rearms itself while any flows remain.
-  // An entry therefore lives between one and two timeouts past its last packet.
-  void sweepIdleFlows();
-
+  // Sessions a filter has registered on this worker. During a hot restart the parent keeps serving
+  // these and forwards datagrams of any other 4-tuple to the child instance.
+  absl::flat_hash_set<Network::UdpRecvData::LocalPeerAddresses> active_sessions_;
+  // Destroying the filters unregisters their sessions, which touches active_sessions_ above.
   std::list<Network::UdpListenerReadFilterPtr> read_filters_;
   Network::UdpPacketWriterPtr udp_packet_writer_;
-  absl::flat_hash_map<Network::UdpRecvData::LocalPeerAddresses, MonotonicTime> flow_last_activity_;
-  Event::TimerPtr flow_sweep_timer_;
   OptRef<Network::NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
-  const std::chrono::milliseconds flow_idle_timeout_;
 };
 
 } // namespace Server

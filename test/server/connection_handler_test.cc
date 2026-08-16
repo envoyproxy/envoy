@@ -2750,7 +2750,7 @@ TEST_F(ConnectionHandlerTest, ShutdownUdpListener) {
 }
 
 // Shutdown with a hot restart packet forwarding handler keeps the udp listener alive and
-// forwards packets of unknown flows instead of delivering them locally.
+// forwards packets of unregistered sessions instead of delivering them locally.
 TEST_F(ConnectionHandlerTest, HotRestartShutdownUdpListenerKeepsListening) {
   Network::MockUdpReadFilterCallbacks dummy_callbacks;
   auto listener = new NiceMock<MockUpstreamUdpListener>(*this);
@@ -2788,8 +2788,8 @@ TEST_F(ConnectionHandlerTest, HotRestartShutdownUdpListenerKeepsListening) {
   options.non_dispatched_udp_packet_handler_ = packet_handler;
   handler_->stopListeners(1, options);
 
-  // A packet of an unknown flow is forwarded instead of being dropped by a shut down listener or
-  // delivered locally.
+  // A packet of an unregistered session is forwarded instead of being dropped by a shut down
+  // listener or delivered locally.
   EXPECT_CALL(packet_handler, handle(0, _));
   EXPECT_CALL(*filter_ptr, onData(_)).Times(0);
   Network::UdpRecvData data;

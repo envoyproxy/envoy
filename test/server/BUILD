@@ -132,7 +132,6 @@ envoy_cc_test(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/network:utility_lib",
-        "//source/common/protobuf:utility_lib",
         "//source/server:active_udp_listener",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",

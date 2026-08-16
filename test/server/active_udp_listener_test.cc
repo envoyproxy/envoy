@@ -7,7 +7,6 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/network/utility.h"
-#include "source/common/protobuf/utility.h"
 #include "source/server/active_udp_listener.h"
 
 #include "test/mocks/event/mocks.h"
@@ -19,11 +18,9 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnPointee;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -59,11 +56,8 @@ public:
       : version_(GetParam()), local_address_(Network::Test::getCanonicalLoopbackAddress(version_)) {
   }
 
-  void setup(uint32_t concurrency = 1,
-             std::chrono::milliseconds flow_idle_timeout = std::chrono::milliseconds(60000)) {
+  void setup(uint32_t concurrency = 1) {
     udp_listener_config_ = std::make_unique<NiceMock<Network::MockUdpListenerConfig>>(2);
-    *udp_listener_config_->config_.mutable_flow_idle_timeout() =
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(flow_idle_timeout.count());
     ON_CALL(conn_handler_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     EXPECT_CALL(conn_handler_, statPrefix()).WillRepeatedly(ReturnRef(listener_stat_prefix_));
 
@@ -206,47 +200,18 @@ TEST_P(ActiveUdpListenerTest, MultipleFiltersOnReceiveErrorStopIteration) {
   active_listener_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
 }
 
-TEST_P(ActiveUdpListenerTest, FlowIdleTimerLifecycle) {
-  const auto flow_idle_timeout = std::chrono::milliseconds(5);
-  auto* sweep_timer = new Event::MockTimer(&dispatcher_);
-  setup(1, flow_idle_timeout);
-
-  MonotonicTime now{};
-  ON_CALL(dispatcher_, approximateMonotonicTime()).WillByDefault(ReturnPointee(&now));
-
-  auto test_filter = std::make_unique<NiceMock<Network::MockUdpListenerReadFilter>>(cb_);
-  EXPECT_CALL(*test_filter, onData(_)).Times(3);
-  active_listener_->addReadFilter(std::move(test_filter));
-  EXPECT_CALL(*sweep_timer, enableTimer(flow_idle_timeout, _)).Times(3);
-
-  // The first flow arms the sweep timer.
-  active_listener_->onData(makeRecvData(1000));
-
-  // A refreshed flow survives a sweep, which rearms the timer.
-  now += std::chrono::milliseconds(3);
-  active_listener_->onData(makeRecvData(1000));
-  now += std::chrono::milliseconds(3);
-  sweep_timer->invokeCallback();
-
-  // An idle flow is erased and the sweep stops; the next packet starts over.
-  now += std::chrono::milliseconds(6);
-  sweep_timer->invokeCallback();
-  active_listener_->onData(makeRecvData(1000));
-}
-
-TEST_P(ActiveUdpListenerTest, HotRestartShutdownForwardsUnknownFlows) {
-  auto* sweep_timer = new Event::MockTimer(&dispatcher_);
+TEST_P(ActiveUdpListenerTest, HotRestartShutdownForwardsUnknownSessions) {
   setup();
 
-  MonotonicTime now{};
-  ON_CALL(dispatcher_, approximateMonotonicTime()).WillByDefault(ReturnPointee(&now));
-
   auto test_filter = std::make_unique<NiceMock<Network::MockUdpListenerReadFilter>>(cb_);
-  EXPECT_CALL(*test_filter, onData(_)).Times(2);
+  // Only the post-shutdown datagram of the registered session is served locally.
+  EXPECT_CALL(*test_filter, onData(_));
   active_listener_->addReadFilter(std::move(test_filter));
-  EXPECT_CALL(*sweep_timer, enableTimer(_, _)).Times(AnyNumber());
 
-  active_listener_->onData(makeRecvData(1000));
+  // A filter registers a session, as udp_proxy would on the first datagram.
+  auto session = makeRecvData(1000);
+  auto handle = active_listener_->registerHotRestartSession(session.addresses_.local_,
+                                                            session.addresses_.peer_);
 
   Network::MockNonDispatchedUdpPacketHandler packet_handler;
   Network::ExtraShutdownListenerOptions options;
@@ -254,18 +219,17 @@ TEST_P(ActiveUdpListenerTest, HotRestartShutdownForwardsUnknownFlows) {
   active_listener_->shutdownListener(options);
   EXPECT_NE(active_listener_->listener(), nullptr);
 
-  // Known flow is still served locally.
+  // The registered session is still served locally.
   active_listener_->onData(makeRecvData(1000));
 
-  // Unknown flow is forwarded to the child instance without creating local flow state,
-  // so a repeated packet is forwarded again.
+  // An unregistered session is forwarded to the child instance without creating local state,
+  // so a repeated datagram is forwarded again.
   EXPECT_CALL(packet_handler, handle(0, _)).Times(3);
   active_listener_->onData(makeRecvData(2000));
   active_listener_->onData(makeRecvData(2000));
 
-  // Flow idled out by the sweep counts as unknown.
-  now += std::chrono::hours(1);
-  sweep_timer->invokeCallback();
+  // After the handle is dropped, the session is forwarded too.
+  handle.reset();
   active_listener_->onData(makeRecvData(1000));
 }
 

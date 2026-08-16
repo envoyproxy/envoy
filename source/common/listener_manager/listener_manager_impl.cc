@@ -1304,7 +1304,7 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
     // Close the listen sockets right away to avoid leaving TCP connections in accept queue
     // already waiting for long timeout. UDP listeners keep their sockets: QUIC listeners
     // need them to receive packets for existing connections, raw UDP listeners need them
-    // so a hot restart parent can keep serving established flows during drain.
+    // so a hot restart parent can keep serving established sessions during drain.
     listener.closeAllSockets();
 
     // In case of this listener was in-place updated previously and in the filter chains draining
