@@ -54,6 +54,16 @@ def envoy_toolchains():
         },
     )
 
+    # Host platform for macOS builds. arch_alias() only maps CPU architecture,
+    # so the OS-specific mapping is done via .bazelrc build:macos override.
+    arch_alias(
+        name = "macos_clang_platform",
+        aliases = {
+            "amd64": "@envoy//bazel/platforms:macos_x86_64",
+            "aarch64": "@envoy//bazel/platforms:macos_arm64",
+        },
+    )
+
     if LLVM_PATH and "llvm_toolchain_llvm" not in native.existing_rules():
         native.new_local_repository(
             name = "llvm_toolchain_llvm",
