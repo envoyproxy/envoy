@@ -270,7 +270,7 @@ public:
    * @param tags the tag name/value pairs.
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterFromMergedStatName(StatName full_name, StatName tag_extracted_name,
+  virtual Counter& counterFromMergedStatName(StatName tagged_name, StatName base_name,
                                              std::optional<StatNameTagSpan> tags) PURE;
 
   /**
