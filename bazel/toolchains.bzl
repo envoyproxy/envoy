@@ -46,12 +46,15 @@ filegroup(
 
 def envoy_toolchains():
     native.register_toolchains("@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-toolchain")
-    arch_alias(
+    native.alias(
         name = "clang_platform",
-        aliases = {
-            "amd64": "@envoy//bazel/platforms/rbe:linux_x64",
-            "aarch64": "@envoy//bazel/platforms/rbe:linux_arm64",
-        },
+        actual = select({
+            "@envoy//bazel:darwin_arm64": "@envoy//bazel/platforms:macos_arm64",
+            "@envoy//bazel:darwin_x86_64": "@envoy//bazel/platforms:macos_x86_64",
+            "@envoy//bazel:linux_aarch64": "@envoy//bazel/platforms/rbe:linux_arm64",
+            "@envoy//bazel:linux_x86_64": "@envoy//bazel/platforms/rbe:linux_x64",
+            "//conditions:default": "@envoy//bazel/platforms/rbe:linux_x64",
+        }),
     )
 
     if LLVM_PATH and "llvm_toolchain_llvm" not in native.existing_rules():
