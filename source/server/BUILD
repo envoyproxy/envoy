@@ -99,6 +99,7 @@ envoy_cc_library(
         "//envoy/server:listener_manager_interface",
         "//source/common/network:listener_lib",
         "//source/common/network:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/server:active_listener_base",
         "@abseil-cpp//absl/container:flat_hash_set",
     ],

@@ -13,6 +13,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -231,6 +232,28 @@ TEST_P(ActiveUdpListenerTest, HotRestartShutdownForwardsUnknownSessions) {
   // After the handle is dropped, the session is forwarded too.
   handle.reset();
   active_listener_->onData(makeRecvData(1000));
+}
+
+TEST_P(ActiveUdpListenerTest, HotRestartShutdownGuardDisabledServesLocally) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.udp_hot_restart_session_handoff", "false"}});
+  setup();
+
+  auto test_filter = std::make_unique<NiceMock<Network::MockUdpListenerReadFilter>>(cb_);
+  // With the guard disabled the draining parent serves every datagram locally, registered or not.
+  EXPECT_CALL(*test_filter, onData(_)).Times(2);
+  active_listener_->addReadFilter(std::move(test_filter));
+
+  Network::MockNonDispatchedUdpPacketHandler packet_handler;
+  EXPECT_CALL(packet_handler, handle(_, _)).Times(0);
+  Network::ExtraShutdownListenerOptions options;
+  options.non_dispatched_udp_packet_handler_ = packet_handler;
+  active_listener_->shutdownListener(options);
+
+  EXPECT_NE(active_listener_->listener(), nullptr);
+  active_listener_->onData(makeRecvData(1000));
+  active_listener_->onData(makeRecvData(2000));
 }
 
 TEST_P(ActiveUdpListenerTest, RegularShutdownDestroysListener) {

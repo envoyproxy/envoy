@@ -10,6 +10,7 @@
 #include "envoy/network/listener.h"
 
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/server/active_listener_base.h"
 
 namespace Envoy {
@@ -100,7 +101,13 @@ public:
   void resumeListening() override { udp_listener_->enable(); }
   void shutdownListener(const Network::ExtraShutdownListenerOptions& options) override {
     if (options.non_dispatched_udp_packet_handler_) {
-      non_dispatched_udp_packet_handler_ = options.non_dispatched_udp_packet_handler_;
+      // Keep the listener alive during hot restart drain. Forward datagrams of unknown sessions to
+      // the child only when the guard is enabled, otherwise keep serving them locally on the
+      // draining parent rather than forwarding each over the hot restart RPC.
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.udp_hot_restart_session_handoff")) {
+        non_dispatched_udp_packet_handler_ = options.non_dispatched_udp_packet_handler_;
+      }
       return;
     }
     // The read filter should be deleted before the UDP listener is deleted.
