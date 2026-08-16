@@ -103,6 +103,19 @@ Protobuf::Value HeaderFormatter::formatValue(OptRef<const Http::HeaderMap> heade
   return ValueUtil::stringValue(std::string(val));
 }
 
+void HeaderFormatter::formatValueTo(ValueSink& sink, OptRef<const Http::HeaderMap> headers) const {
+  const Http::HeaderEntry* header = findHeader(headers);
+  if (!header) {
+    // Keep the sink unmodified if no value is extracted and the caller can decide how to
+    // handle the missing value.
+    return;
+  }
+
+  absl::string_view val = header->value().getStringView();
+  val = SubstitutionFormatUtils::truncateStringView(val, max_length_);
+  sink.addString(val);
+}
+
 ResponseHeaderFormatter::ResponseHeaderFormatter(absl::string_view main_header,
                                                  absl::string_view alternative_header,
                                                  std::optional<size_t> max_length)
@@ -121,6 +134,11 @@ bool ResponseHeaderFormatter::formatTo(std::string& sink, const Context& context
 Protobuf::Value ResponseHeaderFormatter::formatValue(const Context& context,
                                                      const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(context.responseHeaders());
+}
+
+void ResponseHeaderFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                            const StreamInfo::StreamInfo&) const {
+  HeaderFormatter::formatValueTo(sink, context.responseHeaders());
 }
 
 RequestHeaderFormatter::RequestHeaderFormatter(absl::string_view main_header,
@@ -143,6 +161,11 @@ Protobuf::Value RequestHeaderFormatter::formatValue(const Context& context,
   return HeaderFormatter::formatValue(context.requestHeaders());
 }
 
+void RequestHeaderFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                           const StreamInfo::StreamInfo&) const {
+  HeaderFormatter::formatValueTo(sink, context.requestHeaders());
+}
+
 ResponseTrailerFormatter::ResponseTrailerFormatter(absl::string_view main_header,
                                                    absl::string_view alternative_header,
                                                    std::optional<size_t> max_length)
@@ -161,6 +184,11 @@ bool ResponseTrailerFormatter::formatTo(std::string& sink, const Context& contex
 Protobuf::Value ResponseTrailerFormatter::formatValue(const Context& context,
                                                       const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(context.responseTrailers());
+}
+
+void ResponseTrailerFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                             const StreamInfo::StreamInfo&) const {
+  HeaderFormatter::formatValueTo(sink, context.responseTrailers());
 }
 
 HeadersByteSizeFormatter::HeadersByteSizeFormatter(const HeaderType header_type)
@@ -254,8 +282,8 @@ GrpcStatusFormatter::create(const std::string& main_header, const std::string& a
   if (!format_or_status.ok()) {
     return format_or_status.status();
   }
-  return std::unique_ptr<GrpcStatusFormatter>(new GrpcStatusFormatter(
-      main_header, alternative_header, max_length, format_or_status.value()));
+  return std::make_unique<GrpcStatusFormatter>(main_header, alternative_header, max_length,
+                                               format_or_status.value());
 }
 
 absl::StatusOr<GrpcStatusFormatter::Format>
