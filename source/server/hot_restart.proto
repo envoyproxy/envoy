@@ -89,10 +89,10 @@ message HotRestartMessage {
       // recover the tag name/value pairs or the tag-extracted name from the name alone. Without
       // this, the tags would be lost across hot restart: the merge re-creates the stat from the
       // name with no tags, the tag values collapse into the metric name, and the labels go empty.
-      message TaggedMetric {
+      message MetricTags {
         // The stat name with tag values removed; used as the metric name when exporting (e.g. to
         // Prometheus).
-        string tag_extracted_name = 1;
+        string base_name = 1;
         // The tag name/value pairs.
         repeated Tag tags = 2;
       }
