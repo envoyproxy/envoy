@@ -187,22 +187,29 @@ message PrivateKeyJwtConfig {
 
   // The value to use as the ``aud`` (audience) claim in the JWT client assertion.
   //
-  // `OIDC Core 1.0 Section 9 <https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication>`_
-  // recommends the token endpoint URL, but this is vulnerable to replay attacks when the
-  // authorization server does not track ``jti`` claims.
-  // `RFC 9126 Section 2.1 <https://datatracker.ietf.org/doc/html/rfc9126#section-2.1>`_ and
-  // `FAPI 2.0 <https://openid.net/specs/fapi-security-profile-2_0.html>`_ recommend using
-  // the authorization server's issuer identifier instead.
+  // `RFC 7523 Section 3 <https://datatracker.ietf.org/doc/html/rfc7523#section-3>`_ requires the
+  // ``aud`` claim to identify the authorization server, and allows the token endpoint URL to be
+  // used for this purpose.
+  // `RFC 9126 Section 2.1 <https://datatracker.ietf.org/doc/html/rfc9126#section-2.1>`_ recommends
+  // the authorization server's issuer identifier instead, and
+  // `FAPI 2.0 <https://openid.net/specs/fapi-security-profile-2_0-final.html>`_ requires it, as a
+  // single canonical value identifies the server regardless of which endpoint receives the
+  // assertion.
+  //
   // If not set, defaults to the configured ``token_endpoint`` URI.
   string assertion_audience = 3;
 
-  // Optional Key ID (kid) to include in the JWT header per
+  // Key ID to set as the ``kid`` header parameter of the JWT client assertion, per
   // `RFC 7515 Section 4.1.4 <https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.4>`_.
-  // This is a hint to the identity provider indicating which key was used to sign
-  // the client assertion. Required by
-  // `OpenID Connect Core Section 10.1 <https://openid.net/specs/openid-connect-core-1_0.html#Signing>`_
-  // when the client has multiple keys registered with the provider. The value is typically stable
-  // and changes only when the signing key is rotated.
+  // The ``kid`` is a hint indicating which key was used to sign the assertion, and is needed by
+  // identity providers that have more than one key registered for the client.
+  //
+  // This value is taken from the filter configuration and is not derived from the signing key, so
+  // it is not updated when the key is rotated via SDS. Update ``key_id`` in the filter
+  // configuration together with the key; a stale ``key_id`` causes the identity provider to
+  // reject the client assertion.
+  //
+  // If not set, the ``kid`` header parameter is omitted from the assertion.
   string key_id = 4;
 }
 
