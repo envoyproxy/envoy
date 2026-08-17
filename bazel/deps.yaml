@@ -1248,6 +1248,7 @@ rules_pkg:
   release_date: "2025-12-03"
   use_category:
   - build
+  - test_only
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_pkg/blob/{version}/LICENSE"
 
