@@ -56,6 +56,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
+        "//test/common/formatter:formatter_test_utility_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/server:listener_factory_context_mocks",
         "//test/test_common:environment_lib",

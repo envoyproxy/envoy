@@ -120,11 +120,10 @@ public:
                     std::optional<size_t> max_length, GetMetadataFunction get);
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
   std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
   std::optional<std::string>
@@ -183,11 +182,10 @@ public:
                 bool is_upstream = false, absl::string_view field_name = {});
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
   std::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   FilterStateFormatter(absl::string_view key, std::optional<size_t> max_length,
@@ -214,11 +212,10 @@ public:
   create(absl::string_view sub_command);
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
   std::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const override;
 
   static const absl::flat_hash_map<absl::string_view, TimePointGetter> KnownTimePointGetters;
 
@@ -296,11 +293,6 @@ public:
   }
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatTo;
-  using StreamInfoFormatterProvider::formatValue;
-  using StreamInfoFormatterProvider::formatValueTo;
   std::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
   bool formatTo(std::string& sink, const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
@@ -398,11 +390,10 @@ public:
   EnvironmentFormatter(absl::string_view key, std::optional<size_t> max_length);
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
   std::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const StreamInfo::StreamInfo&) const override;
+  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo&) const override;
 
 private:
   Protobuf::Value str_;
@@ -428,11 +419,10 @@ public:
   create(absl::string_view source, absl::string_view option);
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
   std::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const StreamInfo::StreamInfo&) const override;
+  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo&) const override;
 
   std::optional<std::string> getHostFromHeaders(const StreamInfo::StreamInfo& stream_info) const;
   std::optional<std::string> getSNIFromStreamInfo(const StreamInfo::StreamInfo& stream_info) const;
