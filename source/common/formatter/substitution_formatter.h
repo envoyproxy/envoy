@@ -177,6 +177,8 @@ public:
 
   // Formatter
   std::string format(const Context& context, const StreamInfo::StreamInfo& info) const override;
+  void formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& info) const override;
 
 private:
   const std::unique_ptr<JsonFormatMapNode> root_;
