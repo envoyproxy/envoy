@@ -137,12 +137,12 @@ void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance& serv
   }
 }
 
-bool ReverseTunnelInitiatorExtension::parentStoppedAccepting() {
+bool ReverseTunnelInitiatorExtension::parentStopAcceptingRequested() {
   if (server_ == nullptr) {
     // Not yet initialized (or some unit tests): no parent to wait for, so don't defer dialing.
     return true;
   }
-  return server_->hotRestart().parentStoppedAccepting();
+  return server_->hotRestart().parentStopAcceptingRequested();
 }
 
 void ReverseTunnelInitiatorExtension::onWorkerThreadInitialized() {

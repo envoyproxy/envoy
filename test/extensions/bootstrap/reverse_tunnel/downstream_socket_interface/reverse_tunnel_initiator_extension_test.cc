@@ -261,19 +261,19 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitialized) {
   extension_->onServerInitialized(server_);
 }
 
-TEST_F(ReverseTunnelInitiatorExtensionTest, ParentStoppedAcceptingForwardsToHotRestart) {
+TEST_F(ReverseTunnelInitiatorExtensionTest, ParentStopAcceptingRequestedForwardsToHotRestart) {
   extension_->onServerInitialized(server_);
   // Once the server is captured, the query is forwarded to the hot restart implementation.
-  EXPECT_CALL(server_.hot_restart_, parentStoppedAccepting())
+  EXPECT_CALL(server_.hot_restart_, parentStopAcceptingRequested())
       .WillOnce(Return(false))
       .WillOnce(Return(true));
-  EXPECT_FALSE(extension_->parentStoppedAccepting());
-  EXPECT_TRUE(extension_->parentStoppedAccepting());
+  EXPECT_FALSE(extension_->parentStopAcceptingRequested());
+  EXPECT_TRUE(extension_->parentStopAcceptingRequested());
 }
 
-TEST_F(ReverseTunnelInitiatorExtensionTest, ParentStoppedAcceptingTrueWithoutServer) {
+TEST_F(ReverseTunnelInitiatorExtensionTest, ParentStopAcceptingRequestedTrueWithoutServer) {
   // Before onServerInitialized(), there is no server to reach hotRestart(); nothing to wait for.
-  EXPECT_TRUE(extension_->parentStoppedAccepting());
+  EXPECT_TRUE(extension_->parentStopAcceptingRequested());
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnWorkerThreadInitialized) {

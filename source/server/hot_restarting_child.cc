@@ -172,8 +172,9 @@ void HotRestartingChild::drainParentListeners() {
     main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
   }
 
-  // Whether or not there was a parent to notify, the parent (if any) has now been asked to stop
-  // accepting new connections. Latch the flag so a subsequent query observes it.
+  // Latch that the drain-listeners request was sent. The parent stops its listeners synchronously
+  // when it processes the RPC, but delivery is asynchronous, so callers that must not race the
+  // parent's accept queue should wait briefly after this flips before dialing (see reverse_tunnel).
   parent_stop_accepting_requested_.store(true);
 }
 

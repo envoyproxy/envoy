@@ -51,6 +51,11 @@ constexpr uint64_t kMaintainIntervalMs = 10000;
 // until it has asked the parent to stop accepting). The handoff window is brief, so poll frequently
 // to bound the added latency before the child stands up its own tunnel.
 constexpr uint64_t kParentStopAcceptingRecheckMs = 10;
+// After the drain-listeners request is sent, wait briefly before dialing so the parent has time to
+// receive the RPC and call stopListeners(). The request is fire-and-forget, so this bounds the
+// race where the child dials while the parent is still accepting through a shared loopback
+// listener.
+constexpr uint64_t kParentDrainPropagationGraceMs = 50;
 } // namespace
 
 // ReverseConnectionIOHandle implementation
@@ -964,10 +969,24 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
   // through a shared loopback listener and be reset when the parent exits. Re-check shortly. With
   // no extension (some unit tests), no parent, or hot restart disabled, this dials immediately.
   auto* extension = getDownstreamExtension();
-  if (extension != nullptr && !extension->parentStoppedAccepting()) {
+  if (extension != nullptr && !extension->parentStopAcceptingRequested()) {
+    deferred_for_parent_stop_accepting_ = true;
     ENVOY_LOG(debug, "reverse_tunnel: parent still accepting; deferring reverse connection dial");
     if (rev_conn_retry_timer_) {
       rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(kParentStopAcceptingRecheckMs));
+    }
+    return;
+  }
+  // Once the drain request has been sent, wait a fixed grace period so the parent can process the
+  // RPC and stop listeners before we dial. Only applies when we actually deferred above, so fresh
+  // starts and hot-restart-disabled runs dial immediately.
+  if (deferred_for_parent_stop_accepting_) {
+    deferred_for_parent_stop_accepting_ = false;
+    ENVOY_LOG(debug,
+              "reverse_tunnel: waiting for parent drain to propagate before reverse connection "
+              "dial");
+    if (rev_conn_retry_timer_) {
+      rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(kParentDrainPropagationGraceMs));
     }
     return;
   }

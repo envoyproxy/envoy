@@ -18,7 +18,7 @@ public:
   // Server::HotRestart
   void drainParentListeners() override {}
   // No parent when hot restart is disabled, so there is nothing to wait for.
-  bool parentStoppedAccepting() override { return true; }
+  bool parentStopAcceptingRequested() override { return true; }
   int duplicateParentListenSocket(const std::string&, uint32_t, absl::string_view) override {
     return -1;
   }

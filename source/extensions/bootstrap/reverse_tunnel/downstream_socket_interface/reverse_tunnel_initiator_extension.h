@@ -54,16 +54,11 @@ public:
   void onWorkerThreadInitialized() override;
 
   /**
-   * @return whether the reverse-tunnel initiator may start dialing, i.e. whether the hot-restart
-   * parent (if any) has been asked to stop accepting new connections. Deferring the first dial
-   * until then avoids a freshly-forked child dialing into a loopback listener whose accept queue is
-   * still shared with the draining parent, which would otherwise let the child's tunnel be serviced
-   * by the old process during the handoff window.
-   *
-   * Returns true when there is no parent (fresh start), hot restart is disabled, or the server is
-   * not yet initialized. Safe to call from a worker thread.
+   * @return whether drainParentListeners() has sent the drain-listeners request to the hot-restart
+   * parent (if any). Returns true when there is no parent (fresh start), hot restart is disabled,
+   * or the server is not yet initialized. Safe to call from a worker thread.
    */
-  bool parentStoppedAccepting();
+  bool parentStopAcceptingRequested();
 
   /**
    * @return reference to the stat prefix string.
