@@ -587,9 +587,8 @@ TEST_F(GeoipProviderTest, ValidConfigAnonHostingOnlySuccessfulLookup) {
       Network::Utility::parseInternetAddressNoThrow("71.160.223.45");
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
   testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
-  auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  provider_->lookup(std::move(lookup_rq), lookup_cb.AsStdFunction());
   EXPECT_THAT(captured_lookup_response_,
               testing::UnorderedElementsAre(testing::Pair("x-geo-anon-hosting", "true")));
   expectStats("anon_db");
