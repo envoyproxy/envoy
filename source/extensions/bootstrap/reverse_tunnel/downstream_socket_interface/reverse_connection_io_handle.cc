@@ -104,6 +104,12 @@ void ReverseConnectionIOHandle::cleanup() {
                  "reverse_tunnel: resetting file events before closing trigger pipe; "
                  "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
                  trigger_pipe_write_fd_, trigger_pipe_read_fd_);
+  // cleanup() runs from the destructor, which on server teardown fires after the worker
+  // dispatchers have already been destroyed, leaving worker_dispatcher_ dangling. Null it before
+  // resetFileEvents() so the override does not dereference it via isThreadSafe(). By this point
+  // the retry timer was either already torn down on the worker during listener stop, or the
+  // workers are stopped and this is the sole owner, so resetting it here is safe.
+  worker_dispatcher_ = nullptr;
   resetFileEvents();
   SET_SOCKET_INVALID(trigger_pipe_read_fd_);
 

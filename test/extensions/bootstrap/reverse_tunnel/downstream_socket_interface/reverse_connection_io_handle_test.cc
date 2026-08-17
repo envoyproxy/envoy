@@ -3442,7 +3442,12 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsStopsReplacementDialOnListe
 
   auto* mock_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  // Maintenance may re-arm the periodic timer with a jittered (non-zero) delay, but the
+  // drain-aware replacement path must never schedule an immediate (0ms) dial once the listener
+  // has stopped. Set both expectations before resetFileEvents() destroys the timer, so they are
+  // verified when the mock is torn down rather than being touched afterwards.
   EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _)).Times(0);
 
   Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
   io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
@@ -3453,12 +3458,12 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsStopsReplacementDialOnListe
   addHostConnectionInfo(host, "remote-cluster", 1);
   getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
 
-  // Simulate ~TcpListenerImpl during stopListeners: worker-thread resetFileEvents.
+  // Simulate ~TcpListenerImpl during stopListeners: worker-thread resetFileEvents. This destroys
+  // the retry timer (verifying the enableTimer(0ms) Times(0) expectation above).
   io_handle_->resetFileEvents();
 
-  // No immediate replacement dial after the listener has stopped accepting.
-  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _)).Times(0);
-
+  // After the listener has stopped, a drain notice must still drop the key from tracking but must
+  // not dial a replacement. The timer is already gone, so this must be a safe no-op.
   io_handle_->markTunnelDrainingAndDialReplacement(connection_key);
 
   // Tracking is still updated so accounting stays consistent; only the dial is suppressed.
