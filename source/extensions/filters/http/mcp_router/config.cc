@@ -33,8 +33,9 @@ McpRouterFilterConfigFactory::createFilterFactoryFromProtoTyped(
 absl::StatusOr<Http::FilterFactoryCb>
 McpRouterFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
-  return createFilterFactory(proto_config, stats_prefix, context, context.scope());
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  return createFilterFactory(proto_config, extra_context.stats_prefix, context, context.scope());
 }
 
 /**

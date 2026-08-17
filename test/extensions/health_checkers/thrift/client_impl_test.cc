@@ -136,6 +136,18 @@ TEST_F(ThriftClientImplTest, Success) {
   client_->close();
 }
 
+// Tests that start() reports failure when the underlying connection cannot be created (e.g. a
+// network namespace binding failure makes the connection factory return a null connection).
+TEST_F(ThriftClientImplTest, ConnectionCreateFailure) {
+  Upstream::MockHost::MockCreateConnectionData conn_info;
+  EXPECT_CALL(client_callback_, createConnection_).WillOnce(Return(conn_info));
+
+  ClientFactoryImpl& factory = ClientFactoryImpl::instance_;
+  client_ = factory.create(client_callback_, transport_, protocol_, method_name_, host_,
+                           initial_seq_id_, false);
+  EXPECT_FALSE(client_->start());
+}
+
 TEST_F(ThriftClientImplTest, Execption) {
   InSequence s;
 

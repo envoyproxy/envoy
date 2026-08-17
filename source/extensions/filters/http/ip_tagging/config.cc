@@ -31,11 +31,12 @@ absl::StatusOr<Http::FilterFactoryCb> IpTaggingFilterFactory::createFilterFactor
 
 absl::StatusOr<Http::FilterFactoryCb> IpTaggingFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& proto_config,
-    const std::string& stat_prefix, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
 
   absl::StatusOr<IpTaggingFilterConfigSharedPtr> config = IpTaggingFilterConfig::create(
-      proto_config, stat_prefix, context.singletonManager(), context.scope(), context.runtime(),
-      context.api(), context.threadLocal(), context.mainThreadDispatcher(),
+      proto_config, extra_context.stats_prefix, context.singletonManager(), context.scope(),
+      context.runtime(), context.api(), context.threadLocal(), context.mainThreadDispatcher(),
       context.messageValidationVisitor());
   RETURN_IF_NOT_OK_REF(config.status());
   return

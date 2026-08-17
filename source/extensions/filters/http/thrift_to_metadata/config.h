@@ -25,7 +25,8 @@ private:
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata&,
-      const std::string&, Server::Configuration::ServerFactoryContext&) override;
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 } // namespace ThriftToMetadata

@@ -742,6 +742,14 @@ protected:
   const bool stream_error_on_invalid_http_messaging_;
   const bool record_http2_histograms_;
   const uint64_t max_cookie_size_bytes_{0};
+  // Latched value of the `http2_include_cookies_in_limits` runtime feature, read once per
+  // connection instead of on every header field in saveHeader().
+  const bool http2_include_cookies_in_limits_ = false;
+#ifndef ENVOY_ENABLE_UHV
+  // Latched value of the `validate_upstream_headers` runtime feature, consulted per encoded
+  // request instead of performing a runtime lookup there.
+  const bool validate_upstream_headers_ = false;
+#endif
 
   // Status for any errors encountered by the nghttp2 callbacks.
   // nghttp2 library uses single return code to indicate callback failure and
@@ -895,6 +903,9 @@ private:
   // The action to take when a request header name contains underscore characters.
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  // Latched value of the `http2_discard_host_header` runtime feature, read once per connection
+  // instead of on every header field in onHeader().
+  const bool http2_discard_host_header_ = false;
   // Remove when removing runtime feature `http2_fix_goaway_loadshed_point`.
   Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
   Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};

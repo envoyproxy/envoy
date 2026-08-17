@@ -30,8 +30,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.2",
-        sha256 = "3427dc6eaafa83042249125920b3fb03ebc3779bb1aff02c147faedebb6c0475",
+        version = "0.4.6",
+        sha256 = "4c949b54da816e83673028faf28831206f0ef3a28fc4eb95cc01a5275d85cfe6",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -537,8 +537,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "89d6d17edc0f0b79f38edf6fac9e5c8bf5f3cfd7",
-        sha256 = "d994da485d3e1821bcf20a0da5f38ee3d28bd8c0f00389a59adb7ce1196dbce7",
+        version = "90a1e2218164586d4dc711bb9639a313d95de9df",
+        sha256 = "42336ae13c29d687ad9458e230bc56cc7e36f5ffc02ee78541929e6e165c8c90",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -622,7 +622,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     # After updating you may need to run:
     #
-    #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
+    #     bazel run //bazel/external/cargo:crates_vendor -- --repin
     #
     rules_rust = dict(
         version = "0.69.0",

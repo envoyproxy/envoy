@@ -19,8 +19,9 @@ absl::StatusOr<Http::FilterFactoryCb> GrpcWebFilterConfig::createFilterFactoryFr
 }
 
 absl::StatusOr<Http::FilterFactoryCb> GrpcWebFilterConfig::createHttpFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::grpc_web::v3::GrpcWeb&, const std::string&,
-    Server::Configuration::ServerFactoryContext& factory_context) {
+    const envoy::extensions::filters::http::grpc_web::v3::GrpcWeb&,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::ExtraFactoryContext&) {
   return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<GrpcWebFilter>(factory_context.grpcContext()));
   };

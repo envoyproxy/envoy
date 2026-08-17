@@ -36,7 +36,8 @@ absl::StatusOr<Http::FilterFactoryCb> HeaderToMetadataConfig::createFilterFactor
 
 absl::StatusOr<Http::FilterFactoryCb> HeaderToMetadataConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::header_to_metadata::v3::Config& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
   return createFilterFactory(proto_config, context, context.scope());
 }
 

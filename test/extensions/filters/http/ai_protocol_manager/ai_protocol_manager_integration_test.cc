@@ -16,12 +16,17 @@ namespace {
 // downstream HTTP filter chain and once in the upstream (cluster) filter chain.
 class AiProtocolManagerIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
-  void prependFilter(bool downstream = true) {
-    config_helper_.prependFilter(R"EOF(
+  // The filter only offloads a payload it has reason to inspect. These scenarios
+  // are about the round-trip, not parsing, and their bodies are not JSON -- so
+  // they use best effort, which engages on every route and tolerates that.
+  void prependFilter(bool downstream = true, bool best_effort_parsing = true) {
+    config_helper_.prependFilter(fmt::format(R"EOF(
 name: envoy.filters.http.ai_protocol_manager
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+  best_effort_parsing: {}
 )EOF",
+                                             best_effort_parsing),
                                  downstream);
   }
 
@@ -42,6 +47,7 @@ typed_config:
   void runHeaderAndBodyAndTrailers();
   void runHeaderAndTrailersNoBody();
   void runLocalReplyDuringReplay(bool downstream);
+  void runPassThroughWhenNotInspecting();
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, AiProtocolManagerIntegrationTest,
@@ -264,6 +270,40 @@ typed_config:
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(ok_response->waitForEndStream());
   EXPECT_EQ("200", ok_response->headers().getStatusValue());
+}
+
+// With nothing configured to inspect the payload the filter does not offload at
+// all; the round-trip must still be transparent.
+void AiProtocolManagerIntegrationTest::runPassThroughWhenNotInspecting() {
+  initialize();
+
+  for (const uint64_t body_size : {0u, 16u, 1024u, 64u * 1024u}) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    const std::string body(body_size, 'c');
+    auto response = codec_client_->makeRequestWithBody(requestHeaders(), body);
+
+    waitForNextUpstreamRequest();
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ(body_size, upstream_request_->bodyLength());
+    EXPECT_EQ(body, upstream_request_->body().toString());
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+
+    cleanupUpstreamAndDownstream();
+  }
+}
+
+TEST_P(AiProtocolManagerIntegrationTest, PassThroughWhenNotInspecting) {
+  prependFilter(/*downstream=*/true, /*best_effort_parsing=*/false);
+  runPassThroughWhenNotInspecting();
+}
+
+TEST_P(AiProtocolManagerIntegrationTest, UpstreamPassThroughWhenNotInspecting) {
+  prependFilter(/*downstream=*/false, /*best_effort_parsing=*/false);
+  runPassThroughWhenNotInspecting();
 }
 
 TEST_P(AiProtocolManagerIntegrationTest, LocalReplyDuringReplayTearsDownCleanly) {

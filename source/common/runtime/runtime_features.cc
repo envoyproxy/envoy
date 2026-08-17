@@ -85,6 +85,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http_preserve_rst_no_error);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
+RUNTIME_GUARD(envoy_reloadable_features_ja4_alpn_hex_conversion_fix);
 RUNTIME_GUARD(envoy_reloadable_features_json_formatter_omit_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header);
 RUNTIME_GUARD(envoy_reloadable_features_limit_json_parser_nesting_depth);
@@ -141,6 +142,7 @@ RUNTIME_GUARD(envoy_reloadable_features_tls_inspector_enforce_client_tls_version
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_bind_config_fix_port_exhaustion);
+RUNTIME_GUARD(envoy_reloadable_features_upstream_http_filters_correct_stats_prefix);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_wasm_filter_uses_root_scope);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_match_on_asterisk);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_mixed_variable_literals);
@@ -153,7 +155,6 @@ RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_resp
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
-RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
@@ -291,6 +292,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
 // validated in production. When disabled, QUIC retains zlib-only compression while TCP TLS has
 // no certificate compression.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
+
+// DnsFilter created resolver on the worker thread which could lead to race when sharing resolvers
+// Do not turn this on if DnsFilter is used or until the race is fixed
+FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

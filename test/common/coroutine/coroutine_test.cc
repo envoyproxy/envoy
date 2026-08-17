@@ -480,6 +480,108 @@ TEST(LaunchTest, InlineStartRunsUpToFirstSuspension) {
   EXPECT_TRUE(result->ok());
 }
 
+// ---------------------------------------------------------------------------
+// Status macros tests (ASSIGN_OR_CO_RETURN, CO_RETURN_IF_ERROR, etc.)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+Task<absl::StatusOr<std::string>> helperReturnsStringOrError(bool ok) {
+  if (!ok) {
+    co_return absl::InvalidArgumentError("string error");
+  }
+  co_return "hello";
+}
+
+Task<absl::Status> helperReturnsStatusOrError(bool ok) {
+  if (!ok) {
+    co_return absl::InternalError("status error");
+  }
+  co_return absl::OkStatus();
+}
+
+Task<absl::StatusOr<int>> testAssignOrCoReturn(bool ok) {
+  ASSIGN_OR_CO_RETURN(std::string s, co_await helperReturnsStringOrError(ok));
+  co_return static_cast<int>(s.length());
+}
+
+Task<absl::StatusOr<int>> testAssignOrCoReturnExistingVar(bool ok) {
+  std::string s;
+  ASSIGN_OR_CO_RETURN(s, co_await helperReturnsStringOrError(ok));
+  co_return static_cast<int>(s.length());
+}
+
+Task<absl::Status> testCoReturnIfError(bool ok) {
+  CO_RETURN_IF_ERROR(co_await helperReturnsStatusOrError(ok));
+  co_return absl::OkStatus();
+}
+
+} // namespace
+
+TEST(StatusMacrosTest, AssignOrCoReturnSuccess) {
+  auto exec = std::make_shared<ManualExecutor>();
+  std::optional<absl::StatusOr<int>> result;
+  DetachedHandle handle = launch(
+      testAssignOrCoReturn(true), exec,
+      [&result](absl::StatusOr<int> status_or) { result = std::move(status_or); },
+      StartMode::Inline);
+
+  ASSERT_TRUE(result.has_value());
+  EXPECT_OK(*result);
+  EXPECT_EQ(result->value(), 5);
+}
+
+TEST(StatusMacrosTest, AssignOrCoReturnFailure) {
+  auto exec = std::make_shared<ManualExecutor>();
+  std::optional<absl::StatusOr<int>> result;
+  DetachedHandle handle = launch(
+      testAssignOrCoReturn(false), exec,
+      [&result](absl::StatusOr<int> status_or) { result = std::move(status_or); },
+      StartMode::Inline);
+
+  ASSERT_TRUE(result.has_value());
+  EXPECT_FALSE(result->ok());
+  EXPECT_EQ(result->status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(result->status().message(), "string error");
+}
+
+TEST(StatusMacrosTest, AssignOrCoReturnExistingVar) {
+  auto exec = std::make_shared<ManualExecutor>();
+  std::optional<absl::StatusOr<int>> result;
+  DetachedHandle handle = launch(
+      testAssignOrCoReturnExistingVar(true), exec,
+      [&result](absl::StatusOr<int> status_or) { result = std::move(status_or); },
+      StartMode::Inline);
+
+  ASSERT_TRUE(result.has_value());
+  EXPECT_OK(*result);
+  EXPECT_EQ(result->value(), 5);
+}
+
+TEST(StatusMacrosTest, CoReturnIfErrorSuccess) {
+  auto exec = std::make_shared<ManualExecutor>();
+  std::optional<absl::Status> result;
+  DetachedHandle handle = launch(
+      testCoReturnIfError(true), exec,
+      [&result](absl::Status status) { result = std::move(status); }, StartMode::Inline);
+
+  ASSERT_TRUE(result.has_value());
+  EXPECT_OK(*result);
+}
+
+TEST(StatusMacrosTest, CoReturnIfErrorFailure) {
+  auto exec = std::make_shared<ManualExecutor>();
+  std::optional<absl::Status> result;
+  DetachedHandle handle = launch(
+      testCoReturnIfError(false), exec,
+      [&result](absl::Status status) { result = std::move(status); }, StartMode::Inline);
+
+  ASSERT_TRUE(result.has_value());
+  EXPECT_FALSE(result->ok());
+  EXPECT_EQ(result->code(), absl::StatusCode::kInternal);
+  EXPECT_EQ(result->message(), "status error");
+}
+
 } // namespace
 } // namespace Coroutine
 } // namespace Envoy
