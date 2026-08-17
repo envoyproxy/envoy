@@ -5,6 +5,8 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread_impl.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Filesystem {
 
@@ -23,9 +25,10 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& fi
 
   read_handle_->initializeFileEvent(
       dispatcher,
-      [this](uint32_t events) -> void {
+      [this](uint32_t events) -> absl::Status {
         ASSERT(events == Event::FileReadyType::Read);
         onDirectoryEvent();
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Level, Event::FileReadyType::Read);
 
@@ -204,7 +207,7 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
       if (watch.file_ == file && (watch.events_ & events)) {
         ENVOY_LOG(debug, "matched callback: file: {}", watcher->wstring_converter_.to_bytes(file));
         const auto cb = watch.cb_;
-        const auto cb_closure = [cb, events]() -> void { cb(events); };
+        const auto cb_closure = [cb, events]() -> void { cb(events).IgnoreError(); };
         watcher->active_callbacks_.push(cb_closure);
         // write a byte to the other end of the socket that libevent is watching
         // this tells the libevent callback to pull this callback off the active_callbacks_

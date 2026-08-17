@@ -81,6 +81,7 @@ envoy_cc_win32_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:thread_lib",
         "//source/common/network:default_socket_interface_lib",
+        "@abseil-cpp//absl/status",
     ],
 )
 
