@@ -661,7 +661,8 @@ impl EnvoyStatSinkConfig {
 /// Envoy-side resource when dropped.
 #[automock]
 pub trait EnvoyStatSinkConfigScheduler: Send + Sync {
-  /// Schedules [`StatSink::on_config_scheduled`] to run on the main thread with the given `event_id`.
+  /// Schedules [`StatSink::on_config_scheduled`] to run on the main thread with the given
+  /// `event_id`.
   ///
   /// This can be called multiple times to schedule multiple events. The configuration is guaranteed
   /// to be alive when the event runs.

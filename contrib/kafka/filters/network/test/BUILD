@@ -141,7 +141,7 @@ envoy_cc_test(
 genrule(
     name = "request_generated_tests",
     srcs = [
-        "@kafka_source//:request_protocol_files",
+        "@kafka_message//:request_protocol_files",
     ],
     outs = [
         "external/requests_test.cc",
@@ -211,7 +211,7 @@ envoy_cc_test(
 genrule(
     name = "response_generated_tests",
     srcs = [
-        "@kafka_source//:response_protocol_files",
+        "@kafka_message//:response_protocol_files",
     ],
     outs = [
         "external/responses_test.cc",

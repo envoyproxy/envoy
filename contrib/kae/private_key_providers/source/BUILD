@@ -17,7 +17,7 @@ envoy_cc_library(
     ],
     external_deps = ["ssl"],
     repository = "@envoy",
-    deps = ["//contrib/kae:uadklib"],
+    deps = ["@uadk"],
 )
 
 envoy_cc_library(

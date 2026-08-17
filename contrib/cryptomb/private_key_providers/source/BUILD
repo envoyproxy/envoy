@@ -2,62 +2,12 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",
     "envoy_cc_library",
-    "envoy_cmake",
     "envoy_contrib_package",
-)
-load(
-    "//contrib:all_contrib_extensions.bzl",
-    "envoy_contrib_linux_x86_64_constraints",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
-
-envoy_cmake(
-    name = "ipp-crypto",
-    build_args = select({
-        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//conditions:default": ["-j1"],
-    }),
-    cache_entries = {
-        "BORINGSSL": "on",
-        "DYNAMIC_LIB": "off",
-        "MB_STANDALONE": "on",
-        "Python_EXECUTABLE": "$$EXT_BUILD_ROOT/$(PYTHON3)",
-    } | select({
-        # FIPS builds use libcrypto.a/libssl.a
-        "//bazel:using_fips_ssl": {
-            "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto.a",
-        },
-        # Non-FIPS builds use libcrypto_internal.a/libssl_internal.a
-        "//conditions:default": {
-            "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto_internal.a",
-        },
-    }),
-    defines = [
-        "OPENSSL_USE_STATIC_LIBS=TRUE",
-    ],
-    exec_properties = select({
-        "//bazel:engflow_rbe_x86_64": {
-            "Pool": "linux_x64_large",
-        },
-        "//conditions:default": {},
-    }),
-    generate_args = [
-        "-G",
-        "Ninja",
-    ],
-    lib_source = "@ipp-crypto//:all",
-    out_static_libs = ["libcrypto_mb.a"],
-    tags = ["skip_on_windows"],
-    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
-    toolchains = ["@rules_python//python:current_py_toolchain"],
-    visibility = ["//visibility:private"],
-    working_directory = "sources/ippcp/crypto_mb",
-    # Use ssl label_flag to select the SSL library.
-    deps = ["//bazel:ssl"],
-)
 
 envoy_cc_library(
     name = "ipp_crypto_wrapper_lib",
@@ -78,7 +28,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = select({
         "//bazel:linux_x86_64": [
-            ":ipp-crypto",
+            "@ipp-crypto//:crypto_mb",
         ],
         "//conditions:default": [],
     }),

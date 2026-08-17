@@ -1,7 +1,8 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@envoy_toolshed//dependency:reachability.bzl", "dependency_reachability")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
@@ -64,27 +65,19 @@ py_console_script_binary(
     script = "dependatool",
 )
 
-py_binary(
-    name = "validate",
-    srcs = ["validate.py"],
-    args = [
-        "$(location //bazel:all_repository_locations)",
-        "$(location //source/extensions:extensions_build_config)",
-    ],
+py_test(
+    name = "validate_reachability_test",
+    srcs = ["validate_reachability_test.py"],
     data = [
+        ":dep-reachability",
         "//bazel:all_repository_locations",
         "//source/extensions:extensions_build_config",
     ],
-    deps = [
-        "@envoy_repo",
-        requirement("aio.api.bazel"),
-    ],
-)
-
-py_binary(
-    name = "validate_test",
-    srcs = ["validate_test.py"],
-    deps = [":validate"],
+    env = {
+        "REACHABILITY_JSON": "$(location :dep-reachability)",
+        "REPOSITORY_LOCATIONS_JSON": "$(location //bazel:all_repository_locations)",
+        "EXTENSIONS_BUILD_CONFIG_JSON": "$(location //source/extensions:extensions_build_config)",
+    },
 )
 
 json_merge(
@@ -260,4 +253,11 @@ sh_test(
     },
     tags = ["no-remote-exec"],
     toolchains = ["@jq_toolchains//:resolved_toolchain"],
+)
+
+dependency_reachability(
+    name = "dep-reachability",
+    roots = [
+        "//source/exe:envoy_main_common_with_core_extensions_lib",
+    ],
 )

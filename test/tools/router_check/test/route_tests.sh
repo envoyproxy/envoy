@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -eu
 
 ENVOY_SRCDIR="${TEST_SRCDIR}/${TEST_WORKSPACE}"
 

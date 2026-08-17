@@ -4,7 +4,7 @@
 
 # Usage: generate_fixture.sh <transport> <protocol> -s [multiplex-service] -H [headers] method [param...]
 
-set -e
+set -eu
 
 function usage() {
     echo "Usage: $0 <mode> <transport> <protocol> -s [multiplex-service] -H [headers] -T [TempPath] method [param...]"
@@ -75,7 +75,7 @@ if [[ "$OSTYPE" == "msys" ]]; then
     done
     SOCKET="127.0.0.1:${port}"
 else
-    if [[ -z "${TEST_UDSDIR}" ]]; then
+    if [[ -z "${TEST_UDSDIR:-}" ]]; then
         TEST_UDSDIR=$(mktemp -d /tmp/envoy_test_thrift.XXXXXX)
     fi
     SOCKET="${TEST_UDSDIR}/fixture.sock"

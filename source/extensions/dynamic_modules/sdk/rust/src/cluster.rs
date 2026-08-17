@@ -62,8 +62,7 @@ pub trait Cluster: Send + Sync {
   /// default implementation is a no-op.
   ///
   /// * `envoy_cluster` provides access to the underlying Envoy cluster object.
-  /// * `event_id` is the module-defined identifier supplied at the main-thread fan-out call
-  ///   site.
+  /// * `event_id` is the module-defined identifier supplied at the main-thread fan-out call site.
   fn on_worker_event(&self, _envoy_cluster: &dyn EnvoyCluster, _event_id: u64) {}
 
   /// Called when the server initialization is complete (PostInit lifecycle stage).

@@ -22,6 +22,9 @@ def main():
     protobuf = ProtobufValidator(parsed.descriptor_path)
 
     for example in parsed.paths:
+        is_yaml = example.endswith(".yaml")
+        if not is_yaml:
+            continue
         try:
             protobuf.validate_yaml(pathlib.Path(example).read_text())
         except (ParseError, KeyError, ParserError, ScannerError) as e:

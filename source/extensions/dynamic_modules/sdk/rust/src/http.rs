@@ -408,9 +408,10 @@ pub trait EnvoyHttpFilterConfig {
   /// `name` is the name of the secret: for a static secret the name in the bootstrap
   /// configuration, and for a dynamic secret the resource name requested from the SDS server.
   ///
-  /// `sds_config_source` is the JSON serialized `envoy.config.core.v3.ConfigSource` describing where
-  /// to fetch the secret from, so that the value is updated whenever the SDS server pushes a new
-  /// version. Pass `None` to look the name up among the statically configured secrets instead.
+  /// `sds_config_source` is the JSON serialized `envoy.config.core.v3.ConfigSource` describing
+  /// where to fetch the secret from, so that the value is updated whenever the SDS server pushes
+  /// a new version. Pass `None` to look the name up among the statically configured secrets
+  /// instead.
   ///
   /// This can only be called while the filter config is being created, i.e. from
   /// [`HttpFilterConfig`]'s constructor. Returns `None` if the secret cannot be subscribed to, for

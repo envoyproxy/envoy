@@ -39,7 +39,7 @@ The bssl-compat build currently produces two unit test executables,
 `@bssl-compat//test:utests-boringssl`. Each executable runs the _identical_ set
 of unit tests, the only difference being that one of the executables is linked
 against the `@bssl-compat` library, and the other one, which acts as a sanity
-check, is linked against the real `@boringssl` libraries.
+check, is linked against the real `@boringssl-source` libraries.
 
 # Structure
 

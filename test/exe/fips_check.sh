@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
-set -e
-
+set -eu
 
 # env vars dont really work in bazels env - so replace with correct var
+LLVM_DIRECTORY="${LLVM_DIRECTORY:-}"
+OBJDUMP="${OBJDUMP:-}"
 OBJDUMP="${OBJDUMP//\$\{LLVM_DIRECTORY\}/$LLVM_DIRECTORY}"
 
 # FIPS requires a consistency self-test. In practice, the FIPS binary has

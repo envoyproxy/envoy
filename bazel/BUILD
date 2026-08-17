@@ -11,6 +11,7 @@ load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(":deprecated_features.bzl", "check_removed_fips_define")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+load(":repository_locations_aliases.bzl", "MODULE_NAME_ALIASES")
 
 licenses(["notice"])  # Apache 2
 
@@ -34,6 +35,20 @@ exports_files([
     "exported_symbols.txt",
     "exported_symbols_apple.txt",
 ])
+
+# TODO(phlax): Cleanup once bzlmod migration is complete
+bool_flag(
+    name = "enable_bzlmod",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "bzlmod_mode",
+    flag_values = {
+        ":enable_bzlmod": "True",
+    },
+    visibility = ["//visibility:public"],
+)
 
 sh_library(
     name = "volatile_env",
@@ -559,7 +574,7 @@ config_setting(
 
 config_setting(
     name = "using_boringssl_fips",
-    flag_values = {":ssl": "@boringssl_fips//:ssl"},
+    flag_values = {":ssl": "@boringssl-fips//:ssl"},
 )
 
 config_setting(
@@ -584,6 +599,52 @@ check_removed_fips_define(
 label_flag(
     name = "zlib",
     build_setting_default = "@zlib-ng",
+)
+
+# TODO(phlax): Cleanup once bzlmod migration is complete.
+# Compatibility aliases: select between the foreign_cc build and the module-provided library.
+# Once bzlmod is the only supported mode these become plain aliases to the module (or can
+# be removed entirely along with //bazel/foreign_cc).
+alias(
+    name = "libevent",
+    actual = select({
+        ":bzlmod_mode": "@libevent",
+        "//conditions:default": "//bazel/foreign_cc:_event_foreign_cc",
+    }),
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "luajit",
+    actual = select({
+        ":bzlmod_mode": "@luajit",
+        "//conditions:default": "//bazel/foreign_cc:_luajit_foreign_cc",
+    }),
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "libmaxminddb",
+    actual = select({
+        ":bzlmod_mode": "@libmaxminddb",
+        "//conditions:default": "//bazel/foreign_cc:maxmind",
+    }),
+    visibility = ["//visibility:public"],
+)
+
+# TODO(phlax): Cleanup once bzlmod migration is complete.
+# Platform-gated wrapper for libmaxminddb; only links on Linux and macOS.
+# cc_library is equivalent to envoy_cc_library for this deps-only wrapper: copts,
+# linkstatic, and Windows handling from envoy_cc_library only apply to compiled srcs.
+cc_library(
+    name = "maxmind_linux_darwin",
+    srcs = [],
+    visibility = ["//visibility:public"],
+    deps = select({
+        "//bazel:linux": [":libmaxminddb"],
+        "//bazel:darwin_any": [":libmaxminddb"],
+        "//conditions:default": [],
+    }),
 )
 
 config_setting(
@@ -971,7 +1032,7 @@ json_merge(
 )
 
 json_data(
-    name = "all_repository_locations_version_info",
+    name = "all_repository_locations_legacy_version_info",
     data = merge_dicts(
         load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
         load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
@@ -979,8 +1040,8 @@ json_data(
 )
 
 json_merge(
-    name = "all_repository_locations",
-    srcs = [":all_repository_locations_version_info"],
+    name = "all_repository_locations_legacy",
+    srcs = [":all_repository_locations_legacy_version_info"],
     filter = """
     .[0] as $versions
     | .[1] as $metadata1
@@ -1006,6 +1067,72 @@ json_merge(
         ":deps.yaml",
         "@envoy_api//bazel:deps.yaml",
     ],
+)
+
+json_data(
+    name = "all_repository_locations_module_name_aliases",
+    data = MODULE_NAME_ALIASES,
+)
+
+json_merge(
+    name = "all_repository_locations",
+    srcs = [
+        ":all_repository_locations_legacy_version_info",
+        ":all_repository_locations_module_name_aliases",
+        "@envoy_mod_graph//:deps.json",
+    ],
+    filter = """
+    .[0] as $non_modules
+    | .[1] as $module_aliases
+    | .[2] as $modules
+    | .[3] as $metadata1
+    | .[4] as $metadata2
+    | ($metadata1 * $metadata2) as $metadata
+    | def module_source($dep):
+        if $modules[$dep] then
+          ($modules[$dep] + {module_name: $dep})
+        elif ($dep | startswith("com_google_")) and $modules[$dep | sub("^com_google_"; "")] then
+          (($dep | sub("^com_google_"; "")) as $module_name | $modules[$module_name] + {module_name: $module_name})
+        else
+          ($module_aliases[$dep] // ($dep | gsub("_"; "-"))) as $module_name
+          | if $modules[$module_name] then
+              ($modules[$module_name] + {module_name: $module_name})
+            else null end
+        end;
+      def dependency_source($dep):
+        module_source($dep) // $non_modules[$dep];
+      $metadata
+      | keys
+      | reduce .[] as $k ({};
+          (dependency_source($k)) as $source
+          | if $source then
+              . + {($k): (
+                ($source + ($metadata[$k] // {}))
+                | .version as $ver
+                | if .license_url and $ver then
+                    .license_url |= (
+                      gsub("{version}"; $ver)
+                      | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
+                      | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
+                    )
+                  else . end
+              )}
+            else .
+            end
+        )
+    """,
+    visibility = ["//visibility:public"],
+    yaml_srcs = [
+        ":deps.yaml",
+        "@envoy_api//bazel:deps.yaml",
+    ],
+)
+
+sh_test(
+    name = "all_repository_locations_test",
+    srcs = ["all_repository_locations_test.sh"],
+    args = ["$(location :all_repository_locations)"],
+    data = [":all_repository_locations"],
 )
 
 # A dependency required by python protobuf
@@ -1109,4 +1236,10 @@ config_setting(
 alias(
     name = "cpp_runfiles",
     actual = "@bazel_tools//tools/cpp/runfiles",
+)
+
+filegroup(
+    name = "redacted_dates_h",
+    srcs = ["@llvm_toolchain//:redacted_dates.h"],
+    visibility = ["//visibility:public"],
 )

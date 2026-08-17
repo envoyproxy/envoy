@@ -19,16 +19,23 @@ startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 # global
 #############################################################################
 
-common --noenable_bzlmod
-common --enable_workspace
+common --enable_bzlmod
+common --noenable_workspace
+common --@envoy//bazel:enable_bzlmod=True
 common --noincompatible_disallow_empty_glob
 common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
 
 fetch --color=yes
 run --color=yes
-
 build --color=yes
+
+common --registry=https://bcr.bazel.build/
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/76411adc226d57e32ebe1599c6d290786ff9e914
+# common --registry=file:///bazel-registry
+# this can be useful for dev
+# common --lockfile_mode=off
+
 build --jobs=HOST_CPUS-1
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
@@ -71,13 +78,6 @@ test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 # Allow tags to influence execution requirements
 common --incompatible_allow_tags_propagation
 
-# Python
-common --@rules_python//python/config_settings:bootstrap_impl=script
-build --incompatible_default_to_explicit_init_py
-
-# Protobuf
-common --@com_google_protobuf//bazel/flags:prefer_prebuilt_protoc=true
-
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
 
@@ -91,8 +91,37 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 coverage --config=coverage
 coverage --build_tests_only
 
+
+#############################################################################
+# global: deps
+#############################################################################
+
+# Python
+common --@rules_python//python/config_settings:bootstrap_impl=script
+build --incompatible_default_to_explicit_init_py
+
+# Rust
 # Specifies the rustfmt.toml for all rustfmt_test targets.
 build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
+
+# grpc
+build --@grpc//third_party:ssl_lib=@envoy//bazel:ssl
+build --@grpc//third_party:crypto_lib=@envoy//bazel:crypto
+
+# kafka
+build --@librdkafka//:with_ssl=false
+build --@librdkafka//:with_zlib=false
+build --per_file_copt=contrib/kafka/.*\.cc@-Wno-old-style-cast
+
+# protobuf
+common --incompatible_enable_proto_toolchain_resolution=true
+common --@com_google_protobuf//bazel/toolchains:prefer_prebuilt_protoc
+common --@com_google_protobuf//:zlib=@zlib-ng
+# these are here to detect if the toolchain attempts to compile protoc
+common --per_file_copt=bazel-out/.*/bin/external/protobuf.*/protoc@--THIS_CC_TOOLCHAIN_IS_BROKEN
+
+# proxy-wasm-cpp-host
+common --@proxy-wasm-cpp-host//bazel:crypto_lib=@envoy//bazel:crypto
 
 
 #############################################################################
@@ -240,8 +269,8 @@ common:fips-common --@envoy//bazel:fips=True
 
 # BoringSSL FIPS
 common:boringssl-fips --config=fips-common
-common:boringssl-fips --@envoy//bazel:ssl=@boringssl_fips//:ssl
-common:boringssl-fips --@envoy//bazel:crypto=@boringssl_fips//:crypto
+common:boringssl-fips --@envoy//bazel:ssl=@boringssl-fips//:ssl
+common:boringssl-fips --@envoy//bazel:crypto=@boringssl-fips//:crypto
 
 # OpenSSL
 common:openssl --@envoy//bazel:openssl=True
@@ -433,6 +462,7 @@ build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 # This flag may be more generally useful - it sets foreign_cc builds -jauto.
 # It is only set here because if it were the default it risks OOMing on local builds.
 build:remote --@envoy//bazel/foreign_cc:parallel_builds
+build:remote --@openssl//:parallel_builds
 
 ## RBE (Engflow Envoy)
 

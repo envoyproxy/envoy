@@ -841,7 +841,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
       .set_dynamic_metadata_string_batch("ns_req_header_batch", &[("k1", "v1"), ("k2", "v2")]);
     envoy_filter.set_dynamic_metadata_string_batch("ns_req_header_batch_empty", &[]);
 
-    // Set a non-UTF-8 byte value, asserted end-to-end by the C++ integration test in filter_test.cc.
+    // Set a non-UTF-8 byte value, asserted end-to-end by the C++ integration test in
+    // filter_test.cc.
     envoy_filter.set_dynamic_metadata_bytes("ns_req_header_bytes", "key", &[0xff, 0x00, 0xfe]);
 
     // Set a whole namespace from a serialized google.protobuf.Struct { "k": "v" }, asserted
