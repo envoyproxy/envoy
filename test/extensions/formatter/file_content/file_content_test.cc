@@ -149,6 +149,28 @@ TEST_F(FileContentFormatterTest, FormatValueMissingFileReturnsEmpty) {
   EXPECT_EQ(nullptr, provider);
 }
 
+TEST_F(FileContentFormatterTest, UnsetThreadLocalDataIsMissingValue) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("deferred.txt", "my-value");
+
+  // Must be set before the provider is created, so that its slot->set() is deferred.
+  context_.server_factory_context_.thread_local_.defer_data_ = true;
+
+  FileContentFormatterFactory factory;
+  auto proto_config = factory.createEmptyConfigProto();
+  auto parser = factory.createCommandParserFromProto(*proto_config, context_);
+  ASSERT_NE(nullptr, parser);
+  auto provider = *parser->parse("FILE_CONTENT", file_path, std::nullopt);
+  ASSERT_NE(nullptr, provider);
+
+  // Covers both the string and the value paths, old and sink-based alike.
+  EXPECT_EQ(std::nullopt,
+            Envoy::Formatter::formatForTest(*provider, formatter_context_, stream_info_));
+  EXPECT_EQ(Protobuf::Value::KIND_NOT_SET,
+            Envoy::Formatter::formatValueForTest(*provider, formatter_context_, stream_info_)
+                .kind_case());
+}
+
 TEST_F(FileContentFormatterTest, WatchDirectoryUpdatesOnSymlinkSwap) {
   const std::string dir = TestEnvironment::temporaryPath("file_content_watch");
   TestEnvironment::createPath(dir);
