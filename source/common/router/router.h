@@ -280,6 +280,13 @@ public:
   Http::Context& http_context_;
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
+  // The upstream filter config provider manager is an *unpinned* singleton, so it is kept alive
+  // only by its holders. Each dynamic (ECDS) provider in upstream_http_filter_factories_ owns a
+  // FilterConfigSubscription that holds a raw reference back to this manager and writes through it
+  // from its destructor, so the manager must outlive the factories below. Declared first so that it
+  // is destroyed last.
+  std::shared_ptr<Http::UpstreamFilterConfigProviderManager>
+      upstream_filter_config_provider_manager_;
   std::unique_ptr<Server::Configuration::UpstreamFactoryContext> upstream_ctx_;
   Http::FilterChainUtility::FilterFactoriesList upstream_http_filter_factories_;
 

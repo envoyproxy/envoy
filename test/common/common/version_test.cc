@@ -66,7 +66,7 @@ TEST(VersionTest, MakeBuildVersionWithoutLabel) {
   EXPECT_EQ(2, build_version.version().minor_number());
   EXPECT_EQ(3, build_version.version().patch());
   const auto& fields = build_version.metadata().fields();
-  EXPECT_EQ(fields.find(BuildVersionMetadataKeys::get().BuildLabel), fields.end());
+  EXPECT_FALSE(fields.contains(BuildVersionMetadataKeys::get().BuildLabel));
   // Other metadata should still be present
   EXPECT_GE(fields.size(), 1);
 }
@@ -77,7 +77,7 @@ TEST(VersionTest, MakeBadBuildVersion) {
   EXPECT_EQ(0, build_version.version().minor_number());
   EXPECT_EQ(0, build_version.version().patch());
   const auto& fields = build_version.metadata().fields();
-  EXPECT_EQ(fields.find(BuildVersionMetadataKeys::get().BuildLabel), fields.end());
+  EXPECT_FALSE(fields.contains(BuildVersionMetadataKeys::get().BuildLabel));
   // Other metadata should still be present
   EXPECT_GE(fields.size(), 1);
 }

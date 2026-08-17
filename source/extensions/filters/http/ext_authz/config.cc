@@ -23,7 +23,8 @@ namespace ExtAuthz {
 
 absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+    Server::Configuration::ServerFactoryContext& server_context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   AuthCacheFactory* const cache_factory =
       proto_config.has_cache()
           ? &Config::Utility::getAndCheckFactory<AuthCacheFactory>(proto_config.cache())
@@ -39,9 +40,9 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
                            : nullptr;
 
   absl::Status creation_status = absl::OkStatus();
-  const auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, server_context.scope(), stats_prefix,
-                                     server_context, std::move(cache), creation_status);
+  const auto filter_config = std::make_shared<FilterConfig>(
+      proto_config, server_context.scope(), extra_context.stats_prefix, server_context,
+      std::move(cache), creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
 
   // The callback is created in main thread and executed in worker thread, variables except factory

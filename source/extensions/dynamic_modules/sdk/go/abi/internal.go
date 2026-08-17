@@ -861,6 +861,26 @@ func (h *dymHttpFilterHandle) SetMetadata(metadataNamespace, key string, value a
 	runtime.KeepAlive(strValue)
 }
 
+func (h *dymHttpFilterHandle) SetMetadataStruct(metadataNamespace string, serializedStruct []byte) {
+	C.envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		bytesToModuleBuffer(serializedStruct),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(serializedStruct)
+}
+
+func (h *dymHttpFilterHandle) SetTypedMetadata(metadataNamespace string, serializedAny []byte) {
+	C.envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		bytesToModuleBuffer(serializedAny),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(serializedAny)
+}
+
 func (h *dymHttpFilterHandle) GetAttributeNumber(
 	attributeID shared.AttributeID,
 ) (float64, bool) {

@@ -838,6 +838,97 @@ TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionBytesSetFailure) {
       envoy_dynamic_module_type_socket_direction_Downstream, {value.data(), value.size()}));
 }
 
+TEST(ABIImpl, SetDynamicMetadataStruct) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  const std::string ns = "foo";
+
+  // A nested Struct ({"outer": {"inner": "value"}}) round-trips into the namespace.
+  Protobuf::Struct input;
+  Protobuf::Struct nested;
+  (*nested.mutable_fields())["inner"].set_string_value("value");
+  (*input.mutable_fields())["outer"].mutable_struct_value()->CopyFrom(nested);
+  std::string serialized;
+  ASSERT_TRUE(input.SerializeToString(&serialized));
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+      &filter, {ns.data(), ns.size()}, {serialized.data(), serialized.size()});
+
+  ASSERT_TRUE(metadata.filter_metadata().contains(ns));
+  EXPECT_EQ(metadata.filter_metadata()
+                .at(ns)
+                .fields()
+                .at("outer")
+                .struct_value()
+                .fields()
+                .at("inner")
+                .string_value(),
+            "value");
+
+  // A second struct is merged in: new keys are added, existing keys are preserved.
+  Protobuf::Struct second;
+  (*second.mutable_fields())["extra"].set_string_value("bar");
+  std::string serialized2;
+  ASSERT_TRUE(second.SerializeToString(&serialized2));
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+      &filter, {ns.data(), ns.size()}, {serialized2.data(), serialized2.size()});
+  EXPECT_EQ(metadata.filter_metadata().at(ns).fields().at("extra").string_value(), "bar");
+  EXPECT_TRUE(metadata.filter_metadata().at(ns).fields().contains("outer"));
+
+  // A buffer that does not parse as a google.protobuf.Struct is a no-op (wire type 7 is invalid).
+  const std::string garbage("\x0f", 1);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(&filter, {ns.data(), ns.size()},
+                                                                 {garbage.data(), garbage.size()});
+  EXPECT_TRUE(metadata.filter_metadata().at(ns).fields().contains("extra"));
+  EXPECT_TRUE(metadata.filter_metadata().at(ns).fields().contains("outer"));
+}
+
+TEST(ABIImpl, SetDynamicTypedMetadata) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  const std::string ns = "foo";
+
+  // A packed Any round-trips into typed_filter_metadata with its type_url preserved.
+  Protobuf::StringValue payload;
+  payload.set_value("hello");
+  Protobuf::Any any;
+  ASSERT_TRUE(any.PackFrom(payload));
+  std::string serialized;
+  ASSERT_TRUE(any.SerializeToString(&serialized));
+  envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+      &filter, {ns.data(), ns.size()}, {serialized.data(), serialized.size()});
+
+  ASSERT_TRUE(metadata.typed_filter_metadata().contains(ns));
+  Protobuf::StringValue unpacked;
+  ASSERT_TRUE(metadata.typed_filter_metadata().at(ns).UnpackTo(&unpacked));
+  EXPECT_EQ(unpacked.value(), "hello");
+
+  // A buffer that does not parse as a google.protobuf.Any is a no-op (wire type 7 is invalid).
+  const std::string garbage("\x0f", 1);
+  envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(&filter, {ns.data(), ns.size()},
+                                                                {garbage.data(), garbage.size()});
+  Protobuf::StringValue still;
+  ASSERT_TRUE(metadata.typed_filter_metadata().at(ns).UnpackTo(&still));
+  EXPECT_EQ(still.value(), "hello");
+}
+
 TEST(ABIImpl, metadata) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
@@ -2272,6 +2363,32 @@ TEST(ABIImpl, BufferedResponseBody) {
   EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
                 &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody),
             4);
+}
+
+// destroy() clears the stream callbacks before it hands the in-module filter to the dispatcher, so
+// every callback that needs them must be a no-op for the module hooks that still run in between.
+TEST(ABIImpl, StreamCallbacksAfterTeardown) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+
+  for (const auto body_type : {envoy_dynamic_module_type_http_body_type_BufferedRequestBody,
+                               envoy_dynamic_module_type_http_body_type_BufferedResponseBody}) {
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks(&filter, body_type, nullptr));
+    EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(&filter, body_type), 0);
+    EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(&filter, body_type), 0);
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_drain_body(&filter, body_type, 0));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_append_body(&filter, body_type, {nullptr, 0}));
+  }
+
+  // The current body pointers belong to the hook that set them, so they outlive the teardown and
+  // can still be set here.
+  Buffer::OwnedImpl body;
+  filter.current_request_body_ = &body;
+  filter.current_response_body_ = &body;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_request_body(&filter));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_received_buffered_response_body(&filter));
+
+  EXPECT_EQ(envoy_dynamic_module_callback_get_most_specific_route_config(&filter), nullptr);
 }
 
 TEST(ABIImpl, ClearRouteCache) {

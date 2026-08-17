@@ -50,8 +50,15 @@ public:
       const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
           DownstreamReverseConnectionSocketInterface& config);
 
-  void onServerInitialized(Server::Instance&) override;
+  void onServerInitialized(Server::Instance& server) override;
   void onWorkerThreadInitialized() override;
+
+  /**
+   * @return whether drainParentListeners() has sent the drain-listeners request to the hot-restart
+   * parent (if any). Returns true when there is no parent (fresh start), hot restart is disabled,
+   * or the server is not yet initialized. Safe to call from a worker thread.
+   */
+  bool parentStopAcceptingRequested();
 
   /**
    * @return reference to the stat prefix string.
@@ -185,6 +192,8 @@ public:
 
 private:
   Server::Configuration::ServerFactoryContext& context_;
+  // Captured in onServerInitialized() to reach hotRestart(); not owned. Null until then.
+  Server::Instance* server_{nullptr};
   const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config_;
   ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;
