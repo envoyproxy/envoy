@@ -1866,6 +1866,19 @@ TEST_F(SimpleConnReadFilterTest, OnDataWithNullParent) {
   EXPECT_EQ(result, Network::FilterStatus::StopIteration);
 }
 
+TEST_F(SimpleConnReadFilterTest, OnDataAfterClearParent) {
+  auto wrapper = createMockWrapper();
+  auto filter = createFilter(wrapper.get());
+
+  filter->clearParent();
+
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\n");
+  // After clearParent(), onData must no-op even though the wrapper object is still alive. This
+  // models shutdown() clearing the back-pointer before the wrapper is deferred-deleted.
+  auto result = filter->onData(buffer, false);
+  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
+}
+
 TEST_F(SimpleConnReadFilterTest, OnDataWithHttp200Response) {
   // Create wrapper and filter.
   auto wrapper = createMockWrapper();

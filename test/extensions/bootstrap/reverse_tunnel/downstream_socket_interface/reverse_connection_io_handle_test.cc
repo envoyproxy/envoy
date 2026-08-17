@@ -1768,7 +1768,10 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
   EXPECT_TRUE(getHostToConnInfoMap().contains("192.168.1.1"));
   EXPECT_TRUE(getHostToConnInfoMap().contains("192.168.1.2"));
 
-  // Verify that connection wrappers for the removed host are removed.
+  // Verify that connection wrappers for the removed host are removed from tracking immediately.
+  // The wrapper itself is held on the deferred-delete list until clearDeferredDeleteList(),
+  // matching onConnectionDone(), so an in-flight handshake read cannot hit a freed
+  // RCConnectionWrapper.
   EXPECT_EQ(getConnectionWrappers().size(), 1);   // Only host 192.168.1.2's wrapper remains
   EXPECT_EQ(getConnWrapperToHostMap().size(), 1); // Only host 192.168.1.2's mapping remains
 
@@ -1776,6 +1779,9 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
   const auto& wrapper_to_host_map = getConnWrapperToHostMap();
   EXPECT_EQ(wrapper_to_host_map.size(), 1);
   EXPECT_EQ(wrapper_to_host_map.begin()->second, "192.168.1.2"); // Only 192.168.1.2 should remain
+
+  // Drain deferred deletes so the removed wrapper is destroyed without leaking into TearDown.
+  dispatcher_.clearDeferredDeleteList();
 }
 
 // Test read() method - should delegate to base class.
