@@ -25,6 +25,7 @@ aws_c_auth_testdata:
   project_desc: "C99 library implementation of AWS client-side authentication: standard credentials providers and signing"
   project_url: "https://github.com/awslabs/aws-c-auth"
   release_date: "2026-07-10"
+  apparent_name: aws-c-auth-testdata
   use_category:
   - test_only
   extensions:
@@ -176,6 +177,7 @@ cel_spec:
   project_name: "Common Expression Language (CEL) spec"
   project_desc: "Common Expression Language (CEL) spec and conformance tests"
   project_url: "https://opensource.google/projects/cel"
+  apparent_name: cel-spec
   release_date: "2026-05-08"
   use_category:
   - dataplane_ext
@@ -268,6 +270,7 @@ dd_trace_cpp:
   project_name: "Datadog C++ Tracing Library"
   project_desc: "Datadog distributed tracing for C++"
   project_url: "https://github.com/DataDog/dd-trace-cpp"
+  apparent_name: dd-trace-cpp
   release_date: "2026-06-19"
   use_category:
   - observability_ext
@@ -523,6 +526,7 @@ hessian2_codec:
   project_name: "hessian2-codec"
   project_desc: "hessian2-codec is a C++ library for hessian2 codec"
   project_url: "https://github.com/alibaba/hessian2-codec.git"
+  apparent_name: hessian2-codec
   release_date: "2025-01-14"
   use_category:
   - dataplane_ext
@@ -594,6 +598,7 @@ ipp_crypto:
   project_name: "libipp-crypto"
   project_desc: "Intel® Integrated Performance Primitives Cryptography"
   project_url: "https://github.com/intel/cryptography-primitives"
+  apparent_name: ipp-crypto
   release_date: "2026-05-28"
   use_category:
   - dataplane_ext
@@ -690,6 +695,7 @@ libprotobuf_mutator:
   project_name: "libprotobuf-mutator"
   project_desc: "Library to randomly mutate protobuffers"
   project_url: "https://github.com/google/libprotobuf-mutator"
+  apparent_name: libprotobuf-mutator
   release_date: "2025-04-08"
   use_category:
   - test_only
@@ -798,6 +804,7 @@ ocp:
   project_name: "ocp"
   project_desc: "Libraries used in gRPC field extraction library"
   project_url: "https://github.com/opencomputeproject/ocp-diag-core"
+  apparent_name: ocp-diag-core
   release_date: "2023-05-05"
   use_category:
   - dataplane_ext
@@ -1218,6 +1225,7 @@ sql_parser:
   project_name: "C++ SQL Parser Library"
   project_desc: "Forked from Hyrise SQL Parser"
   project_url: "https://github.com/envoyproxy/sql-parser"
+  apparent_name: sql-parser
   release_date: "2026-07-15"
   use_category:
   - dataplane_ext
@@ -1231,6 +1239,7 @@ su_exec:
   project_name: "su-exec"
   project_desc: "Utility to switch user and group id, setgroups and exec"
   project_url: "https://github.com/ncopa/su-exec"
+  apparent_name: su-exec
   release_date: "2025-10-07"
   use_category:
   - other
@@ -1325,6 +1334,7 @@ vpp_vcl:
   project_name: "VPP Comms Library"
   project_desc: "FD.io Vector Packet Processor (VPP) Comms Library"
   project_url: "https://fd.io/"
+  apparent_name: vpp-vcl
   release_date: "2026-01-11"
   use_category:
   - other
@@ -1395,6 +1405,7 @@ yq_bzl:
   project_name: "yq.bzl"
   project_desc: "Bazel rules for yq"
   project_url: "https://github.com/bazel-contrib/yq.bzl"
+  apparent_name: yq.bzl
   release_date: "2025-05-26"
   use_category:
   - build

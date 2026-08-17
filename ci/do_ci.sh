@@ -664,13 +664,9 @@ case $CI_TARGET in
         echo "dependency metadata ordering..."
         bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:deps_order_test
-        echo "dependency validate_test..."
-        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-              //tools/dependency:validate_test
-        echo "verifying dependencies..."
-        # Validate dependency relationships between core/extensions and external deps.
-        time bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-             //tools/dependency:validate
+        echo "dependency validate_reachability_test..."
+        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/dependency:validate_reachability_test
         # Validate repository metadata.
         echo "check repositories..."
         "${ENVOY_SRCDIR}/tools/check_repositories.sh"
