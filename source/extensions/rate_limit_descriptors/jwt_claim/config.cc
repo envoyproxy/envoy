@@ -92,7 +92,7 @@ private:
   const std::string value_prefix_;
   const std::string claim_name_;
   const std::string default_value_;
-  const bool skip_if_absent_;
+  const bool skip_if_absent_ = false;
 };
 
 std::string JwtClaimDescriptorFactory::name() const {
