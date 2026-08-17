@@ -808,8 +808,6 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(
     first_tool = false;
 
     response_fragments.emplace_back("{\"name\":");
-    // owned_response_fragments.push_back(nlohmann::json(tool->name()).dump());
-    // response_fragments.emplace_back(owned_response_fragments.back());
     response_fragments.emplace_back(*owned_response_fragments.emplace_back(
         std::make_unique<std::string>(nlohmann::json(tool->name()).dump())));
 
