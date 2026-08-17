@@ -248,7 +248,7 @@ absl::Status ProcessorState::handleHeaderContinue() {
   if (no_body_) {
     // Fall through if there was never a body in the first place.
     ENVOY_STREAM_LOG(debug, "The message had no body", *filterCallbacks());
-  } else if (complete_body_available_ && body_mode_ != ProcessingMode::NONE) {
+  } else if (checkCompleteBodyAvailable() && body_mode_ != ProcessingMode::NONE) {
     return handleCompleteBodyAvailable();
   } else if (body_mode_ == ProcessingMode::BUFFERED) {
     // Here, we're not ready to continue processing because then

@@ -119,6 +119,7 @@ public:
 
   bool completeBodyAvailable() const { return complete_body_available_; }
   void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
+  virtual bool checkCompleteBodyAvailable() { return complete_body_available_; }
   bool hasNoBody() const { return no_body_; }
   void setHasNoBody(bool b) { no_body_ = b; }
   bool bodyReplaced() const { return body_replaced_; }
@@ -561,6 +562,17 @@ public:
     decoder_callbacks_ = &callbacks;
   }
 
+  bool checkCompleteBodyAvailable() override {
+    if (complete_body_available_) {
+      return true;
+    }
+    if (decoder_callbacks_ && decoder_callbacks_->requestTrailers().has_value()) {
+      trailers_ = &decoder_callbacks_->requestTrailers().value().get();
+      return true;
+    }
+    return false;
+  }
+
   const Buffer::Instance* bufferedData() const override {
     return decoder_callbacks_->decodingBuffer();
   }
@@ -709,6 +721,17 @@ public:
 
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
     encoder_callbacks_ = &callbacks;
+  }
+
+  bool checkCompleteBodyAvailable() override {
+    if (complete_body_available_) {
+      return true;
+    }
+    if (encoder_callbacks_ && encoder_callbacks_->responseTrailers().has_value()) {
+      trailers_ = &encoder_callbacks_->responseTrailers().value().get();
+      return true;
+    }
+    return false;
   }
 
   const Buffer::Instance* bufferedData() const override {
