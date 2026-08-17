@@ -37,6 +37,26 @@ public:
   const std::optional<std::string>& asnHeader() const { return asn_header_; }
   const std::optional<std::string>& asnOrgHeader() const { return asn_org_header_; }
 
+  const std::optional<std::string>& cityGeonameIdHeader() const { return city_geoname_id_header_; }
+  const std::optional<std::string>& latitudeHeader() const { return latitude_header_; }
+  const std::optional<std::string>& longitudeHeader() const { return longitude_header_; }
+  const std::optional<std::string>& timeZoneHeader() const { return time_zone_header_; }
+  const std::optional<std::string>& postalCodeHeader() const { return postal_code_header_; }
+  const std::optional<std::string>& regionNameHeader() const { return region_name_header_; }
+  const std::optional<std::string>& regionGeonameIdHeader() const {
+    return region_geoname_id_header_;
+  }
+  const std::optional<std::string>& subregionGeonameIdHeader() const {
+    return subregion_geoname_id_header_;
+  }
+  const std::optional<std::string>& countryGeonameIdHeader() const {
+    return country_geoname_id_header_;
+  }
+  const std::optional<std::string>& continentGeonameIdHeader() const {
+    return continent_geoname_id_header_;
+  }
+  const std::optional<std::string>& metroCodeHeader() const { return metro_code_header_; }
+
   const std::optional<std::string>& anonHeader() const { return anon_header_; }
   const std::optional<std::string>& anonVpnHeader() const { return anon_vpn_header_; }
   const std::optional<std::string>& anonHostingHeader() const { return anon_hosting_header_; }
@@ -93,6 +113,18 @@ private:
   std::optional<std::string> region_header_;
   std::optional<std::string> asn_header_;
   std::optional<std::string> asn_org_header_;
+
+  std::optional<std::string> city_geoname_id_header_;
+  std::optional<std::string> latitude_header_;
+  std::optional<std::string> longitude_header_;
+  std::optional<std::string> time_zone_header_;
+  std::optional<std::string> postal_code_header_;
+  std::optional<std::string> region_name_header_;
+  std::optional<std::string> region_geoname_id_header_;
+  std::optional<std::string> subregion_geoname_id_header_;
+  std::optional<std::string> country_geoname_id_header_;
+  std::optional<std::string> continent_geoname_id_header_;
+  std::optional<std::string> metro_code_header_;
 
   std::optional<std::string> anon_header_;
   std::optional<std::string> anon_vpn_header_;
