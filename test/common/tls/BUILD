@@ -384,6 +384,7 @@ envoy_cc_benchmark_binary(
     # Uses raw POSIX syscalls, does not build on Windows.
     tags = ["skip_on_windows"],
     deps = [
+        "//bazel:cpp_runfiles",
         "//source/common/buffer:buffer_lib",
         "@benchmark",
     ],
