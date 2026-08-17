@@ -32,7 +32,12 @@ def envoy_dependencies_extra(
     setup_libcxx_libs()
     if not use_host_tools:
         setup_llvm_minimal()
-        llvm_toolchain_alias(name = "llvm_toolchain_llvm")
+        llvm_toolchain_alias(
+            name = "llvm_toolchain_llvm",
+            minimal_linux_x64 = "@llvm_minimal_linux_x64//:BUILD.bazel",
+            minimal_linux_arm64 = "@llvm_minimal_linux_arm64//:BUILD.bazel",
+            minimal_macos_arm64 = "@llvm_minimal_macos_arm64//:BUILD.bazel",
+        )
     setup_sysroots(glibc_version = glibc_version)
     emsdk_deps()
     raze_fetch_remote_crates()
