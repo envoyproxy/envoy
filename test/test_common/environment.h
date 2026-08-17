@@ -122,17 +122,21 @@ public:
 
   /**
    * Obtain read-only test input data directory.
-   * @param workspace the name of the Bazel workspace where the input data is.
+   * @param workspace the name of the Bazel workspace where the input data is. When empty (the
+   *        default), the workspace is resolved from the TEST_WORKSPACE environment variable,
+   *        falling back to "envoy" for compatibility with non-test callers.
+   *        TODO: remove the "envoy" fallback once the bzlmod migration is complete.
    * @return const std::string& with the path to the read-only test input directory.
    */
-  static std::string runfilesDirectory(const std::string& workspace = "envoy");
+  static std::string runfilesDirectory(const std::string& workspace = "");
 
   /**
    * Prefix a given path with the read-only test input data directory.
    * @param path path suffix.
+   * @param workspace see runfilesDirectory.
    * @return std::string path qualified with read-only test input data directory.
    */
-  static std::string runfilesPath(const std::string& path, const std::string& workspace = "envoy");
+  static std::string runfilesPath(const std::string& path, const std::string& workspace = "");
 
   /**
    * Obtain Unix Domain Socket temporary directory.
