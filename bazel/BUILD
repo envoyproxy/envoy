@@ -1105,3 +1105,8 @@ config_setting(
         ":libstdc++": "True",
     },
 )
+
+alias(
+    name = "cpp_runfiles",
+    actual = "@bazel_tools//tools/cpp/runfiles",
+)
