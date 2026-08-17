@@ -343,17 +343,29 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
   const int pkey_id = EVP_PKEY_id(public_key);
   switch (pkey_id) {
   case EVP_PKEY_EC: {
-    // We only support P-256 ECDSA today.
     const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key);
     // Since we checked the key type above, this should be valid.
     ASSERT(ecdsa_public_key != nullptr);
     const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
-    if (ecdsa_group == nullptr || EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
-      *error_details = "Invalid leaf cert, only P-256 ECDSA certificates are supported";
+    if (ecdsa_group == nullptr) {
+      *error_details = "Invalid leaf cert, bad EC key";
       break;
     }
-    // QUICHE uses SHA-256 as hash function in cert signature.
-    sign_alg = SSL_SIGN_ECDSA_SECP256R1_SHA256;
+    const int curve_nid = EC_GROUP_get_curve_name(ecdsa_group);
+    switch (curve_nid) {
+    case NID_X9_62_prime256v1:
+      sign_alg = SSL_SIGN_ECDSA_SECP256R1_SHA256;
+      break;
+    case NID_secp384r1:
+      sign_alg = SSL_SIGN_ECDSA_SECP384R1_SHA384;
+      break;
+    case NID_secp521r1:
+      sign_alg = SSL_SIGN_ECDSA_SECP521R1_SHA512;
+      break;
+    default:
+      *error_details = "Invalid leaf cert, only P-256, P-384, and P-521 ECDSA certificates are supported";
+      break;
+    }
   } break;
   case EVP_PKEY_RSA: {
     // We require RSA certificates with 2048-bit or larger keys.
