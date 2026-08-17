@@ -1,3 +1,5 @@
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -10,6 +12,7 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+load("//test/common/router:corpus.bzl", "corpus_from_test_binary")
 
 licenses(["notice"])  # Apache 2
 
@@ -85,34 +88,31 @@ sh_binary(
     srcs = ["corpus_from_config_impl.sh"],
 )
 
-genrule(
-    name = "corpus_from_config_impl",
+corpus_from_test_binary(
+    name = "corpus_from_config_impl_dir",
     testonly = 1,
-    srcs = [
-        # This is deliberately in srcs, since we run into host/target confusion
-        # otherwise in oss-fuzz builds.
-        ":config_impl_test_static",
-    ],
-    outs = ["corpus_from_config_impl.tar.gz"],
-    cmd = """
-    export GENRULE_OUTPUT_DIR=$$(mktemp -d)
-    $(location corpus_from_config_impl_sh) \
-      $(location //test/common/router:config_impl_test_static)
-    # normalize the output as the test build side effect is not deterministic.
-    sed -i 's/[[:space:]]*$$//' $$GENRULE_OUTPUT_DIR/*
-    sed -i 's|^goo\\.gle/debug[a-z]*|goo.gle/debugproto|' $$GENRULE_OUTPUT_DIR/*
-    # Dedupe the resulting corpus files.
-    # Files are saved in the root of the tarball (have their dirs stripped)
-    md5sum $$GENRULE_OUTPUT_DIR/* \
-      | sort -k1,1 -u \
-      | cut -d' ' -f3- \
-      | tar -czf $@ --transform='s|.*/||' -T -
-    """,
     exec_properties = select({
         "//bazel:engflow_rbe_x86_64": {"Pool": "6gig"},
         "//conditions:default": {},
     }),
-    tools = [":corpus_from_config_impl_sh"],
+    script = ":corpus_from_config_impl_sh",
+    # test_binary uses cfg = "target" (not "exec") to preserve host/target
+    # distinction needed for oss-fuzz builds.
+    test_binary = ":config_impl_test_static",
+)
+
+pkg_files(
+    name = "corpus_from_config_impl_files",
+    testonly = 1,
+    srcs = [":corpus_from_config_impl_dir"],
+    strip_prefix = "corpus_from_config_impl_dir",
+)
+
+pkg_tar(
+    name = "corpus_from_config_impl",
+    testonly = 1,
+    srcs = [":corpus_from_config_impl_files"],
+    extension = "tar.gz",
 )
 
 envoy_cc_test(
