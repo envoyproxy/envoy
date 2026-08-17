@@ -577,7 +577,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LogLevelFilter {
     let config_info_enabled = self.config_info_enabled.to_string();
     envoy_filter.set_response_header("x-config-log-info-enabled", config_info_enabled.as_bytes());
     let config_error_enabled = self.config_error_enabled.to_string();
-    envoy_filter.set_response_header("x-config-log-error-enabled", config_error_enabled.as_bytes());
+    envoy_filter.set_response_header(
+      "x-config-log-error-enabled",
+      config_error_enabled.as_bytes(),
+    );
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
