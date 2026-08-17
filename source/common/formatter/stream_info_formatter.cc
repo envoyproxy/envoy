@@ -1926,7 +1926,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<
                                      StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.ciphersuiteString();
+                                       return std::make_optional<std::string>(
+                                           connection_info.ciphersuiteString());
                                      });
                                }}},
                              {"UPSTREAM_TLS_GROUP",
@@ -2398,7 +2399,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<
                                      StreamInfoSslConnectionInfoFormatterProvider>(
                                      [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.ciphersuiteString();
+                                       return std::make_optional<std::string>(
+                                           connection_info.ciphersuiteString());
                                      });
                                }}},
                              {"DOWNSTREAM_TLS_GROUP",
