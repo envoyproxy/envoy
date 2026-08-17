@@ -2,7 +2,10 @@
 #include "test/integration/filters/test_network_filter.pb.h"
 #include "test/server/admin/admin_instance.h"
 
+#include "absl/strings/str_cat.h"
+
 using testing::HasSubstr;
+using testing::Not;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
@@ -13,6 +16,19 @@ namespace Server {
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+void wireClusters(Upstream::MockClusterManager& cluster_manager,
+                  Upstream::ClusterManager::ClusterInfoMaps& maps) {
+  ON_CALL(cluster_manager, clusters()).WillByDefault(ReturnPointee(&maps));
+  ON_CALL(cluster_manager, getActiveCluster(_))
+      .WillByDefault(Invoke([&maps](absl::string_view name) -> OptRef<const Upstream::Cluster> {
+        const auto it = maps.active_clusters_.find(name);
+        if (it == maps.active_clusters_.end()) {
+          return std::nullopt;
+        }
+        return it->second.get();
+      }));
+}
 
 // helper method for adding host's info
 void addHostInfo(NiceMock<Upstream::MockHost>& host, const std::string& hostname,
@@ -69,8 +85,8 @@ TEST_P(AdminInstanceTest, ConfigDump) {
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
   EXPECT_EQ(Http::Code::OK,
             getCallback("/config_dump?resource=&mask=&name_regex=", header_map, response2));
-  EXPECT_EQ(expected_json, response.toString());
-  EXPECT_EQ(expected_json, response2.toString());
+  EXPECT_THAT(response.toString(), JsonStringEq(expected_json));
+  EXPECT_THAT(response2.toString(), JsonStringEq(expected_json));
 }
 
 TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
@@ -125,14 +141,14 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
     Http::TestResponseHeaderMapImpl header_map;
     EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
     const std::string output = response.toString();
-    EXPECT_EQ(expected_json, output);
+    EXPECT_THAT(output, JsonStringEq(expected_json));
   }
 }
 
 // Test that using ?include_eds parameter adds EDS to the config dump.
 TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
   Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
-  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
+  wireClusters(server_.cluster_manager_, cluster_maps);
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   cluster_maps.active_clusters_.emplace(cluster.info_->name_, cluster);
@@ -224,13 +240,13 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
  ]
 }
 )EOF";
-  EXPECT_EQ(expected_json, output);
+  EXPECT_THAT(output, JsonStringEq(expected_json));
 }
 
 // Test EDS config dump while multiple localities and priorities exist
 TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
   Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
-  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
+  wireClusters(server_.cluster_manager_, cluster_maps);
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   cluster_maps.active_clusters_.emplace(cluster.info_->name_, cluster);
@@ -404,7 +420,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
  ]
 }
 )EOF";
-  EXPECT_EQ(expected_json, output);
+  EXPECT_THAT(output, JsonStringEq(expected_json));
   delete (hosts_per_locality);
 }
 
@@ -436,7 +452,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   EXPECT_EQ(Http::Code::OK,
             getCallback("/config_dump?resource=dynamic_listeners", header_map, response));
   std::string output = response.toString();
-  EXPECT_EQ(expected_json, output);
+  EXPECT_THAT(output, JsonStringEq(expected_json));
 }
 
 // Test that using the resource and name_regex query parameters filter the config dump including
@@ -445,7 +461,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
 // ?name_regex=fake_cluster_2.
 TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResourceAndName) {
   Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
-  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
+  wireClusters(server_.cluster_manager_, cluster_maps);
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster_1;
   cluster_maps.active_clusters_.emplace(cluster_1.info_->name_, cluster_1);
@@ -526,7 +542,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResourceAndName) {
  ]
 }
 )EOF";
-  EXPECT_EQ(expected_json, output);
+  EXPECT_THAT(output, JsonStringEq(expected_json));
 
   // Check that endpoints dump uses the name_matcher.
   Buffer::OwnedImpl response2;
@@ -577,7 +593,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResourceAndName) {
  ]
 }
 )EOF";
-  EXPECT_EQ(expected_json2, response2.toString());
+  EXPECT_THAT(response2.toString(), JsonStringEq(expected_json2));
 }
 
 // Test that using the mask query parameter filters the config dump.
@@ -612,7 +628,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   EXPECT_EQ(Http::Code::OK,
             getCallback("/config_dump?mask=dynamic_listeners", header_map, response));
   std::string output = response.toString();
-  EXPECT_EQ(expected_json, output);
+  EXPECT_THAT(output, JsonStringEq(expected_json));
 }
 
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByNameRegex) {
@@ -646,7 +662,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByNameRegex) {
 )EOF";
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?name_regex=.*a.*", header_map, response));
   std::string output = response.toString();
-  EXPECT_EQ(expected_json, output);
+  EXPECT_THAT(output, JsonStringEq(expected_json));
 }
 
 TEST_P(AdminInstanceTest, InvalidRegexIsBadRequest) {
@@ -702,7 +718,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
                                         "cluster.name,version_info,cluster.http2_protocol_options",
                                         header_map, response));
   std::string output = response.toString();
-  EXPECT_EQ(expected_json, output);
+  EXPECT_THAT(output, JsonStringEq(expected_json));
 }
 
 // Test that BadRequest is returned if there is no intersection between the fields
@@ -745,8 +761,6 @@ TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
 }
 
 TEST_P(AdminInstanceTest, InvalidFieldMaskWithResourceDoesNotCrash) {
-  Buffer::OwnedImpl response;
-  Http::TestResponseHeaderMapImpl header_map;
   auto clusters = admin_.getConfigTracker().add("clusters", [](const Matchers::StringMatcher&) {
     auto msg = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
     auto* static_cluster = msg->add_static_clusters();
@@ -758,18 +772,20 @@ TEST_P(AdminInstanceTest, InvalidFieldMaskWithResourceDoesNotCrash) {
   });
 
   // `transport_socket_matches` is a repeated field, and cannot be indexed through in a FieldMask.
+  std::string body;
+  Http::TestResponseHeaderMapImpl header_map;
   EXPECT_EQ(Http::Code::BadRequest,
-            getCallback(
+            admin_.request(
                 "/config_dump?resource=static_clusters&mask=cluster.transport_socket_matches.name",
-                header_map, response));
+                "GET", header_map, body));
   std::string expected_mask_text = R"pb(paths: "cluster.transport_socket_matches.name")pb";
   Protobuf::FieldMask expected_mask_proto;
   std::ignore = Protobuf::TextFormat::ParseFromString(expected_mask_text, &expected_mask_proto);
   EXPECT_EQ(fmt::format("FieldMask {} could not be successfully used.",
                         expected_mask_proto.DebugString()),
-            response.toString());
+            body);
   EXPECT_EQ(header_map.ContentType()->value().getStringView(),
-            Http::Headers::get().ContentTypeValues.Text);
+            Http::Headers::get().ContentTypeValues.TextUtf8);
   EXPECT_EQ(header_map.get(Http::Headers::get().XContentTypeOptions)[0]->value(),
             Http::Headers::get().XContentTypeOptionValues.Nosniff);
 }
@@ -810,7 +826,7 @@ TEST_P(AdminInstanceTest, FieldMasksWorkWhenFetchingAllResources) {
     return msg;
   });
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?mask=bootstrap", header_map, response));
-  EXPECT_EQ(R"EOF({
+  EXPECT_THAT(response.toString(), JsonStringEq(R"EOF({
  "configs": [
   {
    "@type": "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
@@ -829,8 +845,7 @@ TEST_P(AdminInstanceTest, FieldMasksWorkWhenFetchingAllResources) {
   }
  ]
 }
-)EOF",
-            response.toString());
+)EOF"));
 }
 
 ProtobufTypes::MessagePtr testDumpEcdsConfig(const Matchers::StringMatcher&) {
@@ -897,7 +912,7 @@ TEST_P(AdminInstanceTest, ConfigDumpEcds) {
   EXPECT_EQ(Http::Code::OK,
             getCallback("/config_dump?resource=ecds_filters", header_map, response));
   std::string output = response.toString();
-  EXPECT_EQ(expected_json, output);
+  EXPECT_THAT(output, JsonStringEq(expected_json));
 }
 
 TEST_P(AdminInstanceTest, ConfigDumpEcdsByResourceAndMask) {
@@ -929,7 +944,198 @@ TEST_P(AdminInstanceTest, ConfigDumpEcdsByResourceAndMask) {
                                         "ecds_filter.name,version_info",
                                         header_map, response));
   std::string output = response.toString();
-  EXPECT_EQ(expected_json, output);
+  EXPECT_THAT(output, JsonStringEq(expected_json));
+}
+
+std::string dumpWhileMutating(AdminInstanceTest& test, absl::string_view query,
+                              absl::string_view mutate_after, std::function<void()> mutate) {
+  test.request_headers_.setPath(query);
+  test.admin_filter_.decodeHeaders(test.request_headers_, false);
+
+  ConfigDumpHandler handler(test.admin_.getConfigTracker(), test.server_);
+  Admin::RequestPtr request = handler.makeRequest(test.admin_filter_);
+  dynamic_cast<ConfigDumpRequest&>(*request).setChunkSize(1);
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  EXPECT_EQ(Http::Code::OK, request->start(response_headers));
+
+  Buffer::OwnedImpl chunk;
+  std::string output;
+  bool mutated = false;
+  bool more = true;
+  while (more) {
+    more = request->nextChunk(chunk);
+    output += chunk.toString();
+    chunk.drain(chunk.length());
+    if (!mutated && absl::StrContains(output, mutate_after)) {
+      mutate();
+      mutated = true;
+    }
+  }
+  EXPECT_TRUE(mutated) << mutate_after << " never reached the response";
+  return output;
+}
+
+ConfigTracker::EntryOwnerPtr addComponent(AdminInstanceTest& test, const std::string& name,
+                                          const std::string& value) {
+  return test.admin_.getConfigTracker().add(name, [value](const Matchers::StringMatcher&) {
+    auto msg = std::make_unique<Protobuf::StringValue>();
+    msg->set_value(value);
+    return msg;
+  });
+}
+
+int64_t configCount(const std::string& output) {
+  return TestUtility::jsonToStruct(output).fields().at("configs").list_value().values_size();
+}
+
+TEST_P(AdminInstanceTest, ComponentRemovedMidStream) {
+  ConfigTracker::EntryOwnerPtr component1 = addComponent(*this, "component1", "value1");
+  ConfigTracker::EntryOwnerPtr component2 = addComponent(*this, "component2", "value2");
+
+  const std::string output =
+      dumpWhileMutating(*this, "/config_dump", "value1", [&component2]() { component2.reset(); });
+  EXPECT_THAT(output, HasSubstr("value1"));
+  EXPECT_THAT(output, Not(HasSubstr("value2")));
+  EXPECT_EQ(1, configCount(output));
+}
+
+TEST_P(AdminInstanceTest, ComponentAddedMidStream) {
+  ConfigTracker::EntryOwnerPtr component1 = addComponent(*this, "component1", "value1");
+  ConfigTracker::EntryOwnerPtr component2;
+
+  const std::string output =
+      dumpWhileMutating(*this, "/config_dump", "value1", [this, &component2]() {
+        component2 = addComponent(*this, "component2", "value2");
+      });
+  EXPECT_THAT(output, HasSubstr("value1"));
+  EXPECT_THAT(output, Not(HasSubstr("value2")));
+  EXPECT_EQ(1, configCount(output));
+}
+
+TEST_P(AdminInstanceTest, ClusterRemovedMidStream) {
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  wireClusters(server_.cluster_manager_, cluster_maps);
+  ON_CALL(server_.cluster_manager_, hasActiveClusters()).WillByDefault(Return(true));
+
+  // The snapshot is partitioned static first, so cluster1 is always serialized before cluster2.
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster1;
+  cluster1.info_->name_ = "cluster1";
+  ON_CALL(*cluster1.info_, addedViaApi()).WillByDefault(Return(false));
+  cluster_maps.active_clusters_.emplace(cluster1.info_->name_, cluster1);
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster2;
+  cluster2.info_->name_ = "cluster2";
+  ON_CALL(*cluster2.info_, addedViaApi()).WillByDefault(Return(true));
+  cluster_maps.active_clusters_.emplace(cluster2.info_->name_, cluster2);
+
+  const std::string output =
+      dumpWhileMutating(*this, "/config_dump?include_eds", "cluster1",
+                        [&cluster_maps]() { cluster_maps.active_clusters_.erase("cluster2"); });
+  EXPECT_THAT(output, HasSubstr("cluster1"));
+  EXPECT_THAT(output, Not(HasSubstr("cluster2")));
+  EXPECT_EQ(1, configCount(output));
+}
+
+TEST_P(AdminInstanceTest, ClusterAddedMidStream) {
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  wireClusters(server_.cluster_manager_, cluster_maps);
+  ON_CALL(server_.cluster_manager_, hasActiveClusters()).WillByDefault(Return(true));
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster1;
+  cluster1.info_->name_ = "cluster1";
+  ON_CALL(*cluster1.info_, addedViaApi()).WillByDefault(Return(false));
+  cluster_maps.active_clusters_.emplace(cluster1.info_->name_, cluster1);
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster2;
+  cluster2.info_->name_ = "cluster2";
+  ON_CALL(*cluster2.info_, addedViaApi()).WillByDefault(Return(true));
+
+  const std::string output = dumpWhileMutating(
+      *this, "/config_dump?include_eds", "cluster1", [&cluster_maps, &cluster2]() {
+        cluster_maps.active_clusters_.emplace(cluster2.info_->name_, cluster2);
+      });
+  EXPECT_THAT(output, HasSubstr("cluster1"));
+  EXPECT_THAT(output, Not(HasSubstr("cluster2")));
+  EXPECT_EQ(1, configCount(output));
+}
+
+TEST_P(AdminInstanceTest, ConfigDumpWithEndpointReportsHostHealth) {
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  wireClusters(server_.cluster_manager_, cluster_maps);
+  ON_CALL(server_.cluster_manager_, hasActiveClusters()).WillByDefault(Return(true));
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
+  cluster_maps.active_clusters_.emplace(cluster.info_->name_, cluster);
+
+  Upstream::MockHostSet* host_set = cluster.priority_set_.getMockHostSet(0);
+  envoy::config::core::v3::Locality locality;
+  const std::string hostname = "example.com";
+  const std::string hostname_for_healthcheck = "healthcheck.example.com";
+
+  uint32_t port = 1;
+  for (const auto health : {Upstream::Host::Health::Healthy, Upstream::Host::Health::Unhealthy,
+                            Upstream::Host::Health::Degraded}) {
+    auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+    addHostInfo(*host, hostname, absl::StrCat("tcp://1.2.3.4:", port++), {}, locality,
+                hostname_for_healthcheck, "tcp://1.2.3.5:90", 5, 6);
+    ON_CALL(*host, coarseHealth()).WillByDefault(Return(health));
+    host_set->hosts_.emplace_back(host);
+  }
+
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_eds", header_map, response));
+  const std::string output = response.toString();
+  EXPECT_THAT(output, HasSubstr(R"("health_status":"HEALTHY")"));
+  EXPECT_THAT(output, HasSubstr(R"("health_status":"UNHEALTHY")"));
+  EXPECT_THAT(output, HasSubstr(R"("health_status":"DEGRADED")"));
+}
+
+TEST_P(AdminInstanceTest, ConfigDumpEndpointResourceHonorsNameRegex) {
+  Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
+  wireClusters(server_.cluster_manager_, cluster_maps);
+  ON_CALL(server_.cluster_manager_, hasActiveClusters()).WillByDefault(Return(true));
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster1;
+  cluster1.info_->name_ = "cluster1";
+  ON_CALL(*cluster1.info_, addedViaApi()).WillByDefault(Return(true));
+  cluster_maps.active_clusters_.emplace(cluster1.info_->name_, cluster1);
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster2;
+  cluster2.info_->name_ = "cluster2";
+  ON_CALL(*cluster2.info_, addedViaApi()).WillByDefault(Return(true));
+  cluster_maps.active_clusters_.emplace(cluster2.info_->name_, cluster2);
+
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/config_dump?include_eds&resource=dynamic_endpoint_configs&name_regex="
+                        "cluster2",
+                        header_map, response));
+  const std::string output = response.toString();
+  EXPECT_THAT(output, HasSubstr(R"("cluster_name":"cluster2")"));
+  EXPECT_THAT(output, Not(HasSubstr(R"("cluster_name":"cluster1")")));
+}
+
+TEST_P(AdminInstanceTest, ConfigDumpResourceMissingFromEndpointsIsNotFound) {
+  ON_CALL(server_.cluster_manager_, hasActiveClusters()).WillByDefault(Return(true));
+
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::NotFound,
+            getCallback("/config_dump?include_eds&resource=static_clusters", header_map, response));
+  EXPECT_THAT(response.toString(), HasSubstr("static_clusters not found in config dump"));
+}
+
+TEST_P(AdminInstanceTest, ConfigDumpMaskUnusableByEndpointsIsBadRequest) {
+  ON_CALL(server_.cluster_manager_, hasActiveClusters()).WillByDefault(Return(true));
+
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::BadRequest,
+            getCallback("/config_dump?include_eds&mask=bootstrap", header_map, response));
+  EXPECT_THAT(response.toString(), HasSubstr("could not be successfully applied"));
 }
 
 } // namespace Server
