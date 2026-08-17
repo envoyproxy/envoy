@@ -3639,7 +3639,7 @@ TEST_F(EdsTest, HealthCheckStartsImmediatelyWithZeroInitialFetchTimeout) {
 
   auto health_checker = std::make_shared<MockHealthChecker>();
   EXPECT_CALL(*health_checker, start());
-  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(1);
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster_->setHealthChecker(health_checker);
 }
 
@@ -3655,7 +3655,7 @@ TEST_F(EdsTest, HealthCheckDeferredWithNonZeroInitialFetchTimeout) {
 
   auto health_checker = std::make_shared<MockHealthChecker>();
   EXPECT_CALL(*health_checker, start()).Times(0);
-  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(1);
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster_->setHealthChecker(health_checker);
 }
 
