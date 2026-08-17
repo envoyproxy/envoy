@@ -66,6 +66,16 @@ TEST_F(McpJsonParserTest, MetaFieldWithDotInKey) {
   EXPECT_EQ(it->second.string_value(), "2026-07-28");
 }
 
+TEST_F(McpJsonParserTest, ValidJsonRpcRequest) {
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "id": 1})";
+
+  EXPECT_OK(parser_->parse(json));
+  ASSERT_OK(parser_->finishParse());
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), "test");
+}
+
 TEST_F(McpJsonParserTest, MissingJsonRpcVersion) {
   std::string json = R"({"method": "test", "id": 1})";
 
