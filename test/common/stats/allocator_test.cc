@@ -12,7 +12,10 @@
 
 #include "absl/synchronization/notification.h"
 #include "gmock/gmock-matchers.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
 
 namespace Envoy {
 namespace Stats {
@@ -256,7 +259,7 @@ TEST_F(AllocatorTest, ForEachCounter) {
   size_t num_iterations = 0;
   alloc_.forEachCounter([&num_counters](std::size_t size) { num_counters = size; },
                         [&num_iterations, &stat_names](Counter& counter) {
-                          EXPECT_EQ(stat_names.count(counter.statName()), 1);
+                          EXPECT_THAT(stat_names, Contains(counter.statName()));
                           ++num_iterations;
                         });
   EXPECT_EQ(num_counters, 11);
@@ -309,7 +312,7 @@ TEST_F(AllocatorTest, ForEachGauge) {
   size_t num_iterations = 0;
   alloc_.forEachGauge([&num_gauges](std::size_t size) { num_gauges = size; },
                       [&num_iterations, &stat_names](Gauge& gauge) {
-                        EXPECT_EQ(stat_names.count(gauge.statName()), 1);
+                        EXPECT_THAT(stat_names, Contains(gauge.statName()));
                         ++num_iterations;
                       });
   EXPECT_EQ(num_gauges, 11);
@@ -362,7 +365,7 @@ TEST_F(AllocatorTest, ForEachTextReadout) {
   size_t num_iterations = 0;
   alloc_.forEachTextReadout([&num_text_readouts](std::size_t size) { num_text_readouts = size; },
                             [&num_iterations, &stat_names](TextReadout& text_readout) {
-                              EXPECT_EQ(stat_names.count(text_readout.statName()), 1);
+                              EXPECT_THAT(stat_names, Contains(text_readout.statName()));
                               ++num_iterations;
                             });
   EXPECT_EQ(num_text_readouts, 11);

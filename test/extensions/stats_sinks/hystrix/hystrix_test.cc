@@ -316,7 +316,7 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   }
 
   std::string rolling_map = sink_->printRollingWindows();
-  EXPECT_NE(std::string::npos, rolling_map.find(cluster1_name_ + ".total"))
+  EXPECT_THAT(rolling_map, HasSubstr(cluster1_name_ + ".total"))
       << "cluster1_name = " << cluster1_name_;
 
   cluster_message_map = buildClusterMap(cluster_stats_buffer_.toString());

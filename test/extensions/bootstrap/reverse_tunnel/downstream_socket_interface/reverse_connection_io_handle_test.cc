@@ -34,6 +34,10 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::StrictMock;
 
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -696,9 +700,7 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsValidHosts) {
 
   // Verify that hosts were added to the mapping.
   const auto& host_to_conn_info_map = getHostToConnInfoMap();
-  EXPECT_EQ(host_to_conn_info_map.size(), 2);
-  EXPECT_TRUE(host_to_conn_info_map.contains("192.168.1.1"));
-  EXPECT_TRUE(host_to_conn_info_map.contains("192.168.1.2"));
+  EXPECT_THAT(host_to_conn_info_map, UnorderedElementsAre(Key("192.168.1.1"), Key("192.168.1.2")));
 }
 
 // Test maybeUpdateHostsMappingsAndConnections with no new hosts.
@@ -738,10 +740,8 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsNoNewHosts) {
 
   // Verify that all three host entries exist after maintainClusterConnections.
   const auto& host_to_conn_info_map = getHostToConnInfoMap();
-  EXPECT_EQ(host_to_conn_info_map.size(), 3);
-  EXPECT_TRUE(host_to_conn_info_map.contains("192.168.1.1"));
-  EXPECT_TRUE(host_to_conn_info_map.contains("192.168.1.2"));
-  EXPECT_TRUE(host_to_conn_info_map.contains("192.168.1.3"));
+  EXPECT_THAT(host_to_conn_info_map,
+              UnorderedElementsAre(Key("192.168.1.1"), Key("192.168.1.2"), Key("192.168.1.3")));
 
   // Now test partial host removal by calling maybeUpdateHostsMappingsAndConnections with fewer.
   // hosts
@@ -750,11 +750,8 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsNoNewHosts) {
 
   // Verify that the removed host was cleaned up but others remain.
   const auto& updated_host_to_conn_info_map = getHostToConnInfoMap();
-  EXPECT_EQ(updated_host_to_conn_info_map.size(), 2);
-  EXPECT_TRUE(updated_host_to_conn_info_map.contains("192.168.1.1"));
-  EXPECT_EQ(updated_host_to_conn_info_map.find("192.168.1.2"),
-            updated_host_to_conn_info_map.end()); // Should be removed
-  EXPECT_TRUE(updated_host_to_conn_info_map.contains("192.168.1.3"));
+  EXPECT_THAT(updated_host_to_conn_info_map,
+              UnorderedElementsAre(Key("192.168.1.1"), Key("192.168.1.3")));
 }
 
 // Test shouldAttemptConnectionToHost with valid host and no existing connections.
@@ -1149,13 +1146,9 @@ TEST_F(ReverseConnectionIOHandleTest, HostMappingAndBackoffIntegration) {
 
   // Verify all hosts exist initially.
   const auto& host_to_conn_info_map_initial = getHostToConnInfoMap();
-  EXPECT_EQ(host_to_conn_info_map_initial.size(),
-            5); // 192.168.1.1, 192.168.1.2, 192.168.1.3, 192.168.2.1, 192.168.2.2
-  EXPECT_TRUE(host_to_conn_info_map_initial.contains("192.168.1.1"));
-  EXPECT_TRUE(host_to_conn_info_map_initial.contains("192.168.1.2"));
-  EXPECT_TRUE(host_to_conn_info_map_initial.contains("192.168.1.3"));
-  EXPECT_TRUE(host_to_conn_info_map_initial.contains("192.168.2.1"));
-  EXPECT_TRUE(host_to_conn_info_map_initial.contains("192.168.2.2"));
+  EXPECT_THAT(host_to_conn_info_map_initial,
+              UnorderedElementsAre(Key("192.168.1.1"), Key("192.168.1.2"), Key("192.168.1.3"),
+                                   Key("192.168.2.1"), Key("192.168.2.2")));
 
   // Step 3: Put some hosts in backoff.
   trackConnectionFailure("192.168.1.1", "cluster-A"); // 192.168.1.1 in backoff
@@ -1672,10 +1665,7 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateMultipleConnectionsMixedResults) {
   for (const auto& [wrapper, host] : wrapper_to_host_map) {
     mapped_hosts.insert(host);
   }
-  EXPECT_EQ(mapped_hosts.size(), 2);                  // Should have 2 successful hosts
-  EXPECT_TRUE(mapped_hosts.contains("192.168.1.1"));  // Success
-  EXPECT_FALSE(mapped_hosts.contains("192.168.1.2")); // Failed - not in map
-  EXPECT_TRUE(mapped_hosts.contains("192.168.1.3"));  // Success
+  EXPECT_THAT(mapped_hosts, UnorderedElementsAre("192.168.1.1", "192.168.1.3"));
 }
 
 // Test removeStaleHostAndCloseConnections removes host and closes connections.
@@ -1750,9 +1740,7 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
   maintainClusterConnections("test-cluster", cluster_config);
 
   // Verify both hosts are initially present.
-  EXPECT_EQ(getHostToConnInfoMap().size(), 2);
-  EXPECT_TRUE(getHostToConnInfoMap().contains("192.168.1.1"));
-  EXPECT_TRUE(getHostToConnInfoMap().contains("192.168.1.2"));
+  EXPECT_THAT(getHostToConnInfoMap(), UnorderedElementsAre(Key("192.168.1.1"), Key("192.168.1.2")));
 
   // Verify that connection wrappers were created by maintainClusterConnections.
   const auto& connection_wrappers = getConnectionWrappers();
@@ -1764,9 +1752,7 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
 
   // Verify that host 192.168.1.1 is still in host_to_conn_info_map_
   // (removeStaleHostAndCloseConnections doesn't remove it)
-  EXPECT_EQ(getHostToConnInfoMap().size(), 2);
-  EXPECT_TRUE(getHostToConnInfoMap().contains("192.168.1.1"));
-  EXPECT_TRUE(getHostToConnInfoMap().contains("192.168.1.2"));
+  EXPECT_THAT(getHostToConnInfoMap(), UnorderedElementsAre(Key("192.168.1.1"), Key("192.168.1.2")));
 
   // Verify that connection wrappers for the removed host are removed.
   EXPECT_EQ(getConnectionWrappers().size(), 1);   // Only host 192.168.1.2's wrapper remains
@@ -2245,8 +2231,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneFailureAndRecovery) {
 
   // Verify host info is still present (should not be removed)
   const auto& host_to_conn_info_map = getHostToConnInfoMap();
-  EXPECT_EQ(host_to_conn_info_map.size(), 1);
-  EXPECT_TRUE(host_to_conn_info_map.contains("192.168.1.1"));
+  EXPECT_THAT(host_to_conn_info_map, UnorderedElementsAre(Key("192.168.1.1")));
 }
 
 // Test downstream connection closure and re-initiation.
@@ -2699,7 +2684,7 @@ TEST_F(ReverseConnectionIOHandleTest, ShouldAttemptConnectionCreatesHostEntry) {
 
   EXPECT_TRUE(shouldAttemptConnectionToHost("10.0.0.5", "cluster-x"));
   const auto& map = getHostToConnInfoMap();
-  EXPECT_TRUE(map.contains("10.0.0.5"));
+  EXPECT_THAT(map, Contains(Key("10.0.0.5")));
 }
 
 // Test maybeUpdateHostsMappingsAndConnections removes stale hosts.
@@ -2717,8 +2702,7 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsRemovesStaleHosts) {
   // Updated set: only a → b should be removed.
   maybeUpdateHostsMappingsAndConnections("c1", std::vector<std::string>{"a"});
   const auto& map = getHostToConnInfoMap();
-  EXPECT_TRUE(map.contains("a"));
-  EXPECT_FALSE(map.contains("b"));
+  EXPECT_THAT(map, UnorderedElementsAre(Key("a")));
 }
 
 // Lightly exercise read/write/connect wrappers for coverage.

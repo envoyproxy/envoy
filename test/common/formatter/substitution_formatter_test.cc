@@ -39,12 +39,16 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
+using testing::Key;
+
 namespace Envoy {
 namespace Formatter {
 namespace {
 
 using ::Envoy::StatusHelpers::IsOk;
 using StatusHelpers::HasStatus;
+using testing::AnyOf;
 using testing::Const;
 using testing::ContainsRegex;
 using testing::HasSubstr;
@@ -1419,7 +1423,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
       StreamInfoFormatter format("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "24");
       auto result = format.format({}, stream_info);
       if (result.has_value()) {
-        EXPECT_TRUE(result.value().find('/') != std::string::npos);
+        EXPECT_THAT(result.value(), HasSubstr("/"));
       }
     }
   }
@@ -1431,8 +1435,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
       StreamInfoFormatter format("DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT", "16");
       auto result = format.format({}, stream_info);
       if (result.has_value()) {
-        EXPECT_TRUE(result.value().find("127.0.0.0/16") != std::string::npos ||
-                    result.value().find('/') != std::string::npos);
+        EXPECT_THAT(result.value(), AnyOf(HasSubstr("127.0.0.0/16"), HasSubstr("/")));
       }
     }
   }
@@ -4516,7 +4519,7 @@ void verifyStructOutput(Protobuf::Struct output,
     EXPECT_EQ(output.fields().at(pair.first).string_value(), pair.second);
   }
   for (const auto& pair : output.fields()) {
-    EXPECT_TRUE(expected_map.contains(pair.first));
+    EXPECT_THAT(expected_map, Contains(Key(pair.first)));
   }
 }
 

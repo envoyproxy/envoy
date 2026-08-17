@@ -41,6 +41,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Router {
 namespace {
@@ -8836,7 +8840,7 @@ virtual_hosts:
   std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
   const Tracing::CustomTagMap& map = route3->tracingConfig()->getCustomTags();
   for (const std::string& custom_tag : custom_tags) {
-    EXPECT_TRUE(map.contains(custom_tag));
+    EXPECT_THAT(map, Contains(Key(custom_tag)));
   }
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -10374,9 +10378,7 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const RouteEntry::UpgradeMap& upgrade_map = config.route(headers, 0)->routeEntry()->upgradeMap();
-  EXPECT_TRUE(upgrade_map.find("websocket")->second);
-  EXPECT_FALSE(upgrade_map.contains("foo"));
-  EXPECT_FALSE(upgrade_map.find("disabled")->second);
+  EXPECT_THAT(upgrade_map, UnorderedElementsAre(Pair("websocket", true), Pair("disabled", false)));
 }
 
 TEST_F(RouteConfigurationV2, EmptyFilterConfigRejected) {

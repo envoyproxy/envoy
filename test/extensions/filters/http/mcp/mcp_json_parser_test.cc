@@ -11,6 +11,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -986,7 +988,7 @@ TEST_F(McpJsonParserTest, FromProtoConfig) {
   EXPECT_EQ(fields[1].path, "params.field2");
 
   // Default fields should still be there (implicit in implementation)
-  EXPECT_TRUE(config.getAlwaysExtract().contains("jsonrpc"));
+  EXPECT_THAT(config.getAlwaysExtract(), Contains("jsonrpc"));
 }
 
 TEST_F(McpJsonParserTest, FloatingPointValues) {
