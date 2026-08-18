@@ -84,6 +84,7 @@ test_only_repos_json_path="${tmpdir}/test_only_repos.json"
 json_array_from_lines < "${test_only_repos_path}" > "${test_only_repos_json_path}"
 
 unexpected_test_repos_json_path="${tmpdir}/unexpected_test_repos.json"
+# shellcheck disable=SC2016
 "${JQ_BIN}" -n \
   --slurpfile marginal "${marginal_test_repos_json_path}" \
   --slurpfile test_only "${test_only_repos_json_path}" \
