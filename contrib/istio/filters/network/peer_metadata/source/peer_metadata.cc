@@ -56,7 +56,7 @@ bool threadLocalMetadataExchangeDisabled(const StreamInfo::StreamInfo& stream_in
   const auto& filterState = stream_info.filterState();
   const StreamInfo::BoolAccessor* enable = filterState.getDataReadOnly<StreamInfo::BoolAccessor>(
       FilterNames::get().EnableTLSFilterExchange);
-  return enable != nullptr && !enable->value();
+  return enable == nullptr || !enable->value();
 }
 
 std::optional<void*> getRegistryKey(Network::Connection& connection) {
