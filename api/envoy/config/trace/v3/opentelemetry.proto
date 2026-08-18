@@ -25,9 +25,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message OpenTelemetryConfig {
   // OTLP exporter specification. Exactly one of ``grpc_service``,
   // ``http_service``, or ``exporter`` must be used.
-  oneof otlp_exporter {
-    option (validate.required) = true;
-
     // The upstream gRPC cluster that will receive OTLP traces.
     // Note that the tracer drops traces if the server does not read data fast
     // enough. Only one of ``grpc_service``, ``http_service``, ``exporter`` may
@@ -51,7 +48,6 @@ message OpenTelemetryConfig {
     // [#extension-category: envoy.tracers.opentelemetry.exporters]
     // [#not-implemented-hide:]
     core.v3.TypedExtensionConfig exporter = 10;
-  }
 
   // The name for the service. This will be populated in the ResourceSpan Resource attributes.
   // If it is not provided, it will default to "unknown_service:envoy".
