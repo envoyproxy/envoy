@@ -301,6 +301,33 @@ TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingNullInnerOptions) {
   EXPECT_TRUE(null_decorated->downstreamSharedFilterStateObjects().empty());
 }
 
+TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingTransportSocketOptionsOverrideAndPassThrough) {
+  std::vector<std::string> http_alpns{"h2", "http/1.1"};
+  auto inner_options = std::make_shared<TransportSocketOptionsImpl>(
+      "original.server.com",
+      std::vector<std::string>{"san1.com"},
+      std::vector<std::string>(http_alpns));
+  ServerNameDecoratingTransportSocketOptions decorated("override.service.target", inner_options);
+  EXPECT_EQ(std::make_optional<std::string>("override.service.target"), decorated.serverNameOverride());
+  EXPECT_EQ(std::vector<std::string>{"san1.com"}, decorated.verifySubjectAltNameListOverride());
+  EXPECT_EQ(http_alpns, decorated.applicationProtocolListOverride());
+}
+TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingTransportSocketOptionsEmptyStringIsNullopt) {
+  auto inner_options = std::make_shared<TransportSocketOptionsImpl>("original.server.com");
+  ServerNameDecoratingTransportSocketOptions decorated("", inner_options);
+  EXPECT_EQ(std::nullopt, decorated.serverNameOverride());
+}
+TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingTransportSocketOptionsNullInnerOptions) {
+  ServerNameDecoratingTransportSocketOptions decorated("override.service.target", nullptr);
+  EXPECT_EQ(std::make_optional<std::string>("override.service.target"), decorated.serverNameOverride());
+  EXPECT_TRUE(decorated.verifySubjectAltNameListOverride().empty());
+  EXPECT_TRUE(decorated.applicationProtocolListOverride().empty());
+  EXPECT_TRUE(decorated.applicationProtocolFallback().empty());
+  EXPECT_EQ(std::nullopt, decorated.proxyProtocolOptions());
+  EXPECT_FALSE(decorated.http11ProxyInfo().has_value());
+  EXPECT_TRUE(decorated.downstreamSharedFilterStateObjects().empty());
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

@@ -368,8 +368,6 @@ TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstShar
   std::string target_name;
   if (options != nullptr && options->serverNameOverride().has_value()) {
     target_name = *options->serverNameOverride();
-  } else if (host_description != nullptr && !host_description->hostname().empty()) {
-    target_name = host_description->hostname();
   }
   return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_, false, target_name);
 }

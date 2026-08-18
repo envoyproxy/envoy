@@ -241,10 +241,9 @@ TEST_P(AltsProxyTest, ClientStartWithTargetNameSuccess) {
   expected_client_start->set_target_name("custom.service.target");
   startFakeHandshakerService({expected_request}, grpc::Status::OK);
 
-  auto alts_proxy = AltsProxy::create(getChannel(), "custom.service.target");
-  EXPECT_OK(alts_proxy.status());
-  EXPECT_TRUE(TestUtility::protoEqual((*alts_proxy)->sendStartClientHandshakeReq().value(),
-                                      expectedClientStartResponse()));
+  ASSERT_OK_AND_ASSIGN(auto alts_proxy, AltsProxy::create(getChannel(), "custom.service.target"));
+  ASSERT_OK_AND_ASSIGN(auto req_resp, alts_proxy->sendStartClientHandshakeReq());
+  EXPECT_TRUE(TestUtility::protoEqual(req_resp, expectedClientStartResponse()));
 }
 
 // Verify full client-side ALTS handshake when target_name is set.
@@ -269,16 +268,13 @@ TEST_P(AltsProxyTest, ClientFullHandshakeWithTargetNameSuccess) {
   expected_request_2.mutable_next()->set_in_bytes(ServerStartResponse);
   startFakeHandshakerService({expected_request_1, expected_request_2}, grpc::Status::OK);
 
-  auto alts_proxy = AltsProxy::create(getChannel(), "custom.service.target");
-  EXPECT_OK(alts_proxy.status());
-  auto resp = (*alts_proxy)->sendStartClientHandshakeReq();
-  EXPECT_OK(resp);
-  EXPECT_TRUE(TestUtility::protoEqual(resp.value(), expectedClientStartResponse()));
+  ASSERT_OK_AND_ASSIGN(auto alts_proxy, AltsProxy::create(getChannel(), "custom.service.target"));
+  ASSERT_OK_AND_ASSIGN(auto resp, alts_proxy->sendStartClientHandshakeReq());
+  EXPECT_TRUE(TestUtility::protoEqual(resp, expectedClientStartResponse()));
 
-  resp = (*alts_proxy)->sendNextHandshakeReq(
++  ASSERT_OK_AND_ASSIGN(resp, alts_proxy->sendNextHandshakeReq(
       absl::MakeSpan(reinterpret_cast<const uint8_t*>(ServerStartResponse.data()),
-                     ServerStartResponse.size()));
-  EXPECT_OK(resp);
+                     ServerStartResponse.size())));
   EXPECT_TRUE(TestUtility::protoEqual(resp.value(), expectedNextResponse()));
 }
 
