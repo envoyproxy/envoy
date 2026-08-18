@@ -54,6 +54,20 @@ void McpParserConfig::initializeDefaults() {
                   {AttributeExtractionRule(std::string(Paths::PARAMS_PROTOCOL_VERSION)),
                    AttributeExtractionRule(std::string(Paths::PARAMS_CLIENT_INFO_NAME))});
 
+  // Discovery.
+  addMethodConfig(Methods::SERVER_DISCOVER, {});
+
+  // Subscriptions.
+  addMethodConfig(Methods::SUBSCRIPTIONS_LISTEN, {});
+
+  // Tasks.
+  addMethodConfig(Methods::TASKS_GET,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_TASK_ID))});
+  addMethodConfig(Methods::TASKS_UPDATE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_TASK_ID))});
+  addMethodConfig(Methods::TASKS_CANCEL,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_TASK_ID))});
+
   // Notifications.
   addMethodConfig(Methods::NOTIFICATION_INITIALIZED, {});
   addMethodConfig(Methods::NOTIFICATION_CANCELLED,
@@ -149,6 +163,21 @@ std::string McpParserConfig::getBuiltInMethodGroup(const std::string& method) co
   // Lifecycle methods
   if (method == INITIALIZE || method == NOTIFICATION_INITIALIZED || method == PING) {
     return std::string(LIFECYCLE);
+  }
+
+  // Discovery methods
+  if (method == SERVER_DISCOVER) {
+    return std::string(DISCOVERY);
+  }
+
+  // Subscription methods
+  if (method == SUBSCRIPTIONS_LISTEN) {
+    return std::string(SUBSCRIPTION);
+  }
+
+  // Task methods
+  if (method == TASKS_GET || method == TASKS_UPDATE || method == TASKS_CANCEL) {
+    return std::string(TASK);
   }
 
   // Tool methods

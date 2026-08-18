@@ -168,6 +168,95 @@ TEST_F(McpJsonParserTest, ResourcesUnsubscribeExtraction) {
   EXPECT_EQ(value->string_value(), "file:///config/settings.json");
 }
 
+TEST_F(McpJsonParserTest, ServerDiscoverExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "server/discover",
+    "id": 123
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::SERVER_DISCOVER);
+}
+
+TEST_F(McpJsonParserTest, SubscriptionsListenExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "subscriptions/listen",
+    "id": 123
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::SUBSCRIPTIONS_LISTEN);
+}
+
+TEST_F(McpJsonParserTest, TasksGetExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tasks/get",
+    "params": {
+      "taskId": "task-123"
+    },
+    "id": 123
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::TASKS_GET);
+
+  // Check extracted metadata contains params.taskId
+  const auto* value = parser_->getNestedValue("params.taskId");
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(value->string_value(), "task-123");
+}
+
+TEST_F(McpJsonParserTest, TasksUpdateExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tasks/update",
+    "params": {
+      "taskId": "task-456"
+    },
+    "id": 123
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::TASKS_UPDATE);
+
+  // Check extracted metadata contains params.taskId
+  const auto* value = parser_->getNestedValue("params.taskId");
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(value->string_value(), "task-456");
+}
+
+TEST_F(McpJsonParserTest, TasksCancelExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tasks/cancel",
+    "params": {
+      "taskId": "task-789"
+    },
+    "id": 123
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), Methods::TASKS_CANCEL);
+
+  // Check extracted metadata contains params.taskId
+  const auto* value = parser_->getNestedValue("params.taskId");
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(value->string_value(), "task-789");
+}
+
 TEST_F(McpJsonParserTest, PromptsListExtraction) {
   std::string json = R"({
     "jsonrpc": "2.0",
@@ -1824,6 +1913,21 @@ TEST(McpParserConfigTest, DefaultSecuritySettings) {
   McpParserConfig config = McpParserConfig::createDefault();
 
   EXPECT_FALSE(config.rejectDuplicateKeys());
+}
+
+TEST(McpParserConfigTest, BuiltInMethodGroupsForNewMethods) {
+  const auto config = McpParserConfig::createDefault();
+
+  EXPECT_EQ(config.getMethodGroup(std::string(Methods::SERVER_DISCOVER)),
+            std::string(MethodGroups::DISCOVERY));
+  EXPECT_EQ(config.getMethodGroup(std::string(Methods::SUBSCRIPTIONS_LISTEN)),
+            std::string(MethodGroups::SUBSCRIPTION));
+  EXPECT_EQ(config.getMethodGroup(std::string(Methods::TASKS_GET)),
+            std::string(MethodGroups::TASK));
+  EXPECT_EQ(config.getMethodGroup(std::string(Methods::TASKS_UPDATE)),
+            std::string(MethodGroups::TASK));
+  EXPECT_EQ(config.getMethodGroup(std::string(Methods::TASKS_CANCEL)),
+            std::string(MethodGroups::TASK));
 }
 
 TEST_F(McpJsonParserTest, ValidJsonRpcResponse) {
