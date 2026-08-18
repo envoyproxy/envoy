@@ -206,19 +206,14 @@ TEST_P(AltsProxyTest, ClientFullHandshakeSuccess) {
   expected_request_2.mutable_next()->set_in_bytes(ServerStartResponse);
   startFakeHandshakerService({expected_request_1, expected_request_2}, grpc::Status::OK);
 
-  auto alts_proxy = AltsProxy::create(getChannel());
-  EXPECT_OK(alts_proxy.status());
-  auto resp = (*alts_proxy)->sendStartClientHandshakeReq();
-  EXPECT_OK(resp);
-  grpc::gcp::HandshakerResp& handshaker_resp = resp.value();
+  ASSERT_OK_AND_ASSIGN(auto alts_proxy, AltsProxy::create(getChannel()));
+  ASSERT_OK_AND_ASSIGN(auto handshaker_resp, alts_proxy->sendStartClientHandshakeReq());
   EXPECT_TRUE(TestUtility::protoEqual(handshaker_resp, expectedClientStartResponse()));
 
-  resp = (*alts_proxy)
-             ->sendNextHandshakeReq(
-                 absl::MakeSpan(reinterpret_cast<const uint8_t*>(ServerStartResponse.data()),
-                                ServerStartResponse.size()));
-  EXPECT_OK(resp);
-  handshaker_resp = resp.value();
+  ASSERT_OK_AND_ASSIGN(handshaker_resp,
+                       alts_proxy->sendNextHandshakeReq(absl::MakeSpan(
+                           reinterpret_cast<const uint8_t*>(ServerStartResponse.data()),
+                           ServerStartResponse.size())));
   EXPECT_TRUE(TestUtility::protoEqual(handshaker_resp, expectedNextResponse()));
 }
 
