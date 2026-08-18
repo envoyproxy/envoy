@@ -137,7 +137,7 @@ def _go_deps(skip_targets):
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
         external_http_archive(name = "io_bazel_rules_go")
-        external_http_archive("bazel_gazelle")
+        external_http_archive("gazelle")
 
 def _rust_deps():
     external_http_archive(
@@ -852,7 +852,10 @@ def _rules_proto_grpc():
         name = "rules_proto_grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:rules_proto_grpc.patch"],
-        repo_mapping = {"@com_github_grpc_grpc": "@grpc"},
+        repo_mapping = {
+            "@com_github_grpc_grpc": "@grpc",
+            "@bazel_gazelle": "@gazelle",
+        },
     )
 
 def _re2():

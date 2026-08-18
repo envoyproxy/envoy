@@ -20,6 +20,7 @@ def api_dependencies(bzlmod = False):
     )
     external_http_archive(
         name = "com_github_chrusty_protoc_gen_jsonschema",
+        repo_mapping = {"@bazel_gazelle": "@gazelle"},
     )
     external_http_archive(
         name = "envoy_toolshed",
@@ -40,6 +41,7 @@ def api_dependencies(bzlmod = False):
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:pgv.patch"],
         repo_mapping = {
+            "@bazel_gazelle": "@gazelle",
             "@com_google_absl": "@abseil-cpp",
             "@com_github_grpc_grpc": "@grpc",
         },
