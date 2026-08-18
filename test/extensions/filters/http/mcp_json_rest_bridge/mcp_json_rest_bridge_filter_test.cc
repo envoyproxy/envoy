@@ -2808,7 +2808,7 @@ INSTANTIATE_TEST_SUITE_P(NonPostMethods, McpHttpMethodFilterTest,
 
 TEST_P(McpHttpMethodFilterTest, NonPostMethodsReturnMethodNotAllowed) {
   EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Eq(Http::Code::MethodNotAllowed), StrEq("Method Not Allowed"), _,
+              sendLocalReply(Eq(Http::Code::MethodNotAllowed), StrEq("HTTP Method Not Allowed"), _,
                              Eq(Grpc::Status::WellKnownGrpcStatus::InvalidArgument),
                              StrEq("mcp_json_rest_bridge_http_request_method_not_post")));
 
