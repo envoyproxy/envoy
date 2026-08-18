@@ -24,6 +24,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
@@ -185,6 +186,23 @@ public:
         metadata);
   }
 
+  void configureThreadLocalExchange() {
+    const bool enable = GetParam() == ExchangePath::ThreadLocalRegistry;
+    if (enable) {
+      stream_info_.filterState()->setData(
+          FilterNames::get().EnableTLSFilterExchange,
+          std::make_shared<StreamInfo::BoolAccessorImpl>(true),
+          StreamInfo::FilterState::LifeSpan::Connection,
+          StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    } else {
+      stream_info_.filterState()->setData(
+          FilterNames::get().EnableTLSFilterExchange,
+          std::make_shared<StreamInfo::BoolAccessorImpl>(false),
+          StreamInfo::FilterState::LifeSpan::Connection,
+          StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    }
+  }
+
   void initialize(const Config& config) {
     const bool use_registry = GetParam() == ExchangePath::ThreadLocalRegistry;
 
@@ -204,13 +222,6 @@ public:
     if (use_registry) {
       registry_key_ =
           wireUserSpaceSocket(read_filter_callbacks_.connection_, io_handle_, connection_socket_);
-      // Enable the TLS filter exchange on the upstream host so storeInRegistry uses the registry.
-      upstream_host_ = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-      Protobuf::Struct md;
-      (*md.mutable_fields())[FilterNames::get().EnableTLSFilterExchange].set_bool_value(true);
-      (*upstream_host_->cluster_.metadata_.mutable_filter_metadata())[FilterNames::get().Name]
-          .MergeFrom(md);
-      stream_info_.upstreamInfo()->setUpstreamHost(upstream_host_);
     }
 
     filter_ = std::make_unique<Filter>(config, local_info_, use_registry ? registry_ : nullptr);
@@ -253,7 +264,6 @@ public:
   Extensions::IoSocket::UserSpace::IoHandleImplPtr io_handle_;
   Network::ConnectionSocketPtr connection_socket_;
   void* registry_key_{nullptr};
-  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> upstream_host_;
   std::unique_ptr<Filter> filter_;
 };
 
@@ -286,6 +296,7 @@ TEST_P(PeerMetadataFilterTest, TestPeerMetadataDiscoveredAndPropagated) {
 
   populateNodeMetadata("workload", "deployment", "workload-service", "v1", "default", "cluster");
   initialize(makeConfig(defaultBaggageKey));
+  configureThreadLocalExchange();
 
   Http::TestResponseHeaderMapImpl headers{{Headers::get().Baggage.get(), baggage}};
   populateTcpProxyResponseHeaders(headers);
@@ -309,6 +320,7 @@ TEST_P(PeerMetadataFilterTest, TestNoFiltersStateFromTcpProxy) {
 
   populateNodeMetadata("workload", "deployment", "workload-service", "v1", "default", "cluster");
   initialize(makeConfig(defaultBaggageKey));
+  configureThreadLocalExchange();
 
   std::vector<std::string> sans{identity};
   populateUpstreamSans(sans);
@@ -327,6 +339,7 @@ TEST_P(PeerMetadataFilterTest, TestNoBaggageHeaderFromTcpProxy) {
 
   populateNodeMetadata("workload", "deployment", "workload-service", "v1", "default", "cluster");
   initialize(makeConfig(defaultBaggageKey));
+  configureThreadLocalExchange();
 
   Http::TestResponseHeaderMapImpl headers{{"bibbage", baggage}};
   populateTcpProxyResponseHeaders(headers);
@@ -348,6 +361,7 @@ TEST_P(PeerMetadataFilterTest, TestDisablePeerDiscovery) {
 
   populateNodeMetadata("workload", "deployment", "workload-service", "v1", "default", "cluster");
   initialize(makeConfig(defaultBaggageKey));
+  configureThreadLocalExchange();
 
   Http::TestResponseHeaderMapImpl headers{{Headers::get().Baggage.get(), baggage}};
   populateTcpProxyResponseHeaders(headers);
@@ -389,14 +403,24 @@ std::shared_ptr<NiceMock<Upstream::MockHostDescription>> makeIpv4Host(absl::stri
 class PeerMetadataUpstreamFilterTestBase : public ::testing::Test {
 public:
   void initialize(bool use_registry = false) {
-    use_registry_ = use_registry;
     ON_CALL(callbacks_.connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
     ON_CALL(Const(callbacks_.connection_), streamInfo()).WillByDefault(ReturnRef(stream_info_));
 
     host_metadata_ = std::make_shared<::envoy::config::core::v3::Metadata>();
 
     if (use_registry) {
+      stream_info_.filterState()->setData(
+          FilterNames::get().EnableTLSFilterExchange,
+          std::make_shared<StreamInfo::BoolAccessorImpl>(true),
+          StreamInfo::FilterState::LifeSpan::Connection,
+          StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
       registry_key_ = wireUserSpaceSocket(callbacks_.connection_, io_handle_, connection_socket_);
+    } else {
+      stream_info_.filterState()->setData(
+          FilterNames::get().EnableTLSFilterExchange,
+          std::make_shared<StreamInfo::BoolAccessorImpl>(false),
+          StreamInfo::FilterState::LifeSpan::Connection,
+          StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
     }
 
     filter_ = std::make_unique<UpstreamFilter>(use_registry ? registry_ : nullptr);
@@ -439,12 +463,6 @@ public:
   void setUpstreamHost(const std::shared_ptr<NiceMock<Upstream::MockHostDescription>>& host) {
     upstream_host_ = host;
     ON_CALL(Const(*upstream_host_), metadata()).WillByDefault(Return(host_metadata_));
-    if (use_registry_) {
-      Protobuf::Struct md;
-      (*md.mutable_fields())[FilterNames::get().EnableTLSFilterExchange].set_bool_value(true);
-      (*upstream_host_->cluster_.metadata_.mutable_filter_metadata())[FilterNames::get().Name]
-          .MergeFrom(md);
-    }
     stream_info_.upstreamInfo()->setUpstreamHost(upstream_host_);
   }
 
@@ -457,7 +475,6 @@ public:
   Extensions::IoSocket::UserSpace::IoHandleImplPtr io_handle_;
   Network::ConnectionSocketPtr connection_socket_;
   void* registry_key_{nullptr};
-  bool use_registry_{false};
   std::unique_ptr<UpstreamFilter> filter_;
 };
 

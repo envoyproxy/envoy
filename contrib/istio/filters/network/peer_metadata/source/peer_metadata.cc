@@ -52,22 +52,11 @@ bool discoveryDisabled(const ::envoy::config::core::v3::Metadata& metadata) {
   return value.bool_value();
 }
 
-bool tlsFilterExchangeDisabled(const ::envoy::config::core::v3::Metadata& metadata) {
-  const auto& value = ::Envoy::Config::Metadata::metadataValue(
-      &metadata, FilterNames::get().Name, FilterNames::get().EnableTLSFilterExchange);
-  return !value.bool_value();
-}
-
-bool tlsFilterExchangeDisabled(const StreamInfo::StreamInfo& stream_info) {
-  const auto upstream = stream_info.upstreamInfo();
-  if (!upstream) {
-    return false;
-  }
-  const auto host = upstream->upstreamHost();
-  if (!host) {
-    return false;
-  }
-  return tlsFilterExchangeDisabled(host->cluster().metadata());
+bool threadLocalMetadataExchangeDisabled(const StreamInfo::StreamInfo& stream_info) {
+  const auto& filterState = stream_info.filterState();
+  const StreamInfo::BoolAccessor* enable = filterState.getDataReadOnly<StreamInfo::BoolAccessor>(
+      FilterNames::get().EnableTLSFilterExchange);
+  return enable != nullptr && !enable->value();
 }
 
 std::optional<void*> getRegistryKey(Network::Connection& connection) {
@@ -233,7 +222,7 @@ std::optional<Envoy::Protobuf::Any> Filter::discoverPeerMetadata() {
 bool Filter::storeInRegistry(const std::optional<Envoy::Protobuf::Any>& peer_metadata) {
   ASSERT(read_callbacks_);
   if (registry_ == nullptr ||
-      tlsFilterExchangeDisabled(read_callbacks_->connection().streamInfo())) {
+      threadLocalMetadataExchangeDisabled(read_callbacks_->connection().streamInfo())) {
     ENVOY_LOG(debug, "Thread local storage for filter exchange is disabled");
     return false;
   }
@@ -364,7 +353,8 @@ bool UpstreamFilter::disableDiscovery() const {
 
 bool UpstreamFilter::tryRegistryLookup() {
   ASSERT(callbacks_);
-  if (registry_ == nullptr || tlsFilterExchangeDisabled(callbacks_->connection().streamInfo())) {
+  if (registry_ == nullptr ||
+      threadLocalMetadataExchangeDisabled(callbacks_->connection().streamInfo())) {
     ENVOY_LOG(debug, "Thread local storage for filter exchange is disabled");
     return false;
   }

@@ -105,7 +105,7 @@ using Headers = ConstSingleton<HeaderValues>;
 struct FilterNameValues {
   const std::string Name = "istio.peer_metadata";
   const std::string DisableDiscoveryField = "disable_baggage_discovery";
-  const std::string EnableTLSFilterExchange = "enable_tls_filter_exchange";
+  const std::string EnableTLSFilterExchange = "istio.peer_metadata.enable_tls_filter_exchange";
 };
 
 using FilterNames = ConstSingleton<FilterNameValues>;
