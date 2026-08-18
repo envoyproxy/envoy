@@ -83,10 +83,23 @@ py_console_script_binary(
     script = "dependatool",
 )
 
+# Core-only root: used to compute the "core" dep set (deps of non-extension
+# production code).  Extension-marginal deps are computed as
+# (all-extensions reachable) minus (core reachable).
+dependency_reachability(
+    name = "dep-reachability-core",
+    roots = [
+        "//source/exe:envoy_main_common_with_core_extensions_lib",
+    ],
+)
+
+# All-extensions root: traverses every extension so that validate_extension_deps
+# actually observes non-core extension deps.  This is the primary reachability
+# data used by all checks.
 dependency_reachability(
     name = "dep-reachability",
     roots = [
-        "//source/exe:envoy_main_common_with_core_extensions_lib",
+        "//source/exe:main_common_with_all_extensions_lib",
     ],
 )
 
@@ -95,11 +108,13 @@ py_test(
     srcs = ["validate_reachability_test.py"],
     data = [
         ":dep-reachability",
+        ":dep-reachability-core",
         "//bazel:all_repository_locations",
         "//source/extensions:extensions_build_config",
     ],
     env = {
         "REACHABILITY_JSON": "$(location :dep-reachability)",
+        "CORE_REACHABILITY_JSON": "$(location :dep-reachability-core)",
         "REPOSITORY_LOCATIONS_JSON": "$(location //bazel:all_repository_locations)",
         "EXTENSIONS_BUILD_CONFIG_JSON": "$(location //source/extensions:extensions_build_config)",
     },

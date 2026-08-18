@@ -667,6 +667,8 @@ case $CI_TARGET in
         echo "dependency validate_reachability_test..."
         bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:validate_reachability_test
+        echo "dependency graph structure..."
+        "${ENVOY_SRCDIR}/tools/dependency/validate_graph_structure.sh"
         # Validate repository metadata.
         echo "check repositories..."
         "${ENVOY_SRCDIR}/tools/check_repositories.sh"

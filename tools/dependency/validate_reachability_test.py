@@ -2,24 +2,42 @@
 """Validate dependency metadata against build graph reachability data.
 
 This replaces the old validate.py which used `bazel query` (slow, broken under
-bzlmod).  The checks are identical; the data source is the pre-built
-``dependency_reachability`` JSON produced by the ``@envoy_toolshed`` aspect.
+bzlmod).  The data source is the pre-built ``dependency_reachability`` JSON
+produced by the ``@envoy_toolshed`` aspect.
 
-Behaviour changes relative to validate.py:
+NOTE: This Python implementation is transitional.  After the bzlmod migration,
+this logic will move to jq inside ``@envoy_toolshed``, where it will be
+properly tested.  Do not invest in Python unit tests here.
+
+Two reachability roots are declared (see tools/dependency/BUILD):
+
+  dep-reachability-core — rooted at envoy_main_common_with_core_extensions_lib.
+      Used only to derive the "core dep" set for the extension-marginal check.
+
+  dep-reachability — rooted at main_common_with_all_extensions_lib (all
+      extensions).  This is the primary reachability data used by all checks.
+
+Core deps are those reachable from the core root; extension-marginal deps are
+those reachable from the all-extensions root but *not* from the core root.
+This restores the original deps(ext) − deps(core) semantics from validate.py.
+
+Checks still covered outside this test:
 
 (a) validate_build_graph_structure: the old assertion
     deps(//source/...) == deps(core) ∪ deps(//source/extensions/...)
-    is not expressible over the reachability JSON (the JSON only covers targets
-    reachable from the declared roots, not the full //source/... closure). It is
-    dropped in this version.
+    is enforced by tools/dependency/validate_graph_structure.sh. It is not
+    expressible over the reachability JSON because the aspect only covers targets
+    reachable from declared concrete roots; it cannot root at //source/... or ask
+    whether anything exists outside those roots.
 
 (b) validate_test_only_deps (second direction): the old code also verified that
     deps reachable from //test/... but not //source/... were declared test_only,
     carrying an allowlist for raze__/cu__/remotejdk/_pip3 and an openssl
-    exclusion. This direction is not implemented here because //test/... is not
-    a declared root, so test targets do not appear in the reachability data. The
-    first direction (test_only deps must not be reachable via a production path)
-    is fully retained.
+    exclusion. That direction is enforced by
+    tools/dependency/validate_graph_structure.sh for the same reason: //test/...
+    is not a declared root, and aspect roots cannot be wildcards or query
+    expressions. The first direction (test_only deps must not be reachable via a
+    production path) is fully retained here.
 """
 
 import json
@@ -33,8 +51,11 @@ import unittest
 # ---------------------------------------------------------------------------
 
 # Package prefixes considered part of the "dataplane core" path set.
+# Each prefix is stored without a trailing delimiter so that both
+# sub-package targets ("//source/common/http/foo:bar") and package-level
+# targets ("//source/common/http:baz") are matched correctly.
 DATAPLANE_PACKAGE_PREFIXES = tuple(
-    "//source/common/%s/" % p
+    "//source/common/%s" % p
     for p in [
         "api",
         "buffer",
@@ -49,9 +70,7 @@ DATAPLANE_PACKAGE_PREFIXES = tuple(
     ]
 )
 
-CONTROLPLANE_PACKAGE_PREFIX = "//source/common/config/"
-
-EXTENSION_CONSUMER_RE = re.compile(r"^//source/extensions/([^:]+):")
+CONTROLPLANE_PACKAGE_PREFIX = "//source/common/config"
 
 # Internal/tooling deps to skip in all checks (mirrors validate.py's IGNORE_DEPS).
 IGNORE_DEPS = frozenset(
@@ -94,7 +113,12 @@ def _build_apparent_name_lookup(metadata):
 
 
 def _build_implied_revmap(metadata):
-    """Reverse-map untracked transitive deps back to their tracking dep."""
+    """Reverse-map untracked transitive deps back to their tracking dep.
+
+    Keyed on the exact string declared in ``implied_untracked_deps``.  Those
+    declarations must use the canonical bzlmod repo name (or the apparent_name
+    spelling that the aspect emits) — there is no heuristic name translation.
+    """
     revmap = {}
     for name, meta in metadata.items():
         for untracked in meta.get("implied_untracked_deps", []):
@@ -127,29 +151,13 @@ def _deps_by_use_category(metadata, use_category):
     return {k for k, v in metadata.items() if use_category in v.get("use_category", [])}
 
 
-def _is_local_consumer(consumer):
-    """True if the consumer is an in-repo target (not an external-repo target)."""
-    return not consumer["target"].startswith("@@")
+def _is_under_package(target, pkg):
+    """True if *target* is within the subtree rooted at *pkg*.
 
-
-def _extension_package(target):
-    """Return ``//source/extensions/<pkg>`` or None."""
-    m = EXTENSION_CONSUMER_RE.match(target)
-    return ("//source/extensions/" + m.group(1)) if m else None
-
-
-def _core_consumer(target):
-    """True if the consumer makes a dep non-marginal for the extension check.
-
-    A dep is considered "core" (not extension-marginal) if it has any consumer
-    that is:
-    - a local in-repo target outside of ``//source/extensions/``, OR
-    - a target in an external repository (@@...), which means the dep is pulled
-      in transitively by another external dep that is itself a core dep.
+    Matches both sub-package targets (``pkg + "/"``) and targets declared
+    directly in *pkg* itself (``pkg + ":"``).
     """
-    if target.startswith("@@"):
-        return True
-    return target.startswith("//source/") and not target.startswith("//source/extensions/")
+    return target.startswith(pkg + "/") or target.startswith(pkg + ":")
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +204,38 @@ def check_apparent_name_uniqueness(metadata):
 # ---------------------------------------------------------------------------
 
 
+def validate_dep_names_resolved(deps, metadata, apparent_lookup, revmap):
+    """Every observed dep name must resolve to a known metadata key.
+
+    If a dep name cannot be resolved, raise an actionable error instructing the
+    maintainer to add an ``apparent_name`` mapping (or an
+    ``implied_untracked_deps`` entry) in ``bazel/deps.yaml`` /
+    ``api/bazel/deps.yaml`` so the name is covered by declared metadata.
+    """
+    unresolved = []
+    for dep_data in deps.values():
+        observed = dep_data["name"]
+        key = _resolve_dep_name(observed, apparent_lookup, revmap)
+        if key in IGNORE_DEPS:
+            continue
+        if key not in metadata:
+            unresolved.append(observed)
+
+    if unresolved:
+        raise AssertionError(
+            "The following dependency repo names observed in the build graph could not be"
+            " resolved to any metadata entry in bazel/deps.yaml or"
+            " api/bazel/deps.yaml:\n"
+            "  %s\n"
+            "For each name above, either:\n"
+            "  (a) add an apparent_name field to the appropriate entry so the canonical"
+            " bzlmod name maps back to the metadata key, or\n"
+            "  (b) add it to implied_untracked_deps under its parent dep entry, or\n"
+            "  (c) add it to IGNORE_DEPS in validate_reachability_test.py with a"
+            " documented rationale." % "\n  ".join(sorted(unresolved))
+        )
+
+
 def validate_test_only_deps(deps, metadata, apparent_lookup, revmap):
     """No test_only-marked dep may be reachable via a non-testonly (production) path."""
     test_only = _deps_by_use_category(metadata, "test_only")
@@ -227,7 +267,8 @@ def validate_data_plane_core_deps(deps, metadata, apparent_lookup, revmap):
             continue
         for consumer in dep_data["consumers"]:
             if any(
-                consumer["target"].startswith(pfx) for pfx in DATAPLANE_PACKAGE_PREFIXES
+                _is_under_package(consumer["target"], pfx)
+                for pfx in DATAPLANE_PACKAGE_PREFIXES
             ):
                 observed[key] = observed_name
                 break
@@ -261,7 +302,7 @@ def validate_control_plane_deps(deps, metadata, apparent_lookup, revmap):
         if key in IGNORE_DEPS:
             continue
         for consumer in dep_data["consumers"]:
-            if consumer["target"].startswith(CONTROLPLANE_PACKAGE_PREFIX):
+            if _is_under_package(consumer["target"], CONTROLPLANE_PACKAGE_PREFIX):
                 observed[key] = observed_name
                 break
 
@@ -279,12 +320,22 @@ def validate_control_plane_deps(deps, metadata, apparent_lookup, revmap):
         )
 
 
-def validate_extension_deps(deps, metadata, apparent_lookup, revmap, extensions_build_config):
+def validate_extension_deps(deps, metadata, apparent_lookup, revmap, extensions_build_config,
+                             core_deps):
     """Per-extension marginal deps must carry an ext/observability/other/api category.
 
     ``extensions_build_config`` is a dict mapping extension-name -> target label.
-    Marginal deps for extension X are deps whose *only* in-repo consumers are
-    targets under ``//source/extensions/X/...`` (no core consumer exists).
+
+    ``core_deps`` is the set of resolved metadata keys that are reachable from
+    the core (non-extension) root.  Extension-marginal deps are those reachable
+    from the all-extensions root but *not* in ``core_deps``; this restores the
+    original ``deps(ext) − deps(core)`` semantics from validate.py.
+
+    A consumer target is attributed to extension package ``pkg`` when the
+    consumer label falls within the ``pkg`` subtree — i.e. starts with
+    ``pkg + "/"`` (sub-package) or ``pkg + ":"`` (target in the package itself).
+    A consumer may match multiple extension packages; it is attributed to all
+    of them (broadest possible coverage).
     """
     # Build package-path -> [extension-name] mapping from the config.
     pkg_to_ext: dict = {}
@@ -294,28 +345,20 @@ def validate_extension_deps(deps, metadata, apparent_lookup, revmap, extensions_
             pkg = m.group(1)
             pkg_to_ext.setdefault(pkg, []).append(ext_name)
 
-    # Determine which dep names are "core" (have at least one core consumer).
-    # _core_consumer includes @@-prefixed (external-repo) consumers because they
-    # indicate the dep is pulled in transitively by another external dep, not
-    # solely by an extension.
-    core_dep_names = set()
-    for dep_data in deps.values():
-        key = _resolve_dep_name(dep_data["name"], apparent_lookup, revmap)
-        for consumer in dep_data["consumers"]:
-            if _core_consumer(consumer["target"]):
-                core_dep_names.add(key)
-                break
-
     # For each extension package, collect the marginal deps it introduces.
+    # A dep is "core" (non-marginal) if its resolved key appears in core_deps.
+    # The consumer→extension attribution uses subtree matching so that targets
+    # in sub-packages of the extension's config package are attributed correctly.
     ext_pkg_deps: dict = {}
     for dep_data in deps.values():
         key = _resolve_dep_name(dep_data["name"], apparent_lookup, revmap)
-        if key in core_dep_names:
+        if key in core_deps:
             continue
         for consumer in dep_data["consumers"]:
-            pkg = _extension_package(consumer["target"])
-            if pkg:
-                ext_pkg_deps.setdefault(pkg, set()).add(key)
+            target = consumer["target"]
+            for pkg in pkg_to_ext:
+                if _is_under_package(target, pkg):
+                    ext_pkg_deps.setdefault(pkg, set()).add(key)
 
     errors = []
     for pkg, ext_names in pkg_to_ext.items():
@@ -361,15 +404,29 @@ class ValidateReachabilityTest(unittest.TestCase):
     def setUpClass(cls):
         # Paths are passed via environment variables set by the py_test wrapper.
         reach_path = os.environ["REACHABILITY_JSON"]
+        core_reach_path = os.environ["CORE_REACHABILITY_JSON"]
         meta_path = os.environ["REPOSITORY_LOCATIONS_JSON"]
         ext_cfg_path = os.environ["EXTENSIONS_BUILD_CONFIG_JSON"]
 
+        # All-extensions reachability: primary source for all checks.
         raw = _load_json(reach_path)
         cls.deps = raw["dependencies"]
+
+        # Core-only reachability: used to derive the set of core dep keys so
+        # that validate_extension_deps can compute extension-marginal deps as
+        # (all-extensions reachable) − (core reachable).
+        core_raw = _load_json(core_reach_path)
+
         cls.metadata = _load_json(meta_path)
         cls.extensions_build_config = _load_json(ext_cfg_path)
         cls.apparent_lookup = _build_apparent_name_lookup(cls.metadata)
         cls.revmap = _build_implied_revmap(cls.metadata)
+
+        # Resolved set of metadata keys reachable from the core root.
+        cls.core_deps = {
+            _resolve_dep_name(d["name"], cls.apparent_lookup, cls.revmap)
+            for d in core_raw["dependencies"].values()
+        }
 
     def test_apparent_name_uniqueness(self):
         errors = check_apparent_name_uniqueness(self.metadata)
@@ -377,6 +434,11 @@ class ValidateReachabilityTest(unittest.TestCase):
             raise AssertionError(
                 "apparent_name uniqueness violations:\n" + "\n".join(errors)
             )
+
+    def test_dep_names_resolved(self):
+        validate_dep_names_resolved(
+            self.deps, self.metadata, self.apparent_lookup, self.revmap
+        )
 
     def test_test_only_deps(self):
         validate_test_only_deps(self.deps, self.metadata, self.apparent_lookup, self.revmap)
@@ -398,6 +460,7 @@ class ValidateReachabilityTest(unittest.TestCase):
             self.apparent_lookup,
             self.revmap,
             self.extensions_build_config,
+            self.core_deps,
         )
 
 
