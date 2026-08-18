@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <memory>
+#include <optional>
 
 #include "envoy/runtime/runtime.h"
 
@@ -32,15 +33,138 @@ private:
   std::atomic<double> share_factor_{1.0};
 };
 
+// Divides the tokens in proportion to this instance's endpoint load balancing weight, so that a
+// local cluster with heterogeneous weights gives each instance a share of the bucket that matches
+// its share of the traffic.
+class WeightedShareMonitor : public ShareProviderManager::ShareMonitor,
+                             public Logger::Loggable<Logger::Id::local_rate_limit> {
+public:
+  WeightedShareMonitor(OptRef<const LocalInfo::LocalInfo> local_info,
+                       ProtoLocalClusterRateLimit::SelfIdentifier identifier)
+      : identifier_(identifier) {
+    if (!local_info.has_value()) {
+      return;
+    }
+    switch (identifier_) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case ProtoLocalClusterRateLimit::LOCAL_ADDRESS:
+      if (local_info->address() != nullptr && local_info->address()->ip() != nullptr) {
+        self_identity_ = local_info->address()->ip()->addressAsString();
+      }
+      break;
+    case ProtoLocalClusterRateLimit::NODE_ID:
+      self_identity_ = local_info->nodeName();
+      break;
+    }
+  }
+
+  double getTokensShareFactor() const override { return share_factor_.load(); }
+
+  double onLocalClusterUpdate(const Upstream::Cluster& cluster) override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+    uint64_t hosts = 0;
+    uint64_t total_weight = 0;
+    uint64_t self_weight = 0;
+    uint64_t self_matches = 0;
+    // Walk the same host set that DefaultEvenShareMonitor counts, so that a cluster whose hosts all
+    // carry the same weight yields the same share in either mode.
+    for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+      for (const auto& host : host_set->hosts()) {
+        ++hosts;
+        total_weight += host->weight();
+        if (isSelf(*host)) {
+          ++self_matches;
+          self_weight = host->weight();
+        }
+      }
+    }
+
+    // An ambiguous match is treated as no match: adopting the weight of an arbitrary one of several
+    // endpoints sharing this instance's identity would be silently wrong.
+    const bool self_located = self_matches == 1 && self_weight != 0 && total_weight != 0;
+    double new_share_factor = 1.0;
+    if (self_located) {
+      new_share_factor = static_cast<double>(self_weight) / static_cast<double>(total_weight);
+    } else if (hosts != 0) {
+      // Fall back to an even share rather than to the whole bucket, so that an instance which
+      // cannot find itself in the local cluster can never claim the entire fleet-wide budget.
+      new_share_factor = 1.0 / static_cast<double>(hosts);
+    }
+
+    logIfLocatedChanged(self_located, self_matches, self_weight, total_weight, hosts);
+
+    share_factor_.store(new_share_factor);
+    return new_share_factor;
+  }
+
+private:
+  bool isSelf(const Upstream::Host& host) const {
+    if (self_identity_.empty()) {
+      return false;
+    }
+    switch (identifier_) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case ProtoLocalClusterRateLimit::LOCAL_ADDRESS: {
+      // Compare the IP only. The endpoint registered in service discovery typically carries the
+      // port of the application, not the port this Envoy listens on.
+      const auto& address = host.address();
+      return address != nullptr && address->ip() != nullptr &&
+             address->ip()->addressAsString() == self_identity_;
+    }
+    case ProtoLocalClusterRateLimit::NODE_ID:
+      return host.hostname() == self_identity_;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  absl::string_view identifierName() const {
+    return identifier_ == ProtoLocalClusterRateLimit::NODE_ID ? "node id" : "local address";
+  }
+
+  void logIfLocatedChanged(bool self_located, uint64_t self_matches, uint64_t self_weight,
+                           uint64_t total_weight, uint64_t hosts) {
+    if (self_located_ == self_located) {
+      return;
+    }
+    self_located_ = self_located;
+
+    if (self_located) {
+      ENVOY_LOG(info, "local cluster rate limit: weighted share for {} '{}' is {}/{} over {} hosts",
+                identifierName(), self_identity_, self_weight, total_weight, hosts);
+    } else if (self_matches > 1) {
+      ENVOY_LOG(warn,
+                "local cluster rate limit: {} '{}' matches {} of the {} hosts of the local "
+                "cluster, falling back to an even share",
+                identifierName(), self_identity_, self_matches, hosts);
+    } else {
+      ENVOY_LOG(warn,
+                "local cluster rate limit: {} '{}' not found among the {} hosts of the local "
+                "cluster, falling back to an even share",
+                identifierName(), self_identity_, hosts);
+    }
+  }
+
+  const ProtoLocalClusterRateLimit::SelfIdentifier identifier_;
+  std::string self_identity_;
+  std::optional<bool> self_located_;
+  std::atomic<double> share_factor_{1.0};
+};
+
 ShareProviderManager::ShareProviderManager(Event::Dispatcher& main_dispatcher,
-                                           const Upstream::Cluster& cluster)
-    : main_dispatcher_(main_dispatcher), cluster_(cluster) {
+                                           const Upstream::Cluster& cluster,
+                                           OptRef<const LocalInfo::LocalInfo> local_info)
+    : main_dispatcher_(main_dispatcher), cluster_(cluster), local_info_(local_info),
+      even_share_monitor_(std::make_shared<DefaultEvenShareMonitor>()) {
   // It's safe to capture the local cluster reference here because the local cluster is
   // guaranteed to be static cluster and should never be removed.
-  handle_ = cluster_.prioritySet().addMemberUpdateCb(
-      [this](const auto&, const auto&) { share_monitor_->onLocalClusterUpdate(cluster_); });
-  share_monitor_ = std::make_shared<DefaultEvenShareMonitor>();
-  share_monitor_->onLocalClusterUpdate(cluster_);
+  handle_ = cluster_.prioritySet().addMemberUpdateCb([this](const auto&, const auto&) {
+    even_share_monitor_->onLocalClusterUpdate(cluster_);
+    for (const auto& monitor : weighted_share_monitors_) {
+      monitor.second->onLocalClusterUpdate(cluster_);
+    }
+  });
+  even_share_monitor_->onLocalClusterUpdate(cluster_);
 }
 
 ShareProviderManager::~ShareProviderManager() {
@@ -49,18 +173,29 @@ ShareProviderManager::~ShareProviderManager() {
 }
 
 ShareProviderSharedPtr
-ShareProviderManager::getShareProvider(const ProtoLocalClusterRateLimit&) const {
-  // TODO(wbpcode): we may want to support custom share provider in the future based on the
-  // configuration.
-  return share_monitor_;
+ShareProviderManager::getShareProvider(const ProtoLocalClusterRateLimit& config) const {
+  if (config.share_mode() != ProtoLocalClusterRateLimit::WEIGHTED) {
+    return even_share_monitor_;
+  }
+
+  // Config load is main thread only, as is the membership update callback that reads this, so no
+  // locking is needed here.
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  auto& monitor = weighted_share_monitors_[config.self_identifier()];
+  if (monitor == nullptr) {
+    monitor = std::make_shared<WeightedShareMonitor>(local_info_, config.self_identifier());
+    monitor->onLocalClusterUpdate(cluster_);
+  }
+  return monitor;
 }
 
-ShareProviderManagerSharedPtr ShareProviderManager::singleton(Event::Dispatcher& dispatcher,
-                                                              Upstream::ClusterManager& cm,
-                                                              Singleton::Manager& manager) {
+ShareProviderManagerSharedPtr
+ShareProviderManager::singleton(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
+                                Singleton::Manager& manager,
+                                OptRef<const LocalInfo::LocalInfo> local_info) {
   return manager.getTyped<ShareProviderManager>(
       SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit_share_provider_manager),
-      [&dispatcher, &cm]() -> Singleton::InstanceSharedPtr {
+      [&dispatcher, &cm, local_info]() -> Singleton::InstanceSharedPtr {
         const auto& local_cluster_name = cm.localClusterName();
         if (!local_cluster_name.has_value()) {
           return nullptr;
@@ -70,7 +205,7 @@ ShareProviderManagerSharedPtr ShareProviderManager::singleton(Event::Dispatcher&
           return nullptr;
         }
         return ShareProviderManagerSharedPtr{
-            new ShareProviderManager(dispatcher, cluster.value().get())};
+            new ShareProviderManager(dispatcher, cluster.value().get(), local_info)};
       });
 }
 
