@@ -207,10 +207,10 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
     return BridgeStatusValues::REQUEST_TOOLS_CALL_MISSING_REQUIRED_ARG;
   case BridgeStatus::RequestToolsCallPathTraversalRejected:
     return BridgeStatusValues::REQUEST_TOOLS_CALL_PATH_TRAVERSAL_REJECTED;
-  case BridgeStatus::RequestToolsCallInvalidHttpRule:
-    return BridgeStatusValues::REQUEST_TOOLS_CALL_INVALID_HTTP_RULE;
-  case BridgeStatus::RequestToolsListMissingConfig:
-    return BridgeStatusValues::REQUEST_TOOLS_LIST_MISSING_CONFIG;
+  case BridgeStatus::InternalToolsCallInvalidHttpRule:
+    return BridgeStatusValues::INTERNAL_TOOLS_CALL_INVALID_HTTP_RULE;
+  case BridgeStatus::InternalToolsListMissingConfig:
+    return BridgeStatusValues::INTERNAL_TOOLS_LIST_MISSING_CONFIG;
   case BridgeStatus::ResponseTooLarge:
     return BridgeStatusValues::RESPONSE_TOO_LARGE;
   case BridgeStatus::ResponseToolsCallInvalidUtf8:
@@ -506,7 +506,8 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
     ENVOY_STREAM_LOG(warn, "Only POST method is supported for MCP. Received: {}",
                      *decoder_callbacks_, request_headers.getMethodValue());
     sendErrorResponse(
-        Http::Code::MethodNotAllowed, BridgeStatus::HttpRequestMethodNotPost, "HTTP Method Not Allowed",
+        Http::Code::MethodNotAllowed, BridgeStatus::HttpRequestMethodNotPost,
+        "HTTP Method Not Allowed",
         [](Http::ResponseHeaderMap& response_headers) {
           response_headers.addCopy(Http::LowerCaseString("allow"),
                                    Http::Headers::get().MethodValues.Post);
@@ -918,7 +919,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         // be addressed later when the JSON parser is updated.
         mcp_operation_ = McpOperation::Unspecified;
         request_body_str_ = json_rpc.dump();
-        status_ = BridgeStatus::RequestToolsListMissingConfig;
+        status_ = BridgeStatus::InternalToolsListMissingConfig;
         setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                        ? json_rpc[McpConstants::PARAMS_FIELD]
                                        : json::object());
@@ -1164,7 +1165,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
       error_msg = "Path traversal rejected";
     } else if (absl::StrContains(http_request.status().message(), "Unsupported HTTP method") ||
                absl::StrContains(http_request.status().message(), "Invalid HTTP rule")) {
-      bridge_status = BridgeStatus::RequestToolsCallInvalidHttpRule;
+      bridge_status = BridgeStatus::InternalToolsCallInvalidHttpRule;
       error_msg = "Invalid HTTP rule";
     }
     sendErrorResponse(Http::Code::OK, bridge_status,

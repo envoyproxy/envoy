@@ -59,8 +59,8 @@ enum class BridgeStatus {
   RequestToolsCallArgumentsMalformed,
   RequestToolsCallMissingRequiredArg,
   RequestToolsCallPathTraversalRejected,
-  RequestToolsCallInvalidHttpRule,
-  RequestToolsListMissingConfig,
+  InternalToolsCallInvalidHttpRule,
+  InternalToolsListMissingConfig,
   ResponseTooLarge,
   ResponseToolsCallInvalidUtf8,
   ResponseHttpStatusError,
@@ -97,10 +97,10 @@ inline constexpr absl::string_view REQUEST_TOOLS_CALL_MISSING_REQUIRED_ARG =
     "mcp_json_rest_bridge_request_tools_call_missing_required_arg";
 inline constexpr absl::string_view REQUEST_TOOLS_CALL_PATH_TRAVERSAL_REJECTED =
     "mcp_json_rest_bridge_request_tools_call_path_traversal_rejected";
-inline constexpr absl::string_view REQUEST_TOOLS_CALL_INVALID_HTTP_RULE =
-    "mcp_json_rest_bridge_request_tools_call_invalid_http_rule";
-inline constexpr absl::string_view REQUEST_TOOLS_LIST_MISSING_CONFIG =
-    "mcp_json_rest_bridge_request_tools_list_missing_config";
+inline constexpr absl::string_view INTERNAL_TOOLS_CALL_INVALID_HTTP_RULE =
+    "mcp_json_rest_bridge_internal_tools_call_invalid_http_rule";
+inline constexpr absl::string_view INTERNAL_TOOLS_LIST_MISSING_CONFIG =
+    "mcp_json_rest_bridge_internal_tools_list_missing_config";
 inline constexpr absl::string_view RESPONSE_TOO_LARGE = "mcp_json_rest_bridge_response_too_large";
 inline constexpr absl::string_view RESPONSE_TOOLS_CALL_INVALID_UTF8 =
     "mcp_json_rest_bridge_response_tools_call_invalid_utf8";

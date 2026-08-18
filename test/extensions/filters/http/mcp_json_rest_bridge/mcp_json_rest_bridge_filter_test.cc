@@ -1018,11 +1018,11 @@ tool_config:
               sendLocalReply(Eq(Http::Code::OK),
                              StrEq(R"json({"code":-32602,"message":"Invalid HTTP rule"})json"), _,
                              _,
-                             StrEq("mcp_json_rest_bridge_request_tools_call_invalid_http_rule")));
+                             StrEq("mcp_json_rest_bridge_internal_tools_call_invalid_http_rule")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "mcp_json_rest_bridge_request_tools_call_invalid_http_rule",
+    "status": "mcp_json_rest_bridge_internal_tools_call_invalid_http_rule",
     "method": "tools/call",
     "params": {
       "name": "empty_http_rule_tool",
@@ -1432,7 +1432,7 @@ tool_config:
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "mcp_json_rest_bridge_request_tools_list_missing_config",
+    "status": "mcp_json_rest_bridge_internal_tools_list_missing_config",
     "method": "tools/list"
   })json",
                             expected_metadata);
@@ -1781,8 +1781,8 @@ TEST_F(McpJsonRestBridgeFilterTest,
   EXPECT_CALL(
       decoder_callbacks_,
       sendLocalReply(Eq(Http::Code::OK),
-                     StrEq(R"json({"code":-32602,"message":"Unsupported MCP version"})json"),
-                     _, _, StrEq("mcp_json_rest_bridge_request_unsupported_mcp_version")));
+                     StrEq(R"json({"code":-32602,"message":"Unsupported MCP version"})json"), _, _,
+                     StrEq("mcp_json_rest_bridge_request_unsupported_mcp_version")));
   Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","method":"notifications/initialized"})json");
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
@@ -1802,8 +1802,7 @@ TEST_F(McpJsonRestBridgeFilterTest,
   response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
-  Buffer::OwnedImpl response_body(
-      R"json({"code":-32602,"message":"Unsupported MCP version"})json");
+  Buffer::OwnedImpl response_body(R"json({"code":-32602,"message":"Unsupported MCP version"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
@@ -1848,8 +1847,8 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListUnsupportedProtocolVersionReturnsEr
   EXPECT_CALL(
       decoder_callbacks_,
       sendLocalReply(Eq(Http::Code::OK),
-                     StrEq(R"json({"code":-32602,"message":"Unsupported MCP version"})json"),
-                     _, _, StrEq("mcp_json_rest_bridge_request_unsupported_mcp_version")));
+                     StrEq(R"json({"code":-32602,"message":"Unsupported MCP version"})json"), _, _,
+                     StrEq("mcp_json_rest_bridge_request_unsupported_mcp_version")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
@@ -1869,8 +1868,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListUnsupportedProtocolVersionReturnsEr
   response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
-  Buffer::OwnedImpl response_body(
-      R"json({"code":-32602,"message":"Unsupported MCP version"})json");
+  Buffer::OwnedImpl response_body(R"json({"code":-32602,"message":"Unsupported MCP version"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
@@ -1919,8 +1917,8 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsCallUnsupportedProtocolVersionReturnsEr
   EXPECT_CALL(
       decoder_callbacks_,
       sendLocalReply(Eq(Http::Code::OK),
-                     StrEq(R"json({"code":-32602,"message":"Unsupported MCP version"})json"),
-                     _, _, StrEq("mcp_json_rest_bridge_request_unsupported_mcp_version")));
+                     StrEq(R"json({"code":-32602,"message":"Unsupported MCP version"})json"), _, _,
+                     StrEq("mcp_json_rest_bridge_request_unsupported_mcp_version")));
   Buffer::OwnedImpl body(
       R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"list_api_keys","arguments":{"parent":"projects/test-codelab","pageSize":1}}})json");
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
@@ -1930,8 +1928,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsCallUnsupportedProtocolVersionReturnsEr
   response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
-  Buffer::OwnedImpl response_body(
-      R"json({"code":-32602,"message":"Unsupported MCP version"})json");
+  Buffer::OwnedImpl response_body(R"json({"code":-32602,"message":"Unsupported MCP version"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
