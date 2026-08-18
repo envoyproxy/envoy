@@ -421,6 +421,9 @@ public:
     typed_metadata_writes_.clear();
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope());
     filter_ = std::make_unique<AiProtocolManagerFilter>(factory_, config_);
+    // A stream filter receives both callback sets in production; encode-path
+    // code may rely on the decoder callbacks (e.g. the buffer memory account).
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     ON_CALL(encoder_callbacks_.stream_info_, setDynamicMetadata(testing::_, testing::_))
         .WillByDefault(Invoke([this](const std::string& ns, const Protobuf::Struct& value) {
@@ -485,6 +488,7 @@ public:
   InMemoryExternalBufferFactory factory_;
   FilterConfigSharedPtr config_;
   std::unique_ptr<RouteConfig> route_config_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   std::unique_ptr<AiProtocolManagerFilter> filter_;
   std::vector<std::pair<std::string, Protobuf::Struct>> metadata_writes_;

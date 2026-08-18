@@ -69,15 +69,15 @@ private:
   // Counters are thread-safe to increment; mutable so a shared const config
   // serves them.
   mutable AiProtocolManagerStats stats_;
-  const bool request_handling_enabled_;
-  const bool parse_unconfigured_routes_;
-  const bool token_usage_enabled_;
-  const bool include_unconfigured_routes_;
-  const ApiProtocol default_api_protocol_;
+  const bool request_handling_enabled_ = false;
+  const bool parse_unconfigured_routes_ = false;
+  const bool token_usage_enabled_ = false;
+  const bool include_unconfigured_routes_ = false;
+  const ApiProtocol default_api_protocol_ = ApiProtocol::Unspecified;
   const std::string metadata_namespace_;
-  const uint32_t max_sse_event_size_;
-  const uint32_t max_json_body_size_;
-  const uint32_t max_parsed_sse_events_;
+  const uint32_t max_sse_event_size_ = 0;
+  const uint32_t max_json_body_size_ = 0;
+  const uint32_t max_parsed_sse_events_ = 0;
 };
 using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
 
@@ -106,9 +106,9 @@ public:
   }
 
 private:
-  const bool has_request_;
-  const ApiProtocol request_protocol_;
-  const ApiProtocol response_protocol_;
+  const bool has_request_ = false;
+  const ApiProtocol request_protocol_ = ApiProtocol::Unspecified;
+  const ApiProtocol response_protocol_ = ApiProtocol::Unspecified;
 };
 
 // AI Protocol Manager HTTP filter (alpha).

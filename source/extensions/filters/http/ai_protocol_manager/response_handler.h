@@ -147,10 +147,10 @@ private:
   void processSseEvent(absl::string_view event);
   void retainBytes(absl::string_view bytes);
 
-  const uint32_t max_event_size_;
+  const uint32_t max_event_size_ = 0;
   // Remaining parse budget (max_parsed_events); exhaustion makes the handler
   // inert with the accumulated usage flagged partial.
-  uint32_t parse_budget_;
+  uint32_t parse_budget_ = 0;
   bool budget_exhausted_{false};
   // Inside an over-cap unterminated event: nothing is retained, and the
   // scanner's line state finds the real terminating blank line.

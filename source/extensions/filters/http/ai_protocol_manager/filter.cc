@@ -96,23 +96,23 @@ envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degrade
       setter(value.value());
     }
   };
-  set(usage.input_tokens, [&](uint64_t v) { typed.mutable_input_tokens()->set_value(v); });
-  set(usage.output_tokens, [&](uint64_t v) { typed.mutable_output_tokens()->set_value(v); });
-  set(usage.total_tokens, [&](uint64_t v) { typed.mutable_total_tokens()->set_value(v); });
-  set(usage.cached_input_tokens, [&](uint64_t v) {
+  set(usage.input_tokens, [&typed](uint64_t v) { typed.mutable_input_tokens()->set_value(v); });
+  set(usage.output_tokens, [&typed](uint64_t v) { typed.mutable_output_tokens()->set_value(v); });
+  set(usage.total_tokens, [&typed](uint64_t v) { typed.mutable_total_tokens()->set_value(v); });
+  set(usage.cached_input_tokens, [&typed](uint64_t v) {
     typed.mutable_input_token_details()->mutable_cached_tokens()->set_value(v);
   });
-  set(usage.cache_creation_input_tokens, [&](uint64_t v) {
+  set(usage.cache_creation_input_tokens, [&typed](uint64_t v) {
     typed.mutable_input_token_details()->mutable_cache_creation_tokens()->set_value(v);
   });
-  set(usage.tool_use_input_tokens, [&](uint64_t v) {
+  set(usage.tool_use_input_tokens, [&typed](uint64_t v) {
     typed.mutable_input_token_details()->mutable_tool_use_tokens()->set_value(v);
   });
-  set(usage.reasoning_tokens, [&](uint64_t v) {
+  set(usage.reasoning_tokens, [&typed](uint64_t v) {
     typed.mutable_output_token_details()->mutable_reasoning_tokens()->set_value(v);
   });
   set(usage.provider_total_tokens,
-      [&](uint64_t v) { typed.mutable_provider_total_tokens()->set_value(v); });
+      [&typed](uint64_t v) { typed.mutable_provider_total_tokens()->set_value(v); });
   if (!usage.hasAny()) {
     typed.set_extraction_status(envoy::data::ai::v3::TokenUsage::FAILED);
   } else {
@@ -417,8 +417,11 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   // Route scoping: only declared AI endpoints are inspected unless the filter
   // opted into unconfigured routes, so enabling token usage on a mixed
   // listener does not silently parse unrelated JSON/SSE responses. Resolved
-  // here rather than reusing the decode-path copy, which is not taken when
-  // request handling is disabled.
+  // fresh here rather than cached from the decode path: the decode-path copy
+  // is not taken when request handling is disabled, and it could be stale --
+  // a later decode filter may refresh the route (clearRouteCache), and by
+  // response time the route is frozen as the one that actually routed the
+  // request.
   const RouteConfig* route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<RouteConfig>(encoder_callbacks_);
   if (route_config == nullptr && !config_->includeUnconfiguredRoutes()) {
@@ -484,8 +487,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   // Observation buffers charge the stream's memory account when tracking is
   // enabled; in an upstream installation the decoder callbacks resolve to the
   // downstream stream's account.
-  const Buffer::BufferMemoryAccountSharedPtr account =
-      decoder_callbacks_ != nullptr ? decoder_callbacks_->account() : nullptr;
+  const Buffer::BufferMemoryAccountSharedPtr account = decoder_callbacks_->account();
   if (is_sse) {
     response_handler_ = std::make_unique<SseResponseHandler>(protocol, config_->maxSseEventSize(),
                                                              config_->maxParsedSseEvents(),
