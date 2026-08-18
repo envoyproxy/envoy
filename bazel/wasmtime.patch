@@ -1,0 +1,13 @@
+diff --git a/build.rs b/build.rs
+--- a/build.rs
++++ b/build.rs
+@@ -100,6 +100,8 @@
+     }
+ 
+     println!("cargo:rerun-if-changed=src/runtime/vm/helpers.c");
+-    build.file("src/runtime/vm/helpers.c");
++    let helpers_c = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
++        .join("src/runtime/vm/helpers.c");
++    build.file(helpers_c);
+     build.compile("wasmtime-helpers");
+ }

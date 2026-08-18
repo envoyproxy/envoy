@@ -1,3 +1,4 @@
+diff --git a/BUILD b/BUILD
 --- a/BUILD
 +++ b/BUILD
 @@ -93,7 +93,7 @@
@@ -27,3 +28,69 @@
      ],
  )
  
+diff --git a/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel b/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel
+--- a/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel
++++ b/bazel/cargo/wasmtime/remote/BUILD.wasmtime-c-api-impl-45.0.2.bazel
+@@ -109,6 +109,12 @@
+             "WORKSPACE.bazel",
+         ],
+     ),
++    # The `build.rs` of this crate spawns `cmake` to install headers. Use the
++    # hermetic cmake provided by the rules_foreign_cc toolchain rather than
++    # relying on cmake being available on the host (it isn't on Envoy's RBE).
++    build_script_env = {
++        "CMAKE": "$${pwd}/$(CMAKE)",
++    },
+     edition = "2024",
+     links = "wasmtime-c-api",
+     pkg_name = "wasmtime-c-api-impl",
+@@ -127,6 +133,7 @@
+     ],
+     version = "45.0.2",
+     visibility = ["//visibility:private"],
++    toolchains = ["@rules_foreign_cc//toolchains:current_cmake_toolchain"],
+ )
+ 
+ alias(
+
+diff --git a/bazel/cargo/wasmtime/remote/BUILD.wasmtime-45.0.2.bazel b/bazel/cargo/wasmtime/remote/BUILD.wasmtime-45.0.2.bazel
+--- a/bazel/cargo/wasmtime/remote/BUILD.wasmtime-45.0.2.bazel
++++ b/bazel/cargo/wasmtime/remote/BUILD.wasmtime-45.0.2.bazel
+@@ -251,9 +251,12 @@
+             "WORKSPACE",
+             "WORKSPACE.bazel",
+         ],
+-    ),
++    ) + [
++        "@llvm_toolchain//:redacted_dates.h",
++    ],
+     edition = "2024",
+     pkg_name = "wasmtime",
++    rundir = ".",
+     proc_macro_deps = [
+         "@cu__wasmtime-internal-versioned-export-macros-45.0.2//:wasmtime_internal_versioned_export_macros",
+     ],
+
+diff --git a/bazel/cargo/wasmtime/remote/defs.bzl b/bazel/cargo/wasmtime/remote/defs.bzl
+--- a/bazel/cargo/wasmtime/remote/defs.bzl
++++ b/bazel/cargo/wasmtime/remote/defs.bzl
+@@ -1291,15 +1291,19 @@
+         type = "tar.gz",
+         urls = ["https://static.crates.io/crates/wasmtime/45.0.2/download"],
+         strip_prefix = "wasmtime-45.0.2",
++        patches = ["@envoy//bazel:wasmtime.patch"],
++        patch_args = ["-p1"],
+         build_file = Label("@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:BUILD.wasmtime-45.0.2.bazel"),
+     )
+ 
+     maybe(
+         http_archive,
+         name = "cu__wasmtime-c-api-impl-45.0.2",
+         sha256 = "e6015c6d0ac642444161205af3dffc9e6fa62345fdce8f9b87cd0e4aef1c599c",
+         type = "tar.gz",
+         urls = ["https://static.crates.io/crates/wasmtime-c-api-impl/45.0.2/download"],
+         strip_prefix = "wasmtime-c-api-impl-45.0.2",
++        patches = ["@envoy//bazel:wasmtime_c_api_impl.patch"],
++        patch_args = ["-p1"],
+         build_file = Label("@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:BUILD.wasmtime-c-api-impl-45.0.2.bazel"),
+     )
