@@ -1,6 +1,7 @@
 #include <string>
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/response_handler.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -129,7 +130,7 @@ TEST_F(ResponseHandlerTest, SseAnthropicNamedEventsCumulative) {
     EXPECT_TRUE(handler.parsingComplete()); // message_stop seen.
     EXPECT_FALSE(handler.degraded());
     TokenUsage finalized = handler.usage();
-    finalized.finalize();
+    finalized.finalize(AdapterRegistry::get(finalized.api_protocol));
     // Canonical inclusive input: 2679 uncached + 128 cached reads.
     EXPECT_EQ(finalized.input_tokens, 2807);
     EXPECT_EQ(finalized.total_tokens, 2822); // 2807 + 15, inclusive.
@@ -392,7 +393,7 @@ TEST_F(ResponseHandlerTest, GeminiToolUseBreakdownSurvivesHandlerMerge) {
   feed(handler, body, 4096);
   EXPECT_EQ(handler.usage().tool_use_input_tokens, 5);
   TokenUsage finalized = handler.usage();
-  finalized.finalize();
+  finalized.finalize(AdapterRegistry::get(finalized.api_protocol));
   EXPECT_EQ(finalized.input_tokens, 11);
   EXPECT_EQ(finalized.output_tokens, 161);
   EXPECT_EQ(finalized.total_tokens, 172);
@@ -522,7 +523,7 @@ TEST_F(ResponseHandlerTest, SseBareCarriageReturnTerminators) {
        "\"totalTokenCount\":22}}\n\n",
        4096);
   TokenUsage usage = handler.usage();
-  usage.finalize();
+  usage.finalize(AdapterRegistry::get(usage.api_protocol));
   EXPECT_EQ(usage.input_tokens, 6);
   EXPECT_EQ(usage.output_tokens, 16);
   EXPECT_EQ(usage.provider_total_tokens, 22);

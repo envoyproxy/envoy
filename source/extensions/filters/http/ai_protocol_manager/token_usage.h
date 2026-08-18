@@ -5,15 +5,16 @@
 #include <string>
 
 #include "absl/strings/string_view.h"
-#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
+class ApiProtocolAdapter;
+
 // Internal mirror of :ref:`envoy.type.ai.v3.ApiProtocol`: the AI API
-// contract a response speaks. The two OpenAI protocols share extraction
+// contract a payload speaks. The two OpenAI protocols share extraction
 // logic but differ in streaming event semantics and detection markers.
 enum class ApiProtocol {
   Unspecified,
@@ -24,7 +25,7 @@ enum class ApiProtocol {
 };
 
 // The envoy.type.ai.v3.ApiProtocol enum-value name for a protocol
-// (e.g. "OPENAI_CHAT_COMPLETIONS"), used by the Struct metadata projection.
+// (e.g. "OPENAI_CHAT_COMPLETIONS").
 absl::string_view apiProtocolName(ApiProtocol protocol);
 
 // Normalized LLM token usage accumulated over a response. Every field is
@@ -34,8 +35,9 @@ absl::string_view apiProtocolName(ApiProtocol protocol);
 // counts, accumulated with last-wins merge() per field. Native fields are
 // independently optional and cumulative, so canonicalization must not run per
 // event -- a later partial update repeating one native field would regress an
-// already-canonicalized value. finalize(), called once after the last update,
-// rewrites the fields onto the canonical *inclusive* contract:
+// already-canonicalized value. finalize(), called once after the last update
+// with the stream's protocol adapter, rewrites the fields onto the canonical
+// *inclusive* contract:
 //   input_tokens  = ALL input (uncached + cached reads + cache writes +
 //                   tool-use prompt tokens)
 //   output_tokens = ALL output, reasoning/thought tokens included
@@ -72,10 +74,13 @@ struct TokenUsage {
   // Gemini's repeated cumulative snapshots.
   void merge(const TokenUsage& update);
 
-  // Canonicalize the accumulated native counts (see the struct comment).
-  // Must be called exactly once, after the last merge(); repeated calls are
-  // no-ops (the summation must not run twice) and assert in debug builds.
-  void finalize();
+  // Canonicalize the accumulated native counts (see the struct comment): the
+  // adapter rewrites its dialect's native buckets onto the inclusive
+  // contract, then the shared tail derives the canonical total and preserves
+  // the provider-reported one. Must be called exactly once, after the last
+  // merge(), with the adapter for api_protocol; repeated calls are no-ops
+  // (the summation must not run twice) and assert in debug builds.
+  void finalize(const ApiProtocolAdapter& adapter);
 
   // True when finalize() dropped a component or total whose sum exceeded the
   // exactly-representable double bound; the caller must publish the record as
@@ -94,30 +99,6 @@ private:
 struct ExtractionResult {
   TokenUsage usage;
   bool malformed{false};
-};
-
-// Stateless extraction of token usage from a parsed response document (the
-// nlohmann DOM produced by JsonWithExtBufParser) -- one SSE event's data
-// payload, one streamed-array element, or a whole JSON body. Oversized string
-// values may appear as external-reference binary nodes; the extractor never
-// reads large strings, so they are simply skipped.
-class TokenUsageExtractor {
-public:
-  // Detect the API dialect from a response document's shape. Detection is
-  // stream-global once locked, so only strongly shaped, value-validated
-  // markers decide; anything else stays Unknown for a later document.
-  static ApiProtocol detectFormat(const nlohmann::json& json);
-
-  // Extract the partial *native* usage this document carries (see the
-  // TokenUsage lifecycle comment). Absent fields stay unset; the caller
-  // accumulates via TokenUsage::merge() with canonicalization in finalize().
-  static ExtractionResult extract(ApiProtocol format, const nlohmann::json& json);
-
-  // True when this document marks the dialect's logical end of extraction
-  // (Anthropic `message_stop`, OpenAI Responses terminal lifecycle events).
-  // Callers must extract() first: terminal Responses events also carry the
-  // usage. Chat Completions' non-JSON `[DONE]` is handled before parsing.
-  static bool isTerminalEvent(ApiProtocol format, const nlohmann::json& json);
 };
 
 } // namespace AiProtocolManager

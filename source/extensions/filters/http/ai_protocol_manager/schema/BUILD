@@ -17,13 +17,3 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
-    name = "schema_registry_lib",
-    srcs = ["schema_registry.cc"],
-    hdrs = ["schema_registry.h"],
-    deps = [
-        ":openai_chat_completions_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:schema_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:token_usage_extractor_lib",
-    ],
-)

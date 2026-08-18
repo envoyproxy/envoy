@@ -1,4 +1,8 @@
-#include "source/extensions/filters/http/ai_protocol_manager/token_usage_extractor.h"
+#include <algorithm>
+#include <vector>
+
+#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include "gtest/gtest.h"
 
@@ -17,47 +21,42 @@ nlohmann::json parse(const std::string& json) {
 // Most cases only need the usage half of the extraction result; malformed-flag
 // behavior is covered by the dedicated tests below.
 TokenUsage extractUsage(ApiProtocol format, const nlohmann::json& json) {
-  return TokenUsageExtractor::extract(format, json).usage;
+  return AdapterRegistry::get(format).extractUsage(json).usage;
 }
 
 // ---------------------------------------------------------------------------
 // Provider detection.
 
 TEST(DetectFormatTest, OpenAiChatCompletion) {
-  EXPECT_EQ(
-      TokenUsageExtractor::detectFormat(parse(R"({"object":"chat.completion","model":"gpt-4o"})")),
-      ApiProtocol::OpenAiChatCompletions);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(
-                parse(R"({"object":"chat.completion.chunk","choices":[]})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"object":"chat.completion","model":"gpt-4o"})")),
+            ApiProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"object":"chat.completion.chunk","choices":[]})")),
             ApiProtocol::OpenAiChatCompletions);
 }
 
 TEST(DetectFormatTest, OpenAiResponsesApi) {
   // Non-streaming Response object and streaming lifecycle events.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"object":"response","output":[]})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"object":"response","output":[]})")),
             ApiProtocol::OpenAiResponses);
-  EXPECT_EQ(
-      TokenUsageExtractor::detectFormat(parse(R"({"type":"response.completed","response":{}})")),
-      ApiProtocol::OpenAiResponses);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(
-                parse(R"({"type":"response.output_text.delta","delta":"hi"})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"type":"response.completed","response":{}})")),
+            ApiProtocol::OpenAiResponses);
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"type":"response.output_text.delta","delta":"hi"})")),
             ApiProtocol::OpenAiResponses);
 }
 
 TEST(DetectFormatTest, Anthropic) {
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"message","role":"assistant"})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"type":"message","role":"assistant"})")),
             ApiProtocol::AnthropicMessages);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"message_start","message":{}})")),
-            ApiProtocol::AnthropicMessages);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(
-                parse(R"({"type":"message_delta","usage":{"output_tokens":3}})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"type":"message_start","message":{}})")),
             ApiProtocol::AnthropicMessages);
   EXPECT_EQ(
-      TokenUsageExtractor::detectFormat(parse(R"({"type":"message","usage":{"input_tokens":1}})")),
+      AdapterRegistry::detect(parse(R"({"type":"message_delta","usage":{"output_tokens":3}})")),
       ApiProtocol::AnthropicMessages);
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"type":"message","usage":{"input_tokens":1}})")),
+            ApiProtocol::AnthropicMessages);
   // A mid-stream join: the first observed event is a usage-less message_delta,
   // identified by its `delta` object.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(
+  EXPECT_EQ(AdapterRegistry::detect(
                 parse(R"({"type":"message_delta","delta":{"stop_reason":"end_turn"}})")),
             ApiProtocol::AnthropicMessages);
 }
@@ -75,8 +74,8 @@ TEST(ApiProtocolNameTest, NamesMatchProtoEnumValueNames) {
 // An unspecified wire API extracts nothing: extraction requires a concrete
 // dialect (callers detect one first).
 TEST(ExtractTest, UnspecifiedFormatExtractsNothing) {
-  const auto result = TokenUsageExtractor::extract(
-      ApiProtocol::Unspecified, parse(R"({"usage":{"input_tokens":1,"output_tokens":2}})"));
+  const auto result = AdapterRegistry::get(ApiProtocol::Unspecified)
+                          .extractUsage(parse(R"({"usage":{"input_tokens":1,"output_tokens":2}})"));
   EXPECT_FALSE(result.usage.hasAny());
   EXPECT_FALSE(result.malformed);
 }
@@ -87,31 +86,27 @@ TEST(DetectFormatTest, StructurelessAnthropicShapedTypesDoNotLock) {
   // as evidence risks poisoning a foreign stream (a lone message_stop would
   // even terminate extraction). In a genuine Anthropic stream, message_start
   // or the non-streaming Message locks the format first.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"message"})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"type":"message"})")), ApiProtocol::Unspecified);
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"type":"message_stop"})")), ApiProtocol::Unspecified);
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"type":"content_block_delta"})")),
             ApiProtocol::Unspecified);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"message_stop"})")),
-            ApiProtocol::Unspecified);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"content_block_delta"})")),
-            ApiProtocol::Unspecified);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"message_start"})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"type":"message_start"})")),
             ApiProtocol::Unspecified);
 }
 
 TEST(DetectFormatTest, Gemini) {
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"candidates":[{"content":{}}]})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"candidates":[{"content":{}}]})")),
             ApiProtocol::GeminiGenerateContent);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"usageMetadata":{}})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"usageMetadata":{}})")),
             ApiProtocol::GeminiGenerateContent);
 }
 
 TEST(DetectFormatTest, Unknown) {
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"foo":"bar"})")), ApiProtocol::Unspecified);
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"foo":"bar"})")), ApiProtocol::Unspecified);
   // A bare content delta with no discriminating markers.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"text":"hello"})")),
-            ApiProtocol::Unspecified);
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"text":"hello"})")), ApiProtocol::Unspecified);
   // `ping` is a weak marker any gateway may emit: it must not lock detection.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"type":"ping"})")),
-            ApiProtocol::Unspecified);
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"type":"ping"})")), ApiProtocol::Unspecified);
 }
 
 TEST(DetectFormatTest, TypeMismatchedMarkersDoNotLock) {
@@ -119,23 +114,20 @@ TEST(DetectFormatTest, TypeMismatchedMarkersDoNotLock) {
   // hasObject()-style key presence alone must not lock the stream: detection
   // is stream-global, and a foreign document with a `candidates` string would
   // otherwise poison every later event.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"candidates":"not-gemini"})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"candidates":"not-gemini"})")),
             ApiProtocol::Unspecified);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"usageMetadata":"nope"})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"usageMetadata":"nope"})")),
             ApiProtocol::Unspecified);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"usageMetadata":[1]})")),
-            ApiProtocol::Unspecified);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"modelVersion":42})")),
-            ApiProtocol::Unspecified);
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"usageMetadata":[1]})")), ApiProtocol::Unspecified);
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"modelVersion":42})")), ApiProtocol::Unspecified);
   // An array of non-objects is not a Gemini candidates list, and neither is
   // an empty array: real GenerateContentResponse chunks carry candidate
   // objects, so an empty generic `candidates` must not lock the stream.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"candidates":[1,"x",null]})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"candidates":[1,"x",null]})")),
             ApiProtocol::Unspecified);
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"candidates":[]})")),
-            ApiProtocol::Unspecified);
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"candidates":[]})")), ApiProtocol::Unspecified);
   // The correctly-shaped markers still detect.
-  EXPECT_EQ(TokenUsageExtractor::detectFormat(parse(R"({"modelVersion":"gemini-2.5-pro"})")),
+  EXPECT_EQ(AdapterRegistry::detect(parse(R"({"modelVersion":"gemini-2.5-pro"})")),
             ApiProtocol::GeminiGenerateContent);
 }
 
@@ -195,25 +187,25 @@ TEST(ExtractOpenAiTest, ResponsesApiCompletedEvent) {
   EXPECT_EQ(usage.reasoning_tokens, 40);
   EXPECT_EQ(usage.model, "gpt-5.4");
   // Terminal lifecycle events end extraction.
-  EXPECT_TRUE(TokenUsageExtractor::isTerminalEvent(ApiProtocol::OpenAiResponses, json));
+  EXPECT_TRUE(AdapterRegistry::get(ApiProtocol::OpenAiResponses).isTerminalEvent(json));
 }
 
 // Chat Completions and Gemini have no in-band JSON terminator: a `type`
 // field never ends their extraction.
 TEST(ExtractOpenAiTest, TypeKeyedDocumentsNotTerminalForOtherDialects) {
-  EXPECT_FALSE(TokenUsageExtractor::isTerminalEvent(ApiProtocol::OpenAiChatCompletions,
-                                                    parse(R"({"type":"response.completed"})")));
-  EXPECT_FALSE(TokenUsageExtractor::isTerminalEvent(ApiProtocol::GeminiGenerateContent,
-                                                    parse(R"({"type":"message_stop"})")));
+  EXPECT_FALSE(AdapterRegistry::get(ApiProtocol::OpenAiChatCompletions)
+                   .isTerminalEvent(parse(R"({"type":"response.completed"})")));
+  EXPECT_FALSE(AdapterRegistry::get(ApiProtocol::GeminiGenerateContent)
+                   .isTerminalEvent(parse(R"({"type":"message_stop"})")));
 }
 
 TEST(ExtractOpenAiTest, ResponsesApiFailedAndIncompleteAreTerminal) {
-  EXPECT_TRUE(TokenUsageExtractor::isTerminalEvent(
-      ApiProtocol::OpenAiResponses, parse(R"({"type":"response.failed","response":{}})")));
-  EXPECT_TRUE(TokenUsageExtractor::isTerminalEvent(
-      ApiProtocol::OpenAiResponses, parse(R"({"type":"response.incomplete","response":{}})")));
-  EXPECT_FALSE(TokenUsageExtractor::isTerminalEvent(
-      ApiProtocol::OpenAiResponses, parse(R"({"type":"response.in_progress","response":{}})")));
+  EXPECT_TRUE(AdapterRegistry::get(ApiProtocol::OpenAiResponses)
+                  .isTerminalEvent(parse(R"({"type":"response.failed","response":{}})")));
+  EXPECT_TRUE(AdapterRegistry::get(ApiProtocol::OpenAiResponses)
+                  .isTerminalEvent(parse(R"({"type":"response.incomplete","response":{}})")));
+  EXPECT_FALSE(AdapterRegistry::get(ApiProtocol::OpenAiResponses)
+                   .isTerminalEvent(parse(R"({"type":"response.in_progress","response":{}})")));
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +222,7 @@ TEST(ExtractAnthropicTest, NonStreaming) {
   EXPECT_EQ(usage.input_tokens, 2095);
   EXPECT_FALSE(usage.total_tokens.has_value());
   TokenUsage finalized = usage;
-  finalized.finalize();
+  finalized.finalize(AdapterRegistry::get(finalized.api_protocol));
   // Canonical inclusive input: 2095 uncached + 2051 cache writes + 1024
   // cache reads.
   EXPECT_EQ(finalized.input_tokens, 5170);
@@ -262,7 +254,7 @@ TEST(ExtractAnthropicTest, StreamingAccumulation) {
       parse(
           R"({"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":15}})")));
 
-  accumulated.finalize();
+  accumulated.finalize(AdapterRegistry::get(accumulated.api_protocol));
   EXPECT_EQ(accumulated.input_tokens, 2679);
   EXPECT_EQ(accumulated.output_tokens, 15);
   EXPECT_EQ(accumulated.total_tokens, 2694);
@@ -292,10 +284,10 @@ TEST(ExtractAnthropicTest, MessageStartWithoutUsageIsTolerated) {
 }
 
 TEST(ExtractAnthropicTest, MessageStopIsTerminal) {
-  EXPECT_TRUE(TokenUsageExtractor::isTerminalEvent(ApiProtocol::AnthropicMessages,
-                                                   parse(R"({"type":"message_stop"})")));
-  EXPECT_FALSE(TokenUsageExtractor::isTerminalEvent(ApiProtocol::AnthropicMessages,
-                                                    parse(R"({"type":"message_delta"})")));
+  EXPECT_TRUE(AdapterRegistry::get(ApiProtocol::AnthropicMessages)
+                  .isTerminalEvent(parse(R"({"type":"message_stop"})")));
+  EXPECT_FALSE(AdapterRegistry::get(ApiProtocol::AnthropicMessages)
+                   .isTerminalEvent(parse(R"({"type":"message_delta"})")));
 }
 
 // ---------------------------------------------------------------------------
@@ -309,7 +301,7 @@ TEST(ExtractGeminiTest, UsageMetadata) {
        "modelVersion":"gemini-2.5-flash"})"));
   EXPECT_EQ(usage.output_tokens, 149); // Native candidates count, thoughts excluded.
   TokenUsage finalized = usage;
-  finalized.finalize();
+  finalized.finalize(AdapterRegistry::get(finalized.api_protocol));
   EXPECT_EQ(finalized.input_tokens, 6);
   // Canonical inclusive output: 149 candidates + 12 thoughts (Gemini reports
   // thoughts outside candidatesTokenCount).
@@ -330,7 +322,7 @@ TEST(ExtractGeminiTest, ToolUseAndThoughtsAccounting) {
       {"usageMetadata":{"promptTokenCount":6,"toolUsePromptTokenCount":5,
                         "candidatesTokenCount":149,"thoughtsTokenCount":12,
                         "totalTokenCount":172}})"));
-  usage.finalize();
+  usage.finalize(AdapterRegistry::get(usage.api_protocol));
   EXPECT_EQ(usage.input_tokens, 11);
   EXPECT_EQ(usage.output_tokens, 161);
   EXPECT_EQ(usage.total_tokens, 172);
@@ -345,7 +337,7 @@ TEST(ExtractAnthropicTest, CanonicalInclusiveAccounting) {
   auto usage = extractUsage(ApiProtocol::AnthropicMessages, parse(R"(
       {"type":"message","usage":{"input_tokens":100,"cache_creation_input_tokens":20,
        "cache_read_input_tokens":30,"output_tokens":10}})"));
-  usage.finalize();
+  usage.finalize(AdapterRegistry::get(usage.api_protocol));
   EXPECT_EQ(usage.input_tokens, 150);
   EXPECT_EQ(usage.cached_input_tokens, 30);
   EXPECT_EQ(usage.cache_creation_input_tokens, 20);
@@ -365,7 +357,7 @@ TEST(ExtractAnthropicTest, PartialInputUpdatePreservesCacheBuckets) {
   accumulated.merge(extractUsage(ApiProtocol::AnthropicMessages, parse(R"(
       {"type":"message_delta","delta":{"stop_reason":"end_turn"},
        "usage":{"input_tokens":100,"output_tokens":50}})")));
-  accumulated.finalize();
+  accumulated.finalize(AdapterRegistry::get(accumulated.api_protocol));
   EXPECT_EQ(accumulated.input_tokens, 150); // 100 + 30 + 20, not regressed to 100.
   EXPECT_EQ(accumulated.cached_input_tokens, 30);
   EXPECT_EQ(accumulated.cache_creation_input_tokens, 20);
@@ -382,7 +374,7 @@ TEST(ExtractGeminiTest, CumulativeChunksLastWins) {
       {"candidates":[{"content":{"parts":[{"text":"b"}]},"finishReason":"STOP"}],
        "usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":149,"totalTokenCount":155},
        "modelVersion":"gemini-2.5-flash"})")));
-  accumulated.finalize();
+  accumulated.finalize(AdapterRegistry::get(accumulated.api_protocol));
   EXPECT_EQ(accumulated.output_tokens, 149);
   EXPECT_EQ(accumulated.total_tokens, 155);
   EXPECT_EQ(accumulated.model, "gemini-2.5-flash");
@@ -400,8 +392,8 @@ TEST(ExtractGeminiTest, ChunkWithoutUsageMetadataYieldsNothing) {
 
 TEST(TokenUsageTest, PresentButInvalidFieldsAreFlaggedMalformed) {
   // A missing key is not malformed...
-  EXPECT_FALSE(TokenUsageExtractor::extract(ApiProtocol::AnthropicMessages,
-                                            parse(R"({"usage":{"output_tokens":5}})"))
+  EXPECT_FALSE(AdapterRegistry::get(ApiProtocol::AnthropicMessages)
+                   .extractUsage(parse(R"({"usage":{"output_tokens":5}})"))
                    .malformed);
   // ...but a known field that is present with an unusable value is: wrong
   // scalar type, wrong container type, negative, fractional, out of range,
@@ -413,40 +405,40 @@ TEST(TokenUsageTest, PresentButInvalidFieldsAreFlaggedMalformed) {
                                   std::string(R"({"usage":{"output_tokens":5.5}})"),
                                   std::string(R"({"usage":{"output_tokens":9007199254740992}})"),
                                   std::string(R"({"usage":"not-an-object"})")}) {
-    EXPECT_TRUE(TokenUsageExtractor::extract(ApiProtocol::AnthropicMessages, parse(body)).malformed)
+    EXPECT_TRUE(
+        AdapterRegistry::get(ApiProtocol::AnthropicMessages).extractUsage(parse(body)).malformed)
         << body;
   }
   // Null handling is specific to the position. OpenAI documents `"usage": null` as the
   // placeholder on non-terminal chunks (and failed responses): benignly
   // absent, not malformed, and not degraded.
-  EXPECT_FALSE(
-      TokenUsageExtractor::extract(ApiProtocol::OpenAiChatCompletions, parse(R"({"usage":null})"))
-          .malformed);
-  EXPECT_FALSE(TokenUsageExtractor::extract(
-                   ApiProtocol::OpenAiChatCompletions,
-                   parse(R"({"usage":{"prompt_tokens":3,"prompt_tokens_details":null}})"))
+  EXPECT_FALSE(AdapterRegistry::get(ApiProtocol::OpenAiChatCompletions)
+                   .extractUsage(parse(R"({"usage":null})"))
                    .malformed);
+  EXPECT_FALSE(
+      AdapterRegistry::get(ApiProtocol::OpenAiChatCompletions)
+          .extractUsage(parse(R"({"usage":{"prompt_tokens":3,"prompt_tokens_details":null}})"))
+          .malformed);
   // A null in a *count* position is malformed in every dialect (the counters
   // are required integers): a corrupt final cumulative update must not leave
   // an earlier value published as complete.
-  EXPECT_TRUE(TokenUsageExtractor::extract(ApiProtocol::AnthropicMessages,
-                                           parse(R"({"usage":{"output_tokens":null}})"))
+  EXPECT_TRUE(AdapterRegistry::get(ApiProtocol::AnthropicMessages)
+                  .extractUsage(parse(R"({"usage":{"output_tokens":null}})"))
                   .malformed);
-  EXPECT_TRUE(TokenUsageExtractor::extract(ApiProtocol::OpenAiChatCompletions,
-                                           parse(R"({"usage":{"prompt_tokens":null}})"))
+  EXPECT_TRUE(AdapterRegistry::get(ApiProtocol::OpenAiChatCompletions)
+                  .extractUsage(parse(R"({"usage":{"prompt_tokens":null}})"))
                   .malformed);
   // Null in a required structural position is malformed structure.
-  EXPECT_TRUE(
-      TokenUsageExtractor::extract(ApiProtocol::OpenAiChatCompletions,
-                                   parse(R"({"type":"response.completed","response":null})"))
-          .malformed);
-  EXPECT_TRUE(TokenUsageExtractor::extract(ApiProtocol::AnthropicMessages,
-                                           parse(R"({"type":"message_start","message":null})"))
+  EXPECT_TRUE(AdapterRegistry::get(ApiProtocol::OpenAiChatCompletions)
+                  .extractUsage(parse(R"({"type":"response.completed","response":null})"))
+                  .malformed);
+  EXPECT_TRUE(AdapterRegistry::get(ApiProtocol::AnthropicMessages)
+                  .extractUsage(parse(R"({"type":"message_start","message":null})"))
                   .malformed);
   // Valid fields alongside a malformed one still extract.
   const auto result =
-      TokenUsageExtractor::extract(ApiProtocol::AnthropicMessages,
-                                   parse(R"({"usage":{"input_tokens":7,"output_tokens":"nope"}})"));
+      AdapterRegistry::get(ApiProtocol::AnthropicMessages)
+          .extractUsage(parse(R"({"usage":{"input_tokens":7,"output_tokens":"nope"}})"));
   EXPECT_TRUE(result.malformed);
   EXPECT_EQ(result.usage.input_tokens, 7);
 }
@@ -458,14 +450,15 @@ TEST(TokenUsageTest, NullCountRegressionScenario) {
   TokenUsage accumulated;
   bool degraded = false;
   auto merge = [&](const std::string& body) {
-    const auto result = TokenUsageExtractor::extract(ApiProtocol::AnthropicMessages, parse(body));
+    const auto result =
+        AdapterRegistry::get(ApiProtocol::AnthropicMessages).extractUsage(parse(body));
     accumulated.merge(result.usage);
     degraded |= result.malformed;
   };
   merge(R"({"type":"message_start","message":{"usage":{"input_tokens":10,"output_tokens":3}}})");
   merge(R"({"type":"message_delta","delta":{"stop_reason":"end_turn"},)"
         R"("usage":{"output_tokens":null}})");
-  accumulated.finalize();
+  accumulated.finalize(AdapterRegistry::get(accumulated.api_protocol));
   EXPECT_EQ(accumulated.output_tokens, 3); // Earlier value survives...
   EXPECT_TRUE(degraded);                   // ...but the stream is flagged.
 }
@@ -477,13 +470,13 @@ TEST(TokenUsageTest, CanonicalizationOverflowIsSurfaced) {
   auto usage = extractUsage(ApiProtocol::AnthropicMessages, parse(R"(
       {"usage":{"input_tokens":9007199254740991,"cache_read_input_tokens":1,
                 "output_tokens":0}})"));
-  usage.finalize();
+  usage.finalize(AdapterRegistry::get(usage.api_protocol));
   EXPECT_FALSE(usage.input_tokens.has_value());
   EXPECT_TRUE(usage.canonicalizationOverflow());
 
   auto fine = extractUsage(ApiProtocol::AnthropicMessages, parse(R"(
       {"usage":{"input_tokens":100,"cache_read_input_tokens":1,"output_tokens":0}})"));
-  fine.finalize();
+  fine.finalize(AdapterRegistry::get(fine.api_protocol));
   EXPECT_FALSE(fine.canonicalizationOverflow());
 }
 
@@ -491,7 +484,7 @@ TEST(TokenUsageTest, MergeAfterFinalizeIsRejected) {
   TokenUsage usage;
   usage.api_protocol = ApiProtocol::AnthropicMessages;
   usage.input_tokens = 1;
-  usage.finalize();
+  usage.finalize(AdapterRegistry::get(usage.api_protocol));
   TokenUsage update;
   update.output_tokens = 2;
   EXPECT_DEBUG_DEATH(usage.merge(update), "");
@@ -504,12 +497,12 @@ TEST(TokenUsageTest, FinalizeIsSingleUse) {
   usage.cached_input_tokens = 30;
   usage.cache_creation_input_tokens = 20;
   usage.output_tokens = 10;
-  usage.finalize();
+  usage.finalize(AdapterRegistry::get(usage.api_protocol));
   EXPECT_EQ(usage.input_tokens, 150);
   EXPECT_EQ(usage.total_tokens, 160);
   // A second call must not re-add the cache buckets: it asserts in debug
   // builds and is a no-op in release builds.
-  EXPECT_DEBUG_DEATH(usage.finalize(), "");
+  EXPECT_DEBUG_DEATH(usage.finalize(AdapterRegistry::get(usage.api_protocol)), "");
   EXPECT_EQ(usage.input_tokens, 150);
   EXPECT_EQ(usage.total_tokens, 160);
 }
@@ -546,19 +539,19 @@ TEST(TokenUsageTest, FinalizeComputesCanonicalTotal) {
   TokenUsage usage;
   usage.input_tokens = 3;
   usage.output_tokens = 4;
-  usage.finalize();
+  usage.finalize(AdapterRegistry::get(usage.api_protocol));
   EXPECT_EQ(usage.total_tokens, 7);
   EXPECT_FALSE(usage.provider_total_tokens.has_value());
 
   TokenUsage partial;
   partial.output_tokens = 4; // No input: the total cannot be computed.
-  partial.finalize();
+  partial.finalize(AdapterRegistry::get(partial.api_protocol));
   EXPECT_FALSE(partial.total_tokens.has_value());
 
   TokenUsage partial_with_reported;
   partial_with_reported.output_tokens = 4;
   partial_with_reported.total_tokens = 9; // Native total; components incomplete.
-  partial_with_reported.finalize();
+  partial_with_reported.finalize(AdapterRegistry::get(partial_with_reported.api_protocol));
   // The provider total never substitutes for the canonical sum; it is
   // preserved in its own field.
   EXPECT_FALSE(partial_with_reported.total_tokens.has_value());
@@ -574,7 +567,7 @@ TEST(TokenUsageTest, ProviderTotalPreservedSeparately) {
   usage.input_tokens = 3;
   usage.output_tokens = 4;
   usage.total_tokens = 100;
-  usage.finalize();
+  usage.finalize(AdapterRegistry::get(usage.api_protocol));
   EXPECT_EQ(usage.total_tokens, 7);
   EXPECT_EQ(usage.provider_total_tokens, 100);
 
@@ -583,7 +576,7 @@ TEST(TokenUsageTest, ProviderTotalPreservedSeparately) {
   agreeing.input_tokens = 3;
   agreeing.output_tokens = 4;
   agreeing.total_tokens = 7;
-  agreeing.finalize();
+  agreeing.finalize(AdapterRegistry::get(agreeing.api_protocol));
   EXPECT_EQ(agreeing.total_tokens, 7);
   EXPECT_EQ(agreeing.provider_total_tokens, 7);
 }
@@ -623,13 +616,13 @@ TEST(TokenUsageTest, ComputedTotalPublishedOnlyWhenDoubleExact) {
   TokenUsage in_range;
   in_range.input_tokens = uint64_t(9007199254740000);
   in_range.output_tokens = uint64_t(991);
-  in_range.finalize();
+  in_range.finalize(AdapterRegistry::get(in_range.api_protocol));
   EXPECT_EQ(in_range.total_tokens, uint64_t(9007199254740991)); // == 2^53-1, exact.
 
   TokenUsage out_of_range;
   out_of_range.input_tokens = uint64_t(9007199254740991);  // 2^53-1
   out_of_range.output_tokens = uint64_t(9007199254740990); // sum = 2^54-3, odd, inexact
-  out_of_range.finalize();
+  out_of_range.finalize(AdapterRegistry::get(out_of_range.api_protocol));
   EXPECT_FALSE(out_of_range.total_tokens.has_value());
 
   // With both components present but the sum unpublishable, a provider total
@@ -639,7 +632,7 @@ TEST(TokenUsageTest, ComputedTotalPublishedOnlyWhenDoubleExact) {
   out_of_range_reported.input_tokens = uint64_t(9007199254740991);
   out_of_range_reported.output_tokens = uint64_t(9007199254740991);
   out_of_range_reported.total_tokens = 5;
-  out_of_range_reported.finalize();
+  out_of_range_reported.finalize(AdapterRegistry::get(out_of_range_reported.api_protocol));
   EXPECT_FALSE(out_of_range_reported.total_tokens.has_value());
   EXPECT_EQ(out_of_range_reported.provider_total_tokens, 5);
 }
@@ -661,6 +654,52 @@ TEST(TokenUsageTest, SecondaryOnlyCountsStillPublish) {
                                   parse(R"({"usage":{"cache_read_input_tokens":64}})"));
   EXPECT_TRUE(usage.hasAny());
   EXPECT_EQ(usage.cached_input_tokens, 64);
+}
+
+// ---------------------------------------------------------------------------
+// Adapter registry.
+
+TEST(AdapterRegistryTest, SchemaLookup) {
+  // Chat Completions carries the one defined payload schema; APIs without a
+  // schema are not validated.
+  EXPECT_NE(AdapterRegistry::get(ApiProtocol::OpenAiChatCompletions).schema(), nullptr);
+  EXPECT_EQ(AdapterRegistry::get(ApiProtocol::Unspecified).schema(), nullptr);
+  EXPECT_EQ(AdapterRegistry::get(ApiProtocol::OpenAiResponses).schema(), nullptr);
+  EXPECT_EQ(AdapterRegistry::get(ApiProtocol::AnthropicMessages).schema(), nullptr);
+  EXPECT_EQ(AdapterRegistry::get(ApiProtocol::GeminiGenerateContent).schema(), nullptr);
+}
+
+TEST(AdapterRegistryTest, AdaptersReportTheirProtocol) {
+  for (const ApiProtocol protocol :
+       {ApiProtocol::Unspecified, ApiProtocol::OpenAiChatCompletions, ApiProtocol::OpenAiResponses,
+        ApiProtocol::AnthropicMessages, ApiProtocol::GeminiGenerateContent}) {
+    EXPECT_EQ(AdapterRegistry::get(protocol).protocol(), protocol);
+  }
+}
+
+TEST(AdapterRegistryTest, AllDeclaredOffloadableFieldsInStreamOrder) {
+  // Every defined schema must list each of its offloadable field paths in its
+  // streamable field order.
+  for (const ApiProtocol protocol :
+       {ApiProtocol::OpenAiChatCompletions, ApiProtocol::OpenAiResponses,
+        ApiProtocol::AnthropicMessages, ApiProtocol::GeminiGenerateContent}) {
+    const PayloadSchema* schema = AdapterRegistry::get(protocol).schema();
+    if (schema == nullptr) {
+      continue;
+    }
+
+    const std::vector<std::string> offloadable_paths = schema->requestOffloadableFieldPaths();
+    const std::vector<std::string>& stream_order = schema->requestStreamableFieldOrder();
+
+    EXPECT_FALSE(offloadable_paths.empty());
+    for (const std::string& offloadable_path : offloadable_paths) {
+      EXPECT_NE(std::find(stream_order.begin(), stream_order.end(), offloadable_path),
+                stream_order.end())
+          << "Declared offloadable field path '" << offloadable_path
+          << "' is missing from the streamable field order list for protocol "
+          << apiProtocolName(protocol);
+    }
+  }
 }
 
 } // namespace

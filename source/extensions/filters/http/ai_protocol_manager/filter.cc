@@ -10,8 +10,9 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
-#include "source/extensions/filters/http/ai_protocol_manager/schema/schema_registry.h"
+#include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
@@ -311,7 +312,8 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
     if (isAiEndpoint()) {
       // TODO(penguingao): Support validating payload schema on the fly as the Wuffs parser
       // streams and parses chunks, rejecting invalid fields early before end_stream.
-      if (const PayloadSchema* payload_schema = SchemaRegistry::getSchema(route_request_protocol_);
+      if (const PayloadSchema* payload_schema =
+              AdapterRegistry::get(route_request_protocol_).schema();
           payload_schema != nullptr) {
         const absl::Status validation_status = payload_schema->validateRequest(request_json_);
         if (!validation_status.ok()) {
@@ -526,7 +528,7 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
   response_finalized_ = true;
 
   TokenUsage usage = response_handler_->usage();
-  usage.finalize();
+  usage.finalize(AdapterRegistry::get(usage.api_protocol));
   const bool degraded = response_handler_->degraded() || usage.canonicalizationOverflow();
   if (!usage.hasAny() && !degraded) {
     // Legitimately absent usage: e.g. an OpenAI stream without
