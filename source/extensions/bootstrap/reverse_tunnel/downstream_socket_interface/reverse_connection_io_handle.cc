@@ -113,11 +113,7 @@ void ReverseConnectionIOHandle::cleanup() {
                  "reverse_tunnel: resetting file events before closing trigger pipe; "
                  "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
                  trigger_pipe_write_fd_, trigger_pipe_read_fd_);
-  // cleanup() runs from the destructor, which on server teardown fires after the worker
-  // dispatchers have already been destroyed, leaving worker_dispatcher_ dangling. Null it before
-  // resetFileEvents() so the override does not dereference it via isThreadSafe(). By this point
-  // the retry timer was either already torn down on the worker during listener stop, or the
-  // workers are stopped and this is the sole owner, so resetting it here is safe.
+  // The worker dispatcher is destroyed before this handle during server teardown.
   worker_dispatcher_ = nullptr;
   resetFileEvents();
   SET_SOCKET_INVALID(trigger_pipe_read_fd_);
@@ -398,9 +394,7 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
               fd_);
   }
 
-  // The retry timer is normally destroyed on the worker in resetFileEvents() during
-  // shutdownListener (before this main-thread close). Only destroy it here when we are on the
-  // owning dispatcher to avoid cross-thread TimerImpl teardown.
+  // Avoid destroying the worker-owned timer from another thread.
   if (rev_conn_retry_timer_ != nullptr &&
       (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe())) {
     rev_conn_retry_timer_.reset();
@@ -410,9 +404,7 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
 }
 
 void ReverseConnectionIOHandle::resetFileEvents() {
-  // ~TcpListenerImpl calls this on the worker when the listener stops accepting (LDS removal /
-  // drain). Destroy the retry timer on that same thread before the main thread closes the socket,
-  // so drain-aware re-dial cannot arm a replacement handshake against a dying listener.
+  // Stop redials on the timer's worker before the listener closes.
   if (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe()) {
     rev_conn_retry_timer_.reset();
   }
@@ -931,8 +923,7 @@ void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
     return;
   }
 
-  // Listener stop (LDS removal / drain) destroys the retry timer in resetFileEvents() before the
-  // listen socket is closed. Do not start a replacement handshake against a dying listener.
+  // A stopped listener has no retry timer.
   if (rev_conn_retry_timer_ == nullptr) {
     ENVOY_LOG(debug,
               "reverse_tunnel: skipping replacement dial for {}; retry timer is gone "

@@ -3487,9 +3487,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedUnknownKeyIsNo
   EXPECT_TRUE(getHostToConnInfoMap().empty());
 }
 
-// Listener stop (LDS removal / drain) calls resetFileEvents() on the worker before the listen
-// socket is closed. That must destroy the retry timer and block drain-aware replacement dials so
-// a dying reverse_conn_listener cannot start a new outbound handshake.
+// Listener stop must destroy the retry timer and block replacement dials.
 TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsStopsReplacementDialOnListenerStop) {
   setupThreadLocalSlot();
 
@@ -3499,10 +3497,7 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsStopsReplacementDialOnListe
 
   auto* mock_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
-  // Maintenance may re-arm the periodic timer with a jittered (non-zero) delay, but the
-  // drain-aware replacement path must never schedule an immediate (0ms) dial once the listener
-  // has stopped. Set both expectations before resetFileEvents() destroys the timer, so they are
-  // verified when the mock is torn down rather than being touched afterwards.
+  // Set expectations before resetFileEvents() destroys the timer.
   EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _)).Times(0);
 
@@ -3515,15 +3510,12 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsStopsReplacementDialOnListe
   addHostConnectionInfo(host, "remote-cluster", 1);
   getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
 
-  // Simulate ~TcpListenerImpl during stopListeners: worker-thread resetFileEvents. This destroys
-  // the retry timer (verifying the enableTimer(0ms) Times(0) expectation above).
+  // Simulate worker-thread listener teardown.
   io_handle_->resetFileEvents();
 
-  // After the listener has stopped, a drain notice must still drop the key from tracking but must
-  // not dial a replacement. The timer is already gone, so this must be a safe no-op.
+  // Drop tracking without dialing a replacement.
   io_handle_->markTunnelDrainingAndDialReplacement(connection_key);
 
-  // Tracking is still updated so accounting stays consistent; only the dial is suppressed.
   EXPECT_EQ(getHostConnectionInfo(host).connection_keys.count(connection_key), 0);
 }
 

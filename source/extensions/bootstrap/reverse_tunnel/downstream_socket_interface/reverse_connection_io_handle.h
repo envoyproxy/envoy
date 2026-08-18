@@ -185,14 +185,7 @@ public:
    */
   Api::IoCallUint64Result close() override;
 
-  /**
-   * Stop reverse-connection maintenance when the listen socket's file events are torn down.
-   *
-   * During listener stop (LDS removal / drain), ``~TcpListenerImpl`` calls this on the worker
-   * thread before the main thread closes the listen socket. Resetting the retry timer here
-   * (on the owning dispatcher) prevents drain-aware re-dial and the maintenance loop from
-   * starting a new outbound handshake against a dying reverse-connection listener.
-   */
+  /** Stop reverse-connection maintenance on listener teardown. */
   void resetFileEvents() override;
 
   /**
