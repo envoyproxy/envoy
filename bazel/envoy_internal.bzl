@@ -137,23 +137,23 @@ def envoy_copts(repository, test = False):
 # This replaces the need for native.bind() calls and //external: references.
 EXTERNAL_DEPS_MAP = {
     # Abseil
-    "abseil_strings": "@abseil-cpp//absl/strings",
+    "abseil_strings": "@envoy//bazel/deps:abseil_strings",
     # gRPC transcoding
-    "grpc_transcoding": "@grpc_httpjson_transcoding//src:transcoding",
-    "path_matcher": "@grpc_httpjson_transcoding//src:path_matcher",
+    "grpc_transcoding": "@envoy//bazel/deps:grpc_transcoding",
+    "path_matcher": "@envoy//bazel/deps:path_matcher",
     # Google APIs
-    "api_httpbody_protos": "@googleapis//google/api:httpbody_cc_proto",
-    "http_api_protos": "@googleapis//google/api:annotations_cc_proto",
+    "api_httpbody_protos": "@envoy//bazel/deps:api_httpbody_protos",
+    "http_api_protos": "@envoy//bazel/deps:http_api_protos",
     # nghttp2
-    "nghttp2": "@envoy//bazel/foreign_cc:nghttp2",
+    "nghttp2": "@envoy//bazel/deps:nghttp2",
     # gRPC
-    "grpc": "@grpc//:grpc++",
-    "grpc_health_proto": "@grpc//src/proto/grpc/health/v1:health_cc_proto",
+    "grpc": "@envoy//bazel/deps:grpc",
+    "grpc_health_proto": "@envoy//bazel/deps:grpc_health_proto",
     # SSL/Crypto (aliases defined in @envoy//bazel)
     "ssl": "@envoy//bazel:ssl",
     "crypto": "@envoy//bazel:crypto",
     # Bazel tools
-    "bazel_runfiles": "@bazel_tools//tools/cpp/runfiles",
+    "bazel_runfiles": "@envoy//bazel/deps:bazel_runfiles",
 }
 
 # References to Envoy external dependencies should be wrapped with this function.
