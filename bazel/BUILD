@@ -563,11 +563,6 @@ config_setting(
 )
 
 config_setting(
-    name = "using_aws_lc",
-    flag_values = {":ssl": "@aws_lc//:ssl"},
-)
-
-config_setting(
     name = "using_openssl",
     flag_values = {":openssl": "True"},
 )
@@ -577,7 +572,6 @@ selects.config_setting_group(
     name = "using_fips_ssl",
     match_any = [
         ":using_boringssl_fips",
-        ":using_aws_lc",
     ],
 )
 
@@ -691,12 +685,18 @@ config_setting(
 
 config_setting(
     name = "darwin_x86_64",
-    values = {"cpu": "darwin_x86_64"},
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
     name = "darwin_arm64",
-    values = {"cpu": "darwin_arm64"},
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
@@ -1104,4 +1104,9 @@ config_setting(
     flag_values = {
         ":libstdc++": "True",
     },
+)
+
+alias(
+    name = "cpp_runfiles",
+    actual = "@bazel_tools//tools/cpp/runfiles",
 )

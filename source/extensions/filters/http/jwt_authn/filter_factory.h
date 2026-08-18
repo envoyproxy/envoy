@@ -14,14 +14,14 @@ namespace JwtAuthn {
 /**
  * Config registration for jwt_authn filter.
  */
-class FilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication,
-                                 envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig> {
+class FilterFactory : public Common::ExceptionFreeFactoryBase<
+                          envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication,
+                          envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig> {
 public:
-  FilterFactory() : FactoryBase("envoy.filters.http.jwt_authn") {}
+  FilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.jwt_authn") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 

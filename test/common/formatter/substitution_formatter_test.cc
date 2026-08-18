@@ -8,7 +8,9 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/utility.h"
+#include "source/common/formatter/coalesce_formatter.h"
 #include "source/common/formatter/http_specific_formatter.h"
+#include "source/common/formatter/serializer.h"
 #include "source/common/formatter/stream_info_formatter.h"
 #include "source/common/formatter/substitution_format_utility.h"
 #include "source/common/formatter/substitution_formatter.h"
@@ -43,14 +45,18 @@ namespace Envoy {
 namespace Formatter {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOk;
 using StatusHelpers::HasStatus;
 using testing::Const;
+using testing::ContainsRegex;
 using testing::HasSubstr;
 using testing::Invoke;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::StartsWith;
 
 // Helper class to test StreamInfoFormatter.
 class StreamInfoFormatter : public FormatterProvider {
@@ -205,12 +211,9 @@ TEST(SubstitutionFormatParser, commandParser) {
 }
 
 TEST(SubstitutionFormatUtilsTest, protocolToString) {
-  EXPECT_EQ("HTTP/1.0",
-            SubstitutionFormatUtils::protocolToString(Http::Protocol::Http10).value().get());
-  EXPECT_EQ("HTTP/1.1",
-            SubstitutionFormatUtils::protocolToString(Http::Protocol::Http11).value().get());
-  EXPECT_EQ("HTTP/2",
-            SubstitutionFormatUtils::protocolToString(Http::Protocol::Http2).value().get());
+  EXPECT_EQ("HTTP/1.0", SubstitutionFormatUtils::protocolToString(Http::Protocol::Http10).value());
+  EXPECT_EQ("HTTP/1.1", SubstitutionFormatUtils::protocolToString(Http::Protocol::Http11).value());
+  EXPECT_EQ("HTTP/2", SubstitutionFormatUtils::protocolToString(Http::Protocol::Http2).value());
   EXPECT_EQ(std::nullopt, SubstitutionFormatUtils::protocolToString({}));
 }
 
@@ -409,6 +412,24 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("25", roundtrip_duration_format.format({}, stream_info));
     EXPECT_THAT(roundtrip_duration_format.formatValue({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(25.0)));
+  }
+
+  {
+    StreamInfoFormatter rtt_format("DOWNSTREAM_CX_RTT");
+
+    // No round trip time set yet.
+    EXPECT_EQ(std::nullopt, rtt_format.format({}, stream_info));
+    EXPECT_THAT(rtt_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter rtt_format("DOWNSTREAM_CX_RTT");
+
+    stream_info.downstream_connection_info_provider_->setRoundTripTime(
+        std::chrono::milliseconds(42));
+
+    EXPECT_EQ("42", rtt_format.format({}, stream_info));
+    EXPECT_THAT(rtt_format.formatValue({}, stream_info), ProtoEq(ValueUtil::numberValue(42.0)));
   }
 
   {
@@ -1690,8 +1711,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     std::vector<std::string> time_points{
-        "DS_RX_BEG", "DS_RX_END", "US_CX_BEG", "US_CX_END", "US_HS_END", "US_TX_BEG",
-        "US_TX_END", "US_RX_BEG", "US_RX_END", "DS_TX_BEG", "DS_TX_END", "custom_time_point",
+        "DS_RX_BEG", "DS_RX_END",         "US_CX_BEG", "US_CX_END", "US_HS_END",
+        "US_TX_BEG", "US_TX_END",         "US_RX_BEG", "US_RX_END", "DS_TX_BEG",
+        "DS_TX_END", "custom_time_point", "DS_HS_BEG", "DS_HS_END",
     };
 
     std::vector<std::string> precisions{"ms", "us", "ns"};
@@ -1791,6 +1813,16 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
       stream_info.downstream_timing_.setValue("custom_time_point",
                                               MonotonicTime(std::chrono::nanoseconds(12000000)));
 
+      // DS_HS_BEG
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(13000000))));
+      stream_info.downstream_timing_.onDownstreamHandshakeStart(time_system);
+
+      // DS_HS_END
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(14000000))));
+      stream_info.downstream_timing_.onDownstreamHandshakeComplete(time_system);
+
       for (size_t start_index = 0; start_index < time_points.size(); start_index++) {
         for (size_t end_index = 0; end_index < time_points.size(); end_index++) {
           uint64_t precision_factor = 1;
@@ -1879,6 +1911,36 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     StreamInfoFormatter upstream_format("FILTER_CHAIN_NAME");
 
     EXPECT_EQ("mock_filter_chain_name", upstream_format.format({}, stream_info));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+    auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+    ON_CALL(*listener_info, name()).WillByDefault(Return("mock_listener_name"));
+    stream_info.downstream_connection_info_provider_->setListenerInfo(listener_info);
+
+    StreamInfoFormatter upstream_format("LISTENER_NAME");
+
+    EXPECT_EQ("mock_listener_name", upstream_format.format({}, stream_info));
+  }
+
+  {
+    // No listener info set: the operator yields std::nullopt.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setListenerInfo(nullptr);
+    StreamInfoFormatter upstream_format("LISTENER_NAME");
+    EXPECT_EQ(std::nullopt, upstream_format.format({}, stream_info));
+  }
+
+  {
+    // Empty listener name: the operator yields std::nullopt.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+    ON_CALL(*listener_info, name()).WillByDefault(Return(""));
+    stream_info.downstream_connection_info_provider_->setListenerInfo(listener_info);
+    StreamInfoFormatter upstream_format("LISTENER_NAME");
+    EXPECT_EQ(std::nullopt, upstream_format.format({}, stream_info));
   }
 
   {
@@ -3464,9 +3526,9 @@ TEST(SubstitutionFormatterTest, QueryParametersFormatter) {
   formatter_context.setRequestHeaders(request_header);
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse("%QUERY_PARAMS(A)%").IgnoreError(), EnvoyException,
-        "Invalid QUERY_PARAMS option: 'A', only 'ORIG'/'DECODED' are allowed");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%QUERY_PARAMS(A)%"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "Invalid QUERY_PARAMS option: 'A', only 'ORIG'/'DECODED' are allowed"));
   }
 
   {
@@ -3640,6 +3702,290 @@ TEST(SubstitutionFormatterTest, responseTrailerFormatter) {
     EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("PO")));
   }
+}
+
+// Helper to exercise the FormatterProvider::formatValueTo() sink API. It owns the output buffer,
+// the JSON serializer that writes into it and the single-use value sink itself.
+class ValueSinkHelper {
+public:
+  ValueSink& sink() { return sink_; }
+
+  // True if the formatter added a value to the sink.
+  bool consumed() const { return sink_.consumed(); }
+
+  // The JSON serialized value that the formatter wrote to the sink. Empty if the formatter left
+  // the sink unmodified.
+  const std::string& output() const { return buffer_; }
+
+private:
+  std::string buffer_;
+  JsonStringSerializer serializer_{buffer_};
+  ValueSink sink_{serializer_};
+};
+
+TEST(SubstitutionFormatterTest, ValueSinkAddValue) {
+  {
+    ValueSinkHelper helper;
+    helper.sink().addNumber(static_cast<uint64_t>(18446744073709551615U));
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("18446744073709551615", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addNumber(static_cast<int64_t>(-42));
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("-42", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addNumber(1.5);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("1.5", helper.output());
+  }
+
+  // NaN is not representable in JSON and is serialized as null.
+  {
+    ValueSinkHelper helper;
+    helper.sink().addNumber(std::nan(""));
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("null", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addString("foo\"bar");
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("foo\"bar")", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addBool(true);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("true", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addBool(false);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("false", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addNull();
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("null", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addValue(ValueUtil::numberValue(2));
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("2", helper.output());
+  }
+
+  // An explicit null proto value is serialized rather than skipped.
+  {
+    ValueSinkHelper helper;
+    helper.sink().addValue(ValueUtil::nullValue());
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("null", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    Protobuf::Struct struct_value;
+    struct_value.mutable_fields()->insert({"foo", ValueUtil::stringValue("bar")});
+    helper.sink().addValue(struct_value);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"({"foo":"bar"})", helper.output());
+  }
+
+  {
+    ValueSinkHelper helper;
+    helper.sink().addValue(Protobuf::Struct());
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("{}", helper.output());
+  }
+
+  // A sink that was never written to is not consumed and produces no output.
+  {
+    ValueSinkHelper helper;
+    EXPECT_FALSE(helper.consumed());
+    EXPECT_EQ("", helper.output());
+  }
+}
+
+TEST(SubstitutionFormatterTest, HeaderFormatterFormatToAndFormatValueTo) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
+
+  Context formatter_context;
+  formatter_context.setRequestHeaders(request_header);
+
+  // The main header is found.
+  {
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>());
+
+    std::string sink;
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ("GET", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), formatter_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("GET")", helper.output());
+  }
+
+  // The main header is found and the alternative header is not used.
+  {
+    RequestHeaderFormatter formatter(":path", ":method", std::optional<size_t>());
+
+    std::string sink;
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ("/", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), formatter_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("/")", helper.output());
+  }
+
+  // The main header is missing and the alternative header is used.
+  {
+    RequestHeaderFormatter formatter(":TEST", ":METHOD", std::optional<size_t>());
+
+    std::string sink;
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ("GET", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), formatter_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("GET")", helper.output());
+  }
+
+  // Neither header is found. formatTo() reports the failure and leaves the sink untouched and
+  // formatValueTo() leaves the value sink unconsumed.
+  {
+    RequestHeaderFormatter formatter("does_not_exist", "", std::optional<size_t>());
+
+    std::string sink = "existing";
+    EXPECT_FALSE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ("existing", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), formatter_context, stream_info);
+    EXPECT_FALSE(helper.consumed());
+    EXPECT_EQ("", helper.output());
+  }
+
+  // The value is truncated to the max length.
+  {
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(2));
+
+    std::string sink;
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ("GE", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), formatter_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("GE")", helper.output());
+  }
+
+  // formatTo() appends to the sink rather than overwriting it.
+  {
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>());
+
+    std::string sink = "method: ";
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ("method: GETGET", sink);
+  }
+
+  // The header value is JSON sanitized before it is written to the value sink but is written
+  // verbatim to the string sink.
+  {
+    Http::TestRequestHeaderMapImpl special_header{{"x-header", R"(va"lue\)"}};
+    Context special_context;
+    special_context.setRequestHeaders(special_header);
+
+    RequestHeaderFormatter formatter("x-header", "", std::optional<size_t>());
+
+    std::string sink;
+    EXPECT_TRUE(formatter.formatTo(sink, special_context, stream_info));
+    EXPECT_EQ(R"(va"lue\)", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), special_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("va\"lue\\")", helper.output());
+  }
+
+  // A header that is present but empty is still an extracted value.
+  {
+    Http::TestRequestHeaderMapImpl empty_value_header{{"x-header", ""}};
+    Context empty_value_context;
+    empty_value_context.setRequestHeaders(empty_value_header);
+
+    RequestHeaderFormatter formatter("x-header", "", std::optional<size_t>());
+
+    std::string sink = "value: ";
+    EXPECT_TRUE(formatter.formatTo(sink, empty_value_context, stream_info));
+    EXPECT_EQ("value: ", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), empty_value_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ(R"("")", helper.output());
+  }
+
+  // There are no request headers in the context at all.
+  {
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>());
+    Context empty_context;
+
+    std::string sink;
+    EXPECT_FALSE(formatter.formatTo(sink, empty_context, stream_info));
+    EXPECT_EQ("", sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), empty_context, stream_info);
+    EXPECT_FALSE(helper.consumed());
+    EXPECT_EQ("", helper.output());
+  }
+}
+
+TEST(SubstitutionFormatterTest, HeaderFormattersReadTheirOwnHeaderMap) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{"x-header", "request"}};
+  Http::TestResponseHeaderMapImpl response_header{{"x-header", "response"}};
+  Http::TestResponseTrailerMapImpl response_trailer{{"x-header", "trailer"}};
+
+  Context formatter_context;
+  formatter_context.setRequestHeaders(request_header)
+      .setResponseHeaders(response_header)
+      .setResponseTrailers(response_trailer);
+
+  const auto expect_value = [&](const FormatterProvider& formatter, const std::string& expected) {
+    std::string sink;
+    EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
+    EXPECT_EQ(expected, sink);
+
+    ValueSinkHelper helper;
+    formatter.formatValueTo(helper.sink(), formatter_context, stream_info);
+    EXPECT_TRUE(helper.consumed());
+    EXPECT_EQ("\"" + expected + "\"", helper.output());
+  };
+
+  expect_value(RequestHeaderFormatter("x-header", "", std::optional<size_t>()), "request");
+  expect_value(ResponseHeaderFormatter("x-header", "", std::optional<size_t>()), "response");
+  expect_value(ResponseTrailerFormatter("x-header", "", std::optional<size_t>()), "trailer");
 }
 
 TEST(SubstitutionFormatterTest, TraceIDFormatter) {
@@ -5535,7 +5881,7 @@ TEST(SubstitutionFormatterTest, ParserSuccesses) {
                                          "%DOWNSTREAM_PEER_FINGERPRINT_256%"};
 
   for (const std::string& test_case : test_cases) {
-    EXPECT_TRUE(parser.parse(test_case).status().ok());
+    EXPECT_OK(parser.parse(test_case).status());
   }
 }
 
@@ -5590,8 +5936,8 @@ TEST(SubstitutionFormatterTest, PercentEscapingEdgeCase) {
 
 TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%ENVIRONMENT()%").IgnoreError(),
-                              EnvoyException, "ENVIRONMENT requires parameters");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%ENVIRONMENT()%"),
+                HasStatus(absl::StatusCode::kInvalidArgument, "ENVIRONMENT requires parameters"));
   }
 
   {
@@ -5633,15 +5979,16 @@ TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
 
 TEST(SubstitutionFormatterTest, PathTest) {
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%PATH(A)%").IgnoreError(),
-                              EnvoyException,
-                              "Invalid PATH option: 'A', only 'WQ'/'NQ' are allowed");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%PATH(A)%"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "Invalid PATH option: 'A', only 'WQ'/'NQ' are allowed"));
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse("%PATH(NQ:B)%").IgnoreError(), EnvoyException,
-        "Invalid PATH option: 'B', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed");
+    EXPECT_THAT(
+        SubstitutionFormatParser::parse("%PATH(NQ:B)%"),
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  "Invalid PATH option: 'B', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed"));
   }
 
   {
@@ -5703,9 +6050,9 @@ TEST(SubstitutionFormatParser, SyntaxVerifierFail) {
       };
 
   for (const auto& test_case : test_cases) {
-    EXPECT_FALSE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
-                                                    std::get<1>(test_case), std::get<2>(test_case))
-                     .ok());
+    EXPECT_THAT(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                   std::get<1>(test_case), std::get<2>(test_case)),
+                Not(IsOk()));
   }
 }
 
@@ -5734,9 +6081,8 @@ TEST(SubstitutionFormatParser, SyntaxVerifierPass) {
            std::nullopt}};
 
   for (const auto& test_case : test_cases) {
-    EXPECT_TRUE(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
-                                                   std::get<1>(test_case), std::get<2>(test_case))
-                    .ok());
+    EXPECT_OK(CommandSyntaxChecker::verifySyntax(std::get<0>(test_case), "TEST_TOKEN",
+                                                 std::get<1>(test_case), std::get<2>(test_case)));
   }
 }
 
@@ -5937,60 +6283,97 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterGridTest) {
 TEST(SubstitutionFormatterTest, CoalesceFormatterErrorCases) {
   // Empty JSON config.
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%COALESCE()%").IgnoreError(),
-                              EnvoyException, "COALESCE requires parameters");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%COALESCE()%"),
+                HasStatus(absl::StatusCode::kInvalidArgument, "COALESCE requires parameters"));
+  }
+
+  // The command parser rejects the empty parameter before the formatter is created, so the
+  // empty configuration is checked by creating the formatter directly.
+  {
+    EXPECT_THAT(CoalesceFormatter::create("", std::nullopt),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "COALESCE requires a JSON configuration parameter"));
   }
 
   // Invalid JSON.
   {
-    EXPECT_THROW_WITH_REGEX(SubstitutionFormatParser::parse("%COALESCE(not json)%").IgnoreError(),
-                            EnvoyException, "COALESCE: failed to parse JSON configuration.*");
+    EXPECT_THAT(SubstitutionFormatParser::parse("%COALESCE(not json)%"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: failed to parse JSON configuration")));
   }
 
   // Missing operators field.
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"foo": "bar"})%)").IgnoreError(),
-        EnvoyException, "COALESCE: JSON configuration must contain 'operators' array");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"foo": "bar"})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "COALESCE: JSON configuration must contain 'operators' array"));
+  }
+
+  // The operators field is present but is not an array.
+  {
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": "PROTOCOL"})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: 'operators' must be an array")));
   }
 
   // Empty operators array.
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": []})%)").IgnoreError(),
-        EnvoyException, "COALESCE: 'operators' array must not be empty");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": []})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "COALESCE: 'operators' array must not be empty"));
   }
 
   // Invalid operator which is not a string or object.
   {
-    EXPECT_THROW_WITH_REGEX(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [123]})%)").IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [123]})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: failed to parse operator at index 0")));
   }
 
   // Missing command field in operator object.
   {
-    EXPECT_THROW_WITH_REGEX(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [{"param": "foo"}]})%)")
-            .IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*");
+    EXPECT_THAT(SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [{"param": "foo"}]})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          StartsWith("COALESCE: failed to parse operator at index 0")));
   }
 
   // Unknown command.
   {
-    EXPECT_THROW_WITH_REGEX(
-        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["UNKNOWN_COMMAND"]})%)")
-            .IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*unknown command.*");
+    EXPECT_THAT(
+        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["UNKNOWN_COMMAND"]})%)"),
+        HasStatus(
+            absl::StatusCode::kInvalidArgument,
+            ContainsRegex("COALESCE: failed to parse operator at index 0.*unknown command.*")));
+  }
+
+  // The param field is present but is not a string.
+  {
+    EXPECT_THAT(
+        SubstitutionFormatParser::parse(
+            R"(%COALESCE({"operators": [{"command": "REQ", "param": 123}]})%)"),
+        HasStatus(
+            absl::StatusCode::kInvalidArgument,
+            ContainsRegex(
+                "COALESCE: failed to parse operator at index 0.*'param' field must be a string")));
+  }
+
+  // The max_length field is present but is not an integer.
+  {
+    EXPECT_THAT(SubstitutionFormatParser::parse(
+                    R"(%COALESCE({"operators": [{"command": "PROTOCOL", "max_length": "10"}]})%)"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          ContainsRegex("COALESCE: failed to parse operator at index 0.*"
+                                        "'max_length' field must be an integer")));
   }
 
   // Invalid not positive max_length.
   {
-    EXPECT_THROW_WITH_REGEX(
+    EXPECT_THAT(
         SubstitutionFormatParser::parse(
-            R"(%COALESCE({"operators": [{"command": "PROTOCOL", "max_length": 0}]})%)")
-            .IgnoreError(),
-        EnvoyException, "COALESCE: failed to parse operator at index 0.*max_length.*positive.*");
+            R"(%COALESCE({"operators": [{"command": "PROTOCOL", "max_length": 0}]})%)"),
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  ContainsRegex(
+                      "COALESCE: failed to parse operator at index 0.*max_length.*positive.*")));
   }
 }
 
@@ -6028,6 +6411,56 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterFormatValue) {
     auto value = providers[0]->formatValue({&request_headers}, null_stream_info);
     EXPECT_EQ(Protobuf::Value::kNullValue, value.kind_case());
   }
+
+  // A string value longer than the COALESCE max length is truncated.
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["PROTOCOL"]}):4%)");
+    ASSERT_EQ(providers.size(), 1);
+    auto value = providers[0]->formatValue({}, stream_info);
+    EXPECT_EQ(Protobuf::Value::kStringValue, value.kind_case());
+    EXPECT_EQ("HTTP", value.string_value());
+  }
+
+  // A string value shorter than the COALESCE max length is left as is.
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["PROTOCOL"]}):100%)");
+    ASSERT_EQ(providers.size(), 1);
+    auto value = providers[0]->formatValue({}, stream_info);
+    EXPECT_EQ(Protobuf::Value::kStringValue, value.kind_case());
+    EXPECT_EQ("HTTP/1.1", value.string_value());
+  }
+
+  // A non-string value is returned as is and is not subject to the max length.
+  {
+    EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(Return(std::optional<uint32_t>(503)));
+
+    auto providers =
+        *SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["RESPONSE_CODE"]}):1%)");
+    ASSERT_EQ(providers.size(), 1);
+    auto value = providers[0]->formatValue({}, stream_info);
+    EXPECT_EQ(Protobuf::Value::kNumberValue, value.kind_case());
+    EXPECT_EQ(503, value.number_value());
+  }
+
+  // An empty string value is skipped and the next operator is used.
+  {
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.0.0.1", 8080)};
+    auto downstream_address_provider =
+        std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+    downstream_address_provider->setRequestedServerName("");
+    EXPECT_CALL(stream_info, downstreamAddressProvider())
+        .WillRepeatedly(ReturnPointee(downstream_address_provider.get()));
+
+    auto providers = *SubstitutionFormatParser::parse(
+        R"(%COALESCE({"operators": ["REQUESTED_SERVER_NAME", "PROTOCOL"]})%)");
+    ASSERT_EQ(providers.size(), 1);
+    auto value = providers[0]->formatValue({}, stream_info);
+    EXPECT_EQ(Protobuf::Value::kStringValue, value.kind_case());
+    EXPECT_EQ("HTTP/1.1", value.string_value());
+  }
 }
 
 TEST(SubstitutionFormatterTest, CoalesceFormatterWithOtherCommands) {
@@ -6048,7 +6481,7 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterWithOtherCommands) {
 
   auto formatter_or_error = FormatterImpl::create(
       R"(protocol=%PROTOCOL% host=%COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}]})%)");
-  ASSERT_TRUE(formatter_or_error.ok());
+  ASSERT_OK(formatter_or_error);
   auto& formatter = *formatter_or_error.value();
 
   std::string result = formatter.format({&request_headers}, stream_info);

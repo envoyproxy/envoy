@@ -14,12 +14,13 @@ namespace KillRequest {
  * Config registration for KillRequestFilter. @see NamedHttpFilterConfigFactory.
  */
 class KillRequestFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::kill_request::v3::KillRequest> {
+    : public Common::ExceptionFreeFactoryBase<
+          envoy::extensions::filters::http::kill_request::v3::KillRequest> {
 public:
-  KillRequestFilterFactory() : FactoryBase("envoy.filters.http.kill_request") {}
+  KillRequestFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.kill_request") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 

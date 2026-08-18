@@ -61,11 +61,11 @@ public:
   // Returns the application protocol, or std::nullopt for TCP.
   virtual std::optional<Http::Protocol> protocol() const PURE;
 
-  virtual int64_t currentUnusedCapacity() const {
-    int64_t remaining_concurrent_streams =
-        static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
-
-    return std::min<int64_t>(remaining_streams_, remaining_concurrent_streams);
+  virtual uint32_t currentUnusedCapacity() const {
+    if (concurrent_stream_limit_ <= numActiveStreams()) {
+      return 0;
+    }
+    return std::min(remaining_streams_, concurrent_stream_limit_ - numActiveStreams());
   }
 
   // Initialize upstream read filters. Called when connected.
@@ -138,6 +138,11 @@ public:
   // and can be adjusted by SETTINGS frame, but the max value of it can't exceed
   // `configured_stream_limit_`.
   uint32_t concurrent_stream_limit_;
+  // When a SETTINGS frame reduces concurrent_stream_limit_ below the active stream count,
+  // the raw capacity would be negative. This debt tracks that negative portion which is NOT
+  // reflected in the pool-level connecting_and_connected_stream_capacity_, preventing that
+  // aggregate from going negative and confusing preconnect logic.
+  uint32_t capacity_debt_{0};
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
   Stats::TimespanPtr conn_length_;
@@ -209,7 +214,7 @@ public:
   // If anticipate_incoming_stream is true this assumes a call to newStream is
   // pending, which is true for global preconnect.
   static bool shouldConnect(size_t pending_streams, size_t active_streams,
-                            int64_t connecting_and_connected_capacity, float preconnect_ratio,
+                            uint64_t connecting_and_connected_capacity, float preconnect_ratio,
                             bool anticipate_incoming_stream = false);
 
   // Envoy::ConnectionPool::Instance implementation helpers
@@ -283,6 +288,7 @@ public:
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
   void decrClusterStreamCapacity(uint32_t delta) {
+    ASSERT(connecting_and_connected_stream_capacity_ >= delta);
     cluster_connectivity_state_.decrConnectingAndConnectedStreamCapacity(delta);
     connecting_and_connected_stream_capacity_ -= delta;
   }
@@ -406,7 +412,7 @@ private:
 
   // The number of streams that can be immediately dispatched from the current
   // `ready_clients_` plus `connecting_stream_capacity_`.
-  int64_t connecting_and_connected_stream_capacity_{0};
+  uint64_t connecting_and_connected_stream_capacity_{0};
 
   // The number of streams currently attached to clients.
   uint32_t num_active_streams_{0};

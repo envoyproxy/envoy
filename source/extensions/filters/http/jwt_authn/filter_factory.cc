@@ -22,29 +22,34 @@ using JwtVerify::Status;
 /**
  * Validate inline jwks, make sure they are the valid
  */
-void validateJwtConfig(const JwtAuthentication& proto_config, Api::Api& api) {
+absl::Status validateJwtConfig(const JwtAuthentication& proto_config, Api::Api& api) {
   for (const auto& [name, provider] : proto_config.providers()) {
-    const auto inline_jwks = THROW_OR_RETURN_VALUE(
-        Config::DataSource::read(provider.local_jwks(), true, api), std::string);
+    auto inline_jwks_or = Config::DataSource::read(provider.local_jwks(), true, api);
+    RETURN_IF_NOT_OK_REF(inline_jwks_or.status());
+    const auto& inline_jwks = inline_jwks_or.value();
     if (!inline_jwks.empty()) {
       auto jwks_obj = Jwks::createFrom(inline_jwks, Jwks::JWKS);
       if (jwks_obj->getStatus() != Status::Ok) {
-        throw EnvoyException(
+        return absl::InvalidArgumentError(
             fmt::format("Provider '{}' in jwt_authn config has invalid local jwks: {}", name,
                         JwtVerify::getStatusString(jwks_obj->getStatus())));
       }
     }
   }
+  return absl::OkStatus();
 }
 
 } // namespace
 
-Http::FilterFactoryCb
+absl::StatusOr<Http::FilterFactoryCb>
 FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_config,
                                                  const std::string& prefix,
                                                  Server::Configuration::FactoryContext& context) {
-  validateJwtConfig(proto_config, context.serverFactoryContext().api());
-  auto filter_config = std::make_shared<FilterConfigImpl>(proto_config, prefix, context);
+  RETURN_IF_NOT_OK(validateJwtConfig(proto_config, context.serverFactoryContext().api()));
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config =
+      std::make_shared<FilterConfigImpl>(proto_config, prefix, context, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Filter>(filter_config));
   };

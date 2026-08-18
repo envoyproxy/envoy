@@ -198,42 +198,25 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
     options_clone.mutable_hpack_table_size()->set_value(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
   }
   ASSERT(options_clone.hpack_table_size().value() <= OptionsLimits::MAX_HPACK_TABLE_SIZE);
-  const bool safe_http2_options =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.safe_http2_options");
 
   if (!options_clone.has_max_concurrent_streams()) {
-    if (safe_http2_options) {
-      options_clone.mutable_max_concurrent_streams()->set_value(
-          OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
-    } else {
-      options_clone.mutable_max_concurrent_streams()->set_value(
-          OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS_LEGACY);
-    }
+    options_clone.mutable_max_concurrent_streams()->set_value(
+        OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
   }
   ASSERT(
       options_clone.max_concurrent_streams().value() >= OptionsLimits::MIN_MAX_CONCURRENT_STREAMS &&
       options_clone.max_concurrent_streams().value() <= OptionsLimits::MAX_MAX_CONCURRENT_STREAMS);
   if (!options_clone.has_initial_stream_window_size()) {
-    if (safe_http2_options) {
-      options_clone.mutable_initial_stream_window_size()->set_value(
-          OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
-    } else {
-      options_clone.mutable_initial_stream_window_size()->set_value(
-          OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE_LEGACY);
-    }
+    options_clone.mutable_initial_stream_window_size()->set_value(
+        OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
   }
   ASSERT(options_clone.initial_stream_window_size().value() >=
              OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE &&
          options_clone.initial_stream_window_size().value() <=
              OptionsLimits::MAX_INITIAL_STREAM_WINDOW_SIZE);
   if (!options_clone.has_initial_connection_window_size()) {
-    if (safe_http2_options) {
-      options_clone.mutable_initial_connection_window_size()->set_value(
-          OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
-    } else {
-      options_clone.mutable_initial_connection_window_size()->set_value(
-          OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE_LEGACY);
-    }
+    options_clone.mutable_initial_connection_window_size()->set_value(
+        OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
   }
   ASSERT(options_clone.initial_connection_window_size().value() >=
              OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE &&
@@ -1266,7 +1249,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value,
     // We do checking for each char in the string. If the current char is included in the defined
     // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded]
     // to the returned string one by one) started from the current index.
-    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
+    if (ch < ' ' || ch >= '~' || reserved_char_set.contains(ch)) {
       return PercentEncoding::encode(value, i, reserved_char_set);
     }
   }
@@ -1282,7 +1265,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value, const size
 
   for (size_t i = index; i < value.size(); ++i) {
     const char& ch = value[i];
-    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
+    if (ch < ' ' || ch >= '~' || reserved_char_set.contains(ch)) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
       absl::StrAppend(&encoded, fmt::format("%{:02X}", static_cast<const unsigned char&>(ch)));

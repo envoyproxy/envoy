@@ -16,6 +16,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -42,7 +43,7 @@ TEST(Context, EmptyHeadersAttributes) {
   EXPECT_FALSE(header.has_value());
   EXPECT_EQ(0, headers.size());
   EXPECT_TRUE(headers.empty());
-  EXPECT_TRUE(headers.ListKeys().ok());
+  EXPECT_OK(headers.ListKeys());
   EXPECT_EQ(0, headers.ListKeys().value()->size());
 }
 
@@ -197,7 +198,7 @@ TEST(Context, RequestAttributes) {
     auto& map = *value.value().MapOrDie();
     EXPECT_FALSE(map.empty());
     EXPECT_EQ(9, map.size());
-    EXPECT_TRUE(map.ListKeys().ok());
+    EXPECT_OK(map.ListKeys());
     EXPECT_EQ(9, map.ListKeys().value()->size());
 
     auto header = map[CelValue::CreateStringView(Referer)];

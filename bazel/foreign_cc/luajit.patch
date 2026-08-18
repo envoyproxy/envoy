@@ -56,7 +56,7 @@ new file mode 100755
 index 00000000..3b4f8eca
 --- /dev/null
 +++ b/luajit_build.sh
-@@ -0,0 +1,79 @@
+@@ -0,0 +1,84 @@
 +#!/bin/bash
 +
 +set -e
@@ -108,14 +108,19 @@ index 00000000..3b4f8eca
 +    # when linking host build tools (e.g. minilua) via make's implicit rules.
 +    export LDFLAGS=""
 +else
-+    # macOS: extract sysroot from CFLAGS and pass to HOST_CFLAGS/HOST_LDFLAGS for building host tools
++    # macOS: extract sysroot from CFLAGS and linker flags from LDFLAGS for host tools.
++    # The hermetic clang must use ld64.lld (not the system ld) because the system ld
++    # dynamically loads libc++ and picks up the hermetic toolchain's libc++.1.0.dylib
++    # which is missing symbols the system ld needs (e.g. ___cxa_demangle).
 +    SYSROOT_FLAG=$(echo "$CFLAGS" | grep -o -- '--sysroot=[^ ]*' || :)
++    LD_PATH_FLAG=$(echo "$LDFLAGS" | grep -o -- '--ld-path=[^ ]*' || :)
++    HOST_LDFLAGS_PARTS="${SYSROOT_FLAG} ${FUSE_LD_FLAG} ${LD_PATH_FLAG}"
 +    if [[ -n "${SYSROOT_FLAG}" ]]; then
 +        export HOST_CFLAGS="${SYSROOT_FLAG}"
-+        export HOST_LDFLAGS="${SYSROOT_FLAG}"
-+        EXTRA_MAKE_ARGS+=("HOST_CFLAGS=${HOST_CFLAGS}" "HOST_LDFLAGS=${HOST_LDFLAGS}")
 +    fi
-+    export TARGET_LDFLAGS="${CFLAGS:-} -fno-function-sections -fno-data-sections"
++    export HOST_LDFLAGS="${HOST_LDFLAGS_PARTS}"
++    EXTRA_MAKE_ARGS+=("HOST_CFLAGS=${HOST_CFLAGS:-}" "HOST_LDFLAGS=${HOST_LDFLAGS}")
++    export TARGET_LDFLAGS="${CFLAGS:-} ${FUSE_LD_FLAG} ${LD_PATH_FLAG} -fno-function-sections -fno-data-sections"
 +    export CFLAGS=""
 +    export LDFLAGS=""
 +fi

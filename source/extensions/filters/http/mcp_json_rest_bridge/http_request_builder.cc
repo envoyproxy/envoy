@@ -3,6 +3,8 @@
 #include "source/common/http/utility.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "nlohmann/json.hpp"
@@ -140,6 +142,41 @@ absl::StatusOr<json> constructRequestBody(absl::string_view body_rule,
   return getJsonValue(arguments, body_rule);
 }
 
+// Substitutes `value` for every `{element}` and `{element=pattern}` occurrence in `url`.
+//
+// This is the literal equivalent of the RE2 pattern `\{element(?:=[^}]+)?\}`, which used to be
+// compiled on every request. `element` is only ever a literal name (`template_regex` restricts it
+// to `[a-zA-Z0-9_.]+`), so no regex is needed to find it.
+void substitutePathTemplateVariable(std::string& url, absl::string_view element,
+                                    absl::string_view value) {
+  const std::string opening = absl::StrCat("{", element);
+  size_t pos = 0;
+  while ((pos = url.find(opening, pos)) != std::string::npos) {
+    // Index just past `{element`. A match closes either immediately, or after an `=pattern` of
+    // one or more non-'}' characters.
+    const size_t after_name = pos + opening.size();
+    size_t closing = std::string::npos;
+    if (after_name < url.size() && url[after_name] == '}') {
+      closing = after_name;
+    } else if (after_name < url.size() && url[after_name] == '=') {
+      const size_t candidate = url.find('}', after_name + 1);
+      // `[^}]+` requires at least one character between '=' and '}'.
+      if (candidate != std::string::npos && candidate > after_name + 1) {
+        closing = candidate;
+      }
+    }
+    if (closing == std::string::npos) {
+      // Not a match: a longer name that merely starts with `element` (`{elementary}`), or an
+      // unterminated `{element`. Advance one character, as a regex scan would.
+      ++pos;
+      continue;
+    }
+    url.replace(pos, closing - pos + 1, value.data(), value.size());
+    // Resume past the substituted value so it is never scanned again, as RE2::GlobalReplace did.
+    pos += value.size();
+  }
+}
+
 } // namespace
 
 absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
@@ -151,12 +188,28 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
     if (!template_value_json.ok()) {
       return template_value_json.status();
     }
+    const std::string raw_value = jsonValueToString(*template_value_json);
+
+    // The constructed URL is installed verbatim as the upstream `:path` and is not re-normalized by
+    // Envoy, so no attacker-controlled value may contain a '.'/'..' traversal segment (#45931).
+    // '\' is percent-encoded below, but an upstream that decodes it and folds it to '/' would see a
+    // traversal, so treat it as a separator here too.
+    for (const absl::string_view segment : absl::StrSplit(raw_value, absl::ByAnyChar("\\/"))) {
+      if (segment == "." || segment == "..") {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "path template variable '", element, "' must not contain path traversal segments"));
+      }
+    }
+    // A simple variable (`{id}`) fills one segment, so its '/' is encoded; a variable with an
+    // explicit pattern (`{name=projects/*}`) may span segments, so its '/' is preserved.
+    const absl::string_view reserved_chars =
+        absl::StrContains(pattern, absl::StrCat("{", element, "=")) ? ReservedChars
+                                                                    : ReservedCharsWithSlash;
+
     // Non-visible ASCII characters are always escaped by Http::Utility::PercentEncoding::encode,
     // in addition to the specified reserved characters.
-    std::string value_str = Http::Utility::PercentEncoding::encode(
-        jsonValueToString(*template_value_json), ReservedChars);
-    std::string var_pattern = "\\{" + RE2::QuoteMeta(element) + "(?:=[^}]+)?\\}";
-    RE2::GlobalReplace(&base_url, var_pattern, value_str);
+    const std::string value_str = Http::Utility::PercentEncoding::encode(raw_value, reserved_chars);
+    substitutePathTemplateVariable(base_url, element, value_str);
   }
   return base_url;
 }

@@ -343,9 +343,9 @@ TEST_F(ExtAuthzFilterTest, ConfigThrowsWhenGrpcClientFactoryFails) {
 
   FilterConfig proto_config;
   proto_config.set_stat_prefix("test");
-  EXPECT_THROW(
-      std::make_shared<Config>(proto_config, context_.scope(), context_.server_factory_context_),
-      EnvoyException);
+  EXPECT_THROW(std::ignore = std::make_shared<Config>(proto_config, context_.scope(),
+                                                      context_.server_factory_context_),
+               EnvoyException);
 }
 
 } // namespace

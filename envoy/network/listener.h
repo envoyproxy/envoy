@@ -22,6 +22,8 @@
 
 #include "source/common/common/interval_value.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -153,6 +155,11 @@ using InternalListenerConfigOptRef = OptRef<InternalListenerConfig>;
 class ListenerInfo {
 public:
   virtual ~ListenerInfo() = default;
+
+  /**
+   * @return absl::string_view the name of the listener as set in configuration.
+   */
+  virtual absl::string_view name() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the config metadata associated with this

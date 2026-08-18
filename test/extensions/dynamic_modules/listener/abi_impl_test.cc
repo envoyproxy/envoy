@@ -2,6 +2,8 @@
 #include <thread>
 #include <vector>
 
+#include "envoy/registry/registry.h"
+
 #include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
@@ -27,6 +29,23 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace ListenerFilters {
+
+// ObjectFactory used by the typed filter-state tests: the module writes through this factory via
+// envoy_dynamic_module_callback_listener_filter_set_filter_state_typed. It returns nullptr for
+// "BAD_VALUE" to exercise the factory-failure branch.
+class ListenerTestTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.listener_set_typed_object"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    if (data == "BAD_VALUE") {
+      return nullptr;
+    }
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(ListenerTestTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 #ifdef SOL_IP
 // Helper action to set sockaddr in arg2 for getSocketOption mocking.
@@ -1612,6 +1631,105 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetFilterStateNullKey) {
   bool found = envoy_dynamic_module_callback_listener_filter_get_filter_state(filterPtr(), key_buf,
                                                                               &result_buf);
   EXPECT_FALSE(found);
+  EXPECT_EQ(0, result_buf.length);
+  EXPECT_EQ(nullptr, result_buf.ptr);
+}
+
+// =============================================================================
+// Tests for set_filter_state_typed / get_filter_state_typed.
+// =============================================================================
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateTyped) {
+  std::string key = "envoy.test.listener_set_typed_object";
+  std::string value = "typed_value";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_module_buffer value_buf = {value.data(), value.size()};
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+      filterPtr(), key_buf, value_buf));
+
+  // The typed value is readable via the typed getter.
+  envoy_dynamic_module_type_envoy_buffer result_buf = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+      filterPtr(), key_buf, &result_buf));
+  EXPECT_EQ("typed_value", std::string(result_buf.ptr, result_buf.length));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateTypedNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
+
+  std::string key = "envoy.test.listener_set_typed_object";
+  std::string value = "typed_value";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_module_buffer value_buf = {value.data(), value.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+      static_cast<void*>(filter.get()), key_buf, value_buf));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateTypedNullKey) {
+  std::string value = "typed_value";
+  envoy_dynamic_module_type_module_buffer key_buf = {nullptr, 8};
+  envoy_dynamic_module_type_module_buffer value_buf = {value.data(), value.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+      filterPtr(), key_buf, value_buf));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateTypedNullValue) {
+  std::string key = "envoy.test.listener_set_typed_object";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_module_buffer value_buf = {nullptr, 8};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+      filterPtr(), key_buf, value_buf));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateTypedNoFactory) {
+  std::string key = "nonexistent.factory.key";
+  std::string value = "typed_value";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_module_buffer value_buf = {value.data(), value.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+      filterPtr(), key_buf, value_buf));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateTypedBadValue) {
+  std::string key = "envoy.test.listener_set_typed_object";
+  std::string value = "BAD_VALUE";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_module_buffer value_buf = {value.data(), value.size()};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+      filterPtr(), key_buf, value_buf));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetFilterStateTypedNonExisting) {
+  std::string key = "envoy.test.listener_set_typed_object";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result_buf = {nullptr, 0};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+      filterPtr(), key_buf, &result_buf));
+  EXPECT_EQ(0, result_buf.length);
+  EXPECT_EQ(nullptr, result_buf.ptr);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetFilterStateTypedNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
+
+  std::string key = "envoy.test.listener_set_typed_object";
+  envoy_dynamic_module_type_module_buffer key_buf = {key.data(), key.size()};
+  envoy_dynamic_module_type_envoy_buffer result_buf = {nullptr, 0};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+      static_cast<void*>(filter.get()), key_buf, &result_buf));
+  EXPECT_EQ(0, result_buf.length);
+  EXPECT_EQ(nullptr, result_buf.ptr);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetFilterStateTypedNullKey) {
+  envoy_dynamic_module_type_module_buffer key_buf = {nullptr, 8};
+  envoy_dynamic_module_type_envoy_buffer result_buf = {nullptr, 0};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+      filterPtr(), key_buf, &result_buf));
   EXPECT_EQ(0, result_buf.length);
   EXPECT_EQ(nullptr, result_buf.ptr);
 }

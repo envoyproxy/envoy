@@ -33,6 +33,7 @@ envoy_extension_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",

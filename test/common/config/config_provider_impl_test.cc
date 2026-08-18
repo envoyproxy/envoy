@@ -10,6 +10,7 @@
 #include "test/common/config/dummy_config.pb.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -274,7 +275,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   DummyConfigSubscription& subscription =
       dynamic_cast<DummyDynamicConfigProvider&>(*provider1).subscription();
   const auto decoded_resources = TestUtility::decodeResources({dummy_config}, "a");
-  ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "1").ok());
+  ASSERT_OK(subscription.onConfigUpdate(decoded_resources.refvec_, "1"));
 
   // Check that a newly created provider with the same config source will share
   // the subscription, config proto and resulting ConfigProvider::Config.
@@ -299,10 +300,9 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   EXPECT_NE(provider1->config<const DummyConfig>().get(),
             provider3->config<const DummyConfig>().get());
 
-  ASSERT_TRUE(dynamic_cast<DummyDynamicConfigProvider&>(*provider3)
-                  .subscription()
-                  .onConfigUpdate(decoded_resources.refvec_, "provider3")
-                  .ok());
+  ASSERT_OK(dynamic_cast<DummyDynamicConfigProvider&>(*provider3)
+                .subscription()
+                .onConfigUpdate(decoded_resources.refvec_, "provider3"));
 
   EXPECT_EQ(2UL, static_cast<test::common::config::DummyConfigsDump*>(
                      provider_manager_->dumpConfigs().get())
@@ -370,13 +370,13 @@ TEST_F(ConfigProviderImplTest, DuplicateConfigProto) {
   // First time issuing a configUpdate(). A new ConfigProvider::Config should be created.
   const auto dummy_config = parseDummyConfigFromYaml("a: a dynamic dummy config");
   const auto decoded_resources = TestUtility::decodeResources({dummy_config}, "a");
-  ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "1").ok());
+  ASSERT_OK(subscription.onConfigUpdate(decoded_resources.refvec_, "1"));
   EXPECT_NE(subscription.getConfig(), nullptr);
   auto config_ptr = subscription.getConfig();
   EXPECT_EQ(typed_provider->config<DummyConfig>().get(), config_ptr.get());
   // Second time issuing the configUpdate(), this time with a duplicate proto. A new
   // ConfigProvider::Config _should not_ be created.
-  ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "2").ok());
+  ASSERT_OK(subscription.onConfigUpdate(decoded_resources.refvec_, "2"));
   EXPECT_EQ(config_ptr, subscription.getConfig());
   EXPECT_EQ(typed_provider->config<DummyConfig>().get(), config_ptr.get());
 }
@@ -460,7 +460,7 @@ dynamic_dummy_configs:
   DummyConfigSubscription& subscription =
       dynamic_cast<DummyDynamicConfigProvider&>(*dynamic_provider).subscription();
   const auto decoded_resources = TestUtility::decodeResources({dummy_config}, "a");
-  ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "v1").ok());
+  ASSERT_OK(subscription.onConfigUpdate(decoded_resources.refvec_, "v1"));
 
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"](
       Matchers::UniversalStringMatcher());
@@ -711,7 +711,7 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
 
   DeltaDummyConfigSubscription& subscription =
       dynamic_cast<DeltaDummyDynamicConfigProvider&>(*provider1).subscription();
-  ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "1").ok());
+  ASSERT_OK(subscription.onConfigUpdate(decoded_resources.refvec_, "1"));
 
   ConfigProviderPtr provider2 = provider_manager_->createXdsConfigProvider(
       config_source_proto, server_factory_context_, init_manager_, "dummy_prefix",
@@ -732,7 +732,7 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
 
   // Issue a second config update to validate that having multiple providers bound to the
   // subscription causes a single update to the underlying shared config implementation.
-  ASSERT_TRUE(subscription.onConfigUpdate(decoded_resources.refvec_, "2").ok());
+  ASSERT_OK(subscription.onConfigUpdate(decoded_resources.refvec_, "2"));
   // NOTE: the config implementation is append only and _does not_ track updates/removals to the
   // config proto set, so the expectation is to double the size of the set.
   EXPECT_EQ(provider1->config<const DummyConfig>().get(),

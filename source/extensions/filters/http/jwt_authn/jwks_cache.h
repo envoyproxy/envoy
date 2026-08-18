@@ -51,6 +51,15 @@ public:
   // Interface to access a Jwks config rule and its cached Jwks object.
   class JwksData {
   public:
+    // A `claim_to_headers` entry with its claim path resolved once, at config load.
+    // The segments point into the JwtProvider proto, which the FilterConfig owns and never
+    // mutates after construction, and which every in-flight request keeps alive via its
+    // FilterConfigSharedPtr. They must not point at anything shorter-lived.
+    struct ClaimToHeader {
+      std::vector<absl::string_view> claim_path_;
+      std::string header_name_;
+    };
+
     virtual ~JwksData() = default;
 
     // Check if a list of audiences are allowed.
@@ -65,6 +74,9 @@ public:
     // Get the cached config: JWT rule.
     virtual const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&
     getJwtProvider() const PURE;
+
+    // Get the provider's `claim_to_headers` with claim paths already resolved.
+    virtual const std::vector<ClaimToHeader>& claimsToHeaders() const PURE;
 
     // Get the retry policy for remote Jwks fetcher.
     virtual const Router::RetryPolicyConstSharedPtr& retryPolicy() const PURE;
@@ -95,7 +107,7 @@ public:
   virtual JwtAuthnFilterStats& stats() PURE;
 
   // Factory function to create an instance.
-  static JwksCachePtr
+  static absl::StatusOr<JwksCachePtr>
   create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
          Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
          JwtAuthnFilterStats& stats);

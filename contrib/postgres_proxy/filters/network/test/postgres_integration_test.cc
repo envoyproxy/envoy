@@ -7,7 +7,9 @@
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
+#include "test/mocks/network/connection.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 
@@ -20,6 +22,7 @@
 #include "gtest/gtest.h"
 
 using testing::Eq;
+using testing::NiceMock;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

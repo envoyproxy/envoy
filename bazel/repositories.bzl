@@ -1,7 +1,7 @@
-load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
-load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
+load("@googleapis//:repository_rules.bzl", "switched_rules_by_language")
+load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy.router.cluster_specifier_plugin.lua"]
 
@@ -81,6 +81,7 @@ def _cc_deps():
         patches = ["@envoy//bazel:grpc_httpjson_transcoding.patch"],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
+            "@com_google_googleapis": "@googleapis",
             "@com_google_protoconverter": "@proto-converter",
         },
     )
@@ -105,6 +106,7 @@ def _cc_deps():
         patches = ["@envoy//bazel:proto-field-extraction-protobuf-v35.patch"],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
+            "@com_google_googleapis": "@googleapis",
             "@ocp": "@ocp-diag-core",
         },
     )
@@ -116,6 +118,7 @@ def _cc_deps():
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
             "@ocp": "@ocp-diag-core",
+            "@com_google_googleapis": "@googleapis",
             "@com_google_protoconverter": "@proto-converter",
             "@com_google_protofieldextraction": "@proto-field-extraction",
         },
@@ -143,8 +146,9 @@ def _rust_deps():
         patches = ["@envoy//bazel:rules_rust.patch"],
     )
 
-def envoy_dependencies(skip_targets = []):
-    external_http_archive("platforms")
+def envoy_dependencies(skip_targets = [], bzlmod = False):
+    if not bzlmod:
+        external_http_archive("platforms")
 
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
@@ -166,7 +170,6 @@ def envoy_dependencies(skip_targets = []):
     # SSL/crypto dependencies are resolved via EXTERNAL_DEPS_MAP in envoy_internal.bzl
     _boringssl()
     _boringssl_fips()
-    _aws_lc()
     _openssl()
 
     _aws_c_auth_testdata()
@@ -188,7 +191,7 @@ def envoy_dependencies(skip_targets = []):
     _tcmalloc()
     _gperftools()
     _jemalloc()
-    _com_github_grpc_grpc()
+    _grpc()
     _rules_proto_grpc()
     _icu()
     _ipp_crypto()
@@ -275,6 +278,11 @@ def envoy_dependencies(skip_targets = []):
         go = True,
         python = True,
         grpc = True,
+        rules_override = {
+            "py_proto_library": ["@grpc//bazel:python_rules.bzl", ""],
+            "py_grpc_library": ["@grpc//bazel:python_rules.bzl", ""],
+            "cc_grpc_library": ["@grpc//bazel:cc_grpc_library.bzl", ""],
+        },
     )
 
 def _boringssl():
@@ -314,27 +322,6 @@ def _boringssl_fips():
     )
     external_http_archive(
         name = "fips_go_linux_arm64",
-        build_file_content = GO_BUILD_CONTENT,
-    )
-
-def _aws_lc():
-    external_http_archive(
-        name = "aws_lc",
-        build_file = "@envoy//bazel/external:aws_lc.BUILD",
-    )
-    CMAKE_SOURCE_BUILD_CONTENT = "%s\nexports_files([\"bootstrap\"])" % BUILD_ALL_CONTENT
-    external_http_archive(
-        name = "fips_cmake_src",
-        build_file_content = CMAKE_SOURCE_BUILD_CONTENT,
-    )
-    CLANG_BUILD_CONTENT = "%s\nexports_files([\"bin/clang\", \"bin/clang++\"])" % BUILD_ALL_CONTENT
-    external_http_archive(
-        name = "fips_clang_ppc64le",
-        build_file_content = CLANG_BUILD_CONTENT,
-    )
-    GO_BUILD_CONTENT = "%s\nexports_files([\"bin/go\"])" % _build_all_content(["test/**"])
-    external_http_archive(
-        name = "fips_go_ppc64le",
         build_file_content = GO_BUILD_CONTENT,
     )
 
@@ -700,6 +687,7 @@ def _cpp2sky():
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
+        repo_mapping = {"@com_github_grpc_grpc": "@grpc"},
     )
 
 def _nlohmann_json():
@@ -756,19 +744,12 @@ def _com_google_protobuf():
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
-    for platform in PROTOC_VERSIONS:
-        # Ideally we dont use a private build artefact as done here.
-        # If `rules_proto` implements protoc toolchains in the future (currently it
-        # is there, but is empty) we should remove these and use that rule
-        # instead.
-        external_http_archive(
-            "com_google_protobuf_protoc_%s" % platform,
-            build_file = "@envoy//bazel/protoc:BUILD.protoc",
-        )
-
     external_http_archive(
         "com_google_protobuf",
-        patches = ["@envoy//bazel:protobuf.patch"],
+        patches = [
+            "@envoy//bazel:protobuf.patch",
+            "@envoy//bazel:protobuf_prebuilt_tool_integrity.patch",
+        ],
         patch_args = ["-p1"],
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
@@ -778,7 +759,6 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
-            "@envoy//bazel:v8_atomic_ref.patch",
             "@envoy//bazel:v8_novtune.patch",
             "@envoy//bazel:v8_ppc64le.patch",
             # https://issues.chromium.org/issues/423403090
@@ -790,12 +770,6 @@ def _v8():
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fp16/src/include/fp16.h\"!#include \"fp16.h\"!' {} \\;",
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/dragonbox/src/include/dragonbox/dragonbox.h\"!#include \"dragonbox/dragonbox.h\"!' {} \\;",
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fast_float/src/include/fast_float/!#include \"fast_float/!' {} \\;",
-            # TODO(jwendell): Remove the atomic_ref polyfill injection once the LLVM toolchain is
-            # bumped to a version whose libc++ provides std::atomic_ref (LLVM 19+).
-            "grep -rl 'std::atomic_ref' src/ include/ --include='*.h' --include='*.cc' | grep -v atomic_ref_polyfill | while IFS= read -r f; do { echo '#include \"src/base/atomic_ref_polyfill.h\"'; cat \"$f\"; } > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"; done",
-            # TODO(jwendell): Remove consteval->constexpr workaround once the LLVM toolchain is
-            # bumped. Clang 18 has bugs with consteval in template contexts (fixed in clang 19+).
-            "find ./src -type f \\( -name '*.h' -o -name '*.cc' \\) -exec sed -i.bak 's/consteval/constexpr/g' {} \\;",
             "find ./src -type f -name '*.bak' -delete",
         ],
     )
@@ -830,40 +804,6 @@ def _simdutf():
     external_http_archive(
         name = "simdutf",
         build_file = "@envoy//bazel/external:simdutf.BUILD",
-        patch_cmds = [
-            # TODO(jwendell): Remove this polyfill once the LLVM toolchain is bumped to a
-            # version whose libc++ provides std::atomic_ref (LLVM 19+).
-            # LLVM 18's libc++ lacks std::atomic_ref; without it SIMDUTF_ATOMIC_REF is 0
-            # and the atomic_base64/atomic_binary functions are excluded from compilation.
-            """cat > atomic_ref_polyfill.h << 'EOF'
-#ifndef ATOMIC_REF_POLYFILL_H_
-#define ATOMIC_REF_POLYFILL_H_
-#include <atomic>
-#include <type_traits>
-#if !defined(__cpp_lib_atomic_ref)
-#define __cpp_lib_atomic_ref 201806L
-namespace std {
-template <typename T> struct atomic_ref {
-  static_assert(std::is_trivially_copyable_v<T>);
-  static constexpr std::size_t required_alignment = alignof(T);
-  explicit atomic_ref(T& obj) : ptr_(&obj) {}
-  atomic_ref(const atomic_ref&) = default;
-  T load(std::memory_order order = std::memory_order_seq_cst) const noexcept {
-    return reinterpret_cast<const std::atomic<T>*>(ptr_)->load(order);
-  }
-  void store(T desired, std::memory_order order = std::memory_order_seq_cst) const noexcept {
-    reinterpret_cast<std::atomic<T>*>(ptr_)->store(desired, order);
-  }
-private:
-  T* ptr_;
-};
-template <typename T> atomic_ref(T&) -> atomic_ref<T>;
-}  // namespace std
-#endif
-#endif
-EOF""",
-            "{ echo '#include \"atomic_ref_polyfill.h\"'; cat simdutf.cpp; } > simdutf.cpp.tmp && mv simdutf.cpp.tmp simdutf.cpp",
-        ],
     )
 
 def _quiche():
@@ -884,14 +824,16 @@ def _googleurl():
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
-def _com_github_grpc_grpc():
+def _grpc():
     external_http_archive(
-        name = "com_github_grpc_grpc",
+        name = "grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
+            "@com_google_googleapis": "@googleapis",
             "@com_github_cncf_xds": "@xds",
+            "@com_github_grpc_grpc": "@grpc",
             "@com_googlesource_code_re2": "@re2",
             "@openssl": "@boringssl",
         },
@@ -906,7 +848,12 @@ def _com_github_grpc_grpc():
     )
 
 def _rules_proto_grpc():
-    external_http_archive("rules_proto_grpc")
+    external_http_archive(
+        name = "rules_proto_grpc",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_proto_grpc.patch"],
+        repo_mapping = {"@com_github_grpc_grpc": "@grpc"},
+    )
 
 def _re2():
     external_http_archive("re2")
@@ -980,7 +927,6 @@ def _toolchains_llvm():
         patch_args = ["-p1"],
         patches = [
             "@envoy_toolshed//:patches/toolchains_llvm.patch",
-            "@envoy//bazel/foreign_cc:toolchains_llvm_stdc++.patch",
         ],
     )
 

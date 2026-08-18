@@ -15,6 +15,7 @@
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
+using ::testing::ElementsAre;
 using ::testing::MockFunction;
 
 namespace Envoy {
@@ -42,7 +43,9 @@ protected:
 
   void setupCache(const std::string& config_str) {
     TestUtility::loadFromYaml(config_str, config_);
-    cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
+    auto cache_or = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
+    ASSERT_TRUE(cache_or.ok()) << cache_or.status();
+    cache_ = std::move(cache_or).value();
   }
 
   JwtAuthentication config_;
@@ -64,6 +67,32 @@ TEST_F(JwksCacheTest, TestFindByProvider) {
 TEST_F(JwksCacheTest, TestFindByIssuer) {
   EXPECT_TRUE(cache_->findByIssuer("https://example.com") != nullptr);
   EXPECT_TRUE(cache_->findByIssuer("other-issuer") == nullptr);
+}
+
+// claim_to_headers is resolved to a path once here, and the segments are views into the config
+// proto rather than copies, so that resolving a claim per request allocates nothing.
+TEST_F(JwksCacheTest, TestClaimsToHeadersAliasTheConfigProto) {
+  setupCache(ClaimToHeadersConfig);
+  auto* jwks_data = cache_->findByProvider(ProviderName);
+  ASSERT_TRUE(jwks_data != nullptr);
+
+  const auto& claims_to_headers = jwks_data->claimsToHeaders();
+  ASSERT_EQ(2, claims_to_headers.size());
+
+  // A claim_name is still split on ".".
+  EXPECT_EQ("x-jwt-claim-nested", claims_to_headers[0].header_name_);
+  EXPECT_THAT(claims_to_headers[0].claim_path_, ElementsAre("nested", "key-1"));
+
+  // A claim_path key is taken whole, dots and all.
+  EXPECT_EQ("x-jwt-claim-url-name", claims_to_headers[1].header_name_);
+  EXPECT_THAT(claims_to_headers[1].claim_path_, ElementsAre("http://example.org/parent_token"));
+
+  // Both kinds of segment point into the provider proto, never at a temporary, so they stay valid
+  // for as long as the config that owns them.
+  const auto& proto_claims = config_.providers().at(ProviderName).claim_to_headers();
+  EXPECT_EQ(proto_claims[0].claim_name().data(), claims_to_headers[0].claim_path_[0].data());
+  EXPECT_EQ(proto_claims[1].claim_path()[0].key().data(),
+            claims_to_headers[1].claim_path_[0].data());
 }
 
 // Test findByIssuer with issuer not specified.
@@ -96,8 +125,9 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
   auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
   // Set cache_duration to 1 second to test expiration
   provider0.mutable_remote_jwks()->mutable_cache_duration()->set_seconds(1);
-  cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
-
+  auto cache_or = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
+  ASSERT_TRUE(cache_or.ok()) << cache_or.status();
+  cache_ = std::move(cache_or.value());
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
 
@@ -115,8 +145,9 @@ TEST_F(JwksCacheTest, TestSetRemoteJwksWithDefaultCacheDuration) {
   auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
   // Clear cache_duration to use default one.
   provider0.mutable_remote_jwks()->clear_cache_duration();
-  cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
-
+  auto cache_or = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
+  ASSERT_TRUE(cache_or.ok()) << cache_or.status();
+  cache_ = std::move(cache_or.value());
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
 
@@ -132,8 +163,9 @@ TEST_F(JwksCacheTest, TestGoodInlineJwks) {
   auto local_jwks = provider0.mutable_local_jwks();
   local_jwks->set_inline_string(PublicKey);
 
-  cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
-
+  auto cache_or = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
+  ASSERT_TRUE(cache_or.ok()) << cache_or.status();
+  cache_ = std::move(cache_or.value());
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_FALSE(jwks->getJwksObj() == nullptr);
   EXPECT_FALSE(jwks->isExpired());
@@ -146,8 +178,9 @@ TEST_F(JwksCacheTest, TestBadInlineJwks) {
   auto local_jwks = provider0.mutable_local_jwks();
   local_jwks->set_inline_string("BAD-JWKS");
 
-  cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
-
+  auto cache_or = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
+  ASSERT_TRUE(cache_or.ok()) << cache_or.status();
+  cache_ = std::move(cache_or.value());
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
 }

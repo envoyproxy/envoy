@@ -7,6 +7,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -17,6 +18,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
 namespace {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 Cleanup setExtension(const envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::
                          v3::UpstreamReverseConnectionSocketInterface& config,
@@ -51,7 +54,7 @@ request_method: PUT
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -71,7 +74,7 @@ TEST(ReverseTunnelFilterConfigFactoryTest, DefaultConfiguration) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -109,7 +112,7 @@ request_method: POST
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -132,7 +135,7 @@ request_method: POST
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -165,7 +168,7 @@ request_method: PUT
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -197,7 +200,7 @@ validation:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -223,7 +226,7 @@ validation:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -251,7 +254,7 @@ validation:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -278,8 +281,7 @@ validation:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to parse node_id_format"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to parse node_id_format")));
 }
 
 TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithOnlyNodeIdValidation) {
@@ -297,7 +299,7 @@ validation:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -322,7 +324,7 @@ validation:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -347,7 +349,7 @@ validation:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
 
   EXPECT_TRUE(cb != nullptr);
@@ -375,8 +377,7 @@ validation:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to parse tenant_id_format"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to parse tenant_id_format")));
 }
 
 // Tests that the ReverseTunnelFilterConfig is formed properly and the filter construction works.
@@ -389,7 +390,7 @@ TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationSkipRebalancingEnabled) 
   ReverseTunnelFilterConfigFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
   EXPECT_TRUE(cb != nullptr);
 
@@ -405,8 +406,7 @@ TEST(ReverseTunnelFilterConfigFactoryTest, ConnectionLimitRejectedWithoutBootstr
   ReverseTunnelFilterConfigFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("enable_connection_limit"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("enable_connection_limit")));
 }
 
 TEST(ReverseTunnelFilterConfigFactoryTest, ConnectionLimitRejectedWhenCapIsSetToZero) {
@@ -422,8 +422,7 @@ TEST(ReverseTunnelFilterConfigFactoryTest, ConnectionLimitRejectedWhenCapIsSetTo
   ReverseTunnelFilterConfigFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("max_connections_per_node"));
+  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("max_connections_per_node")));
 }
 
 TEST(ReverseTunnelFilterConfigFactoryTest, ConnectionLimitAcceptedWhenCapIsGreaterThanZero) {
@@ -439,7 +438,7 @@ TEST(ReverseTunnelFilterConfigFactoryTest, ConnectionLimitAcceptedWhenCapIsGreat
   ReverseTunnelFilterConfigFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   Network::FilterFactoryCb cb = result.value();
   EXPECT_TRUE(cb != nullptr);
 

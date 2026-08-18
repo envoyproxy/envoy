@@ -42,6 +42,7 @@ envoy_cc_test(
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/extensions/common/matcher:matcher_lib",
+        "//source/extensions/filters/http/proto_api_scrubber:config",
         "//source/extensions/filters/http/proto_api_scrubber:filter_config",
         "//source/extensions/matching/http/cel_input:cel_input_lib",
         "//source/extensions/matching/input_matchers/cel_matcher:config",

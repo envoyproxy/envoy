@@ -19,11 +19,12 @@ TEST(CookieBasedSessionStateFactoryTest, EmptyCookieName) {
   Event::SimulatedTimeSystem time_simulator;
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<CookieBasedSessionStateFactory>(config, time_simulator), EnvoyException,
-      "Cookie key cannot be empty for cookie based stateful sessions");
+      std::ignore = std::make_shared<CookieBasedSessionStateFactory>(config, time_simulator),
+      EnvoyException, "Cookie key cannot be empty for cookie based stateful sessions");
   config.mutable_cookie()->set_name("override_host");
 
-  EXPECT_NO_THROW(std::make_shared<CookieBasedSessionStateFactory>(config, time_simulator));
+  EXPECT_NO_THROW(std::ignore =
+                      std::make_shared<CookieBasedSessionStateFactory>(config, time_simulator));
 }
 
 TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {

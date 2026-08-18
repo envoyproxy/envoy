@@ -404,10 +404,8 @@ local_cluster_rate_limit: {}
   const auto* local_cluster = context.cluster_manager_.active_clusters_.at("local_cluster").get();
   EXPECT_CALL(*local_cluster, prioritySet()).WillOnce(ReturnRef(priority_set));
 
-  EXPECT_TRUE(factory
-                  .createRouteSpecificFilterConfig(*proto_config, context,
-                                                   ProtobufMessage::getNullValidationVisitor())
-                  .ok());
+  EXPECT_OK(factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                    ProtobufMessage::getNullValidationVisitor()));
 }
 
 TEST(Factory, GlobalEmptyConfigWithServerContext) {
@@ -420,8 +418,11 @@ stat_prefix: test
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
 
-  auto callback = factory.createHttpFilterFactoryFromProto(*proto_config, "stats", context).value();
+  auto callback =
+      factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   callback(filter_callback);

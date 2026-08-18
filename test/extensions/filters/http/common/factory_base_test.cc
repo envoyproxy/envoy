@@ -6,6 +6,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -17,6 +18,8 @@ namespace HttpFilters {
 namespace Common {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatus;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using RouterProto = envoy::extensions::filters::http::router::v3::Router;
 
 // A minimal concrete filter factory used to test the default (non-overridden) behavior of
@@ -76,8 +79,7 @@ TEST(FactoryBaseTest, CommonBehavior) {
   // The default route-specific config implementation returns a nullptr config.
   auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, server_context, server_context.messageValidationVisitor());
-  ASSERT_TRUE(route_config.ok());
-  EXPECT_EQ(nullptr, route_config.value());
+  ASSERT_THAT(route_config, IsOkAndHolds(nullptr));
 }
 
 // FactoryBase falls back to createFilterFactoryFromProtoWithServerContextTyped for the
@@ -90,11 +92,14 @@ TEST(FactoryBaseTest, ServerContextNotSupported) {
   EXPECT_THROW_WITH_MESSAGE(
       factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", server_context),
       EnvoyException, "Creating filter factory from server factory context is not supported");
+  Server::Configuration::ExtraFactoryContext extra_context{
+      server_context.messageValidationVisitor(), "stats"};
 
   // createHttpFilterFactoryFromProto delegates to the typed variant, which in turn delegates to the
   // (throwing) server-context implementation.
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).IgnoreError(),
+      factory.createHttpFilterFactoryFromProto(proto_config, server_context, extra_context)
+          .IgnoreError(),
       EnvoyException, "Creating filter factory from server factory context is not supported");
 }
 
@@ -105,8 +110,7 @@ TEST(FactoryBaseTest, FactoryContextCreation) {
   RouterProto proto_config;
 
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  ASSERT_TRUE(cb.ok());
-  EXPECT_NE(nullptr, cb.value());
+  ASSERT_THAT(cb, IsOkAndHolds(::testing::NotNull()));
 }
 
 // ExceptionFreeFactoryBase returns an error status (rather than throwing) when server-context based
@@ -117,12 +121,15 @@ TEST(FactoryBaseTest, ExceptionFreeServerContextNotSupported) {
   RouterProto proto_config;
 
   EXPECT_EQ("test.exception_free_factory_base", factory.name());
+  Server::Configuration::ExtraFactoryContext extra_context{
+      server_context.messageValidationVisitor(), "stats"};
 
-  auto result = factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(absl::StatusCode::kInvalidArgument, result.status().code());
-  EXPECT_EQ("Creating HTTP filter factory from server factory context is not supported",
-            result.status().message());
+  auto result =
+      factory.createHttpFilterFactoryFromProto(proto_config, server_context, extra_context);
+  EXPECT_THAT(
+      result,
+      HasStatus(absl::StatusCode::kInvalidArgument,
+                "Creating HTTP filter factory from server factory context is not supported"));
 }
 
 // ExceptionFreeFactoryBase's downstream FactoryContext path works.
@@ -132,8 +139,7 @@ TEST(FactoryBaseTest, ExceptionFreeFactoryContextCreation) {
   RouterProto proto_config;
 
   auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  ASSERT_TRUE(cb.ok());
-  EXPECT_NE(nullptr, cb.value());
+  ASSERT_THAT(cb, IsOkAndHolds(::testing::NotNull()));
 }
 
 // DualFactoryBase's downstream and upstream FactoryContext paths both work.
@@ -146,13 +152,11 @@ TEST(FactoryBaseTest, DualFactoryContextCreation) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> downstream_context;
   auto downstream_cb =
       factory.createFilterFactoryFromProto(proto_config, "stats", downstream_context);
-  ASSERT_TRUE(downstream_cb.ok());
-  EXPECT_NE(nullptr, downstream_cb.value());
+  ASSERT_THAT(downstream_cb, IsOkAndHolds(::testing::NotNull()));
 
   testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_context;
   auto upstream_cb = factory.createFilterFactoryFromProto(proto_config, "stats", upstream_context);
-  ASSERT_TRUE(upstream_cb.ok());
-  EXPECT_NE(nullptr, upstream_cb.value());
+  ASSERT_THAT(upstream_cb, IsOkAndHolds(::testing::NotNull()));
 }
 
 // DualFactoryBase falls back to the (throwing) server-context typed implementation for both the
@@ -166,9 +170,12 @@ TEST(FactoryBaseTest, DualServerContextNotSupported) {
       factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", server_context),
       EnvoyException,
       "DualFactoryBase: creating filter factory from server factory context is not supported");
+  Server::Configuration::ExtraFactoryContext extra_context{
+      server_context.messageValidationVisitor(), "stats"};
 
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createHttpFilterFactoryFromProto(proto_config, "stats", server_context).IgnoreError(),
+      factory.createHttpFilterFactoryFromProto(proto_config, server_context, extra_context)
+          .IgnoreError(),
       EnvoyException,
       "DualFactoryBase: creating filter factory from server factory context is not supported");
 }

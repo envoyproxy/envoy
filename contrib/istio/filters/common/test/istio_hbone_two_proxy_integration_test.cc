@@ -122,6 +122,18 @@ protected:
 
   void startSidecar(ConfigHelper& helper, const std::vector<uint32_t>& upstream_ports,
                     const std::string& listener_name, IntegrationTestServerPtr& out) {
+    // This test runs two Envoy instances (client and server sidecars) in a single process, which
+    // share Envoy's process-static thread-local storage. The peer_metadata registry's thread-local
+    // slot would shift slot indices across instances and corrupt other extensions' thread-local
+    // data. This test uses the legacy data-stream-preamble hand-off, so the registry is unused;
+    // disable it via a bootstrap layered_runtime static layer. See peer_metadata.cc.
+    helper.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
+      layer->set_name("peer_metadata_static_layer");
+      (*layer->mutable_static_layer()
+            ->mutable_fields())["envoy.contrib.peer_metadata.disable_tls_registry"]
+          .set_bool_value(true);
+    });
     helper.finalize(upstream_ports);
     const std::string path = TestEnvironment::writeStringToFileForTest(
         absl::StrCat("hbone_two_proxy_", listener_name, ".pb"),

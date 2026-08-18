@@ -20,6 +20,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/ssl/ssl.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
@@ -55,6 +56,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
@@ -62,6 +64,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "gmock/gmock.h"
@@ -94,6 +97,67 @@ public:
     return socket.detected_io_error_;
   }
   static absl::string_view failureReason(const SslSocket& socket) { return socket.failure_reason_; }
+};
+
+class ClientContextImplPeer {
+public:
+  // Test peer for SNI-scoped client session cache behavior. The cache is a
+  // private implementation detail, so tests use this friend rather than making
+  // production cache accessors public.
+  static std::shared_ptr<ClientContextImpl>
+  getClientContextImpl(ClientSslSocketFactory& client_ssl_socket_factory) {
+    return std::dynamic_pointer_cast<ClientContextImpl>(client_ssl_socket_factory.sslCtx());
+  }
+
+  static SSL_SESSION* newSession(SSL* ssl) { return SSL_SESSION_new(SSL_get_SSL_CTX(ssl)); }
+
+  static int newSessionKey(ClientContextImpl& context, SSL* ssl, SSL_SESSION* session) {
+    return context.newSessionKey(ssl, session);
+  }
+
+  static std::vector<std::string> cachedSniNames(ClientContextImpl& context) {
+    absl::WriterMutexLock lock(context.session_keys_mu_);
+    std::vector<std::string> names;
+    names.reserve(context.session_keys_by_sni_.size());
+    for (const auto& entry : context.session_keys_by_sni_) {
+      names.push_back(entry.first);
+    }
+    return names;
+  }
+
+  static bool hasCachedSni(ClientContextImpl& context, absl::string_view sni) {
+    absl::WriterMutexLock lock(context.session_keys_mu_);
+    return context.session_keys_by_sni_.contains(sni);
+  }
+
+  static size_t cachedSessionCount(ClientContextImpl& context, absl::string_view sni) {
+    absl::WriterMutexLock lock(context.session_keys_mu_);
+    auto it = context.session_keys_by_sni_.find(sni);
+    return it == context.session_keys_by_sni_.end() ? 0 : it->second.sessions.size();
+  }
+
+  static SSL_SESSION* cachedSession(ClientContextImpl& context, absl::string_view sni) {
+    absl::WriterMutexLock lock(context.session_keys_mu_);
+    auto it = context.session_keys_by_sni_.find(sni);
+    return it != context.session_keys_by_sni_.end() && !it->second.sessions.empty()
+               ? it->second.sessions.front()->session.get()
+               : nullptr;
+  }
+
+  static size_t cachedSniSessionCount(ClientContextImpl& context) {
+    absl::WriterMutexLock lock(context.session_keys_mu_);
+    return context.sni_session_keys_lru_.size();
+  }
+
+  static size_t cachedContextSessionCount(ClientContextImpl& context) {
+    absl::WriterMutexLock lock(context.session_keys_mu_);
+    return context.session_keys_.size();
+  }
+
+  static SSL_SESSION* cachedContextSession(ClientContextImpl& context) {
+    absl::WriterMutexLock lock(context.session_keys_mu_);
+    return context.session_keys_.empty() ? nullptr : context.session_keys_.front().get();
+  }
 };
 
 namespace {
@@ -1342,6 +1406,10 @@ protected:
   void testClientSessionResumption(const std::string& server_ctx_yaml,
                                    const std::string& client_ctx_yaml, bool expect_reuse,
                                    const Network::Address::IpVersion version);
+  void testClientSessionResumptionSniSequence(const std::string& server_ctx_yaml,
+                                              const std::string& client_ctx_yaml,
+                                              const std::vector<uint64_t>& expected_reuse_counts,
+                                              const Network::Address::IpVersion version);
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                       Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
@@ -1364,6 +1432,37 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslSocketTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+class ClientSessionCacheTestContext {
+public:
+  // Builds the real client TLS context/factory used by ClientContextImpl while
+  // letting direct cache tests avoid setting up a full client/server handshake.
+  explicit ClientSessionCacheTestContext(const std::string& client_ctx_yaml)
+      : manager_(server_factory_context_) {
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx_proto;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_ctx_proto);
+
+    auto client_cfg =
+        *ClientContextConfigImpl::create(client_ctx_proto, transport_socket_factory_context_);
+    client_ssl_socket_factory_ = *ClientSslSocketFactory::create(std::move(client_cfg), manager_,
+                                                                 *client_stats_store_.rootScope());
+    client_context_ = ClientContextImplPeer::getClientContextImpl(*client_ssl_socket_factory_);
+  }
+
+  ClientContextImpl& clientContext() {
+    RELEASE_ASSERT(client_context_ != nullptr, "");
+    return *client_context_;
+  }
+
+private:
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  ContextManagerImpl manager_;
+  Stats::TestUtil::TestStore client_stats_store_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
+  std::unique_ptr<ClientSslSocketFactory> client_ssl_socket_factory_;
+  std::shared_ptr<ClientContextImpl> client_context_;
+};
 
 TEST_P(SslSocketTest, ServerTransportSocketOptions) {
   Stats::TestUtil::TestStore server_stats_store;
@@ -5633,6 +5732,349 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
 
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, server_stats_store.counter("ssl.session_reused").value());
   EXPECT_EQ(expect_reuse ? 1UL : 0UL, client_stats_store.counter("ssl.session_reused").value());
+}
+
+void SslSocketTest::testClientSessionResumptionSniSequence(
+    const std::string& server_ctx_yaml, const std::string& client_ctx_yaml,
+    const std::vector<uint64_t>& expected_reuse_counts, const Network::Address::IpVersion version) {
+  ASSERT_EQ(3, expected_reuse_counts.size());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  ContextManagerImpl manager(server_factory_context);
+
+  Stats::TestUtil::TestStore server_stats_store;
+  Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system_);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context;
+  ON_CALL(transport_socket_factory_context.server_context_, api())
+      .WillByDefault(ReturnRef(*server_api));
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_ctx_proto;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_ctx_proto);
+  auto server_cfg = *ServerContextConfigImpl::create(server_ctx_proto,
+                                                     transport_socket_factory_context, {}, false);
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
+
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(version));
+  NiceMock<Network::MockTcpListenerCallbacks> callbacks;
+  NiceMock<Network::MockListenerConfig> listener_config;
+  Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Network::ListenerPtr listener =
+      createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx_proto;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_ctx_proto);
+
+  Stats::TestUtil::TestStore client_stats_store;
+  Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system_);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      client_factory_context;
+  ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
+
+  auto client_cfg = *ClientContextConfigImpl::create(client_ctx_proto, client_factory_context);
+  auto client_ssl_socket_factory = *ClientSslSocketFactory::create(std::move(client_cfg), manager,
+                                                                   *client_stats_store.rootScope());
+
+  // Perform one real client/server TLS connection with the supplied SNI and
+  // assert the cumulative session-reuse counters after both sides complete the
+  // handshake.
+  auto connect = [&](absl::string_view sni, uint64_t expected_reuse_count) {
+    Network::ConnectionPtr server_connection;
+    NiceMock<Network::MockConnectionCallbacks> server_connection_callbacks;
+    NiceMock<Network::MockConnectionCallbacks> client_connection_callbacks;
+
+    auto transport_socket_options =
+        std::make_shared<Network::TransportSocketOptionsImpl>(std::string(sni));
+    Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
+        socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+        client_ssl_socket_factory->createTransportSocket(transport_socket_options, nullptr),
+        nullptr, nullptr);
+    client_connection->addConnectionCallbacks(client_connection_callbacks);
+    client_connection->connect();
+
+    size_t connect_count = 0;
+    auto connect_second_time = [&]() {
+      if (++connect_count == 2) {
+        EXPECT_EQ(expected_reuse_count, server_stats_store.counter("ssl.session_reused").value());
+        EXPECT_EQ(expected_reuse_count, client_stats_store.counter("ssl.session_reused").value());
+        server_connection->close(Network::ConnectionCloseType::NoFlush);
+        client_connection->close(Network::ConnectionCloseType::NoFlush);
+        dispatcher->exit();
+      }
+    };
+
+    EXPECT_CALL(callbacks, onAccept_(_))
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+          server_connection = dispatcher->createServerConnection(
+              std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
+              stream_info_);
+          server_connection->addConnectionCallbacks(server_connection_callbacks);
+        }));
+    EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+
+    EXPECT_CALL(server_connection_callbacks, onEvent(_)).Times(testing::AnyNumber());
+    EXPECT_CALL(client_connection_callbacks, onEvent(_)).Times(testing::AnyNumber());
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+
+    dispatcher->run(Event::Dispatcher::RunType::Block);
+  };
+
+  // Learn a session under SNI A, connect to SNI B, then return to SNI A. The
+  // caller supplies cumulative reuse counts so the same real handshake scenario
+  // can verify both the default SNI-scoped behavior and the runtime-guarded
+  // rollback path.
+  connect("a.example.com", expected_reuse_counts[0]);
+  connect("b.example.com", expected_reuse_counts[1]);
+  connect("a.example.com", expected_reuse_counts[2]);
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheDoesNotCrossSni) {
+  ClientSessionCacheTestContext context(R"EOF(
+common_tls_context:
+max_session_keys: 2
+)EOF");
+
+  auto sni_a_options = std::make_shared<Network::TransportSocketOptionsImpl>("a.example.com");
+  auto sni_b_options = std::make_shared<Network::TransportSocketOptionsImpl>("b.example.com");
+
+  auto ssl_a_or_error = context.clientContext().newSsl(sni_a_options, nullptr);
+  ASSERT_TRUE(ssl_a_or_error.ok()) << ssl_a_or_error.status();
+  auto ssl_a = std::move(ssl_a_or_error.value());
+  ASSERT_EQ(1,
+            ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_a.get(),
+                                                 ClientContextImplPeer::newSession(ssl_a.get())));
+
+  auto ssl_b_or_error = context.clientContext().newSsl(sni_b_options, nullptr);
+  ASSERT_TRUE(ssl_b_or_error.ok()) << ssl_b_or_error.status();
+  auto ssl_b = std::move(ssl_b_or_error.value());
+  EXPECT_EQ(nullptr,
+            ClientContextImplPeer::cachedSession(context.clientContext(), "b.example.com"));
+
+  ASSERT_EQ(1,
+            ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_b.get(),
+                                                 ClientContextImplPeer::newSession(ssl_b.get())));
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "a.example.com"));
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "b.example.com"));
+  EXPECT_NE(ClientContextImplPeer::cachedSession(context.clientContext(), "a.example.com"),
+            ClientContextImplPeer::cachedSession(context.clientContext(), "b.example.com"));
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheUsesContextWideCacheWhenSniScopeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.scope_upstream_tls_session_cache_by_sni", "false"}});
+
+  ClientSessionCacheTestContext context(R"EOF(
+common_tls_context:
+max_session_keys: 2
+)EOF");
+
+  auto sni_a_options = std::make_shared<Network::TransportSocketOptionsImpl>("a.example.com");
+  auto sni_b_options = std::make_shared<Network::TransportSocketOptionsImpl>("b.example.com");
+
+  auto ssl_a_or_error = context.clientContext().newSsl(sni_a_options, nullptr);
+  ASSERT_TRUE(ssl_a_or_error.ok()) << ssl_a_or_error.status();
+  auto ssl_a = std::move(ssl_a_or_error.value());
+  ASSERT_EQ(1,
+            ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_a.get(),
+                                                 ClientContextImplPeer::newSession(ssl_a.get())));
+
+  SSL_SESSION* cached_session =
+      ClientContextImplPeer::cachedContextSession(context.clientContext());
+  ASSERT_NE(nullptr, cached_session);
+  EXPECT_EQ(1, ClientContextImplPeer::cachedContextSessionCount(context.clientContext()));
+  EXPECT_TRUE(ClientContextImplPeer::cachedSniNames(context.clientContext()).empty());
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheKeepsConfiguredSessionCount) {
+  ClientSessionCacheTestContext context(R"EOF(
+common_tls_context:
+max_session_keys: 2
+)EOF");
+
+  const auto options =
+      std::make_shared<Network::TransportSocketOptionsImpl>("sessions.example.com");
+  auto ssl_or_error = context.clientContext().newSsl(options, nullptr);
+  ASSERT_TRUE(ssl_or_error.ok()) << ssl_or_error.status();
+  auto ssl = std::move(ssl_or_error.value());
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_EQ(1,
+              ClientContextImplPeer::newSessionKey(context.clientContext(), ssl.get(),
+                                                   ClientContextImplPeer::newSession(ssl.get())));
+  }
+
+  EXPECT_EQ(2, ClientContextImplPeer::cachedSessionCount(context.clientContext(),
+                                                         "sessions.example.com"));
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheCachesSessionWithoutSni) {
+  ClientSessionCacheTestContext context(R"EOF(
+common_tls_context:
+max_session_keys: 1
+)EOF");
+
+  auto ssl_or_error = context.clientContext().newSsl(nullptr, nullptr);
+  ASSERT_TRUE(ssl_or_error.ok()) << ssl_or_error.status();
+  auto ssl = std::move(ssl_or_error.value());
+  ASSERT_EQ(1, ClientContextImplPeer::newSessionKey(context.clientContext(), ssl.get(),
+                                                    ClientContextImplPeer::newSession(ssl.get())));
+
+  SSL_SESSION* cached_session = ClientContextImplPeer::cachedSession(context.clientContext(), "");
+  ASSERT_NE(nullptr, cached_session);
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), ""));
+  EXPECT_EQ(1, ClientContextImplPeer::cachedSniSessionCount(context.clientContext()));
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheUsesEffectiveSniPrecedence) {
+  ClientSessionCacheTestContext context(R"EOF(
+sni: static.example.com
+auto_host_sni: true
+common_tls_context:
+max_session_keys: 3
+)EOF");
+
+  auto ssl_static_or_error = context.clientContext().newSsl(nullptr, nullptr);
+  ASSERT_TRUE(ssl_static_or_error.ok()) << ssl_static_or_error.status();
+  auto ssl_static = std::move(ssl_static_or_error.value());
+  ASSERT_EQ(
+      1, ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_static.get(),
+                                              ClientContextImplPeer::newSession(ssl_static.get())));
+
+  auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  host->hostname_ = "host.example.com";
+  auto ssl_host_or_error = context.clientContext().newSsl(nullptr, host);
+  ASSERT_TRUE(ssl_host_or_error.ok()) << ssl_host_or_error.status();
+  auto ssl_host = std::move(ssl_host_or_error.value());
+  ASSERT_EQ(
+      1, ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_host.get(),
+                                              ClientContextImplPeer::newSession(ssl_host.get())));
+
+  auto override_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>("override.example.com");
+  auto ssl_override_or_error = context.clientContext().newSsl(override_options, host);
+  ASSERT_TRUE(ssl_override_or_error.ok()) << ssl_override_or_error.status();
+  auto ssl_override = std::move(ssl_override_or_error.value());
+  ASSERT_EQ(1, ClientContextImplPeer::newSessionKey(
+                   context.clientContext(), ssl_override.get(),
+                   ClientContextImplPeer::newSession(ssl_override.get())));
+
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "static.example.com"));
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "host.example.com"));
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "override.example.com"));
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheEvictsGloballyLeastRecentlyUsedSession) {
+  ClientSessionCacheTestContext context(R"EOF(
+common_tls_context:
+max_session_keys: 2
+)EOF");
+
+  auto add_session = [&](absl::string_view sni) -> bssl::UniquePtr<SSL> {
+    auto options = std::make_shared<Network::TransportSocketOptionsImpl>(std::string(sni));
+    auto ssl_or_error = context.clientContext().newSsl(options, nullptr);
+    if (!ssl_or_error.ok()) {
+      ADD_FAILURE() << ssl_or_error.status();
+      return nullptr;
+    }
+    auto ssl = std::move(ssl_or_error.value());
+    EXPECT_EQ(1,
+              ClientContextImplPeer::newSessionKey(context.clientContext(), ssl.get(),
+                                                   ClientContextImplPeer::newSession(ssl.get())));
+    return ssl;
+  };
+
+  auto ssl_a = add_session("a.example.com");
+  ASSERT_NE(nullptr, ssl_a);
+  add_session("b.example.com");
+  ASSERT_EQ(2, ClientContextImplPeer::cachedSniSessionCount(context.clientContext()));
+
+  // Learning a newer session for A makes A most recently used and evicts A's
+  // older session, making B the next global eviction candidate.
+  ASSERT_EQ(1,
+            ClientContextImplPeer::newSessionKey(context.clientContext(), ssl_a.get(),
+                                                 ClientContextImplPeer::newSession(ssl_a.get())));
+  add_session("c.example.com");
+
+  EXPECT_EQ(2, ClientContextImplPeer::cachedSniSessionCount(context.clientContext()));
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "a.example.com"));
+  EXPECT_FALSE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "b.example.com"));
+  EXPECT_TRUE(ClientContextImplPeer::hasCachedSni(context.clientContext(), "c.example.com"));
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheDoesNotReuseAcrossSniHandshake) {
+  // Regression scenario: one upstream client TLS context connects to multiple
+  // logical hosts distinguished by SNI. A session learned for SNI A must not be
+  // resumed when connecting with SNI B, but it should still be available when
+  // connecting to SNI A again.
+  // Some CI/build hosts do not have IPv6 loopback enabled.
+  if (version_ == Network::Address::IpVersion::v6) {
+    return;
+  }
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_0
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_0
+      tls_maximum_protocol_version: TLSv1_2
+  max_session_keys: 2
+)EOF";
+
+  // With SNI-scoped caching enabled by default, the B connection must not reuse
+  // A's session, while the final A connection can resume from A's own bucket.
+  testClientSessionResumptionSniSequence(server_ctx_yaml, client_ctx_yaml, {0, 0, 1}, version_);
+}
+
+TEST_P(SslSocketTest, ClientSessionCacheReusesAcrossSniWhenSniScopeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.scope_upstream_tls_session_cache_by_sni", "false"}});
+
+  // Some CI/build hosts do not have IPv6 loopback enabled.
+  if (version_ == Network::Address::IpVersion::v6) {
+    return;
+  }
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_0
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_0
+      tls_maximum_protocol_version: TLSv1_2
+  max_session_keys: 2
+)EOF";
+
+  // The rollback path keeps the previous context-wide cache semantics: after
+  // A learns a session, B can reuse it even though B sends a different SNI.
+  testClientSessionResumptionSniSequence(server_ctx_yaml, client_ctx_yaml, {0, 1, 2}, version_);
 }
 
 // Test client session resumption using default settings (should be enabled).

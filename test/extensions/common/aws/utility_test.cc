@@ -4,6 +4,7 @@
 
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -491,7 +492,7 @@ TEST(UtilityTest, CorrectlyConvertRegionSet) {
 
 TEST(UtilityTest, JsonStringFound) {
   auto test_json = Json::Factory::loadFromString("{\"access_key_id\":\"testvalue\"}");
-  EXPECT_TRUE(test_json.ok());
+  ASSERT_OK(test_json);
   const auto expiration =
       Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
   EXPECT_EQ(expiration, "testvalue");
@@ -499,7 +500,7 @@ TEST(UtilityTest, JsonStringFound) {
 
 TEST(UtilityTest, JsonStringNotFound) {
   auto test_json = Json::Factory::loadFromString("{\"no_access_key_id\":\"testvalue\"}");
-  EXPECT_TRUE(test_json.ok());
+  ASSERT_OK(test_json);
   const auto expiration =
       Utility::getStringFromJsonOrDefault(test_json.value(), "access_key_id", "notfound");
   EXPECT_EQ(expiration, "notfound");
@@ -507,14 +508,14 @@ TEST(UtilityTest, JsonStringNotFound) {
 
 TEST(UtilityTest, JsonIntegerFound) {
   auto test_json = Json::Factory::loadFromString("{\"expiration\":5}");
-  EXPECT_TRUE(test_json.ok());
+  ASSERT_OK(test_json);
   const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
   EXPECT_EQ(expiration, 5);
 }
 
 TEST(UtilityTest, JsonIntegerNotFound) {
   auto test_json = Json::Factory::loadFromString("{\"noexpiration\":5}");
-  EXPECT_TRUE(test_json.ok());
+  ASSERT_OK(test_json);
   const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
   // Should return default value
   EXPECT_EQ(expiration, 0);
@@ -523,9 +524,9 @@ TEST(UtilityTest, JsonIntegerNotFound) {
 // Check we handle double formatted integer > 0
 TEST(UtilityTest, JsonIntegerExponent) {
   auto test_json = Json::Factory::loadFromString("{\"expiration\":1.714449238E9}");
-  EXPECT_TRUE(test_json.ok());
+  ASSERT_OK(test_json);
   auto value_or_error = test_json.value()->getValue("expiration");
-  EXPECT_TRUE(value_or_error.ok());
+  ASSERT_OK(value_or_error);
   EXPECT_FALSE(absl::holds_alternative<int64_t>(value_or_error.value()));
   EXPECT_TRUE(absl::holds_alternative<double>(value_or_error.value()));
   const auto expiration = Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 0);
@@ -536,9 +537,9 @@ TEST(UtilityTest, JsonIntegerExponent) {
 // Check we handle double formatted integer < 0
 TEST(UtilityTest, JsonIntegerExponentInvalid) {
   auto test_json = Json::Factory::loadFromString("{\"expiration\":-0.17144492389}");
-  EXPECT_TRUE(test_json.ok());
+  ASSERT_OK(test_json);
   auto value_or_error = test_json.value()->getValue("expiration");
-  EXPECT_TRUE(value_or_error.ok());
+  ASSERT_OK(value_or_error);
   EXPECT_FALSE(absl::holds_alternative<int64_t>(value_or_error.value()));
   EXPECT_TRUE(absl::holds_alternative<double>(value_or_error.value()));
   const auto expiration =

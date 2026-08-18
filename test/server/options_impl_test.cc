@@ -542,6 +542,13 @@ TEST_F(OptionsImplTest, SetCpusetOnly) {
   EXPECT_NE(options->concurrency(), 0);
 }
 
+TEST_F(OptionsImplTest, CpusetThreadsRedundantWarning) {
+  // --cpuset-threads is now the default; warn that the flag is no longer required.
+  EXPECT_LOG_CONTAINS("warning",
+                      "--cpuset-threads is now the default behavior and no longer required.",
+                      createOptionsImpl("envoy -c hello --cpuset-threads"));
+}
+
 TEST_F(OptionsImplTest, LogFormatDefault) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl({"envoy", "-c", "hello"});
   EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
@@ -778,6 +785,22 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupLimitVeryLow) {
   uint32_t result = OptionsImplPlatform::getCpuCount();
   // Even with very low cgroup limit, Envoy guarantees at least 1 CPU
   EXPECT_EQ(result, 1U); // Should be exactly 1 due to cgroup constraint
+}
+
+TEST_F(OptionsImplTest, CgroupLimitAppliedByDefaultWithoutCpusetFlag) {
+  // Regression test for #45410: the cgroup CPU limit must constrain the default worker
+  // thread count even when --cpuset-threads is NOT passed.
+  unsetenv("ENVOY_CGROUP_CPU_DETECTION"); // Enable detection (default).
+
+  MockCgroupDetector mock_detector;
+  TestThreadsafeSingletonInjector<CgroupDetectorImpl> injector(&mock_detector);
+
+  // Mock cgroup detection returning 1 CPU; the smallest input wins min().
+  EXPECT_CALL(mock_detector, getCpuLimit(_)).WillOnce(Return(std::optional<uint32_t>(1)));
+
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
+  EXPECT_FALSE(options->cpusetThreadsEnabled());
+  EXPECT_EQ(1U, options->concurrency());
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, CgroupLimitHigherThanTypicalHardware) {

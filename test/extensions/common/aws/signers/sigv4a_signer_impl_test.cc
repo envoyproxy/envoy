@@ -10,6 +10,7 @@
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 using testing::NiceMock;
@@ -72,7 +73,7 @@ public:
         absl::string_view(credentials_.accessKeyId()->data(), credentials_.accessKeyId()->size()),
         absl::string_view(credentials_.secretAccessKey()->data(),
                           credentials_.secretAccessKey()->size()));
-    EXPECT_TRUE(ec_key_or.ok());
+    EXPECT_OK(ec_key_or);
     sigv4a_key_derivation->derivePublicKey(ec_key_or.value());
     absl::Status status;
 
@@ -91,7 +92,7 @@ public:
       status = signer_.signUnsignedPayload(message->headers(), override_region);
       break;
     }
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(status);
 
     std::string short_date = "20180102";
     std::string credential_scope = fmt::format("{}/service/aws4_request", short_date);
@@ -153,7 +154,7 @@ TEST_F(SigV4ASignerImplTest, AnonymousCredentials) {
 
   auto signer_ = getTestSigner(false);
   auto status = signer_.sign(*message_);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 }
 
@@ -221,7 +222,7 @@ TEST_F(SigV4ASignerImplTest, QueryStringDoesntModifyAuthorization) {
   addHeader("Authorization", "testValue");
   auto signer_ = getTestSigner(true);
   auto status = signer_.sign(*message_);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_EQ(message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value(),
             "testValue");
 }
@@ -233,7 +234,7 @@ TEST_F(SigV4ASignerImplTest, SignDateHeader) {
   addPath("/");
   auto signer_ = getTestSigner(false);
   auto status = signer_.sign(*message_);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_FALSE(message_->headers().get(SigV4ASignatureHeaders::get().ContentSha256).empty());
   EXPECT_EQ(
       "20180102T030405Z",
@@ -252,7 +253,7 @@ TEST_F(SigV4ASignerImplTest, SignSecurityTokenHeader) {
   addPath("/");
   auto signer_ = getTestSigner(false);
   auto status = signer_.sign(*message_);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_EQ("token", message_->headers()
                          .get(SigV4ASignatureHeaders::get().SecurityToken)[0]
                          ->value()
@@ -272,7 +273,7 @@ TEST_F(SigV4ASignerImplTest, SignEmptyContentHeader) {
   addPath("/");
   auto signer_ = getTestSigner(false);
   auto status = signer_.sign(*message_, true);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_EQ(SigV4ASignatureConstants::HashedEmptyString,
             message_->headers()
                 .get(SigV4ASignatureHeaders::get().ContentSha256)[0]
@@ -293,7 +294,7 @@ TEST_F(SigV4ASignerImplTest, SignContentHeader) {
   setBody("test1234");
   auto signer_ = getTestSigner(false);
   auto status = signer_.sign(*message_, true);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_EQ("937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
             message_->headers()
                 .get(SigV4ASignatureHeaders::get().ContentSha256)[0]
@@ -314,7 +315,7 @@ TEST_F(SigV4ASignerImplTest, SignContentHeaderOverrideRegion) {
   setBody("test1234");
   auto signer_ = getTestSigner(false);
   auto status = signer_.sign(*message_, true, "region1");
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_EQ("937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
             message_->headers()
                 .get(SigV4ASignatureHeaders::get().ContentSha256)[0]
@@ -337,7 +338,7 @@ TEST_F(SigV4ASignerImplTest, SignExtraHeaders) {
   addHeader("c", "c_value");
   auto signer_ = getTestSigner(false);
   auto status = signer_.sign(*message_);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
       testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
@@ -353,7 +354,7 @@ TEST_F(SigV4ASignerImplTest, SignHostHeader) {
   addHeader("host", "www.example.com");
   auto signer_ = getTestSigner(false);
   auto status = signer_.sign(*message_);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
       testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
@@ -538,7 +539,7 @@ TEST_F(SigV4ASignerImplTest, QueryStringDefault5s) {
                                Extensions::Common::Aws::AwsSigningHeaderMatcherVector{}, true);
 
   auto status = querysigner.signUnsignedPayload(headers);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   EXPECT_TRUE(absl::StrContains(headers.getPathValue(), "X-Amz-Expires=5&"));
 }
 

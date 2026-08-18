@@ -122,7 +122,10 @@ public:
 
   /**
    * Obtain read-only test input data directory.
-   * @param workspace the name of the Bazel workspace where the input data is.
+   * @param workspace the apparent repository name where the input data lives. Defaults to "envoy".
+   *        Resolved via Bazel repo mapping (BAZEL_CURRENT_REPOSITORY), so it works correctly
+   *        under both WORKSPACE and bzlmod, and whether Envoy is the root module or an external
+   *        dependency (e.g. Envoy Mobile).
    * @return const std::string& with the path to the read-only test input directory.
    */
   static std::string runfilesDirectory(const std::string& workspace = "envoy");
@@ -130,6 +133,7 @@ public:
   /**
    * Prefix a given path with the read-only test input data directory.
    * @param path path suffix.
+   * @param workspace see runfilesDirectory.
    * @return std::string path qualified with read-only test input data directory.
    */
   static std::string runfilesPath(const std::string& path, const std::string& workspace = "envoy");

@@ -209,10 +209,10 @@ Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_s
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
                const ResourceConstSharedPtr resource, SamplerSharedPtr sampler,
-               uint64_t max_cache_size)
+               uint64_t max_cache_size, bool set_instrumentation_scope)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
       tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler),
-      max_cache_size_(max_cache_size) {
+      max_cache_size_(max_cache_size), set_instrumentation_scope_(set_instrumentation_scope) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
     flushSpans();
@@ -251,9 +251,11 @@ void Tracer::flushSpans() {
 
   ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span = resource_span->add_scope_spans();
 
-  // set the instrumentation scope name and version
-  *scope_span->mutable_scope()->mutable_name() = "envoy";
-  *scope_span->mutable_scope()->mutable_version() = Envoy::VersionInfo::version();
+  if (set_instrumentation_scope_) {
+    // set the instrumentation scope name and version
+    *scope_span->mutable_scope()->mutable_name() = "envoy";
+    *scope_span->mutable_scope()->mutable_version() = Envoy::VersionInfo::version();
+  }
 
   for (const auto& pending_span : span_buffer_) {
     (*scope_span->add_spans()) = pending_span;

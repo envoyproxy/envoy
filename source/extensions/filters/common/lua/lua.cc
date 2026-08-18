@@ -45,7 +45,7 @@ void LuaLoggable::scriptLog(spdlog::level::level_enum level, absl::string_view m
 Coroutine::Coroutine(const std::pair<lua_State*, lua_State*>& new_thread_state)
     : coroutine_state_(new_thread_state, false) {}
 
-void Coroutine::start(int function_ref, int num_args, const std::function<void()>& yield_callback) {
+absl::Status Coroutine::start(int function_ref, int num_args, const YieldCallback& yield_callback) {
   ASSERT(state_ == State::NotStarted);
 
   state_ = State::Yielded;
@@ -55,31 +55,33 @@ void Coroutine::start(int function_ref, int num_args, const std::function<void()
   // The function needs to come before the arguments but the arguments are already on the stack,
   // so we need to move it into position.
   lua_insert(coroutine_state_.get(), -(num_args + 1));
-  resume(num_args, yield_callback);
+  return resume(num_args, yield_callback);
 }
 
-void Coroutine::resume(int num_args, const std::function<void()>& yield_callback) {
+absl::Status Coroutine::resume(int num_args, const YieldCallback& yield_callback) {
   ASSERT(state_ == State::Yielded);
   int rc = lua_resume(coroutine_state_.get(), num_args);
 
   if (0 == rc) {
     state_ = State::Finished;
     ENVOY_LOG(debug, "coroutine finished");
+    return absl::OkStatus();
   } else if (LUA_YIELD == rc) {
     state_ = State::Yielded;
     ENVOY_LOG(debug, "coroutine yielded");
-    yield_callback();
+    return yield_callback();
   } else {
     state_ = State::Finished;
     const char* error = lua_tostring(coroutine_state_.get(), -1);
     if (!error) {
       error = "unspecified lua error";
     }
-    throw LuaException(error);
+    return absl::InternalError(error);
   }
 }
 
-ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls)
+ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls,
+                                   absl::Status& creation_status)
     : tls_slot_(ThreadLocal::TypedSlot<LuaThreadLocal>::makeUnique(tls)) {
 
   // First verify that the supplied code can be parsed.
@@ -88,7 +90,9 @@ ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAll
   luaL_openlibs(state.get());
 
   if (0 != luaL_dostring(state.get(), code.c_str())) {
-    throw LuaException(fmt::format("script load error: {}", lua_tostring(state.get(), -1)));
+    SET_AND_RETURN(absl::InvalidArgumentError(
+                       fmt::format("script load error: {}", lua_tostring(state.get(), -1))),
+                   creation_status);
   }
 
   // Now initialize on all threads.

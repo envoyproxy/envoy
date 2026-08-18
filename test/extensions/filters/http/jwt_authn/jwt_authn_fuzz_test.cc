@@ -111,11 +111,15 @@ DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
   }
 
   std::shared_ptr<FilterConfigImpl> filter_config;
-  try {
-    filter_config = std::make_shared<FilterConfigImpl>(input.config(), "", mock_factory_ctx);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException during filter config construction: {}", e.what());
-    return;
+  {
+    absl::Status creation_status = absl::OkStatus();
+    filter_config =
+        std::make_shared<FilterConfigImpl>(input.config(), "", mock_factory_ctx, creation_status);
+    if (!creation_status.ok()) {
+      ENVOY_LOG_MISC(debug, "Invalid filter config during construction: {}",
+                     creation_status.message());
+      return;
+    }
   }
 
   // Simulate multiple calls to execute jwt_cache and jwks_cache codes
