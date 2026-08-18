@@ -203,6 +203,7 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 
 class FilterChainInfo;
 class ListenerInfo;
+class DrainDecision;
 
 using FilterChainInfoConstSharedPtr = std::shared_ptr<const FilterChainInfo>;
 
@@ -303,6 +304,11 @@ public:
    * @return the listener info backing this socket.
    */
   virtual OptRef<const ListenerInfo> listenerInfo() const PURE;
+
+  /**
+   * @return the drain decision for the connection.
+   */
+  virtual OptRef<const DrainDecision> drainDecision() const PURE;
 };
 
 class ConnectionInfoSetter : public ConnectionInfoProvider {
@@ -390,6 +396,11 @@ public:
    * @param listener_info the listener info provider backing this socket.
    */
   virtual void setListenerInfo(std::shared_ptr<const ListenerInfo> listener_info) PURE;
+
+  /**
+   * @param assigns a per-connection drain decision.
+   */
+  virtual void setDrainDecision(const DrainDecision& drain_decision) PURE;
 };
 
 using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;

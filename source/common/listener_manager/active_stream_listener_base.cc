@@ -41,6 +41,7 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
   }
 
   socket->connectionInfoProvider().setFilterChainInfo(filter_chain->filterChainInfo());
+  socket->connectionInfoProvider().setDrainDecision(filter_chain->drainDecision());
 
   auto transport_socket = filter_chain->transportSocketFactory().createDownstreamTransportSocket();
   auto server_conn_ptr = dispatcher().createServerConnection(
