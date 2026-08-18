@@ -147,8 +147,8 @@ EXTERNAL_DEPS_MAP = {
     # nghttp2
     "nghttp2": "@envoy//bazel/foreign_cc:nghttp2",
     # gRPC
-    "grpc": "@com_github_grpc_grpc//:grpc++",
-    "grpc_health_proto": "@com_github_grpc_grpc//src/proto/grpc/health/v1:health_cc_proto",
+    "grpc": "@grpc//:grpc++",
+    "grpc_health_proto": "@grpc//src/proto/grpc/health/v1:health_cc_proto",
     # SSL/Crypto (aliases defined in @envoy//bazel)
     "ssl": "@envoy//bazel:ssl",
     "crypto": "@envoy//bazel:crypto",

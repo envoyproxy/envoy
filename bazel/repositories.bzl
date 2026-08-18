@@ -137,7 +137,7 @@ def _go_deps(skip_targets):
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
         external_http_archive(name = "io_bazel_rules_go")
-        external_http_archive("bazel_gazelle")
+        external_http_archive("gazelle")
 
 def _rust_deps():
     external_http_archive(
@@ -191,7 +191,7 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
     _tcmalloc()
     _gperftools()
     _jemalloc()
-    _com_github_grpc_grpc()
+    _grpc()
     _rules_proto_grpc()
     _icu()
     _ipp_crypto()
@@ -278,6 +278,11 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
         go = True,
         python = True,
         grpc = True,
+        rules_override = {
+            "py_proto_library": ["@grpc//bazel:python_rules.bzl", ""],
+            "py_grpc_library": ["@grpc//bazel:python_rules.bzl", ""],
+            "cc_grpc_library": ["@grpc//bazel:cc_grpc_library.bzl", ""],
+        },
     )
 
 def _boringssl():
@@ -682,6 +687,7 @@ def _cpp2sky():
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
+        repo_mapping = {"@com_github_grpc_grpc": "@grpc"},
     )
 
 def _nlohmann_json():
@@ -818,15 +824,16 @@ def _googleurl():
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
-def _com_github_grpc_grpc():
+def _grpc():
     external_http_archive(
-        name = "com_github_grpc_grpc",
+        name = "grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
             "@com_google_googleapis": "@googleapis",
             "@com_github_cncf_xds": "@xds",
+            "@com_github_grpc_grpc": "@grpc",
             "@com_googlesource_code_re2": "@re2",
             "@openssl": "@boringssl",
         },
@@ -841,7 +848,15 @@ def _com_github_grpc_grpc():
     )
 
 def _rules_proto_grpc():
-    external_http_archive("rules_proto_grpc")
+    external_http_archive(
+        name = "rules_proto_grpc",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_proto_grpc.patch"],
+        repo_mapping = {
+            "@com_github_grpc_grpc": "@grpc",
+            "@bazel_gazelle": "@gazelle",
+        },
+    )
 
 def _re2():
     external_http_archive("re2")

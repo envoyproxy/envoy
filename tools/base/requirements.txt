@@ -8,7 +8,6 @@ abstracts==0.2.0 \
     --hash=sha256:1dd6df509a67cae1722c0dd9f58cdd6dee6e42f45bf0d7197e159b2e4c5e98e9 \
     --hash=sha256:995f326ab4408a6652a346439cb33169f48e66f25515c6baf9fc47f1a3e4652a
     # via
-    #   aio-api-bazel
     #   aio-api-github
     #   aio-core
     #   aio-run-checker
@@ -20,10 +19,6 @@ abstracts==0.2.0 \
     #   envoy-dependency-check
     #   envoy-distribution-release
     #   envoy-github-release
-aio-api-bazel==0.1.1 \
-    --hash=sha256:04ee9aa1dddc2998b674ca0a6a791cb7ab9d49f1f400bd19fcd431e00ea54587 \
-    --hash=sha256:59a5050d43f4d5ebf19bb669b4a386c74a66520002dc72e5d900ebd058f4d5d7
-    # via -r tools/base/requirements.in
 aio-api-github==0.3.1 \
     --hash=sha256:04d2e3fb4fcb55927b75f9a3cefae7673cefabd2387dd2416848ff19326d719c \
     --hash=sha256:d083ca09e5577d0c4217138e45b18ea63d57d0cbb030eb336cc2a979f8b244b4
@@ -37,7 +32,6 @@ aio-core==0.11.1 \
     --hash=sha256:76608a1dad3985866c1b3ffc81e0d08bd1a740e8e72125bfbf46d1ee6fc3abfe
     # via
     #   -r tools/base/requirements.in
-    #   aio-api-bazel
     #   aio-api-github
     #   aio-run-runner
     #   dependatool
@@ -60,7 +54,6 @@ aio-run-runner==0.4.1 \
     --hash=sha256:03c2978e4c7e1d02a55e25b0c081603d7900387bcce4fe80b8e8af8f3284e05b \
     --hash=sha256:43c80688c50ba3a528d88635fee5653b9f0f40fc4a036e1aeaddf8ada3794d2e
     # via
-    #   aio-api-bazel
     #   aio-run-checker
     #   envoy-base-utils
     #   envoy-ci-report

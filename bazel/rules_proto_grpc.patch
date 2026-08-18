@@ -1,0 +1,25 @@
+diff --git a/cpp/BUILD.bazel b/cpp/BUILD.bazel
+index 0433f63..3d5c283 100644
+--- a/cpp/BUILD.bazel
++++ b/cpp/BUILD.bazel
+@@ -26,6 +26,6 @@ proto_plugin(
+         "{protopath}.grpc.pb.cc",
+         "{protopath}_mock.grpc.pb.h",
+     ],
+-    tool = "@com_github_grpc_grpc//src/compiler:grpc_cpp_plugin",
++    tool = "@grpc//src/compiler:grpc_cpp_plugin",
+     visibility = ["//visibility:public"],
+ )
+diff --git a/cpp/cpp_grpc_library.bzl b/cpp/cpp_grpc_library.bzl
+index 1e242ea..074b656 100644
+--- a/cpp/cpp_grpc_library.bzl
++++ b/cpp/cpp_grpc_library.bzl
+@@ -56,6 +56,6 @@ def cpp_grpc_library(name, **kwargs):  # buildifier: disable=function-docstring
+ 
+ GRPC_DEPS = [
+     "@com_google_protobuf//:protobuf",
+-    "@com_github_grpc_grpc//:grpc++",
+-    "@com_github_grpc_grpc//:grpc++_reflection",
++    "@grpc//:grpc++",
++    "@grpc//:grpc++_reflection",
+ ]
