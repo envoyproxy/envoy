@@ -115,6 +115,7 @@ envoy_cc_library(
     deps = [
         "//envoy/server:factory_context_interface",
         "//envoy/server:filter_config_interface",
+        "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/status:statusor",
@@ -422,6 +423,7 @@ envoy_cc_library(
         "//source/common/orca:orca_load_metrics_lib",
         "//source/common/orca:orca_parser",
         "//source/common/stream_info:uint32_accessor_lib",
+        "//source/common/upstream:host_utility_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_factory_context_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",

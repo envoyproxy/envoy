@@ -38,10 +38,12 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/dns_utils.h"
+#include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
@@ -145,9 +147,9 @@ parseExtensionProtocolOptions(
 // Recovers the per-cluster upstream (client) codec factory from the parsed protocol options. Any
 // options object may expose one via ProtocolOptionsConfig::upstreamHttpClientCodecFactory(); at
 // most one is allowed across all configured options.
-absl::StatusOr<std::shared_ptr<const Http::ClientCodecFactory>> findUpstreamHttpClientCodecFactory(
+absl::StatusOr<const Http::ClientCodecFactory*> findUpstreamHttpClientCodecFactory(
     const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>& options) {
-  std::shared_ptr<const Http::ClientCodecFactory> found;
+  const Http::ClientCodecFactory* found = nullptr;
   for (const auto& [name, option] : options) {
     OptRef<const Http::ClientCodecFactory> factory = option->upstreamHttpClientCodecFactory();
     if (!factory.has_value()) {
@@ -158,9 +160,7 @@ absl::StatusOr<std::shared_ptr<const Http::ClientCodecFactory>> findUpstreamHttp
           "multiple upstream HTTP client codec factories configured on a single cluster via "
           "typed_extension_protocol_options; at most one is allowed");
     }
-    // Aliasing shared_ptr: shares ownership with the options object (the factory and the options
-    // object are the same instance) while exposing it as a ClientCodecFactory.
-    found = std::shared_ptr<const Http::ClientCodecFactory>(option, &factory.ref());
+    found = &factory.ref();
   }
   return found;
 }
@@ -193,7 +193,7 @@ HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
   net_hosts.reserve(hosts.size());
 
   for (const auto& host : hosts) {
-    if (excluded_hosts.find(host) == excluded_hosts.end()) {
+    if (!excluded_hosts.contains(host)) {
       net_hosts.emplace_back(host);
     }
   }
@@ -487,10 +487,13 @@ generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
     }
   }
 
-  return stats.createScope(fmt::format("cluster.{}.", (!config.alt_stat_name().empty())
-                                                          ? config.alt_stat_name()
-                                                          : config.name()),
-                           false, {}, std::move(scope_matcher));
+  absl::string_view observability_name =
+      !config.alt_stat_name().empty() ? config.alt_stat_name() : config.name();
+
+  // cluster.(<cluster_name>.)*
+  return stats.createScopeWithTaggedName(
+      "cluster", {Stats::TagStringView{Config::TagNames::get().CLUSTER_NAME, observability_name}},
+      fmt::format("cluster.{}.", observability_name), false, {}, std::move(scope_matcher));
 }
 
 // TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the
@@ -986,9 +989,10 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
     uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
-    std::optional<uint32_t> overprovisioning_factor) {
+    std::optional<uint32_t> overprovisioning_factor,
+    HostMapConstSharedPtr cross_priority_host_map) {
   // We assume that each call updates a different priority.
-  ASSERT(priorities_.find(priority) == priorities_.end());
+  ASSERT(!priorities_.contains(priority));
   priorities_.insert(priority);
 
   for (const auto& host : hosts_added) {
@@ -1000,7 +1004,8 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
   }
 
   parent_.updateHosts(priority, std::move(update_hosts_params), locality_weights, hosts_added,
-                      hosts_removed, weighted_priority_health, overprovisioning_factor);
+                      hosts_removed, weighted_priority_health, overprovisioning_factor,
+                      std::move(cross_priority_host_map));
 }
 
 void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
@@ -1224,7 +1229,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           parseExtensionProtocolOptions(config, factory_context), ProtocolOptionsHashMap)),
       upstream_client_codec_factory_(
           THROW_OR_RETURN_VALUE(findUpstreamHttpClientCodecFactory(extension_protocol_options_),
-                                std::shared_ptr<const Http::ClientCodecFactory>)),
+                                const Http::ClientCodecFactory*)),
       http_protocol_options_(THROW_OR_RETURN_VALUE(
           createOptions(config,
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
@@ -1242,6 +1247,12 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.preconnect_policy(), per_upstream_preconnect_ratio, 1.0)),
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
                                                        predictive_preconnect_ratio, 0)),
+      preconnect_enabled_matcher_(
+          config.preconnect_policy().has_preconnect_enabled_metadata()
+              ? std::make_unique<const Matchers::MetadataMatcher>(
+                    config.preconnect_policy().preconnect_enabled_metadata(),
+                    factory_context.serverFactoryContext())
+              : nullptr),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       traffic_stats_(generateStats(
           stats_scope_, factory_context.serverFactoryContext().clusterManager().clusterStatNames(),
@@ -1445,6 +1456,16 @@ ClusterInfoImpl::ClusterInfoImpl(
   // early validation of sanity of fields that we should catch at config ingestion.
   DurationUtil::durationToMilliseconds(common_lb_config_->update_merge_window());
 
+  // stats_prefix passed to the upstream HTTP filter chain. upstream_context_ is already scoped to
+  // "cluster.<name>.", so with the correct-stats-prefix flag enabled pass an empty prefix and the
+  // filter stats land under "cluster.<name>.*". With the flag disabled, reproduce the legacy
+  // stringified scope prefix, which repeats the scope prefix and preserves existing stat names.
+  const std::string http_stats_prefix =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
+          ? EMPTY_STRING
+          : stats_scope_->symbolTable().toString(stats_scope_->prefix());
+
   // Create upstream network filter factories
   const auto& filters = config.filters();
   ASSERT(filter_factories_.empty());
@@ -1493,12 +1514,11 @@ ClusterInfoImpl::ClusterInfoImpl(
         return;
       }
 
-      std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
       Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
           helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
                  factory_context.serverFactoryContext().clusterManager(), upstream_context_,
-                 prefix);
+                 http_stats_prefix);
       SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
                                                      "upstream http", "upstream http",
                                                      http_filter_factories_),
@@ -1828,6 +1848,16 @@ ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
 
 bool ClusterInfoImpl::maintenanceMode() const {
   return runtime_.snapshot().featureEnabled(maintenance_mode_runtime_key_, 0);
+}
+
+bool ClusterInfoImpl::shouldPreconnect(const Host& host) const {
+  // No matcher means every host is eligible (default behavior).
+  if (preconnect_enabled_matcher_ == nullptr) {
+    return true;
+  }
+  static const auto empty_metadata = envoy::config::core::v3::Metadata::default_instance();
+  const auto metadata = host.metadata();
+  return preconnect_enabled_matcher_->match(metadata != nullptr ? *metadata : empty_metadata);
 }
 
 ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) const {
@@ -2359,8 +2389,7 @@ void PriorityStateManager::updateClusterPrioritySet(
 
   // Do we have hosts for the local locality?
   const bool non_empty_local_locality =
-      local_info_node_.has_locality() &&
-      hosts_per_locality.find(local_locality) != hosts_per_locality.end();
+      local_info_node_.has_locality() && hosts_per_locality.contains(local_locality);
 
   // As per HostsPerLocality::get(), the per_locality vector must have the local locality hosts
   // first if non_empty_local_locality.
@@ -2567,20 +2596,17 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
   // Remove hosts from current_priority_hosts that were matched to an existing host in the
   // previous loop.
-  auto erase_from =
-      std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
-                     [&existing_hosts_for_current_priority](const HostSharedPtr& p) {
-                       auto existing_itr =
-                           existing_hosts_for_current_priority.find(p->address()->asString());
+  std::erase_if(
+      current_priority_hosts, [&existing_hosts_for_current_priority](const HostSharedPtr& p) {
+        auto existing_itr = existing_hosts_for_current_priority.find(p->address()->asString());
 
-                       if (existing_itr != existing_hosts_for_current_priority.end()) {
-                         existing_hosts_for_current_priority.erase(existing_itr);
-                         return true;
-                       }
+        if (existing_itr != existing_hosts_for_current_priority.end()) {
+          existing_hosts_for_current_priority.erase(existing_itr);
+          return true;
+        }
 
-                       return false;
-                     });
-  current_priority_hosts.erase(erase_from, current_priority_hosts.end());
+        return false;
+      });
 
   // If we saw existing hosts during this iteration from a different priority, then we've moved
   // a host from another priority into this one, so we should mark the priority as having changed.
@@ -2600,50 +2626,47 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
-    erase_from = std::remove_if(
-        current_priority_hosts.begin(), current_priority_hosts.end(),
-        [&all_new_hosts, &new_hosts_for_current_priority,
-         &hosts_with_updated_locality_for_current_priority,
-         &hosts_with_active_health_check_flag_changed, &final_hosts,
-         &max_host_weight](const HostSharedPtr& p) {
-          const auto address_string = addressToString(p->address());
-          // This host has already been added as a new host in the
-          // new_hosts_for_current_priority. Return false here to make sure that host
-          // reference with older locality gets cleaned up from the priority.
-          if (hosts_with_updated_locality_for_current_priority.contains(address_string)) {
-            return false;
-          }
-          if (hosts_with_active_health_check_flag_changed.contains(address_string)) {
-            return false;
-          }
+    std::erase_if(current_priority_hosts, [&all_new_hosts, &new_hosts_for_current_priority,
+                                           &hosts_with_updated_locality_for_current_priority,
+                                           &hosts_with_active_health_check_flag_changed,
+                                           &final_hosts, &max_host_weight](const HostSharedPtr& p) {
+      const auto address_string = addressToString(p->address());
+      // This host has already been added as a new host in the
+      // new_hosts_for_current_priority. Return false here to make sure that host
+      // reference with older locality gets cleaned up from the priority.
+      if (hosts_with_updated_locality_for_current_priority.contains(address_string)) {
+        return false;
+      }
+      if (hosts_with_active_health_check_flag_changed.contains(address_string)) {
+        return false;
+      }
 
-          if (all_new_hosts.contains(address_string) &&
-              !new_hosts_for_current_priority.contains(address_string)) {
-            // If the address is being completely deleted from this priority, but is
-            // referenced from another priority, then we assume that the other
-            // priority will perform an in-place update to re-use the existing Host.
-            // We should therefore not mark it as PENDING_DYNAMIC_REMOVAL, but
-            // instead remove it immediately from this priority.
-            // Example: health check address changed and priority also changed
-            return false;
-          }
+      if (all_new_hosts.contains(address_string) &&
+          !new_hosts_for_current_priority.contains(address_string)) {
+        // If the address is being completely deleted from this priority, but is
+        // referenced from another priority, then we assume that the other
+        // priority will perform an in-place update to re-use the existing Host.
+        // We should therefore not mark it as PENDING_DYNAMIC_REMOVAL, but
+        // instead remove it immediately from this priority.
+        // Example: health check address changed and priority also changed
+        return false;
+      }
 
-          // PENDING_DYNAMIC_REMOVAL doesn't apply for the host with disabled active
-          // health check, the host is removed immediately from this priority.
-          if ((!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
-                 p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) &&
-              !p->disableActiveHealthCheck()) {
-            if (p->weight() > max_host_weight) {
-              max_host_weight = p->weight();
-            }
+      // PENDING_DYNAMIC_REMOVAL doesn't apply for the host with disabled active
+      // health check, the host is removed immediately from this priority.
+      if ((!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
+             p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) &&
+          !p->disableActiveHealthCheck()) {
+        if (p->weight() > max_host_weight) {
+          max_host_weight = p->weight();
+        }
 
-            final_hosts.push_back(p);
-            p->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
-            return true;
-          }
-          return false;
-        });
-    current_priority_hosts.erase(erase_from, current_priority_hosts.end());
+        final_hosts.push_back(p);
+        p->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+        return true;
+      }
+      return false;
+    });
   }
 
   // At this point we've accounted for all the new hosts as well the hosts that previously

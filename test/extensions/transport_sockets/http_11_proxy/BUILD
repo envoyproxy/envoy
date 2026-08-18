@@ -50,6 +50,7 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
         "//test/integration/filters:header_to_proxy_filter_lib",
+        "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/key_value/file_based/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",

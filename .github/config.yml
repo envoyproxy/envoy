@@ -4,16 +4,16 @@ build-image:
   repo: docker.io/envoyproxy/envoy-build
   repo-gcr: gcr.io/envoy-ci/envoy-build
   # default ci caching (ci)
-  sha: fed53e3048bfc6bacaa02557d30fad43780ab610dfe70049796ce0a21744df85
-  sha-ci: fed53e3048bfc6bacaa02557d30fad43780ab610dfe70049796ce0a21744df85
-  sha-devtools: 0fd8297ea78265561e89256cc47732655db10e67dc449bda9a4f925a319e0fd4
-  sha-docker: e7e0d992d5944d5949fc2b41a113a573b7a3da660242778256e1751812b4a5e5
-  sha-gcc: 342d7eaccb753e8efb2aa171dccfd3bd7e531a22730ecb72372ab64c5967681b
-  sha-mobile: 8652a1160c71fee4a18c1a044d195bcb0b9d75b10b1189c089a8fe24b78117b1
-  sha-worker: 934b50777b1eb9348b0e62cafd9eee5c79828e57d4ca08083c86d3099b14bb42
+  sha: eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663
+  sha-ci: eaa30b863e9ab881e1bc34106788e4282b84313c3fef9bf50661923725331663
+  sha-devtools: f1af63ebb1aa49a4ccd2bb4ae3bf94c5bc3221139538e21b365c9bea7575f702
+  sha-docker: 6deb8633c65ec8d25364beae1cefe1fbc6ec2f330292f9157ed91fdb3ae20b0c
+  sha-gcc: d4ca56020e17aa36d6baad8e172d09c8a08e47ed0a911b779400c645957fa220
+  sha-mobile: d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2
+  sha-worker: 7d3c99085fa5f1cff6b7293de256cc6c93ce61cd7ccb63432113a1f8fbf12a43
   # TODO: remove this dupe (currently used by ci request handler)
-  mobile-sha: 8652a1160c71fee4a18c1a044d195bcb0b9d75b10b1189c089a8fe24b78117b1
-  tag: v0.1.8
+  mobile-sha: d6b6eef676d426e38f15c8e675d4462194d5d267f1b469edf73cc6f2bf4c2ce2
+  tag: v0.2.2
 
 config:
   envoy:
@@ -35,6 +35,7 @@ checks:
     on-run:
     - check-build
     - check-build-openssl
+    - check-build-openssl-presubmit
     - check-coverage
     - check-runtime
     - check-san
@@ -181,6 +182,20 @@ run:
   check-build-openssl:
     paths:
     - "**/*"
+  check-build-openssl-presubmit:
+    paths:
+    - compat/openssl/**/*
+    - source/common/tls/**/*
+    - source/common/crypto/**/*
+    - source/extensions/transport_sockets/tls/**/*
+    - test/common/tls/**/*
+    - test/common/crypto/**/*
+    - test/extensions/transport_sockets/tls/**/*
+    - envoy/ssl/**/*
+    - envoy/extensions/transport_sockets/tls/**/*
+    - bazel/**/*
+    - .bazelrc
+    - ci/do_ci.sh
   check-coverage:
     paths:
     - "**/*"

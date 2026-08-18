@@ -85,6 +85,7 @@ envoy_cc_test_binary(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
+        "//bazel:cpp_runfiles",
         "//source/common/event:dispatcher_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//test/extensions/common/wasm:wasm_runtime",

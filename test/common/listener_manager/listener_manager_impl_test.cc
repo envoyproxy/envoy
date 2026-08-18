@@ -5703,8 +5703,14 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidDesti
     )EOF";
   }
 
-  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                            "malformed IP address: a.b.c.d");
+  if (use_matcher_) {
+    EXPECT_THROW_WITH_MESSAGE(
+        addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+        "cannot create a filter chain matcher: malformed IP address: a.b.c.d");
+  } else {
+    EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+                              "malformed IP address: a.b.c.d");
+  }
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidServerNamesMatch) {
@@ -7128,6 +7134,44 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MptcpOnUdp) {
     )EOF");
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(listener), EnvoyException,
                             "listener mptcp-udp: enable_mptcp can only be used with TCP listeners");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, NoBindToPortOnUdp) {
+  envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+      name: udp-no-bind
+      bind_to_port: false
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1111
+          protocol: UDP
+      filter_chains:
+      - filters: []
+        name: foo
+    )EOF");
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(listener), EnvoyException,
+      "listener udp-no-bind: bind_to_port: false is not supported for UDP listeners");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, NoBindToPortOnQuic) {
+  envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+      name: quic-no-bind
+      bind_to_port: false
+      udp_listener_config:
+        quic_options: {}
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1111
+          protocol: UDP
+      filter_chains:
+      - filters: []
+        name: foo
+    )EOF");
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(listener), EnvoyException,
+      "listener quic-no-bind: bind_to_port: false is not supported for UDP listeners");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, MptcpOnUnixDomainSocket) {

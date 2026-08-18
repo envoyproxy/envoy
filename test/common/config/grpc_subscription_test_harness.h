@@ -203,7 +203,7 @@ public:
       // is no longer internally used by GrpcSubscriptionImpl.
       std::set<std::string> both;
       for (const auto& n : cluster_names) {
-        if (last_cluster_names_.find(n) != last_cluster_names_.end()) {
+        if (last_cluster_names_.contains(n)) {
           both.insert(n);
         }
       }

@@ -25,6 +25,8 @@ bootstrap_extensions:
               tenant=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:tenant_id)%
               upstream_cluster=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:upstream_cluster)%
               host=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:host_address)%
+              worker=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:worker_id)%
+              connection_id=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:connection_id)%
               error=%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:error)%
 
 static_resources:

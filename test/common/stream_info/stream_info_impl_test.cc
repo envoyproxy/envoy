@@ -109,6 +109,10 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   info.downstreamTiming().onLastDownstreamTxByteSent(test_time_.timeSystem());
   dur = checkDuration(dur, timing.lastDownstreamTxByteSent());
 
+  EXPECT_FALSE(timing.downstreamHandshakeStart());
+  info.downstreamTiming().onDownstreamHandshakeStart(test_time_.timeSystem());
+  dur = checkDuration(dur, timing.downstreamHandshakeStart());
+
   EXPECT_FALSE(timing.downstreamHandshakeComplete());
   info.downstreamTiming().onDownstreamHandshakeComplete(test_time_.timeSystem());
   dur = checkDuration(dur, timing.downstreamHandshakeComplete());

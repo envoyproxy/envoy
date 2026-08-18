@@ -29,6 +29,8 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/functional/function_ref.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -335,6 +337,12 @@ public:
       const std::vector<std::string>& addresses, const std::vector<uint32_t>& weights,
       const std::vector<std::string>& regions, const std::vector<std::string>& zones,
       const std::vector<std::string>& sub_zones,
+      const std::vector<std::vector<std::tuple<std::string, std::string, std::string>>>& metadata,
+      std::vector<Upstream::HostSharedPtr>& result_hosts, uint32_t priority = 0);
+  bool addHosts(
+      const std::vector<std::string>& addresses, absl::Span<const absl::string_view> hostnames,
+      const std::vector<uint32_t>& weights, const std::vector<std::string>& regions,
+      const std::vector<std::string>& zones, const std::vector<std::string>& sub_zones,
       const std::vector<std::vector<std::tuple<std::string, std::string, std::string>>>& metadata,
       std::vector<Upstream::HostSharedPtr>& result_hosts, uint32_t priority = 0);
   size_t removeHosts(const std::vector<Upstream::HostSharedPtr>& hosts);

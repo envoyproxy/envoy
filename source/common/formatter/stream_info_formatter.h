@@ -31,9 +31,17 @@ public:
                                     const StreamInfo::StreamInfo& stream_info) const override {
     return format(stream_info);
   }
+  bool formatTo(std::string& sink, const Context&,
+                const StreamInfo::StreamInfo& stream_info) const override {
+    return formatTo(sink, stream_info);
+  }
   Protobuf::Value formatValue(const Context&,
                               const StreamInfo::StreamInfo& stream_info) const override {
     return formatValue(stream_info);
+  }
+  void formatValueTo(ValueSink& sink, const Context&,
+                     const StreamInfo::StreamInfo& stream_info) const override {
+    formatValueTo(sink, stream_info);
   }
 
   /**
@@ -45,11 +53,50 @@ public:
   virtual std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
+   * Append the extracted value to the given sink. This is the allocation-free counterpart of
+   * format() and should be overridden by providers that can write their value directly into the
+   * sink. The default implementation appends the result of format().
+   * @param sink supplies the string the value is appended to. It is left unmodified if no value
+   *        is extracted.
+   * @param stream_info supplies the stream info.
+   * @return bool true if a value was extracted and appended to the sink.
+   */
+  virtual bool formatTo(std::string& sink, const StreamInfo::StreamInfo& stream_info) const {
+    const std::optional<std::string> value = format(stream_info);
+    if (!value.has_value()) {
+      return false;
+    }
+    sink.append(*value);
+    return true;
+  }
+
+  /**
    * Format the value with the given stream info.
    * @param stream_info supplies the stream info.
    * @return Protobuf::Value containing a single value extracted from the given stream info.
    */
   virtual Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * Format the value with the given stream info and append it to the given sink. This is the
+   * allocation-free counterpart of formatValue() and should be overridden by providers that can
+   * write their value directly into the sink. The default implementation forwards the result of
+   * formatValue().
+   * @param sink supplies the sink to append the formatted value to. It is left unmodified if no
+   *        value is extracted.
+   * @param stream_info supplies the stream info.
+   */
+  virtual void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo& stream_info) const {
+    const Protobuf::Value value = formatValue(stream_info);
+    // See the comment of FormatterProvider::formatValueTo(): a null value means the provider
+    // couldn't extract a value and the sink is left unmodified so that the caller can decide
+    // whether to add a default value or not.
+    if (value.kind_case() == Protobuf::Value::kNullValue ||
+        value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+      return;
+    }
+    sink.addValue(value);
+  }
 };
 
 using StreamInfoFormatterProviderPtr = std::unique_ptr<StreamInfoFormatterProvider>;
@@ -194,15 +241,20 @@ private:
   static constexpr absl::string_view LastDownstreamRxByteReceived =
       "DS_RX_END"; // Downstream request receiving end.
   static constexpr absl::string_view DownstreamConnectionBegin =
-      "DS_CX_BEG"; // Downstream connection begin.
+      "DS_CX_BEG"; // Downstream connection begin. The downstream connection establishment time.
+                   // NOTE: This is different from the US_CX_BEG which is the connection
+                   // establishment begin because the downstream connection begin is the time when
+                   // the downstream connection is actually established and accepted by Envoy.
   static constexpr absl::string_view DownstreamConnectionEnd =
-      "DS_CX_END"; // Downstream connection end.
+      "DS_CX_END"; // Downstream connection end. The downstream connection close time.
+                   // NOTE: This is different from the US_CX_END which is the connection
+                   // establishment end and not the connection end.
   static constexpr absl::string_view UpstreamConnectStart =
       "US_CX_BEG"; // Upstream TCP connection establishment start.
   static constexpr absl::string_view UpstreamConnectEnd =
-      "US_CX_END"; // Upstream TCP connection establishment start.
+      "US_CX_END"; // Upstream TCP connection establishment end.
   static constexpr absl::string_view UpstreamTLSConnectEnd =
-      "US_HS_END"; // Upstream TLS connection establishment start.
+      "US_HS_END"; // Upstream TLS connection establishment end.
   static constexpr absl::string_view FirstUpstreamTxByteSent =
       "US_TX_BEG"; // Upstream request sending begin.
   static constexpr absl::string_view LastUpstreamTxByteSent =
@@ -217,6 +269,10 @@ private:
       "DS_TX_BEG"; // Downstream response sending begin.
   static constexpr absl::string_view LastDownstreamTxByteSent =
       "DS_TX_END"; // Downstream response sending end.
+  static constexpr absl::string_view DownstreamHandshakeStart =
+      "DS_HS_BEG"; // Downstream TLS handshake begin, i.e. the time the ClientHello was received.
+  static constexpr absl::string_view DownstreamHandshakeEnd =
+      "DS_HS_END"; // Downstream TLS handshake end.
 
   TimePointGetter time_point_beg_;
   TimePointGetter time_point_end_;
@@ -242,9 +298,13 @@ public:
   // StreamInfoFormatterProvider
   // Don't hide the other structure of format and formatValue.
   using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatTo;
   using StreamInfoFormatterProvider::formatValue;
+  using StreamInfoFormatterProvider::formatValueTo;
   std::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  void formatValueTo(ValueSink& sink, const StreamInfo::StreamInfo&) const override;
 
 protected:
   SystemTimeFormatter(absl::string_view format, TimeFieldExtractorPtr f, bool local_time = false);

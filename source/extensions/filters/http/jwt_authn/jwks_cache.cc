@@ -17,6 +17,7 @@
 #include "source/common/router/retry_policy_impl.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 
@@ -47,6 +48,25 @@ public:
 
     if (jwt_provider_.has_subjects()) {
       sub_matcher_.emplace(jwt_provider_.subjects(), context.serverFactoryContext());
+    }
+
+    // Resolve each claim_to_headers entry to an explicit path once here rather than per request.
+    // FilterConfigImpl checks that every entry sets exactly one of claim_name and claim_path
+    // before it constructs the JwksCache, so by this point claim_path being empty means
+    // claim_name is set, and vice versa.
+    // The stored segments are views into jwt_provider_, never into a temporary: claim_name() and
+    // key() both return a reference to a string the proto owns, and absl::StrSplit deletes the
+    // overloads taking a std::string&&, so splitting a temporary here would not compile.
+    for (const auto& claim_to_header : jwt_provider_.claim_to_headers()) {
+      ClaimToHeader entry{{}, claim_to_header.header_name()};
+      if (claim_to_header.claim_path().empty()) {
+        entry.claim_path_ = absl::StrSplit(claim_to_header.claim_name(), '.');
+      } else {
+        for (const auto& segment : claim_to_header.claim_path()) {
+          entry.claim_path_.push_back(segment.key());
+        }
+      }
+      claims_to_headers_.push_back(std::move(entry));
     }
 
     if (jwt_provider_.require_expiration()) {
@@ -126,12 +146,15 @@ public:
 
       // create async_fetch for remote_jwks, if is no-op if async_fetch is not enabled.
       async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
-          jwt_provider_.remote_jwks(), retry_policy_, context, fetcher_cb, stats,
+          jwt_provider_.remote_jwks(), retry_policy_, context, fetcher_cb,
+          stats.jwks_fetch_success_, stats.jwks_fetch_failed_,
           [this](Envoy::JwtVerify::JwksPtr&& jwks) { setJwksToAllThreads(std::move(jwks)); });
     }
   }
 
   const JwtProvider& getJwtProvider() const override { return jwt_provider_; }
+
+  const std::vector<ClaimToHeader>& claimsToHeaders() const override { return claims_to_headers_; }
 
   const Router::RetryPolicyConstSharedPtr& retryPolicy() const override { return retry_policy_; }
 
@@ -209,6 +232,8 @@ private:
 
   // The jwt provider config.
   const JwtProvider& jwt_provider_;
+  // claim_to_headers with the claim paths resolved.
+  std::vector<ClaimToHeader> claims_to_headers_;
   // The retry policy for remote jwks fetcher.
   Router::RetryPolicyConstSharedPtr retry_policy_;
   // Check audience object

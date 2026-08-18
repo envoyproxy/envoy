@@ -38,6 +38,7 @@
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
+#include "source/common/upstream/host_utility.h"
 
 #include "absl/container/inlined_vector.h"
 
@@ -107,15 +108,24 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
     // TODO(wbpcode): To validate the terminal filter is upstream codec filter by the proto.
     Server::Configuration::ServerFactoryContext& server_factory_ctx =
         context.serverFactoryContext();
-    std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
+    // Retained as a member: the manager is an unpinned singleton, and the ECDS subscriptions
+    // created below hold a raw reference to it that they dereference on destruction.
+    upstream_filter_config_provider_manager_ =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             server_factory_ctx);
-    std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
+    // With the correct-stats-prefix flag enabled (default), pass the HCM stat_prefix as the
+    // stats_prefix string so upstream filters emit stats under "http.<stat_prefix>.rbac.*".
+    // With the flag disabled (legacy behavior), the scope's prefix string is used instead;
+    // since the router scope has an empty prefix this produced unnamespaced stats.
+    std::string prefix = Runtime::runtimeFeatureEnabled(
+                             "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
+                             ? context.scope().symbolTable().toString(stat_prefix)
+                             : context.scope().symbolTable().toString(context.scope().prefix());
     upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
         server_factory_ctx, context.initManager(), context.scope());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*filter_config_provider_manager, server_factory_ctx,
+        helper(*upstream_filter_config_provider_manager_, server_factory_ctx,
                context.serverFactoryContext().clusterManager(), *upstream_ctx_, prefix);
     SET_AND_RETURN_IF_NOT_OK(helper.processFilters(config.upstream_http_filters(),
                                                    "router upstream http", "router upstream http",
@@ -2565,12 +2575,8 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
 
   // Inline capacity of 2 covers the typical case of 1-2 LB policies per host.
   absl::InlinedVector<Upstream::HostLbPolicyData*, 2> orca_recipients;
-  for (size_t i = 0; i < upstream_host->lbPolicyDataCount(); ++i) {
-    auto host_lb_policy_data = upstream_host->lbPolicyDataAt(i);
-    if (host_lb_policy_data.has_value() && host_lb_policy_data->receivesOrcaLoadReport()) {
-      orca_recipients.push_back(host_lb_policy_data.ptr());
-    }
-  }
+  Upstream::HostUtility::forEachOrcaLoadReportRecipient(
+      *upstream_host, [&](Upstream::HostLbPolicyData& data) { orca_recipients.push_back(&data); });
 
   if (!cluster_->lrsReportMetricNames().has_value() && orca_recipients.empty()) {
     // If the cluster doesn't have LRS metric names configured then there is no need to

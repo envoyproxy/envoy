@@ -227,6 +227,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/mocks/upstream:cluster_update_callbacks_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
