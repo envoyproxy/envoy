@@ -73,6 +73,11 @@ void DnsSrvCluster::startResolve() {
             ENVOY_LOG(debug, "SRV: host: {}, port: {}, weight: {}, prio: {}", dns.srv().target_,
                       dns.srv().port_, dns.srv().weight_, dns.srv().priority_);
 
+            if (dns.srv().ttl_ > 0) {
+              dns_refresh_rate_ms_ =
+                  std::min(std::chrono::milliseconds(dns.srv().ttl_), dns_refresh_rate_ms_);
+            }
+
             if (auto address = Envoy::Network::Utility::parseInternetAddressNoThrow(
                     dns.srv().target_, 0, false);
                 address != nullptr) {
