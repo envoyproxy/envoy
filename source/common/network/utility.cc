@@ -513,6 +513,11 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
       /*rc=*/0, /*err=*/Api::IoError::none());
 
   const bool is_connected = handle.wasConnected();
+  if (!has_payload &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_send_zero_length_datagrams")) {
+    return Api::ioCallUint64ResultNoError();
+  }
+
   const char* operation = is_connected ? (has_payload ? "writev" : "send") : "sendmsg";
   do {
     if (is_connected) {

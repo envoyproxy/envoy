@@ -2,6 +2,7 @@
 
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -46,6 +47,11 @@ Api::IoCallUint64Result
 UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
                                const Network::Address::Instance& peer_address) {
   const size_t payload_len = static_cast<size_t>(buffer.length());
+
+  if (payload_len == 0 &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_send_zero_length_datagrams")) {
+    return Api::ioCallUint64ResultNoError();
+  }
 
   // A zero-length datagram cannot share a GSO batch: it contributes no segment bytes and would be
   // consumed without being emitted. Flush older packets first to preserve datagram ordering.

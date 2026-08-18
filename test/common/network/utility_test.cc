@@ -28,6 +28,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -100,6 +101,24 @@ TEST(NetworkUtility, WriteEmptyDatagramUnconnected) {
       Utility::writeToSocket(io_handle, buffer, nullptr, peer_address);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(NetworkUtility, DropEmptyDatagramWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.udp_send_zero_length_datagrams", "false"}});
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+
+  for (const bool connected : {false, true}) {
+    StrictMock<MockIoHandle> io_handle;
+    EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(connected));
+
+    Buffer::OwnedImpl buffer;
+    const Api::IoCallUint64Result result =
+        Utility::writeToSocket(io_handle, buffer, nullptr, peer_address);
+    EXPECT_TRUE(result.ok());
+    EXPECT_EQ(0, result.return_value_);
+  }
 }
 
 struct Interface {
