@@ -504,48 +504,13 @@ TEST_F(OpenTelemetryDriverTest, NullCustomExporterIncrementsSpansDropped) {
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
-// Verifies that the tracer cannot be configured with two exporters at the same time
-TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {
+// Verifies that the tracer cannot be configured with multiple exporters at the same time
+TEST_F(OpenTelemetryDriverTest, MultipleExportersConfigured) {
   const std::string yaml_string = R"EOF(
     grpc_service:
       envoy_grpc:
         cluster_name: fake-cluster
       timeout: 0.250s
-    http_service:
-      http_uri:
-        cluster: "my_o11y_backend"
-        uri: "https://some-o11y.com/otlp/v1/traces"
-        timeout: 0.250s
-    )EOF";
-  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, opentelemetry_config),
-                          EnvoyException, ".*oneof.*");
-  EXPECT_EQ(driver_, nullptr);
-}
-
-// Verifies that the tracer cannot be configured with both a custom exporter and
-// gRPC exporter at the same time
-TEST_F(OpenTelemetryDriverTest, CustomExporterAndGrpcExporterConfigured) {
-  const std::string yaml_string = R"EOF(
-    grpc_service:
-      envoy_grpc:
-        cluster_name: fake-cluster
-      timeout: 0.250s
-    exporter:
-      name: envoy.tracers.opentelemetry.exporters.dummy_tracer_impl_test
-      typed_config:
-        "@type": type.googleapis.com/google.protobuf.Empty
-    )EOF";
-  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, opentelemetry_config),
-                          EnvoyException, ".*oneof.*");
-  EXPECT_EQ(driver_, nullptr);
-}
-
-// Verifies that the tracer cannot be configured with both a custom exporter and
-// HTTP exporter at the same time
-TEST_F(OpenTelemetryDriverTest, CustomExporterAndHttpExporterConfigured) {
-  const std::string yaml_string = R"EOF(
     http_service:
       http_uri:
         cluster: "my_o11y_backend"
@@ -557,8 +522,10 @@ TEST_F(OpenTelemetryDriverTest, CustomExporterAndHttpExporterConfigured) {
         "@type": type.googleapis.com/google.protobuf.Empty
     )EOF";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, opentelemetry_config),
-                          EnvoyException, ".*oneof.*");
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  EXPECT_THROW_WITH_MESSAGE(
+      setup(opentelemetry_config), EnvoyException,
+      "OpenTelemetry Tracer must have exactly one of gRPC, HTTP, or custom exporter configured.");
   EXPECT_EQ(driver_, nullptr);
 }
 
@@ -1676,7 +1643,7 @@ TEST_F(OpenTelemetryDriverTest, DisableLocalDecisionWithSampledTrue) {
 }
 
 // Verifies tracer throws exception when no exporter is configured
-TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
+TEST_F(OpenTelemetryDriverTest, NoExporterConfigured) {
   const std::string yaml_string = "{}";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);

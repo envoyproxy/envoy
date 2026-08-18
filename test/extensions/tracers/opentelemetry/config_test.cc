@@ -89,8 +89,9 @@ TEST(OpenTelemetryTracerConfigTest, OpenTelemetryTracerNoExporter) {
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
-  EXPECT_THROW_WITH_REGEX(factory.createTracerDriver(*message, context), EnvoyException,
-                          "Proto constraint validation failed");
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createTracerDriver(*message, context), EnvoyException,
+      "OpenTelemetry Tracer must have exactly one of gRPC, HTTP, or custom exporter configured.");
 }
 
 namespace {
