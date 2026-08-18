@@ -1,4 +1,4 @@
-#include "source/extensions/filters/common/expr/flatbuffers_backed_impl.h"
+#include "source/extensions/filters/common/expr/flatbuffers_backed_cel_map.h"
 
 #include <algorithm>
 #include <optional>
@@ -64,7 +64,7 @@ public:
   CelValue operator[](int index) const override {
     auto value = list_->Get(index);
     return CelValue::CreateMap(
-        Protobuf::Arena::Create<FlatBuffersMapImpl>(arena_, *value, schema_, object_, arena_));
+        Protobuf::Arena::Create<FlatBuffersBackedCelMap>(arena_, *value, schema_, object_, arena_));
   }
 
 private:
@@ -116,8 +116,8 @@ public:
       auto value = flatbuffers::GetFieldS(**it, index_);
       auto sv = value ? absl::string_view(value->c_str(), value->size()) : absl::string_view();
       if (sv == key) {
-        return CelValue::CreateMap(
-            Protobuf::Arena::Create<FlatBuffersMapImpl>(arena_, **it, schema_, object_, arena_));
+        return CelValue::CreateMap(Protobuf::Arena::Create<FlatBuffersBackedCelMap>(
+            arena_, **it, schema_, object_, arena_));
       }
     }
     return std::nullopt;
@@ -158,7 +158,7 @@ const reflection::Field* findStringKeyField(const reflection::Object& object) {
 
 } // namespace
 
-absl::StatusOr<bool> FlatBuffersMapImpl::Has(const CelValue& key) const {
+absl::StatusOr<bool> FlatBuffersBackedCelMap::Has(const CelValue& key) const {
   auto lookup_result = (*this)[key];
   if (!lookup_result.has_value()) {
     return false;
@@ -170,7 +170,7 @@ absl::StatusOr<bool> FlatBuffersMapImpl::Has(const CelValue& key) const {
   return true;
 }
 
-std::optional<CelValue> FlatBuffersMapImpl::operator[](CelValue cel_key) const {
+std::optional<CelValue> FlatBuffersBackedCelMap::operator[](CelValue cel_key) const {
   if (!cel_key.IsString()) {
     return CreateErrorValue(
         arena_, absl::InvalidArgumentError(absl::StrCat("Invalid map key type: '",
@@ -217,7 +217,7 @@ std::optional<CelValue> FlatBuffersMapImpl::operator[](CelValue cel_key) const {
       return CelValue::CreateNull();
     }
     if (field_schema) {
-      return CelValue::CreateMap(Protobuf::Arena::Create<FlatBuffersMapImpl>(
+      return CelValue::CreateMap(Protobuf::Arena::Create<FlatBuffersBackedCelMap>(
           arena_, *field_table, schema_, *field_schema, arena_));
     }
     break;
@@ -301,10 +301,10 @@ std::optional<CelValue> FlatBuffersMapImpl::operator[](CelValue cel_key) const {
 }
 
 const google::api::expr::runtime::CelMap*
-createFlatBuffersBackedObject(const uint8_t* flatbuf, const reflection::Schema& schema,
+createFlatBuffersBackedCelMap(const uint8_t* flatbuf, const reflection::Schema& schema,
                               Protobuf::Arena* arena) {
-  return Protobuf::Arena::Create<const FlatBuffersMapImpl>(arena, *flatbuffers::GetAnyRoot(flatbuf),
-                                                           schema, *schema.root_table(), arena);
+  return Protobuf::Arena::Create<const FlatBuffersBackedCelMap>(
+      arena, *flatbuffers::GetAnyRoot(flatbuf), schema, *schema.root_table(), arena);
 }
 
 } // namespace Expr

@@ -1,6 +1,6 @@
 #include <string>
 
-#include "source/extensions/filters/common/expr/flatbuffers_backed_impl.h"
+#include "source/extensions/filters/common/expr/flatbuffers_backed_cel_map.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
@@ -59,9 +59,9 @@ constexpr absl::string_view kIndexedField = "r_indexed";
 
 const int64_t kNumFields = 27;
 
-class FlatBuffersTest : public testing::Test {
+class FlatBuffersBackedCelMapTest : public testing::Test {
 public:
-  FlatBuffersTest() {
+  FlatBuffersBackedCelMapTest() {
     EXPECT_TRUE(flatbuffers::LoadFile(TestEnvironment::runfilesPath(kReflectionBufferPath).c_str(),
                                       true, &schema_file_));
     flatbuffers::Verifier verifier(reinterpret_cast<const uint8_t*>(schema_file_.data()),
@@ -74,7 +74,7 @@ public:
   const CelMap& loadJson(std::string data) {
     EXPECT_TRUE(parser_.Parse(data.data()));
     const CelMap* value =
-        createFlatBuffersBackedObject(parser_.builder_.GetBufferPointer(), *schema_, &arena_);
+        createFlatBuffersBackedCelMap(parser_.builder_.GetBufferPointer(), *schema_, &arena_);
     EXPECT_NE(nullptr, value);
     EXPECT_EQ(kNumFields, value->size());
     const CelList* keys = value->ListKeys().value();
@@ -91,7 +91,7 @@ protected:
   Protobuf::Arena arena_;
 };
 
-TEST_F(FlatBuffersTest, PrimitiveFields) {
+TEST_F(FlatBuffersBackedCelMapTest, PrimitiveFields) {
   const CelMap& value = loadJson(R"({
               f_byte: -1,
               f_ubyte: 1,
@@ -202,7 +202,7 @@ TEST_F(FlatBuffersTest, PrimitiveFields) {
   }
 }
 
-TEST_F(FlatBuffersTest, PrimitiveFieldDefaults) {
+TEST_F(FlatBuffersBackedCelMapTest, PrimitiveFieldDefaults) {
   const CelMap& value = loadJson("{}");
   // byte
   {
@@ -234,7 +234,7 @@ TEST_F(FlatBuffersTest, PrimitiveFieldDefaults) {
   }
 }
 
-TEST_F(FlatBuffersTest, ObjectField) {
+TEST_F(FlatBuffersBackedCelMapTest, ObjectField) {
   const CelMap& value = loadJson(R"({
                                     f_obj: {
                                       f_string: "entry",
@@ -285,14 +285,14 @@ TEST_F(FlatBuffersTest, ObjectField) {
   }
 }
 
-TEST_F(FlatBuffersTest, ObjectFieldDefault) {
+TEST_F(FlatBuffersBackedCelMapTest, ObjectFieldDefault) {
   const CelMap& value = loadJson("{}");
   auto f = value[CelValue::CreateStringView(kObjField)];
   EXPECT_TRUE(f.has_value());
   EXPECT_TRUE(f->IsNull());
 }
 
-TEST_F(FlatBuffersTest, PrimitiveVectorFields) {
+TEST_F(FlatBuffersBackedCelMapTest, PrimitiveVectorFields) {
   const CelMap& value = loadJson(R"({
               r_byte: [-97],
               r_ubyte: [97, 98, 99],
@@ -408,7 +408,7 @@ TEST_F(FlatBuffersTest, PrimitiveVectorFields) {
   }
 }
 
-TEST_F(FlatBuffersTest, ObjectVectorField) {
+TEST_F(FlatBuffersBackedCelMapTest, ObjectVectorField) {
   const CelMap& value = loadJson(R"({
                                     r_obj: [{
                                       f_string: "entry",
@@ -485,7 +485,7 @@ TEST_F(FlatBuffersTest, ObjectVectorField) {
   }
 }
 
-TEST_F(FlatBuffersTest, VectorFieldDefaults) {
+TEST_F(FlatBuffersBackedCelMapTest, VectorFieldDefaults) {
   const CelMap& value = loadJson("{}");
   for (const auto field :
        std::vector<absl::string_view>{kIntsField, kBoolsField, kStringsField, kObjsField}) {
@@ -513,7 +513,7 @@ TEST_F(FlatBuffersTest, VectorFieldDefaults) {
   }
 }
 
-TEST_F(FlatBuffersTest, IndexedObjectVectorField) {
+TEST_F(FlatBuffersBackedCelMapTest, IndexedObjectVectorField) {
   const CelMap& value = loadJson(R"({
                                     r_indexed: [
                                     {
@@ -577,7 +577,7 @@ TEST_F(FlatBuffersTest, IndexedObjectVectorField) {
   }
 }
 
-TEST_F(FlatBuffersTest, IndexedObjectVectorFieldDefaults) {
+TEST_F(FlatBuffersBackedCelMapTest, IndexedObjectVectorFieldDefaults) {
   const CelMap& value = loadJson(R"({
                                     r_indexed: [
                                     {

@@ -136,8 +136,8 @@ flatbuffer_library_public(
 )
 
 envoy_extension_cc_test(
-    name = "flatbuffers_backed_impl_test",
-    srcs = ["flatbuffers_backed_impl_test.cc"],
+    name = "flatbuffers_backed_cel_map_test",
+    srcs = ["flatbuffers_backed_cel_map_test.cc"],
     data = [":test_data/flatbuffers_out"],
     extension_names = ["envoy.filters.http.rbac"],
     rbe_pool = "6gig",

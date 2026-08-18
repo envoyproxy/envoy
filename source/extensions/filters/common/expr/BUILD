@@ -54,10 +54,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "flatbuffers_backed_cel_map_lib",
     srcs = [
-        "flatbuffers_backed_impl.cc",
+        "flatbuffers_backed_cel_map.cc",
     ],
     hdrs = [
-        "flatbuffers_backed_impl.h",
+        "flatbuffers_backed_cel_map.h",
     ],
     tags = ["skip_on_windows"],
     deps = [

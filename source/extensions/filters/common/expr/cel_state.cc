@@ -1,6 +1,6 @@
 #include "source/extensions/filters/common/expr/cel_state.h"
 
-#include "source/extensions/filters/common/expr/flatbuffers_backed_impl.h"
+#include "source/extensions/filters/common/expr/flatbuffers_backed_cel_map.h"
 
 #include "eval/public/structs/cel_proto_wrapper.h"
 #include "flatbuffers/reflection.h"
@@ -33,7 +33,7 @@ CelValue CelState::exprValue(Protobuf::Arena* arena, bool last) const {
         return CelValue::CreateBytes(&value_);
       }
       return CelValue::CreateMap(
-          createFlatBuffersBackedObject(reinterpret_cast<const uint8_t*>(value_.data()),
+          createFlatBuffersBackedCelMap(reinterpret_cast<const uint8_t*>(value_.data()),
                                         *reflection::GetSchema(schema_.data()), arena));
     }
   }

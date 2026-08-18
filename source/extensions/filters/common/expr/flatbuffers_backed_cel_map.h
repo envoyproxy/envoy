@@ -13,10 +13,10 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
-class FlatBuffersMapImpl : public google::api::expr::runtime::CelMap {
+class FlatBuffersBackedCelMap : public google::api::expr::runtime::CelMap {
 public:
-  FlatBuffersMapImpl(const flatbuffers::Table& table, const reflection::Schema& schema,
-                     const reflection::Object& object, Protobuf::Arena* arena)
+  FlatBuffersBackedCelMap(const flatbuffers::Table& table, const reflection::Schema& schema,
+                          const reflection::Object& object, Protobuf::Arena* arena)
       : arena_(arena), table_(table), schema_(schema) {
     keys_.fields = object.fields();
   }
@@ -53,7 +53,7 @@ private:
 // Factory method to instantiate a CelMap on the arena for flatbuffer object
 // from a reflection schema.
 const google::api::expr::runtime::CelMap*
-createFlatBuffersBackedObject(const uint8_t* flatbuf, const reflection::Schema& schema,
+createFlatBuffersBackedCelMap(const uint8_t* flatbuf, const reflection::Schema& schema,
                               Protobuf::Arena* arena);
 
 } // namespace Expr
