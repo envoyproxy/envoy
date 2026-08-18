@@ -181,7 +181,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "jemalloc-{version}",
         urls = ["https://github.com/jemalloc/jemalloc/releases/download/{version}/jemalloc-{version}.tar.bz2"],
     ),
-    com_github_grpc_grpc = dict(
+    grpc = dict(
         version = "1.83.0",
         sha256 = "90d453393a9d41215df546103b10b33b9566df79cdf6f49dc67f6c4d044d090d",
         strip_prefix = "grpc-{version}",

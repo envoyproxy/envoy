@@ -222,18 +222,6 @@ colm:
   license: "MIT"
   license_url: "https://github.com/adrian-thurston/colm/blob/{version}/COPYING"
 
-com_github_grpc_grpc:
-  project_name: "gRPC"
-  project_desc: "gRPC C core library"
-  project_url: "https://grpc.io"
-  release_date: "2026-07-22"
-  use_category:
-  - dataplane_core
-  - controlplane
-  cpe: "cpe:2.3:a:grpc:grpc:*"
-  license: "Apache-2.0"
-  license_url: "https://github.com/grpc/grpc/blob/v{version}/LICENSE"
-
 com_google_protobuf:
   project_name: "Protocol Buffers"
   project_desc: "Language-neutral, platform-neutral extensible mechanism for serializing structured data"
@@ -510,6 +498,18 @@ gperftools:
   cpe: "cpe:2.3:a:gperftools_project:gperftools:*"
   license: "BSD-3-Clause"
   license_url: "https://github.com/gperftools/gperftools/blob/gperftools-{version}/COPYING"
+
+grpc:
+  project_name: "gRPC"
+  project_desc: "gRPC C core library"
+  project_url: "https://grpc.io"
+  release_date: "2026-07-22"
+  use_category:
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:grpc:grpc:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/grpc/grpc/blob/v{version}/LICENSE"
 
 grpc_httpjson_transcoding:
   project_name: "grpc-httpjson-transcoding"
