@@ -179,10 +179,9 @@ TEST_P(AltsProxyTest, ClientStartSuccess) {
   expected_client_start->set_max_frame_size(MaxFrameSize);
   startFakeHandshakerService({expected_request}, grpc::Status::OK);
 
-  auto alts_proxy = AltsProxy::create(getChannel());
-  EXPECT_OK(alts_proxy.status());
-  EXPECT_TRUE(TestUtility::protoEqual((*alts_proxy)->sendStartClientHandshakeReq().value(),
-                                      expectedClientStartResponse()));
+  ASSERT_OK_AND_ASSIGN(auto alts_proxy, AltsProxy::create(getChannel()));
+  ASSERT_OK_AND_ASSIGN(auto resp, alts_proxy->sendStartClientHandshakeReq());
+  EXPECT_TRUE(TestUtility::protoEqual(resp, expectedClientStartResponse()));
 }
 
 // Verify that a full client-side ALTS handshake can be performed when talking
