@@ -1635,6 +1635,13 @@ vm_config:
     // The wasm should be in runtime error state now.
     EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
 
+    // The crashed counter should have incremented exactly once.
+    const std::string crashed_stat_name =
+        absl::StrCat("wasm.envoy.wasm.runtime.", runtime_name, ".crashed");
+    auto crashed_counter = TestUtility::findCounter(server_.store_, crashed_stat_name);
+    ASSERT_NE(nullptr, crashed_counter);
+    EXPECT_EQ(crashed_counter->value(), 1);
+
     // Wait 2 seconds to avoid possible backoff.
     server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(2));
 
@@ -1659,6 +1666,9 @@ vm_config:
 
     // The wasm should be in runtime error state again.
     EXPECT_EQ(context_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
+
+    // The crashed counter should have incremented again (second VM crash).
+    EXPECT_EQ(TestUtility::findCounter(server_.store_, crashed_stat_name)->value(), 2);
 
     // The wasm failed again and the PluginConfig::wasm() will try to reload again but will backoff.
     // The previous wasm will be returned.
