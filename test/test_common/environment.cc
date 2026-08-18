@@ -1,5 +1,7 @@
 #include "test/test_common/environment.h"
 
+#include <sys/stat.h>
+
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -34,6 +36,7 @@
 #include "absl/debugging/symbolize.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
@@ -300,9 +303,16 @@ const std::string& TestEnvironment::temporaryDirectory() {
 
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
+  // For external dependencies (e.g. @envoy as a dependency in mobile builds),
+  // TEST_WORKSPACE cannot be used since it names the root module, not the dep.
+  // With BAZEL_CURRENT_REPOSITORY passed to Runfiles::Create, the repo mapping
+  // resolves apparent names (e.g. "envoy") to their canonical form directly,
+  // so the manual "+"/"~" suffix probing is no longer needed.
+  // TODO(phlax): Cleanup once bzlmod migration is complete
   auto path = runfiles_->Rlocation(workspace);
+  RELEASE_ASSERT(!path.empty(), absl::StrCat("runfiles path not found for workspace: ", workspace));
 #ifdef WIN32
-  path = std::regex_replace(path, std::regex("\\\\"), "/");
+  path = absl::StrReplaceAll(path, {{"\\", "/"}});
 #endif
   return path;
 }

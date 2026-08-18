@@ -7,6 +7,8 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread_impl.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Filesystem {
 
@@ -25,9 +27,10 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& fi
 
   read_handle_->initializeFileEvent(
       dispatcher,
-      [this](uint32_t events) -> void {
+      [this](uint32_t events) -> absl::Status {
         ASSERT(events == Event::FileReadyType::Read);
         onDirectoryEvent();
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Level, Event::FileReadyType::Read);
 

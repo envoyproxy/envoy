@@ -19,11 +19,14 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
+// Resolve the aws-c-auth-testdata testdata directory via the runfiles library.
+// The data target @aws-c-auth-testdata//:sigv4_tests is declared in the BUILD target,
+// so the runfiles library handles the apparent→canonical repo name mapping automatically.
 std::vector<std::string> directoryListing() {
   std::vector<std::string> directories;
-  for (auto const& entry : std::filesystem::directory_iterator(
-           TestEnvironment::runfilesDirectory("aws-c-auth-testdata") +
-           "/tests/aws-signing-test-suite/v4/")) {
+  const std::string path =
+      TestEnvironment::runfilesPath("tests/aws-signing-test-suite/v4", "aws-c-auth-testdata");
+  for (auto const& entry : std::filesystem::directory_iterator(path)) {
     directories.push_back(entry.path().string());
   }
   return directories;
