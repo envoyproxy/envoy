@@ -53,9 +53,8 @@ message LocalResponsePolicy {
   // ``csrf_origin_mismatch``), or ``response_code_details`` to set an explicit
   // replacement.
   oneof response_code_details_action {
-    // If true, keep the existing ``response_code_details`` already present on
-    // StreamInfo. If false, clear details (same as leaving this oneof unset).
-    bool preserve_response_code_details = 5;
+    // If set, keep the existing ``response_code_details`` already present on StreamInfo.
+    bool preserve_response_code_details = 5 [(validate.rules).bool = {const: true}];
 
     // Replace ``response_code_details`` with this value.
     string response_code_details = 6 [(validate.rules).string = {min_len: 1}];

@@ -51,7 +51,7 @@ private:
 
   // When true, pass existing StreamInfo response_code_details into sendLocalReply.
   // When false and response_code_details_ is unset, pass "" (legacy Clear behavior).
-  const bool preserve_response_code_details_;
+  const bool preserve_response_code_details_ = false;
   // When set, pass this explicit value into sendLocalReply (Override).
   const std::optional<std::string> response_code_details_;
 };

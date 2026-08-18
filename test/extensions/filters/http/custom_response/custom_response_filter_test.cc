@@ -434,9 +434,8 @@ TEST_F(CustomResponseFilterTest, PreserveResponseCodeDetails) {
   ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
             ::Envoy::Http::FilterHeadersStatus::Continue);
-  EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(static_cast<::Envoy::Http::Code>(403), "forbidden", _, _,
-                             "csrf_origin_mismatch"));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(static_cast<::Envoy::Http::Code>(403), "forbidden",
+                                                 _, _, "csrf_origin_mismatch"));
   ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
       .WillByDefault(Return(&request_headers));
   EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
@@ -490,16 +489,15 @@ TEST_F(CustomResponseFilterTest, ExplicitResponseCodeDetails) {
   ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
             ::Envoy::Http::FilterHeadersStatus::Continue);
-  EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(static_cast<::Envoy::Http::Code>(403), "forbidden", _, _,
-                             "custom_error_page"));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(static_cast<::Envoy::Http::Code>(403), "forbidden",
+                                                 _, _, "custom_error_page"));
   ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
       .WillByDefault(Return(&request_headers));
   EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
             ::Envoy::Http::FilterHeadersStatus::StopIteration);
 }
 
-TEST_F(CustomResponseFilterTest, PreserveResponseCodeDetailsFalseClears) {
+TEST_F(CustomResponseFilterTest, UnsetResponseCodeDetailsActionClears) {
   createConfig(R"EOF(
   custom_response_matcher:
     on_no_match:
@@ -510,7 +508,6 @@ TEST_F(CustomResponseFilterTest, PreserveResponseCodeDetailsFalseClears) {
           status_code: 403
           body:
             inline_string: "forbidden"
-          preserve_response_code_details: false
 )EOF");
   setupFilterAndCallback();
 

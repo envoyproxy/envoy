@@ -2,6 +2,7 @@
 
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/config/datasource.h"
 #include "source/common/formatter/substitution_format_string.h"
@@ -102,11 +103,12 @@ Envoy::Http::FilterHeadersStatus LocalResponsePolicy::encodeHeaders(
              headers, encoder_callbacks->streamInfo(), encoder_callbacks->activeSpan(), body);
 
   // Resolve details before sendLocalReply, which overwrites response_code_details.
-  std::string details;
+  absl::string_view details;
   if (response_code_details_.has_value()) {
     details = *response_code_details_;
   } else if (preserve_response_code_details_) {
-    details = encoder_callbacks->streamInfo().responseCodeDetails().value_or("");
+    const auto& stream_details = encoder_callbacks->streamInfo().responseCodeDetails();
+    details = stream_details.has_value() ? *stream_details : EMPTY_STRING;
   }
 
   const auto mutate_headers = [this, encoder_callbacks](Envoy::Http::ResponseHeaderMap& headers) {
