@@ -84,10 +84,8 @@ public:
    */
   Value find(absl::string_view key) const {
     const size_t key_size = key.size();
-    // Theoretically we could also bottom-cap the size range, but the
-    // cost of the extra comparison and operation would almost certainly
-    // outweigh the benefit of omitting 4 or 5 entries.
-    if (key_size >= table_.size() || table_[key_size] == nullptr) {
+    const size_t word_idx = key_size / 64;
+    if (word_idx >= length_mask_.size() || !(length_mask_[word_idx] & (1ULL << (key_size % 64)))) {
       return {};
     }
     return table_[key_size]->find(key);
@@ -105,6 +103,8 @@ public:
    */
   void compile(std::vector<KV> contents) {
     if (contents.empty()) {
+      table_.clear();
+      length_mask_.clear();
       return;
     }
     std::sort(contents.begin(), contents.end(),
@@ -114,6 +114,14 @@ public:
     // subtract [min length] every time we index, so the table size must
     // be one larger than the longest key.
     table_.resize(longest + 1);
+
+    // Initialize the bitmask of valid key lengths.
+    length_mask_.assign((longest + 64) / 64, 0);
+    for (const auto& pair : contents) {
+      const size_t len = pair.first.size();
+      length_mask_[len / 64] |= (1ULL << (len % 64));
+    }
+
     auto range_start = contents.begin();
     // Populate the sub-nodes for each length of key that exists.
     while (range_start != contents.end()) {
@@ -219,6 +227,7 @@ private:
     return std::make_unique<BranchNode>(best.index_, best.min_, std::move(nodes));
   }
   std::vector<std::unique_ptr<Node>> table_;
+  std::vector<uint64_t> length_mask_;
 };
 
 } // namespace Envoy
