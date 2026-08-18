@@ -65,6 +65,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+bzlmod
 CIO
 CBC
 cbc

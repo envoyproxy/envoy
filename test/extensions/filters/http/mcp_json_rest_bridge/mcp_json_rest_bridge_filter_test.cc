@@ -3060,6 +3060,67 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalPerRouteConfig) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalNoDescription) {
+  proto_config_.Clear();
+  auto* tool_config = proto_config_.mutable_tool_config();
+  tool_config->mutable_tool_list_local();
+
+  auto* tool1 = tool_config->add_tools();
+  tool1->set_name("tool_1");
+  tool1->mutable_tool_list_config()->set_title("Tool with no description");
+  tool1->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  auto* tool2 = tool_config->add_tools();
+  tool2->set_name("tool_2");
+  tool2->mutable_tool_list_config()->set_title("Tool with a description");
+  tool2->mutable_tool_list_config()->set_description("Description.");
+  tool2->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  makeFilter();
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_.setMethod("POST");
+  request_headers_.setPath("/mcp");
+  request_headers_.setContentType("application/json");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "tools/list", "id": "req-2"})";
+  Buffer::OwnedImpl data(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::OK), _, _, Eq(Grpc::Status::WellKnownGrpcStatus::Ok),
+                             StrEq("mcp_json_rest_bridge_tools_list")))
+      .WillOnce(
+          testing::Invoke([](Http::Code, absl::string_view body,
+                             std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                             const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+            auto parsed_response = nlohmann::json::parse(body);
+
+            EXPECT_EQ(parsed_response["jsonrpc"], "2.0");
+            EXPECT_EQ(parsed_response["id"], "req-2");
+            auto tools = parsed_response["result"]["tools"];
+            EXPECT_EQ(tools.size(), 2);
+            EXPECT_EQ(tools[0]["name"], "tool_1");
+            EXPECT_EQ(tools[0]["title"], "Tool with no description");
+            EXPECT_FALSE(tools[0].contains("description"));
+            EXPECT_EQ(tools[0]["inputSchema"]["type"], "object");
+
+            EXPECT_EQ(tools[1]["name"], "tool_2");
+            EXPECT_EQ(tools[1]["title"], "Tool with a description");
+            EXPECT_EQ(tools[1]["description"], "Description.");
+            EXPECT_EQ(tools[1]["inputSchema"]["type"], "object");
+
+            Http::TestResponseHeaderMapImpl headers;
+            modify_headers(headers);
+            EXPECT_EQ("application/json", headers.getContentTypeValue());
+          }));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
+}
+
 TEST_F(McpJsonRestBridgeFilterTest, DefaultClearRouteCacheIsTrue) {
   makeFilter();
   EXPECT_TRUE(config_->clearRouteCache());
