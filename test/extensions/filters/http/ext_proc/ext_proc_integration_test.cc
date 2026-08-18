@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include <algorithm>
 #include <iostream>
 
@@ -9,6 +12,7 @@
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
 #include "envoy/extensions/retry/host/previous_hosts/v3/previous_hosts.pb.h"
+#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
@@ -79,8 +83,173 @@ using testing::Not;
 using testing::ResultOf;
 using namespace std::chrono_literals;
 
+class ExtProcSessionAffinityIntegrationTest : public ExtProcIntegrationTest {
+protected:
+  void
+  configureSessionAffinity(const envoy::config::route::v3::RouteAction::HashPolicy& hash_policy,
+                           absl::string_view metadata_key, absl::string_view metadata_value) {
+    proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+    auto* metadata = proto_config_.mutable_grpc_service()->add_initial_metadata();
+    metadata->set_key(metadata_key);
+    metadata->set_value(metadata_value);
+
+    initializeConfig({}, {{0, 2}});
+    config_helper_.addConfigModifier(
+        [hash_policy](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          envoy::config::cluster::v3::Cluster* ext_proc_cluster = nullptr;
+          for (auto& cluster : *bootstrap.mutable_static_resources()->mutable_clusters()) {
+            if (cluster.name() == "ext_proc_server_0") {
+              ext_proc_cluster = &cluster;
+              break;
+            }
+          }
+          ASSERT_NE(ext_proc_cluster, nullptr);
+          ext_proc_cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::RING_HASH);
+
+          envoy::extensions::upstreams::http::v3::HttpProtocolOptions options;
+          options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+          *options.add_hash_policy() = hash_policy;
+          auto& options_any = (*ext_proc_cluster->mutable_typed_extension_protocol_options())
+              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+          ASSERT_TRUE(options_any.PackFrom(options));
+        });
+
+    autonomous_upstream_ = true;
+    HttpIntegrationTest::initialize();
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+  }
+
+  void waitForProcessorMessage(uint64_t& upstream_index, FakeStreamPtr& processor_stream,
+                               ProcessingRequest& request) {
+    ASSERT_EQ(grpc_upstreams_.size(), 2);
+    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+    while (bound.withinBound()) {
+      for (uint64_t i = 0; i < grpc_upstreams_.size(); ++i) {
+        FakeHttpConnectionPtr& processor_connection =
+            i == 0 ? processor_connection_ : processor_connection_1_;
+        if (processor_connection == nullptr) {
+          FakeHttpConnectionPtr connection;
+          if (grpc_upstreams_[i]->waitForHttpConnection(*dispatcher_, connection, 5ms)) {
+            processor_connection = std::move(connection);
+          }
+        }
+        if (processor_connection == nullptr) {
+          continue;
+        }
+
+        FakeStreamPtr stream;
+        if (processor_connection->waitForNewStream(*dispatcher_, stream, 5ms)) {
+          ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+          upstream_index = i;
+          processor_stream = std::move(stream);
+          return;
+        }
+      }
+    }
+    FAIL() << "Timed out waiting for an ext_proc stream";
+  }
+
+  void processAffinityRequest(
+      std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers,
+      absl::string_view metadata_key, std::optional<absl::string_view> expected_metadata_value,
+      uint64_t& upstream_index) {
+    Http::TestRequestHeaderMapImpl headers;
+    HttpTestUtility::addDefaultHeaders(headers);
+    if (modify_headers) {
+      (*modify_headers)(headers);
+    }
+    auto response = codec_client_->makeHeaderOnlyRequest(headers);
+
+    ProcessingRequest request;
+    FakeStreamPtr processor_stream;
+    waitForProcessorMessage(upstream_index, processor_stream, request);
+    ASSERT_TRUE(request.has_request_headers());
+
+    if (expected_metadata_value.has_value()) {
+      const auto metadata = processor_stream->headers().get(LowerCaseString(metadata_key));
+      ASSERT_EQ(metadata.size(), 1);
+      EXPECT_EQ(metadata[0]->value().getStringView(), expected_metadata_value.value());
+    }
+
+    processor_stream->startGrpcStream();
+    ProcessingResponse processor_response;
+    processor_response.mutable_request_headers();
+    processor_stream->sendGrpcMessage(processor_response);
+    verifyDownstreamResponse(*response, 200);
+    ASSERT_TRUE(processor_stream->waitForReset(*dispatcher_));
+  }
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing,
+                         ExtProcSessionAffinityIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(ExtProcSessionAffinityIntegrationTest, HeaderSessionAffinity) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Cluster hash policies only apply to Envoy gRPC";
+  }
+
+  envoy::config::route::v3::RouteAction::HashPolicy hash_policy;
+  hash_policy.mutable_header()->set_header_name("x-session-id");
+  configureSessionAffinity(hash_policy, "x-session-id", "%REQ(x-session-id)%");
+
+  uint64_t first_upstream;
+  processAffinityRequest(
+      [](Http::RequestHeaderMap& headers) {
+        headers.addCopy(Http::LowerCaseString("x-session-id"), "session-1");
+      },
+      "x-session-id", "session-1", first_upstream);
+
+  uint64_t second_upstream;
+  processAffinityRequest(
+      [](Http::RequestHeaderMap& headers) {
+        headers.addCopy(Http::LowerCaseString("x-session-id"), "session-1");
+      },
+      "x-session-id", "session-1", second_upstream);
+
+  EXPECT_EQ(first_upstream, second_upstream);
+}
+
+TEST_P(ExtProcSessionAffinityIntegrationTest, PassiveCookieSessionAffinity) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Cluster hash policies only apply to Envoy gRPC";
+  }
+
+  envoy::config::route::v3::RouteAction::HashPolicy hash_policy;
+  hash_policy.mutable_cookie()->set_name("session_id");
+  configureSessionAffinity(hash_policy, "cookie", "%REQ(cookie)%");
+
+  uint64_t first_upstream;
+  processAffinityRequest(
+      [](Http::RequestHeaderMap& headers) {
+        headers.addCopy(Http::LowerCaseString("cookie"), "session_id=session-1");
+      },
+      "cookie", "session_id=session-1", first_upstream);
+
+  uint64_t second_upstream;
+  processAffinityRequest(
+      [](Http::RequestHeaderMap& headers) {
+        headers.addCopy(Http::LowerCaseString("cookie"), "session_id=session-1");
+      },
+      "cookie", "session_id=session-1", second_upstream);
+
+  EXPECT_EQ(first_upstream, second_upstream);
+}
+
+TEST_P(ExtProcSessionAffinityIntegrationTest, MissingSessionAffinityKey) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Cluster hash policies only apply to Envoy gRPC";
+  }
+
+  envoy::config::route::v3::RouteAction::HashPolicy hash_policy;
+  hash_policy.mutable_header()->set_header_name("x-session-id");
+  configureSessionAffinity(hash_policy, "x-session-id", "%REQ(x-session-id)%");
+
+  uint64_t upstream;
+  processAffinityRequest(std::nullopt, "x-session-id", std::nullopt, upstream);
+}
+
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
 // by immediately closing the stream.

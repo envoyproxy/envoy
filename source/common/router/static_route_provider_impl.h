@@ -38,6 +38,7 @@ public:
   StaticRouteConfigProviderImpl(const envoy::config::route::v3::RouteConfiguration& config,
                                 Rds::ConfigTraits& config_traits,
                                 Server::Configuration::ServerFactoryContext& factory_context,
+                                Init::Manager& init_manager,
                                 Rds::RouteConfigProviderManager& route_config_provider_manager);
   ~StaticRouteConfigProviderImpl() override;
 

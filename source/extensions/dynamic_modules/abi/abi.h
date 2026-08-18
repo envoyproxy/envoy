@@ -987,6 +987,9 @@ envoy_dynamic_module_on_http_filter_response_trailers(
  * envoy_dynamic_module_on_http_filter_stream_complete is called when the HTTP stream is complete.
  * This is called before envoy_dynamic_module_on_http_filter_destroy and access logs are flushed.
  *
+ * Unlike envoy_dynamic_module_on_http_filter_destroy, this can run while another event hook of the
+ * same filter is on the stack, because a hook that ends the stream completes it inline.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
@@ -999,6 +1002,15 @@ void envoy_dynamic_module_on_http_filter_stream_complete(
 /**
  * envoy_dynamic_module_on_http_filter_destroy is called when the HTTP filter is destroyed for each
  * HTTP stream.
+ *
+ * Envoy runs this from the worker dispatcher's deferred deletion list, so it is never called while
+ * another event hook of the same filter is on the stack. A hook can end the stream, for example via
+ * envoy_dynamic_module_callback_http_filter_recreate_stream, which tears the filter chain down
+ * before the hook returns. Envoy does not destroy the in-module filter before that hook returns,
+ * and the callbacks the module makes after the teardown are safe.
+ *
+ * By the time this is called the filter is already detached from the HTTP stream, so the callbacks
+ * that need it are no-ops.
  *
  * @param filter_module_ptr is the pointer to the in-module HTTP filter.
  */
@@ -3443,7 +3455,9 @@ void envoy_dynamic_module_callback_http_filter_send_go_away_and_close(
  * with new headers. This is useful for implementing internal redirects or request retries.
  *
  * After calling this function successfully, the current filter chain will be destroyed and a new
- * stream will be created. The filter should return StopIteration from the current event hook.
+ * stream will be created. The filter should return StopIteration from the current event hook. The
+ * in-module filter stays valid until the hook returns, and the callbacks the module makes after
+ * the teardown are safe and do not affect the recreated stream.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
@@ -9915,6 +9929,33 @@ void envoy_dynamic_module_on_cluster_worker_timer_fired(
 bool envoy_dynamic_module_callback_cluster_add_hosts(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
     const envoy_dynamic_module_type_module_buffer* addresses, const uint32_t* weights,
+    const envoy_dynamic_module_type_module_buffer* regions,
+    const envoy_dynamic_module_type_module_buffer* zones,
+    const envoy_dynamic_module_type_module_buffer* sub_zones,
+    const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
+    size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs);
+
+/**
+ * envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames is equivalent to
+ * envoy_dynamic_module_callback_cluster_add_hosts, but additionally assigns each host a logical
+ * hostname.
+ *
+ * A non-empty logical hostname is available to upstream features such as automatic SNI and SAN
+ * validation. An empty hostname entry uses the same synthesized hostname behavior as
+ * envoy_dynamic_module_callback_cluster_add_hosts.
+ *
+ * @param hostnames is the optional array of logical hostnames corresponding to ``addresses``. Each
+ * entry is owned by the module. An entry with length 0 uses the same synthesized hostname behavior
+ * as envoy_dynamic_module_callback_cluster_add_hosts. The entire array can be nullptr to use that
+ * behavior for all hosts.
+ *
+ * See envoy_dynamic_module_callback_cluster_add_hosts for all other parameters and return
+ * semantics.
+ */
+bool envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
+    const envoy_dynamic_module_type_module_buffer* addresses,
+    const envoy_dynamic_module_type_module_buffer* hostnames, const uint32_t* weights,
     const envoy_dynamic_module_type_module_buffer* regions,
     const envoy_dynamic_module_type_module_buffer* zones,
     const envoy_dynamic_module_type_module_buffer* sub_zones,

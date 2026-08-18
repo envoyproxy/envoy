@@ -53,9 +53,10 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
 
 absl::StatusOr<Http::FilterFactoryCb>
 AwsRequestSigningFilterFactory::createHttpFilterFactoryFromProtoTyped(
-    const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix,
-    Server::Configuration::ServerFactoryContext& server_context) {
-  return createFilterFactoryFromProtoHelper(config, stats_prefix, server_context,
+    const AwsRequestSigningProtoConfig& config,
+    Server::Configuration::ServerFactoryContext& server_context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  return createFilterFactoryFromProtoHelper(config, extra_context.stats_prefix, server_context,
                                             server_context.scope());
 }
 

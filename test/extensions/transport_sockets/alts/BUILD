@@ -39,7 +39,7 @@ envoy_extension_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@com_github_grpc_grpc//:grpc++",
+        "@grpc//:grpc++",
     ],
 )
 
@@ -59,7 +59,7 @@ envoy_extension_cc_test(
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/synchronization",
-        "@com_github_grpc_grpc//:grpc++",
+        "@grpc//:grpc++",
     ],
 )
 
@@ -80,7 +80,7 @@ envoy_extension_cc_test(
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/synchronization",
-        "@com_github_grpc_grpc//:grpc++",
+        "@grpc//:grpc++",
     ],
 )
 

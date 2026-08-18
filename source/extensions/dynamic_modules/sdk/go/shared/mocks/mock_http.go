@@ -1540,6 +1540,18 @@ func (mr *MockHttpFilterHandleMockRecorder) SetMetadata(metadataNamespace, key, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMetadata", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetMetadata), metadataNamespace, key, value)
 }
 
+// SetMetadataStruct mocks base method.
+func (m *MockHttpFilterHandle) SetMetadataStruct(metadataNamespace string, serializedStruct []byte) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetMetadataStruct", metadataNamespace, serializedStruct)
+}
+
+// SetMetadataStruct indicates an expected call of SetMetadataStruct.
+func (mr *MockHttpFilterHandleMockRecorder) SetMetadataStruct(metadataNamespace, serializedStruct any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMetadataStruct", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetMetadataStruct), metadataNamespace, serializedStruct)
+}
+
 // SetSocketOptionBytes mocks base method.
 func (m *MockHttpFilterHandle) SetSocketOptionBytes(level, name int64, state shared.SocketOptionState, direction shared.SocketDirection, value []byte) bool {
 	m.ctrl.T.Helper()
@@ -1566,6 +1578,18 @@ func (m *MockHttpFilterHandle) SetSocketOptionInt(level, name int64, state share
 func (mr *MockHttpFilterHandleMockRecorder) SetSocketOptionInt(level, name, state, direction, value any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSocketOptionInt", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetSocketOptionInt), level, name, state, direction, value)
+}
+
+// SetTypedMetadata mocks base method.
+func (m *MockHttpFilterHandle) SetTypedMetadata(metadataNamespace string, serializedAny []byte) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetTypedMetadata", metadataNamespace, serializedAny)
+}
+
+// SetTypedMetadata indicates an expected call of SetTypedMetadata.
+func (mr *MockHttpFilterHandleMockRecorder) SetTypedMetadata(metadataNamespace, serializedAny any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTypedMetadata", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetTypedMetadata), metadataNamespace, serializedAny)
 }
 
 // SetUpstreamOverrideHost mocks base method.

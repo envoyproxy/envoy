@@ -47,8 +47,9 @@ public:
   }
 
   absl::StatusOr<Http::FilterFactoryCb>
-  createHttpFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                                   Server::Configuration::ServerFactoryContext&) override {
+  createHttpFilterFactoryFromProto(const Protobuf::Message&,
+                                   Server::Configuration::ServerFactoryContext&,
+                                   Server::Configuration::ExtraFactoryContext&) override {
     return [this](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(std::make_shared<Http::MockStreamDecoderFilter>());
       filter_added_++;

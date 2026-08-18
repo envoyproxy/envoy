@@ -47,6 +47,15 @@ constexpr uint32_t kMaxBackoffExponent = 32;
 constexpr uint64_t kReconnectJitterPercent = 15;
 // Steady-state maintenance re-check interval.
 constexpr uint64_t kMaintainIntervalMs = 10000;
+// Short re-check interval used while a hot-restart child is waiting to be allowed to dial (i.e.
+// until it has asked the parent to stop accepting). The handoff window is brief, so poll frequently
+// to bound the added latency before the child stands up its own tunnel.
+constexpr uint64_t kParentStopAcceptingRecheckMs = 10;
+// After the drain-listeners request is sent, wait briefly before dialing so the parent has time to
+// receive the RPC and call stopListeners(). The request is fire-and-forget, so this bounds the
+// race where the child dials while the parent is still accepting through a shared loopback
+// listener.
+constexpr uint64_t kParentDrainPropagationGraceMs = 50;
 } // namespace
 
 // ReverseConnectionIOHandle implementation
@@ -455,7 +464,7 @@ void ReverseConnectionIOHandle::maybeUpdateHostsMappingsAndConnections(
     removed_hosts = cluster_to_resolved_hosts_itr->second;
   }
   for (const std::string& host : hosts) {
-    if (removed_hosts.find(host) != removed_hosts.end()) {
+    if (removed_hosts.contains(host)) {
       // Since the host still exists, we will remove it from removed_hosts.
       removed_hosts.erase(host);
     }
@@ -518,12 +527,9 @@ void ReverseConnectionIOHandle::removeStaleHostAndCloseConnections(const std::st
     // Remove from wrapper-to-host map.
     conn_wrapper_to_host_map_.erase(wrapper);
     // Remove the wrapper from connection_wrappers_ vector.
-    connection_wrappers_.erase(
-        std::remove_if(connection_wrappers_.begin(), connection_wrappers_.end(),
-                       [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) {
-                         return w.get() == wrapper;
-                       }),
-        connection_wrappers_.end());
+    std::erase_if(connection_wrappers_, [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) {
+      return w.get() == wrapper;
+    });
   }
   // Clear connection keys from host info.
   auto host_it = host_to_conn_info_map_.find(host);
@@ -843,7 +849,7 @@ ReverseConnectionIOHandle::dropTunnelFromTracking(const std::string& connection_
   std::string host_address;
   std::string cluster_name;
   for (const auto& [host, host_info] : host_to_conn_info_map_) {
-    if (host_info.connection_keys.find(connection_key) != host_info.connection_keys.end()) {
+    if (host_info.connection_keys.contains(connection_key)) {
       host_address = host;
       cluster_name = host_info.cluster_name;
       break;
@@ -955,6 +961,33 @@ void ReverseConnectionIOHandle::updateStateGauge(const std::string& host_address
 }
 
 void ReverseConnectionIOHandle::maintainReverseConnections() {
+  // During a hot restart, don't dial until we've asked the parent to stop accepting new
+  // connections; otherwise the child's connection can be accepted by the still-listening parent
+  // through a shared loopback listener and be reset when the parent exits. Re-check shortly. With
+  // no extension (some unit tests), no parent, or hot restart disabled, this dials immediately.
+  auto* extension = getDownstreamExtension();
+  if (extension != nullptr && !extension->parentStopAcceptingRequested()) {
+    deferred_for_parent_stop_accepting_ = true;
+    ENVOY_LOG(debug, "reverse_tunnel: parent still accepting; deferring reverse connection dial");
+    if (rev_conn_retry_timer_) {
+      rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(kParentStopAcceptingRecheckMs));
+    }
+    return;
+  }
+  // Once the drain request has been sent, wait a fixed grace period so the parent can process the
+  // RPC and stop listeners before we dial. Only applies when we actually deferred above, so fresh
+  // starts and hot-restart-disabled runs dial immediately.
+  if (deferred_for_parent_stop_accepting_) {
+    deferred_for_parent_stop_accepting_ = false;
+    ENVOY_LOG(debug,
+              "reverse_tunnel: waiting for parent drain to propagate before reverse connection "
+              "dial");
+    if (rev_conn_retry_timer_) {
+      rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(kParentDrainPropagationGraceMs));
+    }
+    return;
+  }
+
   // Validate required configuration parameters at the top level.
   if (config_.src_node_id.empty()) {
     ENVOY_LOG(error, "Source node ID is required but empty - cannot maintain reverse connections");

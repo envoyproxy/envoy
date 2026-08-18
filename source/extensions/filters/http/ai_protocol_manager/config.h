@@ -12,7 +12,8 @@ namespace AiProtocolManager {
 
 class AiProtocolManagerFilterConfigFactory
     : public Common::DualFactoryBase<
-          envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager> {
+          envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager,
+          envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute> {
 public:
   AiProtocolManagerFilterConfigFactory()
       : DualFactoryBase("envoy.filters.http.ai_protocol_manager") {}
@@ -23,6 +24,13 @@ private:
           proto_config,
       const std::string& stats_prefix, DualInfo info,
       Server::Configuration::ServerFactoryContext& context) override;
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute&
+          proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
 };
 
 using UpstreamAiProtocolManagerFilterConfigFactory = AiProtocolManagerFilterConfigFactory;
