@@ -76,8 +76,15 @@ ClientContextImpl::ClientContextImpl(
     return;
   }
 
-  // If a custom TLS certificate selector is used, allow more than one TLS cert.
-  if (!config.tlsCertificateSelectorFactory() && tls_contexts_.size() != 1) {
+  // If a custom TLS certificate selector is used and maxSessionKeys is set to 0
+  // then allow multiple certificates.
+  //
+  // newSSL() installs a cached session before certificate selection callback,
+  // and is only keyed by SNI, so it's possible that a session created for
+  // cert A can be resumed by a connection that would choose cert B. Therefore
+  // to prevent incorrect TLS session resumption, maxSessionKeys should be 0.
+  if (!(config.tlsCertificateSelectorFactory() && config.maxSessionKeys() == 0) &&
+      tls_contexts_.size() != 1) {
     creation_status =
         absl::InvalidArgumentError("Client TLS context supports only a single certificate");
     return;

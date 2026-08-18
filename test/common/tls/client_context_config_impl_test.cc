@@ -387,6 +387,7 @@ TEST_F(ClientContextConfigImplTest, MultipleTlsCertificatesWhenCustomTlsCertSele
       provider_factory);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  tls_context.mutable_max_session_keys()->set_value(0);
   const std::string custom_tls_certificate_selector_yaml = R"EOF(
   name: test-tls-context-provider
   typed_config:
