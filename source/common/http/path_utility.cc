@@ -3,7 +3,9 @@
 #include <optional>
 
 #include "source/common/common/logger.h"
+#include "source/common/runtime/runtime_features.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
@@ -15,6 +17,12 @@ namespace Http {
 
 namespace {
 std::optional<std::string> canonicalizePath(absl::string_view original_path) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.allow_percentzerozero_in_url_path")) {
+    if (absl::StrContains(original_path, "%00")) {
+      return std::nullopt;
+    }
+  }
   std::string canonical_path;
   url::Component in_component(0, original_path.size());
   url::Component out_component;
