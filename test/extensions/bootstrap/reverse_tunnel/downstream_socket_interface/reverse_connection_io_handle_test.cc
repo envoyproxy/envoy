@@ -3470,34 +3470,6 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsStopsReplacementDialOnListe
   EXPECT_EQ(getHostConnectionInfo(host).connection_keys.count(connection_key), 0);
 }
 
-// After resetFileEvents(), a subsequent initializeFileEvent() (socket reuse across a compatible
-// listener update) must be allowed to restart reverse-connection maintenance.
-TEST_F(ReverseConnectionIOHandleTest, InitializeFileEventRestartsAfterResetFileEvents) {
-  setupThreadLocalSlot();
-
-  auto config = createDefaultTestConfig();
-  io_handle_ = createTestIOHandle(config);
-  ASSERT_NE(io_handle_, nullptr);
-
-  auto* first_timer = new NiceMock<Event::MockTimer>();
-  auto* second_timer = new NiceMock<Event::MockTimer>();
-  EXPECT_CALL(dispatcher_, createTimer_(_))
-      .WillOnce(Return(first_timer))
-      .WillOnce(Return(second_timer));
-  EXPECT_CALL(*first_timer, enableTimer(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(*second_timer, enableTimer(_, _)).Times(testing::AtLeast(1));
-
-  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
-  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
-                                  Event::FileReadyType::Read);
-
-  io_handle_->resetFileEvents();
-
-  // Must create a new retry timer and resume maintenance.
-  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
-                                  Event::FileReadyType::Read);
-}
-
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions

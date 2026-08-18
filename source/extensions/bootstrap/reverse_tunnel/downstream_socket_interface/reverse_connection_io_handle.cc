@@ -180,10 +180,6 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
     return;
   }
 
-  // A reused listen socket (compatible-address listener update) may have previously been marked
-  // shutting down via resetFileEvents(); clear that so maintenance can start again.
-  shutting_down_.store(false, std::memory_order_release);
-
   ENVOY_LOG(info, "reverse_tunnel: Starting reverse connections on worker thread '{}'",
             dispatcher.name());
 
@@ -376,8 +372,6 @@ ReverseConnectionIOHandle::connect(Envoy::Network::Address::InstanceConstSharedP
 Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
   ENVOY_LOG(error, "reverse_tunnel: performing graceful shutdown.");
 
-  shutting_down_.store(true, std::memory_order_release);
-
   // If initializeFileEvent() ran, fd_ was reassigned to trigger_pipe_read_fd_ and the base class
   // will close that. We must close original_socket_fd_ explicitly since nothing else owns it.
   // If initializeFileEvent() did not run, fd_ == original_socket_fd_ and the base class handles it.
@@ -408,12 +402,10 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
 
 void ReverseConnectionIOHandle::resetFileEvents() {
   // ~TcpListenerImpl calls this on the worker when the listener stops accepting (LDS removal /
-  // drain). Tear down maintenance on that same thread before the main thread closes the socket,
-  // so drain-aware re-dial cannot start a replacement handshake against a dying listener.
+  // drain). Destroy the retry timer on that same thread before the main thread closes the socket,
+  // so drain-aware re-dial cannot arm a replacement handshake against a dying listener.
   if (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe()) {
-    shutting_down_.store(true, std::memory_order_release);
     rev_conn_retry_timer_.reset();
-    is_reverse_conn_started_ = false;
   }
   IoSocketHandleImpl::resetFileEvents();
 }
@@ -930,12 +922,12 @@ void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
     return;
   }
 
-  // Listener stop (LDS removal / drain) tears down the retry timer in resetFileEvents() before the
+  // Listener stop (LDS removal / drain) destroys the retry timer in resetFileEvents() before the
   // listen socket is closed. Do not start a replacement handshake against a dying listener.
-  if (shutting_down_.load(std::memory_order_acquire) || rev_conn_retry_timer_ == nullptr) {
+  if (rev_conn_retry_timer_ == nullptr) {
     ENVOY_LOG(debug,
-              "reverse_tunnel: skipping replacement dial for {} because the reverse connection "
-              "listener is shutting down",
+              "reverse_tunnel: skipping replacement dial for {}; retry timer is gone "
+              "(listener stop)",
               connection_key);
     return;
   }
@@ -988,11 +980,6 @@ void ReverseConnectionIOHandle::updateStateGauge(const std::string& host_address
 }
 
 void ReverseConnectionIOHandle::maintainReverseConnections() {
-  if (shutting_down_.load(std::memory_order_acquire)) {
-    ENVOY_LOG(debug, "reverse_tunnel: skipping connection maintenance; listener is shutting down");
-    return;
-  }
-
   // Validate required configuration parameters at the top level.
   if (config_.src_node_id.empty()) {
     ENVOY_LOG(error, "Source node ID is required but empty - cannot maintain reverse connections");
@@ -1022,14 +1009,6 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
 bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& cluster_name,
                                                              const std::string& host_address,
                                                              Upstream::HostConstSharedPtr host) {
-  if (shutting_down_.load(std::memory_order_acquire)) {
-    ENVOY_LOG(debug,
-              "reverse_tunnel: skipping initiate to {}/{} because the reverse connection "
-              "listener is shutting down",
-              cluster_name, host_address);
-    return false;
-  }
-
   // Generate a temporary connection key for early failure tracking.
   const std::string temp_connection_key =
       "temp_" + cluster_name + "_" + host_address + "_" + std::to_string(rand());

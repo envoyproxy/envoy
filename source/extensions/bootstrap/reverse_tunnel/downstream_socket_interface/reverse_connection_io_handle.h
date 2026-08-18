@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <chrono>
 #include <memory>
 #include <optional>
@@ -539,9 +538,6 @@ private:
 
   bool is_reverse_conn_started_{
       false}; // Whether reverse connections have been started on worker thread
-  // Set when the listen socket is stopping (resetFileEvents / close). Stops maintenance and
-  // drain-aware replacement dials so LDS removal cannot start a new handshake.
-  std::atomic<bool> shutting_down_{false};
   Event::Dispatcher* worker_dispatcher_{nullptr}; // Dispatcher for the worker thread
 
   // Store original socket FD for cleanup.
