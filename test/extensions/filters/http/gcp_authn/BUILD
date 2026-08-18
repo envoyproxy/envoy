@@ -53,6 +53,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.gcp_authn"],
     deps = [
         ":gcp_authn_mocks",
+        "//envoy/common:time_interface",
         "//source/extensions/filters/http/gcp_authn",
         "//source/extensions/filters/http/gcp_authn:config",
         "//test/common/http:common_lib",
