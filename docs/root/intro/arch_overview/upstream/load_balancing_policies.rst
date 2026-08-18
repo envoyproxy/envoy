@@ -33,23 +33,9 @@ The subset load balancer does not currently support inner load balancers which a
 Taking :ref:`random load balancing policy <envoy_v3_api_msg_extensions.load_balancing_policies.random.v3.Random>`
 as an example:
 
-.. code-block:: yaml
-
-    name: example_cluster
-    type: STRICT_DNS
-    connect_timeout: 0.25s
-    load_assignment:
-      cluster_name: example_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: example.com
-                port_value: 80
-    load_balancing_policy:
-      policies:
-      - typed_extension_config:
-          name: envoy.load_balancing_policies.random
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.random.v3.Random
+.. literalinclude:: _include/load-balancing-policy.yaml
+    :language: yaml
+    :lines: 24-35
+    :lineno-start: 24
+    :linenos:
+    :caption: :download:`load-balancing-policy.yaml <_include/load-balancing-policy.yaml>`
