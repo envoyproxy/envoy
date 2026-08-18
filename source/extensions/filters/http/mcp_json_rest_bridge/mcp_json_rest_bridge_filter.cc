@@ -793,63 +793,59 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(
     ASSERT(false, "serveToolsListLocal requires an RPC ID");
   }
 
-  size_t reserve_size = sizeof("{\"jsonrpc\":\"2.0\",\"id\":") - 1 + request_id_json.size() +
-                        sizeof(",\"result\":{\"tools\":[") - 1 + sizeof("]}}") - 1;
+  std::vector<std::unique_ptr<std::string>> owned_response_fragments;
+  std::vector<absl::string_view> response_fragments;
 
-  for (const auto* tool : tools) {
-    reserve_size += sizeof("{\"name\":") - 1 + nlohmann::json(tool->name()).dump().size();
-
-    if (!tool->tool_list_config().title().empty()) {
-      reserve_size += sizeof(",\"title\":") - 1 +
-                      nlohmann::json(tool->tool_list_config().title()).dump().size();
-    }
-
-    reserve_size += sizeof(",\"description\":") - 1 +
-                    nlohmann::json(tool->tool_list_config().description()).dump().size() +
-                    sizeof(",\"inputSchema\":") - 1;
-
-    if (!tool->tool_list_config().input_schema().empty()) {
-      reserve_size += tool->tool_list_config().input_schema().size();
-    } else {
-      reserve_size += sizeof("{\"type\":\"object\"}") - 1;
-    }
-    reserve_size += sizeof("}") - 1 + sizeof(",") - 1;
-  }
-
-  std::string response_data;
-  response_data.reserve(reserve_size);
-  absl::StrAppend(&response_data, "{\"jsonrpc\":\"2.0\",\"id\":", request_id_json,
-                  ",\"result\":{\"tools\":[");
+  response_fragments.emplace_back("{\"jsonrpc\":\"2.0\",\"id\":");
+  response_fragments.emplace_back(request_id_json),
+      response_fragments.emplace_back(",\"result\":{\"tools\":[");
 
   bool first_tool = true;
   for (const auto* tool : tools) {
     if (!first_tool) {
-      absl::StrAppend(&response_data, ",");
+      response_fragments.emplace_back(",");
     }
     first_tool = false;
 
-    absl::StrAppend(&response_data, "{\"name\":", nlohmann::json(tool->name()).dump());
+    response_fragments.emplace_back("{\"name\":");
+    response_fragments.emplace_back(*owned_response_fragments.emplace_back(
+        std::make_unique<std::string>(nlohmann::json(tool->name()).dump())));
 
     if (!tool->tool_list_config().title().empty()) {
-      absl::StrAppend(&response_data,
-                      ",\"title\":", nlohmann::json(tool->tool_list_config().title()).dump());
+      response_fragments.emplace_back(",\"title\":");
+      response_fragments.emplace_back(*owned_response_fragments.emplace_back(
+          std::make_unique<std::string>(nlohmann::json(tool->tool_list_config().title()).dump())));
     }
 
-    absl::StrAppend(&response_data, ",\"description\":",
-                    nlohmann::json(tool->tool_list_config().description()).dump(),
-                    ",\"inputSchema\":");
+    if (!tool->tool_list_config().description().empty()) {
+      response_fragments.emplace_back(",\"description\":");
+      response_fragments.emplace_back(
+          *owned_response_fragments.emplace_back(std::make_unique<std::string>(
+              nlohmann::json(tool->tool_list_config().description()).dump())));
+    }
+    response_fragments.emplace_back(",\"inputSchema\":");
 
     // WARNING: assumes input_schema is trusted to be a valid JSON fragment. Does not validate.
     if (!tool->tool_list_config().input_schema().empty()) {
-      absl::StrAppend(&response_data, tool->tool_list_config().input_schema());
+      response_fragments.emplace_back(tool->tool_list_config().input_schema());
     } else {
-      absl::StrAppend(&response_data, "{\"type\":\"object\"}");
+      response_fragments.emplace_back("{\"type\":\"object\"}");
     }
 
-    absl::StrAppend(&response_data, "}");
+    response_fragments.emplace_back("}");
   }
 
-  absl::StrAppend(&response_data, "]}}");
+  response_fragments.emplace_back("]}}");
+
+  std::string response_data;
+  size_t reserve_size = 0;
+  for (const auto& fragment : response_fragments) {
+    reserve_size += fragment.size();
+  }
+  response_data.reserve(reserve_size);
+  for (const auto& fragment : response_fragments) {
+    absl::StrAppend(&response_data, fragment);
+  }
 
   decoder_callbacks_->sendLocalReply(
       Http::Code::OK, response_data,

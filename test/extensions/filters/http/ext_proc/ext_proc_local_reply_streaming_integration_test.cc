@@ -30,6 +30,13 @@ using Http::LowerCaseString;
 
 class ExtProcLocalReplyStreamingIntegrationTest : public ExtProcIntegrationTest {
 public:
+  void SetUp() override {
+    if (!IsEnvoyGrpc()) {
+      GTEST_SKIP()
+          << "Google gRPC client is not supported for local reply streaming integration tests";
+    }
+  }
+
   void sendLocalResponseBody(bool end_of_stream) {
     ProcessingResponse body_response;
     auto streamed_response =

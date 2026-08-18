@@ -31,8 +31,8 @@ LambdaDelegate::~LambdaDelegate() {
 }
 
 void LambdaDelegate::log(absl::string_view msg, const spdlog::details::log_msg& log_msg) {
-  // Logger::Levels is simply an alias to spdlog::level::level_enum, so we can safely cast it.
-  logger_->on_log_(static_cast<Logger::Levels>(log_msg.level), std::string(msg));
+  // Levels is simply an alias to spdlog::level::level_enum, so we can safely cast it.
+  logger_->on_log_(static_cast<Levels>(log_msg.level), std::string(msg));
 }
 
 DefaultDelegate::DefaultDelegate(absl::Mutex& mutex, DelegatingLogSinkSharedPtr log_sink)

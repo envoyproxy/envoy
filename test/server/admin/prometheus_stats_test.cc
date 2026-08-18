@@ -2341,8 +2341,8 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramDenseDataAccuracy) {
         NativeHistogramDecoder::expectedBucketIndex(schema, static_cast<double>(v));
 
     // The bucket should exist
-    EXPECT_TRUE(buckets.count(expected_idx) > 0 || buckets.count(expected_idx - 1) > 0 ||
-                buckets.count(expected_idx + 1) > 0)
+    EXPECT_TRUE(buckets.contains(expected_idx) || buckets.contains(expected_idx - 1) ||
+                buckets.contains(expected_idx + 1))
         << "Value " << v << " should be in bucket near index " << expected_idx;
   }
 

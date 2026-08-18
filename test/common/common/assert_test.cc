@@ -109,6 +109,46 @@ TEST(EnvoyBugStackTrace, TestStackTraceSingleEntry) {
   Assert::EnvoyBugStackTrace::setSingleLine(saved);
 }
 
+TEST(EnvoyBugStackTrace, TestStackTraceSingleEntryWithMessage) {
+  const bool saved = Assert::EnvoyBugStackTrace::singleLine();
+  Assert::EnvoyBugStackTrace::setSingleLine(true);
+  Assert::EnvoyBugStackTrace st;
+  st.capture();
+  {
+    LogLevelSetter save_levels(spdlog::level::trace);
+    StartStopRecording recording(GetLogSink());
+    st.logStackTrace("envoy bug failure: some_condition. Details: something went wrong");
+    auto messages = recording.messages();
+    ASSERT_EQ(1, messages.size());
+    EXPECT_THAT(
+        messages[0],
+        testing::HasSubstr("envoy bug failure: some_condition. Details: something went wrong"));
+    EXPECT_THAT(messages[0], testing::HasSubstr("#0"));
+    EXPECT_THAT(messages[0], testing::Not(testing::HasSubstr("stacktrace for envoy bug")));
+  }
+  Assert::EnvoyBugStackTrace::setSingleLine(saved);
+}
+
+TEST(EnvoyBugDeathTest, SingleEntryIncludesMessage) {
+#if !defined(NDEBUG) && !defined(ENVOY_CONFIG_COVERAGE)
+  GTEST_SKIP() << "ENVOY_BUG aborts in debug mode, cannot verify log entry count";
+#endif
+  const bool saved = Assert::EnvoyBugStackTrace::singleLine();
+  Assert::EnvoyBugStackTrace::setSingleLine(true);
+  Assert::resetEnvoyBugCountersForTest();
+  auto envoy_bug_action_registration = Assert::addEnvoyBugFailureRecordAction([](const char*) {});
+  {
+    LogLevelSetter save_levels(spdlog::level::trace);
+    StartStopRecording recording(GetLogSink());
+    ENVOY_BUG(false, "test details");
+    auto messages = recording.messages();
+    ASSERT_EQ(1, messages.size());
+    EXPECT_THAT(messages[0], testing::HasSubstr("envoy bug failure: false. Details: test details"));
+    EXPECT_THAT(messages[0], testing::HasSubstr("#0"));
+  }
+  Assert::EnvoyBugStackTrace::setSingleLine(saved);
+}
+
 TEST(EnvoyBugDeathTest, VariousLogs) {
   // Use 2 envoy bug action registrations to verify that action chaining is working correctly.
   int envoy_bug_fail_count = 0;
