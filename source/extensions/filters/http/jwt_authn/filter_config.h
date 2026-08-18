@@ -7,10 +7,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/jwt_authn/extractor.h"
 #include "source/extensions/filters/http/jwt_authn/matcher.h"
 #include "source/extensions/filters/http/jwt_authn/stats.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/jwt_authn/verifier.h"
 
 #include "absl/container/flat_hash_map.h"
