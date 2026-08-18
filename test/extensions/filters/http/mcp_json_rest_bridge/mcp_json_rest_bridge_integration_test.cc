@@ -382,7 +382,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, UnsupportedMcpProtocolVersionHeader) {
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
-          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"Unsupported protocol version"}})json"));
+          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"Unsupported MCP version"}})json"));
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, MissingIdField) {
@@ -573,7 +573,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InvalidArguments) {
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
-          R"json({"jsonrpc":"2.0","id":321,"error":{"code":-32602,"message":"Invalid tool arguments"}})json"));
+          R"json({"jsonrpc":"2.0","id":321,"error":{"code":-32602,"message":"Missing required argument"}})json"));
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithErrorResponse) {
