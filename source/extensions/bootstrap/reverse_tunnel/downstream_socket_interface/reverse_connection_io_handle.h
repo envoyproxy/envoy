@@ -526,6 +526,10 @@ private:
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
 
+  // Set while waiting for parentStopAcceptingRequested(); cleared after scheduling the one-shot
+  // drain-propagation grace timer so fresh starts dial immediately.
+  bool deferred_for_parent_stop_accepting_{false};
+
   bool is_reverse_conn_started_{
       false}; // Whether reverse connections have been started on worker thread
   Event::Dispatcher* worker_dispatcher_{nullptr}; // Dispatcher for the worker thread

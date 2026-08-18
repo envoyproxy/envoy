@@ -65,6 +65,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+bzlmod
 CIO
 CBC
 cbc
@@ -1191,6 +1192,7 @@ oauth
 observability
 observations
 ocagent
+offloadable
 offsetof
 oneof
 oneway
