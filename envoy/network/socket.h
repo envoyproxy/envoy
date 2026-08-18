@@ -447,8 +447,11 @@ public:
 
   /**
    * Close the underlying socket.
+   * @param send_rst whether to perform an abortive close (i.e. RST) or a graceful close (i.e. FIN).
+   *                 Defaults to false (graceful close).
    */
-  virtual void close(bool send_rst = false) PURE;
+  virtual void close(bool send_rst) PURE;
+  void close() { close(false); }
 
   /**
    * Return true if close() hasn't been called.

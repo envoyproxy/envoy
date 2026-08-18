@@ -194,7 +194,8 @@ public:
   Socket::Type socketType() const override { return Socket::Type::Stream; }
 
   bool isOpen() const override { return ListenSocketImpl::isOpen(); }
-  void close(bool send_rst = false) override { ListenSocketImpl::close(send_rst); }
+  void close(bool send_rst) override { ListenSocketImpl::close(send_rst); }
+  void close() { ListenSocketImpl::close(); }
 };
 
 TEST_P(ListenSocketImplTestTcp, NonIoHandleListenSocket) {

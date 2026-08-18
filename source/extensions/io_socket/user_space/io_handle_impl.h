@@ -47,7 +47,8 @@ public:
     ASSERT(false, "not supported");
     return INVALID_SOCKET;
   }
-  Api::IoCallUint64Result close(bool send_rst = false) override;
+  Api::IoCallUint64Result close(bool send_rst) override;
+  Api::IoCallUint64Result close() { return close(false); }
   bool isOpen() const override;
   bool wasConnected() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,

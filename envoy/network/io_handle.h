@@ -59,8 +59,11 @@ public:
 
   /**
    * Clean up IoHandle resources
+   * @param send_rst whether to perform an abortive close (i.e. RST) or a graceful close (i.e. FIN).
+   *                 Defaults to false (graceful close).
    */
-  virtual Api::IoCallUint64Result close(bool send_rst = false) PURE;
+  virtual Api::IoCallUint64Result close(bool send_rst) PURE;
+  Api::IoCallUint64Result close() { return close(false); }
 
   /**
    * Return true if close() hasn't been called.

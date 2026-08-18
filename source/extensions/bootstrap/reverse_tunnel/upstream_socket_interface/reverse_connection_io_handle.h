@@ -52,7 +52,15 @@ public:
    *
    * @return IoCallUint64Result indicating the result of the close operation.
    */
-  Api::IoCallUint64Result close(bool send_rst = false) override;
+  Api::IoCallUint64Result close(bool send_rst) override;
+
+  /**
+   * Close the underlying socket.
+   * @return IoCallUint64Result indicating the result of the close operation.
+   * @param send_rst whether to perform an abortive close (i.e. RST) or a graceful close (i.e. FIN).
+   *                 Defaults to false (graceful close).
+   */
+  Api::IoCallUint64Result close() { return close(false); }
 
   /**
    * Override of shutdown for reverse connections.

@@ -35,11 +35,12 @@ protected:
   void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
 
-  void close(bool send_rst = false) override {
+  void close(bool send_rst) override {
     if (io_handle_ != nullptr && io_handle_->isOpen()) {
       io_handle_->close(send_rst);
     }
   }
+  void close() { return close(false); }
   bool isOpen() const override { return io_handle_ != nullptr && io_handle_->isOpen(); }
 };
 
@@ -110,13 +111,14 @@ public:
     ASSERT(io_handle_ != nullptr);
     return *io_handle_;
   }
-  void close(bool send_rst = false) override {
+  void close(bool send_rst) override {
     if (io_handle_ != nullptr) {
       if (io_handle_->isOpen()) {
         io_handle_->close(send_rst);
       }
     }
   }
+  void close() { close(false); }
   bool isOpen() const override {
     return io_handle_ == nullptr ? false // Consider listen socket as closed if it does not bind to
                                          // port. No fd will leak.
@@ -179,7 +181,7 @@ public:
     PANIC("not implemented");
   }
 
-  void close(bool /*send_rst*/ = false) override { ASSERT(io_handle_ == nullptr); }
+  void close(bool /*send_rst*/) override { ASSERT(io_handle_ == nullptr); }
   bool isOpen() const override {
     ASSERT(io_handle_ == nullptr);
     return false;

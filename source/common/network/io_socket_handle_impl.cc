@@ -62,6 +62,7 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
 Api::IoCallUint64Result IoSocketHandleImpl::close(bool send_rst) {
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
   if (send_rst) {
+    // Enabling SO_LINGER with a timeout of zero results in an abortive close.
     struct linger l;
     l.l_onoff = 1;
     l.l_linger = 0;
