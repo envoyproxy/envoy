@@ -54,16 +54,6 @@ bazel_features:
   license: "Apache-2.0"
   license_url: "https://github.com/bazel-contrib/bazel_features/blob/v{version}/LICENSE"
 
-bazel_gazelle:
-  project_name: "Gazelle"
-  project_desc: "Bazel BUILD file generator for Go projects"
-  project_url: "https://github.com/bazelbuild/bazel-gazelle"
-  release_date: "2025-11-07"
-  use_category:
-  - build
-  license: "Apache-2.0"
-  license_url: "https://github.com/bazelbuild/bazel-gazelle/blob/v{version}/LICENSE"
-
 benchmark:
   project_name: "Benchmark"
   project_desc: "Library to benchmark code snippets"
@@ -464,6 +454,16 @@ fp16:
   - dataplane_ext
   extensions:
   - envoy.wasm.runtime.v8
+
+gazelle:
+  project_name: "Gazelle"
+  project_desc: "Bazel BUILD file generator for Go projects"
+  project_url: "https://github.com/bazelbuild/bazel-gazelle"
+  release_date: "2025-11-07"
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/bazel-gazelle/blob/v{version}/LICENSE"
 
 googletest:
   project_name: "Google Test"
