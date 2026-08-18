@@ -1,6 +1,6 @@
-load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
+load("@googleapis//:repository_rules.bzl", "switched_rules_by_language")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy.router.cluster_specifier_plugin.lua"]
@@ -81,6 +81,7 @@ def _cc_deps():
         patches = ["@envoy//bazel:grpc_httpjson_transcoding.patch"],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
+            "@com_google_googleapis": "@googleapis",
             "@com_google_protoconverter": "@proto-converter",
         },
     )
@@ -105,6 +106,7 @@ def _cc_deps():
         patches = ["@envoy//bazel:proto-field-extraction-protobuf-v35.patch"],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
+            "@com_google_googleapis": "@googleapis",
             "@ocp": "@ocp-diag-core",
         },
     )
@@ -116,6 +118,7 @@ def _cc_deps():
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
             "@ocp": "@ocp-diag-core",
+            "@com_google_googleapis": "@googleapis",
             "@com_google_protoconverter": "@proto-converter",
             "@com_google_protofieldextraction": "@proto-field-extraction",
         },
@@ -822,6 +825,7 @@ def _com_github_grpc_grpc():
         patches = ["@envoy//bazel:grpc.patch"],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
+            "@com_google_googleapis": "@googleapis",
             "@com_github_cncf_xds": "@xds",
             "@com_googlesource_code_re2": "@re2",
             "@openssl": "@boringssl",

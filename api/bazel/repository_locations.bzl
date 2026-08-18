@@ -30,7 +30,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "zipkin-api-{version}",
         urls = ["https://github.com/openzipkin/zipkin-api/archive/{version}.tar.gz"],
     ),
-    com_google_googleapis = dict(
+    googleapis = dict(
         # TODO(dio): Consider writing a Starlark macro for importing Google API proto.
         version = "fd52b5754b2b268bc3a22a10f29844f206abb327",
         sha256 = "97fc354dddfd3ea03e7bf2ad74129291ed6fad7ff39d3bd8daec738a3672eb8a",
