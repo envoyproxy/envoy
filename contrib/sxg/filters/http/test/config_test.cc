@@ -57,7 +57,7 @@ void expectCreateFilter(std::string yaml, bool is_sds_config) {
 
 // This loads one of the secrets in credentials, and fails the other one.
 void expectInvalidSecretConfig(const std::string& failed_secret_name,
-                               const std::string& exception_message) {
+                               const std::string& error_message) {
   const std::string yaml = R"YAML(
 certificate:
   name: certificate
@@ -80,9 +80,9 @@ validity_url: "/.sxg/validity.msg"
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, exception_message);
+  const auto cb_or_error = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_FALSE(cb_or_error.ok());
+  EXPECT_EQ(cb_or_error.status().message(), error_message);
 }
 
 } // namespace

@@ -12,13 +12,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace SXG {
 
-class FilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
+class FilterFactory : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
                           envoy::extensions::filters::http::sxg::v3alpha::SXG> {
 public:
-  FilterFactory() : FactoryBase("envoy.filters.http.sxg") {}
+  FilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.sxg") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::sxg::v3alpha::SXG& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

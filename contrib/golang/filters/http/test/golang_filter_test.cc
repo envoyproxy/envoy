@@ -129,7 +129,7 @@ public:
     config_ = std::make_shared<FilterConfig>(
         proto_config, Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name), "",
         context_);
-    config_->newGoPluginConfig();
+    ASSERT_TRUE(config_->newGoPluginConfig().ok());
     // Setup per route config for Golang filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
@@ -228,7 +228,7 @@ TEST_F(GolangHttpFilterTest, BufferedDataAfterDestroyDuringContinue) {
   TestUtility::loadFromYaml(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> mock_context;
   auto config = std::make_shared<FilterConfig>(proto_config, dso_lib, "", mock_context);
-  config->newGoPluginConfig();
+  ASSERT_TRUE(config->newGoPluginConfig().ok());
 
   Network::Address::InstanceConstSharedPtr addr(
       (*Network::Address::PipeInstance::create("/test/test.sock")).release());
@@ -282,7 +282,7 @@ TEST_F(GolangHttpFilterTest, ContinueStatusFromInsideHeaderCgoCallbackPostsToDis
   TestUtility::loadFromYaml(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> mock_context;
   auto config = std::make_shared<FilterConfig>(proto_config, dso_lib, "", mock_context);
-  config->newGoPluginConfig();
+  ASSERT_TRUE(config->newGoPluginConfig().ok());
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> mock_callbacks;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> mock_enc_callbacks;
