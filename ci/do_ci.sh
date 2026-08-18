@@ -661,6 +661,9 @@ case $CI_TARGET in
 
     deps)
         setup_clang_toolchain
+        echo "dependency metadata ordering..."
+        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/dependency:deps_order_test
         echo "dependency validate_test..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:validate_test

@@ -240,6 +240,7 @@ envoy_cc_library(
         "//envoy/filesystem:filesystem_interface",
         "//source/common/common:logger_lib",
         "//source/common/filesystem:filesystem_lib",
+        "//source/common/singleton:threadsafe_singleton",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/synchronization",

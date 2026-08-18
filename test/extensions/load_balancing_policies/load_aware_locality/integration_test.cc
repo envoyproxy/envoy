@@ -249,6 +249,7 @@ TEST_P(LoadAwareLocalityIntegrationTest, AdaptiveSpillAndRecovery) {
   EXPECT_GT(phase1_remote, phase1_local);
 
   const std::vector<double> rebalanced = {0.3, 0.3, 0.3, 0.3};
+  seedAllUpstreams(rebalanced);
   sendRequestsAndTrack(60, rebalanced);
   // Rebalanced utilization snaps local, incrementing local_preferred_total.
   advanceWeightTick("local_preferred_total");

@@ -194,7 +194,7 @@ bool ReverseTunnelFilterConfig::validateConnectionLimit(absl::string_view node_i
   return false;
 }
 
-bool ReverseTunnelFilterConfig::validateIdentifiers(
+ReverseTunnelValidationResult ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id, absl::string_view tenant_id,
     const Http::RequestHeaderMap& request_headers,
     const StreamInfo::StreamInfo& stream_info) const {
@@ -202,12 +202,12 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
   if (!validateConnectionLimit(node_id, tenant_id)) {
     ENVOY_LOG(debug, "reverse_tunnel: connection limit reached. node_id: {}, tenant_id: {}",
               node_id, tenant_id);
-    return false;
+    return ReverseTunnelValidationResult::Rejected;
   }
 
   // If no validation configured, pass validation.
   if (!node_id_formatter_ && !cluster_id_formatter_ && !tenant_id_formatter_) {
-    return true;
+    return ReverseTunnelValidationResult::ValidationPassed;
   }
 
   // Give the formatter the parsed handshake headers so validation strings can read them with
@@ -230,7 +230,7 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
     if (binding_failed(expected_node_id, node_id)) {
       ENVOY_LOG(debug, "reverse_tunnel: node_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_node_id, node_id);
-      return false;
+      return ReverseTunnelValidationResult::ValidationFailed;
     }
   }
 
@@ -240,7 +240,7 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
     if (binding_failed(expected_cluster_id, cluster_id)) {
       ENVOY_LOG(debug, "reverse_tunnel: cluster_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_cluster_id, cluster_id);
-      return false;
+      return ReverseTunnelValidationResult::ValidationFailed;
     }
   }
 
@@ -250,18 +250,16 @@ bool ReverseTunnelFilterConfig::validateIdentifiers(
     if (binding_failed(expected_tenant_id, tenant_id)) {
       ENVOY_LOG(debug, "reverse_tunnel: tenant_id validation failed. Expected: '{}', Actual: '{}'",
                 expected_tenant_id, tenant_id);
-      return false;
+      return ReverseTunnelValidationResult::ValidationFailed;
     }
   }
 
-  return true;
+  return ReverseTunnelValidationResult::ValidationPassed;
 }
 
-void ReverseTunnelFilterConfig::emitValidationMetadata(absl::string_view node_id,
-                                                       absl::string_view cluster_id,
-                                                       absl::string_view tenant_id,
-                                                       bool validation_passed,
-                                                       StreamInfo::StreamInfo& stream_info) const {
+void ReverseTunnelFilterConfig::emitValidationMetadata(
+    absl::string_view node_id, absl::string_view cluster_id, absl::string_view tenant_id,
+    ReverseTunnelValidationResult validation_result, StreamInfo::StreamInfo& stream_info) const {
   if (!emit_dynamic_metadata_) {
     return;
   }
@@ -275,7 +273,7 @@ void ReverseTunnelFilterConfig::emitValidationMetadata(absl::string_view node_id
   fields["tenant_id"].set_string_value(std::string(tenant_id));
 
   // Emit validation result.
-  fields["validation_result"].set_string_value(validation_passed ? "allowed" : "denied");
+  fields["validation_result"].set_string_value(toStringView(validation_result));
 
   // Set dynamic metadata on the stream info.
   stream_info.setDynamicMetadata(dynamic_metadata_namespace_, metadata);
@@ -284,7 +282,7 @@ void ReverseTunnelFilterConfig::emitValidationMetadata(absl::string_view node_id
             "reverse_tunnel: emitted dynamic metadata to namespace '{}': node_id={}, "
             "cluster_id={}, tenant_id={}, validation_result={}",
             dynamic_metadata_namespace_, node_id, cluster_id, tenant_id,
-            validation_passed ? "allowed" : "denied");
+            toStringView(validation_result));
 }
 
 // ReverseTunnelFilter implementation.
@@ -559,20 +557,28 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   }
 
   // Validate node_id, cluster_id, and tenant_id if validation is configured.
-  const bool validation_passed = parent_.config_->validateIdentifiers(
+  const ReverseTunnelValidationResult validation_result = parent_.config_->validateIdentifiers(
       node_id, cluster_id, tenant_id, *headers_, connection.streamInfo());
 
   // Emit validation metadata if configured.
-  parent_.config_->emitValidationMetadata(node_id, cluster_id, tenant_id, validation_passed,
+  parent_.config_->emitValidationMetadata(node_id, cluster_id, tenant_id, validation_result,
                                           connection.streamInfo());
 
-  if (!validation_passed) {
-    parent_.stats_.validation_failed_.inc();
+  if (validation_result != ReverseTunnelValidationResult::ValidationPassed) {
+    if (validation_result == ReverseTunnelValidationResult::Rejected) {
+      parent_.stats_.rejected_.inc();
+    } else {
+      parent_.stats_.validation_failed_.inc();
+    }
     ENVOY_CONN_LOG(debug,
-                   "reverse_tunnel: validation failed for node '{}', cluster '{}', tenant '{}'",
-                   parent_.read_callbacks_->connection(), node_id, cluster_id, tenant_id);
-    sendLocalReply(Http::Code::Forbidden, "Validation failed", nullptr, std::nullopt,
-                   "reverse_tunnel_validation_failed");
+                   "reverse_tunnel: handshake denied for node '{}', cluster '{}', tenant '{}', "
+                   "result: {}",
+                   parent_.read_callbacks_->connection(), node_id, cluster_id, tenant_id,
+                   toStringView(validation_result));
+    sendLocalReply(
+        validation_result == ReverseTunnelValidationResult::Rejected ? Http::Code::TooManyRequests
+                                                                     : Http::Code::Forbidden,
+        toStringView(validation_result), nullptr, std::nullopt, toStringView(validation_result));
     parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
     return;
   }

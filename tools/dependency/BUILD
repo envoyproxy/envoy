@@ -1,4 +1,5 @@
 load("@base_pip3//:requirements.bzl", "requirement")
+load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@rules_python//python:defs.bzl", "py_binary")
@@ -7,6 +8,23 @@ load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 licenses(["notice"])  # Apache 2
+
+# This does a unicode sort
+DEPS_ORDER_FILTER = """
+.[0]
+| keys_unsorted as $actual
+| keys as $expected
+| if $actual == $expected then {sorted: true}
+  else
+    ([$actual, $expected]
+     | transpose
+     | map(select(.[0] != .[1]))
+     | first) as $mismatch
+    | error(
+        "deps metadata is not sorted alphabetically, "
+        + "expected \\($mismatch[1]) where \\($mismatch[0]) is")
+  end
+"""
 
 # Currently we are unable to check for the libdrdkafka dep
 # this is a workaround to just exclude it from checks for now
@@ -260,4 +278,25 @@ sh_test(
     },
     tags = ["no-remote-exec"],
     toolchains = ["@jq_toolchains//:resolved_toolchain"],
+)
+
+# These targets are for testing
+json_merge(
+    name = "deps-order",
+    filter = DEPS_ORDER_FILTER,
+    yaml_srcs = ["//bazel:deps.yaml"],
+)
+
+json_merge(
+    name = "api-deps-order",
+    filter = DEPS_ORDER_FILTER,
+    yaml_srcs = ["@envoy_api//bazel:deps.yaml"],
+)
+
+build_test(
+    name = "deps_order_test",
+    targets = [
+        ":deps-order",
+        ":api-deps-order",
+    ],
 )

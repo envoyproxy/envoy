@@ -42,10 +42,11 @@ def api_dependencies(bzlmod = False):
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
     external_http_archive(
-        name = "com_google_googleapis",
+        name = "googleapis",
     )
     external_http_archive(
         name = "xds",
+        repo_mapping = {"@com_google_googleapis": "@googleapis"},
     )
     external_http_archive(
         name = "rules_buf",

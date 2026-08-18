@@ -1208,7 +1208,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
         // This prevents us from double incrementing if listeners are stopped twice.
         // This can happen if the admin endpoint is triggered for inbound_only and then
         // all. We perform the check in the callback to ensure it's done on the main thread
-        if (stopped_listener_tags_.find(listener_tag) == stopped_listener_tags_.end()) {
+        if (!stopped_listener_tags_.contains(listener_tag)) {
           stats_.listener_stopped_.inc();
           stopped_listener_tags_.insert(listener_tag);
           for (auto& listener : active_listeners_) {
