@@ -77,6 +77,7 @@ opentelemetry_proto:
   project_name: "OpenTelemetry Proto"
   project_desc: "Language Independent Interface Types For OpenTelemetry"
   project_url: "https://github.com/open-telemetry/opentelemetry-proto"
+  apparent_name: opentelemetry-proto
   release_date: "2026-07-21"
   use_category:
   - api
@@ -138,6 +139,7 @@ zipkin_api:
   project_name: "Zipkin API"
   project_desc: "Zipkin's language independent model and HTTP Api Definitions"
   project_url: "https://github.com/openzipkin/zipkin-api"
+  apparent_name: zipkin-api
   release_date: "2020-11-22"
   use_category:
   - api
