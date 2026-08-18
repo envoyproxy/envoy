@@ -9,6 +9,7 @@ load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 licenses(["notice"])  # Apache 2
 
+# This does a unicode sort
 DEPS_ORDER_FILTER = """
 .[0]
 | keys_unsorted as $actual
@@ -279,6 +280,7 @@ sh_test(
     toolchains = ["@jq_toolchains//:resolved_toolchain"],
 )
 
+# These targets are for testing
 json_merge(
     name = "deps-order",
     filter = DEPS_ORDER_FILTER,
