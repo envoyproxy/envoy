@@ -105,16 +105,6 @@ brotli:
   license: "MIT"
   license_url: "https://github.com/google/brotli/blob/v{version}/LICENSE"
 
-build_bazel_rules_apple:
-  project_name: "Apple Rules for Bazel"
-  project_desc: "Bazel rules for Apple platforms"
-  project_url: "https://github.com/bazelbuild/rules_apple"
-  release_date: "2025-03-14"
-  use_category:
-  - build
-  license: "Apache-2.0"
-  license_url: "https://github.com/bazelbuild/rules_apple/blob/{version}/LICENSE"
-
 buildtools:
   project_name: "Bazel build tools"
   project_desc: "Developer tools for working with Google's bazel buildtool."
@@ -225,18 +215,6 @@ com_google_protobuf:
   cpe: "cpe:2.3:a:google:protobuf:*"
   license: "Protocol Buffers"
   license_url: "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE"
-
-confluentinc_librdkafka:
-  project_name: "Kafka (C/C++ client)"
-  project_desc: "C/C++ client for Apache Kafka (open-source distributed event streaming platform)"
-  project_url: "https://github.com/confluentinc/librdkafka"
-  release_date: "2024-10-10"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.filters.network.kafka_mesh
-  license: "librdkafka"
-  license_url: "https://github.com/confluentinc/librdkafka/blob/v{version}/LICENSE"
 
 cpp2sky:
   project_name: "cpp2sky"
@@ -515,6 +493,7 @@ grpc_httpjson_transcoding:
   project_name: "grpc-httpjson-transcoding"
   project_desc: "Library that supports transcoding so that HTTP/JSON can be converted to gRPC"
   project_url: "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding"
+  apparent_name: "grpc-httpjson-transcoding"
   release_date: "2025-05-07"
   use_category:
   - dataplane_ext
@@ -707,6 +686,18 @@ libprotobuf_mutator:
   - test_only
   license: "Apache-2.0"
   license_url: "https://github.com/google/libprotobuf-mutator/blob/v{version}/LICENSE"
+
+librdkafka:
+  project_name: "Kafka (C/C++ client)"
+  project_desc: "C/C++ client for Apache Kafka (open-source distributed event streaming platform)"
+  project_url: "https://github.com/confluentinc/librdkafka"
+  release_date: "2024-10-10"
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.network.kafka_mesh
+  license: "librdkafka"
+  license_url: "https://github.com/confluentinc/librdkafka/blob/v{version}/LICENSE"
 
 libsxg:
   project_name: "libsxg"
@@ -1045,6 +1036,16 @@ re2:
   - dataplane_core
   license: "BSD-3-Clause"
   license_url: "https://github.com/google/re2/blob/{version}/LICENSE"
+
+rules_apple:
+  project_name: "Apple Rules for Bazel"
+  project_desc: "Bazel rules for Apple platforms"
+  project_url: "https://github.com/bazelbuild/rules_apple"
+  release_date: "2025-03-14"
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_apple/blob/{version}/LICENSE"
 
 rules_cc:
   project_name: "C++ rules for Bazel"

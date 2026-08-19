@@ -154,7 +154,7 @@ configure_make(
     env = {
         "AR": "$(AR)",
     },
-    lib_source = "@confluentinc_librdkafka//:all",
+    lib_source = "@librdkafka//:all",
     out_static_libs = [
         "librdkafka.a",
         "librdkafka++.a",

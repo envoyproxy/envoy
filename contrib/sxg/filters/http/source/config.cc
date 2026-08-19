@@ -33,7 +33,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 }
 } // namespace
 
-Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> FilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::sxg::v3alpha::SXG& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   const auto& certificate = proto_config.certificate();
@@ -44,12 +44,12 @@ Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
   auto secret_provider_certificate =
       secretsProvider(certificate, server_context, context.initManager());
   if (secret_provider_certificate == nullptr) {
-    throw EnvoyException("invalid certificate secret configuration");
+    return absl::InvalidArgumentError("invalid certificate secret configuration");
   }
   auto secret_provider_private_key =
       secretsProvider(private_key, server_context, context.initManager());
   if (secret_provider_private_key == nullptr) {
-    throw EnvoyException("invalid private_key secret configuration");
+    return absl::InvalidArgumentError("invalid private_key secret configuration");
   }
 
   auto secret_reader = std::make_shared<SDSSecretReader>(

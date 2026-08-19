@@ -68,8 +68,7 @@ jobs:
       pull-requests: read
     name: Precheck (${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).summary.title || 'SKIPPED' }})
     uses: ./.github/workflows/_precheck_deps.yml
-    # TODO(phlax): Re-enable once test works correctly in CI
-    if: false && ${{ fromJSON(needs.load.outputs.request).run.precheck-deps }}
+    if: ${{ fromJSON(needs.load.outputs.request).run.precheck-deps }}
     needs:
     - load
     with:

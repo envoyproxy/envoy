@@ -60,6 +60,7 @@ def swift_repos():
         name = "com_github_buildbuddy_io_rules_xcodeproj",
         sha256 = "d02932255ba3ffaab1859e44528c69988e93fa353fa349243e1ef5054bd1ba80",
         url = "https://github.com/buildbuddy-io/rules_xcodeproj/releases/download/1.2.0/release.tar.gz",
+        repo_mapping = {"@build_bazel_rules_apple": "@rules_apple"},
     )
 
     http_archive(

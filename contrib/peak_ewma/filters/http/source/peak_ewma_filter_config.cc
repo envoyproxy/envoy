@@ -9,7 +9,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace PeakEwma {
 
-Http::FilterFactoryCb PeakEwmaFilterConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+PeakEwmaFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::peak_ewma::v3alpha::PeakEwmaConfig&, const std::string&,
     Server::Configuration::FactoryContext&) {
   return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {

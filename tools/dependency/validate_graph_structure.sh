@@ -60,7 +60,7 @@ if [[ -s "${graph_gap_repos_path}" ]]; then
 fi
 
 echo "Validating marginal //test/... dependencies are declared test_only..."
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:filtered-dependencies >/dev/null
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel //tools/dependency:filtered-dependencies >/dev/null
 filtered_dependencies_path="$(dependency_json_path //tools/dependency:filtered-dependencies)"
 
 test_only_repos_path="${tmpdir}/test_only_repos.txt"
