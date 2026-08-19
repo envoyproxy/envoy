@@ -349,20 +349,26 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
     const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
     const int ec_group_curve_name =
         ecdsa_group == nullptr ? 0 : EC_GROUP_get_curve_name(ecdsa_group);
+    const bool additional_curves_enabled = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.quic_support_additional_ecdsa_curves");
     switch (ec_group_curve_name) {
     case NID_X9_62_prime256v1:
       sign_alg = SSL_SIGN_ECDSA_SECP256R1_SHA256;
       break;
     case NID_secp384r1:
-      sign_alg = SSL_SIGN_ECDSA_SECP384R1_SHA384;
+      sign_alg = additional_curves_enabled ? SSL_SIGN_ECDSA_SECP384R1_SHA384 : 0;
       break;
     case NID_secp521r1:
-      sign_alg = SSL_SIGN_ECDSA_SECP521R1_SHA512;
+      sign_alg = additional_curves_enabled ? SSL_SIGN_ECDSA_SECP521R1_SHA512 : 0;
       break;
     default:
-      *error_details =
-          "Invalid leaf cert, only P-256, P-384 or P-521 ECDSA certificates are supported";
       break;
+    }
+    if (sign_alg == 0) {
+      *error_details = additional_curves_enabled
+                           ? "Invalid leaf cert, only P-256, P-384 or P-521 ECDSA certificates "
+                             "are supported"
+                           : "Invalid leaf cert, only P-256 ECDSA certificates are supported";
     }
   } break;
   case EVP_PKEY_RSA: {

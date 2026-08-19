@@ -13,6 +13,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -315,6 +316,44 @@ jD+/8ipt
       << error_details;
   EXPECT_NE(verify_details, nullptr);
   EXPECT_TRUE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureP384ECKeyWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quic_support_additional_ecdsa_curves", "false"}});
+  const std::string certs{R"(-----BEGIN CERTIFICATE-----
+MIIC0jCCAlegAwIBAgIUUv13YuIFYMJxp1t4z8Z7H0cFdHowCgYIKoZIzj0EAwIw
+ejELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcMDVNh
+biBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsMEEx5ZnQgRW5naW5l
+ZXJpbmcxFDASBgNVBAMMC1Rlc3QgU2VydmVyMB4XDTI0MDgyMTE5MTQxMFoXDTI2
+MDgyMTE5MTQxMFowejELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWEx
+FjAUBgNVBAcMDVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsM
+EEx5ZnQgRW5naW5lZXJpbmcxFDASBgNVBAMMC1Rlc3QgU2VydmVyMHYwEAYHKoZI
+zj0CAQYFK4EEACIDYgAEtFQWaGrCFUT70YVGv9IA0H1d/fUGdoATjqAQlgOnzWf4
+FcJIqRQ8dGJ0wom/p8b/3MrKpy8wpWBnAo2C9+9owGdOqcqSIFLVV0iaGogKhIAx
+7KAjWoMEpal4uNnaYLlCo4GdMIGaMAwGA1UdEwEB/wQCMAAwCwYDVR0PBAQDAgXg
+MB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcDATAeBgNVHREEFzAVghNzZXJ2
+ZXIxLmV4YW1wbGUuY29tMB0GA1UdDgQWBBQ23kFgk8ELq1P0xW3R8SYRwJRcyjAf
+BgNVHSMEGDAWgBQ23kFgk8ELq1P0xW3R8SYRwJRcyjAKBggqhkjOPQQDAgNpADBm
+AjEA6FC5eEaKcV7i9AUuVsIJruDKqLVmSLKzHX+DVxOvaxQcTuKMwtg8AuTq1qq+
+MZ8EAjEA3JKxxjQAp2hi2gvSUGXQqk3seETImDNmUdWXmYcohDRM36KKJORqXoui
+jD+/8ipt
+-----END CERTIFICATE-----)"};
+  root_ca_cert_ = certs;
+  configCertVerificationDetails(true);
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  std::stringstream pem_stream(certs);
+  std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
+  std::vector<absl::string_view> chain_view(chain.begin(), chain.end());
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_FAILURE,
+            verifier_->VerifyCertChain("server1.example.com", 54321, chain_view, ocsp_response,
+                                       cert_sct, &verify_context_, &error_details, &verify_details,
+                                       nullptr, nullptr));
+  EXPECT_EQ("Invalid leaf cert, only P-256 ECDSA certificates are supported", error_details);
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureNonServerAuthEKU) {
