@@ -250,7 +250,7 @@ common:openssl --@envoy//bazel:crypto=@envoy//compat/openssl:crypto
 common:openssl --copt=-DENVOY_SSL_OPENSSL
 common:openssl --host_copt=-DENVOY_SSL_OPENSSL
 common:openssl --@envoy//bazel:http3=False
-common:openssl --test_tag_filters=-nofips
+common:openssl --test_tag_filters=-nofips,-quiche
 common:openssl --build_tag_filters=-nofips
 
 

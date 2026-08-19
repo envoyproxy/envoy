@@ -3,13 +3,11 @@ load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_cc_test",
     "envoy_cc_test_library",
 )
 load(
     "@envoy//bazel/external:quiche.bzl",
     "envoy_quic_cc_library",
-    "envoy_quic_cc_test",
     "envoy_quic_cc_test_library",
     "envoy_quiche_platform_impl_cc_library",
     "envoy_quiche_platform_impl_cc_test_library",
@@ -17,6 +15,8 @@ load(
 )
 
 licenses(["notice"])  # Apache 2
+
+package(default_visibility = ["//visibility:public"])
 
 # QUICHE is Google's implementation of QUIC and related protocols. It is the
 # same code used in Chromium and Google's servers, but packaged in a form that
@@ -43,28 +43,120 @@ src_files = glob([
     "**/*.proto",
 ])
 
-test_suite(
-    name = "ci_tests",
-    tests = [
-        "http2_adapter_event_forwarder_test",
-        "http2_adapter_header_validator_test",
-        "http2_adapter_impl_comparison_test",
-        "http2_adapter_nghttp2_adapter_test",
-        "http2_adapter_nghttp2_data_provider_test",
-        "http2_adapter_nghttp2_session_test",
-        "http2_adapter_oghttp2_adapter_test",
-        "http2_adapter_oghttp2_session_test",
-        "http2_adapter_oghttp2_util_test",
-        "http2_adapter_recording_http2_visitor_test",
-        "http2_adapter_window_manager_test",
-        "http2_platform_api_test",
-        "quiche_balsa_balsa_frame_test",
-        "quiche_balsa_balsa_headers_test",
-        "quiche_balsa_header_properties_test",
-        "quiche_balsa_simple_buffer_test",
-        "quiche_common_test",
-        "quiche_http_header_block_test",
+# Filegroups exposing test sources for consumption by Envoy's test targets
+# in //test/common/quic/quiche/BUILD, which use the real envoy_cc_test macro.
+filegroup(
+    name = "http2_adapter_event_forwarder_test_srcs",
+    srcs = ["quiche/http2/adapter/event_forwarder_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "http2_adapter_header_validator_test_srcs",
+    srcs = [
+        "quiche/http2/adapter/header_validator_test.cc",
+        "quiche/http2/adapter/noop_header_validator_test.cc",
     ],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "http2_adapter_impl_comparison_test_srcs",
+    srcs = ["quiche/http2/adapter/adapter_impl_comparison_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "http2_adapter_nghttp2_adapter_test_srcs",
+    srcs = ["quiche/http2/adapter/nghttp2_adapter_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "http2_adapter_nghttp2_data_provider_test_srcs",
+    srcs = ["quiche/http2/adapter/nghttp2_data_provider_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "http2_adapter_nghttp2_session_test_srcs",
+    srcs = ["quiche/http2/adapter/nghttp2_session_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "http2_adapter_oghttp2_adapter_test_srcs",
+    srcs = ["quiche/http2/adapter/oghttp2_adapter_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "http2_adapter_oghttp2_session_test_srcs",
+    srcs = ["quiche/http2/adapter/oghttp2_session_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "http2_adapter_oghttp2_util_test_srcs",
+    srcs = ["quiche/http2/adapter/oghttp2_util_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "http2_adapter_recording_http2_visitor_test_srcs",
+    srcs = ["quiche/http2/adapter/recording_http2_visitor_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "http2_adapter_window_manager_test_srcs",
+    srcs = ["quiche/http2/adapter/window_manager_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "http2_platform_api_test_srcs",
+    srcs = ["quiche/http2/test_tools/http2_random_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "quiche_balsa_balsa_frame_test_srcs",
+    srcs = ["quiche/balsa/balsa_frame_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "quiche_balsa_balsa_headers_test_srcs",
+    srcs = ["quiche/balsa/balsa_headers_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "quiche_balsa_header_properties_test_srcs",
+    srcs = ["quiche/balsa/header_properties_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "quiche_balsa_simple_buffer_test_srcs",
+    srcs = ["quiche/balsa/simple_buffer_test.cc"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "quiche_common_test_srcs",
+    srcs = [
+        "quiche/common/quiche_linked_hash_map_test.cc",
+        "quiche/common/quiche_mem_slice_storage_test.cc",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "quiche_http_header_block_test_srcs",
+    srcs = ["quiche/common/http/http_header_block_test.cc"],
+    visibility = ["//visibility:public"],
 )
 
 envoy_cc_test_library(
@@ -85,17 +177,6 @@ envoy_cc_library(
     deps = [
         ":quiche_common_circular_deque_lib",
         ":quiche_common_platform_export",
-    ],
-)
-
-envoy_cc_test(
-    name = "http2_adapter_chunked_buffer_test",
-    srcs = ["quiche/http2/adapter/chunked_buffer_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quiche_common_platform_test",
-        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -122,19 +203,6 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_test(
-    name = "http2_adapter_event_forwarder_test",
-    srcs = ["quiche/http2/adapter/event_forwarder_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_event_forwarder",
-        ":http2_core_protocol_lib",
-        ":http2_test_tools_mock_spdy_framer_visitor_lib",
-        ":quiche_common_platform_test",
-    ],
-)
-
 envoy_cc_library(
     name = "http2_adapter_header_validator",
     srcs = [
@@ -151,20 +219,6 @@ envoy_cc_library(
     deps = [
         ":http2_constants_lib",
         ":quiche_common_platform_export",
-    ],
-)
-
-envoy_cc_test(
-    name = "http2_adapter_header_validator_test",
-    srcs = [
-        "quiche/http2/adapter/header_validator_test.cc",
-        "quiche/http2/adapter/noop_header_validator_test.cc",
-    ],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_header_validator",
-        ":quiche_common_platform_test",
     ],
 )
 
@@ -204,22 +258,6 @@ envoy_cc_library(
     deps = [
         ":http2_adapter_http2_protocol",
         ":quiche_common_platform_export",
-    ],
-)
-
-envoy_cc_test(
-    name = "http2_adapter_impl_comparison_test",
-    srcs = ["quiche/http2/adapter/adapter_impl_comparison_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter",
-        ":http2_adapter_http2_protocol",
-        ":http2_adapter_mock_http2_visitor",
-        ":http2_adapter_recording_http2_visitor",
-        ":http2_adapter_test_frame_sequence",
-        ":http2_adapter_test_utils",
-        ":quiche_common_platform_test",
     ],
 )
 
@@ -293,25 +331,6 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_test(
-    name = "http2_adapter_nghttp2_adapter_test",
-    srcs = ["quiche/http2/adapter/nghttp2_adapter_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_http2_protocol",
-        ":http2_adapter_http2_visitor_interface",
-        ":http2_adapter_mock_http2_visitor",
-        ":http2_adapter_nghttp2_adapter",
-        ":http2_adapter_nghttp2_include",
-        ":http2_adapter_nghttp2_test_utils",
-        ":http2_adapter_oghttp2_util",
-        ":http2_adapter_test_frame_sequence",
-        ":http2_adapter_test_utils",
-        ":quiche_common_platform_test",
-    ],
-)
-
 envoy_cc_library(
     name = "http2_adapter_nghttp2_callbacks",
     srcs = ["quiche/http2/adapter/nghttp2_callbacks.cc"],
@@ -344,41 +363,12 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_test(
-    name = "http2_adapter_nghttp2_data_provider_test",
-    srcs = ["quiche/http2/adapter/nghttp2_data_provider_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_nghttp2_data_provider",
-        ":http2_adapter_test_utils",
-        ":quiche_common_platform_test",
-    ],
-)
-
 envoy_cc_library(
     name = "http2_adapter_nghttp2_include",
     hdrs = ["quiche/http2/adapter/nghttp2.h"],
     copts = quiche_copts,
     external_deps = ["nghttp2"],
     repository = "@envoy",
-)
-
-envoy_cc_test(
-    name = "http2_adapter_nghttp2_session_test",
-    srcs = ["quiche/http2/adapter/nghttp2_session_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter",
-        ":http2_adapter_mock_http2_visitor",
-        ":http2_adapter_nghttp2_callbacks",
-        ":http2_adapter_nghttp2_util",
-        ":http2_adapter_test_frame_sequence",
-        ":http2_adapter_test_utils",
-        ":quiche_common_platform_expect_bug",
-        ":quiche_common_platform_test",
-    ],
 )
 
 envoy_cc_test_library(
@@ -449,38 +439,6 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_test(
-    name = "http2_adapter_oghttp2_adapter_test",
-    srcs = ["quiche/http2/adapter/oghttp2_adapter_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_http2_protocol",
-        ":http2_adapter_http2_visitor_interface",
-        ":http2_adapter_mock_http2_visitor",
-        ":http2_adapter_oghttp2_adapter",
-        ":http2_adapter_oghttp2_util",
-        ":http2_adapter_test_frame_sequence",
-        ":http2_adapter_test_utils",
-        ":quiche_common_platform_expect_bug",
-        ":quiche_common_platform_test",
-    ],
-)
-
-envoy_cc_test(
-    name = "http2_adapter_oghttp2_session_test",
-    srcs = ["quiche/http2/adapter/oghttp2_session_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_mock_http2_visitor",
-        ":http2_adapter_oghttp2_adapter",
-        ":http2_adapter_test_frame_sequence",
-        ":http2_adapter_test_utils",
-        ":quiche_common_platform_test",
-    ],
-)
-
 envoy_cc_library(
     name = "http2_adapter_oghttp2_util",
     srcs = ["quiche/http2/adapter/oghttp2_util.cc"],
@@ -491,19 +449,6 @@ envoy_cc_library(
         ":common_http_http_header_block_lib",
         ":http2_adapter_http2_protocol",
         ":quiche_common_platform_export",
-    ],
-)
-
-envoy_cc_test(
-    name = "http2_adapter_oghttp2_util_test",
-    srcs = ["quiche/http2/adapter/oghttp2_util_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_http2_protocol",
-        ":http2_adapter_oghttp2_util",
-        ":http2_adapter_test_frame_sequence",
-        ":quiche_common_platform_test",
     ],
 )
 
@@ -518,20 +463,6 @@ envoy_cc_test_library(
         ":http2_adapter_http2_util",
         ":http2_adapter_http2_visitor_interface",
         ":quiche_common_platform_export",
-        ":quiche_common_platform_test",
-    ],
-)
-
-envoy_cc_test(
-    name = "http2_adapter_recording_http2_visitor_test",
-    srcs = ["quiche/http2/adapter/recording_http2_visitor_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_http2_protocol",
-        ":http2_adapter_http2_visitor_interface",
-        ":http2_adapter_recording_http2_visitor",
-        ":http2_test_tools_random",
         ":quiche_common_platform_test",
     ],
 )
@@ -594,21 +525,6 @@ envoy_cc_library(
         ":quiche_common_callbacks",
         ":quiche_common_platform",
         ":quiche_common_platform_export",
-    ],
-)
-
-envoy_cc_test(
-    name = "http2_adapter_window_manager_test",
-    srcs = ["quiche/http2/adapter/window_manager_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_window_manager",
-        ":http2_test_tools_random",
-        ":quiche_common_platform_expect_bug",
-        ":quiche_common_platform_export",
-        ":quiche_common_platform_test",
-        "@abseil-cpp//absl/functional:bind_front",
     ],
 )
 
@@ -1947,18 +1863,6 @@ envoy_quic_cc_library(
         ":quic_platform_base",
         ":quic_platform_bug_tracker",
         ":quiche_common_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "quic_core_blocked_writer_list_test",
-    srcs = ["quiche/quic/core/quic_blocked_writer_list_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quic_core_blocked_writer_interface_lib",
-        ":quic_core_blocked_writer_list_lib",
-        ":quic_platform_test",
     ],
 )
 
@@ -5017,30 +4921,6 @@ envoy_cc_test_library(
     deps = ["@envoy//test/common/quic/platform:quiche_test_impl_lib"],
 )
 
-envoy_cc_test(
-    name = "quiche_common_mem_slice_test",
-    srcs = ["quiche/common/quiche_mem_slice_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quiche_common_buffer_allocator_lib",
-        ":quiche_common_mem_slice",
-        ":quiche_common_platform",
-        ":quiche_common_platform_test",
-    ],
-)
-
-envoy_cc_test(
-    name = "quiche_common_time_utils_test",
-    srcs = ["quiche/common/platform/api/quiche_time_utils_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quiche_common_platform",
-        ":quiche_common_platform_test",
-    ],
-)
-
 envoy_cc_library(
     name = "quiche_common_print_elements_lib",
     hdrs = ["quiche/common/print_elements.h"],
@@ -5141,18 +5021,6 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_test(
-    name = "quiche_http_header_block_test",
-    srcs = ["quiche/common/http/http_header_block_test.cc"],
-    repository = "@envoy",
-    deps = [
-        ":http2_test_tools_test_utils_lib",
-        ":quiche_common_platform_test",
-        ":quiche_http_header_block_lib",
-        "@abseil-cpp//absl/functional:bind_front",
-    ],
-)
-
 envoy_cc_library(
     name = "quiche_common_structured_headers_lib",
     srcs = ["quiche/common/structured_headers.cc"],
@@ -5174,32 +5042,6 @@ envoy_cc_library(
     ],
 )
 
-envoy_quic_cc_test(
-    name = "quiche_common_test",
-    srcs = [
-        "quiche/common/quiche_linked_hash_map_test.cc",
-        "quiche/common/quiche_mem_slice_storage_test.cc",
-    ],
-    deps = [
-        ":quiche_common_lib",
-        ":quiche_common_mem_slice_storage",
-        ":quiche_common_platform_test",
-    ],
-)
-
-envoy_cc_test(
-    name = "http2_platform_api_test",
-    srcs = [
-        "quiche/http2/test_tools/http2_random_test.cc",
-    ],
-    repository = "@envoy",
-    deps = [
-        ":http2_test_tools_random",
-        ":quiche_common_platform",
-        ":quiche_common_test_tools_test_utils_lib",
-    ],
-)
-
 envoy_quic_cc_library(
     name = "quiche_common_mem_slice_storage",
     srcs = ["quiche/common/quiche_mem_slice_storage.cc"],
@@ -5209,22 +5051,6 @@ envoy_quic_cc_library(
         ":quic_core_utils_lib",
         ":quic_platform_base",
         ":quiche_common_platform",
-    ],
-)
-
-envoy_cc_test(
-    name = "quic_core_batch_writer_batch_writer_test",
-    srcs = select({
-        "@envoy//bazel:linux": ["quiche/quic/core/batch_writer/quic_batch_writer_test.cc"],
-        "//conditions:default": [],
-    }),
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quic_core_batch_writer_batch_writer_test_lib",
-        ":quic_core_batch_writer_gso_batch_writer_lib",
-        ":quic_core_batch_writer_sendmmsg_batch_writer_lib",
-        ":quic_platform",
     ],
 )
 
@@ -5385,19 +5211,6 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_test(
-    name = "quiche_balsa_simple_buffer_test",
-    srcs = ["quiche/balsa/simple_buffer_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quiche_balsa_simple_buffer_lib",
-        ":quiche_common_platform_expect_bug",
-        ":quiche_common_platform_test",
-        "@abseil-cpp//absl/strings",
-    ],
-)
-
 envoy_cc_library(
     name = "quiche_balsa_header_properties_lib",
     srcs = ["quiche/balsa/header_properties.cc"],
@@ -5410,17 +5223,6 @@ envoy_cc_library(
         ":quiche_common_text_utils_lib",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/strings",
-    ],
-)
-
-envoy_cc_test(
-    name = "quiche_balsa_header_properties_test",
-    srcs = ["quiche/balsa/header_properties_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quiche_balsa_header_properties_lib",
-        ":quiche_common_platform_test",
     ],
 )
 
@@ -5448,27 +5250,6 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_test(
-    name = "quiche_balsa_balsa_headers_test",
-    srcs = ["quiche/balsa/balsa_headers_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quiche_balsa_balsa_enums_lib",
-        ":quiche_balsa_balsa_frame_lib",
-        ":quiche_balsa_balsa_headers_lib",
-        ":quiche_balsa_simple_buffer_lib",
-        ":quiche_common_platform_expect_bug",
-        ":quiche_common_platform_logging",
-        ":quiche_common_platform_test",
-        ":quiche_common_test_tools_test_utils_lib",
-        "@abseil-cpp//absl/base:core_headers",
-        "@abseil-cpp//absl/memory",
-        "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/strings:str_format",
-    ],
-)
-
 envoy_cc_library(
     name = "quiche_balsa_balsa_frame_lib",
     srcs = ["quiche/balsa/balsa_frame.cc"],
@@ -5489,28 +5270,6 @@ envoy_cc_library(
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
         "@abseil-cpp//absl/strings",
-    ],
-)
-
-envoy_cc_test(
-    name = "quiche_balsa_balsa_frame_test",
-    srcs = ["quiche/balsa/balsa_frame_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quiche_balsa_balsa_enums_lib",
-        ":quiche_balsa_balsa_frame_lib",
-        ":quiche_balsa_balsa_headers_lib",
-        ":quiche_balsa_balsa_visitor_interface_lib",
-        ":quiche_balsa_http_validation_policy_lib",
-        ":quiche_balsa_noop_balsa_visitor_lib",
-        ":quiche_balsa_simple_buffer_lib",
-        ":quiche_common_platform_expect_bug",
-        ":quiche_common_platform_logging",
-        ":quiche_common_platform_test",
-        "@abseil-cpp//absl/flags:flag",
-        "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 
