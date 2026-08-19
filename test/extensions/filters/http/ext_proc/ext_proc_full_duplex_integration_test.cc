@@ -902,8 +902,7 @@ TEST_P(ExtProcIntegrationTest,
 }
 
 // With trailers, both directions, server fully buffers.
-TEST_P(ExtProcIntegrationTest,
-       TwoExtProcFiltersBothDuplexInBothDirectionWithTrailerFullyBuffered) {
+TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionWithTrailerFullyBuffered) {
   twoExtProcFiltersFullDuplexConfig();
 
   const std::string body_sent(10 * 1024, 's');
