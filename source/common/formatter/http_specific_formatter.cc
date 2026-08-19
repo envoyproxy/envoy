@@ -499,7 +499,7 @@ bool GrpcStatusFormatter::formatTo(std::string& sink, const Context& context,
     return true;
   }
   case Number:
-    absl::StrAppend(&sink, grpc_status.value());
+    sink.append(absl::StrCat(grpc_status.value()));
     return true;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
