@@ -126,7 +126,7 @@ private:
 
   const envoy::config::cluster::v3::Cluster& cluster_;
   Network::DnsResolverSharedPtr dns_resolver_;
-  const std::chrono::milliseconds dns_refresh_rate_ms_;
+  std::chrono::milliseconds dns_refresh_rate_ms_;
   const bool respect_dns_ttl_;
   Event::TimerPtr resolve_timer_;
   Network::ActiveDnsQuery* active_dns_query_{};
