@@ -63,7 +63,6 @@ envoy_cc_contrib_extension(
     deps = [
         ":golang_filter_lib",
         "//contrib/golang/common/dso:dso_lib",
-        "//envoy/common:exception_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//envoy/server:lifecycle_notifier_interface",

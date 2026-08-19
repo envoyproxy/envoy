@@ -2,7 +2,6 @@
 
 #include <string>
 
-#include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/fmt.h"
