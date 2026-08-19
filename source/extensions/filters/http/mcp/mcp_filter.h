@@ -95,6 +95,7 @@ private:
       propagate_baggage_;
   const uint32_t max_request_body_size_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
+  const envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attribute_source_;
   const std::string metadata_namespace_;
   ParserConfig parser_config_;
   McpFilterStats stats_;

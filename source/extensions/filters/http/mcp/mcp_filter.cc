@@ -108,9 +108,10 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
                              ? std::make_optional(proto_config.propagate_baggage())
                              : std::nullopt),
       max_request_body_size_(proto_config.has_max_request_body_size()
-                                 ? proto_config.max_request_body_size().value()
-                                 : 8192), // Default: 8KB
+                                ? proto_config.max_request_body_size().value()
+                                : 8192),
       request_storage_mode_(proto_config.request_storage_mode()),
+      attribute_source_(proto_config.attribute_source()),
       metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
