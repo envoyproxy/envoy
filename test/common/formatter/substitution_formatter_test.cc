@@ -1759,9 +1759,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     std::vector<std::string> time_points{
-        "DS_RX_BEG", "DS_RX_END",         "US_CX_BEG", "US_CX_END", "US_HS_END",
-        "US_TX_BEG", "US_TX_END",         "US_RX_BEG", "US_RX_END", "DS_TX_BEG",
-        "DS_TX_END", "custom_time_point", "DS_HS_BEG", "DS_HS_END",
+        "DS_RX_BEG", "DS_RX_HDR_END", "DS_RX_END",         "US_CX_BEG", "US_CX_END",
+        "US_HS_END", "US_TX_BEG",     "US_TX_END",         "US_RX_BEG", "US_RX_END",
+        "DS_TX_BEG", "DS_TX_END",     "custom_time_point", "DS_HS_BEG", "DS_HS_END",
     };
 
     std::vector<std::string> precisions{"ms", "us", "ns"};
@@ -1800,75 +1800,80 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(1000000))));
       stream_info.start_time_monotonic_ = time_system.monotonicTime();
 
-      // DS_RX_END
+      // DS_RX_HDR_END
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(2000000))));
+      stream_info.downstream_timing_.onLastDownstreamHeaderRxByteReceived(time_system);
+
+      // DS_RX_END
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(3000000))));
       stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
       // US_CX_BEG
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(3000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(4000000))));
       stream_info.upstream_info_->upstreamTiming().upstream_connect_start_ =
           time_system.monotonicTime();
 
       // US_CX_END
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(4000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
       stream_info.upstream_info_->upstreamTiming().upstream_connect_complete_ =
           time_system.monotonicTime();
 
       // US_HS_END
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(6000000))));
       stream_info.upstream_info_->upstreamTiming().upstream_handshake_complete_ =
           time_system.monotonicTime();
 
       // US_TX_BEG
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(6000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(7000000))));
       stream_info.upstream_info_->upstreamTiming().first_upstream_tx_byte_sent_ =
           time_system.monotonicTime();
 
       // US_TX_END
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(7000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(8000000))));
       stream_info.upstream_info_->upstreamTiming().last_upstream_tx_byte_sent_ =
           time_system.monotonicTime();
 
       // US_RX_BEG
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(8000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(9000000))));
       stream_info.upstream_info_->upstreamTiming().first_upstream_rx_byte_received_ =
           time_system.monotonicTime();
 
       // US_RX_END
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(9000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(10000000))));
       stream_info.upstream_info_->upstreamTiming().last_upstream_rx_byte_received_ =
           time_system.monotonicTime();
 
       // DS_TX_BEG
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(10000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(11000000))));
       stream_info.downstream_timing_.onFirstDownstreamTxByteSent(time_system);
 
       // DS_TX_END
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(11000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(12000000))));
       stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
 
       // custom_time_point
       stream_info.downstream_timing_.setValue("custom_time_point",
-                                              MonotonicTime(std::chrono::nanoseconds(12000000)));
+                                              MonotonicTime(std::chrono::nanoseconds(13000000)));
 
       // DS_HS_BEG
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(13000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(14000000))));
       stream_info.downstream_timing_.onDownstreamHandshakeStart(time_system);
 
       // DS_HS_END
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(14000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(15000000))));
       stream_info.downstream_timing_.onDownstreamHandshakeComplete(time_system);
 
       for (size_t start_index = 0; start_index < time_points.size(); start_index++) {
@@ -4342,6 +4347,7 @@ void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata) {
 }
 
 TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
+  Context formatter_context;
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -4538,6 +4544,7 @@ TEST(SubstitutionFormatterTest, MetadataFormatterWithoutMetadataSource) {
 }
 
 TEST(SubstitutionFormatterTest, FilterStateFormatter) {
+  Context formatter_context;
   StreamInfo::MockStreamInfo stream_info;
 
   stream_info.filter_state_->setData("key",
@@ -4689,6 +4696,7 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
 }
 
 TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
+  Context formatter_context;
   // No downstreamSslConnection
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -4740,6 +4748,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVStartFormatter) {
 }
 
 TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
+  Context formatter_context;
   // No downstreamSslConnection
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -4785,6 +4794,7 @@ TEST(SubstitutionFormatterTest, DownstreamPeerCertVEndFormatter) {
 }
 
 TEST(SubstitutionFormatterTest, UpstreamPeerCertVStartFormatter) {
+  Context formatter_context;
   // No upstream connection
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -4845,6 +4855,7 @@ TEST(SubstitutionFormatterTest, UpstreamPeerCertVStartFormatter) {
 }
 
 TEST(SubstitutionFormatterTest, UpstreamPeerCertVEndFormatter) {
+  Context formatter_context;
   // No upstream connection
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -4898,6 +4909,7 @@ TEST(SubstitutionFormatterTest, UpstreamPeerCertVEndFormatter) {
 }
 
 TEST(SubstitutionFormatterTest, StartTimeFormatter) {
+  Context formatter_context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_headers;
