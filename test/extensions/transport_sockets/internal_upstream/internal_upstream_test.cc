@@ -26,6 +26,32 @@ using IoSocket::UserSpace::PassthroughState;
 
 class TestObject : public StreamInfo::FilterState::Object {};
 
+// Produces an empty object, mirroring how a real placeholder factory behaves: created empty here
+// and populated later by whichever filter owns the value.
+class TestPlaceholderFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "test.placeholder"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    if (!data.empty()) {
+      return nullptr;
+    }
+    return std::make_unique<TestObject>();
+  }
+};
+
+REGISTER_FACTORY(TestPlaceholderFactory, StreamInfo::FilterState::ObjectFactory);
+
+// Declines to produce an object at all.
+class NullPlaceholderFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "test.null_placeholder"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view) const override {
+    return nullptr;
+  }
+};
+
 class MockUserSpaceIoHandle : public Network::MockIoHandle, public IoHandle {
 public:
   MOCK_METHOD(void, setEof, ());
@@ -117,6 +143,98 @@ TEST_F(InternalSocketTest, EmptyPassthroughState) {
         ASSERT_EQ(0, filter_state_objects.size());
       }));
   initialize(io_handle);
+}
+
+// A configured factory name is resolved and an empty object is forward-shared under that name.
+TEST_F(InternalSocketTest, ProvisionsPlaceholderAndForwardShares) {
+  TestPlaceholderFactory factory;
+  placeholder_factories_.push_back(&factory);
+  auto state = std::make_shared<NiceMock<MockPassthroughState>>();
+  NiceMock<MockUserSpaceIoHandle> io_handle;
+  EXPECT_CALL(io_handle, passthroughState()).WillRepeatedly(testing::Return(state));
+  EXPECT_CALL(*state, initialize(_, _))
+      .WillOnce(Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata>,
+                           const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
+        ASSERT_EQ(1, filter_state_objects.size());
+        EXPECT_EQ("test.placeholder", filter_state_objects.at(0).name_);
+        EXPECT_NE(nullptr, filter_state_objects.at(0).data_);
+      }));
+  initialize(io_handle);
+}
+
+// A name already being shared in from the downstream side is left alone rather than provisioned
+// over.
+TEST_F(InternalSocketTest, SkipsProvisioningWhenNameAlreadyShared) {
+  TestPlaceholderFactory factory;
+  placeholder_factories_.push_back(&factory);
+  auto existing = std::make_shared<TestObject>();
+  filter_state_objects_.push_back(
+      {existing, StreamInfo::StreamSharingMayImpactPooling::None, "test.placeholder"});
+
+  auto state = std::make_shared<NiceMock<MockPassthroughState>>();
+  NiceMock<MockUserSpaceIoHandle> io_handle;
+  EXPECT_CALL(io_handle, passthroughState()).WillRepeatedly(testing::Return(state));
+  EXPECT_CALL(*state, initialize(_, _))
+      .WillOnce(Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata>,
+                           const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
+        ASSERT_EQ(1, filter_state_objects.size());
+        EXPECT_EQ(existing.get(), filter_state_objects.at(0).data_.get());
+      }));
+  initialize(io_handle);
+}
+
+// A factory that declines to produce an object contributes nothing.
+TEST_F(InternalSocketTest, SkipsProvisioningWhenFactoryDeclines) {
+  NullPlaceholderFactory factory;
+  placeholder_factories_.push_back(&factory);
+  auto state = std::make_shared<NiceMock<MockPassthroughState>>();
+  NiceMock<MockUserSpaceIoHandle> io_handle;
+  EXPECT_CALL(io_handle, passthroughState()).WillRepeatedly(testing::Return(state));
+  EXPECT_CALL(*state, initialize(_, _))
+      .WillOnce(Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata>,
+                           const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
+        EXPECT_EQ(0, filter_state_objects.size());
+      }));
+  initialize(io_handle);
+}
+
+// The provisioned object is also placed on this connection's own filter state, and it is the same
+// instance that was forward-shared.
+TEST_F(InternalSocketTest, OnConnectedPlacesPlaceholderOnConnectionFilterState) {
+  TestPlaceholderFactory factory;
+  placeholder_factories_.push_back(&factory);
+  auto state = std::make_shared<NiceMock<MockPassthroughState>>();
+  NiceMock<MockUserSpaceIoHandle> io_handle;
+  EXPECT_CALL(io_handle, passthroughState()).WillRepeatedly(testing::Return(state));
+
+  const StreamInfo::FilterState::Object* shared = nullptr;
+  EXPECT_CALL(*state, initialize(_, _))
+      .WillOnce(Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata>,
+                           const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
+        ASSERT_EQ(1, filter_state_objects.size());
+        shared = filter_state_objects.at(0).data_.get();
+      }));
+  initialize(io_handle);
+
+  socket_->onConnected();
+  const auto* placed =
+      transport_callbacks_.connection().streamInfo().filterState()->getDataReadOnly<TestObject>(
+          "test.placeholder");
+  ASSERT_NE(nullptr, placed);
+  EXPECT_EQ(shared, placed);
+}
+
+// Calling onConnected without any provisioned objects is a no-op.
+TEST_F(InternalSocketTest, OnConnectedWithNothingProvisioned) {
+  auto state = std::make_shared<NiceMock<MockPassthroughState>>();
+  NiceMock<MockUserSpaceIoHandle> io_handle;
+  EXPECT_CALL(io_handle, passthroughState()).WillRepeatedly(testing::Return(state));
+  initialize(io_handle);
+  socket_->onConnected();
+  EXPECT_EQ(
+      nullptr,
+      transport_callbacks_.connection().streamInfo().filterState()->getDataReadOnly<TestObject>(
+          "test.placeholder"));
 }
 
 class ConfigTest : public testing::Test {
@@ -213,6 +331,22 @@ TEST_F(ConfigTest, Empty) {
   initialize();
   EXPECT_EQ(nullptr, config_->extractMetadata(host_));
   EXPECT_EQ(0, stats_store_.counter("internal_upstream.no_metadata").value());
+}
+
+// A name that resolves to a registered factory is accepted.
+TEST_F(ConfigTest, RegisteredPlaceholderFactoryAccepted) {
+  TestUtility::loadFromYaml(std::string(SampleConfig), config_proto_);
+  config_proto_.add_provisioned_placeholder_factories("test.placeholder");
+  EXPECT_NO_THROW(initialize());
+}
+
+// A name with no registered factory is rejected at config load rather than silently producing
+// nothing at request time.
+TEST_F(ConfigTest, UnregisteredPlaceholderFactoryRejected) {
+  TestUtility::loadFromYaml(std::string(SampleConfig), config_proto_);
+  config_proto_.add_provisioned_placeholder_factories("test.not_registered");
+  EXPECT_THROW_WITH_REGEX(initialize(), EnvoyException,
+                          "no StreamInfo::FilterState::ObjectFactory registered");
 }
 
 } // namespace

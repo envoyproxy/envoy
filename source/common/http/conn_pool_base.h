@@ -91,7 +91,8 @@ public:
                      Envoy::ConnectionPool::AttachContext& context,
                      StreamInfo::FilterStateSharedPtr connection_filter_state) override {
     auto* callbacks = typedContext<HttpAttachContext>(context).callbacks_;
-    callbacks->onPoolFailure(reason, failure_reason, host_description, connection_filter_state);
+    callbacks->onPoolFailureWithFilterState(reason, failure_reason, host_description,
+                                            connection_filter_state);
   }
   void onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
                    Envoy::ConnectionPool::AttachContext& context) override;

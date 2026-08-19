@@ -86,8 +86,8 @@ public:
   std::string name() const override { return TunnelResponseHeaders::key(); }
   std::unique_ptr<StreamInfo::FilterState::Object>
   createFromBytes(absl::string_view data) const override {
-    // Not deserializable from bytes: instances are created empty and populated when the CONNECT
-    // response arrives. Returns nullptr for non-empty input rather than discarding it.
+    // Cannot be deserialized from bytes: instances are created empty and populated when the
+    // CONNECT response arrives. Returns nullptr for non-empty input rather than discarding it.
     if (!data.empty()) {
       return nullptr;
     }

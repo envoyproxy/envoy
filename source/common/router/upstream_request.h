@@ -122,10 +122,11 @@ public:
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
-                     absl::string_view transport_failure_reason,
-                     Upstream::HostDescriptionConstSharedPtr host,
-                     StreamInfo::FilterStateSharedPtr connection_filter_state) override;
+  void
+  onPoolFailureWithFilterState(ConnectionPool::PoolFailureReason reason,
+                               absl::string_view transport_failure_reason,
+                               Upstream::HostDescriptionConstSharedPtr host,
+                               StreamInfo::FilterStateSharedPtr connection_filter_state) override;
   void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                    Upstream::HostDescriptionConstSharedPtr host,
                    const Network::ConnectionInfoProvider& address_provider,

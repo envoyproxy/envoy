@@ -606,10 +606,10 @@ void UpstreamRequest::recordConnectionPoolCallbackLatency() {
       start_time_, parent_.callbacks()->dispatcher().timeSource());
 }
 
-void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
-                                    absl::string_view transport_failure_reason,
-                                    Upstream::HostDescriptionConstSharedPtr host,
-                                    StreamInfo::FilterStateSharedPtr connection_filter_state) {
+void UpstreamRequest::onPoolFailureWithFilterState(
+    ConnectionPool::PoolFailureReason reason, absl::string_view transport_failure_reason,
+    Upstream::HostDescriptionConstSharedPtr host,
+    StreamInfo::FilterStateSharedPtr connection_filter_state) {
   if (connection_filter_state != nullptr && stream_info_.upstreamInfo() != nullptr) {
     stream_info_.upstreamInfo()->setUpstreamFilterState(connection_filter_state);
   }

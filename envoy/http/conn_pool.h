@@ -36,12 +36,14 @@ public:
                              Upstream::HostDescriptionConstSharedPtr host) PURE;
 
   /**
-   * Overload of onPoolFailure that additionally supplies the filter state of the connection whose
-   * failure caused the error.
+   * As onPoolFailure, additionally supplying the filter state of the connection whose failure
+   * caused the error. Deliberately not an overload of onPoolFailure: an overload would be hidden
+   * in every implementation that declares only the three-argument form.
    */
-  virtual void onPoolFailure(PoolFailureReason reason, absl::string_view transport_failure_reason,
-                             Upstream::HostDescriptionConstSharedPtr host,
-                             StreamInfo::FilterStateSharedPtr) {
+  virtual void onPoolFailureWithFilterState(PoolFailureReason reason,
+                                            absl::string_view transport_failure_reason,
+                                            Upstream::HostDescriptionConstSharedPtr host,
+                                            StreamInfo::FilterStateSharedPtr) {
     onPoolFailure(reason, transport_failure_reason, host);
   }
 
