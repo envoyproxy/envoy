@@ -93,7 +93,8 @@ public:
   MOCK_METHOD(ActiveClientPtr, instantiateActiveClient, ());
   MOCK_METHOD(void, onPoolFailure,
               (const Upstream::HostDescriptionConstSharedPtr& n, absl::string_view,
-               ConnectionPool::PoolFailureReason, AttachContext&));
+               ConnectionPool::PoolFailureReason, AttachContext&,
+               StreamInfo::FilterStateSharedPtr));
   MOCK_METHOD(void, onPoolReady, (ActiveClient&, AttachContext&));
   void setSkipPendingOverflowForTest(bool value) { skip_pending_overflow_on_active_rq_ = value; }
 };
@@ -757,7 +758,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflow) {
   newActiveClientAndStream(ActiveClient::State::Ready);
 
   // Second stream: finds the Ready client, attachStreamToClient() overflows.
-  EXPECT_CALL(pool_, onPoolFailure(_, _, ConnectionPool::PoolFailureReason::Overflow, _));
+  EXPECT_CALL(pool_, onPoolFailure(_, _, ConnectionPool::PoolFailureReason::Overflow, _, _));
   pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
 
   EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_active_overflow_.value());
@@ -778,7 +779,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflowLegacy) {
 
   newActiveClientAndStream(ActiveClient::State::Ready);
 
-  EXPECT_CALL(pool_, onPoolFailure(_, _, ConnectionPool::PoolFailureReason::Overflow, _));
+  EXPECT_CALL(pool_, onPoolFailure(_, _, ConnectionPool::PoolFailureReason::Overflow, _, _));
   pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
 
   EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_active_overflow_.value());

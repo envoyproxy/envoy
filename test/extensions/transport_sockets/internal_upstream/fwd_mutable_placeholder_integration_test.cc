@@ -22,8 +22,7 @@ class SeedPlaceholderFilter : public Http::PassThroughFilter {
 public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     decoder_callbacks_->streamInfo().filterState()->setData(
-        TcpProxy::TunnelResponseHeaders::key(),
-        std::make_shared<TcpProxy::TunnelResponseHeaders>(),
+        TcpProxy::TunnelResponseHeaders::key(), std::make_shared<TcpProxy::TunnelResponseHeaders>(),
         StreamInfo::FilterState::LifeSpan::Connection,
         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
     return Http::FilterHeadersStatus::Continue;
@@ -99,10 +98,9 @@ public:
       // Naming the factory makes internal_upstream provision the object; left unset, the seed
       // filter supplies it.
       const std::string provisioning_block =
-          read_upstream_filter_state_
-              ? "\n        provisioned_placeholder_factories:\n        - "
-                "envoy.tcp_proxy.propagate_response_headers"
-              : "";
+          read_upstream_filter_state_ ? "\n        provisioned_placeholder_factories:\n        - "
+                                        "envoy.tcp_proxy.propagate_response_headers"
+                                      : "";
       const std::string wrapped_transport_socket =
           wrapped_socket_uses_tls_
               ? fmt::format(R"EOF(
@@ -128,7 +126,6 @@ public:
       )EOF",
                                             wrapped_transport_socket, provisioning_block),
                                 *cluster->mutable_transport_socket());
-
 
       TestUtility::loadFromYaml(R"EOF(
       name: internal_listener
@@ -251,7 +248,8 @@ TEST_F(FwdMutablePlaceholderIntegrationTest, ProvisionedPlaceholderReadableOnPoo
 
   // The connection must have failed to connect. If it reached readiness instead, this case would
   // not exercise the failure path at all.
-  EXPECT_GT(test_server_->counter("cluster.internal_listener.upstream_cx_connect_fail")->value(), 0);
+  EXPECT_GT(test_server_->counter("cluster.internal_listener.upstream_cx_connect_fail")->value(),
+            0);
 
   EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr(header_value));
 }

@@ -4,7 +4,6 @@
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
 
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {

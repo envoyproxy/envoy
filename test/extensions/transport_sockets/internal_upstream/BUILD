@@ -82,7 +82,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//envoy/server:filter_config_interface",
-        "//source/common/tcp_proxy:tcp_proxy",
+        "//source/common/tcp_proxy",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
@@ -96,6 +96,5 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/bootstrap/internal_listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

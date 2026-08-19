@@ -59,13 +59,14 @@ public:
     inner_socket_ = inner_socket.get();
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(testing::ReturnRef(io_handle));
     socket_ = std::make_unique<InternalSocket>(std::move(inner_socket), std::move(metadata_),
-                                               filter_state_objects_);
+                                               filter_state_objects_, placeholder_factories_);
     EXPECT_CALL(*inner_socket_, setTransportSocketCallbacks(_));
     socket_->setTransportSocketCallbacks(transport_callbacks_);
   }
 
   std::unique_ptr<envoy::config::core::v3::Metadata> metadata_;
   StreamInfo::FilterState::Objects filter_state_objects_;
+  std::vector<const StreamInfo::FilterState::ObjectFactory*> placeholder_factories_;
   NiceMock<Network::MockTransportSocket>* inner_socket_;
   std::unique_ptr<InternalSocket> socket_;
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks_;
