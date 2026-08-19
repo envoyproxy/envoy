@@ -2780,6 +2780,63 @@ TEST_F(ClusterManagerImplTest, LocalInterfaceNameForUpstreamConnectionThrowsInWi
 }
 #endif
 
+TEST_F(ClusterManagerImplTest, RemoveClustersBatch) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: static_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: static_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  static constexpr char dynamic_yaml_template[] = R"EOF(
+    name: {}
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: {}
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+
+  auto cluster1 = parseClusterFromV3Yaml(fmt::format(dynamic_yaml_template, "dynamic1", "dynamic1"));
+  auto cluster2 = parseClusterFromV3Yaml(fmt::format(dynamic_yaml_template, "dynamic2", "dynamic2"));
+
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster1, "v1", true));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster2, "v1", true));
+
+  EXPECT_EQ(3, cluster_manager_->clusters().active_clusters_.size());
+
+  // Expect runOnAllThreads to be called exactly once during removeClusters.
+  EXPECT_CALL(factory_.tls_, runOnAllThreads(testing::An<std::function<void()>>()))
+      .Times(1)
+      .WillOnce(Invoke(&factory_.tls_, &ThreadLocal::MockInstance::runOnAllThreads1));
+
+  std::vector<std::string> removed = cluster_manager_->removeClusters({"dynamic1", "dynamic2"}, true);
+  EXPECT_EQ(2, removed.size());
+  EXPECT_EQ("dynamic1", removed[0]);
+  EXPECT_EQ("dynamic2", removed[1]);
+
+  EXPECT_EQ(1, cluster_manager_->clusters().active_clusters_.size());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

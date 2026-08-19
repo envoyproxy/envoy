@@ -812,55 +812,73 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
 }
 
 bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const bool remove_ignored) {
-  bool removed = false;
-  auto existing_active_cluster = active_clusters_.find(cluster_name);
-  if (existing_active_cluster != active_clusters_.end() &&
-      existing_active_cluster->second->added_via_api_ &&
-      (!existing_active_cluster->second->avoid_cds_removal_ || remove_ignored)) {
-    removed = true;
-    init_helper_.removeCluster(*existing_active_cluster->second);
-    active_clusters_.erase(existing_active_cluster);
+  return !removeClusters({std::string(cluster_name)}, remove_ignored).empty();
+}
 
-    ENVOY_LOG(debug, "removing cluster {}", cluster_name);
-    tls_.runOnAllThreads([cluster_name = std::string(cluster_name)](
+std::vector<std::string> ClusterManagerImpl::removeClusters(const std::vector<std::string>& clusters, const bool remove_ignored) {
+  std::vector<std::string> removed_clusters;
+  std::vector<std::string> active_clusters_removed_names;
+
+  for (const auto& cluster_name : clusters) {
+    bool removed = false;
+    auto existing_active_cluster = active_clusters_.find(cluster_name);
+    if (existing_active_cluster != active_clusters_.end() &&
+        existing_active_cluster->second->added_via_api_ &&
+        (!existing_active_cluster->second->avoid_cds_removal_ || remove_ignored)) {
+      removed = true;
+      init_helper_.removeCluster(*existing_active_cluster->second);
+      active_clusters_.erase(existing_active_cluster);
+      active_clusters_removed_names.push_back(cluster_name);
+      cluster_initialization_map_.erase(cluster_name);
+      ENVOY_LOG(debug, "removing cluster {}", cluster_name);
+    }
+
+    auto existing_warming_cluster = warming_clusters_.find(cluster_name);
+    if (existing_warming_cluster != warming_clusters_.end() &&
+        existing_warming_cluster->second->added_via_api_ &&
+        (!existing_warming_cluster->second->avoid_cds_removal_ || remove_ignored)) {
+      removed = true;
+      init_helper_.removeCluster(*existing_warming_cluster->second);
+      warming_clusters_.erase(existing_warming_cluster);
+      ENVOY_LOG(info, "removing warming cluster {}", cluster_name);
+    }
+
+    if (removed) {
+      removed_clusters.push_back(cluster_name);
+      // Cancel any pending merged updates.
+      updates_map_.erase(cluster_name);
+    }
+  }
+
+  if (!active_clusters_removed_names.empty()) {
+    tls_.runOnAllThreads([active_clusters_removed_names](
                              OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-      ASSERT(cluster_manager->thread_local_clusters_.contains(cluster_name) ||
-             cluster_manager->thread_local_deferred_clusters_.contains(cluster_name));
-      ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
-      for (auto cb_it = cluster_manager->update_callbacks_.begin();
-           cb_it != cluster_manager->update_callbacks_.end();) {
-        // The current callback may remove itself from the list, so a handle for
-        // the next item is fetched before calling the callback.
-        auto curr_cb_it = cb_it;
-        ++cb_it;
-        (*curr_cb_it)->onClusterRemoval(cluster_name);
+      for (const auto& cluster_name : active_clusters_removed_names) {
+        ASSERT(cluster_manager->thread_local_clusters_.contains(cluster_name) ||
+               cluster_manager->thread_local_deferred_clusters_.contains(cluster_name));
+        ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
+        for (auto cb_it = cluster_manager->update_callbacks_.begin();
+             cb_it != cluster_manager->update_callbacks_.end();) {
+          // The current callback may remove itself from the list, so a handle for
+          // the next item is fetched before calling the callback.
+          auto curr_cb_it = cb_it;
+          ++cb_it;
+          (*curr_cb_it)->onClusterRemoval(cluster_name);
+        }
+        cluster_manager->thread_local_clusters_.erase(cluster_name);
+        cluster_manager->thread_local_deferred_clusters_.erase(cluster_name);
       }
-      cluster_manager->thread_local_clusters_.erase(cluster_name);
-      cluster_manager->thread_local_deferred_clusters_.erase(cluster_name);
       cluster_manager->local_stats_.clusters_inflated_.set(
           cluster_manager->thread_local_clusters_.size());
     });
-    cluster_initialization_map_.erase(cluster_name);
   }
 
-  auto existing_warming_cluster = warming_clusters_.find(cluster_name);
-  if (existing_warming_cluster != warming_clusters_.end() &&
-      existing_warming_cluster->second->added_via_api_ &&
-      (!existing_warming_cluster->second->avoid_cds_removal_ || remove_ignored)) {
-    removed = true;
-    init_helper_.removeCluster(*existing_warming_cluster->second);
-    warming_clusters_.erase(existing_warming_cluster);
-    ENVOY_LOG(info, "removing warming cluster {}", cluster_name);
-  }
-
-  if (removed) {
-    cm_stats_.cluster_removed_.inc();
+  if (!removed_clusters.empty()) {
+    cm_stats_.cluster_removed_.add(removed_clusters.size());
     updateClusterCounts();
-    // Cancel any pending merged updates.
-    updates_map_.erase(cluster_name);
   }
 
-  return removed;
+  return removed_clusters;
 }
 
 absl::StatusOr<ClusterManagerImpl::ClusterDataPtr>
