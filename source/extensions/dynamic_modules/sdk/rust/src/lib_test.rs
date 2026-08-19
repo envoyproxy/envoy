@@ -6973,7 +6973,7 @@ fn test_cluster_callout_done_with_null_buffers_yields_none() {
   struct TestCluster;
   impl Cluster for TestCluster {
     fn on_init(&mut self, _envoy_cluster: &dyn EnvoyCluster) {}
-    fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
+    fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
       unimplemented!("not exercised by this test")
     }
 

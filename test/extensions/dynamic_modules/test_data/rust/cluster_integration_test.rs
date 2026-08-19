@@ -89,6 +89,10 @@ fn new_cluster_config(
         metrics: envoy_cluster_metrics,
       }))
     },
+    "native_lb_test" => Some(Box::new(NativeLbTestClusterConfig {
+      upstream_address: config_str.to_string(),
+      metrics: envoy_cluster_metrics,
+    })),
     _ => None,
   }
 }
@@ -140,13 +144,13 @@ impl Cluster for SyncHostSelectionCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(SyncHostSelectionLb {
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(SyncHostSelectionLb {
       hosts: self.hosts.clone(),
       index: AtomicUsize::new(0),
       counter_id: self.counter_id,
       metrics: self.metrics.clone(),
-    })
+    }))
   }
 }
 
@@ -207,10 +211,10 @@ impl Cluster for AsyncHostSelectionCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(AsyncHostSelectionLb {
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(AsyncHostSelectionLb {
       hosts: self.hosts.clone(),
-    })
+    }))
   }
 }
 
@@ -297,11 +301,11 @@ impl Cluster for SchedulerHostUpdateCluster {
     scheduler.commit(ADD_HOST_EVENT_ID);
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(SchedulerHostUpdateLb {
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(SchedulerHostUpdateLb {
       hosts: self.hosts.clone(),
       membership_update_count: AtomicUsize::new(0),
-    })
+    }))
   }
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
@@ -376,10 +380,10 @@ impl Cluster for LifecycleCallbacksCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(LifecycleCallbacksLb {
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(LifecycleCallbacksLb {
       hosts: self.hosts.clone(),
-    })
+    }))
   }
 
   fn on_server_initialized(&mut self, _envoy_cluster: &dyn EnvoyCluster) {
@@ -472,10 +476,10 @@ impl Cluster for RunOnAllWorkersCluster {
     scheduler.commit(RUN_ON_ALL_WORKERS_TRIGGER_EVENT_ID);
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(RunOnAllWorkersLb {
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(RunOnAllWorkersLb {
       hosts: self.hosts.clone(),
-    })
+    }))
   }
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
@@ -557,13 +561,13 @@ impl Cluster for WorkerLocalRebuildCluster {
     scheduler.commit(WORKER_LOCAL_REBUILD_ADD_EVENT_ID);
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(WorkerLocalRebuildLb {
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(WorkerLocalRebuildLb {
       hosts: Vec::new(),
       index: 0,
       counter_id: self.counter_id,
       metrics: self.metrics.clone(),
-    })
+    }))
   }
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
@@ -671,13 +675,13 @@ impl Cluster for MemberUpdatePackedAddressCluster {
     scheduler.commit(PACKED_ADDRESS_ADD_EVENT_ID);
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(MemberUpdatePackedAddressLb {
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(MemberUpdatePackedAddressLb {
       hosts: Vec::new(),
       index: 0,
       counter_id: self.counter_id,
       metrics: self.metrics.clone(),
-    })
+    }))
   }
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
@@ -806,14 +810,14 @@ impl Cluster for WorkerTimerCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(WorkerTimerLb {
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(WorkerTimerLb {
       hosts: self.hosts.clone(),
       timer: None,
       armed_id: self.armed_id,
       fired_id: self.fired_id,
       metrics: self.metrics.clone(),
-    })
+    }))
   }
 }
 
@@ -866,5 +870,54 @@ impl ClusterLb for WorkerTimerLb {
     }
     // Re-arm for periodic firing.
     timer.enable(std::time::Duration::from_millis(WORKER_TIMER_INTERVAL_MS));
+  }
+}
+
+// =============================================================================
+// Native LB test: module that only provides host discovery, not load balancing.
+// =============================================================================
+//
+// This module's new_load_balancer returns None, signaling to Envoy to use its native
+// load balancer. This is used to test that native LB policies (LEAST_REQUEST, ROUND_ROBIN,
+// RANDOM) work correctly with dynamic_modules clusters.
+
+struct NativeLbTestClusterConfig {
+  upstream_address: String,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for NativeLbTestClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    let counter_id = self.metrics.define_counter("native_lb_requests").ok();
+    Box::new(NativeLbTestCluster {
+      upstream_address: self.upstream_address.clone(),
+      hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
+      counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct NativeLbTestCluster {
+  upstream_address: String,
+  hosts: SharedHostList,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for NativeLbTestCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    let addresses = vec![self.upstream_address.clone()];
+    let weights = vec![1u32];
+    if let Some(host_ptrs) = envoy_cluster.add_hosts(&addresses, &weights) {
+      self.hosts.lock().unwrap().0 = host_ptrs;
+    }
+    envoy_cluster.pre_init_complete();
+  }
+
+  // Return None to signal that this module does not provide a load balancer.
+  // Envoy will use the native factory load balancer based on lb_policy.
+  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+    None
   }
 }
