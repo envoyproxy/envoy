@@ -55,6 +55,14 @@ void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   callbacks_->onPoolFailure(reason, transport_failure_reason, host);
 }
 
+void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                 absl::string_view transport_failure_reason,
+                                 Upstream::HostDescriptionConstSharedPtr host,
+                                 StreamInfo::FilterStateSharedPtr connection_filter_state) {
+  conn_pool_stream_handle_ = nullptr;
+  callbacks_->onPoolFailure(reason, transport_failure_reason, host, connection_filter_state);
+}
+
 void HttpConnPool::onPoolReady(Envoy::Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
                                StreamInfo::StreamInfo& info,

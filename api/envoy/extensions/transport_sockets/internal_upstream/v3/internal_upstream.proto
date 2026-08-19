@@ -46,4 +46,14 @@ message InternalUpstreamTransport {
 
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 3 [(validate.rules).message = {required: true}];
+
+  // Names of registered ``StreamInfo::FilterState::ObjectFactory`` instances. For each name, an
+  // empty object is created on the upstream connection and shared by reference with the downstream
+  // internal connection, under a key equal to the factory's name. A filter on the internal
+  // connection can populate that object in place, and the value is then readable on the upstream
+  // connection, for example via ``%UPSTREAM_FILTER_STATE%``.
+  //
+  // A name whose key is already shared in from the downstream side is skipped, leaving that object
+  // untouched. Objects must be mutable to be populated.
+  repeated string provisioned_placeholder_factories = 4;
 }

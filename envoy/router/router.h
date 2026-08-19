@@ -1595,6 +1595,18 @@ public:
   virtual void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                              absl::string_view transport_failure_reason,
                              Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * Overload of onPoolFailure that additionally supplies the filter state of the connection whose
+   * failure caused the error.
+   */
+  virtual void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                             absl::string_view transport_failure_reason,
+                             Upstream::HostDescriptionConstSharedPtr host,
+                             StreamInfo::FilterStateSharedPtr) {
+    onPoolFailure(reason, transport_failure_reason, host);
+  }
+
   /**
    * Called when GenericConnPool::newStream has established a new stream.
    *

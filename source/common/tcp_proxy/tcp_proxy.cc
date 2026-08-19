@@ -81,6 +81,22 @@ public:
 
 REGISTER_FACTORY(PerConnectionIdleTimeoutMsObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
+class TunnelResponseHeadersObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return TunnelResponseHeaders::key(); }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    // Not deserializable from bytes: instances are created empty and populated when the CONNECT
+    // response arrives. Returns nullptr for non-empty input rather than discarding it.
+    if (!data.empty()) {
+      return nullptr;
+    }
+    return std::make_unique<TunnelResponseHeaders>();
+  }
+};
+
+REGISTER_FACTORY(TunnelResponseHeadersObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
 Config::SimpleRouteImpl::SimpleRouteImpl(const Config& parent, absl::string_view cluster_name)
     : parent_(parent), cluster_name_(cluster_name) {}
 
@@ -1050,6 +1066,12 @@ void TunnelingConfigHelperImpl::propagateResponseHeaders(
     Http::ResponseHeaderMapPtr&& headers,
     const StreamInfo::FilterStateSharedPtr& filter_state) const {
   if (!propagate_response_headers_) {
+    return;
+  }
+  if (auto* placeholder =
+          filter_state->getDataMutable<TunnelResponseHeaders>(TunnelResponseHeaders::key());
+      placeholder != nullptr) {
+    placeholder->setResponseHeaders(std::move(headers));
     return;
   }
   filter_state->setData(TunnelResponseHeaders::key(),

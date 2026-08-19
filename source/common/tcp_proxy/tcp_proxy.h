@@ -138,13 +138,19 @@ using TunnelingConfig =
  */
 class TunnelResponseHeaders : public Http::TunnelResponseHeadersOrTrailersImpl {
 public:
+  // Default-constructed instances hold an empty header map, so value() is safe to call before
+  // any response has been captured.
+  TunnelResponseHeaders() : response_headers_(Http::ResponseHeaderMapImpl::create()) {}
   TunnelResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers)
       : response_headers_(std::move(response_headers)) {}
   const Http::HeaderMap& value() const override { return *response_headers_; }
+  void setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) {
+    response_headers_ = std::move(response_headers);
+  }
   static const std::string& key();
 
 private:
-  const Http::ResponseHeaderMapPtr response_headers_;
+  Http::ResponseHeaderMapPtr response_headers_;
 };
 
 /**

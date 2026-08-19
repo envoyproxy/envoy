@@ -65,3 +65,37 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/transport_sockets/internal_upstream/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "fwd_mutable_placeholder_integration_test",
+    size = "large",
+    srcs = [
+        "fwd_mutable_placeholder_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    extension_names = [
+        "envoy.bootstrap.internal_listener",
+        "envoy.transport_sockets.internal_upstream",
+    ],
+    rbe_pool = "6gig",
+    deps = [
+        "//envoy/server:filter_config_interface",
+        "//source/common/tcp_proxy:tcp_proxy",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/bootstrap/internal_listener:config",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/transport_sockets/internal_upstream:config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/bootstrap/internal_listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)

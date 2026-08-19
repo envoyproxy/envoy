@@ -3,6 +3,7 @@
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/io_socket/user_space/io_handle.h"
@@ -30,6 +31,9 @@ public:
       Stats::Scope& scope);
   std::unique_ptr<envoy::config::core::v3::Metadata>
   extractMetadata(const Upstream::HostDescriptionConstSharedPtr& host) const;
+  const std::vector<const StreamInfo::FilterState::ObjectFactory*>& placeholderFactories() const {
+    return placeholder_factories_;
+  }
 
 private:
   enum class MetadataKind { Host, Cluster };
@@ -40,6 +44,7 @@ private:
   };
   InternalUpstreamStats stats_;
   std::vector<MetadataSource> metadata_sources_;
+  std::vector<const StreamInfo::FilterState::ObjectFactory*> placeholder_factories_;
 };
 
 class InternalSocketFactory : public PassthroughFactory {

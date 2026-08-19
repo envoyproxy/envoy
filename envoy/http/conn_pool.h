@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
@@ -33,6 +34,16 @@ public:
    */
   virtual void onPoolFailure(PoolFailureReason reason, absl::string_view transport_failure_reason,
                              Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * Overload of onPoolFailure that additionally supplies the filter state of the connection whose
+   * failure caused the error.
+   */
+  virtual void onPoolFailure(PoolFailureReason reason, absl::string_view transport_failure_reason,
+                             Upstream::HostDescriptionConstSharedPtr host,
+                             StreamInfo::FilterStateSharedPtr) {
+    onPoolFailure(reason, transport_failure_reason, host);
+  }
 
   /**
    * Called when a connection is available to process a request/response.

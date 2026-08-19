@@ -210,7 +210,8 @@ void ConnPoolImpl::onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
 void ConnPoolImpl::onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                                  absl::string_view failure_reason,
                                  ConnectionPool::PoolFailureReason reason,
-                                 Envoy::ConnectionPool::AttachContext& context) {
+                                 Envoy::ConnectionPool::AttachContext& context,
+                                 StreamInfo::FilterStateSharedPtr) {
   auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
   callbacks->onPoolFailure(reason, failure_reason, host_description);
 }

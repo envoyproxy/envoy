@@ -42,6 +42,10 @@ public:
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     absl::string_view transport_failure_reason,
+                     Upstream::HostDescriptionConstSharedPtr host,
+                     StreamInfo::FilterStateSharedPtr connection_filter_state) override;
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
                    Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
                    std::optional<Envoy::Http::Protocol> protocol) override;

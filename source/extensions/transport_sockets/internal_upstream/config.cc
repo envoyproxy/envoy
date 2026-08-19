@@ -68,6 +68,17 @@ Config::Config(
     }
     metadata_sources_.push_back(MetadataSource(kind, metadata.name()));
   }
+  for (const auto& factory_name : config_proto.provisioned_placeholder_factories()) {
+    auto* factory =
+        Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(factory_name);
+    if (factory == nullptr) {
+      throw EnvoyException(
+          absl::StrCat("internal_upstream: no StreamInfo::FilterState::ObjectFactory registered "
+                       "under provisioned_placeholder_factories name: ",
+                       factory_name));
+    }
+    placeholder_factories_.push_back(factory);
+  }
 }
 
 std::unique_ptr<envoy::config::core::v3::Metadata>
@@ -120,7 +131,8 @@ InternalSocketFactory::createTransportSocket(Network::TransportSocketOptionsCons
   }
   return std::make_unique<InternalSocket>(std::move(inner_socket), std::move(extracted_metadata),
                                           options ? options->downstreamSharedFilterStateObjects()
-                                                  : StreamInfo::FilterState::Objects());
+                                                  : StreamInfo::FilterState::Objects(),
+                                          config_.placeholderFactories());
 }
 
 REGISTER_FACTORY(InternalUpstreamConfigFactory,

@@ -88,9 +88,10 @@ public:
                                                 bool can_send_early_data) override;
   void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                      absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason,
-                     Envoy::ConnectionPool::AttachContext& context) override {
+                     Envoy::ConnectionPool::AttachContext& context,
+                     StreamInfo::FilterStateSharedPtr connection_filter_state) override {
     auto* callbacks = typedContext<HttpAttachContext>(context).callbacks_;
-    callbacks->onPoolFailure(reason, failure_reason, host_description);
+    callbacks->onPoolFailure(reason, failure_reason, host_description, connection_filter_state);
   }
   void onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
                    Envoy::ConnectionPool::AttachContext& context) override;
@@ -164,6 +165,9 @@ public:
   }
   uint32_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }
   uint64_t id() const override { return codec_client_->id(); }
+  StreamInfo::FilterStateSharedPtr connectionFilterState() override {
+    return codec_client_ != nullptr ? codec_client_->streamInfo().filterState() : nullptr;
+  }
   HttpConnPoolImplBase& parent() { return *static_cast<HttpConnPoolImplBase*>(&parent_); }
 
   Http::CodecClientPtr codec_client_;

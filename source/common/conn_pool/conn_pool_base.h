@@ -5,6 +5,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/timespan.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/debug_recursion_checker.h"
@@ -33,6 +34,8 @@ class ActiveClient : public LinkedObject<ActiveClient>,
                      public Event::DeferredDeletable,
                      protected Logger::Loggable<Logger::Id::pool> {
 public:
+  virtual StreamInfo::FilterStateSharedPtr connectionFilterState() { return nullptr; }
+
   ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
                uint32_t effective_concurrent_streams, uint32_t concurrent_stream_limit);
   ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
@@ -245,7 +248,8 @@ public:
   // Fails all pending streams, calling onPoolFailure on the associated callbacks.
   void purgePendingStreams(const Upstream::HostDescriptionConstSharedPtr& host_description,
                            absl::string_view failure_reason,
-                           ConnectionPool::PoolFailureReason pool_failure_reason);
+                           ConnectionPool::PoolFailureReason pool_failure_reason,
+                           StreamInfo::FilterStateSharedPtr connection_filter_state);
 
   // Closes any idle connections as this pool is drained.
   void closeIdleConnectionsForDrainingPool();
@@ -274,7 +278,8 @@ public:
   virtual void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                              absl::string_view failure_reason,
                              ConnectionPool::PoolFailureReason pool_failure_reason,
-                             AttachContext& context) PURE;
+                             AttachContext& context,
+                             StreamInfo::FilterStateSharedPtr connection_filter_state) PURE;
   virtual void onPoolReady(ActiveClient& client, AttachContext& context) PURE;
   // Called by derived classes any time a stream is completed or destroyed for any reason.
   void onStreamClosed(Envoy::ConnectionPool::ActiveClient& client, bool delay_attaching_stream);

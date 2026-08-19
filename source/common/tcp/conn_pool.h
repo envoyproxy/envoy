@@ -182,7 +182,8 @@ public:
                    Envoy::ConnectionPool::AttachContext& context) override;
   void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                      absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason,
-                     Envoy::ConnectionPool::AttachContext& context) override;
+                     Envoy::ConnectionPool::AttachContext& context,
+                     StreamInfo::FilterStateSharedPtr connection_filter_state) override;
   bool enforceMaxRequests() const override { return false; }
   // These two functions exist for testing parity between old and new Tcp Connection Pools.
   virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient&) {}
