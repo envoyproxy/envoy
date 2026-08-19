@@ -40,12 +40,23 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          spdlog::level::level_enum default_log_level)
     : OptionsImpl(toArgsVector(argc, argv), hot_restart_version_cb, default_log_level) {}
 
+OptionsImpl::OptionsImpl(int argc, const char* const* argv,
+                         const HotRestartVersionCb& hot_restart_version_cb,
+                         Logger::Levels default_log_level)
+    : OptionsImpl(toArgsVector(argc, argv), hot_restart_version_cb, default_log_level) {}
+
 OptionsImpl::OptionsImpl(std::vector<std::string> args,
                          const HotRestartVersionCb& hot_restart_version_cb,
-                         spdlog::level::level_enum default_log_level) {
+                         spdlog::level::level_enum default_log_level)
+    : OptionsImpl(args, hot_restart_version_cb, static_cast<Logger::Levels>(default_log_level)) {}
+
+OptionsImpl::OptionsImpl(std::vector<std::string> args,
+                         const HotRestartVersionCb& hot_restart_version_cb,
+                         Logger::Levels default_log_level) {
   std::string log_levels_string = fmt::format("Log levels: {}", allowedLogLevels());
   log_levels_string +=
-      fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
+      fmt::format("\nDefault is [{}]",
+                  spdlog::level::level_string_views[static_cast<uint32_t>(default_log_level)]);
 
   const std::string component_log_level_string =
       "Comma-separated list of component log levels. For example upstream:debug,config:trace";
@@ -117,7 +128,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                                         false, "v4", "string", cmd);
   TCLAP::ValueArg<std::string> log_level(
       "l", "log-level", log_levels_string, false,
-      spdlog::level::level_string_views[default_log_level].data(), "string", cmd);
+      spdlog::level::level_string_views[static_cast<uint32_t>(default_log_level)].data(), "string",
+      cmd);
   TCLAP::ValueArg<std::string> component_log_level(
       "", "component-log-level", component_log_level_string, false, "", "string", cmd);
   TCLAP::ValueArg<std::string> log_format("", "log-format", log_format_string, false,
@@ -220,7 +232,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
     }
     log_level_ = status_or_error.value();
   } else {
-    log_level_ = default_log_level;
+    log_level_ = static_cast<spdlog::level::level_enum>(default_log_level);
   }
 
   log_format_ = log_format.getValue();
@@ -478,4 +490,11 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
   setServiceZone(service_zone);
 }
 
+OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& service_node,
+                         const std::string& service_zone, Logger::Levels log_level) {
+  setLogLevel(log_level);
+  setServiceClusterName(service_cluster);
+  setServiceNodeName(service_node);
+  setServiceZone(service_zone);
+}
 } // namespace Envoy
