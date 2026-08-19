@@ -83,24 +83,16 @@ Protobuf::Value formatValueForTest(const FormatterProvider& provider, const Cont
   return expected;
 }
 
-std::optional<std::string> formatForTest(const StreamInfoFormatterProvider& provider,
+std::optional<std::string> formatForTest(const FormatterProvider& provider,
                                          const StreamInfo::StreamInfo& stream_info) {
-  const std::optional<std::string> expected = provider.format(stream_info);
-  std::string sink{SinkSentinel};
-  const bool has_value = provider.formatTo(sink, stream_info);
-  checkFormatTo(expected, has_value, sink);
-  return expected;
+  Envoy::Formatter::Context context;
+  return formatForTest(provider, context, stream_info);
 }
 
-Protobuf::Value formatValueForTest(const StreamInfoFormatterProvider& provider,
+Protobuf::Value formatValueForTest(const FormatterProvider& provider,
                                    const StreamInfo::StreamInfo& stream_info) {
-  const Protobuf::Value expected = provider.formatValue(stream_info);
-  std::string actual;
-  JsonStringSerializer serializer(actual);
-  ValueSink sink(serializer);
-  provider.formatValueTo(sink, stream_info);
-  checkFormatValueTo(expected, sink.consumed(), actual);
-  return expected;
+  Envoy::Formatter::Context context;
+  return formatValueForTest(provider, context, stream_info);
 }
 
 } // namespace Formatter
