@@ -6,6 +6,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 
@@ -23,7 +24,11 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
                bool warm)
     : init_target_(fmt::format("SdsApi {}", sds_config_name), [this, warm] { initialize(warm); }),
       dispatcher_(dispatcher), api_(api),
-      scope_(stats.createScope(absl::StrCat("sds.", sds_config_name, "."))),
+      // sds.[<resource_name>.]**
+      scope_(stats.createScopeWithTaggedName(
+          "sds",
+          {Stats::TagStringView{Envoy::Config::TagNames::get().XDS_RESOURCE_NAME, sds_config_name}},
+          absl::StrCat("sds.", sds_config_name, "."))),
       sds_api_stats_(generateStats(*scope_)), resource_type_helper_(validation_visitor, "name"),
       sds_config_(std::move(sds_config)), sds_config_name_(sds_config_name),
       clean_up_(std::move(destructor_cb)), subscription_factory_(subscription_factory),

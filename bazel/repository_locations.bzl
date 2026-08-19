@@ -13,7 +13,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazel-contrib/bazel_features/releases/download/v{version}/bazel_features-v{version}.tar.gz"],
         strip_prefix = "bazel_features-{version}",
     ),
-    bazel_gazelle = dict(
+    gazelle = dict(
         version = "0.47.0",
         sha256 = "675114d8b433d0a9f54d81171833be96ebc4113115664b791e6f204d58e93446",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
@@ -30,8 +30,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.2",
-        sha256 = "3427dc6eaafa83042249125920b3fb03ebc3779bb1aff02c147faedebb6c0475",
+        version = "0.4.6",
+        sha256 = "4c949b54da816e83673028faf28831206f0ef3a28fc4eb95cc01a5275d85cfe6",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -181,7 +181,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "jemalloc-{version}",
         urls = ["https://github.com/jemalloc/jemalloc/releases/download/{version}/jemalloc-{version}.tar.bz2"],
     ),
-    com_github_grpc_grpc = dict(
+    grpc = dict(
         version = "1.83.0",
         sha256 = "90d453393a9d41215df546103b10b33b9566df79cdf6f49dc67f6c4d044d090d",
         strip_prefix = "grpc-{version}",
@@ -622,7 +622,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     # After updating you may need to run:
     #
-    #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
+    #     bazel run //bazel/external/cargo:crates_vendor -- --repin
     #
     rules_rust = dict(
         version = "0.69.0",
