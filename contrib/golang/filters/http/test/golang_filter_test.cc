@@ -19,6 +19,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -36,6 +37,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Golang {
+
+using Envoy::StatusHelpers::HasStatus;
 
 class TestFilter : public Filter {
 public:
@@ -203,9 +206,8 @@ TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
 TEST_F(GolangHttpFilterTest, InvalidConfigForRouteConfigFilter) {
   InSequence s;
   auto status = setupWithStatus(ROUTECONFIG, genSoPath(), ROUTECONFIG);
-  EXPECT_FALSE(status.ok());
-  EXPECT_THAT(std::string(status.message()),
-              testing::HasSubstr("golang filter failed to parse plugin config"));
+  EXPECT_THAT(status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("golang filter failed to parse plugin config")));
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/44320.

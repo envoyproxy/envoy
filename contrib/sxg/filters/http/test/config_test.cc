@@ -7,6 +7,7 @@
 
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
 #include "contrib/sxg/filters/http/source/config.h"
@@ -20,6 +21,8 @@ namespace SXG {
 
 using testing::NiceMock;
 using testing::Return;
+
+using Envoy::StatusHelpers::HasStatus;
 
 namespace {
 
@@ -81,8 +84,8 @@ validity_url: "/.sxg/validity.msg"
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
   const auto cb_or_error = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(cb_or_error.ok());
-  EXPECT_EQ(cb_or_error.status().message(), error_message);
+  EXPECT_THAT(cb_or_error.status(),
+              HasStatus(absl::StatusCode::kInvalidArgument, testing::HasSubstr(error_message)));
 }
 
 } // namespace
