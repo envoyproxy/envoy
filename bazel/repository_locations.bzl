@@ -18,7 +18,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "675114d8b433d0a9f54d81171833be96ebc4113115664b791e6f204d58e93446",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
     ),
-    build_bazel_rules_apple = dict(
+    rules_apple = dict(
         version = "3.20.1",
         sha256 = "73ad768dfe824c736d0a8a81521867b1fb7a822acda2ed265897c03de6ae6767",
         urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
@@ -578,7 +578,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "kafka-{version}/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/{version}.zip"],
     ),
-    confluentinc_librdkafka = dict(
+    librdkafka = dict(
         version = "2.6.0",
         sha256 = "abe0212ecd3e7ed3c4818a4f2baf7bf916e845e902bb15ae48834ca2d36ac745",
         strip_prefix = "librdkafka-{version}",

@@ -76,7 +76,8 @@ default_envoy_build_config = repository_rule(
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     external_http_archive(
-        name = "grpc_httpjson_transcoding",
+        name = "grpc-httpjson-transcoding",
+        location_name = "grpc_httpjson_transcoding",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc_httpjson_transcoding.patch"],
         repo_mapping = {
@@ -105,6 +106,7 @@ def _cc_deps():
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:proto-field-extraction-protobuf-v35.patch"],
         repo_mapping = {
+            "@grpc_httpjson_transcoding": "@grpc-httpjson-transcoding",
             "@com_google_absl": "@abseil-cpp",
             "@com_google_googleapis": "@googleapis",
             "@ocp": "@ocp-diag-core",
@@ -830,6 +832,7 @@ def _grpc():
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
         repo_mapping = {
+            "@build_bazel_rules_apple": "@rules_apple",
             "@com_google_absl": "@abseil-cpp",
             "@com_google_googleapis": "@googleapis",
             "@com_github_cncf_xds": "@xds",
@@ -839,7 +842,7 @@ def _grpc():
         },
     )
     external_http_archive(
-        "build_bazel_rules_apple",
+        "rules_apple",
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:rules_apple.patch",
@@ -994,7 +997,7 @@ filegroup(
     # This archive provides Kafka C/CPP client used by mesh filter to communicate with upstream
     # Kafka clusters.
     external_http_archive(
-        name = "confluentinc_librdkafka",
+        name = "librdkafka",
         build_file_content = BUILD_ALL_CONTENT,
         # (adam.kotwasinski) librdkafka bundles in cJSON, which is also bundled in by libvppinfra.
         # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.
