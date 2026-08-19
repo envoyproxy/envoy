@@ -60,6 +60,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "proto_streamer_lib",
+    srcs = ["proto_streamer.cc"],
+    hdrs = ["proto_streamer.h"],
+    deps = [
+        ":json_streamer_lib",
+        "//source/common/common:base64_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "constants_lib",
     hdrs = ["constants.h"],
     deps = [

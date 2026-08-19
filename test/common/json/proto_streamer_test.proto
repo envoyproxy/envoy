@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package test.common.json;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+enum TestEnum {
+  TEST_ENUM_UNSPECIFIED = 0;
+  ALPHA = 1;
+  BETA = 2;
+}
+
+message TestNested {
+  string name = 1;
+  float ratio = 2;
+  repeated bytes objects = 3;
+}
+
+message TestMessage {
+  int32 int32_value = 1;
+  int64 int64_value = 2;
+  uint32 uint32_value = 3;
+  uint64 uint64_value = 4;
+  sint32 sint32_value = 5;
+  sint64 sint64_value = 6;
+  fixed32 fixed32_value = 7;
+  fixed64 fixed64_value = 8;
+  sfixed32 sfixed32_value = 9;
+  sfixed64 sfixed64_value = 10;
+  double double_value = 11;
+  float float_value = 12;
+  bool bool_value = 13;
+  string string_value = 14;
+  bytes bytes_value = 15;
+  TestEnum enum_value = 16;
+
+  repeated int64 repeated_int64 = 20;
+  repeated uint64 repeated_uint64 = 21;
+  repeated double repeated_double = 22;
+  repeated string repeated_strings = 23;
+  repeated TestEnum repeated_enum = 24;
+
+  map<bool, string> bool_keyed = 30;
+  map<int32, string> int32_keyed = 31;
+  map<int64, string> int64_keyed = 32;
+  map<uint32, string> uint32_keyed = 33;
+  map<uint64, string> uint64_keyed = 34;
+  map<string, string> string_keyed = 35;
+  map<string, TestNested> message_valued = 36;
+
+  google.protobuf.DoubleValue wrapped_double = 40;
+  google.protobuf.FloatValue wrapped_float = 41;
+  google.protobuf.Int64Value wrapped_int64 = 42;
+  google.protobuf.UInt64Value wrapped_uint64 = 43;
+  google.protobuf.Int32Value wrapped_int32 = 44;
+  google.protobuf.UInt32Value wrapped_uint32 = 45;
+  google.protobuf.BoolValue wrapped_bool = 46;
+  google.protobuf.StringValue wrapped_string = 47;
+  google.protobuf.BytesValue wrapped_bytes = 48;
+
+  google.protobuf.Duration duration = 50;
+  google.protobuf.Timestamp timestamp = 51;
+  google.protobuf.Any any = 52;
+  repeated google.protobuf.Any repeated_any = 53;
+  google.protobuf.Struct structured = 54;
+
+  TestNested nested = 60;
+  repeated TestNested repeated_nested = 61;
+}
