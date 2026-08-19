@@ -82,15 +82,16 @@ void DnsSrvCluster::startResolve() {
                     dns.srv().target_, 0, false);
                 address != nullptr) {
               // SRV record target is an IP address, not a hostname.
+              // todo: priority and weight are not supported for now, implement them later
               ResolveTargetPtr target = std::make_unique<ResolveTarget>(
                   *active_resolve_list_, dns_resolver_, dns_lookup_family_, dns.srv().target_,
-                  dns.srv().priority_, dns.srv().weight_, dns.srv().port_);
+                  /* priority */ 0, /* weight */ 0, dns.srv().port_);
 
               active_resolve_list_->addResolvedTarget(std::move(target), address);
             } else {
               active_resolve_list_->addTarget(std::make_unique<ResolveTarget>(
                   *active_resolve_list_, dns_resolver_, dns_lookup_family_, dns.srv().target_,
-                  dns.srv().priority_, dns.srv().weight_, dns.srv().port_));
+                  /* priority */ 0, /* weight */ 0, dns.srv().port_));
             }
           }
 
