@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "source/common/common/base64.h"
+#include "source/common/common/macros.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/protobuf/visitor_helper.h"
 
@@ -31,6 +32,36 @@ bool hasSpecialRepresentation(const Protobuf::Message& message) {
   default:
     return true;
   }
+}
+
+constexpr absl::string_view RedactedText = "[redacted]";
+
+const std::string& redactedBytes() {
+  CONSTRUCT_ON_FIRST_USE(std::string, Base64::encode(RedactedText));
+}
+
+// Whether redaction clears `field` instead of replacing it, which it does to everything but
+// messages and text.
+bool redactionClears(const Field& field) {
+  return field.cpp_type() != Field::CPPTYPE_MESSAGE && field.type() != Field::TYPE_STRING &&
+         field.type() != Field::TYPE_BYTES;
+}
+
+ProtobufTypes::MessagePtr redactedCopy(const Protobuf::Message& message,
+                                       bool ancestor_is_sensitive) {
+  ProtobufTypes::MessagePtr copy(message.New());
+  copy->CopyFrom(message);
+  if (ancestor_is_sensitive) {
+    MessageUtil::redactAll(*copy);
+  } else {
+    MessageUtil::redact(*copy);
+  }
+  return copy;
+}
+
+bool isTypedStruct(const Protobuf::Descriptor& descriptor) {
+  const absl::string_view name = descriptor.full_name();
+  return name == "xds.type.v3.TypedStruct" || name == "udpa.type.v1.TypedStruct";
 }
 
 // Converts map key `field` to a string.
@@ -64,30 +95,31 @@ absl::string_view mapKeyToString(const Protobuf::Message& entry, const Field& fi
 } // namespace
 
 MessageStreamer::MessageStreamer(const Protobuf::Message& message, BufferStreamer::Level& level,
-                                 TypeUrl type_url, FieldNames field_names)
-    : json_names_(field_names == FieldNames::LowerCamelCase) {
+                                 TypeUrl type_url, FieldNames field_names, Sensitive sensitive)
+    : json_names_(field_names == FieldNames::LowerCamelCase),
+      redact_(sensitive == Sensitive::Redact) {
   const std::string name =
       type_url == TypeUrl::Emit
           ? TypeUtil::descriptorFullNameToTypeUrl(message.GetDescriptor()->full_name())
           : "";
-  emitNamedMessage(message, level, name);
+  emitNamedMessage(message, level, name, false);
 }
 
 void MessageStreamer::emitNamedMessage(const Protobuf::Message& message,
                                        BufferStreamer::Level& level, absl::string_view type_url,
-                                       ProtobufTypes::MessagePtr owned) {
+                                       bool is_sensitive, ProtobufTypes::MessagePtr owned) {
   // ProtoJSON pairs a special representation with its `@type` under `value`.
   if (!type_url.empty() && hasSpecialRepresentation(message)) {
     BufferStreamer::MapPtr map = level.addMap();
     map->addKey("@type");
     map->addString(type_url);
     map->addKey("value");
-    emitSpecialRepresentation(message, *map);
+    emitSpecialRepresentation(message, *map, is_sensitive);
     return;
   }
 
-  Frame& frame = pushFrame(message, level);
-  frame.owned_ = std::move(owned);
+  Frame& frame = owned == nullptr ? pushFrame(message, level, is_sensitive)
+                                  : pushOwnedFrame(std::move(owned), level, is_sensitive);
   if (!type_url.empty()) {
     frame.map_->addKey("@type");
     frame.map_->addString(type_url);
@@ -133,18 +165,27 @@ void MessageStreamer::nextElement(Frame& frame) {
 
   const int index = frame.next_element_++;
   if (!field.is_map()) {
-    emitValue(frame.message_, field, index, *frame.elements_);
+    emitValue(frame.message_, field, index, *frame.elements_, frame.field_is_sensitive_);
     return;
   }
 
+  // Keys are left alone, redacting them would collapse the map onto one key.
   BufferStreamer::Map& entries = static_cast<BufferStreamer::Map&>(*frame.elements_);
   const Protobuf::Message& entry = reflection.GetRepeatedMessage(frame.message_, &field, index);
   entries.addKey(mapKeyToString(entry, *field.message_type()->map_key(), scratch_));
-  emitValue(entry, *field.message_type()->map_value(), -1, entries);
+  emitValue(entry, *field.message_type()->map_value(), -1, entries, frame.field_is_sensitive_);
 }
 
 void MessageStreamer::startField(Frame& frame) {
   const Field& field = *frame.fields_[frame.next_field_];
+
+  frame.field_is_sensitive_ =
+      redact_ && (frame.ancestor_is_sensitive_ || MessageUtil::isSensitiveField(field));
+  // A cleared field is unset, so it drops out of the output instead of printing a default.
+  if (frame.field_is_sensitive_ && redactionClears(field)) {
+    ++frame.next_field_;
+    return;
+  }
 
   frame.map_->addKey(json_names_ ? field.json_name() : field.name());
   if (field.is_map()) {
@@ -156,12 +197,19 @@ void MessageStreamer::startField(Frame& frame) {
     return;
   }
   ++frame.next_field_;
-  emitValue(frame.message_, field, -1, *frame.map_);
+  emitValue(frame.message_, field, -1, *frame.map_, frame.field_is_sensitive_);
 }
 
 void MessageStreamer::emitValue(const Protobuf::Message& message, const Field& field, int index,
-                                BufferStreamer::Level& level) {
+                                BufferStreamer::Level& level, bool is_sensitive) {
   const Protobuf::Reflection& reflection = *message.GetReflection();
+  // A map entry and a wrapper print their value even when unset, and startField cannot drop either,
+  // it never sees the value field. Redaction clears it, so the default comes off an empty message.
+  if (is_sensitive && redactionClears(field)) {
+    const ProtobufTypes::MessagePtr cleared(message.New());
+    emitValue(*cleared, field, -1, level, false);
+    return;
+  }
   switch (field.cpp_type()) {
   case Field::CPPTYPE_INT32:
     level.addNumber(static_cast<int64_t>(REFLECTION_GET(Int32, field, index)));
@@ -210,6 +258,11 @@ void MessageStreamer::emitValue(const Protobuf::Message& message, const Field& f
     return;
   }
   case Field::CPPTYPE_STRING: {
+    if (is_sensitive) {
+      level.addString(field.type() == Field::TYPE_BYTES ? absl::string_view(redactedBytes())
+                                                        : RedactedText);
+      return;
+    }
     scratch_.clear();
     const std::string& value =
         index < 0 ? reflection.GetStringReference(message, &field, &scratch_)
@@ -219,19 +272,24 @@ void MessageStreamer::emitValue(const Protobuf::Message& message, const Field& f
     return;
   }
   case Field::CPPTYPE_MESSAGE:
-    emitMessage(REFLECTION_GET(Message, field, index), level);
+    emitMessage(REFLECTION_GET(Message, field, index), level, is_sensitive);
     return;
   }
 }
 
-void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStreamer::Level& level) {
+void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStreamer::Level& level,
+                                  bool is_sensitive) {
   const Protobuf::Descriptor& descriptor = *message.GetDescriptor();
   switch (descriptor.well_known_type()) {
   case Protobuf::Descriptor::WELLKNOWNTYPE_UNSPECIFIED:
-    pushFrame(message, level);
+    if (redact_ && isTypedStruct(descriptor)) {
+      pushOwnedFrame(redactedCopy(message, is_sensitive), level, false);
+      return;
+    }
+    pushFrame(message, level, is_sensitive);
     return;
   case Protobuf::Descriptor::WELLKNOWNTYPE_ANY:
-    emitAny(message, level);
+    emitAny(message, level, is_sensitive);
     return;
   case Protobuf::Descriptor::WELLKNOWNTYPE_DOUBLEVALUE:
   case Protobuf::Descriptor::WELLKNOWNTYPE_FLOATVALUE:
@@ -243,29 +301,34 @@ void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStream
   case Protobuf::Descriptor::WELLKNOWNTYPE_BYTESVALUE:
   case Protobuf::Descriptor::WELLKNOWNTYPE_BOOLVALUE:
     // A wrapper is spelled as the value of its only field.
-    emitValue(message, *descriptor.field(0), -1, level);
+    emitValue(message, *descriptor.field(0), -1, level, is_sensitive);
     return;
   case Protobuf::Descriptor::WELLKNOWNTYPE_DURATION:
-    if (const auto* duration = Protobuf::DynamicCastMessage<Protobuf::Duration>(&message)) {
-      level.addString(Protobuf::util::TimeUtil::ToString(*duration));
-    } else {
-      emitSpecialRepresentation(message, level);
+    if (!is_sensitive) {
+      if (const auto* duration = Protobuf::DynamicCastMessage<Protobuf::Duration>(&message)) {
+        level.addString(Protobuf::util::TimeUtil::ToString(*duration));
+        return;
+      }
     }
+    emitSpecialRepresentation(message, level, is_sensitive);
     return;
   case Protobuf::Descriptor::WELLKNOWNTYPE_TIMESTAMP:
-    if (const auto* timestamp = Protobuf::DynamicCastMessage<Protobuf::Timestamp>(&message)) {
-      level.addString(Protobuf::util::TimeUtil::ToString(*timestamp));
-    } else {
-      emitSpecialRepresentation(message, level);
+    if (!is_sensitive) {
+      if (const auto* timestamp = Protobuf::DynamicCastMessage<Protobuf::Timestamp>(&message)) {
+        level.addString(Protobuf::util::TimeUtil::ToString(*timestamp));
+        return;
+      }
     }
+    emitSpecialRepresentation(message, level, is_sensitive);
     return;
   default:
-    emitSpecialRepresentation(message, level);
+    emitSpecialRepresentation(message, level, is_sensitive);
     return;
   }
 }
 
-void MessageStreamer::emitAny(const Protobuf::Message& message, BufferStreamer::Level& level) {
+void MessageStreamer::emitAny(const Protobuf::Message& message, BufferStreamer::Level& level,
+                              bool is_sensitive) {
   const Protobuf::Any* any = Protobuf::DynamicCastMessage<Protobuf::Any>(&message);
   Protobuf::Any copy;
   if (any == nullptr) {
@@ -282,12 +345,15 @@ void MessageStreamer::emitAny(const Protobuf::Message& message, BufferStreamer::
   }
 
   const Protobuf::Message& payload = *packed;
-  emitNamedMessage(payload, level, any->type_url(), std::move(packed));
+  emitNamedMessage(payload, level, any->type_url(), is_sensitive, std::move(packed));
 }
 
 void MessageStreamer::emitSpecialRepresentation(const Protobuf::Message& message,
-                                                BufferStreamer::Level& level) {
-  const absl::StatusOr<std::string> json = MessageUtil::getJsonStringFromMessage(message);
+                                                BufferStreamer::Level& level, bool is_sensitive) {
+  // Protobuf prints the whole message, so it has to be handed a redacted copy.
+  const ProtobufTypes::MessagePtr redacted = is_sensitive ? redactedCopy(message, true) : nullptr;
+  const absl::StatusOr<std::string> json =
+      MessageUtil::getJsonStringFromMessage(redacted == nullptr ? message : *redacted);
   if (json.ok()) {
     level.addRawJson(*json);
   } else {
@@ -296,8 +362,19 @@ void MessageStreamer::emitSpecialRepresentation(const Protobuf::Message& message
 }
 
 MessageStreamer::Frame& MessageStreamer::pushFrame(const Protobuf::Message& message,
-                                                   BufferStreamer::Level& level) {
-  return stack_.emplace_back(message, level.addMap());
+                                                   BufferStreamer::Level& level,
+                                                   bool ancestor_is_sensitive) {
+  Frame& frame = stack_.emplace_back(message, level.addMap());
+  frame.ancestor_is_sensitive_ = ancestor_is_sensitive;
+  return frame;
+}
+
+MessageStreamer::Frame& MessageStreamer::pushOwnedFrame(ProtobufTypes::MessagePtr message,
+                                                        BufferStreamer::Level& level,
+                                                        bool ancestor_is_sensitive) {
+  Frame& frame = pushFrame(*message, level, ancestor_is_sensitive);
+  frame.owned_ = std::move(message);
+  return frame;
 }
 
 #undef REFLECTION_GET

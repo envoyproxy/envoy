@@ -21,9 +21,13 @@ public:
   // https://protobuf.dev/programming-guides/json/#field-names
   enum class FieldNames { Proto, LowerCamelCase };
 
+  // Whether the fields the API marks sensitive are emitted, or replaced the way
+  // MessageUtil::redact replaces them.
+  enum class Sensitive { Emit, Redact };
+
   // Emits `message` as an object opened in `level`, which must be expecting a value.
   MessageStreamer(const Protobuf::Message& message, BufferStreamer::Level& level, TypeUrl type_url,
-                  FieldNames field_names);
+                  FieldNames field_names, Sensitive sensitive);
   ~MessageStreamer();
 
   /**
@@ -50,8 +54,12 @@ private:
     BufferStreamer::MapPtr map_;
     // An array or a map, holding the elements of the repeated field being emitted.
     BufferStreamer::LevelPtr elements_;
-    // Non-null when the frame owns `message_`, which only an Any's unpacked payload is.
+    // Non-null when the frame owns `message_`.
     ProtobufTypes::MessagePtr owned_;
+    // Set when the field this frame was reached through is sensitive, so all of it is.
+    bool ancestor_is_sensitive_{false};
+    // Whether fields_[next_field_] is sensitive, held so its elements can read it back.
+    bool field_is_sensitive_{false};
   };
 
   void nextElement(Frame& frame);
@@ -64,29 +72,38 @@ private:
   // which takes `owned` over when the streamer is the one holding the message.
   // https://protobuf.dev/programming-guides/json/#any
   void emitNamedMessage(const Protobuf::Message& message, BufferStreamer::Level& level,
-                        absl::string_view type_url, ProtobufTypes::MessagePtr owned = nullptr);
+                        absl::string_view type_url, bool is_sensitive,
+                        ProtobufTypes::MessagePtr owned = nullptr);
 
   // Pushes a frame emitting `message` as an object opened in `level`.
-  Frame& pushFrame(const Protobuf::Message& message, BufferStreamer::Level& level);
+  Frame& pushFrame(const Protobuf::Message& message, BufferStreamer::Level& level,
+                   bool ancestor_is_sensitive);
+
+  Frame& pushOwnedFrame(ProtobufTypes::MessagePtr message, BufferStreamer::Level& level,
+                        bool ancestor_is_sensitive);
 
   // Emits one value of `field`, or pushes a frame for it. `index` is which element of a repeated
   // field to emit, or -1 for a field that is not repeated.
   void emitValue(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
-                 int index, BufferStreamer::Level& level);
+                 int index, BufferStreamer::Level& level, bool is_sensitive);
 
   // Emits the value of a message-typed field, which is either a special representation or a new
   // frame.
-  void emitMessage(const Protobuf::Message& message, BufferStreamer::Level& level);
+  void emitMessage(const Protobuf::Message& message, BufferStreamer::Level& level,
+                   bool is_sensitive);
 
   // Emits an Any as its type url and the message it packs, or the type url alone when the payload
   // cannot be unpacked.
-  void emitAny(const Protobuf::Message& message, BufferStreamer::Level& level);
+  void emitAny(const Protobuf::Message& message, BufferStreamer::Level& level, bool is_sensitive);
 
   // Emits the special representation of a well known type through protobuf's printer.
-  void emitSpecialRepresentation(const Protobuf::Message& message, BufferStreamer::Level& level);
+  void emitSpecialRepresentation(const Protobuf::Message& message, BufferStreamer::Level& level,
+                                 bool is_sensitive);
 
   // Whether the keys are json_name(), for the whole walk.
   const bool json_names_;
+  // Whether sensitive fields are redacted, for the whole walk.
+  const bool redact_;
   std::deque<Frame> stack_;
   std::string scratch_;
 };
