@@ -1,6 +1,7 @@
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load("@googleapis//:repository_rules.bzl", "switched_rules_by_language")
+load(":envoy_build_config.bzl", "default_envoy_build_config")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy.router.cluster_specifier_plugin.lua"]
@@ -60,18 +61,6 @@ def external_http_archive(name, **kwargs):
         locations = REPOSITORY_LOCATIONS,
         **kwargs
     )
-
-def _default_envoy_build_config_impl(ctx):
-    ctx.file("WORKSPACE", "")
-    ctx.file("BUILD.bazel", "")
-    ctx.symlink(ctx.attr.config, "extensions_build_config.bzl")
-
-default_envoy_build_config = repository_rule(
-    implementation = _default_envoy_build_config_impl,
-    attrs = {
-        "config": attr.label(default = "@envoy//source/extensions:extensions_build_config.bzl"),
-    },
-)
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
