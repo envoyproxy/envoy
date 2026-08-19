@@ -13,9 +13,6 @@ routing PRs, questions, etc. to the right place.
     possible.
 * Harvey Tuch ([htuch](https://github.com/htuch)) (h@tuch.id.au)
   * xDS APIs, configuration and control plane, extensibility and security.
-* Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
-  * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
-    (metadata, etc.), and macOS build.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TLS, TCP proxy, listeners, and HTTP proxy/connection pooling.
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
@@ -133,6 +130,7 @@ without further review.
 * Alex Xu ([soulxu](https://github.com/soulxu)) (hejie.xu@intel.com)
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
+* Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
 
 # Friends of Envoy
 

@@ -34,10 +34,10 @@ public:
                       Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
                       OptRef<Init::Manager> init_manager);
 
-  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-  createRouteSpecificFilterConfigTyped(
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr> createHttpFilterRouteConfigTyped(
       const envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute&,
-      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 } // namespace Oauth2

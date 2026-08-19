@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/router/router.h"
@@ -22,9 +23,6 @@ namespace AiProtocolManager {
 
 using PerRouteProto =
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute;
-// The schema a route declares its payload follows. UNSPECIFIED means the route
-// declared nothing, i.e. it is not an AI endpoint.
-using Schema = PerRouteProto::Schema;
 
 // Filter-level configuration, shared by every stream on the chain.
 class FilterConfig {
@@ -41,18 +39,18 @@ private:
 using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
 
 // Per-route configuration. Its presence declares the route an AI endpoint: the
-// payload is parsed strictly and, once schemas land, validated against schema()
-// and transcoded to the canonical schema when normalize() is set.
+// payload is parsed strictly, validated against schema(), and transcoded to the
+// canonical schema when normalize() is set.
 class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
   explicit RouteConfig(const PerRouteProto& proto)
       : schema_(proto.schema()), normalize_(proto.normalize()) {}
 
-  Schema schema() const { return schema_; }
+  PerRouteProto::Schema schema() const { return schema_; }
   bool normalize() const { return normalize_; }
 
 private:
-  const Schema schema_;
+  const PerRouteProto::Schema schema_;
   const bool normalize_;
 };
 
@@ -139,7 +137,7 @@ private:
   // Copied out of the route configuration rather than held by pointer: the route
   // can be re-resolved mid-stream, which would leave a cached pointer dangling,
   // and these are two scalars.
-  Schema schema_{PerRouteProto::UNSPECIFIED};
+  PerRouteProto::Schema schema_{PerRouteProto::UNSPECIFIED};
   bool normalize_{false};
 
   // The parsed payload. Populated once the body has been fully received and

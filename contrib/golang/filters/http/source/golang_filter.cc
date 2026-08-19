@@ -1799,7 +1799,7 @@ FilterConfig::FilterConfig(
       metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))),
       secret_reader_(std::make_shared<SecretReader>(proto_config, context)) {};
 
-void FilterConfig::newGoPluginConfig() {
+absl::Status FilterConfig::newGoPluginConfig() {
   ENVOY_LOG(debug, "initializing golang filter config");
   std::string buf;
   auto res = plugin_config_.SerializeToString(&buf);
@@ -1818,11 +1818,12 @@ void FilterConfig::newGoPluginConfig() {
   config_id_ = dso_lib_->envoyGoFilterNewHttpPluginConfig(config_);
 
   if (config_id_ == 0) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("golang filter failed to parse plugin config: {} {}", so_id_, so_path_));
   }
 
   ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
+  return absl::OkStatus();
 }
 
 FilterConfig::~FilterConfig() {

@@ -88,7 +88,7 @@ public:
   GolangFilterStats& stats() { return stats_; }
   const SecretReader& getSecretReader() const { return *secret_reader_; }
 
-  void newGoPluginConfig();
+  absl::Status newGoPluginConfig();
   CAPIStatus defineMetric(uint32_t metric_type, absl::string_view name, uint32_t* metric_id);
   CAPIStatus incrementMetric(uint32_t metric_id, int64_t offset);
   CAPIStatus getMetric(uint32_t metric_id, uint64_t* value);

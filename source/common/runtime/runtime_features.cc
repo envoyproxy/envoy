@@ -128,6 +128,7 @@ RUNTIME_GUARD(envoy_reloadable_features_reject_empty_trusted_ca_file);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_for_non_zero_stats);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_when_rq_active_is_non_zero);
 RUNTIME_GUARD(envoy_reloadable_features_scope_upstream_tls_session_cache_by_sni);
+RUNTIME_GUARD(envoy_reloadable_features_shadow_policy_inherit_dynamic_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_skip_partition_original_dst_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_skip_pending_overflow_count_on_active_rq);
@@ -155,7 +156,6 @@ RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_resp
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
-RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
@@ -293,6 +293,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
 // validated in production. When disabled, QUIC retains zlib-only compression while TCP TLS has
 // no certificate compression.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
+
+// DnsFilter created resolver on the worker thread which could lead to race when sharing resolvers
+// Do not turn this on if DnsFilter is used or until the race is fixed
+FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
