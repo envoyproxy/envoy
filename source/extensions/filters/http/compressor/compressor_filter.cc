@@ -757,10 +757,8 @@ bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
 
   // Check content_type_matcher list if populated
   if (!content_type_matchers_.empty()) {
-    const std::string lower_case_value = absl::AsciiStrToLower(value);
-
     for (const auto& matcher : content_type_matchers_) {
-      if (matcher->match(lower_case_value)) {
+      if (matcher->match(value)) {
         return true;
       }
     }
