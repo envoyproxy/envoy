@@ -598,8 +598,7 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessing) {
 }
 
 // without trailers, server fully buffers the message before sending back the response.
-// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
-TEST_P(ExtProcIntegrationTest, DISABLED_TwoExtProcFiltersBothDuplexInBothDirection) {
+TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirection) {
   twoExtProcFiltersFullDuplexConfig();
 
   const std::string body_sent(5 * 1024, 's');
@@ -657,8 +656,7 @@ TEST_P(ExtProcIntegrationTest, DISABLED_TwoExtProcFiltersBothDuplexInBothDirecti
 }
 
 // Without trailers,  server buffers one chunks of body before sending back the response.
-// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
-TEST_P(ExtProcIntegrationTest, DISABLED_TwoExtProcFiltersBothDuplexInBothDirectionNoTrailerRandom) {
+TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionNoTrailerRandom) {
   twoExtProcFiltersFullDuplexConfig();
 
   const std::string body_sent(10 * 1024, 's');
@@ -832,9 +830,8 @@ TEST_P(ExtProcIntegrationTest, KeepContentLengthDuplexStreamed) {
 }
 
 // With trailers, request direction, fully buffered
-// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
 TEST_P(ExtProcIntegrationTest,
-       DISABLED_TwoExtProcFiltersBothDuplexInRequestDirectionWithTrailerFullyBuffered) {
+       TwoExtProcFiltersBothDuplexInRequestDirectionWithTrailerFullyBuffered) {
   two_ext_proc_filters_ = true;
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
     // Filter-1
@@ -905,9 +902,7 @@ TEST_P(ExtProcIntegrationTest,
 }
 
 // With trailers, both directions, server fully buffers.
-// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
-TEST_P(ExtProcIntegrationTest,
-       DISABLED_TwoExtProcFiltersBothDuplexInBothDirectionWithTrailerFullyBuffered) {
+TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionWithTrailerFullyBuffered) {
   twoExtProcFiltersFullDuplexConfig();
 
   const std::string body_sent(10 * 1024, 's');
