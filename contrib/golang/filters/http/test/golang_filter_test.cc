@@ -87,8 +87,8 @@ public:
     Dso::DsoManager<Dso::HttpFilterDsoImpl>::cleanUpForTest();
   }
 
-  void setup(const std::string& lib_id, const std::string& lib_path,
-             const std::string& plugin_name) {
+  absl::Status setupWithStatus(const std::string& lib_id, const std::string& lib_path,
+                               const std::string& plugin_name) {
     const auto yaml_fmt = R"EOF(
     library_id: %s
     library_path: %s
@@ -108,8 +108,14 @@ public:
 
     envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute per_route_proto_config;
     setupDso(lib_id, lib_path, plugin_name);
-    setupConfig(proto_config, per_route_proto_config, plugin_name);
+    RETURN_IF_NOT_OK(setupConfig(proto_config, per_route_proto_config, plugin_name));
     setupFilter(plugin_name);
+    return absl::OkStatus();
+  }
+
+  void setup(const std::string& lib_id, const std::string& lib_path,
+             const std::string& plugin_name) {
+    ASSERT_TRUE(setupWithStatus(lib_id, lib_path, plugin_name).ok());
   }
 
   std::string genSoPath() {
@@ -121,7 +127,7 @@ public:
     Dso::DsoManager<Dso::HttpFilterDsoImpl>::load(id, path, plugin_name);
   }
 
-  void setupConfig(
+  absl::Status setupConfig(
       envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
       envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& per_route_proto_config,
       std::string plugin_name) {
@@ -129,10 +135,11 @@ public:
     config_ = std::make_shared<FilterConfig>(
         proto_config, Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name), "",
         context_);
-    ASSERT_TRUE(config_->newGoPluginConfig().ok());
+    RETURN_IF_NOT_OK(config_->newGoPluginConfig());
     // Setup per route config for Golang filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
+    return absl::OkStatus();
   }
 
   void setupFilter(const std::string& plugin_name) {
@@ -195,8 +202,10 @@ TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
 // invalid config for routeconfig filter
 TEST_F(GolangHttpFilterTest, InvalidConfigForRouteConfigFilter) {
   InSequence s;
-  EXPECT_THROW_WITH_REGEX(setup(ROUTECONFIG, genSoPath(), ROUTECONFIG), EnvoyException,
-                          "golang filter failed to parse plugin config");
+  auto status = setupWithStatus(ROUTECONFIG, genSoPath(), ROUTECONFIG);
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(std::string(status.message()),
+              testing::HasSubstr("golang filter failed to parse plugin config"));
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/44320.
