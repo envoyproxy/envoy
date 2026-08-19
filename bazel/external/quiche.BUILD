@@ -48,7 +48,6 @@ src_files = glob([
 filegroup(
     name = "http2_adapter_event_forwarder_test_srcs",
     srcs = ["quiche/http2/adapter/event_forwarder_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -57,91 +56,76 @@ filegroup(
         "quiche/http2/adapter/header_validator_test.cc",
         "quiche/http2/adapter/noop_header_validator_test.cc",
     ],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "http2_adapter_impl_comparison_test_srcs",
     srcs = ["quiche/http2/adapter/adapter_impl_comparison_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "http2_adapter_nghttp2_adapter_test_srcs",
     srcs = ["quiche/http2/adapter/nghttp2_adapter_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "http2_adapter_nghttp2_data_provider_test_srcs",
     srcs = ["quiche/http2/adapter/nghttp2_data_provider_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "http2_adapter_nghttp2_session_test_srcs",
     srcs = ["quiche/http2/adapter/nghttp2_session_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "http2_adapter_oghttp2_adapter_test_srcs",
     srcs = ["quiche/http2/adapter/oghttp2_adapter_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "http2_adapter_oghttp2_session_test_srcs",
     srcs = ["quiche/http2/adapter/oghttp2_session_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "http2_adapter_oghttp2_util_test_srcs",
     srcs = ["quiche/http2/adapter/oghttp2_util_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "http2_adapter_recording_http2_visitor_test_srcs",
     srcs = ["quiche/http2/adapter/recording_http2_visitor_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "http2_adapter_window_manager_test_srcs",
     srcs = ["quiche/http2/adapter/window_manager_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "http2_platform_api_test_srcs",
     srcs = ["quiche/http2/test_tools/http2_random_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "quiche_balsa_balsa_frame_test_srcs",
     srcs = ["quiche/balsa/balsa_frame_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "quiche_balsa_balsa_headers_test_srcs",
     srcs = ["quiche/balsa/balsa_headers_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "quiche_balsa_header_properties_test_srcs",
     srcs = ["quiche/balsa/header_properties_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "quiche_balsa_simple_buffer_test_srcs",
     srcs = ["quiche/balsa/simple_buffer_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -150,13 +134,11 @@ filegroup(
         "quiche/common/quiche_linked_hash_map_test.cc",
         "quiche/common/quiche_mem_slice_storage_test.cc",
     ],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "quiche_http_header_block_test_srcs",
     srcs = ["quiche/common/http/http_header_block_test.cc"],
-    visibility = ["//visibility:public"],
 )
 
 envoy_cc_test_library(
@@ -228,7 +210,6 @@ envoy_cc_library(
     hdrs = ["quiche/http2/adapter/http2_protocol.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
         "@abseil-cpp//absl/strings",
@@ -532,7 +513,6 @@ envoy_cc_library(
     name = "http2_adapter",
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":http2_adapter_nghttp2_adapter",
         ":http2_adapter_oghttp2_adapter",
@@ -950,7 +930,6 @@ envoy_cc_library(
     hdrs = ["quiche/http2/hpack/decoder/hpack_decoder.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":http2_decoder_decode_buffer_lib",
         ":http2_decoder_decode_status_lib",
@@ -1198,7 +1177,6 @@ envoy_cc_library(
     name = "http2_no_op_headers_handler_lib",
     hdrs = ["quiche/http2/core/no_op_headers_handler.h"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":http2_header_byte_listener_interface_lib",
         ":quiche_common_platform",
@@ -1209,7 +1187,6 @@ envoy_cc_library(
     name = "http2_header_byte_listener_interface_lib",
     hdrs = ["quiche/http2/core/header_byte_listener_interface.h"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform",
     ],
@@ -1223,7 +1200,6 @@ envoy_cc_library(
     ],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [":quiche_common_platform"],
 )
 
@@ -1255,7 +1231,6 @@ envoy_cc_library(
     hdrs = ["quiche/common/http/http_header_block.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_lib",
         ":quiche_common_platform",
@@ -1271,7 +1246,6 @@ envoy_cc_library(
     ],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [":quiche_common_platform"],
 )
 
@@ -1324,7 +1298,6 @@ envoy_cc_library(
     ],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":http2_core_protocol_lib",
         ":http2_hpack_huffman_hpack_huffman_encoder_lib",
@@ -1378,7 +1351,6 @@ envoy_cc_library(
     ],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":common_http_http_header_block_lib",
         ":http2_core_alt_svc_wire_format_lib",
@@ -1422,7 +1394,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform",
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_time_lib",
         ":quic_platform_base",
@@ -1436,7 +1407,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_hostname_utils.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_hostname_utils",
     ],
@@ -1448,7 +1418,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_stack_trace.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_stack_trace",
     ],
@@ -1460,7 +1429,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_server_stats.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_server_stats",
     ],
@@ -1480,7 +1448,6 @@ envoy_cc_library(
         # "quiche/quic/platform/api/quic_test_loopback.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_bug_tracker",
         ":quic_platform_server_stats",
@@ -1501,7 +1468,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_bug_tracker.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_bug_tracker",
     ],
@@ -1511,7 +1477,6 @@ envoy_cc_library(
     name = "quic_platform_export",
     hdrs = ["quiche/quic/platform/api/quic_export.h"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
     ],
@@ -1528,7 +1493,6 @@ envoy_cc_library(
     name = "quic_platform_ip_address_family",
     hdrs = ["quiche/quic/platform/api/quic_ip_address_family.h"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_bug_tracker",
         ":quiche_common_ip_address_family",
@@ -1540,7 +1504,6 @@ envoy_cc_library(
     srcs = ["quiche/common/quiche_ip_address_family.cc"],
     hdrs = ["quiche/common/quiche_ip_address_family.h"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_bug_tracker",
     ],
@@ -1551,7 +1514,6 @@ envoy_cc_library(
     hdrs = ["quiche/quic/platform/api/quic_ip_address.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",
         ":quic_platform_export",
@@ -1565,7 +1527,6 @@ envoy_cc_library(
     hdrs = ["quiche/common/quiche_ip_address.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",
         ":quic_platform_export",
@@ -1589,7 +1550,6 @@ envoy_cc_library(
     hdrs = ["quiche/common/quiche_socket_address.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_export",
         ":quic_platform_ip_address",
@@ -1601,7 +1561,6 @@ envoy_cc_library(
     hdrs = ["quiche/quic/platform/api/quic_socket_address.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_export",
         ":quic_platform_ip_address",
@@ -1693,7 +1652,6 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_ack_listener_interface.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_time_lib",
         ":quic_core_types_lib",
@@ -1749,7 +1707,6 @@ envoy_cc_library(
     }),
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_linux_socket_utils_lib",
         ":quic_core_packet_writer_lib",
@@ -1774,7 +1731,6 @@ envoy_cc_library(
     }),
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_batch_writer_batch_writer_buffer_lib",
         ":quic_core_packet_writer_lib",
@@ -1816,7 +1772,6 @@ envoy_cc_library(
     }),
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":flow_label_lib",
         ":quic_core_batch_writer_batch_writer_base_lib",
@@ -1841,7 +1796,6 @@ envoy_cc_library(
     }),
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_batch_writer_batch_writer_base_lib",
         ":quic_core_linux_socket_utils_lib",
@@ -2319,7 +2273,6 @@ envoy_cc_library(
     copts = quiche_copts,
     external_deps = ["ssl"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_logging",
         "@abseil-cpp//absl/status",
@@ -2584,7 +2537,6 @@ envoy_cc_library(
     copts = quiche_copts,
     external_deps = ["ssl"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [":quiche_common_random_lib"],
 )
 
@@ -2646,7 +2598,6 @@ envoy_cc_library(
         "quiche/common/simple_buffer_allocator.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
         ":quiche_common_platform_iovec",
@@ -2672,7 +2623,6 @@ envoy_cc_library(
     copts = quiche_copts,
     external_deps = ["ssl"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [":quiche_common_platform_logging"],
 )
 
@@ -2707,7 +2657,6 @@ envoy_cc_library(
     hdrs = ["quiche/common/quiche_callbacks.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
         "@abseil-cpp//absl/functional:any_invocable",
@@ -2741,7 +2690,6 @@ envoy_cc_library(
     copts = quiche_copts,
     external_deps = ["ssl"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",
         ":quic_platform_export",
@@ -2753,7 +2701,6 @@ envoy_cc_library(
     hdrs = ["quiche/common/quiche_feature_flags_list.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
 )
 
 envoy_cc_library(
@@ -2761,7 +2708,6 @@ envoy_cc_library(
     hdrs = ["quiche/common/quiche_protocol_flags_list.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
 )
 
 envoy_quic_cc_library(
@@ -2899,7 +2845,6 @@ envoy_cc_library(
     hdrs = ["quiche/common/capsule.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_data_lib",
         ":quic_core_http_http_frames_lib",
@@ -2919,7 +2864,6 @@ envoy_cc_library(
     hdrs = ["quiche/common/masque/connect_udp_datagram_payload.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_lib",
         ":quiche_common_platform_bug_tracker",
@@ -3189,7 +3133,6 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_interval.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_export",
     ],
@@ -3211,7 +3154,6 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_interval_set.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_interval_lib",
         ":quic_platform_base",
@@ -3253,7 +3195,6 @@ envoy_cc_library(
     ],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_types_lib",
         ":quic_platform_ip_address_family",
@@ -3313,7 +3254,6 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_lru_cache.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [":quic_platform_base"],
 )
 
@@ -3438,7 +3378,6 @@ envoy_cc_library(
     ],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_packets_lib",
         ":quic_core_types_lib",
@@ -4067,7 +4006,6 @@ envoy_cc_library(
     hdrs = ["quiche/quic/core/quic_tag.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",
         ":quiche_common_text_utils_lib",
@@ -4079,7 +4017,6 @@ envoy_cc_library(
     srcs = ["quiche/quic/core/quic_time.cc"],
     hdrs = ["quiche/quic/core/quic_time.h"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [":quic_platform_base"],
 )
 
@@ -4540,7 +4477,6 @@ envoy_cc_library(
     name = "quiche_common_endian_lib",
     hdrs = ["quiche/common/quiche_endian.h"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps =
         [
             ":quiche_common_platform_export",
@@ -4553,7 +4489,6 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_client_stats.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [":quiche_common_platform_default_quiche_platform_impl_client_stats_impl_lib"],
 )
 
@@ -4592,7 +4527,6 @@ envoy_cc_library(
     srcs = ["quiche/common/quiche_mem_slice.cc"],
     hdrs = ["quiche/common/quiche_mem_slice.h"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_callbacks",
@@ -4617,7 +4551,6 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_iovec.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_export",
@@ -4631,7 +4564,6 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_bug_tracker.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
     ] + select({
@@ -4651,7 +4583,6 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_logging.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
     ] + select({
@@ -4690,7 +4621,6 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_hostname_utils.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
         ":quiche_common_platform_googleurl",
@@ -4741,7 +4671,6 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_types_lib",
         ":quic_platform_ip_address_family",
@@ -4754,7 +4683,6 @@ envoy_cc_library(
     name = "quiche_common_platform_server_stats",
     hdrs = ["quiche/common/platform/api/quiche_server_stats.h"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_default_quiche_platform_impl_server_stats_impl_lib",
     ],
@@ -4773,7 +4701,6 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_stack_trace.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
         "@envoy//source/common/quic/platform:quiche_stack_trace_impl_lib",
@@ -4786,7 +4713,6 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_containers.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_default_quiche_platform_impl_containers_impl_lib",
         ":quiche_common_platform_export",
@@ -4819,7 +4745,6 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_testvalue.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
     ],
@@ -4836,7 +4761,6 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_time_utils.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_default_quiche_platform_impl_command_line_flags_impl_lib",
@@ -4908,7 +4832,6 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_export.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         "@envoy//source/common/quic/platform:quiche_export_impl_lib",
     ],
@@ -4975,7 +4898,6 @@ envoy_cc_library(
         "quiche/common/quiche_linked_hash_map.h",
     ],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_endian_lib",
         ":quiche_common_platform",
@@ -5026,7 +4948,6 @@ envoy_cc_library(
     srcs = ["quiche/common/structured_headers.cc"],
     hdrs = ["quiche/common/structured_headers.h"],
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform",
         ":quiche_common_platform_client_stats",
@@ -5060,7 +4981,6 @@ envoy_cc_library(
     hdrs = ["quiche/quic/load_balancer/load_balancer_server_id.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_types_lib",
         ":quic_platform_bug_tracker",
@@ -5123,7 +5043,6 @@ envoy_cc_library(
     hdrs = ["quiche/balsa/balsa_enums.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [":quiche_common_platform_export"],
 )
 
@@ -5132,7 +5051,6 @@ envoy_cc_library(
     hdrs = ["quiche/balsa/balsa_visitor_interface.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_balsa_balsa_enums_lib",
         ":quiche_common_platform_export",
@@ -5144,7 +5062,6 @@ envoy_cc_library(
     hdrs = ["quiche/balsa/noop_balsa_visitor.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_balsa_balsa_visitor_interface_lib",
         ":quiche_common_platform_export",
@@ -5232,7 +5149,6 @@ envoy_cc_library(
     hdrs = ["quiche/balsa/balsa_headers.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_balsa_balsa_enums_lib",
         ":quiche_balsa_header_api_lib",
@@ -5256,7 +5172,6 @@ envoy_cc_library(
     hdrs = ["quiche/balsa/balsa_frame.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":quiche_balsa_balsa_enums_lib",
         ":quiche_balsa_balsa_headers_lib",
@@ -5282,7 +5197,6 @@ envoy_cc_library(
     ],
     copts = quiche_copts,
     repository = "@envoy",
-    visibility = ["//visibility:public"],
     deps = [
         ":common_http_http_header_block_lib",
         ":quiche_common_callbacks",
