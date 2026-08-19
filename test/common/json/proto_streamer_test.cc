@@ -3,6 +3,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/common/json/proto_streamer_test.pb.h"
+#include "test/proto/sensitive.pb.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -17,14 +18,16 @@ using ::test::common::json::TestNested;
 
 std::pair<std::string, uint32_t>
 stream(const Protobuf::Message& message,
-       MessageStreamer::FieldNames field_names = MessageStreamer::FieldNames::Proto) {
+       MessageStreamer::FieldNames field_names = MessageStreamer::FieldNames::Proto,
+       MessageStreamer::Sensitive sensitive = MessageStreamer::Sensitive::Emit) {
   std::string emitted;
   uint32_t pieces = 0;
   Buffer::OwnedImpl buffer;
   {
     BufferStreamer streamer(buffer);
     BufferStreamer::ArrayPtr array = streamer.makeRootArray();
-    MessageStreamer message_streamer(message, *array, MessageStreamer::TypeUrl::Omit, field_names);
+    MessageStreamer message_streamer(message, *array, MessageStreamer::TypeUrl::Omit, field_names,
+                                     sensitive);
     while (message_streamer.next()) {
       emitted += buffer.toString();
       buffer.drain(buffer.length());
@@ -197,6 +200,77 @@ TEST(MessageStreamerTest, NonFiniteNumbers) {
   message.add_repeated_double(std::numeric_limits<double>::infinity());
   message.add_repeated_double(-std::numeric_limits<double>::infinity());
   expectSameJson(message);
+}
+
+void expectSameRedactedJson(const envoy::test::Sensitive& message) {
+  envoy::test::Sensitive redacted = message;
+  MessageUtil::redact(redacted);
+  EXPECT_EQ(
+      printedInArray(redacted),
+      stream(message, MessageStreamer::FieldNames::Proto, MessageStreamer::Sensitive::Redact).first)
+      << message.DebugString();
+}
+
+TEST(MessageStreamerTest, Redacts) {
+  envoy::test::Sensitive sensitive;
+  sensitive.set_sensitive_string("secret");
+  sensitive.add_sensitive_repeated_string("secret");
+  sensitive.set_sensitive_bytes("secret");
+  sensitive.add_sensitive_repeated_bytes("secret");
+  sensitive.set_sensitive_int(1);
+  sensitive.add_sensitive_repeated_int(2);
+  (*sensitive.mutable_sensitive_string_map())["key"] = "secret";
+  (*sensitive.mutable_sensitive_int_map())["key"] = 3;
+
+  sensitive.set_insensitive_string("public");
+  sensitive.add_insensitive_repeated_string("public");
+  sensitive.set_insensitive_bytes("public");
+  sensitive.set_insensitive_int(4);
+  (*sensitive.mutable_insensitive_string_map())["key"] = "public";
+  (*sensitive.mutable_insensitive_int_map())["key"] = 5;
+  expectSameRedactedJson(sensitive);
+}
+
+TEST(MessageStreamerTest, RedactsNestedMessages) {
+  envoy::test::Sensitive sensitive;
+  // Everything under a sensitive field should be redacted.
+  sensitive.mutable_sensitive_message()->set_insensitive_string("public");
+  sensitive.mutable_sensitive_message()->set_insensitive_int(1);
+  sensitive.add_sensitive_repeated_message()->set_insensitive_string("public");
+  // Only the annotated fields of an insensitive message should be redacted.
+  sensitive.mutable_insensitive_message()->set_sensitive_string("secret");
+  sensitive.mutable_insensitive_message()->set_insensitive_string("public");
+  sensitive.add_insensitive_repeated_message()->set_sensitive_int(2);
+  expectSameRedactedJson(sensitive);
+}
+
+TEST(MessageStreamerTest, RedactsInsideAny) {
+  envoy::test::Sensitive packed;
+  packed.set_sensitive_string("secret");
+  packed.set_insensitive_string("public");
+
+  envoy::test::Sensitive sensitive;
+  std::ignore = sensitive.mutable_insensitive_any()->PackFrom(packed);
+  std::ignore = sensitive.mutable_sensitive_any()->PackFrom(packed);
+  std::ignore = sensitive.add_insensitive_repeated_any()->PackFrom(packed);
+  expectSameRedactedJson(sensitive);
+}
+
+TEST(MessageStreamerTest, RedactsInsideTypedStruct) {
+  envoy::test::Sensitive sensitive;
+  TestUtility::loadFromYaml(R"EOF(
+type_url: type.googleapis.com/envoy.test.Sensitive
+value:
+  sensitive_string: secret
+)EOF",
+                            *sensitive.mutable_insensitive_typed_struct());
+  TestUtility::loadFromYaml(R"EOF(
+type_url: type.googleapis.com/envoy.test.Sensitive
+value:
+  insensitive_string: public
+)EOF",
+                            *sensitive.mutable_sensitive_typed_struct());
+  expectSameRedactedJson(sensitive);
 }
 
 TEST(MessageStreamerTest, EmitsInPieces) {
