@@ -515,23 +515,8 @@ void ReverseConnectionIOHandle::removeStaleHostAndCloseConnections(const std::st
       connection->close(Network::ConnectionCloseType::FlushWrite);
     }
 
-    // Detach the handshake read filter / codec before the wrapper leaves the tracking set so a
-    // late onData() cannot dispatch into a destroyed Http1 codec (the SEGV-at-0x0 path in
-    // Http1::ConnectionImpl::dispatch). Match onConnectionDone(): keep the wrapper alive via
-    // deferredDelete until after this dispatcher pass.
     wrapper->shutdown();
-
-    // Remove from wrapper-to-host map.
-    conn_wrapper_to_host_map_.erase(wrapper);
-
-    auto wrapper_vector_it = std::find_if(
-        connection_wrappers_.begin(), connection_wrappers_.end(),
-        [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) { return w.get() == wrapper; });
-    if (wrapper_vector_it != connection_wrappers_.end()) {
-      auto wrapper_to_delete = std::move(*wrapper_vector_it);
-      connection_wrappers_.erase(wrapper_vector_it);
-      getThreadLocalDispatcher().deferredDelete(std::move(wrapper_to_delete));
-    }
+    removeAndDeferredDeleteWrapper(wrapper);
   }
   // Clear connection keys from host info.
   auto host_it = host_to_conn_info_map_.find(host);
@@ -1293,14 +1278,15 @@ void ReverseConnectionIOHandle::onConnectionDone(
     }
   }
 
-  // Safely remove wrapper from tracking.
+  removeAndDeferredDeleteWrapper(wrapper);
+}
+
+void ReverseConnectionIOHandle::removeAndDeferredDeleteWrapper(RCConnectionWrapper* wrapper) {
   conn_wrapper_to_host_map_.erase(wrapper);
 
-  // Find and remove wrapper from vector safely.
   auto wrapper_vector_it = std::find_if(
       connection_wrappers_.begin(), connection_wrappers_.end(),
       [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) { return w.get() == wrapper; });
-
   if (wrapper_vector_it != connection_wrappers_.end()) {
     auto wrapper_to_delete = std::move(*wrapper_vector_it);
     connection_wrappers_.erase(wrapper_vector_it);

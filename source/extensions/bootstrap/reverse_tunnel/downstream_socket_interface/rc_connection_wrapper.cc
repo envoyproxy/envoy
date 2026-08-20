@@ -339,9 +339,7 @@ void RCConnectionWrapper::shutdown() {
   }
   shutdown_called_ = true;
 
-  // Clear the read-filter back-pointer and drop the HTTP/1 codec before touching the connection so
-  // an in-flight or re-entered onData() cannot call into Http1::ConnectionImpl::dispatch() on a
-  // freed / null parser (SEGV @ 0x0).
+  // Stop handshake reads before tearing down the connection.
   read_filter_->clearParent();
   http1_parse_connection_ = nullptr;
   http1_client_codec_.reset();

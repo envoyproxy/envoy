@@ -1768,10 +1768,7 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
   EXPECT_TRUE(getHostToConnInfoMap().contains("192.168.1.1"));
   EXPECT_TRUE(getHostToConnInfoMap().contains("192.168.1.2"));
 
-  // Verify that connection wrappers for the removed host are removed from tracking immediately.
-  // The wrapper itself is held on the deferred-delete list until clearDeferredDeleteList(),
-  // matching onConnectionDone(), so an in-flight handshake read cannot hit a freed
-  // RCConnectionWrapper.
+  // Tracking drops immediately; the wrapper is deferred-deleted.
   EXPECT_EQ(getConnectionWrappers().size(), 1);   // Only host 192.168.1.2's wrapper remains
   EXPECT_EQ(getConnWrapperToHostMap().size(), 1); // Only host 192.168.1.2's mapping remains
 
