@@ -44,7 +44,8 @@ public:
 
     health_checker_ = std::make_shared<ThriftHealthChecker>(
         *cluster_, health_check_config, thrift_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this,
+        cluster_->info()->statsScope());
   }
 
   void setup() {
