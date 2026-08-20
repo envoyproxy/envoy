@@ -828,6 +828,56 @@ TEST_F(LocalRateLimiterDescriptorImplTest, IsNegativeRefillsTokens) {
   EXPECT_EQ(result.token_bucket_context->remainingTokens(), 2);
 }
 
+// Verify shadow mode descriptor failure does not short-circuit enforced descriptor check.
+TEST_F(LocalRateLimiterDescriptorImplTest, ShadowDescriptorDoesNotShortCircuitEnforcedDescriptor) {
+  static constexpr absl::string_view shadow_descriptor_yaml = R"(
+  entries:
+  - key: gate
+    value: shadow
+  token_bucket:
+    max_tokens: 1
+    tokens_per_fill: 1
+    fill_interval: 1000s
+  shadow_mode: true
+  )";
+  static constexpr absl::string_view enforced_descriptor_yaml = R"(
+  entries:
+  - key: gate
+    value: enforced
+  token_bucket:
+    max_tokens: 2
+    tokens_per_fill: 2
+    fill_interval: 100s
+  )";
+
+  TestUtility::loadFromYaml(std::string(shadow_descriptor_yaml), *descriptors_.Add());
+  TestUtility::loadFromYaml(std::string(enforced_descriptor_yaml), *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(100000), 1000, 1000);
+
+  std::vector<RateLimit::Descriptor> descriptors{
+      {{{"gate", "shadow"}}},
+      {{{"gate", "enforced"}}},
+  };
+
+  // Request 1: shadow (1 -> 0), enforced (2 -> 1). Allowed.
+  auto res1 = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_TRUE(res1.allowed);
+
+  // Request 2: shadow bucket exhausted (0 tokens), but enforced bucket still has tokens (1 -> 0).
+  // Request should return not allowed (so shadow stats get captured), but enforced bucket must be
+  // consumed!
+  auto res2 = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_FALSE(res2.allowed);
+  EXPECT_TRUE(res2.token_bucket_context->shadowMode());
+
+  // Request 3: shadow bucket empty (0 tokens), enforced bucket empty (0 tokens).
+  // Because enforced bucket is empty, requestAllowed must report allowed = false with enforced
+  // (non-shadow) bucket!
+  auto res3 = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_FALSE(res3.allowed);
+  EXPECT_FALSE(res3.token_bucket_context->shadowMode());
+}
+
 } // Namespace LocalRateLimit
 } // namespace Common
 } // namespace Filters
