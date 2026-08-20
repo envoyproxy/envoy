@@ -150,7 +150,7 @@ public:
       io_handle_->close(send_rst);
     }
   }
-  void close() { close(false); }
+  using Socket::close;
   bool isOpen() const override { return io_handle_ && io_handle_->isOpen(); }
   void ensureOptions() {
     if (!options_) {

@@ -40,7 +40,7 @@ protected:
       io_handle_->close(send_rst);
     }
   }
-  void close() { return close(false); }
+  using Socket::close;
   bool isOpen() const override { return io_handle_ != nullptr && io_handle_->isOpen(); }
 };
 
@@ -118,7 +118,7 @@ public:
       }
     }
   }
-  void close() { close(false); }
+  using Socket::close;
   bool isOpen() const override {
     return io_handle_ == nullptr ? false // Consider listen socket as closed if it does not bind to
                                          // port. No fd will leak.
