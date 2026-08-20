@@ -554,9 +554,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterNativeLbIntegrationTest
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Verifies that a dynamic_modules cluster with native LB policy (LEAST_REQUEST) works correctly.
-// The module's new_load_balancer returns None, so Envoy uses its factory LB instead of calling
-// the module's choose_host hook. This tests that native LB policies are properly supported.
+// A native lb_policy makes Envoy build its factory load balancer instead of the module's. The
+// request routes to the upstream, and the module's choose_host must not run: the module provides
+// a load balancer, but native_lb_requests stays 0 because Envoy never calls into it.
 TEST_P(DynamicModuleClusterNativeLbIntegrationTest, NativeLbWithLeastRequestPolicy) {
   initializeWithNativeLb();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -567,6 +567,11 @@ TEST_P(DynamicModuleClusterNativeLbIntegrationTest, NativeLbWithLeastRequestPoli
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Native LB selected the host; the module's choose_host was never called, so its
+  // native_lb_requests counter is unincremented (absent or 0).
+  auto choose_host = test_server_->counter("dynamicmodulescustom.native_lb_requests");
+  EXPECT_TRUE(choose_host == nullptr || choose_host->value() == 0);
 }
 
 } // namespace DynamicModules

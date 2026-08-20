@@ -874,12 +874,12 @@ impl ClusterLb for WorkerTimerLb {
 }
 
 // =============================================================================
-// Native LB test: module that only provides host discovery, not load balancing.
+// Native LB test: module provides a load balancer that must be bypassed.
 // =============================================================================
 //
-// This module's new_load_balancer returns None, signaling to Envoy to use its native
-// load balancer. This is used to test that native LB policies (LEAST_REQUEST, ROUND_ROBIN,
-// RANDOM) work correctly with dynamic_modules clusters.
+// choose_host increments native_lb_requests. Tests configure a native lb_policy
+// (LEAST_REQUEST, ROUND_ROBIN, RANDOM) so Envoy uses its factory LB; the module's
+// choose_host must never run, so native_lb_requests stays 0.
 
 struct NativeLbTestClusterConfig {
   upstream_address: String,
@@ -915,9 +915,37 @@ impl Cluster for NativeLbTestCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  // Return None to signal that this module does not provide a load balancer.
-  // Envoy will use the native factory load balancer based on lb_policy.
   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
-    None
+    Some(Box::new(NativeLbTestLb {
+      hosts: self.hosts.clone(),
+      index: AtomicUsize::new(0),
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    }))
+  }
+}
+
+struct NativeLbTestLb {
+  hosts: SharedHostList,
+  index: AtomicUsize,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for NativeLbTestLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    let hosts = self.hosts.lock().unwrap();
+    if hosts.0.is_empty() {
+      return HostSelectionResult::NoHost;
+    }
+    let idx = self.index.fetch_add(1, Ordering::Relaxed) % hosts.0.len();
+    if let Some(counter_id) = self.counter_id {
+      let _ = self.metrics.increment_counter(counter_id, 1);
+    }
+    HostSelectionResult::Selected(hosts.0[idx])
   }
 }
