@@ -153,28 +153,32 @@ Protobuf::Value HeaderFormatter::formatValue(OptRef<const Http::HeaderMap> heade
   }
 }
 
-/*Protobuf::Value HeaderFormatter::formatValue(OptRef<const Http::HeaderMap> headers) const {
-  const Http::HeaderEntry* header = findHeader(headers);
-  if (!header) {
-    return SubstitutionFormatUtils::unspecifiedValue();
-  }
-
-  absl::string_view val = header->value().getStringView();
-  val = SubstitutionFormatUtils::truncateStringView(val, max_length_);
-  return ValueUtil::stringValue(std::string(val));
-}*/
-
 void HeaderFormatter::formatValueTo(ValueSink& sink, OptRef<const Http::HeaderMap> headers) const {
-  const Http::HeaderEntry* header = findHeader(headers);
-  if (!header) {
-    // Keep the sink unmodified if no value is extracted and the caller can decide how to
-    // handle the missing value.
+  const Http::LowerCaseString* headerName = findHeader(headers);
+  if (!headerName) {
     return;
   }
 
-  absl::string_view val = header->value().getStringView();
-  val = SubstitutionFormatUtils::truncateStringView(val, max_length_);
-  sink.addString(val);
+  if (multi_value_.has_value() && multi_value_.value()) {
+    // we want to parse all occurrences of header key
+    const auto multiVal =
+        Http::HeaderUtility::getAllOfHeaderAsString(headers.ref(), *headerName, ":");
+    if (!multiVal.result().has_value()) {
+      return;
+    }
+    absl::string_view val =
+        SubstitutionFormatUtils::truncateStringView(multiVal.result().value(), max_length_);
+    sink.addString(val);
+    return;
+  } else {
+
+    const auto header = headers->get(*headerName);
+    // only pick the first header for the backwards compatible scenario
+    absl::string_view val = header[0]->value().getStringView();
+    val = SubstitutionFormatUtils::truncateStringView(val, max_length_);
+    sink.addString(val);
+    return;
+  }
 }
 
 ResponseHeaderFormatter::ResponseHeaderFormatter(absl::string_view main_header,
