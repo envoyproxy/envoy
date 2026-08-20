@@ -81,6 +81,9 @@ private:
   // Metadata, session, and auth utilities.
   bool readMetadataFromMcpFilter();
   bool decodeAndParseSession();
+  // Encodes a composite session ID, integrity-protecting it when a session signing key is
+  // configured.
+  std::string encodeCompositeSession(const std::string& composite);
   absl::StatusOr<std::string> getAuthenticatedSubject();
   bool validateSubjectIfRequired();
 
