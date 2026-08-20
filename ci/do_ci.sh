@@ -15,6 +15,17 @@ CI_TARGET=$1
 # shellcheck source=ci/build_setup.sh
 . "${CURRENT_SCRIPT_DIR}"/build_setup.sh
 
+# Register exit trap to collect all Bazel JUnit XML test reports before the script exits.
+collect_junit_reports() {
+  if [[ -d "bazel-testlogs" && -n "${ENVOY_TEST_RESULTS}" ]]; then
+    echo "Collecting JUnit XML test reports..."
+    pushd bazel-testlogs >/dev/null
+    find . -name "test.xml" -exec cp --parents -f {} "${ENVOY_TEST_RESULTS}" \; 2>/dev/null || true
+    popd >/dev/null
+  fi
+}
+trap collect_junit_reports EXIT
+
 echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"

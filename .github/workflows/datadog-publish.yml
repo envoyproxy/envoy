@@ -1,0 +1,44 @@
+name: Datadog CI Visibility
+
+permissions:
+  actions: read
+  contents: read
+
+on:
+  workflow_run:
+    workflows: ["Envoy/Checks"]
+    types:
+      - completed
+
+jobs:
+  upload:
+    runs-on: ubuntu-24.04
+    if: |
+      github.repository == 'envoyproxy/envoy'
+      && github.event.workflow_run.conclusion != 'skipped'
+    steps:
+      - name: Download JUnit XML artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          pattern: junit-xml-*
+          merge-multiple: true
+          path: junit-reports
+
+      - name: Check for report files
+        id: check-files
+        run: |
+          if [ -d junit-reports ] && [ "$(find junit-reports -name '*.xml' | wc -l)" -gt 0 ]; then
+            echo "has_reports=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No JUnit reports found to upload."
+            echo "has_reports=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      - name: Upload test results to Datadog CI Visibility
+        if: steps.check-files.outputs.has_reports == 'true'
+        uses: datadog/github-action-upload-junit@7f8cd36e2f694dbf069177a64112e75306cd10e9 # v1.4.0
+        with:
+          api-key: ${{ secrets.DD_API_KEY }}
+          service: envoy-ci
+          files: "junit-reports/**/*.xml"
