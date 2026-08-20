@@ -16,6 +16,6 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/extensions/common/wasm:wasm_runtime_factory_interface",
         "@proxy_wasm_cpp_host//:base_lib",
-        "@proxy_wasm_cpp_host//:v8_lib",
+        "@envoy_toolshed//v8:wee8",
     ]),
 )

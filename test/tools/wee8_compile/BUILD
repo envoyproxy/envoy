@@ -25,6 +25,6 @@ envoy_cc_library(
     ],
     deps = [
         "@proxy_wasm_cpp_host//:base_lib",
-        "@proxy_wasm_cpp_host//:v8_lib",
+        "@envoy_toolshed//v8:wee8",
     ],
 )
