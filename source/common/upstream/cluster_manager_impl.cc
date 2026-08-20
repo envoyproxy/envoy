@@ -818,7 +818,6 @@ bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const boo
 std::vector<std::string> ClusterManagerImpl::removeClusters(const std::vector<std::string>& clusters, const bool remove_ignored) {
   std::vector<std::string> removed_clusters;
   std::vector<std::string> active_clusters_removed_names;
-
   for (const auto& cluster_name : clusters) {
     bool removed = false;
     auto existing_active_cluster = active_clusters_.find(cluster_name);
@@ -851,26 +850,47 @@ std::vector<std::string> ClusterManagerImpl::removeClusters(const std::vector<st
   }
 
   if (!active_clusters_removed_names.empty()) {
-    tls_.runOnAllThreads([active_clusters_removed_names](
-                             OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-      for (const auto& cluster_name : active_clusters_removed_names) {
-        ASSERT(cluster_manager->thread_local_clusters_.contains(cluster_name) ||
-               cluster_manager->thread_local_deferred_clusters_.contains(cluster_name));
-        ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
-        for (auto cb_it = cluster_manager->update_callbacks_.begin();
-             cb_it != cluster_manager->update_callbacks_.end();) {
-          // The current callback may remove itself from the list, so a handle for
-          // the next item is fetched before calling the callback.
-          auto curr_cb_it = cb_it;
-          ++cb_it;
-          (*curr_cb_it)->onClusterRemoval(cluster_name);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.batch_cluster_removal")) {
+      tls_.runOnAllThreads([active_clusters_removed_names](
+                               OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+        for (const auto& cluster_name : active_clusters_removed_names) {
+          ASSERT(cluster_manager->thread_local_clusters_.contains(cluster_name) ||
+                 cluster_manager->thread_local_deferred_clusters_.contains(cluster_name));
+          ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
+          for (auto cb_it = cluster_manager->update_callbacks_.begin();
+               cb_it != cluster_manager->update_callbacks_.end();) {
+            // The current callback may remove itself from the list, so a handle for
+            // the next item is fetched before calling the callback.
+            auto curr_cb_it = cb_it;
+            ++cb_it;
+            (*curr_cb_it)->onClusterRemoval(cluster_name);
+          }
+          cluster_manager->thread_local_clusters_.erase(cluster_name);
+          cluster_manager->thread_local_deferred_clusters_.erase(cluster_name);
         }
-        cluster_manager->thread_local_clusters_.erase(cluster_name);
-        cluster_manager->thread_local_deferred_clusters_.erase(cluster_name);
+        cluster_manager->local_stats_.clusters_inflated_.set(
+            cluster_manager->thread_local_clusters_.size());
+      });
+    } else {
+      for (const auto& cluster_name : active_clusters_removed_names) {
+        tls_.runOnAllThreads([cluster_name](
+                                 OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+          ASSERT(cluster_manager->thread_local_clusters_.contains(cluster_name) ||
+                 cluster_manager->thread_local_deferred_clusters_.contains(cluster_name));
+          ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
+          for (auto cb_it = cluster_manager->update_callbacks_.begin();
+               cb_it != cluster_manager->update_callbacks_.end();) {
+            auto curr_cb_it = cb_it;
+            ++cb_it;
+            (*curr_cb_it)->onClusterRemoval(cluster_name);
+          }
+          cluster_manager->thread_local_clusters_.erase(cluster_name);
+          cluster_manager->thread_local_deferred_clusters_.erase(cluster_name);
+          cluster_manager->local_stats_.clusters_inflated_.set(
+              cluster_manager->thread_local_clusters_.size());
+        });
       }
-      cluster_manager->local_stats_.clusters_inflated_.set(
-          cluster_manager->thread_local_clusters_.size());
-    });
+    }
   }
 
   if (!removed_clusters.empty()) {
@@ -880,6 +900,7 @@ std::vector<std::string> ClusterManagerImpl::removeClusters(const std::vector<st
 
   return removed_clusters;
 }
+
 
 absl::StatusOr<ClusterManagerImpl::ClusterDataPtr>
 ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
