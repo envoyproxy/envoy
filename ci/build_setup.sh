@@ -170,6 +170,10 @@ export ENVOY_FUZZ_COVERAGE_ARTIFACT="${ENVOY_BUILD_DIR}/generated/fuzz_coverage.
 export ENVOY_FAILED_TEST_LOGS="${ENVOY_BUILD_DIR}"/generated/failed-testlogs
 mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
 
+# This is where we copy JUnit XML test reports for CI collection/publishing.
+export ENVOY_TEST_RESULTS="${ENVOY_BUILD_DIR}"/generated/test-results
+mkdir -p "${ENVOY_TEST_RESULTS}"
+
 # This is where we copy the build profile to.
 export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
 mkdir -p "${ENVOY_BUILD_PROFILE}"
