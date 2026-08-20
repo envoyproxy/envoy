@@ -976,7 +976,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
   } else {
     sendErrorResponse(
         Http::Code::OK, BridgeStatus::RequestMcpMethodNotSupported,
-        generateErrorJsonResponse(-32601, absl::StrCat("Method ", method, " is not supported"))
+        generateErrorJsonResponse(-32601, absl::StrCat("MCP method ", method, " is not supported"))
             .dump(),
         nullptr, method,
         json_rpc.contains(McpConstants::PARAMS_FIELD) ? json_rpc[McpConstants::PARAMS_FIELD]
@@ -1281,12 +1281,12 @@ absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann:
   }
   if (!json_rpc.contains(McpConstants::METHOD_FIELD)) {
     sendErrorResponse(Http::Code::OK, BridgeStatus::RequestMcpMethodMalformed,
-                      generateErrorJsonResponse(-32600, "Missing method field").dump());
-    return absl::InvalidArgumentError("Missing method field");
+                      generateErrorJsonResponse(-32600, "Missing MCP method field").dump());
+    return absl::InvalidArgumentError("Missing MCP method field");
   } else if (!json_rpc[McpConstants::METHOD_FIELD].is_string()) {
     sendErrorResponse(Http::Code::OK, BridgeStatus::RequestMcpMethodMalformed,
-                      generateErrorJsonResponse(-32600, "Method field is not a string").dump());
-    return absl::InvalidArgumentError("Method field is not a string");
+                      generateErrorJsonResponse(-32600, "MCP method field is not a string").dump());
+    return absl::InvalidArgumentError("MCP method field is not a string");
   } else if (json_rpc[McpConstants::METHOD_FIELD] ==
              McpConstants::Methods::NOTIFICATION_INITIALIZED) {
     // The notifications/initialized request is not required to have an ID

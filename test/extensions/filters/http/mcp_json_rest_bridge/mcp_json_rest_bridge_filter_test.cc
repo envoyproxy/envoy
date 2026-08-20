@@ -245,10 +245,11 @@ TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Eq(Http::Code::OK),
-                             StrEq(R"json({"code":-32600,"message":"Missing method field"})json"),
-                             _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_malformed")));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Eq(Http::Code::OK),
+                     StrEq(R"json({"code":-32600,"message":"Missing MCP method field"})json"), _, _,
+                     StrEq("mcp_json_rest_bridge_request_mcp_method_malformed")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
@@ -268,7 +269,8 @@ TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
   response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
-  Buffer::OwnedImpl response_body(R"json({"code":-32600,"message":"Missing method field"})json");
+  Buffer::OwnedImpl response_body(
+      R"json({"code":-32600,"message":"Missing MCP method field"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
@@ -277,7 +279,7 @@ TEST_F(McpJsonRestBridgeFilterTest, MissingMethodFieldReturnsError) {
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
-          R"json({"error":{"code":-32600,"message":"Missing method field"},"id":0,"jsonrpc":"2.0"})json"));
+          R"json({"error":{"code":-32600,"message":"Missing MCP method field"},"id":0,"jsonrpc":"2.0"})json"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, UnsupportedMethodReturnsError) {
@@ -292,7 +294,7 @@ TEST_F(McpJsonRestBridgeFilterTest, UnsupportedMethodReturnsError) {
       sendLocalReply(
           Eq(Http::Code::OK),
           StrEq(
-              R"json({"code":-32601,"message":"Method unsupported_method is not supported"})json"),
+              R"json({"code":-32601,"message":"MCP method unsupported_method is not supported"})json"),
           _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
 
   Protobuf::Struct expected_metadata;
@@ -315,7 +317,7 @@ TEST_F(McpJsonRestBridgeFilterTest, UnsupportedMethodReturnsError) {
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
   Buffer::OwnedImpl response_body(
-      R"json({"code":-32601,"message":"Method unsupported_method is not supported"})json");
+      R"json({"code":-32601,"message":"MCP method unsupported_method is not supported"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
@@ -324,7 +326,7 @@ TEST_F(McpJsonRestBridgeFilterTest, UnsupportedMethodReturnsError) {
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
-          R"json({"error":{"code":-32601,"message":"Method unsupported_method is not supported"},"id":0,"jsonrpc":"2.0"})json"));
+          R"json({"error":{"code":-32601,"message":"MCP method unsupported_method is not supported"},"id":0,"jsonrpc":"2.0"})json"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, NonStringMethodReturnsError) {
@@ -334,11 +336,11 @@ TEST_F(McpJsonRestBridgeFilterTest, NonStringMethodReturnsError) {
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  EXPECT_CALL(
-      decoder_callbacks_,
-      sendLocalReply(Eq(Http::Code::OK),
-                     StrEq(R"json({"code":-32600,"message":"Method field is not a string"})json"),
-                     _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_malformed")));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(
+                  Eq(Http::Code::OK),
+                  StrEq(R"json({"code":-32600,"message":"MCP method field is not a string"})json"),
+                  _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_malformed")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
@@ -359,7 +361,7 @@ TEST_F(McpJsonRestBridgeFilterTest, NonStringMethodReturnsError) {
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
   Buffer::OwnedImpl response_body(
-      R"json({"code":-32600,"message":"Method field is not a string"})json");
+      R"json({"code":-32600,"message":"MCP method field is not a string"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
@@ -368,7 +370,7 @@ TEST_F(McpJsonRestBridgeFilterTest, NonStringMethodReturnsError) {
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
-          R"json({"error":{"code":-32600,"message":"Method field is not a string"},"id":0,"jsonrpc":"2.0"})json"));
+          R"json({"error":{"code":-32600,"message":"MCP method field is not a string"},"id":0,"jsonrpc":"2.0"})json"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, MissingIdFieldReturnsError) {
