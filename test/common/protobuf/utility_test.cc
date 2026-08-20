@@ -1331,6 +1331,10 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlScalar) {
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("null"), "null_value: NULL_VALUE"));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("true"), "bool_value: true"));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("1"), "number_value: 1"));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("3.14"), "number_value: 3.14"));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml(".inf"), "string_value: \"Infinity\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("-.inf"), "string_value: \"-Infinity\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml(".nan"), "string_value: \"NaN\""));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("9223372036854775807"),
                                  "string_value: \"9223372036854775807\""));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("\"foo\""), "string_value: \"foo\""));

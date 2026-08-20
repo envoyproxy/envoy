@@ -1,3 +1,4 @@
+#include <cmath>
 #include <limits>
 #include <numeric>
 
@@ -72,8 +73,23 @@ Protobuf::Value parseYamlNode(const YAML::Node& node) {
       }
       break;
     }
-    // Fall back on string, including float/double case. When protobuf parse the JSON into a message
-    // it will convert based on the type in the message definition.
+    double double_value;
+    if (YAML::convert<double>::decode(node, double_value)) {
+      if (std::isfinite(double_value)) {
+        value.set_number_value(double_value);
+      } else {
+        // JSON numbers cannot encode NaN/Infinity/-Infinity, so proto3 JSON mapping represents
+        // these float/double values as the strings "NaN", "Infinity", and "-Infinity" instead.
+        if (std::isnan(double_value)) {
+          value.set_string_value("NaN");
+        } else {
+          value.set_string_value(double_value > 0 ? "Infinity" : "-Infinity");
+        }
+      }
+      break;
+    }
+    // Fall back on string for anything else. When protobuf parses the JSON into a message it will
+    // convert based on the type in the message definition.
     value.set_string_value(node.as<std::string>());
     break;
   }
