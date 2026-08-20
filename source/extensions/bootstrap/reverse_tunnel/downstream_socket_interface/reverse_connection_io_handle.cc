@@ -1249,8 +1249,8 @@ void ReverseConnectionIOHandle::onConnectionDone(
     updateConnectionState(host_address, cluster_name, connection_key,
                           ReverseConnectionState::Failed);
 
-    // decodeHeaders() runs inside Http1::dispatch(); closing here can SEGV on a 403/429 body.
-    // Deferred-delete the wrapper instead. On peer close, only detach leftover file events.
+    // decodeHeaders() runs inside Http1::dispatch(); do not close() here.
+    // The wrapper is deferred-deleted; shutdown() closes the connection afterwards.
     if (closed && connection && connection->getSocket()) {
       connection->getSocket()->ioHandle().resetFileEvents();
     }

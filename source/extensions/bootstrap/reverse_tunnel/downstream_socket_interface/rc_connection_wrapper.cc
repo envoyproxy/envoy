@@ -363,7 +363,13 @@ void RCConnectionWrapper::shutdown() {
   connection_->removeConnectionCallbacks(*this);
   connection_->removeReadFilter(read_filter_);
 
-  // Defer the deletion of the connection and the codec.
+  // Close before deferred-delete so ConnectionImpl is not destroyed with an open socket.
+  if (connection_->state() == Network::Connection::State::Open) {
+    if (connection_->getSocket()) {
+      connection_->getSocket()->ioHandle().resetFileEvents();
+    }
+    connection_->close(Network::ConnectionCloseType::NoFlush);
+  }
   connection_->dispatcher().deferredDelete(std::move(connection_));
 }
 

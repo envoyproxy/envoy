@@ -1581,18 +1581,21 @@ TEST_F(RCConnectionWrapperTest, DispatchHttp1ErrorPath) {
 }
 
 // 403 responses have a body, so decodeHeaders() runs inside Http1::dispatch().
+// close() must happen after dispatch returns (wrapper shutdown), not on that stack.
 TEST_F(RCConnectionWrapperTest, DispatchForbiddenWithBodyDoesNotCloseDuringDispatch) {
   auto mock_connection = getDeletableConn(dispatcher_);
 
   EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
   EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, removeReadFilter(_));
   EXPECT_CALL(*mock_connection, connect());
   EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(42));
   EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
   EXPECT_CALL(*mock_connection, write(_, _))
       .WillRepeatedly(
           Invoke([](Buffer::Instance& buffer, bool) { buffer.drain(buffer.length()); }));
-  EXPECT_CALL(*mock_connection, close(_)).Times(0);
+  EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
 
   auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80);
   auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10001);
@@ -1623,6 +1626,11 @@ TEST_F(RCConnectionWrapperTest, DispatchForbiddenWithBodyDoesNotCloseDuringDispa
 
   EXPECT_TRUE(io_handle_->connection_wrappers_.empty());
   EXPECT_TRUE(io_handle_->conn_wrapper_to_host_map_.empty());
+
+  // onConnectionDone deferred-deletes the wrapper; shutdown() closes after dispatch.
+  while (!dispatcher_.to_delete_.empty()) {
+    dispatcher_.to_delete_.pop_front();
+  }
 }
 
 // Test that destructor invokes shutdown when not already called.
