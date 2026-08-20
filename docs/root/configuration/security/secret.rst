@@ -299,6 +299,30 @@ plane. A resource removal sent via the xDS response will cancel the data plane s
 specific secret name. When using the regular GRPC xDS protocol, the subscription for each mapped
 secret remains active until the removal of the parent resource (listener or cluster).
 
+The number of secrets fetched and cached by the selector can be bounded with the optional
+:ref:`max_secrets
+<envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.max_secrets>`
+limit. Each cached secret holds an active SDS subscription, its own gRPC stream when the
+configuration source is not ADS, and the TLS contexts built from the certificate, so the limit
+bounds the memory and control plane load that peers can create when they control the mapped
+secret name, e.g. via the SNI field. When the cache is full and a handshake maps to a name that is
+not already cached, the selector first reclaims a slot from an entry that has no certificate and
+no pending handshakes, such as a subscription created by an interrupted handshake for a name
+unknown to the SDS server; this prevents abandoned fetches from permanently occupying the cache.
+If no entry is reclaimable, the handshake is rejected, while handshakes using cached secrets are
+unaffected.
+
+Cached secrets are removed when the management server removes the resource (including by the
+expiry of the :ref:`resource TTL <xds_protocol_TTL>`, which is processed as a removal) or when the
+parent listener or cluster is drained. Removing a secret cancels its SDS subscription; connections
+that are already established with the certificate are not affected, and a later handshake for the
+same name fetches it again. Prefetched secrets are pinned in the cache and are never reclaimed.
+
+Secrets that resolved to a certificate are never reclaimed by the cache limit and are only
+released by the removal paths above, so the limit is best suited for deployments where the SDS
+server resolves a known set of names; when the server issues certificates for arbitrary
+peer-controlled names, idle resolved secrets can fill the cache until new names are rejected.
+
 In addition to the standard SDS `subscription statistics <subscription_statistics>`, the following
 statistics are produced by the on-demand certificate extension. For downstream listeners, they are
 in the *listener.<stat_prefix>.on_demand_secret.* namespace. For upstream clusters, the stat prefix
@@ -310,6 +334,8 @@ is *cluster.<stat_prefix>.on_demand_secret.*.
 
      cert_requested, Counter, Total number of new SDS subscriptions created
      cert_updated, Counter, Total number of certificate updates
+     cert_overflow, Counter, Total number of handshakes rejected due to the secret cache limit
+     cert_reclaimed, Counter, Total number of pending secrets reclaimed to admit new secrets when the cache is full
      cert_active, Gauge, Number of active certificate subscriptions and certificates
 
 .. note::

@@ -367,6 +367,162 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessSNI) {
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
+// Verifies that the cache limit rejects handshakes that require fetching new secrets while
+// handshakes using cached secrets are unaffected, and that a secret removal frees a cache slot.
+TEST_P(OnDemandIntegrationTest, MaxSecretsOverflow) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper only works on downstream";
+  }
+  ssl_options_.setSni("server");
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  max_secrets: 1
+  )EOF");
+
+  // The first secret fills the cache to its limit.
+  auto conn = createClientConnection();
+  waitCertsRequested(1);
+  createXdsConnection();
+  auto& stream = waitSendSdsResponse("server");
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+
+  // A handshake that maps to another secret name overflows the cache and is rejected.
+  ssl_options_.setSni("server2");
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
+  auto conn2 = createClientConnection();
+  test_server_->waitForCounter(onDemandStat("cert_overflow"), Eq(1), TestUtility::DefaultTimeout,
+                               dispatcher_.get());
+  conn2->waitForDisconnect();
+  conn2.reset();
+  // The TCP proxy dials the upstream eagerly on accept, before the handshake resolves. Claim the
+  // rejected client's orphaned upstream connection so that subsequent connections observe their
+  // own upstream counterparts.
+  FakeRawConnectionPtr rejected_upstream;
+  ASSERT_TRUE(dataStream()->waitForRawConnection(rejected_upstream));
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+
+  // The cached secret continues to be served.
+  ssl_options_.setSni("server");
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
+  auto conn3 = createClientConnection();
+  conn3->waitForUpstreamConnection();
+  conn3->sendAndReceiveTlsData("hello", "world");
+  conn3.reset();
+
+  // Removing the cached secret frees a slot for the other secret name.
+  removeSecret(stream, "server");
+  test_server_->waitForGauge(onDemandStat("cert_active"), Eq(0));
+  ssl_options_.setSni("server2");
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
+  auto conn4 = createClientConnection();
+  waitCertsRequested(2);
+  waitSendSdsResponse("server2");
+  conn4->waitForUpstreamConnection();
+  conn4->sendAndReceiveTlsData("hello", "world");
+  conn4.reset();
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+// Verifies that an abandoned fetch for a secret unknown to the SDS server cannot permanently
+// occupy the cache: a later handshake for a different name reclaims the slot.
+TEST_P(OnDemandIntegrationTest, CachePoisonRecovery) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper only works on downstream";
+  }
+  // A connection paused in certificate selection is only reaped by the transport socket connect
+  // timeout, which releases its pending handshake handle.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    filter_chain->mutable_transport_socket_connect_timeout()->set_seconds(1);
+  });
+  ssl_options_.setSni("junk");
+  setup(R"EOF(
+  certificate_mapper:
+    name: sni
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+      default_value: "*"
+  max_secrets: 1
+  )EOF");
+  // A handshake for an unknown name occupies the only cache slot; the SDS server receives the
+  // subscription but never responds.
+  auto conn = createClientConnection();
+  waitCertsRequested(1);
+  createXdsConnection();
+  xds_streams_.emplace_back();
+  AssertionResult stream_result =
+      xds_connection_->waitForNewStream(*dispatcher_, xds_streams_.back());
+  RELEASE_ASSERT(stream_result, stream_result.message());
+  xds_streams_.back()->startGrpcStream();
+  envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+  AssertionResult message_result = xds_streams_.back()->waitForGrpcMessage(*dispatcher_, request);
+  RELEASE_ASSERT(message_result, message_result.message());
+  EXPECT_EQ("junk", request.resource_names_subscribe().at(0));
+
+  // The server reaps the paused connection, releasing the pending handshake handle while the
+  // abandoned subscription stays cached.
+  test_server_->waitForCounter(listenerStatPrefix("downstream_cx_transport_socket_connect_timeout"),
+                               Eq(1), TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter(listenerStatPrefix("downstream_cx_destroy"), Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
+  conn->waitForDisconnect();
+  conn.reset();
+  FakeRawConnectionPtr junk_upstream;
+  ASSERT_TRUE(dataStream()->waitForRawConnection(junk_upstream));
+
+  // A handshake for a known name reclaims the abandoned slot instead of being rejected.
+  ssl_options_.setSni("server");
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
+  auto conn2 = createClientConnection();
+  test_server_->waitForCounter(onDemandStat("cert_reclaimed"), Eq(1), TestUtility::DefaultTimeout,
+                               dispatcher_.get());
+  waitSendSdsResponse("server");
+  conn2->waitForUpstreamConnection();
+  conn2->sendAndReceiveTlsData("hello", "world");
+  conn2.reset();
+  EXPECT_EQ(0, test_server_->counter(onDemandStat("cert_overflow"))->value());
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+// Verifies the overflow rejection for both the downstream and the upstream selector: a pinned,
+// resolved prefetched secret fills the cache, so a handshake mapping to another name is rejected.
+TEST_P(OnDemandIntegrationTest, MaxSecretsOverflowPrefetched) {
+  on_server_init_function_ = [&]() {
+    createXdsConnection();
+    waitSendSdsResponse("server");
+  };
+  setup(R"EOF(
+  certificate_mapper:
+    name: static-name
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+      name: server2
+  prefetch_secret_names:
+  - server
+  max_secrets: 1
+  )EOF");
+  auto conn = createClientConnection();
+  if (upstream_selector_) {
+    // Claim the upstream connection so that the fake upstream starts reading and the TLS
+    // handshake reaches certificate selection.
+    conn->waitForUpstreamConnection();
+  }
+  test_server_->waitForCounter(onDemandStat("cert_overflow"), Eq(1), TestUtility::DefaultTimeout,
+                               dispatcher_.get());
+  conn->waitForDisconnect();
+  conn.reset();
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
 TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
   setup(R"EOF(
   certificate_mapper:

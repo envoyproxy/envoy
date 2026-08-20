@@ -5,6 +5,8 @@ package envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -41,4 +43,28 @@ message Config {
   // requests). The parent resource initializes immediately without waiting for the fetch to
   // complete.
   repeated string prefetch_secret_names = 3;
+
+  // The maximum number of secrets that the certificate selector will fetch and cache. Both the
+  // prefetched secrets and the secrets requested on-demand count towards the limit, and the
+  // configuration is rejected if the number of distinct
+  // :ref:`prefetch_secret_names <envoy_v3_api_field_extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config.prefetch_secret_names>`
+  // exceeds it. Each cached secret holds an active SDS subscription and the TLS contexts built
+  // from the certificate, so the limit bounds both the memory and the number of subscriptions a
+  // peer can create when it controls the mapped secret name, e.g. via SNI.
+  //
+  // When the cache is full and a TLS handshake maps to a secret name that is not already cached,
+  // the selector first tries to reclaim a slot from an entry that has no certificate and no
+  // pending handshakes, e.g. a subscription created by an interrupted handshake for a secret
+  // unknown to the SDS server. If no such entry exists, the handshake is rejected. Handshakes
+  // using cached secrets are unaffected. A cache slot is also released when the SDS server
+  // removes the secret resource, canceling its subscription.
+  //
+  // Secrets that resolved to a certificate are never reclaimed and are only released when the
+  // SDS server removes the secret resource or the parent listener or cluster is drained. This
+  // limit is therefore best suited for deployments where the SDS server only resolves a known
+  // set of names; when the server issues certificates for arbitrary peer-controlled names, idle
+  // resolved secrets can fill the cache until new names are rejected.
+  //
+  // If unset, the number of cached secrets is unlimited.
+  google.protobuf.UInt32Value max_secrets = 4 [(validate.rules).uint32 = {gt: 0}];
 }
