@@ -36,7 +36,7 @@ WINDOWS_SKIP_TARGETS = [
     # RBAC extensions have a link dependency on CEL.
     "envoy.filters.http.rbac",
     "envoy.filters.network.rbac",
-    # TODO: See if objcopy issue can be resolved
+    # TODO(yanavlasov): See if objcopy issue can be resolved
     "envoy.network.dns_resolver.hickory",
     "envoy.rbac.matchers.upstream_ip_port",
 ]
