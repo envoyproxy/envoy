@@ -29,7 +29,6 @@ class DnsSrvClusterTest_CreateClusterWithMinimalConfig_Test;
 namespace Upstream {
 
 class DnsSrvClusterFactory;
-class DnsSrvClusterTest;
 
 /**
  * Cluster implementation for DNS SRV records.
@@ -62,7 +61,7 @@ public:
 
 private:
   friend class DnsSrvClusterFactory;
-  friend class DnsSrvClusterTest;
+  friend class ::Envoy::Extensions::Clusters::DnsSrvClusterTest;
 
   class ResolveList;
 
@@ -152,7 +151,6 @@ public:
   DnsSrvClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.dns_srv") {}
 
 private:
-  friend class DnsSrvClusterTest;
   friend class ::Envoy::Extensions::Clusters::DnsSrvClusterTest;
   friend class ::Envoy::Extensions::Clusters::DnsSrvClusterTest_CreateClusterWithMinimalConfig_Test;
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
