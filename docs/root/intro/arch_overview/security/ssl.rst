@@ -84,7 +84,7 @@ X25519MLKEM768 is **not** included in the default ECDH curves. To opt in, explic
    :language: yaml
    :lines: 1-11
 
-Placing ``X25519MLKEM768`` first gives it the highest priority. Peers that do not support
+Placing X25519MLKEM768 first gives it the highest priority. Peers that do not support
 ML-KEM will gracefully fall back to X25519 or P-256 via standard TLS group negotiation.
 
 The same configuration pattern applies to upstream (client) connections using
