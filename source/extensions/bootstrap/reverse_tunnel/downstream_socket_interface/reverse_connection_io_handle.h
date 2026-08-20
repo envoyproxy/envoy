@@ -296,8 +296,9 @@ public:
                              const std::string& connection_key);
 
   /**
-   * Handle downstream connection closure and update internal maps so that the next
-   * maintenance cycle re-initiates the connection.
+   * Handle downstream connection closure: drop the key from tracking (if still present) and always
+   * emit a connection_closed access log. When the key was already removed at drain time, host and
+   * cluster in the log may be empty; correlate via connection_key / connection_id.
    * @param connection_key the unique key identifying the closed connection.
    * @param connection_id the initiator's per-connection identifier for the closed connection.
    */
@@ -306,13 +307,17 @@ public:
   /**
    * Drop a tunnel from tracking because it has begun draining (the downstream HCM sent a
    * shutdownNotice/GOAWAY due to max_connection_duration or graceful shutdown, or the peer sent a
-   * GOAWAY) and kick maintenance to dial a replacement immediately. The underlying TCP socket is
-   * left alone so in-flight HTTP/2 streams can finish; onDownstreamConnectionClosed() no-ops when
-   * the socket eventually closes.
+   * GOAWAY) and kick maintenance to dial a replacement immediately. Emits a connection_draining
+   * access log. The underlying TCP socket is left alone so in-flight HTTP/2 streams can finish;
+   * onDownstreamConnectionClosed() later still emits connection_closed (host/cluster may be empty
+   * because the key was already dropped) so the close can be correlated via connection_key /
+   * connection_id.
    *
    * @param connection_key the local-address string of the outbound tunnel socket.
+   * @param connection_id the initiator's per-connection identifier for access-log correlation.
    */
-  void markTunnelDrainingAndDialReplacement(const std::string& connection_key);
+  void markTunnelDrainingAndDialReplacement(const std::string& connection_key,
+                                            uint64_t connection_id);
 
   /**
    * Remove a connection key from per-host tracking (the key set and its state gauge). Shared by the
@@ -326,7 +331,7 @@ public:
   /**
    * Child DownstreamReverseConnectionIOHandles register/unregister here at construction/destruction
    * so that, if this parent is destroyed while a tunnel connection is still draining, it can null
-   * each child's back-pointer (see cleanup()) and the child's parent() safely returns nullptr.
+   * each child's back-pointer (see cleanup()) and child drain/close notifications become no-ops.
    */
   void registerChildIoHandle(DownstreamReverseConnectionIOHandle& child) {
     child_io_handles_.insert(&child);

@@ -190,6 +190,10 @@ public:
     tls_slot_ = std::move(slot);
   }
 
+  void setTestOnlyAccessLogs(AccessLog::InstanceSharedPtrVector access_logs) {
+    access_logs_ = std::move(access_logs);
+  }
+
 private:
   Server::Configuration::ServerFactoryContext& context_;
   // Captured in onServerInitialized() to reach hotRestart(); not owned. Null until then.
