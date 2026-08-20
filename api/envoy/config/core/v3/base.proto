@@ -486,6 +486,9 @@ message HeaderValueOption {
 
   // Is the header value allowed to be empty? If false (default), custom headers with empty values are dropped,
   // otherwise they are added.
+  //
+  // .. note::
+  //   This field is only supported by the router filter. Please check: https://github.com/envoyproxy/envoy/pull/21291.
   bool keep_empty_value = 4;
 }
 
