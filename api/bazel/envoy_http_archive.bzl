@@ -6,10 +6,12 @@ def envoy_http_archive(name, locations, location_name = None, **kwargs):
     # users can override dependency versions by using standard Bazel repository
     # rules in their WORKSPACE files.
     existing_rule_keys = native.existing_rules().keys()
+
     if name in existing_rule_keys:
         # This repository has already been defined, probably because the user
         # wants to override the version. Do nothing.
         return
+
     location = locations[location_name or name]
 
     # HTTP tarball at a given URL. Add a BUILD file if requested.
