@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package envoy.extensions.router.cluster_specifiers.weighted_priority.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.router.cluster_specifiers.weighted_priority.v3";
+option java_outer_classname = "WeightedPriorityProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/router/cluster_specifiers/weighted_priority/v3;weighted_priorityv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Weighted priority cluster specifier]
+
+// Selects a cluster by walking ordered priority groups and performing a weighted choice among the
+// clusters of the first group that has any healthy cluster.
+//
+// This differs from :ref:`weighted_clusters
+// <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>` in one respect: a group whose
+// clusters all lack healthy hosts is skipped, so a degraded tier does not absorb its share of the
+// traffic. Weights therefore describe how to split load *within* a tier, while groups describe the
+// order in which tiers are tried.
+//
+// Example configuration:
+//
+// .. code-block:: yaml
+//
+//     priority_groups:
+//     - clusters:
+//       - name: primary_a
+//         weight: 70
+//       - name: primary_b
+//         weight: 30
+//     - clusters:
+//       - name: fallback
+//         weight: 1
+//
+// While either primary cluster has healthy hosts, requests are split 70/30 between them, and the
+// split renormalizes over whichever of the two remains healthy. Once both are unhealthy, requests
+// go to ``fallback``.
+//
+// The cluster is chosen once per request, when the route is resolved, so retries of a request stay
+// within the chosen cluster. Combine this with a cluster type such as :ref:`the composite cluster
+// <arch_overview_composite_cluster>` when retries need to move between clusters.
+//
+// [#extension: envoy.router.cluster_specifier_plugin.weighted_priority]
+message WeightedPriorityClusterSpecifier {
+  // A cluster and its share of the traffic within a priority group.
+  message ClusterWeight {
+    // Name of the cluster. This cluster must be defined elsewhere in the configuration.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Share of the group's traffic that this cluster receives, relative to the other clusters of
+    // the same group. Weights are renormalized over whichever clusters of the group are healthy,
+    // so removing a cluster from consideration redistributes its share proportionally.
+    uint32 weight = 2 [(validate.rules).uint32 = {gt: 0}];
+  }
+
+  // A set of clusters that are considered together, and among which traffic is split by weight.
+  message PriorityGroup {
+    // Clusters belonging to this group. Must contain at least one cluster.
+    repeated ClusterWeight clusters = 1 [(validate.rules).repeated = {min_items: 1}];
+  }
+
+  // Groups in descending order of preference. The first group containing a cluster that both
+  // exists and has healthy hosts is used; earlier groups that have none are skipped.
+  //
+  // If no group has a healthy cluster, the weighted choice is made over the last group while
+  // ignoring health, so the request fails against a real cluster and is attributed to it in stats
+  // rather than being dropped as an unroutable request.
+  repeated PriorityGroup priority_groups = 1 [(validate.rules).repeated = {min_items: 1}];
+}
