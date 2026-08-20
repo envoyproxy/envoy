@@ -399,7 +399,7 @@ public:
 
   /**
    * @return bool true if this filter is a unified filter who implements
-   * createHttpFilterFactoryFromProto but does not implement createFilterFactoryFromProto. This is
+   * createHttpFilterFactoryFromProto to replace createFilterFactoryFromProto completely. This is
    * used to differentiate unified filters from legacy filters.
    */
   virtual bool isUnifiedFilter() { return false; }
@@ -489,12 +489,6 @@ public:
    * produce a factory with the provided parameters, it should return an error status.
    * The returned callback should always be initialized.
    *
-   * NOTE: for backwards compatibility, this method will default to calling
-   * createFilterFactoryFromProtoWithServerContext, which will throw an exception if not
-   * implemented. This new method will be used to replace
-   * createFilterFactoryFromProtoWithServerContext in the future and this delegation will be
-   * removed.
-   *
    * @param config supplies the general Protobuf message to be marshaled into a filter-specific
    * configuration.
    * @param context supplies the filter's context.
@@ -512,34 +506,6 @@ public:
         "createHttpFilterFactoryFromProto is not implemented for this filter");
   }
 };
-
-/**
- * Helper to create the HTTP filter factory creation function from the given filter config factory.
- *
- * Unified filters only implement createHttpFilterFactoryFromProto() and will always return an
- * error for createFilterFactoryFromProto(), so the call must be dispatched based on
- * isUnifiedFilter(). All the callers that create HTTP filters from a FactoryContext or an
- * UpstreamFactoryContext should use this helper rather than calling the factory directly.
- *
- * @param factory the HTTP filter config factory. It could be a NamedHttpFilterConfigFactory for
- * the downstream filter chain or an UpstreamHttpFilterConfigFactory for the upstream filter chain.
- * @param config supplies the general Protobuf message to be marshaled into a filter-specific
- * configuration.
- * @param stats_prefix prefix for stat logging.
- * @param context the FactoryContext (downstream) or UpstreamFactoryContext (upstream).
- * @return Http::FilterFactoryCb the factory creation function.
- */
-template <class FactoryType, class ContextType>
-absl::StatusOr<Http::FilterFactoryCb>
-createHttpFilterFactory(FactoryType& factory, const Protobuf::Message& config,
-                        const std::string& stats_prefix, ContextType& context) {
-  if (factory.isUnifiedFilter()) {
-    ExtraFactoryContext extra_context = ExtraFactoryContext::create(context, stats_prefix);
-    return factory.createHttpFilterFactoryFromProto(config, context.serverFactoryContext(),
-                                                    extra_context);
-  }
-  return factory.createFilterFactoryFromProto(config, stats_prefix, context);
-}
 
 } // namespace Configuration
 } // namespace Server
