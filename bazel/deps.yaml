@@ -920,6 +920,7 @@ proxy_wasm_cpp_host:
   project_name: "WebAssembly for Proxies (C++ host implementation)"
   project_desc: "WebAssembly for Proxies (C++ host implementation)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-host"
+  apparent_name: proxy-wasm-cpp-host
   release_date: "2026-06-23"
   use_category:
   - dataplane_ext
@@ -940,6 +941,7 @@ proxy_wasm_cpp_sdk:
   project_name: "WebAssembly for Proxies (C++ SDK)"
   project_desc: "WebAssembly for Proxies (C++ SDK)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk"
+  apparent_name: proxy-wasm-cpp-sdk
   release_date: "2025-09-25"
   use_category:
   - dataplane_ext
@@ -960,6 +962,7 @@ proxy_wasm_rust_sdk:
   project_name: "WebAssembly for Proxies (Rust SDK)"
   project_desc: "WebAssembly for Proxies (Rust SDK)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-rust-sdk"
+  apparent_name: proxy-wasm-rust-sdk
   release_date: "2025-10-01"
   use_category:
   - test_only
