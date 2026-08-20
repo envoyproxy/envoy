@@ -227,7 +227,11 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
     _proxy_wasm_cpp_host()
     _emsdk()
     _rules_fuzzing()
-    external_http_archive("proxy_wasm_rust_sdk")
+    external_http_archive(
+        name = "proxy-wasm-rust-sdk",
+        location_name = "proxy_wasm_rust_sdk",
+        repo_mapping = {"@proxy_wasm_rust_sdk": "@proxy-wasm-rust-sdk"},
+    )
     _cel_cpp()
     _perfetto()
     _rules_ruby()
@@ -855,23 +859,32 @@ def _re2():
 
 def _proxy_wasm_cpp_sdk():
     external_http_archive(
-        name = "proxy_wasm_cpp_sdk",
+        name = "proxy-wasm-cpp-sdk",
+        location_name = "proxy_wasm_cpp_sdk",
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:proxy_wasm_cpp_sdk.patch",
             "@envoy//bazel:proxy_wasm_cpp_sdk-protobuf-v35.patch",
         ],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@proxy_wasm_cpp_sdk": "@proxy-wasm-cpp-sdk",
+        },
     )
 
 def _proxy_wasm_cpp_host():
     external_http_archive(
-        name = "proxy_wasm_cpp_host",
+        name = "proxy-wasm-cpp-host",
+        location_name = "proxy_wasm_cpp_host",
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:proxy_wasm_cpp_host.patch",
         ],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@proxy_wasm_cpp_host": "@proxy-wasm-cpp-host",
+            "@proxy_wasm_cpp_sdk": "@proxy-wasm-cpp-sdk",
+        },
     )
 
 def _emsdk():
@@ -928,10 +941,13 @@ def _toolchains_llvm():
 def _wasmtime():
     external_http_archive(
         name = "wasmtime",
-        build_file = "@proxy_wasm_cpp_host//:bazel/external/wasmtime.BUILD",
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        build_file = "@proxy-wasm-cpp-host//:bazel/external/wasmtime.BUILD",
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@proxy_wasm_cpp_host": "@proxy-wasm-cpp-host",
+        },
         patches = [
-            "@proxy_wasm_cpp_host//:bazel/external/prefixed_wasmtime.patch",
+            "@proxy-wasm-cpp-host//:bazel/external/prefixed_wasmtime.patch",
         ],
         patch_args = ["-p1"],
     )
