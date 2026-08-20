@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/common/platform.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
@@ -1033,7 +1034,43 @@ TEST_P(TcpProxyTest, DownstreamDisconnectRemote) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _));
+  EXPECT_CALL(
+      *upstream_connections_.at(0),
+      close(Network::ConnectionCloseType::FlushWrite,
+            StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
+TEST_P(TcpProxyTest, DownstreamRemoteResetPropagatesAbortReset) {
+  setup(1);
+
+  raiseEventUpstreamConnected(0);
+
+  filter_callbacks_.connection_.stream_info_.setDownstreamDetectedCloseType(
+      StreamInfo::DetectedCloseType::RemoteReset);
+  EXPECT_CALL(
+      *upstream_connections_.at(0),
+      close(Network::ConnectionCloseType::AbortReset,
+            StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamResetClose));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+#endif
+
+TEST_P(TcpProxyTest, DownstreamRemoteResetUsesFinWhenRuntimeGuardDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.propagate_downstream_rst_to_upstream", "false"}});
+  setup(1);
+
+  raiseEventUpstreamConnected(0);
+
+  filter_callbacks_.connection_.stream_info_.setDownstreamDetectedCloseType(
+      StreamInfo::DetectedCloseType::RemoteReset);
+  EXPECT_CALL(
+      *upstream_connections_.at(0),
+      close(Network::ConnectionCloseType::FlushWrite,
+            StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 

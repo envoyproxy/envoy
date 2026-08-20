@@ -196,7 +196,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setDrainTime(std::chrono::seconds(42));
   options->setDrainStrategy(Server::DrainStrategy::Immediate);
   options->setParentShutdownTime(std::chrono::seconds(43));
-  options->setLogLevel(spdlog::level::trace);
+  options->setLogLevel(Logger::Levels::trace);
   options->setLogFormat("%L %n %v");
   options->setLogPath("/foo/bar");
   options->setRestartEpoch(44);

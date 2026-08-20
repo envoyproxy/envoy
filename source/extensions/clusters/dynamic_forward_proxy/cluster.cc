@@ -598,12 +598,10 @@ void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::In
                                                  std::vector<uint8_t>& hash_key,
                                                  const Network::Connection& connection) {
   const LookupKey key = {hash_key, *connection.connectionInfoProvider().remoteAddress()};
-  connection_info_map_[key].erase(
-      std::remove_if(connection_info_map_[key].begin(), connection_info_map_[key].end(),
-                     [&pool, &connection](const ConnectionInfo& info) {
-                       return (info.pool_ == &pool && info.connection_ == &connection);
-                     }),
-      connection_info_map_[key].end());
+
+  std::erase_if(connection_info_map_[key], [&pool, &connection](const ConnectionInfo& info) {
+    return (info.pool_ == &pool && info.connection_ == &connection);
+  });
 }
 
 absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
@@ -613,7 +611,7 @@ ClusterFactory::createClusterWithConfig(
     Upstream::ClusterFactoryContext& context) {
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context.serverFactoryContext(), context.messageValidationVisitor());
+      context.serverFactoryContext());
 
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (!cluster_config.has_upstream_http_protocol_options()) {

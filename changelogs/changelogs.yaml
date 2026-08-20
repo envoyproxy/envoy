@@ -52,6 +52,8 @@ areas:
     title: circuit_breaker
   composite:
     title: composite
+  compressor:
+    title: compressor
   credential_injector:
     title: credential_injector
   dns_resolver:

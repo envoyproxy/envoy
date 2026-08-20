@@ -33,7 +33,8 @@ absl::StatusOr<Http::FilterFactoryCb>
 AlternateProtocolsCacheFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
         proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
 
   FilterConfigSharedPtr filter_config(
       std::make_shared<FilterConfig>(proto_config, context.httpServerPropertiesCacheManager(),

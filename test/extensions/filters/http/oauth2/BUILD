@@ -38,6 +38,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/oauth2:config",
+        "//test/mocks/init:init_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:status_utility_lib",
@@ -69,12 +70,35 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "oauth_route_integration_test",
+    size = "large",
+    srcs = ["oauth_route_integration_test.cc"],
+    extension_names = ["envoy.filters.http.oauth2"],
+    rbe_pool = "6gig",
+    deps = [
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "//source/extensions/filters/http/oauth2:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:resources_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
+        # so it needs the built-in HTTP command parsers registered.
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
     rbe_pool = "6gig",
     deps = [
         "//source/common/secret:secret_manager_impl_lib",
+        "//source/common/stream_info:stream_id_provider_lib",
         "//source/extensions/filters/http/oauth2:config",
         "//source/extensions/filters/http/oauth2:oauth_callback_interface",
         "//source/extensions/filters/http/oauth2:oauth_client",
@@ -98,10 +122,12 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.oauth2"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/stream_info:stream_id_provider_lib",
         "//source/extensions/filters/http/oauth2:oauth_client",
         "//test/integration:http_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:logging_lib",
         # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
         # so it needs the built-in HTTP command parsers registered.
         "//source/common/formatter:http_speicific_formatter_extension_lib",

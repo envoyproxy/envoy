@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_authz is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
@@ -223,9 +226,12 @@ TEST_F(ExtAuthzFilterHttpTest, FilterWithServerContext) {
   TestUtility::loadFromYaml(ext_authz_config_yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  // Built before the expectation below so that only the factory's own calls are counted.
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
   EXPECT_CALL(context, messageValidationVisitor());
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(*proto_config, "stats", context).value();
+      factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

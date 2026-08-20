@@ -13,7 +13,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 
-Http::FilterFactoryCb DynamoFilterConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> DynamoFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::dynamo::v3::Dynamo&, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
   auto stats = std::make_shared<DynamoStats>(context.scope(), stats_prefix);

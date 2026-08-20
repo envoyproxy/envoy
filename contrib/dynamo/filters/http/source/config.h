@@ -17,13 +17,13 @@ namespace Dynamo {
 /**
  * Config registration for http dynamodb filter.
  */
-class DynamoFilterConfig
-    : public Common::FactoryBase<envoy::extensions::filters::http::dynamo::v3::Dynamo> {
+class DynamoFilterConfig : public Common::ExceptionFreeFactoryBase<
+                               envoy::extensions::filters::http::dynamo::v3::Dynamo> {
 public:
-  DynamoFilterConfig() : FactoryBase("envoy.filters.http.dynamo") {}
+  DynamoFilterConfig() : ExceptionFreeFactoryBase("envoy.filters.http.dynamo") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::dynamo::v3::Dynamo& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

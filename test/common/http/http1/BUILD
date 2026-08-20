@@ -32,6 +32,7 @@ envoy_cc_test(
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/http1:codec_lib",
+        "//source/common/http/http1:legacy_parser_lib",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//test/common/memory:memory_test_utility_lib",
         "//test/common/stats:stat_test_utility_lib",
