@@ -1580,6 +1580,54 @@ TEST_F(RCConnectionWrapperTest, DispatchHttp1ErrorPath) {
   wrapper.dispatchHttp1(invalid_bytes);
 }
 
+// A 403/429 handshake response includes a body, so decodeHeaders() runs inside
+// Http1::dispatch() before that body is consumed. Closing the connection from
+// onConnectionDone() on that stack SEGVs. Feed a full 403 with body and assert
+// close() is not invoked while dispatch() is still running.
+TEST_F(RCConnectionWrapperTest, DispatchForbiddenWithBodyDoesNotCloseDuringDispatch) {
+  auto mock_connection = getDeletableConn(dispatcher_);
+
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(42));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillRepeatedly(
+          Invoke([](Buffer::Instance& buffer, bool) { buffer.drain(buffer.length()); }));
+  EXPECT_CALL(*mock_connection, close(_)).Times(0);
+
+  auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80);
+  auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10001);
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
+        static auto provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local, mock_remote);
+        return *provider;
+      }));
+
+  addHostConnectionInfo("10.0.0.1:80", "test-cluster", 1);
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto wrapper = std::make_unique<RCConnectionWrapper>(*io_handle_, std::move(mock_connection),
+                                                       mock_host, "test-cluster");
+  (void)wrapper->connect("tenant", "cluster", "node");
+
+  RCConnectionWrapper* wrapper_ptr = wrapper.get();
+  io_handle_->connection_wrappers_.push_back(std::move(wrapper));
+  io_handle_->conn_wrapper_to_host_map_[wrapper_ptr] = "10.0.0.1:80";
+
+  Buffer::OwnedImpl response("HTTP/1.1 403 Forbidden\r\n"
+                             "Content-Type: text/plain\r\n"
+                             "Content-Length: 18\r\n"
+                             "\r\n"
+                             "validation_failed");
+  wrapper_ptr->dispatchHttp1(response);
+
+  EXPECT_TRUE(io_handle_->connection_wrappers_.empty());
+  EXPECT_TRUE(io_handle_->conn_wrapper_to_host_map_.empty());
+}
+
 // Test that destructor invokes shutdown when not already called.
 TEST_F(RCConnectionWrapperTest, DestructorInvokesShutdown) {
   auto mock_connection = setupMockConnection();
