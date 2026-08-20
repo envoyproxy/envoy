@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 
 #include "envoy/common/hashable.h"
@@ -146,6 +147,8 @@ public:
   const std::string locality_zone_;
   std::vector<std::pair<std::string, std::string>> labels_;
 };
+
+using WorkloadMetadataObjectConstSharedPtr = std::shared_ptr<const WorkloadMetadataObject>;
 
 // Parse string workload type.
 WorkloadType fromSuffix(absl::string_view suffix);
