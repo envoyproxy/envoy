@@ -15,6 +15,10 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.datadog",
+    # Requires POSIX signal handling.
+    "envoy.watchdog.backtrace_action",
+    # Only implemented for Linux.
+    "envoy.resource_monitors.cpu_utilization",
     # Extensions that require CEL.
     "envoy.access_loggers.extension_filters.cel",
     "envoy.rate_limit_descriptors.expr",
@@ -32,6 +36,8 @@ WINDOWS_SKIP_TARGETS = [
     # RBAC extensions have a link dependency on CEL.
     "envoy.filters.http.rbac",
     "envoy.filters.network.rbac",
+    # TODO(yanavlasov): See if objcopy issue can be resolved
+    "envoy.network.dns_resolver.hickory",
     "envoy.rbac.matchers.upstream_ip_port",
 ]
 
