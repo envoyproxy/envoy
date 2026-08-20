@@ -246,8 +246,6 @@ void RCConnectionWrapper::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bo
     return;
   }
   ENVOY_LOG(error, "Received unexpected HTTP response: {} (expected {})", status, expected);
-  // Called from Http1::dispatch() while a 403/429 body may still be unparsed. The parent
-  // must not close() the connection on this stack (see onConnectionDone).
   // A 429 may carry a Retry-After cool-off hint; forward it so the parent can honor it as the
   // per-host backoff before the next attempt.
   std::optional<std::chrono::milliseconds> retry_after;

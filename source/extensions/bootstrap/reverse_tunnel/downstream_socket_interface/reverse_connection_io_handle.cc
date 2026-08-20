@@ -1249,13 +1249,8 @@ void ReverseConnectionIOHandle::onConnectionDone(
     updateConnectionState(host_address, cluster_name, connection_key,
                           ReverseConnectionState::Failed);
 
-    // Do not close() or resetFileEvents() here. Handshake failures are reported from
-    // RCConnectionWrapper::decodeHeaders(), which runs inside Http1::ConnectionImpl::dispatch().
-    // 403/429 responses include a body, so the parser is still consuming bytes when this
-    // callback fires. Closing the connection on that stack lets dispatch() continue on a
-    // torn-down codec and can SEGV. The wrapper is deferred-deleted below; shutdown() then
-    // drops the connection after dispatch() returns. For a peer close (closed == true) the
-    // socket is already gone; only detach leftover file events.
+    // decodeHeaders() runs inside Http1::dispatch(); closing here can SEGV on a 403/429 body.
+    // Deferred-delete the wrapper instead. On peer close, only detach leftover file events.
     if (closed && connection && connection->getSocket()) {
       connection->getSocket()->ioHandle().resetFileEvents();
     }

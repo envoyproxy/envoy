@@ -1580,10 +1580,7 @@ TEST_F(RCConnectionWrapperTest, DispatchHttp1ErrorPath) {
   wrapper.dispatchHttp1(invalid_bytes);
 }
 
-// A 403/429 handshake response includes a body, so decodeHeaders() runs inside
-// Http1::dispatch() before that body is consumed. Closing the connection from
-// onConnectionDone() on that stack SEGVs. Feed a full 403 with body and assert
-// close() is not invoked while dispatch() is still running.
+// 403 responses have a body, so decodeHeaders() runs inside Http1::dispatch().
 TEST_F(RCConnectionWrapperTest, DispatchForbiddenWithBodyDoesNotCloseDuringDispatch) {
   auto mock_connection = getDeletableConn(dispatcher_);
 
