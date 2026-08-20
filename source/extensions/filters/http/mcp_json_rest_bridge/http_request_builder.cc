@@ -196,7 +196,7 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
     // traversal, so treat it as a separator here too.
     for (const absl::string_view segment : absl::StrSplit(raw_value, absl::ByAnyChar("\\/"))) {
       if (segment == "." || segment == "..") {
-        return absl::InvalidArgumentError(absl::StrCat(
+        return absl::PermissionDeniedError(absl::StrCat(
             "path template variable '", element, "' must not contain path traversal segments"));
       }
     }
@@ -236,7 +236,7 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
     method = "PATCH";
     pattern = http_rule.patch();
   } else {
-    return absl::InvalidArgumentError("Unsupported HTTP method in HttpRule");
+    return absl::InternalError("HttpRule is malformed");
   }
   absl::string_view url_template = pattern;
   absl::flat_hash_set<std::string> templates;

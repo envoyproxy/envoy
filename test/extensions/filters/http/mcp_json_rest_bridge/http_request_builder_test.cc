@@ -215,7 +215,7 @@ body: "*"
 TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableRejectsPathTraversal) {
   json arguments = json::parse(R"json({"id": "../../admin/secrets"})json");
   EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+              StatusIs(absl::StatusCode::kPermissionDenied));
 }
 
 // A simple variable's '/' is confined to a single segment (percent-encoded), not treated as a
@@ -251,7 +251,7 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariablePreservesSlash) {
 TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariableRejectsPathTraversal) {
   json arguments = json::parse(R"json({"name": "../../admin/secrets"})json");
   EXPECT_THAT(constructBaseUrl("/v1/{name=projects/*}/shelves", {"name"}, arguments),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+              StatusIs(absl::StatusCode::kPermissionDenied));
 }
 
 // '\' is percent-encoded to %5C rather than reaching the upstream literally, but an upstream that
@@ -260,7 +260,7 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariableRejectsPathTraversa
 TEST(HttpRequestBuilderTest, ConstructBaseUrlRejectsBackslashPathTraversal) {
   json arguments = json::parse(R"json({"id": "..\\.."})json");
   EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+              StatusIs(absl::StatusCode::kPermissionDenied));
 }
 
 // A backslash that is not a traversal segment is still allowed through, percent-encoded.
@@ -294,6 +294,13 @@ body: "foo"
   json arguments = json::parse(R"json({})json");
 
   EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(HttpRequestBuilderTest, UnsupportedHttpMethodReturnInternalError) {
+  HttpRule http_rule;
+  json arguments = json::parse(R"json({})json");
+
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST(HttpRequestBuilderTest, ConstructBaseUrlTest) {

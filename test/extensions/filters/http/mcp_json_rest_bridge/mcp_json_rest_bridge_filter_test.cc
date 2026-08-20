@@ -1018,8 +1018,8 @@ tool_config:
 
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Eq(Http::Code::OK),
-                             StrEq(R"json({"code":-32602,"message":"Invalid HTTP rule"})json"), _,
-                             _,
+                             StrEq(R"json({"code":-32602,"message":"HttpRule is malformed"})json"),
+                             _, _,
                              StrEq("mcp_json_rest_bridge_internal_tools_call_invalid_http_rule")));
 
   Protobuf::Struct expected_metadata;
@@ -1046,7 +1046,7 @@ tool_config:
   response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
-  Buffer::OwnedImpl response_body(R"json({"code":-32602,"message":"Invalid HTTP rule"})json");
+  Buffer::OwnedImpl response_body(R"json({"code":-32602,"message":"HttpRule is malformed"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
@@ -1055,7 +1055,7 @@ tool_config:
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
-          R"json({"error":{"code":-32602,"message":"Invalid HTTP rule"},"id":123,"jsonrpc":"2.0"})json"));
+          R"json({"error":{"code":-32602,"message":"HttpRule is malformed"},"id":123,"jsonrpc":"2.0"})json"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolArgumentsMustBeObjectReturnsError) {

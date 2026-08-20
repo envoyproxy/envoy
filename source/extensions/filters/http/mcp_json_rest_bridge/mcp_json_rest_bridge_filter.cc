@@ -1158,15 +1158,22 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   if (!http_request.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to build HTTP request for method: {} with status: {}",
                      *decoder_callbacks_, tool_name, http_request.status());
-    BridgeStatus bridge_status = BridgeStatus::RequestToolsCallMissingRequiredArg;
-    std::string error_msg = "Missing required argument";
-    if (absl::StrContains(http_request.status().message(), "path traversal")) {
+    BridgeStatus bridge_status;
+    std::string error_msg;
+    switch (http_request.status().code()) {
+    case absl::StatusCode::kPermissionDenied:
       bridge_status = BridgeStatus::RequestToolsCallPathTraversalRejected;
       error_msg = "Path traversal rejected";
-    } else if (absl::StrContains(http_request.status().message(), "Unsupported HTTP method") ||
-               absl::StrContains(http_request.status().message(), "Invalid HTTP rule")) {
+      break;
+    case absl::StatusCode::kInternal:
       bridge_status = BridgeStatus::InternalToolsCallInvalidHttpRule;
-      error_msg = "Invalid HTTP rule";
+      error_msg = "HttpRule is malformed";
+      break;
+    case absl::StatusCode::kInvalidArgument:
+    default:
+      bridge_status = BridgeStatus::RequestToolsCallMissingRequiredArg;
+      error_msg = "Missing required argument";
+      break;
     }
     sendErrorResponse(Http::Code::OK, bridge_status,
                       generateErrorJsonResponse(-32602, error_msg).dump(), nullptr,
