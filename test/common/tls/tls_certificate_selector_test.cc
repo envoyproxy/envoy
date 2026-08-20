@@ -34,6 +34,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -42,10 +43,12 @@
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::Invoke;
 using testing::MockFunction;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Ref;
 using testing::ReturnRef;
 using testing::WithArg;
@@ -418,7 +421,7 @@ TEST(TlsCertificateSelectorFactoryQuicTest, QUICFactory) {
   auto server_cfg = ServerContextConfigImpl::create(server_tls_context,
                                                     transport_socket_factory_context, {}, true);
 
-  EXPECT_FALSE(server_cfg.ok());
+  EXPECT_THAT(server_cfg, Not(IsOk()));
 }
 
 } // namespace

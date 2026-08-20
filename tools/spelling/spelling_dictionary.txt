@@ -35,6 +35,7 @@ ARRAYSIZE
 ARN
 ASAN
 ASCII
+ASLR
 ASM
 ASN
 ASSERTed
@@ -64,6 +65,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+bzlmod
 CIO
 CBC
 cbc
@@ -659,6 +661,9 @@ auths
 authz
 automata
 autoscale
+awaitable
+awaitables
+awaiter
 backend
 backends
 backgrounded
@@ -959,6 +964,7 @@ hackery
 hacky
 handoff
 handshaker
+hardcode
 hardcoded
 hardcodes
 hardcoding
@@ -1166,6 +1172,7 @@ netmask
 netns
 NLB
 NLMSG
+nodiscard
 nonblocking
 noncopyable
 nonresponsive
@@ -1186,6 +1193,7 @@ oauth
 observability
 observations
 ocagent
+offloadable
 offsetof
 oneof
 oneway
@@ -1364,6 +1372,7 @@ reperform
 repicked
 replayable
 repo
+repos
 representable
 reproducibility
 requirepass
@@ -1402,6 +1411,7 @@ rtest
 rtrim
 rtt
 ruleset
+runfile
 runfiles
 runtime
 runtimes
@@ -1426,6 +1436,7 @@ serializable
 serializer
 serv
 servercert
+setarch
 setenv
 SETNAME
 setsockopt
@@ -1502,6 +1513,7 @@ submatch
 submessages
 subnet
 subnets
+subobject
 suboptimal
 subprocess
 subsecond
@@ -1598,6 +1610,7 @@ udpa
 uint
 un-
 unacked
+uname
 unary
 unconfigurable
 undef
@@ -1670,6 +1683,7 @@ wildcard
 wildcards
 winsock
 workspace
+workspaces
 writev
 wrsq
 www
@@ -1683,6 +1697,9 @@ xid
 xmodem
 xxhash
 xxs
+xxxx
+xxxxxxxx
+xxxxxxxxxxxx
 xyz
 xyzwebservices
 yml

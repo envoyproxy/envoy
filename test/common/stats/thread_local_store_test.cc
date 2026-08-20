@@ -2066,7 +2066,9 @@ TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   ThreadLocalStoreImpl store(alloc);
 
   store.initializeThreading(*dispatcher, tls);
-  { ScopeSharedPtr scope1 = store.createScope("scope1."); }
+  {
+    ScopeSharedPtr scope1 = store.createScope("scope1.");
+  }
   tls.shutdownGlobalThreading();
   store.shutdownThreading();
   tls.shutdownThread();

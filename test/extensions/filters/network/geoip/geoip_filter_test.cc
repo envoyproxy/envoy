@@ -11,6 +11,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -91,7 +92,7 @@ public:
   // Create a simple formatter that returns a static string.
   Formatter::FormatterConstSharedPtr createFormatterFromString(const std::string& format_str) {
     auto formatter_or_error = Formatter::FormatterImpl::create(format_str, false);
-    EXPECT_TRUE(formatter_or_error.ok());
+    EXPECT_OK(formatter_or_error);
     return std::move(formatter_or_error.value());
   }
 

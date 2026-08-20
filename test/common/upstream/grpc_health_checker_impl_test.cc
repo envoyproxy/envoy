@@ -41,6 +41,7 @@
 #include "test/mocks/upstream/transport_socket_match.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -433,7 +434,7 @@ public:
         .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
           std::vector<Grpc::Frame> decoded_frames;
           Grpc::Decoder decoder;
-          ASSERT_TRUE(decoder.decode(data, decoded_frames).ok());
+          ASSERT_OK(decoder.decode(data, decoded_frames));
           ASSERT_EQ(1U, decoded_frames.size());
           auto& frame = decoded_frames[0];
           Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
@@ -617,7 +618,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithAdditionalHeaders) {
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
         std::vector<Grpc::Frame> decoded_frames;
         Grpc::Decoder decoder;
-        ASSERT_TRUE(decoder.decode(data, decoded_frames).ok());
+        ASSERT_OK(decoder.decode(data, decoded_frames));
         ASSERT_EQ(1U, decoded_frames.size());
         auto& frame = decoded_frames[0];
         Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
@@ -924,6 +925,43 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFail) {
   EXPECT_CALL(event_logger_, logAddHealthy(_, _, false));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
+}
+
+// Tests that a failure to create the health check connection (e.g. a network namespace binding
+// failure that makes the upstream connection factory return a null connection) is handled as a
+// network health check failure instead of crashing on a null dereference. Also exercises the
+// re-armed timeout timer firing against a session that has no client.
+TEST_F(GrpcHealthCheckerImplTest, ConnectionCreateFailure) {
+  setupHC();
+  EXPECT_CALL(*this, onHostStatus(_, _)).Times(testing::AnyNumber());
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  // Create only the session timers; the connection cannot be created, so no client connection or
+  // codec mocks must be allocated for this session.
+  TestSessionPtr new_test_session(new TestSession());
+  new_test_session->timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  new_test_session->interval_timer_ = new Event::MockTimer(&dispatcher_);
+  test_sessions_.emplace_back(std::move(new_test_session));
+
+  // The upstream connection cannot be created; the factory returns a null connection.
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer()).Times(testing::AnyNumber());
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, disableTimer()).Times(testing::AnyNumber());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  // The first check fails gracefully instead of crashing.
+  health_checker_->start();
+  // Fire the re-armed timeout timer; onTimeout must tolerate the null client without crashing.
+  test_sessions_[0]->timeout_timer_->invokeCallback();
+
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_GE(cluster_->info_->stats_store_.counter("health_check.failure").value(), 1UL);
+  EXPECT_GE(cluster_->info_->stats_store_.counter("health_check.network_failure").value(), 1UL);
+  expectHostHealthy(false);
 }
 
 // Test disconnects produce network-type failures which does not lead to immediate unhealthy state.

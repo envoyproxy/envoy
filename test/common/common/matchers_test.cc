@@ -332,6 +332,16 @@ TEST_F(MetadataTest, InvertMatch) {
 
 class StringMatcher : public BaseTest {};
 
+TEST_F(StringMatcher, CreateExactMatcher) {
+  const auto matcher = Matchers::StringMatcherImpl::createExactMatcher("envoy_test");
+
+  EXPECT_TRUE(matcher.match("envoy_test"));
+  EXPECT_FALSE(matcher.match("envoy"));
+  EXPECT_FALSE(matcher.match("envoy_test_extra"));
+  EXPECT_FALSE(matcher.match("nginx"));
+  EXPECT_FALSE(matcher.match("ENVOY_TEST"));
+}
+
 TEST_F(StringMatcher, ExactMatchIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("exact");

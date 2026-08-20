@@ -12,6 +12,11 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -858,12 +863,12 @@ TEST_P(NetworkExtProcFilterIntegrationTest, UntypedMetadataForwarding) {
 
   // Verify metadata is present
   EXPECT_TRUE(request.has_metadata());
-  EXPECT_TRUE(request.metadata().filter_metadata().contains("test-namespace"));
+  EXPECT_THAT(request.metadata().filter_metadata(), Contains(Key("test-namespace")));
 
   // Verify metadata values
   const auto& metadata = request.metadata().filter_metadata().at("test-namespace");
-  EXPECT_TRUE(metadata.fields().contains("key1"));
-  EXPECT_TRUE(metadata.fields().contains("key2"));
+  EXPECT_THAT(metadata.fields(), Contains(Key("key1")));
+  EXPECT_THAT(metadata.fields(), Contains(Key("key2")));
   EXPECT_EQ(metadata.fields().at("key1").string_value(), "value1");
   EXPECT_EQ(metadata.fields().at("key2").string_value(), "value2");
 
@@ -895,17 +900,16 @@ TEST_P(NetworkExtProcFilterIntegrationTest, MultipleUntypedNamespaces) {
 
   // Verify metadata is present
   EXPECT_TRUE(request.has_metadata());
-  EXPECT_TRUE(request.metadata().filter_metadata().contains("namespace1"));
-  EXPECT_TRUE(request.metadata().filter_metadata().contains("namespace2"));
-  EXPECT_FALSE(request.metadata().filter_metadata().contains("namespace3"));
+  EXPECT_THAT(request.metadata().filter_metadata(),
+              UnorderedElementsAre(Key("namespace1"), Key("namespace2")));
 
   // Verify metadata values
   const auto& metadata1 = request.metadata().filter_metadata().at("namespace1");
-  EXPECT_TRUE(metadata1.fields().contains("key1"));
+  EXPECT_THAT(metadata1.fields(), Contains(Key("key1")));
   EXPECT_EQ(metadata1.fields().at("key1").string_value(), "value1");
 
   const auto& metadata2 = request.metadata().filter_metadata().at("namespace2");
-  EXPECT_TRUE(metadata2.fields().contains("key2"));
+  EXPECT_THAT(metadata2.fields(), Contains(Key("key2")));
   EXPECT_EQ(metadata2.fields().at("key2").string_value(), "value2");
 
   sendReadGrpcMessage("client_data_inspected", true, true);
@@ -987,7 +991,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TypedMetadataForwarding) {
 
   // Verify typed metadata is present
   EXPECT_TRUE(request.has_metadata());
-  EXPECT_TRUE(request.metadata().typed_filter_metadata().contains("typed-namespace"));
+  EXPECT_THAT(request.metadata().typed_filter_metadata(), Contains(Key("typed-namespace")));
 
   // Verify typed metadata values
   const auto& typed_metadata = request.metadata().typed_filter_metadata().at("typed-namespace");
@@ -1029,13 +1033,13 @@ TEST_P(NetworkExtProcFilterIntegrationTest, BothTypedAndUntypedMetadataForwardin
   EXPECT_TRUE(request.has_metadata());
 
   // Verify untyped metadata
-  EXPECT_TRUE(request.metadata().filter_metadata().contains("untyped-ns"));
+  EXPECT_THAT(request.metadata().filter_metadata(), Contains(Key("untyped-ns")));
   const auto& untyped_metadata = request.metadata().filter_metadata().at("untyped-ns");
-  EXPECT_TRUE(untyped_metadata.fields().contains("key1"));
+  EXPECT_THAT(untyped_metadata.fields(), Contains(Key("key1")));
   EXPECT_EQ(untyped_metadata.fields().at("key1").string_value(), "value1");
 
   // Verify typed metadata
-  EXPECT_TRUE(request.metadata().typed_filter_metadata().contains("typed-ns"));
+  EXPECT_THAT(request.metadata().typed_filter_metadata(), Contains(Key("typed-ns")));
   const auto& typed_metadata = request.metadata().typed_filter_metadata().at("typed-ns");
   EXPECT_EQ(typed_metadata.type_url(), "type.googleapis.com/google.protobuf.StringValue");
 

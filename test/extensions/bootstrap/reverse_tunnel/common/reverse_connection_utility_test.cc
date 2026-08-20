@@ -50,6 +50,35 @@ TEST_F(ReverseConnectionUtilityTest, IsPingMessageInvalidData) {
   EXPECT_FALSE(ReverseConnectionUtility::isPingMessage("Hello World"));
 }
 
+// Test RPING prefix classification.
+using RpingPrefixMatch = ReverseConnectionUtility::RpingPrefixMatch;
+
+TEST_F(ReverseConnectionUtilityTest, ClassifyRpingPrefixComplete) {
+  // Exactly RPING, or RPING followed by trailing application bytes: both are Complete since only
+  // the first PING_MESSAGE.size() bytes are considered.
+  EXPECT_EQ(RpingPrefixMatch::Complete, ReverseConnectionUtility::classifyRpingPrefix("RPING"));
+  EXPECT_EQ(RpingPrefixMatch::Complete,
+            ReverseConnectionUtility::classifyRpingPrefix("RPINGhello"));
+}
+
+TEST_F(ReverseConnectionUtilityTest, ClassifyRpingPrefixPartial) {
+  // Empty input and every proper prefix of RPING are viable partials.
+  EXPECT_EQ(RpingPrefixMatch::PartialPrefix, ReverseConnectionUtility::classifyRpingPrefix(""));
+  EXPECT_EQ(RpingPrefixMatch::PartialPrefix, ReverseConnectionUtility::classifyRpingPrefix("R"));
+  EXPECT_EQ(RpingPrefixMatch::PartialPrefix, ReverseConnectionUtility::classifyRpingPrefix("RP"));
+  EXPECT_EQ(RpingPrefixMatch::PartialPrefix, ReverseConnectionUtility::classifyRpingPrefix("RPI"));
+  EXPECT_EQ(RpingPrefixMatch::PartialPrefix, ReverseConnectionUtility::classifyRpingPrefix("RPIN"));
+}
+
+TEST_F(ReverseConnectionUtilityTest, ClassifyRpingPrefixNotRping) {
+  // A short non-prefix, and a full-length non-match, are both classified as not-RPING.
+  EXPECT_EQ(RpingPrefixMatch::NotRping, ReverseConnectionUtility::classifyRpingPrefix("X"));
+  EXPECT_EQ(RpingPrefixMatch::NotRping, ReverseConnectionUtility::classifyRpingPrefix("RPX"));
+  EXPECT_EQ(RpingPrefixMatch::NotRping, ReverseConnectionUtility::classifyRpingPrefix("PING"));
+  EXPECT_EQ(RpingPrefixMatch::NotRping,
+            ReverseConnectionUtility::classifyRpingPrefix("Hello World"));
+}
+
 // Test createPingResponse functionality
 TEST_F(ReverseConnectionUtilityTest, CreatePingResponse) {
   auto ping_buffer = ReverseConnectionUtility::createPingResponse();

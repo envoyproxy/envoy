@@ -817,7 +817,9 @@ TEST_F(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
 
   // approximateMonotonicTime is increasing between event loop runs.
   dispatcher_->post([this]() {
-    { EXPECT_LT(time_, dispatcher_->approximateMonotonicTime()); }
+    {
+      EXPECT_LT(time_, dispatcher_->approximateMonotonicTime());
+    }
   });
 
   dispatcher_->run(Dispatcher::RunType::Block);

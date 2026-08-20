@@ -70,6 +70,7 @@ envoy_cc_library(
     hdrs = ["decoded_resource_impl.h"],
     deps = [
         "//envoy/config:subscription_interface",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@xds//xds/core/v3:pkg_cc_proto",
@@ -119,6 +120,7 @@ envoy_cc_library(
     hdrs = ["opaque_resource_decoder_impl.h"],
     deps = [
         "//envoy/config:subscription_interface",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )

@@ -286,7 +286,9 @@ TEST(VerifyFileSha256, MissingFileReturnsInternal) {
 TEST(VerifyFileSha256, EmptyFileMatchesEmptyDigest) {
   const std::filesystem::path tmp =
       std::filesystem::temp_directory_path() / "envoy_verify_sha256_empty.bin";
-  { std::ofstream out(tmp, std::ios::binary); }
+  {
+    std::ofstream out(tmp, std::ios::binary);
+  }
   // SHA256 of the empty input.
   const std::string empty_sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
   EXPECT_OK(verifyFileSha256(tmp, empty_sha));

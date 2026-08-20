@@ -4,6 +4,7 @@
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/network/exception.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/fatal_action_config.h"
@@ -28,6 +29,7 @@
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
@@ -48,6 +50,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/crypto.h"
 
@@ -1318,6 +1321,19 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
                           EnvoyException, "Unknown gRPC client cluster");
 }
 
+// Verify that RTDS over ADS initializes successfully and doesn't crash on shutdown.
+TEST_P(ServerInstanceImplTest, RtdsOverAdsShutdown) {
+  Config::MockXdsConfigTrackerFactory factory;
+  Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
+
+  options_.service_cluster_name_ = "some_service";
+  options_.service_node_name_ = "some_node_name";
+  auto server_thread =
+      startTestServer("test/server/test_data/server/runtime_bootstrap_rtds_ads.yaml", false);
+  server_->shutdown();
+  server_thread->join();
+}
+
 // Validate invalid runtime in bootstrap is rejected.
 TEST_P(ServerInstanceImplTest, InvalidBootstrapRuntime) {
   EXPECT_THROW_WITH_MESSAGE(
@@ -1471,12 +1487,12 @@ TEST_P(ServerInstanceImplTest, LogToFile) {
   Logger::Registry::getSink()->flush();
   std::string log = server_->api().fileSystem().fileReadToEnd(path).value();
   EXPECT_GT(log.size(), 0);
-  EXPECT_TRUE(log.find("LogToFile test string") != std::string::npos);
+  EXPECT_THAT(log, HasSubstr("LogToFile test string"));
 
   // Test that critical messages get immediately flushed
   ENVOY_LOG_MISC(critical, "LogToFile second test string");
   log = server_->api().fileSystem().fileReadToEnd(path).value();
-  EXPECT_TRUE(log.find("LogToFile second test string") != std::string::npos);
+  EXPECT_THAT(log, HasSubstr("LogToFile second test string"));
 }
 
 TEST_P(ServerInstanceImplTest, LogToFileError) {

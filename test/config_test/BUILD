@@ -76,6 +76,7 @@ envoy_cc_test_library(
         "//test/mocks/server:worker_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ] + select({
         "//bazel:enable_http3_on_windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),

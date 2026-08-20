@@ -289,8 +289,7 @@ void OriginalDstCluster::cleanup() {
       if (hosts->used_) {
         keep = true;
         hosts->used_ = false; // Mark to be removed during the next round.
-      } else if (Runtime::runtimeFeatureEnabled(
-                     "envoy.reloadable_features.original_dst_rely_on_idle_timeout")) {
+      } else {
         // Check that all hosts (first, as well as others that may have been added concurrently)
         // are not in use by any connection pool.
         if (hosts->host_->used()) {

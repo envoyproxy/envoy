@@ -150,6 +150,132 @@ fn test_envoy_dynamic_module_on_http_filter_new_destroy() {
 }
 
 #[test]
+// A hook that triggers a synchronous `on_http_filter_destroy` (as `recreate_stream` does) must not
+// have its filter freed while the hook is still on the stack; the `Rc` clone keeps it alive.
+fn test_reentrant_destroy_during_hook_defers_drop() {
+  thread_local! {
+    static FILTER_PTR: std::cell::Cell<abi::envoy_dynamic_module_type_http_filter_module_ptr> =
+      const { std::cell::Cell::new(std::ptr::null()) };
+    static DROPPED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static DROPPED_OBSERVED_IN_HOOK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+  }
+
+  struct TestHttpFilterConfig;
+  impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for TestHttpFilterConfig {
+    fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+      Box::new(TestHttpFilter)
+    }
+  }
+
+  struct TestHttpFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for TestHttpFilter {
+    fn on_request_headers(
+      &self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      // Destroy this filter mid-hook, as a successful recreate_stream would.
+      let ptr = FILTER_PTR.with(|p| p.get());
+      unsafe { envoy_dynamic_module_on_http_filter_destroy(ptr) };
+      DROPPED_OBSERVED_IN_HOOK.with(|c| c.set(DROPPED.with(std::cell::Cell::get)));
+      abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+    }
+  }
+  impl Drop for TestHttpFilter {
+    fn drop(&mut self) {
+      DROPPED.with(|c| c.set(true));
+    }
+  }
+
+  let mut filter_config = TestHttpFilterConfig;
+  let filter = envoy_dynamic_module_on_http_filter_new_impl(
+    &mut EnvoyHttpFilterImpl {
+      raw_ptr: std::ptr::null_mut(),
+    },
+    &mut filter_config,
+  );
+  assert!(!filter.is_null());
+  FILTER_PTR.with(|p| p.set(filter));
+
+  let status = unsafe {
+    envoy_dynamic_module_on_http_filter_request_headers(std::ptr::null_mut(), filter, false)
+  };
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+
+  assert!(
+    !DROPPED_OBSERVED_IN_HOOK.with(std::cell::Cell::get),
+    "filter Drop must be deferred while its hook is still on the stack",
+  );
+  assert!(
+    DROPPED.with(std::cell::Cell::get),
+    "filter must be dropped once the trampoline releases its clone",
+  );
+}
+
+#[test]
+// A hook that destroys its own filter leaves the trampoline holding the last reference, so the
+// filter is dropped as the hook returns. If that drop ran while the hook's panic was still
+// unwinding, a panicking Drop would be a panic during unwind and abort the process, taking Envoy
+// with it. The trampoline releases the reference in its own guarded frame, so both panics are
+// merely logged. A panicking Drop is documented as forbidden; this only ensures a buggy module
+// cannot abort Envoy.
+fn test_panicking_hook_and_drop_after_reentrant_destroy_does_not_abort() {
+  thread_local! {
+    static FILTER_PTR: std::cell::Cell<abi::envoy_dynamic_module_type_http_filter_module_ptr> =
+      const { std::cell::Cell::new(std::ptr::null()) };
+  }
+
+  struct TestHttpFilterConfig;
+  impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for TestHttpFilterConfig {
+    fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+      Box::new(TestHttpFilter)
+    }
+  }
+
+  struct TestHttpFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for TestHttpFilter {
+    fn on_request_headers(
+      &self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      // Release Envoy's reference, as a successful recreate_stream would, so the trampoline's clone
+      // is now the only one, then panic while it is still held.
+      let ptr = FILTER_PTR.with(|p| p.get());
+      unsafe { envoy_dynamic_module_on_http_filter_destroy(ptr) };
+      panic!("panic from the hook");
+    }
+  }
+  impl Drop for TestHttpFilter {
+    fn drop(&mut self) {
+      panic!("panic from Drop");
+    }
+  }
+
+  let mut filter_config = TestHttpFilterConfig;
+  let filter = envoy_dynamic_module_on_http_filter_new_impl(
+    &mut EnvoyHttpFilterImpl {
+      raw_ptr: std::ptr::null_mut(),
+    },
+    &mut filter_config,
+  );
+  assert!(!filter.is_null());
+  FILTER_PTR.with(|p| p.set(filter));
+
+  let status = unsafe {
+    envoy_dynamic_module_on_http_filter_request_headers(std::ptr::null_mut(), filter, false)
+  };
+  // Reaching this at all is the assertion: an abort would have killed the test process.
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+}
+
+#[test]
 // This tests all the on_* methods on the HttpFilter trait through the actual entry points.
 fn test_envoy_dynamic_module_on_http_filter_callbacks() {
   struct TestHttpFilterConfig;
@@ -170,7 +296,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
   struct TestHttpFilter;
   impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for TestHttpFilter {
     fn on_request_headers(
-      &mut self,
+      &self,
       _envoy_filter: &mut EHF,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -179,7 +305,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
     }
 
     fn on_request_body(
-      &mut self,
+      &self,
       _envoy_filter: &mut EHF,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
@@ -188,7 +314,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
     }
 
     fn on_request_trailers(
-      &mut self,
+      &self,
       _envoy_filter: &mut EHF,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
       ON_REQUEST_TRAILERS_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -196,7 +322,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
     }
 
     fn on_response_headers(
-      &mut self,
+      &self,
       _envoy_filter: &mut EHF,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
@@ -205,7 +331,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
     }
 
     fn on_response_body(
-      &mut self,
+      &self,
       _envoy_filter: &mut EHF,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
@@ -214,14 +340,14 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
     }
 
     fn on_response_trailers(
-      &mut self,
+      &self,
       _envoy_filter: &mut EHF,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
       ON_RESPONSE_TRAILERS_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
       abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
     }
 
-    fn on_stream_complete(&mut self, _envoy_filter: &mut EHF) {
+    fn on_stream_complete(&self, _envoy_filter: &mut EHF) {
       ON_STREAM_COMPLETE_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
     }
   }
@@ -4094,7 +4220,7 @@ fn test_catch_unwind_http_filter_panic() {
   struct PanicFilter;
   impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
     fn on_request_headers(
-      &mut self,
+      &self,
       _envoy_filter: &mut EHF,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -4104,9 +4230,7 @@ fn test_catch_unwind_http_filter_panic() {
 
   SEND_RESPONSE_STATUS_CODE.store(0, std::sync::atomic::Ordering::SeqCst);
 
-  let mut envoy_filter = http::EnvoyHttpFilterImpl {
-    raw_ptr: std::ptr::null_mut(),
-  };
+  let mut envoy_filter = http::EnvoyHttpFilterImpl::new(std::ptr::null_mut());
   let mut wrapper = CatchUnwind::new(PanicFilter);
 
   let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
@@ -4181,7 +4305,7 @@ fn test_catch_unwind_http_response_headers_panic() {
   struct PanicFilter;
   impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
     fn on_response_headers(
-      &mut self,
+      &self,
       _envoy_filter: &mut EHF,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
@@ -4191,9 +4315,7 @@ fn test_catch_unwind_http_response_headers_panic() {
 
   RESET_STREAM_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
 
-  let mut envoy_filter = http::EnvoyHttpFilterImpl {
-    raw_ptr: std::ptr::null_mut(),
-  };
+  let mut envoy_filter = http::EnvoyHttpFilterImpl::new(std::ptr::null_mut());
   let mut wrapper = CatchUnwind::new(PanicFilter);
 
   let status = HttpFilter::on_response_headers(&mut wrapper, &mut envoy_filter, false);
@@ -4266,7 +4388,7 @@ fn test_catch_unwind_http_callout_done_after_poison_is_skipped() {
   struct PanicFilter;
   impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
     fn on_request_headers(
-      &mut self,
+      &self,
       _envoy_filter: &mut EHF,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -4274,12 +4396,13 @@ fn test_catch_unwind_http_callout_done_after_poison_is_skipped() {
     }
   }
 
-  let mut envoy_filter = http::EnvoyHttpFilterImpl {
-    raw_ptr: std::ptr::null_mut(),
-  };
   let mut wrapper = CatchUnwind::new(PanicFilter);
 
-  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  let status = HttpFilter::on_request_headers(
+    &mut wrapper,
+    &mut http::EnvoyHttpFilterImpl::new(std::ptr::null_mut()),
+    false,
+  );
   assert_eq!(
     status,
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
@@ -4288,7 +4411,7 @@ fn test_catch_unwind_http_callout_done_after_poison_is_skipped() {
   let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
     HttpFilter::on_http_callout_done(
       &mut wrapper,
-      &mut envoy_filter,
+      &mut http::EnvoyHttpFilterImpl::new(std::ptr::null_mut()),
       1,
       abi::envoy_dynamic_module_type_http_callout_result::Success,
       None,
@@ -4306,7 +4429,7 @@ fn test_catch_unwind_http_scheduled_after_poison_is_skipped() {
   struct PanicFilter;
   impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
     fn on_request_headers(
-      &mut self,
+      &self,
       _envoy_filter: &mut EHF,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -4314,19 +4437,24 @@ fn test_catch_unwind_http_scheduled_after_poison_is_skipped() {
     }
   }
 
-  let mut envoy_filter = http::EnvoyHttpFilterImpl {
-    raw_ptr: std::ptr::null_mut(),
-  };
   let mut wrapper = CatchUnwind::new(PanicFilter);
 
-  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  let status = HttpFilter::on_request_headers(
+    &mut wrapper,
+    &mut http::EnvoyHttpFilterImpl::new(std::ptr::null_mut()),
+    false,
+  );
   assert_eq!(
     status,
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
   );
 
   let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-    HttpFilter::on_scheduled(&mut wrapper, &mut envoy_filter, 1);
+    HttpFilter::on_scheduled(
+      &mut wrapper,
+      &mut http::EnvoyHttpFilterImpl::new(std::ptr::null_mut()),
+      1,
+    );
   }));
   assert!(
     result.is_ok(),
@@ -4348,17 +4476,17 @@ fn test_catch_unwind_http_reentrant_status_callback_is_not_poisoned() {
     static RESPONSE_HEADERS_RAN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
   }
   struct ReentrantFilter;
-  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantFilter {
-    fn on_scheduled(&mut self, envoy_filter: &mut EHF, _event_id: u64) {
-      let ptr = WRAPPER_PTR.with(|p| p.get()) as *mut CatchUnwind<ReentrantFilter>;
-      // SAFETY: mirrors the FFI entry points re-deriving &mut from the raw filter ptr while an
-      // outer callback (this on_scheduled) is still on the stack.
-      let wrapper = unsafe { &mut *ptr };
+  impl HttpFilter<http::EnvoyHttpFilterImpl> for ReentrantFilter {
+    fn on_scheduled(&self, envoy_filter: &mut http::EnvoyHttpFilterImpl, _event_id: u64) {
+      let ptr = WRAPPER_PTR.with(|p| p.get()) as *const CatchUnwind<ReentrantFilter>;
+      // Re-enter the same wrapper while this on_scheduled is on the stack; with `&self` hooks the
+      // two shared borrows coexist soundly.
+      let wrapper = unsafe { &*ptr };
       HttpFilter::on_response_headers(wrapper, envoy_filter, false);
     }
     fn on_response_headers(
-      &mut self,
-      _envoy_filter: &mut EHF,
+      &self,
+      _envoy_filter: &mut http::EnvoyHttpFilterImpl,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
       RESPONSE_HEADERS_RAN.with(|c| c.set(true));
@@ -4369,14 +4497,15 @@ fn test_catch_unwind_http_reentrant_status_callback_is_not_poisoned() {
   RESET_STREAM_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
   RESPONSE_HEADERS_RAN.with(|c| c.set(false));
 
-  let mut envoy_filter = http::EnvoyHttpFilterImpl {
-    raw_ptr: std::ptr::null_mut(),
-  };
   let mut wrapper = CatchUnwind::new(ReentrantFilter);
   WRAPPER_PTR
     .with(|p| p.set(&mut wrapper as *mut CatchUnwind<ReentrantFilter> as *mut std::ffi::c_void));
 
-  HttpFilter::on_scheduled(&mut wrapper, &mut envoy_filter, 1);
+  HttpFilter::on_scheduled(
+    &mut wrapper,
+    &mut http::EnvoyHttpFilterImpl::new(std::ptr::null_mut()),
+    1,
+  );
 
   // The re-entrant status-returning callback ran instead of being misread as poisoned.
   assert!(RESPONSE_HEADERS_RAN.with(std::cell::Cell::get));
@@ -4387,6 +4516,43 @@ fn test_catch_unwind_http_reentrant_status_callback_is_not_poisoned() {
 // =============================================================================
 // Cluster Extension FFI stubs for testing.
 // =============================================================================
+
+pub(crate) static MOCK_CLUSTER_ADD_HOSTS_CALLS: AtomicUsize = AtomicUsize::new(0);
+pub(crate) static MOCK_CLUSTER_ADD_HOSTS_WITH_HOSTNAMES_CALLS: std::sync::Mutex<
+  Vec<(u32, Vec<Vec<u8>>)>,
+> = std::sync::Mutex::new(Vec::new());
+
+fn copy_module_buffers(
+  buffers: *const abi::envoy_dynamic_module_type_module_buffer,
+  count: usize,
+) -> Vec<Vec<u8>> {
+  if count == 0 {
+    return Vec::new();
+  }
+  unsafe { std::slice::from_raw_parts(buffers, count) }
+    .iter()
+    .map(|buffer| {
+      if buffer.length == 0 {
+        Vec::new()
+      } else {
+        unsafe { std::slice::from_raw_parts(buffer.ptr as *const u8, buffer.length) }.to_vec()
+      }
+    })
+    .collect()
+}
+
+fn write_mock_cluster_host_ptrs(
+  result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+  count: usize,
+) {
+  for index in 0..count {
+    unsafe {
+      result_host_ptrs
+        .add(index)
+        .write((index + 1) as *mut std::ffi::c_void);
+    }
+  }
+}
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts(
@@ -4402,7 +4568,32 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts(
   _count: usize,
   _result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
 ) -> bool {
-  false
+  MOCK_CLUSTER_ADD_HOSTS_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  write_mock_cluster_host_ptrs(_result_host_ptrs, _count);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+  priority: u32,
+  _addresses: *const abi::envoy_dynamic_module_type_module_buffer,
+  hostnames: *const abi::envoy_dynamic_module_type_module_buffer,
+  _weights: *const u32,
+  _regions: *const abi::envoy_dynamic_module_type_module_buffer,
+  _zones: *const abi::envoy_dynamic_module_type_module_buffer,
+  _sub_zones: *const abi::envoy_dynamic_module_type_module_buffer,
+  _metadata_pairs: *const abi::envoy_dynamic_module_type_module_buffer,
+  _metadata_pairs_per_host: usize,
+  count: usize,
+  result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+) -> bool {
+  MOCK_CLUSTER_ADD_HOSTS_WITH_HOSTNAMES_CALLS
+    .lock()
+    .unwrap()
+    .push((priority, copy_module_buffers(hostnames, count)));
+  write_mock_cluster_host_ptrs(result_host_ptrs, count);
+  true
 }
 
 #[no_mangle]
@@ -6547,7 +6738,7 @@ fn test_http_filter_callout_done_with_null_buffers_yields_none() {
   struct TestHttpFilter;
   impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for TestHttpFilter {
     fn on_http_callout_done(
-      &mut self,
+      &self,
       _envoy_filter: &mut EHF,
       _callout_id: u64,
       _result: abi::envoy_dynamic_module_type_http_callout_result,
@@ -6917,6 +7108,11 @@ fn test_matcher_get_all_headers() {
 const STUB_COUNTERS: [(&str, u64, u64); 2] = [("counter_0", 10, 5), ("counter_1", 20, 0)];
 const STUB_GAUGES: [(&str, u64); 1] = [("gauge_0", 42)];
 const STUB_TEXT_READOUTS: [(&str, &str); 1] = [("text_0", "value_0")];
+// name, sample_count, sample_sum, then the (upper_bound, cumulative_count) buckets.
+const STUB_HISTOGRAM_NAME: &str = "histogram_0";
+const STUB_HISTOGRAM_SAMPLE_COUNT: u64 = 7;
+const STUB_HISTOGRAM_SAMPLE_SUM: f64 = 123.5;
+const STUB_HISTOGRAM_BUCKETS: [(f64, u64); 3] = [(1.0, 2), (5.0, 5), (10.0, 7)];
 
 // Tag-extracted names and tags, indexed to match STUB_COUNTERS. counter_0 carries two tags,
 // counter_1 carries none, exercising both the empty and multi-tag paths.
@@ -7235,6 +7431,69 @@ pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_text_read
   true
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+) -> usize {
+  1
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  index: usize,
+  name_buffer: *mut std::ffi::c_char,
+  name_buffer_capacity: usize,
+  name_size: *mut usize,
+  sample_count_out: *mut u64,
+  sample_sum_out: *mut f64,
+) -> bool {
+  if index != 0 {
+    return false;
+  }
+  unsafe {
+    stub_write(
+      STUB_HISTOGRAM_NAME,
+      name_buffer,
+      name_buffer_capacity,
+      name_size,
+    );
+    *sample_count_out = STUB_HISTOGRAM_SAMPLE_COUNT;
+    *sample_sum_out = STUB_HISTOGRAM_SAMPLE_SUM;
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  histogram_index: usize,
+) -> usize {
+  if histogram_index != 0 {
+    return 0;
+  }
+  STUB_HISTOGRAM_BUCKETS.len()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+  _snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+  histogram_index: usize,
+  bucket_index: usize,
+  upper_bound_out: *mut f64,
+  cumulative_count_out: *mut u64,
+) -> bool {
+  if histogram_index != 0 || bucket_index >= STUB_HISTOGRAM_BUCKETS.len() {
+    return false;
+  }
+  let (upper_bound, cumulative_count) = STUB_HISTOGRAM_BUCKETS[bucket_index];
+  unsafe {
+    *upper_bound_out = upper_bound;
+    *cumulative_count_out = cumulative_count;
+  }
+  true
+}
+
 #[test]
 fn test_envoy_dynamic_module_on_stat_sink_config_new_impl() {
   struct TestStatSink;
@@ -7335,6 +7594,29 @@ fn test_metric_snapshot_reads_all_entry_types() {
   assert!(!snapshot.text_readout(1, &mut name, &mut text_value));
   assert_eq!(name.as_slice(), b"text_0");
   assert_eq!(text_value.as_slice(), b"value_0");
+
+  assert_eq!(snapshot.histogram_count(), 1);
+  let histogram = snapshot.histogram(0, &mut name).unwrap();
+  assert_eq!(name.as_slice(), b"histogram_0");
+  assert_eq!(histogram.sample_count, 7);
+  assert_eq!(histogram.sample_sum, 123.5);
+  // An out-of-range read returns None and leaves the buffer untouched.
+  assert!(snapshot.histogram(1, &mut name).is_none());
+  assert_eq!(name.as_slice(), b"histogram_0");
+
+  // The buckets are cumulative and carry Envoy's resolved upper bounds.
+  assert_eq!(snapshot.histogram_bucket_count(0), 3);
+  assert_eq!(snapshot.histogram_bucket_count(1), 0);
+  assert_eq!(
+    snapshot.histogram_bucket(0, 1),
+    Some(stats_sink::HistogramBucket {
+      upper_bound: 5.0,
+      cumulative_count: 5,
+    })
+  );
+  // Out-of-range histogram or bucket index returns None.
+  assert!(snapshot.histogram_bucket(0, 3).is_none());
+  assert!(snapshot.histogram_bucket(1, 0).is_none());
 }
 
 #[test]
@@ -7693,6 +7975,28 @@ fn test_metric_snapshot_to_owned_copies_all_entries() {
     vec![stats_sink::OwnedTextReadout {
       name: "text_0".to_string(),
       value: "value_0".to_string(),
+    }]
+  );
+  assert_eq!(
+    owned.histograms,
+    vec![stats_sink::OwnedHistogram {
+      name: "histogram_0".to_string(),
+      sample_count: 7,
+      sample_sum: 123.5,
+      buckets: vec![
+        stats_sink::HistogramBucket {
+          upper_bound: 1.0,
+          cumulative_count: 2,
+        },
+        stats_sink::HistogramBucket {
+          upper_bound: 5.0,
+          cumulative_count: 5,
+        },
+        stats_sink::HistogramBucket {
+          upper_bound: 10.0,
+          cumulative_count: 7,
+        },
+      ],
     }]
   );
 

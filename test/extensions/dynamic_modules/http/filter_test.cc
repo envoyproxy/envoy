@@ -1,5 +1,6 @@
 #include <cstring>
 
+#include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/http/message_impl.h"
@@ -14,6 +15,8 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -117,6 +120,81 @@ TEST_P(DynamicModuleHttpLanguageTests, ConfigInitializationFailure) {
       *stats_store.createScope(""), context);
   EXPECT_THAT(filter_config_or_status,
               HasStatusMessage(testing::HasSubstr("Failed to initialize dynamic module")));
+}
+
+// Creating an SDS subscription reaches for the dispatcher's time source, so the simulated time
+// system has to be established before the mocks that expect one (``MockStreamInfo``, reached via
+// the filter callbacks below).
+class DynamicModuleHttpFilterSecretsTest : public Event::TestUsingSimulatedTime,
+                                           public testing::Test {};
+
+// This drives the Rust module only; the integration test covers the Go and C++ SDK bindings against
+// a real server, so this is not parameterized over the languages like the tests around it.
+TEST_F(DynamicModuleHttpFilterSecretsTest, GenericSecretCallbacks) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  ASSERT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  // The module subscribes to this one by name with no config source.
+  envoy::extensions::transport_sockets::tls::v3::Secret static_secret;
+  TestUtility::loadFromYaml(R"EOF(
+name: "static_secret"
+generic_secret:
+  secret:
+    inline_string: "static_value"
+)EOF",
+                            static_secret);
+  ASSERT_TRUE(context.secret_manager_->addStaticSecret(static_secret).ok());
+
+  Stats::IsolatedStoreImpl stats_store;
+  auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+      "generic_secret_callbacks", "", DefaultMetricsNamespace, false,
+      std::move(dynamic_module.value()), *stats_store.createScope(""), context);
+  ASSERT_TRUE(filter_config_or_status.ok());
+
+  // The module also subscribed to a secret over SDS, whose value only arrives once the SDS server
+  // delivers it.
+  envoy::extensions::transport_sockets::tls::v3::Secret dynamic_secret;
+  TestUtility::loadFromYaml(R"EOF(
+name: "dynamic_secret"
+generic_secret:
+  secret:
+    inline_string: "dynamic_value"
+)EOF",
+                            dynamic_secret);
+  const auto decoded_resources = TestUtility::decodeResources({dynamic_secret});
+  ASSERT_TRUE(context.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, "")
+                  .ok());
+
+  // Check the values as Envoy sees them first, so that a mismatch below points at the SDK binding
+  // rather than at the subscriptions themselves. The module subscribed the static secret first, so
+  // it holds ID 1.
+  envoy_dynamic_module_type_envoy_buffer buffer{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+      filter_config_or_status.value().get(), 1, &buffer));
+  EXPECT_EQ(std::string(buffer.ptr, buffer.length), "static_value");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+      filter_config_or_status.value().get(), 2, &buffer));
+  EXPECT_EQ(std::string(buffer.ptr, buffer.length), "dynamic_value");
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_store.symbolTable(), 0);
+  filter->initializeInModuleFilter();
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  // The module copies both secret values onto the request headers. The header ABI reads the map
+  // back through the decoder callbacks, so those have to hand out the map under test.
+  Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_CALL(decoder_callbacks, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<Http::RequestHeaderMap>(request_headers)));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+  EXPECT_EQ(request_headers.get_("x-static-secret"), "static_value");
+  EXPECT_EQ(request_headers.get_("x-dynamic-secret"), "dynamic_value");
 }
 
 TEST_P(DynamicModuleHttpLanguageTests, StatsCallbacks) {
@@ -375,9 +453,8 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   key = ns_res_header->second.fields().find("key");
   ASSERT_NE(key, ns_res_header->second.fields().end());
   EXPECT_EQ(key->second.number_value(), 123);
-  // Multiple string entries set in one namespace via the batch setter. The batch SDK wrapper is
-  // Rust-only, so scope these assertions to the rust parameterization like the other language
-  // guards in the dynamic_modules integration tests.
+  // The batch and raw-bytes SDK wrappers are Rust-only, so scope these assertions to the rust
+  // parameterization like the other language guards in the dynamic_modules integration tests.
   if (GetParam() == "rust") {
     auto ns_req_header_batch = metadata.filter_metadata().find("ns_req_header_batch");
     ASSERT_NE(ns_req_header_batch, metadata.filter_metadata().end());
@@ -397,6 +474,17 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
     ASSERT_NE(bytes_key, ns_req_header_bytes->second.fields().end());
     EXPECT_EQ(bytes_key->second.string_value(), std::string("\xff\x00\xfe", 3));
   }
+  // A whole namespace set from a serialized google.protobuf.Struct via the struct setter.
+  auto ns_req_header_struct = metadata.filter_metadata().find("ns_req_header_struct");
+  ASSERT_NE(ns_req_header_struct, metadata.filter_metadata().end());
+  auto struct_k = ns_req_header_struct->second.fields().find("k");
+  ASSERT_NE(struct_k, ns_req_header_struct->second.fields().end());
+  EXPECT_EQ(struct_k->second.string_value(), "v");
+  // A whole typed namespace set from a serialized google.protobuf.Any via the typed setter.
+  auto ns_req_header_typed = metadata.typed_filter_metadata().find("ns_req_header_typed");
+  ASSERT_NE(ns_req_header_typed, metadata.typed_filter_metadata().end());
+  EXPECT_EQ(ns_req_header_typed->second.type_url(), "t/x");
+  EXPECT_EQ(ns_req_header_typed->second.value(), std::string("\x01\x02", 2));
   auto ns_req_body = metadata.filter_metadata().find("ns_req_body");
   ASSERT_NE(ns_req_body, metadata.filter_metadata().end());
   key = ns_req_body->second.fields().find("key");
@@ -633,6 +721,76 @@ TEST_P(DynamicModuleHttpLanguageTests, RecreateStream) {
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
 
   filter->onDestroy();
+}
+
+// The "destroy_logging" filter of the Rust test module logs when it is dropped, which makes the
+// point at which Envoy destroys the in-module filter observable.
+class DynamicModuleHttpFilterDestroyTest : public testing::Test {
+public:
+  DynamicModuleHttpFilterConfigSharedPtr newFilterConfig() {
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+    EXPECT_OK(dynamic_module);
+    auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+        "destroy_logging", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+        *stats_store_.createScope(""), context_);
+    EXPECT_OK(filter_config_or_status);
+    return filter_config_or_status.value();
+  }
+
+  DynamicModuleHttpFilterSharedPtr newFilter() {
+    return std::make_shared<DynamicModuleHttpFilter>(newFilterConfig(), stats_store_.symbolTable(),
+                                                     0);
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Stats::IsolatedStoreImpl stats_store_;
+};
+
+TEST_F(DynamicModuleHttpFilterDestroyTest, DeferredToDispatcher) {
+  auto filter = newFilter();
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  filter->setDecoderFilterCallbacks(callbacks);
+  filter->initializeInModuleFilter();
+
+  // A module event hook can tear its own filter chain down, so onDestroy() must hand the in-module
+  // filter to the dispatcher instead of destroying it underneath that hook.
+  EXPECT_LOG_NOT_CONTAINS("info", "destroy_logging filter dropped", { filter->onDestroy(); });
+  EXPECT_EQ(1, callbacks.dispatcher_.to_delete_.size());
+
+  // The filter chain calls onDestroy() once, but a second call must not queue a second destroy.
+  filter->onDestroy();
+  EXPECT_EQ(1, callbacks.dispatcher_.to_delete_.size());
+
+  // The pending destroy owns this filter too, so releasing the filter chain's reference leaves the
+  // module free to call back in until the dispatcher runs the deletion.
+  DynamicModuleHttpFilterWeakPtr weak_filter = filter;
+  filter.reset();
+  EXPECT_FALSE(weak_filter.expired());
+
+  EXPECT_LOG_CONTAINS_N_TIMES("info", "destroy_logging filter dropped", 1,
+                              { callbacks.dispatcher_.to_delete_.clear(); });
+  EXPECT_TRUE(weak_filter.expired());
+}
+
+TEST_F(DynamicModuleHttpFilterDestroyTest, InlineWithoutDispatcher) {
+  auto filter = newFilter();
+  filter->initializeInModuleFilter();
+
+  // A filter that never reached a chain has no dispatcher to defer to, so the in-module filter is
+  // destroyed inline from the destructor.
+  EXPECT_LOG_CONTAINS_N_TIMES("info", "destroy_logging filter dropped", 1, { filter.reset(); });
+}
+
+TEST_F(DynamicModuleHttpFilterDestroyTest, InlineWhenNotSharedOwned) {
+  DynamicModuleHttpFilter filter{newFilterConfig(), stats_store_.symbolTable(), 0};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  filter.setDecoderFilterCallbacks(callbacks);
+  filter.initializeInModuleFilter();
+
+  // Deferring hands the dispatcher a reference to this filter, so a filter that is not owned by a
+  // shared_ptr has to destroy the in-module filter inline even though a dispatcher is available.
+  EXPECT_LOG_CONTAINS_N_TIMES("info", "destroy_logging filter dropped", 1, { filter.onDestroy(); });
+  EXPECT_TRUE(callbacks.dispatcher_.to_delete_.empty());
 }
 
 TEST_P(DynamicModuleHttpLanguageTests, SocketOptionCallbacks) {
@@ -2291,6 +2449,19 @@ TEST(DynamicModuleHttpCalloutTest, CancelPendingRequest) {
                                                           stats_scope->symbolTable(), 0);
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
+
+  // The module can start a callout from on_http_filter_new_, which runs before the in-module filter
+  // is assigned, so the teardown guard below must not refuse it.
+  NiceMock<Http::MockAsyncClientRequest> new_filter_req(&cluster->async_client_);
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _)).WillOnce(testing::Return(&new_filter_req));
+  uint64_t new_filter_id = 0;
+  auto new_filter_headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto new_filter_msg = std::make_unique<Http::RequestMessageImpl>(std::move(new_filter_headers));
+  EXPECT_EQ(filter->sendHttpCallout(&new_filter_id, "cluster", std::move(new_filter_msg), 1000),
+            envoy_dynamic_module_type_http_callout_init_result_Success);
+
   filter->initializeInModuleFilter();
 
   Http::AsyncClient::Callbacks* captured = nullptr;
@@ -2316,6 +2487,17 @@ TEST(DynamicModuleHttpCalloutTest, CancelPendingRequest) {
   // request.
   EXPECT_CALL(req, cancel());
   filter->onDestroy();
+
+  // A callout started after the teardown is refused before it reaches the cluster, so it cannot
+  // outlive the cancellation above.
+  testing::Mock::VerifyAndClearExpectations(&cluster->async_client_);
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _)).Times(0);
+  auto late_headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto late_msg = std::make_unique<Http::RequestMessageImpl>(std::move(late_headers));
+  EXPECT_EQ(filter->sendHttpCallout(&id, "cluster", std::move(late_msg), 1000),
+            envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
 }
 
 TEST(DynamicModuleHttpStreamTest, HttpFilterHttpStreamCalloutOnComplete) {
@@ -2684,6 +2866,17 @@ TEST(DynamicModulesTest, HttpFilterResetHttpStream) {
 
   // Clean up properly.
   filter->onDestroy();
+
+  // A stream started after the teardown is refused before it reaches the cluster, so it cannot
+  // outlive the reset above.
+  testing::Mock::VerifyAndClearExpectations(&cluster->async_client_);
+  EXPECT_CALL(cluster->async_client_, start(_, _)).Times(0);
+  auto late_headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto late_message = std::make_unique<Http::RequestMessageImpl>(std::move(late_headers));
+  EXPECT_EQ(filter->startHttpStream(&stream_id, "cluster", std::move(late_message), false, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
 }
 
 TEST(DynamicModulesTest, HttpFilterStartHttpStreamNoBodyEndStream) {

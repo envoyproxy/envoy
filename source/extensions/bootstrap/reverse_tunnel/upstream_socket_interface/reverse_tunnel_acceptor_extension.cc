@@ -200,6 +200,10 @@ void ReverseTunnelAcceptorExtension::populateLifecycleStreamInfo(
     maybeSetStringFilterState(*filter_state, kFilterStateClusterId, lifecycle.cluster_id);
     maybeSetStringFilterState(*filter_state, kFilterStateTenantId, lifecycle.tenant_id);
     maybeSetStringFilterState(*filter_state, kFilterStateWorker, lifecycle.worker);
+    maybeSetStringFilterState(*filter_state, kFilterStateInitiatorWorkerId,
+                              lifecycle.initiator_worker_id);
+    maybeSetStringFilterState(*filter_state, kFilterStateInitiatorConnectionId,
+                              lifecycle.initiator_connection_id);
     if (lifecycle.fd >= 0) {
       maybeSetUint64FilterState(*filter_state, kFilterStateFd, lifecycle.fd);
     }
@@ -211,6 +215,8 @@ void ReverseTunnelAcceptorExtension::populateLifecycleStreamInfo(
   setStringMetadataField(metadata, "cluster_id", lifecycle.cluster_id);
   setStringMetadataField(metadata, "tenant_id", lifecycle.tenant_id);
   setStringMetadataField(metadata, "worker", lifecycle.worker);
+  setStringMetadataField(metadata, "initiator_worker_id", lifecycle.initiator_worker_id);
+  setStringMetadataField(metadata, "initiator_connection_id", lifecycle.initiator_connection_id);
   setStringMetadataField(metadata, "socket_state", socketStateForEvent(event, lifecycle));
   if (!handoff_kind.empty()) {
     setStringMetadataField(metadata, "handoff_kind", handoff_kind);

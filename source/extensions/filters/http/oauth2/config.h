@@ -23,10 +23,10 @@ public:
                                     const std::string&,
                                     Server::Configuration::FactoryContext&) override;
 
-  absl::StatusOr<Http::FilterFactoryCb>
-  createHttpFilterFactoryFromProtoTyped(const envoy::extensions::filters::http::oauth2::v3::OAuth2&,
-                                        const std::string&,
-                                        Server::Configuration::ServerFactoryContext&) override;
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::oauth2::v3::OAuth2&,
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactory(const envoy::extensions::filters::http::oauth2::v3::OAuth2& config,
@@ -34,10 +34,10 @@ public:
                       Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
                       OptRef<Init::Manager> init_manager);
 
-  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-  createRouteSpecificFilterConfigTyped(
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr> createHttpFilterRouteConfigTyped(
       const envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute&,
-      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 } // namespace Oauth2

@@ -53,12 +53,14 @@
 #include "test/mocks/upstream/typed_load_balancer_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatus;
 using testing::_;
 using testing::AnyNumber;
 using testing::ContainerEq;
@@ -67,6 +69,10 @@ using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Upstream {
@@ -1420,10 +1426,10 @@ TEST_P(StrictDnsClusterImplParamTest, CustomResolverFails) {
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
     auto cluster_or_error = createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
-    EXPECT_FALSE(cluster_or_error.ok());
-    EXPECT_EQ(cluster_or_error.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_EQ(cluster_or_error.status().message(),
-              "STRICT_DNS clusters must NOT have a custom resolver name set");
+    EXPECT_THAT(
+        cluster_or_error,
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  testing::Eq("STRICT_DNS clusters must NOT have a custom resolver name set")));
   } else {
     EXPECT_THROW_WITH_MESSAGE(
         auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
@@ -4671,9 +4677,7 @@ TEST(PrioritySet, BatchUpdateMemberCallbackFiresOnce) {
 
   auto member_update_cb = priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) {
     member_cb_count++;
-    EXPECT_EQ(2, dirty_priorities.size());
-    EXPECT_TRUE(dirty_priorities.contains(0));
-    EXPECT_TRUE(dirty_priorities.contains(1));
+    EXPECT_THAT(dirty_priorities, UnorderedElementsAre(0, 1));
     dirty_priorities.clear();
   });
 
@@ -4814,7 +4818,7 @@ public:
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
   parse(const Protobuf::Struct& d) const override {
-    if (d.fields().find("name") != d.fields().end()) {
+    if (d.fields().contains("name")) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
     throw EnvoyException("Cannot create a Baz when metadata is empty.");
@@ -5906,7 +5910,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
       []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::Struct>(); },
       [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
         const auto& msg_struct = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(msg);
-        EXPECT_TRUE(msg_struct.fields().find("option") != msg_struct.fields().end());
+        EXPECT_THAT(msg_struct.fields(), Contains(Key("option")));
 
         return protocol_options;
       });

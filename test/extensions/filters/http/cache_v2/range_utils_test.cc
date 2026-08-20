@@ -328,6 +328,19 @@ TEST(GetRangeDetailsTest, NotSatisfiableRange) {
   ASSERT_TRUE(result->ranges_.empty());
 }
 
+TEST(AdjustByteRange, ContentLengthZeroIsUnsatisfiable) {
+  RangeDetails result = RangeUtils::createAdjustedRangeDetails({{0, 5}}, 0);
+  ASSERT_FALSE(result.satisfiable_);
+  EXPECT_TRUE(result.ranges_.empty());
+}
+
+TEST(CreateRangeDetailsTest, MultipleRangeHeadersReturnsNullopt) {
+  Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {"range", "bytes=0-5"}, {"range", "bytes=6-10"}};
+  std::optional<RangeDetails> result = RangeUtils::createRangeDetails(headers, 100);
+  ASSERT_FALSE(result.has_value());
+}
+
 // operator<<(ostream&, const AdjustedByteRange&) is only used in tests, but lives in //source,
 // and so needs test coverage. This test provides that coverage, to keep the coverage test happy.
 TEST(AdjustedByteRange, StreamingTest) {

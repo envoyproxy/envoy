@@ -140,5 +140,25 @@ TEST_P(DynamicModulesStatsSinkIntegrationTest, OffThreadAggregationPublishesGaug
   test_server_->waitForGauge("integration_aggregated_counters", testing::Ge(1));
 }
 
+// The Rust module reads each histogram's cumulative buckets through the snapshot API and logs a
+// marker only when the last bucket count equals the sample count, proving the buckets decode in the
+// cumulative form Envoy produces. Only the Rust module exercises the bucket getters.
+TEST_P(DynamicModulesStatsSinkIntegrationTest, HistogramBucketsDecodeCumulatively) {
+  if (language() != "rust") {
+    GTEST_SKIP() << "histogram bucket decoding is only exercised by the Rust test module";
+  }
+  auto body = [this]() {
+    addStatSinkAndInitialize();
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+    auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+    EXPECT_TRUE(response->complete());
+    timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(500));
+  };
+  EXPECT_LOG_CONTAINS("info", "stat sink integration test: histogram buckets cumulative for",
+                      body());
+}
+
 } // namespace
 } // namespace Envoy

@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 
 #include "source/common/common/assert.h"
 #include "source/common/http/headers.h"
@@ -73,7 +74,7 @@ bool isMethodValid(absl::string_view method, bool allow_custom_methods) {
       "SUBSCRIBE", "TRACE",   "UNBIND",   "UNLINK",  "UNLOCK",     "UNSUBSCRIBE"};
 
   const auto* begin = &kValidMethods[0];
-  const auto* end = &kValidMethods[ABSL_ARRAYSIZE(kValidMethods) - 1] + 1;
+  const auto* end = &kValidMethods[std::size(kValidMethods) - 1] + 1;
   return std::binary_search(begin, end, method);
 }
 

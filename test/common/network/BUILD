@@ -44,6 +44,7 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
     ],
@@ -89,6 +90,7 @@ envoy_cc_test(
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:cidr_range_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -116,6 +118,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
@@ -224,6 +227,7 @@ envoy_cc_test(
         "//source/common/network:listener_filter_buffer_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:io_handle_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -418,6 +422,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -429,6 +434,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/network:ip_address_parsing_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -634,5 +640,6 @@ envoy_cc_fuzz_test(
         "//test/fuzz:utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:io_handle_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
