@@ -34,6 +34,12 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
+
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -507,7 +513,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, GetPerWorkerStatMapSingleThread) {
 
   // Verify that only worker_0 stats are included.
   for (const auto& [stat_name, value] : stat_map) {
-    EXPECT_TRUE(stat_name.find("worker_0") != std::string::npos);
+    EXPECT_THAT(stat_name, HasSubstr("worker_0"));
   }
 }
 
@@ -929,8 +935,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogVerifiesMetadataNamespa
   EXPECT_CALL(*mock_log, log(_, _))
       .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& filter_metadata = stream_info.dynamicMetadata().filter_metadata();
-        EXPECT_EQ(filter_metadata.size(), 1);
-        EXPECT_TRUE(filter_metadata.contains("envoy.reverse_tunnel.initiator"));
+        EXPECT_THAT(filter_metadata, UnorderedElementsAre(Key("envoy.reverse_tunnel.initiator")));
       }));
 
   extension_->emitAccessLog(time_system, "handshake_success", "n", "c", "t", "u", "h", "k", "w",
@@ -947,7 +952,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogErrorFieldAlwaysPresent
       .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata =
             stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
-        EXPECT_TRUE(metadata.fields().contains("error"));
+        EXPECT_THAT(metadata.fields(), Contains(Key("error")));
         EXPECT_EQ(metadata.fields().at("error").string_value(), "");
       }));
 

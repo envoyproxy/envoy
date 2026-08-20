@@ -10,6 +10,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
+using testing::Key;
+
 namespace Envoy {
 namespace Extensions {
 namespace ThriftFilters {
@@ -23,7 +26,7 @@ MATCHER_P(MapEq, rhs, "") {
   const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
-    EXPECT_NE(obj.fields().find(entry.first), obj.fields().end());
+    EXPECT_THAT(obj.fields(), Contains(Key(entry.first)));
     EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
   }
   return true;
@@ -33,7 +36,7 @@ MATCHER_P(MapEqNum, rhs, "") {
   const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
-    EXPECT_NE(obj.fields().find(entry.first), obj.fields().end());
+    EXPECT_THAT(obj.fields(), Contains(Key(entry.first)));
     EXPECT_EQ(obj.fields().at(entry.first).number_value(), entry.second);
   }
   return true;
