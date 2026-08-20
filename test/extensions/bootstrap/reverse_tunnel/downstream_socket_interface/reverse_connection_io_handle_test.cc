@@ -3487,6 +3487,38 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedUnknownKeyIsNo
   EXPECT_TRUE(getHostToConnInfoMap().empty());
 }
 
+// Listener stop must destroy the retry timer and block replacement dials.
+TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsStopsReplacementDialOnListenerStop) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  // Set expectations before resetFileEvents() destroys the timer.
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _)).Times(0);
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, "remote-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+
+  // Simulate worker-thread listener teardown.
+  io_handle_->resetFileEvents();
+
+  // Drop tracking without dialing a replacement.
+  io_handle_->markTunnelDrainingAndDialReplacement(connection_key);
+
+  EXPECT_EQ(getHostConnectionInfo(host).connection_keys.count(connection_key), 0);
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions
