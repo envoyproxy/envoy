@@ -1,4 +1,4 @@
-load("@com_google_protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
+load("@protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
 load(":utils.bzl", "normalize_workspace_name")
 
 def _file_descriptor_set_text(ctx):
