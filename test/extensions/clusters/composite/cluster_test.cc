@@ -39,6 +39,12 @@ public:
   CompositeClusterTest() = default;
 
   void initialize(const std::string& yaml_config) {
+    THROW_IF_NOT_OK_REF(initializeWithStatus(yaml_config));
+  }
+
+  // As above, but surfaces the construction status instead of throwing, for configs expected to
+  // be rejected at load time.
+  absl::Status initializeWithStatus(const std::string& yaml_config) {
     cluster_config_ = Upstream::parseClusterFromV3Yaml(yaml_config);
     THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
         cluster_config_.cluster_type().typed_config(),
@@ -50,7 +56,7 @@ public:
     absl::Status creation_status = absl::OkStatus();
     cluster_ = std::shared_ptr<Cluster>(
         new Cluster(cluster_config_, config_, factory_context, creation_status));
-    THROW_IF_NOT_OK_REF(creation_status);
+    return creation_status;
   }
 
   envoy::config::cluster::v3::Cluster cluster_config_;
@@ -75,9 +81,9 @@ cluster_type:
 )EOF";
 
   initialize(yaml);
-  EXPECT_EQ(2, cluster_->clusters_->size());
-  EXPECT_EQ("primary", (*cluster_->clusters_)[0]);
-  EXPECT_EQ("secondary", (*cluster_->clusters_)[1]);
+  EXPECT_EQ(2, cluster_->clusters().size());
+  EXPECT_EQ("primary", cluster_->clusters()[0]);
+  EXPECT_EQ("secondary", cluster_->clusters()[1]);
   EXPECT_EQ(Upstream::Cluster::InitializePhase::Secondary, cluster_->initializePhase());
 }
 
@@ -98,8 +104,7 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
-                                  cluster_->clusters_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
 
   // Test with null context.
   EXPECT_EQ(0, lb.getAttemptCount(nullptr));
@@ -123,8 +128,8 @@ cluster_type:
   EXPECT_EQ(0, lb.getAttemptCount(&context_null));
 }
 
-// Test cluster index mapping.
-TEST_F(CompositeClusterTest, ClusterIndexMapping) {
+// Test mapping of attempt count to cluster name using the configured order.
+TEST_F(CompositeClusterTest, ClusterNameForAttemptStaticOrder) {
   const std::string yaml = R"EOF(
 name: composite_cluster
 connect_timeout: 0.25s
@@ -140,23 +145,71 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
-                                  cluster_->clusters_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
 
   // Test invalid attempt 0.
-  EXPECT_FALSE(lb.mapAttemptToClusterIndex(0).has_value());
+  EXPECT_EQ("", lb.clusterForAttempt(nullptr, 0).name_);
 
   // Test normal mapping (1-based attempts).
-  EXPECT_EQ(0, lb.mapAttemptToClusterIndex(1).value()); // First attempt -> first cluster.
-  EXPECT_EQ(1, lb.mapAttemptToClusterIndex(2).value()); // Second attempt -> second cluster.
+  EXPECT_EQ("primary", lb.clusterForAttempt(nullptr, 1).name_);
+  EXPECT_EQ("secondary", lb.clusterForAttempt(nullptr, 2).name_);
 
   // Test overflow - should fail when attempts exceed available clusters.
-  EXPECT_FALSE(lb.mapAttemptToClusterIndex(3).has_value());
-  EXPECT_FALSE(lb.mapAttemptToClusterIndex(10).has_value());
+  EXPECT_EQ("", lb.clusterForAttempt(nullptr, 3).name_);
+  EXPECT_EQ("", lb.clusterForAttempt(nullptr, 10).name_);
 }
 
-// Test getClusterByIndex with bounds checking.
-TEST_F(CompositeClusterTest, GetClusterByIndexBoundsCheck) {
+// Selecting itself would recurse until the worker stack overflows.
+TEST_F(CompositeClusterTest, SelfReferenceRejected) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: primary
+    - name: composite_cluster
+)EOF";
+
+  const absl::Status status = initializeWithStatus(yaml);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(absl::StatusCode::kInvalidArgument, status.code());
+  EXPECT_THAT(std::string(status.message()), testing::HasSubstr("cannot list itself"));
+}
+
+// Each position reports its own index, not the index of the first occurrence of the name.
+TEST_F(CompositeClusterTest, DuplicateConfiguredNamesReportTheirOwnIndex) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: primary
+    - name: secondary
+    - name: primary
+)EOF";
+
+  initialize(yaml);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
+
+  EXPECT_EQ("primary", lb.clusterForAttempt(nullptr, 1).name_);
+  EXPECT_EQ(0, lb.clusterForAttempt(nullptr, 1).configured_index_);
+  EXPECT_EQ("secondary", lb.clusterForAttempt(nullptr, 2).name_);
+  EXPECT_EQ(1, lb.clusterForAttempt(nullptr, 2).configured_index_);
+  // Attempt 3 is the second "primary" entry, at index 2 - not index 0.
+  EXPECT_EQ("primary", lb.clusterForAttempt(nullptr, 3).name_);
+  EXPECT_EQ(2, lb.clusterForAttempt(nullptr, 3).configured_index_);
+}
+
+// Test that resolveCluster returns nothing when the named cluster is unknown to the manager.
+TEST_F(CompositeClusterTest, ResolveClusterUnknownToClusterManager) {
   const std::string yaml = R"EOF(
 name: composite_cluster
 connect_timeout: 0.25s
@@ -172,16 +225,19 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
-                                  cluster_->clusters_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
 
-  // Test out of bounds index.
-  EXPECT_EQ(nullptr, lb.getClusterByIndex(2));
-  EXPECT_EQ(nullptr, lb.getClusterByIndex(10));
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
 
-  // Test that cluster manager returns nullptr for unknown cluster.
-  EXPECT_EQ(nullptr, lb.getClusterByIndex(0)); // primary doesn't exist in cluster manager.
-  EXPECT_EQ(nullptr, lb.getClusterByIndex(1)); // secondary doesn't exist in cluster manager.
+  // Neither configured cluster exists in the cluster manager.
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
+  EXPECT_FALSE(static_cast<bool>(lb.resolveCluster(&context)));
+
+  // Attempts past the end of the configured order resolve to nothing as well.
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(3)));
+  EXPECT_FALSE(static_cast<bool>(lb.resolveCluster(&context)));
 }
 
 // Test load balancer methods when no clusters are available.
@@ -200,8 +256,7 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
-                                  cluster_->clusters_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -237,8 +292,7 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
-                                  cluster_->clusters_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
 
   // Test cluster removal for cluster in our list and unknown cluster.
   lb.onClusterRemoval("primary");
@@ -358,9 +412,9 @@ cluster_type:
 
   // This should still construct successfully even if clusters don't exist yet.
   initialize(yaml);
-  EXPECT_EQ(2, cluster_->clusters_->size());
-  EXPECT_EQ("missing_cluster", (*cluster_->clusters_)[0]);
-  EXPECT_EQ("another_missing_cluster", (*cluster_->clusters_)[1]);
+  EXPECT_EQ(2, cluster_->clusters().size());
+  EXPECT_EQ("missing_cluster", cluster_->clusters()[0]);
+  EXPECT_EQ("another_missing_cluster", cluster_->clusters()[1]);
 }
 
 // Test cluster update callbacks when clusters are added/updated.
@@ -380,8 +434,7 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
-                                  cluster_->clusters_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
 
   // Test onClusterAddOrUpdate for clusters in our list.
   NiceMock<Upstream::MockThreadLocalCluster> mock_cluster;
@@ -416,7 +469,7 @@ cluster_type:
 )EOF");
 
   CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
-                                  cluster_->clusters_);
+                                  cluster_->config_);
 
   // Set up mocks for successful delegation.
   NiceMock<Upstream::MockLoadBalancerContext> context;
@@ -453,7 +506,7 @@ cluster_type:
 )EOF");
 
   CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
-                                  cluster_->clusters_);
+                                  cluster_->config_);
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -488,8 +541,7 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
-                                  cluster_->clusters_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -515,8 +567,7 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
-                                  cluster_->clusters_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -542,7 +593,7 @@ cluster_type:
 )EOF");
 
   CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
-                                  cluster_->clusters_);
+                                  cluster_->config_);
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -648,8 +699,7 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
-                                  cluster_->clusters_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
 
   // Mock context for attempt 1 (should map to cluster index 0).
   NiceMock<Upstream::MockLoadBalancerContext> mock_context;
@@ -683,8 +733,7 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
-                                  cluster_->clusters_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -696,6 +745,386 @@ cluster_type:
 
   auto result = lb.chooseHost(&context);
   EXPECT_EQ(nullptr, result.host);
+}
+
+// Fixture for the per-request order override supplied via request dynamic metadata.
+class CompositeClusterOrderMetadataTest : public CompositeClusterTest {
+public:
+  // Three configured clusters, with the order override key pointing at
+  // envoy.clusters.composite:order.
+  static constexpr absl::string_view ThreeClustersWithOrderKey = R"EOF(
+name: composite_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: cluster_0
+    - name: cluster_1
+    - name: cluster_2
+    order_metadata_key:
+      key: envoy.clusters.composite
+      path:
+      - key: order
+)EOF";
+
+  // The same three clusters with no order override configured.
+  static constexpr absl::string_view ThreeClustersNoOrderKey = R"EOF(
+name: composite_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: cluster_0
+    - name: cluster_1
+    - name: cluster_2
+)EOF";
+
+  void SetUp() override {
+    ON_CALL(context_, requestStreamInfo()).WillByDefault(Return(&stream_info_));
+  }
+
+  // MockStreamInfo returns its `metadata_` member by reference from dynamicMetadata(), so tests
+  // populate that member directly rather than adding an expectation.
+  void setOrder(const std::vector<std::string>& order) {
+    Protobuf::Value value;
+    // Unconditional, so an empty `order` stores an empty ListValue rather than KIND_NOT_SET.
+    auto* values = value.mutable_list_value();
+    for (const auto& name : order) {
+      values->add_values()->set_string_value(name);
+    }
+    setValue(value);
+  }
+
+  void setValue(const Protobuf::Value& value) {
+    (*(*stream_info_.metadata_.mutable_filter_metadata())["envoy.clusters.composite"]
+          .mutable_fields())["order"] = value;
+  }
+
+  // Name selected for `attempt`, which is 1-based.
+  absl::string_view nameForAttempt(CompositeClusterLoadBalancer& lb, uint32_t attempt) {
+    return lb.clusterForAttempt(&context_, attempt).name_;
+  }
+
+  NiceMock<Upstream::MockLoadBalancerContext> context_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+};
+
+// The order override key is absent unless configured, and is parsed when it is.
+TEST_F(CompositeClusterOrderMetadataTest, OrderMetadataKeyParsing) {
+  initialize(std::string(ThreeClustersNoOrderKey));
+  EXPECT_FALSE(cluster_->config_->order_metadata_key_.has_value());
+
+  initialize(std::string(ThreeClustersWithOrderKey));
+  ASSERT_TRUE(cluster_->config_->order_metadata_key_.has_value());
+  EXPECT_EQ("envoy.clusters.composite", cluster_->config_->order_metadata_key_->key_);
+  EXPECT_THAT(cluster_->config_->order_metadata_key_->path_, testing::ElementsAre("order"));
+}
+
+// The allowlist is built from the configured clusters, and duplicates map to the first index.
+TEST_F(CompositeClusterOrderMetadataTest, AllowlistBuiltFromConfiguredClusters) {
+  initialize(std::string(ThreeClustersWithOrderKey));
+  EXPECT_EQ(3, cluster_->config_->index_by_name_.size());
+  EXPECT_EQ(0, cluster_->config_->index_by_name_.at("cluster_0"));
+  EXPECT_EQ(2, cluster_->config_->index_by_name_.at("cluster_2"));
+  EXPECT_FALSE(cluster_->config_->index_by_name_.contains("not_configured"));
+
+  initialize(R"EOF(
+name: composite_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: repeated_cluster
+    - name: other_cluster
+    - name: repeated_cluster
+)EOF");
+  EXPECT_EQ(3, cluster_->clusters().size());
+  EXPECT_EQ(2, cluster_->config_->index_by_name_.size());
+  EXPECT_EQ(0, cluster_->config_->index_by_name_.at("repeated_cluster"));
+}
+
+// A full reorder replaces the configured order for every attempt.
+TEST_F(CompositeClusterOrderMetadataTest, FullReorder) {
+  initialize(std::string(ThreeClustersWithOrderKey));
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
+
+  setOrder({"cluster_2", "cluster_0", "cluster_1"});
+  EXPECT_EQ("cluster_2", nameForAttempt(lb, 1));
+  EXPECT_EQ("cluster_0", nameForAttempt(lb, 2));
+  EXPECT_EQ("cluster_1", nameForAttempt(lb, 3));
+  EXPECT_EQ("", nameForAttempt(lb, 4));
+}
+
+// Attempts past the end of a subset fail rather than falling back to the configured tail.
+TEST_F(CompositeClusterOrderMetadataTest, OrderedSubsetOverflows) {
+  initialize(std::string(ThreeClustersWithOrderKey));
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
+
+  setOrder({"cluster_2", "cluster_0"});
+  EXPECT_EQ("cluster_2", nameForAttempt(lb, 1));
+  EXPECT_EQ("cluster_0", nameForAttempt(lb, 2));
+  EXPECT_EQ("", nameForAttempt(lb, 3));
+}
+
+// Names that are not configured are dropped, and the remaining entries keep their relative order.
+TEST_F(CompositeClusterOrderMetadataTest, UnknownNamesDropped) {
+  initialize(std::string(ThreeClustersWithOrderKey));
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
+
+  setOrder({"not_configured", "cluster_1", "also_not_configured", "cluster_0"});
+  EXPECT_EQ("cluster_1", nameForAttempt(lb, 1));
+  EXPECT_EQ("cluster_0", nameForAttempt(lb, 2));
+  EXPECT_EQ("", nameForAttempt(lb, 3));
+}
+
+// A cluster may legitimately be named more than once, consuming two attempts.
+TEST_F(CompositeClusterOrderMetadataTest, DuplicateEntriesConsumeSeparateAttempts) {
+  initialize(std::string(ThreeClustersWithOrderKey));
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
+
+  setOrder({"cluster_1", "cluster_1", "cluster_0"});
+  EXPECT_EQ("cluster_1", nameForAttempt(lb, 1));
+  EXPECT_EQ("cluster_1", nameForAttempt(lb, 2));
+  EXPECT_EQ("cluster_0", nameForAttempt(lb, 3));
+  EXPECT_EQ("", nameForAttempt(lb, 4));
+}
+
+// Non-string entries are skipped exactly like unknown names.
+TEST_F(CompositeClusterOrderMetadataTest, NonStringEntriesSkipped) {
+  initialize(std::string(ThreeClustersWithOrderKey));
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
+
+  Protobuf::Value value;
+  auto* values = value.mutable_list_value();
+  values->add_values()->set_number_value(42);
+  values->add_values()->set_string_value("cluster_2");
+  values->add_values()->set_bool_value(true);
+  values->add_values()->mutable_struct_value();
+  values->add_values()->set_string_value("cluster_0");
+  setValue(value);
+
+  EXPECT_EQ("cluster_2", nameForAttempt(lb, 1));
+  EXPECT_EQ("cluster_0", nameForAttempt(lb, 2));
+  EXPECT_EQ("", nameForAttempt(lb, 3));
+}
+
+// Every shape of unusable metadata falls back to the configured order rather than failing.
+TEST_F(CompositeClusterOrderMetadataTest, UnusableMetadataFallsBackToConfiguredOrder) {
+  initialize(std::string(ThreeClustersWithOrderKey));
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
+
+  const auto expectConfiguredOrder = [&]() {
+    EXPECT_EQ("cluster_0", nameForAttempt(lb, 1));
+    EXPECT_EQ("cluster_1", nameForAttempt(lb, 2));
+    EXPECT_EQ("cluster_2", nameForAttempt(lb, 3));
+    EXPECT_EQ("", nameForAttempt(lb, 4));
+  };
+
+  // No metadata at all.
+  expectConfiguredOrder();
+
+  // Wrong namespace.
+  (*(*stream_info_.metadata_.mutable_filter_metadata())["other.namespace"]
+        .mutable_fields())["order"]
+      .set_string_value("cluster_2");
+  expectConfiguredOrder();
+
+  // Right namespace, wrong key.
+  (*(*stream_info_.metadata_.mutable_filter_metadata())["envoy.clusters.composite"]
+        .mutable_fields())["other_key"]
+      .set_string_value("cluster_2");
+  expectConfiguredOrder();
+
+  // Value is a bare string rather than a list.
+  Protobuf::Value string_value;
+  string_value.set_string_value("cluster_2");
+  setValue(string_value);
+  expectConfiguredOrder();
+
+  // Value is a struct.
+  Protobuf::Value struct_value;
+  struct_value.mutable_struct_value();
+  setValue(struct_value);
+  expectConfiguredOrder();
+
+  // Value is a number.
+  Protobuf::Value number_value;
+  number_value.set_number_value(7);
+  setValue(number_value);
+  expectConfiguredOrder();
+
+  // Empty list.
+  setOrder({});
+  expectConfiguredOrder();
+
+  // A list in which nothing names a configured cluster.
+  setOrder({"not_configured", "also_not_configured"});
+  expectConfiguredOrder();
+}
+
+// Metadata is ignored entirely when the cluster does not configure the key.
+TEST_F(CompositeClusterOrderMetadataTest, IgnoredWhenKeyNotConfigured) {
+  initialize(std::string(ThreeClustersNoOrderKey));
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
+
+  setOrder({"cluster_2", "cluster_0"});
+  EXPECT_EQ("cluster_0", nameForAttempt(lb, 1));
+  EXPECT_EQ("cluster_1", nameForAttempt(lb, 2));
+}
+
+// A null context or absent stream info falls back to the configured order.
+TEST_F(CompositeClusterOrderMetadataTest, IgnoredWithoutRequestStreamInfo) {
+  initialize(std::string(ThreeClustersWithOrderKey));
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
+
+  setOrder({"cluster_2", "cluster_0"});
+
+  EXPECT_EQ("cluster_0", lb.clusterForAttempt(nullptr, 1).name_);
+
+  EXPECT_CALL(context_, requestStreamInfo()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ("cluster_0", lb.clusterForAttempt(&context_, 1).name_);
+}
+
+// A nested metadata path resolves through intermediate structs.
+TEST_F(CompositeClusterOrderMetadataTest, NestedMetadataPath) {
+  initialize(R"EOF(
+name: composite_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: cluster_0
+    - name: cluster_1
+    order_metadata_key:
+      key: envoy.clusters.composite
+      path:
+      - key: routing
+      - key: order
+)EOF");
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->config_);
+
+  Protobuf::Value order;
+  order.mutable_list_value()->add_values()->set_string_value("cluster_1");
+  (*(*(*stream_info_.metadata_.mutable_filter_metadata())["envoy.clusters.composite"]
+          .mutable_fields())["routing"]
+        .mutable_struct_value()
+        ->mutable_fields())["order"] = order;
+
+  EXPECT_EQ("cluster_1", nameForAttempt(lb, 1));
+  EXPECT_EQ("", nameForAttempt(lb, 2));
+}
+
+// The reported index is the selected cluster's configured index, not its position in the order.
+TEST_F(CompositeClusterOrderMetadataTest, ChooseHostUsesOverrideAndReportsConfiguredIndex) {
+  initialize(std::string(ThreeClustersWithOrderKey));
+  CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
+                                  cluster_->config_);
+
+  NiceMock<Upstream::MockThreadLocalCluster> mock_cluster;
+  NiceMock<Upstream::MockLoadBalancer> mock_lb;
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+
+  setOrder({"cluster_2", "cluster_0"});
+  EXPECT_CALL(context_, requestStreamInfo()).WillRepeatedly(Return(&stream_info_));
+  EXPECT_CALL(stream_info_, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
+
+  // Only the override's first entry is consulted; the configured first cluster is not.
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("cluster_2"))
+      .WillRepeatedly(Return(&mock_cluster));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("cluster_0")).Times(0);
+  EXPECT_CALL(mock_cluster, loadBalancer()).WillRepeatedly(ReturnRef(mock_lb));
+
+  size_t reported_index = 0;
+  EXPECT_CALL(mock_lb, chooseHost(_)).WillOnce([&](Upstream::LoadBalancerContext* ctx) {
+    reported_index = static_cast<CompositeLoadBalancerContext*>(ctx)->selectedClusterIndex();
+    return Upstream::HostSelectionResponse{mock_host};
+  });
+
+  auto result = lb.chooseHost(&context_);
+  EXPECT_EQ(mock_host, result.host);
+  // cluster_2 is at index 2 of the configured list, not index 0 of the override.
+  EXPECT_EQ(2, reported_index);
+}
+
+// An attempt past the end of a usable override selects no host and consults no cluster.
+TEST_F(CompositeClusterOrderMetadataTest, ChooseHostFailsPastEndOfOverride) {
+  initialize(std::string(ThreeClustersWithOrderKey));
+  CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
+                                  cluster_->config_);
+
+  setOrder({"cluster_2"});
+  EXPECT_CALL(context_, requestStreamInfo()).WillRepeatedly(Return(&stream_info_));
+  EXPECT_CALL(stream_info_, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(2)));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  EXPECT_EQ(nullptr, lb.chooseHost(&context_).host);
+}
+
+// peekAnotherHost and selectExistingConnection honor the override as well.
+TEST_F(CompositeClusterOrderMetadataTest, PeekAndSelectExistingConnectionUseOverride) {
+  initialize(std::string(ThreeClustersWithOrderKey));
+  CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
+                                  cluster_->config_);
+
+  NiceMock<Upstream::MockThreadLocalCluster> mock_cluster;
+  NiceMock<Upstream::MockLoadBalancer> mock_lb;
+  NiceMock<Upstream::MockHost> host;
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  std::vector<uint8_t> hash_key;
+
+  setOrder({"cluster_2", "cluster_0"});
+  EXPECT_CALL(context_, requestStreamInfo()).WillRepeatedly(Return(&stream_info_));
+  EXPECT_CALL(stream_info_, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("cluster_2"))
+      .WillRepeatedly(Return(&mock_cluster));
+  EXPECT_CALL(mock_cluster, loadBalancer()).WillRepeatedly(ReturnRef(mock_lb));
+
+  EXPECT_CALL(mock_lb, peekAnotherHost(_)).WillOnce(Return(mock_host));
+  EXPECT_EQ(mock_host, lb.peekAnotherHost(&context_));
+
+  EXPECT_CALL(mock_lb, selectExistingConnection(_, _, _)).WillOnce(Return(std::nullopt));
+  EXPECT_EQ(std::nullopt, lb.selectExistingConnection(&context_, host, hash_key));
+}
+
+// The load balancer holds no per-request state across successive attempts.
+TEST_F(CompositeClusterOrderMetadataTest, OverrideStableAcrossAttempts) {
+  initialize(std::string(ThreeClustersWithOrderKey));
+  CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
+                                  cluster_->config_);
+
+  NiceMock<Upstream::MockThreadLocalCluster> mock_cluster;
+  NiceMock<Upstream::MockLoadBalancer> mock_lb;
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+
+  setOrder({"cluster_2", "cluster_0"});
+  EXPECT_CALL(context_, requestStreamInfo()).WillRepeatedly(Return(&stream_info_));
+  EXPECT_CALL(mock_cluster, loadBalancer()).WillRepeatedly(ReturnRef(mock_lb));
+  // HostSelectionResponse is move-only, so build a fresh one per call rather than using Return().
+  EXPECT_CALL(mock_lb, chooseHost(_)).WillRepeatedly([mock_host](Upstream::LoadBalancerContext*) {
+    return Upstream::HostSelectionResponse{mock_host};
+  });
+
+  EXPECT_CALL(stream_info_, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("cluster_2"))
+      .WillOnce(Return(&mock_cluster));
+  EXPECT_EQ(mock_host, lb.chooseHost(&context_).host);
+
+  EXPECT_CALL(stream_info_, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(2)));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("cluster_0"))
+      .WillOnce(Return(&mock_cluster));
+  EXPECT_EQ(mock_host, lb.chooseHost(&context_).host);
 }
 
 } // namespace Composite
