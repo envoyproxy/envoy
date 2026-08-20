@@ -80,18 +80,9 @@ X25519MLKEM768 is **not** included in the default ECDH curves. To opt in, explic
 ``ecdh_curves`` field in the
 :ref:`TlsParameters <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsParameters>`:
 
-.. code-block:: yaml
-
-   transport_socket:
-     name: envoy.transport_sockets.tls
-     typed_config:
-       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-       common_tls_context:
-         tls_params:
-           ecdh_curves:
-           - X25519MLKEM768
-           - X25519
-           - P-256
+.. literalinclude:: _include/ssl-pqc.yaml
+   :language: yaml
+   :lines: 1-11
 
 Placing ``X25519MLKEM768`` first gives it the highest priority. Peers that do not support
 ML-KEM will gracefully fall back to X25519 or P-256 via standard TLS group negotiation.
@@ -104,19 +95,19 @@ The same configuration pattern applies to upstream (client) connections using
    X25519MLKEM768 is only available in non-FIPS builds of BoringSSL. FIPS builds do not
    support ML-KEM.
 
-ClientHello size considerations
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``ClientHello`` size considerations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-X25519MLKEM768 adds approximately 1.1 KB to the TLS ClientHello due to the ML-KEM public
+X25519MLKEM768 adds approximately 1.1 KB to the TLS ``ClientHello`` due to the ML-KEM public
 key material. For TCP/TLS this is generally not a problem, as analysis by BoringSSL
-maintainers has shown that the larger ClientHello does not cause issues with standard TLS
+maintainers has shown that the larger ``ClientHello`` does not cause issues with standard TLS
 infrastructure.
 
-For **QUIC**, however, the larger ClientHello can push initial server flights beyond the
+For ``QUIC``, however, the larger ``ClientHello`` can push initial server flights beyond the
 `3x amplification limit <https://www.rfc-editor.org/rfc/rfc9000.html#section-8.1>`_
 enforced before address validation completes. This may cause handshake failures or force an
-extra round trip, negating QUIC's 1-RTT advantage. Use X25519MLKEM768 over QUIC only if
-your deployment can tolerate this (e.g., because Retry tokens or NEW_TOKEN frames are
+extra round trip, negating ``QUIC``'s 1-RTT advantage. Use X25519MLKEM768 over ``QUIC`` only if
+your deployment can tolerate this (e.g., because Retry tokens or ``NEW_TOKEN`` frames are
 already in use).
 
 Regulatory context
