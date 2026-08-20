@@ -209,7 +209,7 @@ build:coverage --coverage_report_generator=@envoy//tools/coverage:report_generat
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
-build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target
+build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target,-quiche
 
 ## Compile-time-options testing
 # Right now, none of the available compile-time options conflict with each other. If this
@@ -250,7 +250,7 @@ common:openssl --@envoy//bazel:crypto=@envoy//compat/openssl:crypto
 common:openssl --copt=-DENVOY_SSL_OPENSSL
 common:openssl --host_copt=-DENVOY_SSL_OPENSSL
 common:openssl --@envoy//bazel:http3=False
-common:openssl --test_tag_filters=-nofips
+common:openssl --test_tag_filters=-nofips,-quiche
 common:openssl --build_tag_filters=-nofips
 
 
@@ -359,7 +359,7 @@ build:asan-fuzzer --linkopt=-lc++
 
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
-build:fuzz-coverage --test_tag_filters=-nocoverage
+build:fuzz-coverage --test_tag_filters=-nocoverage,-quiche
 # Existing fuzz tests don't need a full WASM runtime and in generally we don't really want to
 # fuzz dependencies anyways. On the other hand, disabling WASM reduces the build time and
 # resources required to build and run the tests.

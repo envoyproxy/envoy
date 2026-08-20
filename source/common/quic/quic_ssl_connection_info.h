@@ -29,10 +29,10 @@ public:
     return crypto_stream->CiphersuiteId();
   }
 
-  std::string ciphersuiteString() const override {
+  absl::string_view ciphersuiteString() const override {
     auto* crypto_stream = session_.GetCryptoStream();
     ASSERT(crypto_stream != nullptr);
-    return std::string(crypto_stream->CiphersuiteString());
+    return crypto_stream->CiphersuiteString();
   }
 
   uint16_t tlsGroupId() const override {

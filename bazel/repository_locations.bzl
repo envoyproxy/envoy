@@ -13,12 +13,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazel-contrib/bazel_features/releases/download/v{version}/bazel_features-v{version}.tar.gz"],
         strip_prefix = "bazel_features-{version}",
     ),
-    bazel_gazelle = dict(
+    gazelle = dict(
         version = "0.47.0",
         sha256 = "675114d8b433d0a9f54d81171833be96ebc4113115664b791e6f204d58e93446",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
     ),
-    build_bazel_rules_apple = dict(
+    rules_apple = dict(
         version = "3.20.1",
         sha256 = "73ad768dfe824c736d0a8a81521867b1fb7a822acda2ed265897c03de6ae6767",
         urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
@@ -30,8 +30,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.2",
-        sha256 = "3427dc6eaafa83042249125920b3fb03ebc3779bb1aff02c147faedebb6c0475",
+        version = "0.4.6",
+        sha256 = "4c949b54da816e83673028faf28831206f0ef3a28fc4eb95cc01a5275d85cfe6",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -181,7 +181,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "jemalloc-{version}",
         urls = ["https://github.com/jemalloc/jemalloc/releases/download/{version}/jemalloc-{version}.tar.bz2"],
     ),
-    com_github_grpc_grpc = dict(
+    grpc = dict(
         version = "1.83.0",
         sha256 = "90d453393a9d41215df546103b10b33b9566df79cdf6f49dc67f6c4d044d090d",
         strip_prefix = "grpc-{version}",
@@ -578,7 +578,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "kafka-{version}/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/{version}.zip"],
     ),
-    confluentinc_librdkafka = dict(
+    librdkafka = dict(
         version = "2.6.0",
         sha256 = "abe0212ecd3e7ed3c4818a4f2baf7bf916e845e902bb15ae48834ca2d36ac745",
         strip_prefix = "librdkafka-{version}",
@@ -622,7 +622,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     # After updating you may need to run:
     #
-    #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
+    #     bazel run //bazel/external/cargo:crates_vendor -- --repin
     #
     rules_rust = dict(
         version = "0.69.0",

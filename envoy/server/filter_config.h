@@ -247,6 +247,12 @@ struct ExtraFactoryContext {
   // Prefix for stat logging. May be empty for contexts where no stat prefix is available, such as
   // route specific filter configurations.
   const std::string& stats_prefix;
+  // Optional init manager that the filter configuration should use to warm up its resources. May be
+  // nullopt for contexts where no init manager is available, such as specific embedded filter
+  // configurations. The init manager is only guaranteed to be alive until the configuration that
+  // owns the filter configuration is warmed up, so factories may register init targets with it but
+  // must never store the reference.
+  OptRef<Init::Manager> init_manager = std::nullopt;
 };
 
 /**
