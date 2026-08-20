@@ -68,6 +68,9 @@ public:
 
   bool rejectDuplicateKeys() const { return parser_config_.rejectDuplicateKeys(); }
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
+  envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attributeSource() const {
+    return attribute_source_;
+  }
   const ParserConfig& parserConfig() const { return parser_config_; }
   bool shouldStoreToDynamicMetadata() const {
     return request_storage_mode_ ==
@@ -168,6 +171,7 @@ private:
   // we assume the route does not change during the request, so it is resolved only once.
   envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode();
   uint32_t getMaxRequestBodySize() const;
+  bool needsBody() const;
   bool clearRouteCache() const;
   const ParserConfig& parserConfig() const;
   bool shouldStoreToDynamicMetadata() const;
@@ -188,6 +192,8 @@ private:
   std::unique_ptr<JsonPathParser> parser_;
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
+  std::string header_method_;
+  std::string header_name_;
   Filters::Common::Mcp::Status status_{Filters::Common::Mcp::Status::Ok};
 };
 
