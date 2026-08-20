@@ -13,21 +13,6 @@ namespace HttpFilters {
 namespace GrpcJsonReverseTranscoder {
 
 absl::StatusOr<Http::FilterFactoryCb>
-GrpcJsonReverseTranscoderFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
-        GrpcJsonReverseTranscoder& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
-  absl::Status creation_status = absl::OkStatus();
-  std::shared_ptr<GrpcJsonReverseTranscoderConfig> filter_config =
-      std::make_shared<GrpcJsonReverseTranscoderConfig>(
-          proto_config, context.serverFactoryContext().api(), creation_status);
-  RETURN_IF_NOT_OK_REF(creation_status);
-  return [filter_config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<GrpcJsonReverseTranscoderFilter>(filter_config));
-  };
-}
-
-absl::StatusOr<Http::FilterFactoryCb>
 GrpcJsonReverseTranscoderFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
         GrpcJsonReverseTranscoder& proto_config,

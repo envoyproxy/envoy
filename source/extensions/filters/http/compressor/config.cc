@@ -45,7 +45,7 @@ absl::StatusOr<Http::FilterFactoryCb> CompressorFilterFactory::createFilterFacto
     const std::string& stats_prefix, DualInfo info,
     Server::Configuration::ServerFactoryContext& context) {
   Server::GenericFactoryContextImpl generic_context(
-      context, info.scope, context.messageValidationVisitor(), &info.init_manager);
+      context, info.scope, context.messageValidationVisitor(), info.init_manager);
   return createFilterFactory(proto_config, stats_prefix, generic_context);
 }
 
