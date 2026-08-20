@@ -620,6 +620,52 @@ TEST_F(StatNameTest, JoinAllEmpty) {
   EXPECT_EQ("", table_.toString(StatName(joined.get())));
 }
 
+// StatNameJoiner must produce exactly what join() produces, whether or not it elides.
+TEST_F(StatNameTest, JoinerMatchesJoin) {
+  const std::vector<StatNameVec> cases = {
+      {makeStat("a.b"), makeStat("c.d")},
+      {makeStat(""), makeStat("c.d")},
+      {makeStat("a.b"), makeStat("")},
+      {makeStat(""), makeStat("")},
+      {makeStat("a.b"), makeStat("c.d"), makeStat("e.f")},
+      {makeStat(""), makeStat("c.d"), makeStat("")},
+      {makeStat(""), makeStat(""), makeStat("")},
+  };
+  for (const StatNameVec& names : cases) {
+    SymbolTable::StoragePtr joined = table_.join(names);
+    StatNameJoiner joiner(names, table_);
+    EXPECT_EQ(table_.toString(StatName(joined.get())), table_.toString(joiner.statName()));
+    EXPECT_EQ(StatName(joined.get()), joiner.statName());
+  }
+}
+
+// A join with at most one non-empty name references that name rather than copying it.
+TEST_F(StatNameTest, JoinerElidesNoOpJoin) {
+  StatName name = makeStat("a.b");
+  StatNameJoiner joiner({StatName(), name}, table_);
+  EXPECT_EQ(name.dataIncludingSize(), joiner.statName().dataIncludingSize());
+
+  StatNameJoiner joiner_both({name, makeStat("c.d")}, table_);
+  EXPECT_NE(name.dataIncludingSize(), joiner_both.statName().dataIncludingSize());
+  EXPECT_EQ("a.b.c.d", table_.toString(joiner_both.statName()));
+}
+
+// join() replaces any previously joined value, including dropping storage when the new join
+// is elided.
+TEST_F(StatNameTest, JoinerRejoin) {
+  StatNameJoiner joiner;
+  EXPECT_TRUE(joiner.statName().empty());
+
+  joiner.join({makeStat("a.b"), makeStat("c.d")}, table_);
+  EXPECT_EQ("a.b.c.d", table_.toString(joiner.statName()));
+
+  joiner.join({StatName(), makeStat("e.f")}, table_);
+  EXPECT_EQ("e.f", table_.toString(joiner.statName()));
+
+  joiner.join({makeStat("g.h"), makeStat("i.j")}, table_);
+  EXPECT_EQ("g.h.i.j", table_.toString(joiner.statName()));
+}
+
 // Validates that we don't get tsan or other errors when concurrently creating
 // a large number of stats.
 TEST_F(StatNameTest, RacingSymbolCreation) {
