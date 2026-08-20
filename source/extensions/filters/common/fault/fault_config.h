@@ -68,6 +68,8 @@ public:
     return provider_->percentage(request_headers);
   }
 
+  const std::string& errorMessage() const { return error_message_; }
+
 private:
   // Abstract abort provider.
   class AbortProvider {
@@ -142,6 +144,7 @@ private:
   using AbortProviderPtr = std::unique_ptr<AbortProvider>;
 
   AbortProviderPtr provider_;
+  const std::string error_message_;
 };
 
 using FaultAbortConfigPtr = std::unique_ptr<FaultAbortConfig>;

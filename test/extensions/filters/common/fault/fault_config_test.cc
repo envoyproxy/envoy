@@ -35,6 +35,15 @@ TEST(FaultConfigTest, FaultAbortHeaderConfig) {
   EXPECT_EQ(Http::Code::Unauthorized, config.httpStatusCode(&good_headers));
 }
 
+TEST(FaultConfigTest, FaultAbortErrorMessage) {
+  envoy::extensions::filters::http::fault::v3::FaultAbort proto_config;
+  proto_config.set_http_status(503);
+  proto_config.set_error_message("custom error message");
+  FaultAbortConfig config(proto_config);
+
+  EXPECT_EQ("custom error message", config.errorMessage());
+}
+
 TEST(FaultConfigTest, FaultAbortGrpcHeaderConfig) {
   envoy::extensions::filters::http::fault::v3::FaultAbort proto_config;
   proto_config.mutable_header_abort();
