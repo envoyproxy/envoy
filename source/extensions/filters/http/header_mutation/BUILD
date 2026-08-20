@@ -14,12 +14,15 @@ envoy_cc_library(
     srcs = ["header_mutation.cc"],
     hdrs = ["header_mutation.h"],
     deps = [
+        "//envoy/protobuf:message_validator_interface",
         "//envoy/server:filter_config_interface",
         "//source/common/config:utility_lib",
+        "//source/common/formatter:substitution_format_string_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_mutation_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/filters/http/header_mutation/v3:pkg_cc_proto",
     ],
 )

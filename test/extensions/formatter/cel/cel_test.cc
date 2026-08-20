@@ -331,7 +331,7 @@ TEST_F(CELFormatterTest, TestFormatConversionV1AlphaToDevCel) {
               ProtoEq(ValueUtil::stringValue("true")));
 }
 
-TEST_F(CELFormatterTest, TestRequestHeaderWithLegacyConfiguration) {
+TEST_F(CELFormatterTest, TestConfiguredFormatterWithoutCelConfig) {
   const std::string yaml = R"EOF(
   text_format_source:
     inline_string: "%CEL(request.headers[':method'])%"
@@ -345,6 +345,42 @@ TEST_F(CELFormatterTest, TestRequestHeaderWithLegacyConfiguration) {
   auto formatter =
       *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("GET", formatter->format(formatter_context_, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestCelConfigEnablesStringFunctions) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(request.headers['x-envoy-original-path'].replace('/original', '/mutated'))%"
+  formatters:
+    - name: envoy.formatter.cel
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+        cel_config:
+          enable_string_functions: true
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("/mutated/path?secret=parameter", formatter->format(formatter_context_, stream_info_));
+}
+
+// Without `cel_config`, string functions default off, so `replace()` is
+// unregistered and building the expression fails.
+TEST_F(CELFormatterTest, TestStringFunctionExpressionRejectedWithoutCelConfig) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(request.headers['x-envoy-original-path'].replace('/original', '/mutated'))%"
+  formatters:
+    - name: envoy.formatter.cel
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  EXPECT_THROW_WITH_REGEX(
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+      EnvoyException, "failed to create an expression: .*");
 }
 
 TEST_F(CELFormatterTest, TestRequestHeader) {

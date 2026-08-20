@@ -16,7 +16,16 @@ envoy_extension_cc_test(
     srcs = [
         "header_mutation_test.cc",
     ],
-    extension_names = ["envoy.filters.http.header_mutation"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = [
+        "envoy.filters.http.header_mutation",
+        "envoy.formatter.cel",
+    ],
     rbe_pool = "6gig",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
@@ -25,7 +34,12 @@ envoy_extension_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
-    ],
+    ] + select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "//source/extensions/formatter/cel:config",
+        ],
+    }),
 )
 
 envoy_extension_cc_test(
