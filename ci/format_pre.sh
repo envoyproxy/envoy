@@ -52,19 +52,42 @@ check_legacy_dep_names () {
     local legacy="$1"
     local new="$2"
     local matches
-    matches="$(git grep -l "$legacy" -- ':!*.patch' ':!*repositories.bzl' ':!ci/format_pre.sh' ':!MODULE.bazel' || :)"
+    # Anchor on `@name//` or `"@name"` to avoid false positives on maven coordinates
+    # (e.g. @maven//:com_google_protobuf_protobuf_javalite) and prose comments.
+    matches="$(git grep -lE "@${legacy}(//|\")" \
+        -- ':!*.patch' \
+           ':!bazel/repositories.bzl' \
+           ':!api/bazel/repositories.bzl' \
+           ':!bazel/dependency_imports.bzl' \
+           ':!mobile/bazel/envoy_mobile_dependencies.bzl' \
+           ':!mobile/bazel/envoy_mobile_repositories.bzl' \
+           ':!ci/format_pre.sh' \
+           ':!MODULE.bazel' \
+           ':!api/MODULE.bazel' \
+           ':!mobile/MODULE.bazel' \
+           ':!MODULE.bazel.lock' || :)"
     if [[ -n "$matches" ]]; then
-        echo "ERROR: Found references to '$legacy' that should use '@${new}' instead:"
+        echo "ERROR: Found references to '@${legacy}' that should use '@${new}' instead:"
         echo ""
-        git grep -l "$legacy" -- ':!*.patch' ':!*repositories.bzl' ':!ci/format_pre.sh' ':!MODULE.bazel'
+        echo "$matches"
         echo ""
         echo "Please replace '@${legacy}//' with '@${new}//' in the above files."
         return 1
     fi
 }
 
+# Renamed deps: legacy name -> canonical (BCR) name
 check_legacy_dep_names com_google_absl abseil-cpp
 check_legacy_dep_names com_github_cncf_xds xds
+check_legacy_dep_names com_google_protobuf protobuf
+check_legacy_dep_names com_github_grpc_grpc grpc
+check_legacy_dep_names com_googlesource_code_re2 re2
+check_legacy_dep_names com_google_googleapis googleapis
+check_legacy_dep_names com_google_googletest googletest
+check_legacy_dep_names ocp ocp-diag-core
+check_legacy_dep_names com_google_protoconverter proto-converter
+check_legacy_dep_names com_google_protofieldextraction proto-field-extraction
+check_legacy_dep_names grpc_httpjson_transcoding grpc-httpjson-transcoding
 
 CURRENT=check
 # This test runs code check with:
