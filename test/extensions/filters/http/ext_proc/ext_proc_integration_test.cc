@@ -39,8 +39,12 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "ocpdiag/core/testing/status_matchers.h"
+
+using testing::Contains;
+using testing::Key;
 
 namespace Envoy {
 namespace Extensions {
@@ -4009,7 +4013,7 @@ TEST_P(ExtProcIntegrationTest, SendClusterMetadata) {
             "some_value");
 
   const auto& typed_filter_metadata = received_metadata.typed_filter_metadata();
-  EXPECT_TRUE(typed_filter_metadata.contains("cluster_ns_typed"));
+  EXPECT_THAT(typed_filter_metadata, Contains(Key("cluster_ns_typed")));
 
   processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
@@ -4194,14 +4198,14 @@ TEST_P(ExtProcIntegrationTest, RequestAttributeVirtualHostMetadataIsTextProto) {
         EXPECT_TRUE(req.has_request_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         const auto& proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_TRUE(proto_struct.fields().contains("xds.virtual_host_metadata"));
+        EXPECT_THAT(proto_struct.fields(), Contains(Key("xds.virtual_host_metadata")));
         const auto& metadata_textproto =
             proto_struct.fields().at("xds.virtual_host_metadata").string_value();
         envoy::config::core::v3::Metadata parsed_metadata;
         const bool parsed =
             Protobuf::TextFormat::ParseFromString(metadata_textproto, &parsed_metadata);
         EXPECT_TRUE(parsed);
-        EXPECT_TRUE(parsed_metadata.filter_metadata().contains("someKey"));
+        EXPECT_THAT(parsed_metadata.filter_metadata(), Contains(Key("someKey")));
         EXPECT_EQ(parsed_metadata.filter_metadata()
                       .at("someKey")
                       .fields()

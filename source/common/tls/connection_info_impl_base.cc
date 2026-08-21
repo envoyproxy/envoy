@@ -358,7 +358,7 @@ uint16_t ConnectionInfoImplBase::ciphersuiteId() const {
   return static_cast<uint16_t>(SSL_CIPHER_get_id(cipher));
 }
 
-std::string ConnectionInfoImplBase::ciphersuiteString() const {
+absl::string_view ConnectionInfoImplBase::ciphersuiteString() const {
   const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl());
   if (cipher == nullptr) {
     return {};

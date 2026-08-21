@@ -41,7 +41,7 @@ envoy_cc_library(
     hdrs = ["geoip_provider.h"],
     tags = ["skip_on_windows"],
     deps = [
-        "//bazel/foreign_cc:maxmind_linux_darwin",
+        "//bazel/deps:maxmind_linux_darwin",
         "//envoy/geoip:geoip_provider_driver_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:thread_synchronizer_lib",
