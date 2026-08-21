@@ -195,7 +195,6 @@ public:
 
   bool isOpen() const override { return ListenSocketImpl::isOpen(); }
   void close() override { ListenSocketImpl::close(); }
-  using Socket::close;
 };
 
 TEST_P(ListenSocketImplTestTcp, NonIoHandleListenSocket) {
