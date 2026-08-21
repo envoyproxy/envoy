@@ -82,7 +82,7 @@ Tracer::Tracer(const std::string& collector_cluster, const std::string& collecto
 
 // Tracer::TracingDriver
 
-Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
+Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
                                    const StreamInfo::StreamInfo& stream_info,
                                    const std::string& operation_name,
                                    Tracing::Decision tracing_decision) {
@@ -91,16 +91,21 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
     return std::make_unique<Tracing::NullSpan>();
   }
 
-  // The OpenTracing implementation ignored the `Tracing::Config` argument,
-  // so we will as well.
   datadog::tracing::SpanConfig span_config;
-  // The `operation_name` parameter to this function more closely matches
-  // Datadog's concept of "resource name." Datadog's "span name," or "operation
-  // name," instead describes the category of operation being performed, which
-  // here we hard-code.
   span_config.name = "envoy.proxy";
   span_config.resource = operation_name;
   span_config.start = estimateTime(stream_info.startTime());
+
+  // Set span.kind based on the traffic direction. Ingress traffic is mapped
+  // to span.kind=server, egress to span.kind=client.
+  switch (config.operationName()) {
+  case Tracing::OperationName::Ingress:
+    span_config.tags["span.kind"] = "server";
+    break;
+  case Tracing::OperationName::Egress:
+    span_config.tags["span.kind"] = "client";
+    break;
+  }
 
   TraceContextReader reader{trace_context};
   datadog::tracing::Span span =
