@@ -40,6 +40,12 @@ namespace {
 const Http::LowerCaseString kMcpSessionId{
     std::string(Filters::Common::Mcp::McpConstants::MCP_SESSION_ID_HEADER)};
 
+const Http::LowerCaseString kMcpMethod{
+    std::string(Filters::Common::Mcp::McpConstants::MCP_METHOD_HEADER)};
+
+const Http::LowerCaseString kMcpName{
+    std::string(Filters::Common::Mcp::McpConstants::MCP_NAME_HEADER)};
+
 McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = absl::StrCat(prefix, "mcp.");
   return McpFilterStats{MCP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
@@ -111,6 +117,7 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB
       request_storage_mode_(proto_config.request_storage_mode()),
+      attribute_source_(proto_config.attribute_source()),
       metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
@@ -281,6 +288,19 @@ bool McpFilter::rejectDuplicateKeys() const {
   return config_->rejectDuplicateKeys();
 }
 
+bool McpFilter::needsBody() const {
+  if (config_->attributeSource() != envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS) {
+    return true;
+  }
+
+  if (config_->propagateTraceContext().has_value() || config_->propagateBaggage().has_value() ||
+      rejectDuplicateKeys()) {
+    return true;
+  }
+
+  return false;
+}
+
 const McpOverrideConfig* McpFilter::routeOverride() const {
   // TODO(mkbehr): We can latch the McpOverrideConfig in order to do fewer route lookups. The
   // McpOverrideConfig has lifetime equal to the route, so we'll need to take care not to keep a
@@ -310,11 +330,27 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
   if (isValidMcpPostRequest(headers)) {
     is_json_post_request_ = true;
     ENVOY_LOG(debug, "valid MCP Post request");
+    if (config_->attributeSource() != envoy::extensions::filters::http::mcp::v3::Mcp::BODY) {
+      const auto method_headers = headers.get(kMcpMethod);
+      if (!method_headers.empty()) {
+        header_method_ = std::string(method_headers[0]->value().getStringView());
+      }
+
+      const auto name_headers = headers.get(kMcpName);
+      if (!name_headers.empty()) {
+        header_name_ = std::string(name_headers[0]->value().getStringView());
+      }
+    }
+
     if (end_stream) {
       is_mcp_request_ = false;
     } else {
       // Need to buffer the body to check for JSON-RPC 2.0
       is_mcp_request_ = true;
+
+      if (!needsBody()) {
+        return Http::FilterHeadersStatus::Continue;
+      }
 
       // Set the buffer limit.
       const uint32_t max_size = getMaxRequestBodySize();
