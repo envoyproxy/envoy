@@ -88,6 +88,7 @@ protected:
 };
 
 using SlotSharedPtr = std::shared_ptr<Slot>;
+using SlotPtr = SlotSharedPtr;
 
 /**
  * Interface used to allocate thread local slots.
