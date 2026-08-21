@@ -147,12 +147,16 @@ public:
 
   uint64_t length() const override { return size_; }
 
+  uint64_t sliceCount() const override { PANIC("not implemented"); }
+
   void* linearize(uint32_t /*size*/) override {
     // Sketchy, but probably will work for test purposes.
     return mutableStart();
   }
 
   Buffer::SliceDataPtr extractMutableFrontSlice() override { PANIC("not implemented"); }
+
+  Buffer::SliceDataPtr extractImmutableFrontSlice() override { PANIC("not implemented"); }
 
   void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }
 
