@@ -49,8 +49,7 @@ class MXMethod : public DiscoveryMethod {
 public:
   MXMethod(bool downstream, const absl::flat_hash_set<std::string> additional_labels,
            Server::Configuration::ServerFactoryContext& factory_context);
-  PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
-                          Context&) const override;
+  PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&, Context&) const override;
   void remove(Http::HeaderMap&) const override;
 
 private:
@@ -104,8 +103,7 @@ private:
 class BaggageDiscoveryMethod : public DiscoveryMethod, public Logger::Loggable<Logger::Id::filter> {
 public:
   BaggageDiscoveryMethod();
-  PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
-                          Context&) const override;
+  PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&, Context&) const override;
 };
 
 class FilterConfig : public Logger::Loggable<Logger::Id::filter> {

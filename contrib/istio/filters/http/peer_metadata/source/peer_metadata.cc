@@ -22,8 +22,7 @@ public:
       : downstream_(downstream),
         metadata_provider_(Extensions::Common::WorkloadDiscovery::GetProvider(factory_context)),
         local_info_(factory_context.localInfo()) {}
-  PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
-                          Context&) const override;
+  PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&, Context&) const override;
 
 private:
   const bool downstream_;
@@ -164,8 +163,7 @@ public:
   UpstreamFilterStateMethod(
       const io::istio::http::peer_metadata::Config_UpstreamFilterState& config)
       : peer_metadata_key_(config.peer_metadata_key()) {}
-  PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
-                          Context&) const override;
+  PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&, Context&) const override;
 
 private:
   std::string peer_metadata_key_;
