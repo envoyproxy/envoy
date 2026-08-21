@@ -32,7 +32,7 @@ public:
   // Build config directly from HttpService without constructing a temporary ExtAuthz.
   ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service,
                bool encode_raw_headers, uint32_t timeout,
-               Server::Configuration::CommonFactoryContext& context);
+               Server::Configuration::CommonFactoryContext& context, bool emit_client_span = true);
 
   /**
    * Returns the name of the authorization cluster.
@@ -108,6 +108,11 @@ public:
    */
   const Router::RetryPolicyConstSharedPtr& retryPolicy() const { return retry_policy_; }
 
+  /**
+   * Returns whether to emit client span.
+   */
+  bool emitClientSpan() const { return emit_client_span_; }
+
 private:
   static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
                                            Server::Configuration::CommonFactoryContext& context);
@@ -135,6 +140,7 @@ private:
   Router::HeaderParserPtr request_headers_parser_;
   const bool encode_raw_headers_;
   const Router::RetryPolicyConstSharedPtr retry_policy_;
+  const bool emit_client_span_;
 };
 
 using ClientConfigSharedPtr = std::shared_ptr<ClientConfig>;

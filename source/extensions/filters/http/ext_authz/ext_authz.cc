@@ -177,6 +177,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       include_tls_session_(config.include_tls_session()),
       charge_cluster_response_stats_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
+      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
       ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
@@ -231,6 +232,9 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   for (auto it = begin_it; it != end_it; ++it) {
     context_extensions_[it->first] = it->second;
   }
+  if (other.emit_client_span_.has_value()) {
+    emit_client_span_ = other.emit_client_span_;
+  }
 }
 
 // Constructor used for merging configurations from different levels (vhost, route, etc.)
@@ -244,7 +248,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       grpc_service_(more_specific.grpc_service_.has_value() ? more_specific.grpc_service_
                                                             : std::nullopt),
       http_service_(more_specific.http_service_.has_value() ? more_specific.http_service_
-                                                            : std::nullopt) {
+                                                            : std::nullopt),
+      emit_client_span_(more_specific.emit_client_span_.has_value()
+                            ? more_specific.emit_client_span_
+                            : less_specific.emit_client_span_) {
   // Merge context extensions from more specific configuration, overriding less specific ones.
   for (const auto& extension : more_specific.context_extensions_) {
     context_extensions_[extension.first] = extension.second;
@@ -429,6 +436,13 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server.", *decoder_callbacks_);
   // Store start time of ext_authz filter call
   start_time_ = decoder_callbacks_->dispatcher().timeSource().monotonicTime();
+
+  bool emit_client_span = config_->emitClientSpan();
+  if (maybe_merged_per_route_config &&
+      maybe_merged_per_route_config->emitClientSpan().has_value()) {
+    emit_client_span = maybe_merged_per_route_config->emitClientSpan().value();
+  }
+  client_to_use->setEmitClientSpan(emit_client_span);
 
   state_ = State::Calling;
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
