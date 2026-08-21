@@ -20,9 +20,9 @@ Usage in an aspect or rule:
 
 # The toolchain type registered via
 #   native.register_toolchains(
-#       "@com_google_protobuf//bazel/private/oss/toolchains/prebuilt:all")
+#       "@protobuf//bazel/private/oss/toolchains/prebuilt:all")
 # in bazel/toolchains.bzl.
-_PROTO_TOOLCHAIN = "@com_google_protobuf//bazel/private:proto_toolchain_type"
+_PROTO_TOOLCHAIN = "@protobuf//bazel/private:proto_toolchain_type"
 
 def use_proto_toolchain():
     """Returns the toolchains list to declare on an aspect or rule."""

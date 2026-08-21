@@ -1,10 +1,10 @@
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
-load("@com_google_protobuf//bazel:java_lite_proto_library.bzl", "java_lite_proto_library")
-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load("@grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@grpc//bazel:python_rules.bzl", _py_proto_library = "py_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+load("@protobuf//bazel:java_lite_proto_library.bzl", "java_lite_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_test")
 load(
     "//bazel:external_proto_deps.bzl",
@@ -28,13 +28,13 @@ _JAVA_PROTO_SUFFIX = "_java_proto"
 _IS_BZLMOD = str(Label("//:invalid")).startswith("@@")
 
 _COMMON_PROTO_DEPS = [
-    "@com_google_protobuf//:any_proto",
-    "@com_google_protobuf//:descriptor_proto",
-    "@com_google_protobuf//:duration_proto",
-    "@com_google_protobuf//:empty_proto",
-    "@com_google_protobuf//:struct_proto",
-    "@com_google_protobuf//:timestamp_proto",
-    "@com_google_protobuf//:wrappers_proto",
+    "@protobuf//:any_proto",
+    "@protobuf//:descriptor_proto",
+    "@protobuf//:duration_proto",
+    "@protobuf//:empty_proto",
+    "@protobuf//:struct_proto",
+    "@protobuf//:timestamp_proto",
+    "@protobuf//:wrappers_proto",
     "@googleapis//google/api:http_proto",
     "@googleapis//google/api:httpbody_proto",
     "@googleapis//google/api:annotations_proto",
@@ -103,6 +103,7 @@ def api_cc_py_proto_library(
             "@googleapis//google/rpc:status_cc_proto",
         ],
         deps = [relative_name],
+        protobuf = "@protobuf//:protobuf",
         re2 = "@re2",
         visibility = ["//visibility:public"],
     )
