@@ -229,7 +229,8 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlSimpleVariableRejectsPathTraversal)
   json arguments = json::parse(R"json({"id": "../../admin/secrets"})json");
   BridgeStatus status = BridgeStatus::Ok;
   EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments, status),
-              HasStatus(absl::StatusCode::kInvalidArgument, "Path traversal rejected"));
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "path template variable 'id' must not contain path traversal segments"));
   EXPECT_EQ(status, BridgeStatus::RequestToolsCallPathTraversalRejected);
 }
 
@@ -275,7 +276,8 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlWildcardVariableRejectsPathTraversa
   json arguments = json::parse(R"json({"name": "../../admin/secrets"})json");
   BridgeStatus status = BridgeStatus::Ok;
   EXPECT_THAT(constructBaseUrl("/v1/{name=projects/*}/shelves", {"name"}, arguments, status),
-              HasStatus(absl::StatusCode::kInvalidArgument, "Path traversal rejected"));
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "path template variable 'name' must not contain path traversal segments"));
   EXPECT_EQ(status, BridgeStatus::RequestToolsCallPathTraversalRejected);
 }
 
@@ -286,7 +288,8 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlRejectsBackslashPathTraversal) {
   json arguments = json::parse(R"json({"id": "..\\.."})json");
   BridgeStatus status = BridgeStatus::Ok;
   EXPECT_THAT(constructBaseUrl("/v1/users/{id}/profile", {"id"}, arguments, status),
-              HasStatus(absl::StatusCode::kInvalidArgument, "Path traversal rejected"));
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "path template variable 'id' must not contain path traversal segments"));
   EXPECT_EQ(status, BridgeStatus::RequestToolsCallPathTraversalRejected);
 }
 
@@ -312,8 +315,9 @@ get: "/v1/{parent=projects/*}"
   })json");
 
   BridgeStatus status = BridgeStatus::Ok;
-  EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
-              HasStatus(absl::StatusCode::kInvalidArgument, "Missing required argument"));
+  EXPECT_THAT(
+      buildHttpRequest(http_rule, arguments, status),
+      HasStatus(absl::StatusCode::kInvalidArgument, "Could not find value for path: parent"));
   EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
 }
 
@@ -328,7 +332,7 @@ body: "foo"
 
   BridgeStatus status = BridgeStatus::Ok;
   EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
-              HasStatus(absl::StatusCode::kInvalidArgument, "Missing required argument"));
+              HasStatus(absl::StatusCode::kInvalidArgument, "Could not find value for path: foo"));
   EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
 }
 
@@ -364,8 +368,9 @@ TEST(HttpRequestBuilderTest, ConstructBaseUrlTest) {
   EXPECT_EQ(status, BridgeStatus::Ok);
 
   // Missing argument.
-  EXPECT_THAT(constructBaseUrl("/v1/{missing}", {"missing"}, arguments, status),
-              HasStatus(absl::StatusCode::kInvalidArgument, "Missing required argument"));
+  EXPECT_THAT(
+      constructBaseUrl("/v1/{missing}", {"missing"}, arguments, status),
+      HasStatus(absl::StatusCode::kInvalidArgument, "Could not find value for path: missing"));
   EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
 }
 

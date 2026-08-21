@@ -901,9 +901,10 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallMissingRequiredArgReturnsError) {
 
   EXPECT_CALL(
       decoder_callbacks_,
-      sendLocalReply(Eq(Http::Code::OK),
-                     StrEq(R"json({"code":-32602,"message":"Missing required argument"})json"), _,
-                     _, StrEq("mcp_json_rest_bridge_request_tools_call_missing_required_arg")));
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(R"json({"code":-32602,"message":"Could not find value for path: parent"})json"), _,
+          _, StrEq("mcp_json_rest_bridge_request_tools_call_missing_required_arg")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
@@ -932,7 +933,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallMissingRequiredArgReturnsError) {
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
   Buffer::OwnedImpl response_body(
-      R"json({"code":-32602,"message":"Missing required argument"})json");
+      R"json({"code":-32602,"message":"Could not find value for path: parent"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
@@ -941,7 +942,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallMissingRequiredArgReturnsError) {
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
-          R"json({"error":{"code":-32602,"message":"Missing required argument"},"id":123,"jsonrpc":"2.0"})json"));
+          R"json({"error":{"code":-32602,"message":"Could not find value for path: parent"},"id":123,"jsonrpc":"2.0"})json"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallPathTraversalRejectedReturnsError) {
@@ -954,9 +955,11 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallPathTraversalRejectedReturnsError) {
 
   EXPECT_CALL(
       decoder_callbacks_,
-      sendLocalReply(Eq(Http::Code::OK),
-                     StrEq(R"json({"code":-32602,"message":"Path traversal rejected"})json"), _, _,
-                     StrEq("mcp_json_rest_bridge_request_tools_call_path_traversal_rejected")));
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(
+              R"json({"code":-32602,"message":"path template variable 'parent' must not contain path traversal segments"})json"),
+          _, _, StrEq("mcp_json_rest_bridge_request_tools_call_path_traversal_rejected")));
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
@@ -987,7 +990,8 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallPathTraversalRejectedReturnsError) {
   response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
-  Buffer::OwnedImpl response_body(R"json({"code":-32602,"message":"Path traversal rejected"})json");
+  Buffer::OwnedImpl response_body(
+      R"json({"code":-32602,"message":"path template variable 'parent' must not contain path traversal segments"})json");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
   EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
@@ -996,7 +1000,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolCallPathTraversalRejectedReturnsError) {
   EXPECT_EQ(
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
-          R"json({"error":{"code":-32602,"message":"Path traversal rejected"},"id":123,"jsonrpc":"2.0"})json"));
+          R"json({"error":{"code":-32602,"message":"path template variable 'parent' must not contain path traversal segments"},"id":123,"jsonrpc":"2.0"})json"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolCallInvalidHttpRuleReturnsError) {

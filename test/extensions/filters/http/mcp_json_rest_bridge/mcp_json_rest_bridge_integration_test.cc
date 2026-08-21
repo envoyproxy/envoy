@@ -573,7 +573,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InvalidArguments) {
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
-          R"json({"jsonrpc":"2.0","id":321,"error":{"code":-32602,"message":"Missing required argument"}})json"));
+          R"json({"jsonrpc":"2.0","id":321,"error":{"code":-32602,"message":"Could not find value for path: parent"}})json"));
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithErrorResponse) {

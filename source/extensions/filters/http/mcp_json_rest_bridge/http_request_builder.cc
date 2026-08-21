@@ -188,7 +188,7 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
     absl::StatusOr<nlohmann::json> template_value_json = getJsonValue(arguments, element);
     if (!template_value_json.ok()) {
       bridge_status = BridgeStatus::RequestToolsCallMissingRequiredArg;
-      return absl::InvalidArgumentError("Missing required argument");
+      return template_value_json.status();
     }
     const std::string raw_value = jsonValueToString(*template_value_json);
 
@@ -199,7 +199,8 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
     for (const absl::string_view segment : absl::StrSplit(raw_value, absl::ByAnyChar("\\/"))) {
       if (segment == "." || segment == "..") {
         bridge_status = BridgeStatus::RequestToolsCallPathTraversalRejected;
-        return absl::InvalidArgumentError("Path traversal rejected");
+        return absl::InvalidArgumentError(absl::StrCat(
+            "path template variable '", element, "' must not contain path traversal segments"));
       }
     }
     // A simple variable (`{id}`) fills one segment, so its '/' is encoded; a variable with an
@@ -260,7 +261,7 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
             constructQueryParams(query_params, http_rule.body(), arguments, templates, base_path);
         !status.ok()) {
       bridge_status = BridgeStatus::RequestToolsCallMissingRequiredArg;
-      return absl::InvalidArgumentError("Missing required argument");
+      return status;
     }
   }
   appendQueryParamsToBaseUrl(*url, query_params);
@@ -268,7 +269,7 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
   absl::StatusOr<json> http_body = constructRequestBody(http_rule.body(), templates, arguments);
   if (!http_body.ok()) {
     bridge_status = BridgeStatus::RequestToolsCallMissingRequiredArg;
-    return absl::InvalidArgumentError("Missing required argument");
+    return http_body.status();
   }
 
   return HttpRequest{
