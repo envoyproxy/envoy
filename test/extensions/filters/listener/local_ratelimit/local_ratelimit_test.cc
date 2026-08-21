@@ -11,7 +11,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::ByMove;
 using testing::InSequence;
 using testing::NiceMock;
@@ -44,7 +43,7 @@ public:
     }
 
     void expectIoHandleClose() {
-      EXPECT_CALL(io_handle_, close(_)).WillOnce(Return(ByMove(Api::ioCallUint64ResultNoError())));
+      EXPECT_CALL(io_handle_, close()).WillOnce(Return(ByMove(Api::ioCallUint64ResultNoError())));
     }
 
   private:

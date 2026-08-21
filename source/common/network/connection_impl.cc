@@ -372,8 +372,12 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   connection_stats_.reset();
 
+  if (abort_reset) {
+    socket_->requestRst();
+  }
+
   // It is safe to call close() since there is an IO handle check.
-  socket_->close(abort_reset);
+  socket_->close();
 
   // Propagate transport failure reason to StreamInfo before raising close events,
   // ensuring it's available to all filters and access loggers.

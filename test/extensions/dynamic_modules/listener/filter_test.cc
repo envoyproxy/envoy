@@ -18,7 +18,6 @@ namespace ListenerFilters {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
-using ::testing::_;
 using ::testing::Not;
 
 // A simple mock implementation of ListenerFilterBuffer for testing.
@@ -138,7 +137,7 @@ TEST_F(DynamicModuleListenerFilterTest, OnAcceptWithNullInModuleFilterClosesSock
   // Create a real mock io handle so we can verify close is called.
   auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
   auto* mock_io_handle_ptr = mock_io_handle.get();
-  EXPECT_CALL(*mock_io_handle_ptr, close(_))
+  EXPECT_CALL(*mock_io_handle_ptr, close())
       .WillOnce(testing::Return(Api::IoCallUint64Result(0, Api::IoError::none())));
 
   // Replace the io_handle and update the ioHandle() mock to return a reference to it.

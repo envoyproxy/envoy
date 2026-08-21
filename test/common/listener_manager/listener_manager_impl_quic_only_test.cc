@@ -199,7 +199,7 @@ filter_chain_matcher:
       .WillOnce(Invoke([](Network::ListenerConfig&, const Network::ExtraShutdownListenerOptions&,
                           std::function<void()> completion) { completion(); }));
   manager_->stopListeners(ListenerManager::StopListenersType::All, {});
-  EXPECT_CALL(*listener_factory_.socket_, close(_)).Times(0u);
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(0u);
   EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 }
 

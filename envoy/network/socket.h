@@ -446,12 +446,14 @@ public:
   virtual std::optional<Address::IpVersion> ipVersion() const PURE;
 
   /**
-   * Close the underlying socket.
-   * @param send_rst whether to perform an abortive close (i.e. RST) or a graceful close (i.e. FIN).
-   *                 Defaults to false (graceful close).
+   * Request RST on a subsequent close().
    */
-  virtual void close(bool send_rst) PURE;
-  void close() { close(false); }
+  virtual void requestRst() PURE;
+
+  /**
+   * Close the underlying socket.
+   */
+  virtual void close() PURE;
 
   /**
    * Return true if close() hasn't been called.

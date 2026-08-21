@@ -96,7 +96,8 @@ public:
   const Network::IoHandle& ioHandle() const override { return *io_handle_; }
 
   // Dummy method
-  void close(bool /*send_rst*/) override {}
+  void requestRst() override {}
+  void close() override {}
   bool isOpen() const override { return false; }
   Network::Socket::Type socketType() const override { return Network::Socket::Type::Stream; }
   Network::Address::Type addressType() const override {

@@ -47,8 +47,8 @@ public:
     ASSERT(false, "not supported");
     return INVALID_SOCKET;
   }
-  Api::IoCallUint64Result close(bool send_rst) override;
-  Api::IoCallUint64Result close() { return close(false); }
+  void requestRst() override;
+  Api::IoCallUint64Result close() override;
   bool isOpen() const override;
   bool wasConnected() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
@@ -113,7 +113,7 @@ public:
     receive_data_end_stream_ = true;
     setNewDataAvailable();
   }
-  void setReset() override {
+  void setRst() override {
     receive_data_reset_ = true;
     receive_data_end_stream_ = true;
     setNewDataAvailable();
@@ -193,6 +193,10 @@ private:
 
   // Indicates whether this handle has sent EOF to the peer by calling setEof().
   bool sent_eof_{false};
+
+  // Set by requestRst() to indicate that a subsequent close() operation should propagate an RST
+  // (rather than a FIN).
+  bool rst_requested_{false};
 
   // Shared state between peer handles.
   PassthroughStateSharedPtr passthrough_state_{nullptr};

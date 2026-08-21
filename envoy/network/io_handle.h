@@ -58,12 +58,14 @@ public:
   virtual os_fd_t fdDoNotUse() const PURE;
 
   /**
-   * Clean up IoHandle resources
-   * @param send_rst whether to perform an abortive close (i.e. RST) or a graceful close (i.e. FIN).
-   *                 Defaults to false (graceful close).
+   * Requests RST on a subsequent close().
    */
-  virtual Api::IoCallUint64Result close(bool send_rst) PURE;
-  Api::IoCallUint64Result close() { return close(false); }
+  virtual void requestRst() PURE;
+
+  /**
+   * Clean up IoHandle resources
+   */
+  virtual Api::IoCallUint64Result close() PURE;
 
   /**
    * Return true if close() hasn't been called.

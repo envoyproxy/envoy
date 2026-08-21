@@ -52,24 +52,23 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
   }
 }
 
-Api::IoCallUint64Result IoUringSocketHandleImpl::close(bool send_rst) {
-  ENVOY_LOG(trace, "close, fd = {}, type = {}, send_rst = {}", fd_, ioUringSocketTypeStr(),
-            send_rst);
-
-  ASSERT(SOCKET_VALID(fd_));
-
+void IoUringSocketHandleImpl::requestRst() {
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
-  if (send_rst) {
-    // Enabling SO_LINGER with a timeout of zero results in an abortive close.
-    struct linger l;
-    l.l_onoff = 1;
-    l.l_linger = 0;
-    auto res = setOption(SOL_SOCKET, SO_LINGER, &l, sizeof(l));
-    if (res.return_value_ < 0) {
-      ENVOY_LOG_EVERY_POW_2(error, "rst setting so_linger=0 failed on fd {}", fd_);
-    }
+  // Enabling SO_LINGER with a timeout of zero results in an abortive close.
+  struct linger l;
+  l.l_onoff = 1;
+  l.l_linger = 0;
+  auto res = setOption(SOL_SOCKET, SO_LINGER, &l, sizeof(l));
+  if (res.return_value_ < 0) {
+    ENVOY_LOG_EVERY_POW_2(error, "rst setting so_linger=0 failed on fd {}", fd_);
   }
 #endif
+}
+
+Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
+  ENVOY_LOG(trace, "close, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
+
+  ASSERT(SOCKET_VALID(fd_));
 
   if (io_uring_socket_type_ == IoUringSocketType::Unknown ||
       io_uring_socket_type_ == IoUringSocketType::Accept || !io_uring_socket_.has_value()) {

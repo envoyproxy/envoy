@@ -34,7 +34,7 @@ UpstreamReverseConnectionIOHandle::connect(Network::Address::InstanceConstShared
   return Api::SysCallIntResult{0, 0};
 }
 
-Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::close(bool send_rst) {
+Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::close() {
   ENVOY_LOG(debug, "reverse_tunnel: close() called for fd: {}", fd_);
 
   if (owned_socket_) {
@@ -47,7 +47,7 @@ Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::close(bool send_rst) 
     SET_SOCKET_INVALID(fd_);
     return Api::ioCallUint64ResultNoError();
   }
-  return IoSocketHandleImpl::close(send_rst);
+  return IoSocketHandleImpl::close();
 }
 
 Api::SysCallIntResult UpstreamReverseConnectionIOHandle::shutdown(int how) {

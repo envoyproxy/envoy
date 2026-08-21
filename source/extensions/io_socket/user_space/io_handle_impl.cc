@@ -66,15 +66,21 @@ IoHandleImpl::~IoHandleImpl() {
   }
 }
 
-Api::IoCallUint64Result IoHandleImpl::close(bool send_rst) {
+void IoHandleImpl::requestRst() {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_send_rst_on_user_space_socket")) {
+    rst_requested_ = true;
+  }
+}
+
+Api::IoCallUint64Result IoHandleImpl::close() {
   ASSERT(!closed_);
   if (!closed_) {
     if (peer_handle_) {
-      ENVOY_LOG(trace, "socket {} close before peer {} closes, send_rst = {}.",
-                static_cast<void*>(this), static_cast<void*>(peer_handle_), send_rst);
-      if (send_rst && Runtime::runtimeFeatureEnabled(
-                          "envoy.reloadable_features.enable_send_rst_on_user_space_socket")) {
-        peer_handle_->setReset();
+      ENVOY_LOG(trace, "socket {} close before peer {} closes.", static_cast<void*>(this),
+                static_cast<void*>(peer_handle_));
+      if (rst_requested_) {
+        peer_handle_->setRst();
       } else {
         // Notify the peer that it will not receive more data. shutdown(WRITE).
         peer_handle_->setEof();

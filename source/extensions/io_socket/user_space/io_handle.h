@@ -49,7 +49,7 @@ public:
   /**
    * Called by the peer to indicate that the connection was reset.
    */
-  virtual void setReset() PURE;
+  virtual void setRst() PURE;
 
   /**
    * @return true if the peer has indicated that it will not send any more data.

@@ -20,7 +20,8 @@ public:
   }
 
   MOCK_METHOD(os_fd_t, fdDoNotUse, (), (const));
-  MOCK_METHOD(Api::IoCallUint64Result, close, (bool send_rst));
+  MOCK_METHOD(void, requestRst, ());
+  MOCK_METHOD(Api::IoCallUint64Result, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(bool, wasConnected, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, readv,

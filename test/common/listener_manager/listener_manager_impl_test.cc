@@ -184,7 +184,7 @@ public:
                     ListenerHandle* listener_handle, Network::MockListenSocket& socket) {
 
     EXPECT_CALL(*worker_, stopListener(_, _, _));
-    EXPECT_CALL(socket, close(_));
+    EXPECT_CALL(socket, close());
     EXPECT_CALL(*listener_handle->drain_manager_,
                 startDrainSequence(Network::DrainDirection::All, _));
     EXPECT_TRUE(manager_->removeListener(listener_proto.name()));
@@ -2741,7 +2741,7 @@ filter_chains:
 
   // Remove foo into draining.
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_factory_.socket_, close(_));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
@@ -2795,7 +2795,7 @@ filter_chains:
 
   // Remove foo into draining.
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_factory_.socket_, close(_)).Times(2);
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(2);
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
@@ -3299,7 +3299,7 @@ filter_chains:
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_factory_.socket_, close(_));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 2, 1, 2, 0, 0, 1, 0);
@@ -3367,7 +3367,7 @@ filter_chains:
 
   // Validate that stop listener is only called once - for inbound listeners.
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_factory_.socket_, close(_));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly, {});
   EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
 
@@ -3446,7 +3446,7 @@ filter_chains:
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_factory_.socket_, close(_));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::All, {});
   EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
@@ -3516,7 +3516,7 @@ filter_chains:
   // Stop foo which should remove warming listener.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_factory_.socket_, close(_));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly, {});
   EXPECT_EQ(1, server_.stats_store_.counterFromString("listener_manager.listener_stopped").value());
@@ -7932,7 +7932,7 @@ filter_chains:
   // Stop foo which should remove warming listener.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_factory_.socket_, close(_));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly, {});
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
@@ -7994,7 +7994,7 @@ filter_chains:
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_factory_.socket_, close(_));
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 1, 1, 0, 0, 1, 0);
@@ -9352,7 +9352,7 @@ TEST_P(ListenerManagerImplTest, CustomSocketInterfaceTcpListenSocketBindToPort) 
     EXPECT_CALL(*mock_io_handle, bind(_));
 
     // *** Crucially, expect close() to NOT be called ***
-    EXPECT_CALL(*mock_io_handle, close(_)).Times(0);
+    EXPECT_CALL(*mock_io_handle, close()).Times(0);
 
     custom_interface_ptr->setMockIoHandle(std::move(mock_io_handle));
 

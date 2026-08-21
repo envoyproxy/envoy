@@ -363,7 +363,7 @@ ReverseConnectionIOHandle::connect(Envoy::Network::Address::InstanceConstSharedP
 // should typically happen when the listener is being drained.
 // Individual reverse connections initiated by this ReverseConnectionIOHandle are managed via
 // DownstreamReverseConnectionIOHandle RAII ownership.
-Api::IoCallUint64Result ReverseConnectionIOHandle::close(bool send_rst) {
+Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
   ENVOY_LOG(error, "reverse_tunnel: performing graceful shutdown.");
 
   // If initializeFileEvent() ran, fd_ was reassigned to trigger_pipe_read_fd_ and the base class
@@ -387,7 +387,7 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close(bool send_rst) {
     rev_conn_retry_timer_.reset();
   }
 
-  return IoSocketHandleImpl::close(send_rst);
+  return IoSocketHandleImpl::close();
 }
 
 void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {

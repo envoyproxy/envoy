@@ -194,7 +194,7 @@ public:
   Socket::Type socketType() const override { return Socket::Type::Stream; }
 
   bool isOpen() const override { return ListenSocketImpl::isOpen(); }
-  void close(bool send_rst) override { ListenSocketImpl::close(send_rst); }
+  void close() override { ListenSocketImpl::close(); }
   using Socket::close;
 };
 

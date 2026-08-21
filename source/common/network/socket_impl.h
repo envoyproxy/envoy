@@ -145,12 +145,16 @@ public:
 
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
-  void close(bool send_rst) override {
+  void requestRst() override {
     if (io_handle_ && io_handle_->isOpen()) {
-      io_handle_->close(send_rst);
+      io_handle_->requestRst();
     }
   }
-  using Socket::close;
+  void close() override {
+    if (io_handle_ && io_handle_->isOpen()) {
+      io_handle_->close();
+    }
+  }
   bool isOpen() const override { return io_handle_ && io_handle_->isOpen(); }
   void ensureOptions() {
     if (!options_) {
