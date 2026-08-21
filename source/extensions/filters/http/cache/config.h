@@ -10,15 +10,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-class CacheFilterFactory : public Common::ExceptionFreeFactoryBase<
-                               envoy::extensions::filters::http::cache::v3::CacheConfig> {
+class CacheFilterFactory
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::cache::v3::CacheConfig> {
 public:
-  CacheFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.cache") {}
+  CacheFilterFactory() : UnifiedFactoryBase("envoy.filters.http.cache") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
       Server::Configuration::ServerFactoryContext& context,

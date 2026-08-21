@@ -15,6 +15,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
+#include "gmock/gmock.h"
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;

@@ -13,6 +13,7 @@
 #include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::Contains;

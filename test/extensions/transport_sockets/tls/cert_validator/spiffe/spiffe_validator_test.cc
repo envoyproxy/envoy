@@ -27,6 +27,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/status/status.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "include/nlohmann/json.hpp"
 #include "openssl/ssl.h"
@@ -230,8 +231,8 @@ typed_config:
   )EOF")));
 
   EXPECT_EQ(1, validator().getSpiffeData()->trust_bundle_stores_.size());
-  EXPECT_NE(validator().getCaFileName().find("test_data/ca_cert_with_crl.pem"), std::string::npos);
-  EXPECT_NE(validator().getCaFileName().find("hello.com"), std::string::npos);
+  EXPECT_THAT(validator().getCaFileName(), HasSubstr("test_data/ca_cert_with_crl.pem"));
+  EXPECT_THAT(validator().getCaFileName(), HasSubstr("hello.com"));
 
   // Multiple trust bundles.
   ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(

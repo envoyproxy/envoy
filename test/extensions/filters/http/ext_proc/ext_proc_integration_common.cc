@@ -19,10 +19,13 @@
 
 #include "test/test_common/struct_matchers.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::Contains;
 using testing::Ge;
+using testing::Key;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -752,7 +755,8 @@ void ExtProcIntegrationTest::testSendDyanmicMetadata() {
   processGenericMessage(
       *grpc_upstreams_[0], true, [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
         // Verify the processing request contains the untyped metadata we injected.
-        EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
+        EXPECT_THAT(req.metadata_context().filter_metadata(),
+                    Contains(Key("forwarding_ns_untyped")));
         const Protobuf::Struct& fwd_metadata =
             req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
         EXPECT_EQ(1, fwd_metadata.fields_size());
@@ -761,7 +765,8 @@ void ExtProcIntegrationTest::testSendDyanmicMetadata() {
                     Contains(IsStructString("foo", "value from set_metadata")));
 
         // Verify the processing request contains the typed metadata we injected.
-        EXPECT_TRUE(req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
+        EXPECT_THAT(req.metadata_context().typed_filter_metadata(),
+                    Contains(Key("forwarding_ns_typed")));
         const Protobuf::Any& fwd_typed_metadata =
             req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
         EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",

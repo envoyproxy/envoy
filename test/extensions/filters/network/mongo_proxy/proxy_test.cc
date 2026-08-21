@@ -27,7 +27,9 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::Contains;
 using testing::Invoke;
+using testing::Key;
 using testing::Matcher;
 using testing::NiceMock;
 using testing::Property;

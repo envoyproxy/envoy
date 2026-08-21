@@ -1412,9 +1412,7 @@ TEST_F(ProtobufUtilityTest, HashedValueStdHash) {
   set.emplace(hv2);
   set.emplace(hv3);
 
-  EXPECT_EQ(set.size(), 2); // hv1 == hv2
-  EXPECT_TRUE(set.contains(hv1));
-  EXPECT_TRUE(set.contains(hv3));
+  EXPECT_THAT(set, UnorderedElementsAre(hv1, hv3)); // hv1 == hv2
 }
 
 TEST_F(ProtobufUtilityTest, AnyBytes) {

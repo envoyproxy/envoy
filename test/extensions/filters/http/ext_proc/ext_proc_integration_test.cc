@@ -40,6 +40,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "ocpdiag/core/testing/status_matchers.h"
 
@@ -51,6 +52,7 @@ using testing::MatchesRegex;
 using testing::UnorderedElementsAre;
 
 using testing::IsSupersetOf;
+using testing::Key;
 
 namespace Envoy {
 namespace Extensions {
@@ -4019,7 +4021,7 @@ TEST_P(ExtProcIntegrationTest, SendClusterMetadata) {
               Contains(IsStructString("some_string", "some_value")));
 
   const auto& typed_filter_metadata = received_metadata.typed_filter_metadata();
-  EXPECT_TRUE(typed_filter_metadata.contains("cluster_ns_typed"));
+  EXPECT_THAT(typed_filter_metadata, Contains(Key("cluster_ns_typed")));
 
   processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
