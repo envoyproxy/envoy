@@ -1,2 +1,4 @@
 
 try-import ../.bazelrc
+
+build --@rules_rust//rust/settings:extra_exec_rustc_flags=-Clink-self-contained=no

@@ -118,3 +118,11 @@ envoy_pch_library(
         "@spdlog",
     ],
 )
+
+envoy_cc_test_library(
+    name = "quiche_test_main_lib",
+    deps = [
+        ":main",
+        "//test/test_common:test_version_linkstamp",
+    ],
+)

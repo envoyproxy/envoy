@@ -10,6 +10,10 @@ try-import ../.bazelrc
 
 common --repo_env=ANDROID_HOME
 
+# Android SDK/NDK licence acceptance (replaces sdkmanager --licenses)
+common --repo_env=ACCEPTED_ANDROID_SDK_LICENSE_VERSION=30
+common --repo_env=ACCEPTED_ANDROID_NDK_LICENSE_VERSION=r29
+
 # Common flags for all builds
 build --define=hot_restart=disabled
 build --define=tcmalloc=disabled

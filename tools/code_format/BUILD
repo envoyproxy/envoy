@@ -15,14 +15,14 @@ py_binary(
     args = [
         "--path=%s" % PATH,
         "--clang_format_path=$(location //tools/clang-format)",
-        "--buildifier_path=$(location @buildtools//buildifier)",
-        "--buildozer_path=$(location @buildtools//buildozer)",
+        "--buildifier_path=$(location @buildifier_prebuilt//:buildifier)",
+        "--buildozer_path=$(location @buildifier_prebuilt//:buildozer)",
     ],
     data = [
         ":config.yaml",
         "//tools/clang-format",
-        "@buildtools//buildifier",
-        "@buildtools//buildozer",
+        "@buildifier_prebuilt//:buildifier",
+        "@buildifier_prebuilt//:buildozer",
     ],
     deps = [
         requirement("pyyaml"),

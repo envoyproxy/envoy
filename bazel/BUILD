@@ -11,6 +11,7 @@ load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(":deprecated_features.bzl", "check_removed_fips_define")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
+load(":repository_locations_aliases.bzl", "MODULE_NAME_ALIASES")
 
 licenses(["notice"])  # Apache 2
 
@@ -573,7 +574,7 @@ config_setting(
 
 config_setting(
     name = "using_boringssl_fips",
-    flag_values = {":ssl": "@boringssl_fips//:ssl"},
+    flag_values = {":ssl": "@boringssl-fips//:ssl"},
 )
 
 config_setting(
@@ -969,11 +970,12 @@ json_merge(
     | .[1] as $metadata1
     | .[2] as $metadata2
     | ($metadata1 * $metadata2) as $metadata
-    | $versions
+    | $metadata
     | keys
     | reduce .[] as $k ({};
-        . + {($k): (
-          ($versions[$k] + ($metadata[$k] // {}))
+        ($metadata[$k].apparent_name // $k) as $vkey
+        | . + {($k): (
+          ($versions[$vkey] // {}) + $metadata[$k]
           | .version as $ver
           | if .license_url and $ver then
               .license_url |= (
@@ -989,6 +991,70 @@ json_merge(
         ":deps.yaml",
         "@envoy_api//bazel:deps.yaml",
     ],
+)
+
+json_data(
+    name = "all_repository_locations_module_name_aliases",
+    data = MODULE_NAME_ALIASES,
+)
+
+json_merge(
+    name = "bzlmod_all_repository_locations",
+    srcs = [
+        ":all_repository_locations_module_name_aliases",
+        "@envoy_mod_graph//:deps.json",
+    ],
+    filter = """
+    .[0] as $module_aliases
+    | .[1] as $modules
+    | .[2] as $metadata1
+    | .[3] as $metadata2
+    | ($metadata1 * $metadata2) as $metadata
+    | def module_source($dep):
+        if $modules[$dep] then
+          ($modules[$dep] + {module_name: $dep})
+        elif ($dep | startswith("com_google_")) and $modules[$dep | sub("^com_google_"; "")] then
+          (($dep | sub("^com_google_"; "")) as $module_name | $modules[$module_name] + {module_name: $module_name})
+        else
+          ($module_aliases[$dep] // ($dep | gsub("_"; "-"))) as $module_name
+          | if $modules[$module_name] then
+              ($modules[$module_name] + {module_name: $module_name})
+            else null end
+        end;
+      def dependency_source($dep):
+        module_source($dep);
+      $metadata
+      | keys
+      | reduce .[] as $k ({};
+          (dependency_source($k)) as $source
+          | if $source then
+              . + {($k): (
+                ($source + ($metadata[$k] // {}))
+                | .version as $ver
+                | if .license_url and $ver then
+                    .license_url |= (
+                      gsub("{version}"; $ver)
+                      | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
+                      | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
+                    )
+                  else . end
+              )}
+            else .
+            end
+        )
+    """,
+    visibility = ["//visibility:public"],
+    yaml_srcs = [
+        ":deps.yaml",
+        "@envoy_api//bazel:deps.yaml",
+    ],
+)
+
+sh_test(
+    name = "all_repository_locations_test",
+    srcs = ["all_repository_locations_test.sh"],
+    args = ["$(location :all_repository_locations)"],
+    data = [":all_repository_locations"],
 )
 
 # A dependency required by python protobuf
@@ -1096,5 +1162,8 @@ alias(
 
 alias(
     name = "all_repository_locations",
-    actual = ":legacy_all_repository_locations",
+    actual = select({
+        ":bzlmod_mode": ":bzlmod_all_repository_locations",
+        "//conditions:default": ":legacy_all_repository_locations",
+    }),
 )

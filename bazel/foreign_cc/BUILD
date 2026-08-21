@@ -35,7 +35,7 @@ configure_make(
         },
         "//conditions:default": {},
     }),
-    lib_source = "@liburing//:all",
+    lib_source = "@liburing_workspace//:all",
     tags = [
         "nocompdb",
         "skip_on_windows",

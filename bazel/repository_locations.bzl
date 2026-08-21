@@ -80,7 +80,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "aws-c-auth-{version}",
         urls = ["https://github.com/awslabs/aws-c-auth/archive/refs/tags/v{version}.tar.gz"],
     ),
-    liburing = dict(
+    liburing_workspace = dict(
         version = "2.15",
         sha256 = "8d052f2622dcb3678cbaee5ff582a87572672a6c0a56533cdda5b65cb636120a",
         strip_prefix = "liburing-liburing-{version}",
@@ -393,7 +393,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "googletest-{version}",
         urls = ["https://github.com/google/googletest/releases/download/v{version}/googletest-{version}.tar.gz"],
     ),
-    com_google_protobuf = dict(
+    protobuf = dict(
         version = "35.1",
         # When upgrading the protobuf library, please re-run
         # test/common/json:gen_excluded_unicodes to recompute the ranges

@@ -220,6 +220,7 @@ def envoy_dependency_imports(
         importpath = "github.com/planetscale/vtprotobuf",
         sum = "h1:ujRGEVWJEoaxQ+8+HMl8YEpGaDAgohgZxJ5S+d2TTFQ=",
         version = "v0.6.1-0.20240409071808-615f978279ca",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     go_repository(
@@ -227,6 +228,7 @@ def envoy_dependency_imports(
         importpath = "github.com/envoyproxy/protoc-gen-validate",
         sum = "h1:TvGH1wof4H33rezVKWSpqKz5NXWg5VPuZ0uONDT6eb4=",
         version = "v1.3.0",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     rules_proto_grpc_toolchains()

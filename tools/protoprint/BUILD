@@ -17,6 +17,7 @@ py_binary(
         "//tools/clang-format",
         "//tools/type_whisperer:api_type_db.pb_text",
     ],
+    imports = ["external/googleapis~"],
     visibility = ["//visibility:public"],
     deps = [
         ":utils",
@@ -26,9 +27,9 @@ py_binary(
         requirement("packaging"),
         "//tools/type_whisperer",
         "//tools/type_whisperer:api_type_db_proto_py_proto",
-        "@com_google_protobuf//:protobuf_python",
         "@envoy_api//envoy/annotations:pkg_py_proto",
         "@googleapis//google/api:annotations_py_proto",
+        "@protobuf//:protobuf_python",
         "@xds//udpa/annotations:pkg_py_proto",
         "@xds//xds/annotations/v3:pkg_py_proto",
     ],
