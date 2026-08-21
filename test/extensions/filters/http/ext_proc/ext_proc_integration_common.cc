@@ -745,7 +745,7 @@ void ExtProcIntegrationTest::testGetAndCloseStream() {
   verifyDownstreamResponse(*response, 200);
 }
 
-void ExtProcIntegrationTest::testSendDyanmicMetadata() {
+void ExtProcIntegrationTest::testSendDynamicMetadata() {
   Protobuf::Struct test_md_struct;
   (*test_md_struct.mutable_fields())["foo"].set_string_value("value from ext_proc");
 
@@ -759,10 +759,8 @@ void ExtProcIntegrationTest::testSendDyanmicMetadata() {
                     Contains(Key("forwarding_ns_untyped")));
         const Protobuf::Struct& fwd_metadata =
             req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
-        EXPECT_EQ(1, fwd_metadata.fields_size());
-        EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
         EXPECT_THAT(fwd_metadata.fields(),
-                    Contains(IsStructString("foo", "value from set_metadata")));
+                    UnorderedElementsAre(IsStructString("foo", "value from set_metadata")));
 
         // Verify the processing request contains the typed metadata we injected.
         EXPECT_THAT(req.metadata_context().typed_filter_metadata(),
@@ -785,7 +783,7 @@ void ExtProcIntegrationTest::testSendDyanmicMetadata() {
       });
 }
 
-void ExtProcIntegrationTest::testSendTypedDyanmicMetadata() {
+void ExtProcIntegrationTest::testSendTypedDynamicMetadata() {
   envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_to_stuff;
   typed_md_to_stuff.set_metadata_namespace("typed_value from ext_proc");
 
