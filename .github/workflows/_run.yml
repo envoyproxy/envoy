@@ -393,7 +393,9 @@ jobs:
         steps-post: ${{ inputs.steps-post }}
         steps-post-name: ${{ inputs.steps-post-name }}
         summary-post: ${{ inputs.summary-post }}
-        uploads: ${{ inputs.uploads }}
+        uploads: |
+          ${{ inputs.uploads }}
+          junit-xml-${{ inputs.target-name || inputs.target }}-${{ inputs.arch || 'x64' }}: container/envoy/*/generated/test-results/**/*.xml
         warning-match: ${{ inputs.warning-match }}
         working-directory: ${{ inputs.working-directory }}
       env:
@@ -420,14 +422,6 @@ jobs:
         ENVOY_COMMIT: ${{ fromJSON(inputs.request).request.sha }}
         ENVOY_REPO: ${{ github.repository }}
         ENVOY_PUBLISH_DRY_RUN: ${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
-
-    - name: Upload JUnit XML artifact
-      if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v4
-      with:
-        name: junit-xml-${{ inputs.target-name || inputs.target }}-${{ inputs.arch || 'x64' }}
-        path: ${{ runner.temp }}/container/envoy/*/generated/test-results/**/*.xml
-        if-no-files-found: ignore
 
 ######################################################################################################################
 ##
