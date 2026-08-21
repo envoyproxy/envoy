@@ -37,6 +37,7 @@ using testing::Contains;
 using testing::Eq;
 using testing::Key;
 using testing::NotNull;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -866,15 +867,9 @@ TEST(ABIImpl, SetDynamicMetadataStruct) {
       &filter, {ns.data(), ns.size()}, {serialized.data(), serialized.size()});
 
   ASSERT_TRUE(metadata.filter_metadata().contains(ns));
-  EXPECT_EQ(metadata.filter_metadata()
-                .at(ns)
-                .fields()
-                .at("outer")
-                .struct_value()
-                .fields()
-                .at("inner")
-                .string_value(),
-            "value");
+  EXPECT_THAT(metadata.filter_metadata().at(ns).fields(),
+              UnorderedElementsAre(
+                  IsStructStruct("outer", UnorderedElementsAre(IsStructString("inner", "value")))));
 
   // A second struct is merged in: new keys are added, existing keys are preserved.
   Protobuf::Struct second;
@@ -883,15 +878,15 @@ TEST(ABIImpl, SetDynamicMetadataStruct) {
   ASSERT_TRUE(second.SerializeToString(&serialized2));
   envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
       &filter, {ns.data(), ns.size()}, {serialized2.data(), serialized2.size()});
-  EXPECT_THAT(metadata.filter_metadata().at(ns).fields(), Contains(IsStructString("extra", "bar")));
-  EXPECT_TRUE(metadata.filter_metadata().at(ns).fields().contains("outer"));
+  EXPECT_THAT(metadata.filter_metadata().at(ns).fields(),
+              UnorderedElementsAre(IsStructString("extra", "bar"), IsStructStruct("outer", _)));
 
   // A buffer that does not parse as a google.protobuf.Struct is a no-op (wire type 7 is invalid).
   const std::string garbage("\x0f", 1);
   envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(&filter, {ns.data(), ns.size()},
                                                                  {garbage.data(), garbage.size()});
-  EXPECT_THAT(metadata.filter_metadata().at(ns).fields(), Contains(Key("extra")));
-  EXPECT_THAT(metadata.filter_metadata().at(ns).fields(), Contains(Key("outer")));
+  EXPECT_THAT(metadata.filter_metadata().at(ns).fields(),
+              UnorderedElementsAre(IsStructString("extra", "bar"), IsStructStruct("outer", _)));
 }
 
 TEST(ABIImpl, SetDynamicTypedMetadata) {
