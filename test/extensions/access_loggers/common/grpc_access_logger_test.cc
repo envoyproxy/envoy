@@ -21,6 +21,10 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
+#include "test/test_common/struct_matchers.h"
+
+using testing::Contains;
+
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
@@ -172,7 +176,7 @@ public:
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
           EXPECT_TRUE(message.fields().contains(key));
-          EXPECT_EQ(message.fields().at(key).number_value(), count);
+          EXPECT_THAT(message.fields(), Contains(IsStructNumber(key, count)));
         }));
   }
 
@@ -487,7 +491,7 @@ public:
               Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
               EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
               EXPECT_TRUE(message.fields().contains(key));
-              EXPECT_EQ(message.fields().at(key).number_value(), count);
+              EXPECT_THAT(message.fields(), Contains(IsStructNumber(key, count)));
               return nullptr; // We don't care about the returned request.
             }));
   }

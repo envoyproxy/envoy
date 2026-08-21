@@ -20,6 +20,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -34,6 +35,12 @@ using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrEq;
+
+using testing::AllOf;
+using testing::Contains;
+using testing::Field;
+
+using testing::IsSupersetOf;
 
 namespace Envoy {
 namespace Extensions {
@@ -2786,8 +2793,8 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
                                              .fields()
                                              .at("complex")
                                              .struct_value();
-  EXPECT_EQ("abcd", meta_complex.fields().at("x").string_value());
-  EXPECT_EQ(1234.0, meta_complex.fields().at("y").number_value());
+  EXPECT_THAT(meta_complex.fields(), IsSupersetOf(StructMatchers(IsStructString("x", "abcd"),
+                                                                 IsStructNumber("y", 1234.0))));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
@@ -3835,11 +3842,10 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHost) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(
-      decoder_callbacks_,
-      setUpstreamOverrideHost(testing::AllOf(
-          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
-          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, false))));
+  EXPECT_CALL(decoder_callbacks_,
+              setUpstreamOverrideHost(
+                  AllOf(Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+                        Field(&Upstream::LoadBalancerContext::OverrideHost::strict, false))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -3855,11 +3861,10 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostStrict) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(
-      decoder_callbacks_,
-      setUpstreamOverrideHost(testing::AllOf(
-          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
-          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
+  EXPECT_CALL(decoder_callbacks_,
+              setUpstreamOverrideHost(
+                  AllOf(Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+                        Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -3922,11 +3927,10 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostDifferentPaths) {
 
   {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/path1"}};
-    EXPECT_CALL(
-        decoder_callbacks_,
-        setUpstreamOverrideHost(testing::AllOf(
-            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
-            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
+    EXPECT_CALL(decoder_callbacks_,
+                setUpstreamOverrideHost(AllOf(
+                    Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+                    Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   }
 
@@ -3934,11 +3938,10 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostDifferentPaths) {
 
   {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/path2"}};
-    EXPECT_CALL(
-        decoder_callbacks_,
-        setUpstreamOverrideHost(testing::AllOf(
-            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
-            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
+    EXPECT_CALL(decoder_callbacks_,
+                setUpstreamOverrideHost(AllOf(
+                    Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+                    Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   }
 }

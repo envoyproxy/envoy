@@ -34,6 +34,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -41,6 +42,8 @@
 #include "absl/status/status.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
 
 namespace Envoy {
 namespace Formatter {
@@ -54,7 +57,7 @@ using testing::ContainsRegex;
 using testing::HasSubstr;
 using testing::Invoke;
 using testing::NiceMock;
-using ::testing::Not;
+using testing::Not;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
@@ -4860,7 +4863,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
 void verifyStructOutput(Protobuf::Struct output,
                         absl::node_hash_map<std::string, std::string> expected_map) {
   for (const auto& pair : expected_map) {
-    EXPECT_EQ(output.fields().at(pair.first).string_value(), pair.second);
+    EXPECT_THAT(output.fields(), Contains(IsStructString(pair.first, pair.second)));
   }
   for (const auto& pair : output.fields()) {
     EXPECT_TRUE(expected_map.contains(pair.first));

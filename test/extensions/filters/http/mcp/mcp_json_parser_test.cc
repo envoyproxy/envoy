@@ -4,12 +4,16 @@
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::DoubleEq;
 
 namespace Envoy {
 namespace Extensions {
@@ -19,8 +23,8 @@ namespace {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
-using ::testing::HasSubstr;
-using ::testing::Not;
+using testing::HasSubstr;
+using testing::Not;
 using namespace Filters::Common::Mcp::McpConstants;
 
 class McpJsonParserTest : public testing::Test {
@@ -1056,13 +1060,13 @@ TEST(McpFieldExtractorTest, DirectIntegerRendering) {
   const auto& fields = metadata.fields();
 
   ASSERT_TRUE(fields.contains("int32_val"));
-  EXPECT_EQ(fields.at("int32_val").number_value(), -123.0);
+  EXPECT_THAT(fields, Contains(IsStructNumber("int32_val", -123.0)));
 
   ASSERT_TRUE(fields.contains("uint32_val"));
-  EXPECT_EQ(fields.at("uint32_val").number_value(), 456.0);
+  EXPECT_THAT(fields, Contains(IsStructNumber("uint32_val", 456.0)));
 
   ASSERT_TRUE(fields.contains("int64_val"));
-  EXPECT_EQ(fields.at("int64_val").number_value(), -789.0);
+  EXPECT_THAT(fields, Contains(IsStructNumber("int64_val", -789.0)));
 }
 
 TEST_F(McpJsonParserTest, FinishParseWithoutParsing) {
@@ -1101,10 +1105,10 @@ TEST(McpFieldExtractorTest, RenderBytesAndFloat) {
   const auto& fields = metadata.fields();
 
   ASSERT_TRUE(fields.contains("bytes_val"));
-  EXPECT_EQ(fields.at("bytes_val").string_value(), "binary_data");
+  EXPECT_THAT(fields, Contains(IsStructString("bytes_val", "binary_data")));
 
   ASSERT_TRUE(fields.contains("float_val"));
-  EXPECT_FLOAT_EQ(fields.at("float_val").number_value(), 3.14);
+  EXPECT_THAT(fields, Contains(IsStructNumber("float_val", DoubleEq(3.14f))));
 }
 
 TEST_F(McpJsonParserTest, ArrayWithNestedObjectsAndStrings) {

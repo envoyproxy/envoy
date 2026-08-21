@@ -22,6 +22,14 @@ using testing::Mock;
 using testing::Return;
 using testing::ReturnRef;
 
+#include "test/test_common/struct_matchers.h"
+
+using testing::Bool;
+using testing::Contains;
+using testing::IsNull;
+using testing::Optional;
+using testing::StrEq;
+
 namespace Envoy {
 namespace Http {
 
@@ -2716,7 +2724,7 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
   EXPECT_CALL(*handler, log(_, _))
       .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         auto dynamic_meta = stream_info.dynamicMetadata().filter_metadata().at("metadata_key");
-        EXPECT_EQ("value", dynamic_meta.fields().at("field").string_value());
+        EXPECT_THAT(dynamic_meta.fields(), Contains(IsStructString("field", "value")));
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -3105,7 +3113,7 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
             EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
             EXPECT_EQ(stream_info.requestComplete(), std::nullopt);
             EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
-                        testing::IsNull());
+                        IsNull());
           }))
       .WillOnce(Invoke(
           [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
@@ -3126,9 +3134,8 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
           [&](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
             EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
-            EXPECT_THAT(stream_info.responseCodeDetails(),
-                        testing::Optional(testing::StrEq("details")));
-            EXPECT_THAT(stream_info.responseCode(), testing::Optional(200));
+            EXPECT_THAT(stream_info.responseCodeDetails(), Optional(StrEq("details")));
+            EXPECT_THAT(stream_info.responseCode(), Optional(200));
             EXPECT_EQ(stream_info.getDownstreamBytesMeter()
                           ->bytesAtLastDownstreamPeriodicLog()
                           ->wire_bytes_received,
@@ -3790,7 +3797,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(IdleAndFlushTimeoutTestFixture, IdleAndFlushTimeoutTestFixture,
-                         testing::Combine(testing::Bool(), testing::Bool(), testing::Bool()),
+                         testing::Combine(Bool(), Bool(), Bool()),
                          [](const testing::TestParamInfo<std::tuple<bool, bool, bool>>& info) {
                            return absl::StrCat(std::get<0>(info.param) ? "GlobalFlushTimeoutSet"
                                                                        : "NoGlobalFlushTimeout",

@@ -9,8 +9,13 @@
 #include "test/integration/base_integration_test.h"
 #include "test/integration/fake_upstream.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
+
+using testing::Contains;
+
+using testing::IsSupersetOf;
 
 namespace Envoy {
 namespace Extensions {
@@ -864,8 +869,8 @@ TEST_P(NetworkExtProcFilterIntegrationTest, UntypedMetadataForwarding) {
   const auto& metadata = request.metadata().filter_metadata().at("test-namespace");
   EXPECT_TRUE(metadata.fields().contains("key1"));
   EXPECT_TRUE(metadata.fields().contains("key2"));
-  EXPECT_EQ(metadata.fields().at("key1").string_value(), "value1");
-  EXPECT_EQ(metadata.fields().at("key2").string_value(), "value2");
+  EXPECT_THAT(metadata.fields(), IsSupersetOf(StructMatchers(IsStructString("key1", "value1"),
+                                                             IsStructString("key2", "value2"))));
 
   sendReadGrpcMessage("client_data_inspected", true, true);
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
@@ -902,11 +907,11 @@ TEST_P(NetworkExtProcFilterIntegrationTest, MultipleUntypedNamespaces) {
   // Verify metadata values
   const auto& metadata1 = request.metadata().filter_metadata().at("namespace1");
   EXPECT_TRUE(metadata1.fields().contains("key1"));
-  EXPECT_EQ(metadata1.fields().at("key1").string_value(), "value1");
+  EXPECT_THAT(metadata1.fields(), Contains(IsStructString("key1", "value1")));
 
   const auto& metadata2 = request.metadata().filter_metadata().at("namespace2");
   EXPECT_TRUE(metadata2.fields().contains("key2"));
-  EXPECT_EQ(metadata2.fields().at("key2").string_value(), "value2");
+  EXPECT_THAT(metadata2.fields(), Contains(IsStructString("key2", "value2")));
 
   sendReadGrpcMessage("client_data_inspected", true, true);
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
@@ -1032,7 +1037,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, BothTypedAndUntypedMetadataForwardin
   EXPECT_TRUE(request.metadata().filter_metadata().contains("untyped-ns"));
   const auto& untyped_metadata = request.metadata().filter_metadata().at("untyped-ns");
   EXPECT_TRUE(untyped_metadata.fields().contains("key1"));
-  EXPECT_EQ(untyped_metadata.fields().at("key1").string_value(), "value1");
+  EXPECT_THAT(untyped_metadata.fields(), Contains(IsStructString("key1", "value1")));
 
   // Verify typed metadata
   EXPECT_TRUE(request.metadata().typed_filter_metadata().contains("typed-ns"));

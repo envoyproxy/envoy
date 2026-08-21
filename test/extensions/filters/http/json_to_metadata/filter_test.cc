@@ -10,10 +10,13 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
 
 namespace Envoy {
 namespace Extensions {
@@ -24,7 +27,7 @@ MATCHER_P(MapEq, rhs, "") {
   const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
-    EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
+    EXPECT_THAT(obj.fields(), Contains(IsStructString(entry.first, entry.second)));
   }
   return true;
 }
