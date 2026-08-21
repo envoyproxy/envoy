@@ -84,13 +84,13 @@ public:
     http_status: 429
   )EOF";
 
-  const std::string abort_with_error_message_yaml = R"EOF(
+  const std::string abort_with_response_body_yaml = R"EOF(
   abort:
     percentage:
       numerator: 100
       denominator: HUNDRED
     http_status: 429
-    error_message: "custom error message"
+    response_body: "custom response body"
   )EOF";
 
   const std::string fixed_delay_and_abort_yaml = R"EOF(
@@ -294,8 +294,8 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
-TEST_F(FaultFilterTest, AbortWithHttpStatusAndErrorMessage) {
-  setUpTest(abort_with_error_message_yaml);
+TEST_F(FaultFilterTest, AbortWithHttpStatusAndResponseBody) {
+  setUpTest(abort_with_response_body_yaml);
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
@@ -322,7 +322,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatusAndErrorMessage) {
               encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true))
       .WillOnce(
-          [](Buffer::Instance& data, bool) { EXPECT_EQ("custom error message", data.toString()); });
+          [](Buffer::Instance& data, bool) { EXPECT_EQ("custom response body", data.toString()); });
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));

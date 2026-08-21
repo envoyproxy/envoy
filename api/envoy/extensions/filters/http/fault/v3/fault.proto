@@ -55,8 +55,9 @@ message FaultAbort {
   // provided.
   type.v3.FractionalPercent percentage = 3;
 
-  // The error message to be used as the response body when aborting the request.
-  string error_message = 6;
+  // The response body to be returned when aborting the request.
+  // If not specified, defaults to "fault filter abort".
+  string response_body = 6;
 }
 
 // [#next-free-field: 17]

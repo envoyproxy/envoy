@@ -479,8 +479,8 @@ void FaultFilter::abortWithStatus(Http::Code http_status_code,
       fault_settings_->filterMetadata();
   absl::string_view body = "fault filter abort";
   if (fault_settings_->requestAbort() != nullptr &&
-      !fault_settings_->requestAbort()->errorMessage().empty()) {
-    body = fault_settings_->requestAbort()->errorMessage();
+      !fault_settings_->requestAbort()->responseBody().empty()) {
+    body = fault_settings_->requestAbort()->responseBody();
   }
   decoder_callbacks_->sendLocalReply(http_status_code, body, nullptr, grpc_status,
                                      RcDetails::get().FaultAbort);

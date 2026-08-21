@@ -37,7 +37,7 @@ HeaderPercentageProvider::percentage(const Http::RequestHeaderMap* request_heade
 
 FaultAbortConfig::FaultAbortConfig(
     const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config)
-    : error_message_(abort_config.error_message()) {
+    : response_body_(abort_config.response_body()) {
   switch (abort_config.error_type_case()) {
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
     provider_ =
