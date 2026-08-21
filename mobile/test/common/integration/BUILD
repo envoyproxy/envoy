@@ -69,6 +69,23 @@ envoy_cc_test_library_with_engine_builder(
     ],
 )
 
+envoy_cc_test_library(
+    name = "fake_factory_contexts_lib",
+    hdrs = ["fake_factory_contexts.h"],
+    repository = "@envoy",
+    deps = [
+        "@envoy//envoy/api:api_interface",
+        "@envoy//envoy/server:factory_context_interface",
+        "@envoy//envoy/server:lifecycle_notifier_interface",
+        "@envoy//envoy/server:options_interface",
+        "@envoy//source/common/common:assert_lib",
+        "@envoy//source/common/protobuf:message_validator_lib",
+        "@envoy//source/common/secret:secret_manager_impl_lib",
+        "@envoy//source/common/singleton:manager_impl_lib",
+        "@envoy//source/common/tls:context_lib",
+    ],
+)
+
 # interface libs for test servers` jni implementations
 envoy_cc_test_library(
     name = "test_server_lib",
@@ -83,14 +100,13 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
+        ":fake_factory_contexts_lib",
         "//library/common:engine_common_lib",
         "@envoy//bazel:cpp_runfiles",
         "@envoy//source/common/listener_manager:listener_manager_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",
-        "@envoy//test/mocks/server:factory_context_mocks",
-        "@envoy//test/mocks/server:server_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
         "@envoy_build_config//:extension_registry",
     ] + envoy_select_signal_trace(

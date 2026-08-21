@@ -125,6 +125,10 @@ baseProxyConfig(Network::Address::IpVersion version, bool http, int port) {
 
 TestServer::TestServer()
     : api_(Api::createApiForTest(stats_store_, time_system_)),
+      server_factory_context_(std::make_unique<FakeServerFactoryContext>(
+          *api_, time_system_, *stats_store_.rootScope())),
+      factory_context_(std::make_unique<FakeTransportSocketFactoryContext>(
+          *server_factory_context_, *stats_store_.rootScope())),
       version_(TestEnvironment::getIpVersionsForTest()[0]), upstream_config_(time_system_),
       port_(0) {
   std::string runfiles_error;
@@ -135,11 +139,6 @@ TestServer::TestServer()
                      runfiles_ != nullptr,
                  runfiles_error);
   TestEnvironment::setRunfiles(runfiles_.get());
-  ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-  ON_CALL(factory_context_, statsScope())
-      .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
-  ON_CALL(factory_context_.server_context_, sslContextManager())
-      .WillByDefault(testing::ReturnRef(context_manager_));
 
   Envoy::ExtensionRegistry::registerFactories();
 }
@@ -165,11 +164,11 @@ void TestServer::start(TestServerType type, int port) {
     // envoy.quic.crypto_stream.server.quiche
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP3;
     upstream_config_.udp_fake_upstream_ = FakeUpstreamConfig::UdpConfig();
-    factory = createQuicUpstreamTlsContext(factory_context_);
+    factory = createQuicUpstreamTlsContext(*factory_context_);
     break;
   case TestServerType::HTTP2_WITH_TLS:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
-    factory = createUpstreamTlsContext(factory_context_, /* add_alpn= */ true);
+    factory = createUpstreamTlsContext(*factory_context_, /* add_alpn= */ true);
     break;
   case TestServerType::HTTP1_WITHOUT_TLS:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP1;
@@ -177,7 +176,7 @@ void TestServer::start(TestServerType type, int port) {
     break;
   case TestServerType::HTTP1_WITH_TLS:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP1;
-    factory = createUpstreamTlsContext(factory_context_, /* add_alpn= */ false);
+    factory = createUpstreamTlsContext(*factory_context_, /* add_alpn= */ false);
     break;
   case TestServerType::HTTP_PROXY: {
     Server::forceRegisterDefaultListenerManagerFactoryImpl();
@@ -309,9 +308,8 @@ void TestServer::setResponse(const absl::flat_hash_map<std::string, std::string>
 }
 
 Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsContext(
-    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
+    FakeTransportSocketFactoryContext& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{server_factory_context_};
   tls_context.mutable_common_tls_context()->add_alpn_protocols("h3");
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -331,8 +329,7 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
 }
 
 Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContext(
-    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context,
-    bool add_alpn) {
+    FakeTransportSocketFactoryContext& factory_context, bool add_alpn) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -350,7 +347,8 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContex
       tls_context, factory_context, {}, false);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-      std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
+      std::move(cfg), server_factory_context_->sslContextManager(),
+      *upstream_stats_store->rootScope());
 }
 
 } // namespace Envoy
