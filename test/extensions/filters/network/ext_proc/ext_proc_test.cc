@@ -14,6 +14,7 @@
 #include "gtest/gtest.h"
 
 using testing::Contains;
+using testing::UnorderedElementsAre;
 
 using testing::IsSupersetOf;
 
@@ -1687,8 +1688,8 @@ TEST_F(NetworkExtProcFilterTest, SendRequestWithConnectionAttributes) {
     EXPECT_EQ(1, req.attributes().size());
     auto proto_struct = req.attributes().at("envoy.filters.network.ext_proc");
     EXPECT_THAT(proto_struct.fields(),
-                IsSupersetOf(StructMatchers(IsStructBool("connection.mtls", false),
-                                            IsStructNumber("connection.id", 12345))));
+                UnorderedElementsAre(IsStructBool("connection.mtls", false),
+                                     IsStructNumber("connection.id", 12345)));
   });
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));

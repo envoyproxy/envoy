@@ -14,6 +14,7 @@
 #include "test/test_common/utility.h"
 
 using testing::Contains;
+using testing::UnorderedElementsAre;
 
 using testing::IsSupersetOf;
 
@@ -869,8 +870,8 @@ TEST_P(NetworkExtProcFilterIntegrationTest, UntypedMetadataForwarding) {
   const auto& metadata = request.metadata().filter_metadata().at("test-namespace");
   EXPECT_TRUE(metadata.fields().contains("key1"));
   EXPECT_TRUE(metadata.fields().contains("key2"));
-  EXPECT_THAT(metadata.fields(), IsSupersetOf(StructMatchers(IsStructString("key1", "value1"),
-                                                             IsStructString("key2", "value2"))));
+  EXPECT_THAT(metadata.fields(), UnorderedElementsAre(IsStructString("key1", "value1"),
+                                                      IsStructString("key2", "value2")));
 
   sendReadGrpcMessage("client_data_inspected", true, true);
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));

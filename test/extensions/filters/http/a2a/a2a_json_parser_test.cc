@@ -204,7 +204,7 @@ TEST_F(A2aJsonParserTest, ParseMessageSendMultiChunks) {
   EXPECT_EQ(parser_.getMethod(), "message/send");
   EXPECT_THAT(
       parser_.metadata().fields(),
-      IsSupersetOf(StructMatchers(
+      UnorderedElementsAre(
           IsStructString("jsonrpc", "2.0"), IsStructString("method", "message/send"),
           IsStructString("id", "123"),
           IsStructStruct(
@@ -223,7 +223,7 @@ TEST_F(A2aJsonParserTest, ParseMessageSendMultiChunks) {
                                   IsStructString("type", "text"),
                                   IsStructString("text",
                                                  "Can you analyze the attached CSV for Q3 sales "
-                                                 "trends?"))))))))))));
+                                                 "trends?")))))))))));
 }
 
 TEST_F(A2aJsonParserTest, ParseTasksGet) {

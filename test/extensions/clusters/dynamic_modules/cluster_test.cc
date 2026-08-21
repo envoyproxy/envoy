@@ -34,6 +34,7 @@
 using testing::An;
 using testing::Contains;
 using testing::HasSubstr;
+using testing::UnorderedElementsAre;
 
 using testing::IsSupersetOf;
 
@@ -3477,9 +3478,8 @@ TEST_F(DynamicModuleClusterTest, AddHostsWithLocalityAndMetadata) {
   const auto& filter_metadata = hosts[0]->metadata()->filter_metadata();
   auto it = filter_metadata.find("envoy.lb");
   ASSERT_NE(it, filter_metadata.end());
-  EXPECT_THAT(it->second.fields(),
-              IsSupersetOf(StructMatchers(IsStructString("shard", "42"),
-                                          IsStructString("service", "my-service"))));
+  EXPECT_THAT(it->second.fields(), UnorderedElementsAre(IsStructString("shard", "42"),
+                                                        IsStructString("service", "my-service")));
 }
 
 // Test adding hosts with locality via the ABI callback.

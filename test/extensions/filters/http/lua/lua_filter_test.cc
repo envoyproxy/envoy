@@ -39,6 +39,7 @@ using testing::StrEq;
 using testing::AllOf;
 using testing::Contains;
 using testing::Field;
+using testing::UnorderedElementsAre;
 
 using testing::IsSupersetOf;
 
@@ -2793,8 +2794,8 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
                                              .fields()
                                              .at("complex")
                                              .struct_value();
-  EXPECT_THAT(meta_complex.fields(), IsSupersetOf(StructMatchers(IsStructString("x", "abcd"),
-                                                                 IsStructNumber("y", 1234.0))));
+  EXPECT_THAT(meta_complex.fields(),
+              UnorderedElementsAre(IsStructString("x", "abcd"), IsStructNumber("y", 1234.0)));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }

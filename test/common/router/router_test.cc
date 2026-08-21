@@ -67,6 +67,7 @@ using testing::Bool;
 using testing::Contains;
 using testing::Eq;
 using testing::NotNull;
+using testing::UnorderedElementsAre;
 
 using testing::IsSupersetOf;
 
@@ -6338,8 +6339,8 @@ filter_metadata:
         EXPECT_NE(it, options.metadata.filter_metadata().end());
         const auto& fields = it->second.fields();
         // Request-level value wins; connection-only value is preserved.
-        EXPECT_THAT(fields, IsSupersetOf(StructMatchers(IsStructString("version", "v2"),
-                                                        IsStructString("from_connection", "yes"))));
+        EXPECT_THAT(fields, UnorderedElementsAre(IsStructString("version", "v2"),
+                                                 IsStructString("from_connection", "yes")));
         return &foo_request;
       }));
 
@@ -6424,8 +6425,8 @@ filter_metadata:
             options.metadata.filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
         EXPECT_NE(it, options.metadata.filter_metadata().end());
         const auto& fields = it->second.fields();
-        EXPECT_THAT(fields, IsSupersetOf(StructMatchers(IsStructString("version", "v1"),
-                                                        IsStructString("from_connection", "yes"))));
+        EXPECT_THAT(fields, UnorderedElementsAre(IsStructString("version", "v1"),
+                                                 IsStructString("from_connection", "yes")));
         return &foo_request;
       }));
 

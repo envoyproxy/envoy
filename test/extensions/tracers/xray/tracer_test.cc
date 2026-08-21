@@ -21,6 +21,7 @@
 #include "gtest/gtest.h"
 
 using testing::Contains;
+using testing::UnorderedElementsAre;
 
 using testing::IsSupersetOf;
 
@@ -106,10 +107,10 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
     EXPECT_FALSE(s.fault());    /*server error*/
     EXPECT_FALSE(s.error());    /*client error*/
     EXPECT_FALSE(s.throttle()); /*request throttled*/
-    EXPECT_THAT(s.http().response().fields(),
-                IsSupersetOf(StructMatchers(
-                    IsStructNumber(Tracing::Tags::get().Status, expected_status_code),
-                    IsStructNumber("content_length", expected_content_length))));
+    EXPECT_THAT(
+        s.http().response().fields(),
+        UnorderedElementsAre(IsStructNumber(Tracing::Tags::get().Status, expected_status_code),
+                             IsStructNumber("content_length", expected_content_length)));
     EXPECT_THAT(
         s.http().request().fields(),
         IsSupersetOf(StructMatchers(IsStructString("client_ip", expected_client_ip),
@@ -157,10 +158,10 @@ TEST_F(XRayTracerTest, SerializeSpanTestXForwardedForSet) {
     EXPECT_FALSE(s.fault());    /*server error*/
     EXPECT_FALSE(s.error());    /*client error*/
     EXPECT_FALSE(s.throttle()); /*request throttled*/
-    EXPECT_THAT(s.http().response().fields(),
-                IsSupersetOf(StructMatchers(
-                    IsStructNumber(Tracing::Tags::get().Status, expected_status_code),
-                    IsStructNumber("content_length", expected_content_length))));
+    EXPECT_THAT(
+        s.http().response().fields(),
+        UnorderedElementsAre(IsStructNumber(Tracing::Tags::get().Status, expected_status_code),
+                             IsStructNumber("content_length", expected_content_length)));
     EXPECT_THAT(
         s.http().request().fields(),
         IsSupersetOf(StructMatchers(IsStructString("client_ip", expected_client_ip),

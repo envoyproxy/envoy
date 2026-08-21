@@ -19,6 +19,7 @@
 #include "gtest/gtest.h"
 
 using testing::Contains;
+using testing::UnorderedElementsAre;
 
 using testing::IsSupersetOf;
 
@@ -863,8 +864,8 @@ TEST_F(AwsEventstreamParserFilterTest, MultipleDeferredFallbackActions) {
   EXPECT_EQ(2, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_THAT(metadata.fields(), IsSupersetOf(StructMatchers(IsStructNumber("tokens", 0),
-                                                             IsStructNumber("input_tokens", 99))));
+  EXPECT_THAT(metadata.fields(), UnorderedElementsAre(IsStructNumber("tokens", 0),
+                                                      IsStructNumber("input_tokens", 99)));
 }
 
 // Test on_missing without a value field does not write metadata (covers !action.value.has_value()).
@@ -946,8 +947,8 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleStringExtraction) {
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
   EXPECT_THAT(metadata.fields(),
-              IsSupersetOf(StructMatchers(IsStructString("event_type", "ContentBlockDelta"),
-                                          IsStructNumber("tokens", 42))));
+              UnorderedElementsAre(IsStructString("event_type", "ContentBlockDelta"),
+                                   IsStructNumber("tokens", 42)));
 }
 
 // Test int32 header extraction.
@@ -1841,9 +1842,8 @@ TEST_F(AwsEventstreamParserFilterTest, ContentParserStopWithSatisfiedHeaderRules
 
   EXPECT_EQ(2, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_THAT(metadata.fields(),
-              IsSupersetOf(StructMatchers(IsStructNumber("tokens", 50),
-                                          IsStructString("event_type", "MessageStop"))));
+  EXPECT_THAT(metadata.fields(), UnorderedElementsAre(IsStructNumber("tokens", 50),
+                                                      IsStructString("event_type", "MessageStop")));
 }
 
 // Test that allHeaderRulesSatisfied() returns false when a header rule has
@@ -1948,9 +1948,8 @@ TEST_F(AwsEventstreamParserFilterTest, ContentParserStopButHeaderRuleNotYetSatis
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data3, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_THAT(metadata.fields(),
-              IsSupersetOf(StructMatchers(IsStructNumber("tokens", 10),
-                                          IsStructString("event_type", "Found"))));
+  EXPECT_THAT(metadata.fields(), UnorderedElementsAre(IsStructNumber("tokens", 10),
+                                                      IsStructString("event_type", "Found")));
 }
 
 // Test header on_missing with default (empty) namespace.

@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 
 using testing::Contains;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Config {
@@ -113,9 +114,8 @@ TEST(RegistryTest, VersionedFactory) {
   EXPECT_EQ(2, version.value().version().major_number());
   EXPECT_EQ(5, version.value().version().minor_number());
   EXPECT_EQ(39, version.value().version().patch());
-  EXPECT_EQ(1, version.value().metadata().fields().size());
   EXPECT_THAT(version.value().metadata().fields(),
-              Contains(IsStructString("build.label", "alpha")));
+              UnorderedElementsAre(IsStructString("build.label", "alpha")));
 }
 
 TEST(RegistryTest, TestDoubleRegistrationByName) {

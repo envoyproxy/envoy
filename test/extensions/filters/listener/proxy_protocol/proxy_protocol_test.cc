@@ -54,6 +54,7 @@ using testing::ReturnRef;
 
 using testing::Contains;
 using testing::HasSubstr;
+using testing::UnorderedElementsAre;
 
 using testing::IsSupersetOf;
 
@@ -2370,9 +2371,8 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateSerializeMethods) {
   ASSERT_NE(nullptr, proto);
   const auto* struct_proto = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(proto.get());
   ASSERT_NE(nullptr, struct_proto);
-  EXPECT_EQ(1, struct_proto->fields().size());
-  EXPECT_EQ(1, struct_proto->fields().count("PP2 type authority"));
-  EXPECT_THAT(struct_proto->fields(), Contains(IsStructString("PP2 type authority", "foo.com")));
+  EXPECT_THAT(struct_proto->fields(),
+              UnorderedElementsAre(IsStructString("PP2 type authority", "foo.com")));
 
   // Test serializeAsString
   auto json_str = tlv_obj->serializeAsString();

@@ -23,6 +23,7 @@ using testing::ReturnRef;
 
 using testing::Contains;
 using testing::ElementsAre;
+using testing::UnorderedElementsAre;
 
 using testing::IsSupersetOf;
 
@@ -572,8 +573,8 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetComplexDynamicMetadata) {
                                          .struct_value();
 
   EXPECT_THAT(meta_foo.fields(),
-              IsSupersetOf(StructMatchers(IsStructNumber("x", 1234.0), IsStructString("y", "baz"),
-                                          IsStructBool("z", true))));
+              UnorderedElementsAre(IsStructNumber("x", 1234.0), IsStructString("y", "baz"),
+                                   IsStructBool("z", true)));
 
   const Protobuf::ListValue& meta_so =
       stream_info.dynamicMetadata().filter_metadata().at("envoy.lb").fields().at("so").list_value();

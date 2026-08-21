@@ -24,6 +24,7 @@ using testing::ReturnRef;
 #include "test/test_common/struct_matchers.h"
 
 using testing::Contains;
+using testing::UnorderedElementsAre;
 
 using testing::IsSupersetOf;
 
@@ -366,10 +367,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
 
   auto filter_meta =
       stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
-  EXPECT_THAT(filter_meta.fields(),
-              IsSupersetOf(StructMatchers(
-                  IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"),
-                  IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"))));
+  EXPECT_THAT(
+      filter_meta.fields(),
+      UnorderedElementsAre(IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"),
+                           IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed")));
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, DelayDenied) {
@@ -500,10 +501,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherDenied) {
 
   auto filter_meta =
       stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
-  EXPECT_THAT(filter_meta.fields(),
-              IsSupersetOf(StructMatchers(
-                  IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"),
-                  IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"))));
+  EXPECT_THAT(
+      filter_meta.fields(),
+      UnorderedElementsAre(IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"),
+                           IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed")));
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherNetworkNamespaceAllowed) {
