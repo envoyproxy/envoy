@@ -404,29 +404,34 @@ public:
 
     auto& ctximpl = static_cast<ContextImpl&>(*context);
 
-    // Use allow_failed=false so the authenticator surfaces the original
-    // verification status (e.g. JwtExpired) instead of collapsing it to Ok.
-    // allow_missing=true keeps "no token" reported as Ok via the missing
-    // path. The verifier itself collapses any remaining failure into Ok
-    // below, since extract-only mode never fails the request.
+    // extract_only=true makes the authenticator decode any present JWT and forward its
+    // claims/payload WITHOUT any issuer/JWKS/signature/time/audience validation, always
+    // reporting Ok. allow_missing=true keeps "no token" reported via the missing path.
+    // allow_failed=false is retained for the guard-off fallback: if the extract_only
+    // runtime flag is disabled, the old verify-then-report path runs and still surfaces
+    // the real verification status.
     auto auth = auth_factory_.create(nullptr, std::nullopt,
                                      /*=allow failed*/ false,
-                                     /*=allow missing*/ true);
+                                     /*=allow missing*/ true,
+                                     /*=extract only*/ true);
 
     extractor_->sanitizeHeaders(ctximpl.headers());
+    auto tokens = extractor_->extract(ctximpl.headers());
+    // Capture token presence before moving the tokens into verify(). Extract-only never
+    // verifies, so the status header can no longer key off a failure status; it now flags
+    // that forwarded-but-unverified claims are present.
+    const bool jwt_present = !tokens.empty();
     auth->verify(
-        ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
+        ctximpl.headers(), ctximpl.parentSpan(), std::move(tokens),
         [&ctximpl](const std::string& name, const Protobuf::Struct& extracted_data) {
           ctximpl.addExtractedData(name, extracted_data);
         },
-        [this, &ctximpl](const Status& status) {
+        [this, &ctximpl, jwt_present](const Status& status) {
           ENVOY_LOG(debug, "JWT extraction completed with status: {}, treating as success",
                     static_cast<int>(status));
-          // Status::Ok means verification succeeded; Status::JwtMissed means
-          // no token was present (collapsed by allow_missing). Any other
-          // status is a real verification failure — signal downstream that
-          // the forwarded claims are unverified.
-          if (status != Status::Ok && status != Status::JwtMissed &&
+          // A JWT was present and its claims were forwarded without verification: signal
+          // downstream that the forwarded claims are unverified.
+          if (jwt_present &&
               Runtime::runtimeFeatureEnabled(
                   "envoy.reloadable_features.jwt_authn_add_verification_status_header")) {
             ctximpl.headers().setCopy(verification_status_header_, kVerificationStatusValue);

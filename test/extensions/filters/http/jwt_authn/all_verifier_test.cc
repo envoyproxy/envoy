@@ -32,6 +32,9 @@ providers:
       value_prefix: ""
     forward_payload_header: "x-example-payload"
     forward: true
+    claim_to_headers:
+    - header_name: "x-example-claim-sub"
+      claim_name: "sub"
     local_jwks:
       inline_string: ""
   other_provider:
@@ -41,6 +44,10 @@ providers:
       value_prefix: ""
     forward_payload_header: "x-other-payload"
     forward: true
+    claim_to_headers:
+    - header_name: "x-other-claim-sub"
+      claim_path:
+      - key: "sub"
     local_jwks:
       inline_string: ""
 rules:
@@ -63,6 +70,13 @@ MATCHER_P(JwtOutputSuccess, jwt_header, "") {
 MATCHER_P(JwtOutputFailedOrIgnore, jwt_header, "") {
   auto payload_header = absl::StrCat(jwt_header, "-payload");
   return !arg.has(payload_header);
+}
+
+// Returns true if the `<jwt_header>-claim-sub` header (populated from the JWT's `sub` claim via
+// claim_to_headers) is present.
+MATCHER_P(JwtClaimForwarded, jwt_header, "") {
+  auto claim_header = absl::StrCat(jwt_header, "-claim-sub");
+  return arg.has(claim_header);
 }
 
 class AllVerifierTest : public testing::Test {
@@ -648,7 +662,12 @@ TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, BadJwt) {
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+  // extract_only_without_validation decodes and forwards claims even for a JWT that would fail
+  // validation (here: expired). The payload and claim_to_headers output must be present.
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtClaimForwarded(kExampleHeader));
+  // The forwarded claims are unverified, so the status header is stamped.
+  EXPECT_EQ(headers.get_("x-jwt-signature-verified"), "false");
 }
 
 TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, OneGoodJwt) {
@@ -669,24 +688,25 @@ TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, TwoGoodJwts) {
   EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
 }
 
-// Test: Verification status header is NOT set when JWT is valid.
-TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest,
-       VerificationStatusHeaderNotSetOnGoodJwt) {
+// Test: In extract-only mode the JWT is never verified, so the "unverified" status header is set
+// whenever a token is present — including a structurally-good one.
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHeaderSetOnGoodJwt) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  // Good JWT verified successfully — no "unverified" header should be set.
-  EXPECT_TRUE(headers.get_("x-jwt-signature-verified").empty());
+  // No signature verification is ever performed in extract-only mode; a forwarded token is always
+  // flagged as unverified.
+  EXPECT_EQ(headers.get_("x-jwt-signature-verified"), "false");
 }
 
-// Test: Verification status header IS set when JWT fails verification.
+// Test: Verification status header IS set when a JWT that would fail verification is present.
 TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHeaderSetOnBadJwt) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  // Expired JWT failed verification — header should be set to "false".
+  // Expired JWT forwarded without verification — header should be set to "false".
   EXPECT_EQ(headers.get_("x-jwt-signature-verified"), "false");
 }
 
@@ -744,15 +764,44 @@ TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, GoodAndBadJwts) {
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
+  // Both tokens are decoded and forwarded without validation. Note ExpiredToken's issuer is also
+  // https://example.com, so BOTH tokens resolve to example_provider and forward into its
+  // x-example-payload / x-example-claim-sub headers regardless of which request header they arrived
+  // in. Nothing is written to the x-other headers.
   EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtClaimForwarded(kExampleHeader));
   EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
 }
 
-TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, InvalidFormatJwt) {
+// NonExistKidToken is structurally valid but its signature references a kid absent from the JWKS
+// (the "no usable JWKS" case from issue #39930). extract_only_without_validation must still decode
+// and forward its claims — this is the exact behavior the feature was created to provide.
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, ForwardsClaimsOnUnverifiableJwt) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, NonExistKidToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
+  // Claims and payload ARE forwarded even though the signature cannot be verified.
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtClaimForwarded(kExampleHeader));
+  EXPECT_EQ(headers.get_("x-example-claim-sub"), "test@example.com");
+  // The forwarded claims are flagged unverified.
+  EXPECT_EQ(headers.get_("x-jwt-signature-verified"), "false");
+}
+
+// With the runtime guard disabled, extract-only reverts to the old behavior: an unverifiable JWT's
+// claims are NOT forwarded (extraction happened only on the verification-success path).
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, GuardDisabledDropsUnverifiableJwt) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.jwt_authn_extract_only_forwards_unverified_claims", "false"}});
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, NonExistKidToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // Old (pre-fix) behavior: no claims forwarded because the signature could not be verified.
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
 }
 
 class ExtractOnlyWithoutValidationInOrListTest : public AllVerifierTest {
@@ -782,7 +831,10 @@ TEST_F(ExtractOnlyWithoutValidationInOrListTest, BadJwt) {
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+  // The example_provider leg fails (expired) and does not complete the OR, so the
+  // extract_only_without_validation leg runs and forwards the claims unverified.
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtClaimForwarded(kExampleHeader));
 }
 
 TEST_F(ExtractOnlyWithoutValidationInOrListTest, OneGoodJwt) {
@@ -892,7 +944,10 @@ TEST_F(ExtractOnlyWithoutValidationInNestedListTest, BadJwt) {
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+  // In each nested OR, the provider leg fails on the expired token, so the
+  // extract_only_without_validation leg runs and forwards the claims unverified.
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtClaimForwarded(kExampleHeader));
 }
 
 TEST_F(ExtractOnlyWithoutValidationInNestedListTest, OneGoodJwt) {
@@ -919,8 +974,12 @@ TEST_F(ExtractOnlyWithoutValidationInNestedListTest, WrongIssuers) {
       Http::TestRequestHeaderMapImpl{{kExampleHeader, OtherGoodToken}, {kOtherHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
-  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
+  // Extract-only ignores the issuer for validation but resolves the provider config by issuer:
+  // OtherGoodToken (iss=other.com) forwards via other_provider -> x-other-payload; GoodToken
+  // (iss=example.com) forwards via example_provider -> x-example-payload. Both are forwarded
+  // unverified, so both payload headers are present.
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
 }
 
 class ExtractOnlyWithoutValidationVsAllowMissingTest : public AllVerifierTest {
@@ -942,7 +1001,10 @@ requires_any:
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
+  // The example_provider leg fails (expired); the extract_only_without_validation leg then forwards
+  // the claims unverified. (Contrast with AllowMissingWithBadJwt below, which does NOT forward.)
+  EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
+  EXPECT_THAT(headers, JwtClaimForwarded(kExampleHeader));
 }
 
 TEST_F(ExtractOnlyWithoutValidationVsAllowMissingTest, AllowMissingWithBadJwt) {
