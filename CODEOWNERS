@@ -456,6 +456,7 @@
 # Cluster specifier
 /*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
 /*/extensions/router/cluster_specifiers/matcher @wbpcode @agrawroh
+/*/extensions/router/cluster_specifiers/priority_group @wbpcode @kanurag94
 
 # Queue policy
 /*/extensions/queue_policy/common @nezdolik @yanavlasov @tonya11en @balrawi-figma
