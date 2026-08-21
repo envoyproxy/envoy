@@ -23,6 +23,7 @@
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/upstream_address.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/common/router/route_fuzz.pb.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/fuzz/utility.h"
@@ -1547,6 +1548,157 @@ virtual_hosts:
                         creation_status_);
   EXPECT_THAT(creation_status_,
               HasStatusMessage(testing::HasSubstr("Failed to create host rewrite formatter: ")));
+}
+
+// Verify that an extension formatter (CommandParserFactory) used in a route header value without
+// declaring it in the route config 'formatters' field fails with a clear error, even when the
+// extension is registered in the factory registry. Extension formatters must be explicitly
+// declared to be usable in header values.
+TEST_F(RouteMatcherTest, TestRouteHeadersExtensionFormatterUndeclared) {
+  Envoy::Formatter::TestCommandFactory test_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(test_factory);
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: test
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+        route:
+          cluster: "www2"
+        request_headers_to_add:
+          - header:
+              key: x-custom
+              value: "%COMMAND_EXTENSION()%"
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_TRUE(absl::StrContains(creation_status_.message(),
+                                "Not supported field in StreamInfo: COMMAND_EXTENSION"));
+}
+
+// Verify that declaring an extension formatter (CommandParserFactory) in the route config
+// 'formatters' field makes it available for use in header values at the virtual host and route
+// levels, and that it evaluates correctly.
+TEST_F(RouteMatcherTest, TestRouteHeadersWithDeclaredExtensionFormatter) {
+  Envoy::Formatter::TestCommandFactory test_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(test_factory);
+
+  const std::string yaml = R"EOF(
+formatters:
+  - name: envoy.formatter.TestFormatter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+virtual_hosts:
+  - name: test
+    domains: ["*"]
+    request_headers_to_add:
+      - header:
+          key: x-vhost-custom
+          value: "%COMMAND_EXTENSION()%"
+    routes:
+      - match:
+          prefix: "/"
+        route:
+          cluster: "www2"
+        request_headers_to_add:
+          - header:
+              key: x-route-custom
+              value: "%COMMAND_EXTENSION()%"
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  ASSERT_TRUE(creation_status_.ok()) << creation_status_.message();
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  const Formatter::Context formatter_context(&headers);
+  route_entry->finalizeRequestHeaders(headers, formatter_context, stream_info, true);
+
+  // The extension formatter emits a fixed token, proving it was resolved and evaluated.
+  EXPECT_EQ("TestFormatter", headers.get_("x-vhost-custom"));
+  EXPECT_EQ("TestFormatter", headers.get_("x-route-custom"));
+}
+
+// Verify that a declared extension formatter is also available for header values on weighted
+// clusters, and evaluates correctly.
+TEST_F(RouteMatcherTest, TestWeightedClusterHeadersWithDeclaredExtensionFormatter) {
+  Envoy::Formatter::TestCommandFactory test_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(test_factory);
+
+  const std::string yaml = R"EOF(
+formatters:
+  - name: envoy.formatter.TestFormatter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+virtual_hosts:
+  - name: test
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: cluster1
+                weight: 100
+                request_headers_to_add:
+                  - header:
+                      key: x-cluster-custom
+                      value: "%COMMAND_EXTENSION()%"
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  ASSERT_TRUE(creation_status_.ok()) << creation_status_.message();
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+  // Keep the cached route alive: for weighted clusters config.route() returns a shared_ptr that
+  // owns a dynamically-created route entry.
+  RouteConstSharedPtr cached_route = config.route(headers, 0);
+  const RouteEntry* route_entry = cached_route->routeEntry();
+  EXPECT_EQ("cluster1", route_entry->clusterName());
+  const Formatter::Context formatter_context(&headers);
+  route_entry->finalizeRequestHeaders(headers, formatter_context, stream_info, true);
+
+  EXPECT_EQ("TestFormatter", headers.get_("x-cluster-custom"));
+}
+
+// Verify that an extension formatter used on a weighted cluster header without declaring it in the
+// route config 'formatters' field fails with a clear error.
+TEST_F(RouteMatcherTest, TestWeightedClusterHeadersExtensionFormatterUndeclared) {
+  Envoy::Formatter::TestCommandFactory test_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(test_factory);
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: test
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: cluster1
+                weight: 100
+                request_headers_to_add:
+                  - header:
+                      key: x-cluster-custom
+                      value: "%COMMAND_EXTENSION()%"
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1"}, {});
+  EXPECT_THROW_WITH_REGEX(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_,
+                                         true, creation_status_),
+                          EnvoyException, "Not supported field in StreamInfo: COMMAND_EXTENSION");
 }
 
 // Virtual cluster that contains neither pattern nor regex. This must be checked while pattern is

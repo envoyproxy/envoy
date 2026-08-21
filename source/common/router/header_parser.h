@@ -101,6 +101,18 @@ public:
   configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
             const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
+  /*
+   * @param headers_to_add defines headers to add during calls to evaluateHeaders.
+   * @param headers_to_remove defines headers to remove during calls to evaluateHeaders.
+   * @param command_parsers custom formatter command parsers for extension formatters (e.g.
+   * %SECRET()%).
+   * @return HeaderParserPtr a configured HeaderParserPtr.
+   */
+  static absl::StatusOr<HeaderParserPtr>
+  configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
+            const Protobuf::RepeatedPtrField<std::string>& headers_to_remove,
+            const Formatter::CommandParserPtrVector& command_parsers);
+
   static const HeaderParser& defaultParser() {
     static HeaderParser* instance = new HeaderParser();
     return *instance;
