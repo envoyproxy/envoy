@@ -326,6 +326,30 @@ TEST_F(FilterStateImplTest, SharedWithUpstream) {
   EXPECT_EQ(objects->at(3).stream_sharing_, StreamSharingMayImpactPooling::None);
 }
 
+TEST_F(FilterStateImplTest, SharedWithDownstreamConnectionOnClose) {
+  auto shared = std::make_shared<SimpleType>(1);
+  filterState().setData("shared_close_1", shared, FilterState::LifeSpan::Connection,
+                        StreamSharingMayImpactPooling::SharedWithDownstreamConnectionOnClose);
+  filterState().setData("unshared_2", std::make_shared<SimpleType>(2),
+                        FilterState::LifeSpan::Connection);
+  filterState().setData("upstream_only_3", std::make_shared<SimpleType>(3),
+                        FilterState::LifeSpan::Connection,
+                        StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  filterState().setData("shared_close_4", std::make_shared<SimpleType>(4),
+                        FilterState::LifeSpan::Request,
+                        StreamSharingMayImpactPooling::SharedWithDownstreamConnectionOnClose);
+  auto objects = filterState().objectsSharedWithDownstreamConnectionOnClose();
+  EXPECT_EQ(objects->size(), 2);
+  std::sort(objects->begin(), objects->end(),
+            [](const auto& lhs, const auto& rhs) -> bool { return lhs.name_ < rhs.name_; });
+  EXPECT_EQ(objects->at(0).name_, "shared_close_1");
+  EXPECT_EQ(objects->at(0).data_.get(), shared.get());
+  // Captured objects are imported as exclusive (None) to prevent transitive re-propagation.
+  EXPECT_EQ(objects->at(0).stream_sharing_, StreamSharingMayImpactPooling::None);
+  EXPECT_EQ(objects->at(1).name_, "shared_close_4");
+  EXPECT_EQ(objects->at(1).stream_sharing_, StreamSharingMayImpactPooling::None);
+}
+
 TEST_F(FilterStateImplTest, HasDataAtOrAboveLifeSpan) {
   filterState().setData("test_1", std::make_unique<SimpleType>(1),
                         FilterState::LifeSpan::FilterChain);

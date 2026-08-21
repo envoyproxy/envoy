@@ -352,5 +352,122 @@ TEST_F(InternalUpstreamIntegrationTest, TcpProxyHalfCloseLeak) {
                              testing::Eq(0));
 }
 
+// Reverse propagation of tcp_proxy propagate_response_headers across the
+// internal-listener boundary: an inner tcp_proxy whose CONNECT receives a
+// non-2xx response must surface the captured response-headers filter state
+// object on the outer proxy's upstream connection, readable via
+// %UPSTREAM_FILTER_STATE% on the outer HCM.
+class InternalUpstreamTunnelingIntegrationTest : public testing::Test, public HttpIntegrationTest {
+public:
+  InternalUpstreamTunnelingIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, TestEnvironment::getIpVersionsForTest().front(),
+                            ConfigHelper::httpProxyConfig()) {
+    setUpstreamCount(1);
+  }
+
+  void initialize() override {
+    access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename("upstream_fs"));
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      envoy::extensions::bootstrap::internal_listener::v3::InternalListener config;
+      auto* bootstrap_extension = bootstrap.add_bootstrap_extensions();
+      std::ignore = bootstrap_extension->mutable_typed_config()->PackFrom(config);
+      bootstrap_extension->set_name("envoy.bootstrap.internal_listener");
+
+      auto* static_resources = bootstrap.mutable_static_resources();
+
+      // Cluster reaching the internal listener over the internal_upstream
+      // transport socket (the outer side of the boundary).
+      auto* cluster = static_resources->mutable_clusters()->Add();
+      cluster->set_name("internal_listener");
+      cluster->clear_load_assignment();
+      cluster->mutable_load_assignment()->set_cluster_name("internal_listener");
+      auto* endpoint = cluster->mutable_load_assignment()
+                           ->add_endpoints()
+                           ->add_lb_endpoints()
+                           ->mutable_endpoint();
+      auto* addr = endpoint->mutable_address()->mutable_envoy_internal_address();
+      addr->set_server_listener_name("internal_listener");
+      addr->set_endpoint_id("lorem_ipsum");
+      TestUtility::loadFromYaml(R"EOF(
+      name: envoy.transport_sockets.internal_upstream
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
+        transport_socket:
+          name: envoy.transport_sockets.raw_buffer
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+      )EOF",
+                                *cluster->mutable_transport_socket());
+
+      // Internal listener whose tcp_proxy CONNECT-tunnels to cluster_0 and
+      // propagates non-2xx response headers into filter state.
+      TestUtility::loadFromYaml(R"EOF(
+      name: internal_listener
+      internal_listener: {}
+      filter_chains:
+      - filters:
+        - name: tcp_proxy
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+            cluster: cluster_0
+            stat_prefix: internal_tunnel
+            tunneling_config:
+              hostname: host.com:443
+              propagate_response_headers: true
+      )EOF",
+                                *static_resources->mutable_listeners()->Add());
+    });
+
+    // Route the outer HCM to the internal listener and emit the reverse-
+    // propagated object from the outer (upstream) connection filter state.
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_route()
+              ->set_cluster("internal_listener");
+          TestUtility::loadFromYaml(fmt::format(R"EOF(
+          name: envoy.file_access_log
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+            path: {}
+            log_format:
+              text_format_source:
+                inline_string: "%UPSTREAM_FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)%\n"
+          )EOF",
+                                                access_log_name_),
+                                    *hcm.add_access_log());
+        });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+TEST_F(InternalUpstreamTunnelingIntegrationTest, PropagateNon2xxConnectResponseAcrossBoundary) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+
+  const std::string header_value = "secret-value";
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  response_headers.addCopy("test-header-name", header_value);
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  ASSERT_TRUE(response->waitForEndStream());
+  cleanupUpstreamAndDownstream();
+
+  // The propagated response-headers object crossed the internal-listener
+  // boundary onto the outer proxy's upstream connection filter state.
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr(header_value));
+}
+
 } // namespace
 } // namespace Envoy

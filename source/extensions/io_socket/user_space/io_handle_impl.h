@@ -1,6 +1,8 @@
 #pragma once
 
+#include <functional>
 #include <memory>
+#include <vector>
 
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
@@ -159,6 +161,10 @@ public:
 
   PassthroughStateSharedPtr passthroughState() override { return passthrough_state_; }
 
+  void addOnPreCloseCallback(std::function<void()> callback) override {
+    pre_close_callbacks_.push_back(std::move(callback));
+  }
+
 private:
   friend class IoHandleFactory;
   explicit IoHandleImpl(PassthroughStateSharedPtr passthrough_state = nullptr);
@@ -189,6 +195,12 @@ private:
 
   // Shared state between peer handles.
   PassthroughStateSharedPtr passthrough_state_{nullptr};
+
+  // Callbacks fired exactly once when this handle is about to close. Used to
+  // capture filter state from the owning connection's stream info before the
+  // connection is torn down, enabling reverse propagation across the internal
+  // listener boundary.
+  std::vector<std::function<void()>> pre_close_callbacks_;
 };
 
 class PassthroughStateImpl : public PassthroughState, public Logger::Loggable<Logger::Id::io> {
@@ -197,12 +209,18 @@ public:
                   const StreamInfo::FilterState::Objects& filter_state_objects) override;
   void mergeInto(envoy::config::core::v3::Metadata& metadata,
                  StreamInfo::FilterState& filter_state) override;
+  void captureReverse(const StreamInfo::FilterState& filter_state) override;
+  void mergeReverse(StreamInfo::FilterState& filter_state) override;
 
 protected:
   enum class State { Created, Initialized, Done };
   State state_{State::Created};
   std::unique_ptr<envoy::config::core::v3::Metadata> metadata_;
   StreamInfo::FilterState::Objects filter_state_objects_;
+
+  enum class ReverseState { Created, Captured, Done };
+  ReverseState reverse_state_{ReverseState::Created};
+  StreamInfo::FilterState::Objects reverse_filter_state_objects_;
 };
 
 using IoHandleImplPtr = std::unique_ptr<IoHandleImpl>;

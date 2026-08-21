@@ -51,6 +51,7 @@ public:
   MOCK_METHOD(void, onPeerBufferLowWatermark, ());
   MOCK_METHOD(bool, isReadable, (), (const));
   MOCK_METHOD(PassthroughStateSharedPtr, passthroughState, ());
+  MOCK_METHOD(void, addOnPreCloseCallback, (std::function<void()> callback));
 };
 
 class FileEventImplTest : public testing::Test {

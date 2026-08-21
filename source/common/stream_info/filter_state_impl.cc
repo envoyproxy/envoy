@@ -126,6 +126,20 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
   return objects;
 }
 
+FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithDownstreamConnectionOnClose() const {
+  auto objects = parent_ ? parent_->objectsSharedWithDownstreamConnectionOnClose()
+                         : std::make_unique<FilterState::Objects>();
+  for (const auto& [name, object] : data_storage_) {
+    if (object->stream_sharing_ ==
+        StreamSharingMayImpactPooling::SharedWithDownstreamConnectionOnClose) {
+      // Imported into the recipient as exclusive to it; the recipient must
+      // not transitively re-propagate.
+      objects->push_back({object->data_, StreamSharingMayImpactPooling::None, name});
+    }
+  }
+  return objects;
+}
+
 bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) const {
   return data_storage_.contains(data_name);
 }

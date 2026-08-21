@@ -44,6 +44,15 @@ enum class StreamSharingMayImpactPooling {
   // not transitively shared. The filter state is imported into the upstream
   // connection filter state as exclusive to the upstream connection.
   SharedWithUpstreamConnectionOnce,
+
+  // Mark a filter state object as shared back to the downstream connection
+  // when the upstream connection closes. This is the reverse of
+  // SharedWithUpstreamConnection: at upstream close, marked objects are
+  // captured from the upstream connection filter state and merged into the
+  // downstream connection filter state. Currently honored across the
+  // internal-listener boundary (the upstream connection is the inner side of
+  // the internal listener pair; the downstream connection is the outer side).
+  SharedWithDownstreamConnectionOnClose,
 };
 
 /**
@@ -231,6 +240,13 @@ public:
    * @return filter objects that are shared with the upstream connection.
    **/
   virtual ObjectsPtr objectsSharedWithUpstreamConnection() const PURE;
+
+  /**
+   * @return filter objects marked SharedWithDownstreamConnectionOnClose. Used
+   * at upstream connection close to capture objects for reverse propagation
+   * across the internal-listener boundary back to the downstream connection.
+   **/
+  virtual ObjectsPtr objectsSharedWithDownstreamConnectionOnClose() const PURE;
 };
 
 } // namespace StreamInfo
