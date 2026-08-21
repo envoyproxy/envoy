@@ -24,6 +24,6 @@ envoy_cc_library(
     deps = [
         ":openai_chat_completions_lib",
         "//source/extensions/filters/http/ai_protocol_manager:schema_lib",
-        "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
+        "//source/extensions/filters/http/ai_protocol_manager:token_usage_extractor_lib",
     ],
 )

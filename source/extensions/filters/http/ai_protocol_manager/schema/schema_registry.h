@@ -1,21 +1,19 @@
 #pragma once
 
-#include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
-
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
+#include "source/extensions/filters/http/ai_protocol_manager/token_usage_extractor.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-using PerRouteProto =
-    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute;
-
-// Registry mapping route schema configurations to their corresponding PayloadSchema.
+// Registry mapping a route's declared wire API to its PayloadSchema, when one
+// is defined. APIs without a registered schema (or an undeclared API) return
+// nullptr and are not validated.
 class SchemaRegistry {
 public:
-  static const PayloadSchema* getSchema(PerRouteProto::Schema schema);
+  static const PayloadSchema* getSchema(ApiProtocol protocol);
 };
 
 } // namespace AiProtocolManager
