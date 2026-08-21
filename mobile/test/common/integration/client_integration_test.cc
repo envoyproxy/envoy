@@ -2177,6 +2177,42 @@ TEST_P(ClientIntegrationTest, SconeValuePropagationMultipleUpdates) {
   terminal_callback_.waitReady();
 }
 
+TEST_P(ClientIntegrationTest, SconeDisabled) {
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+    return;
+  }
+
+  const int16_t expected_bandwidth = 127;
+
+  MockRecvMsgOsSysCalls sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
+
+  builder_.enableScone(false);
+  initialize();
+
+  int64_t captured_scone_max_kbps = 0;
+  int64_t captured_scone_timestamp_ms = 0;
+
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+  stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers, bool,
+                                     envoy_stream_intel intel) {
+    cc_.on_headers_calls_++;
+    cc_.status_ = absl::StrCat(headers.getStatusValue());
+    captured_scone_max_kbps = intel.scone_max_kbps;
+    captured_scone_timestamp_ms = intel.scone_timestamp_ms;
+  };
+
+  stream_ = createNewStream(std::move(stream_callbacks));
+  sys_calls.scone_bandwidth_.store(expected_bandwidth);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+
+  cc_.terminal_callback_->waitReady();
+
+  EXPECT_EQ(captured_scone_max_kbps, -1);
+  EXPECT_EQ(captured_scone_timestamp_ms, -1);
+}
+
 TEST_P(ClientIntegrationTest, DrainConnectionsBySocketTag) {
   autonomous_upstream_ = false;
   builder_.enableSocketTagging(true);
