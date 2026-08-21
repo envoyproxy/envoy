@@ -45,7 +45,6 @@ protected:
       io_handle_->close();
     }
   }
-  using Socket::close;
   bool isOpen() const override { return io_handle_ != nullptr && io_handle_->isOpen(); }
 };
 
@@ -117,17 +116,13 @@ public:
     return *io_handle_;
   }
   void requestRst() override {
-    if (io_handle_ != nullptr) {
-      if (io_handle_->isOpen()) {
-        io_handle_->requestRst();
-      }
+    if (io_handle_ != nullptr && io_handle_->isOpen()) {
+      io_handle_->requestRst();
     }
   }
   void close() override {
-    if (io_handle_ != nullptr) {
-      if (io_handle_->isOpen()) {
-        io_handle_->close();
-      }
+    if (io_handle_ != nullptr && io_handle_->isOpen()) {
+      io_handle_->close();
     }
   }
   bool isOpen() const override {
