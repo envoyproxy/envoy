@@ -2,6 +2,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
 #include "source/common/ssl/ssl.h"
+#include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -13,6 +14,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 
 using testing::_;
 using testing::Eq;
@@ -358,6 +360,81 @@ TEST_P(TlsInspectorJA4Test, JA4FingerprintFromCapturedClientHello) {
   if (state == Network::FilterStatus::Continue) {
     EXPECT_EQ(1, cfg_->stats().tls_found_.value());
   }
+}
+
+// Replays each captured ClientHello from JA4_TEST_VECTORS against
+// ``JA4Fingerprinter::create`` with every value of the ``Protocol`` enum and
+// asserts the parameter's contract holds for every capture in the corpus:
+//   - the no-arg overload is byte-identical to ``Protocol::TLS`` (backward
+//     compatibility for callers, including the built-in listener filter),
+//   - ``Protocol::TLS`` -> ``t``, ``QUIC`` -> ``q``, ``DTLS`` -> ``d`` at the
+//     first character, and
+//   - only the first character changes across protocol choices; every other
+//     byte of the fingerprint is identical.
+//
+// This complements the primary ``JA4FingerprintFromCapturedClientHello`` suite
+// above: that one drives captured bytes end-to-end through the listener filter
+// (which always calls ``create`` with the default ``Protocol::TLS``); this one
+// reuses the same corpus but exercises the caller-visible overload directly,
+// so downstream integrators that pass ``Protocol::QUIC`` (or a hypothetical
+// future in-tree QUIC listener filter) get coverage against the same real
+// captures the filter suite already trusts. Assertions are deliberately
+// relative to the fingerprint each capture actually produces, not to a pinned
+// string -- this test's job is to prove the new parameter's behavior, not to
+// re-verify the corpus's pinned hashes.
+class TlsInspectorJA4ProtocolArgTest
+    : public testing::TestWithParam<std::tuple<std::string, std::string, std::string>> {};
+
+INSTANTIATE_TEST_SUITE_P(JA4TestVectors, TlsInspectorJA4ProtocolArgTest,
+                         testing::ValuesIn(JA4_TEST_VECTORS));
+
+TEST_P(TlsInspectorJA4ProtocolArgTest, ProtocolArgSelectsFirstCharacter) {
+  const auto& [client_name, client_hello_hex, expected_ja4] = GetParam();
+  // `expected_ja4` is not asserted directly: this test proves the Protocol
+  // parameter's contract holds relative to what each capture actually produces,
+  // not that the corpus's pinned hashes are individually correct.
+  (void)expected_ja4;
+
+  // Decode the captured bytes and hand the ClientHello body (past the 5-byte
+  // TLS record header and 4-byte handshake header) to BoringSSL's parser -- the
+  // same parse path the listener filter uses via its ssl-early callback.
+  const std::vector<uint8_t> wire = Hex::decode(client_hello_hex);
+  ASSERT_GT(wire.size(), 9u);
+  const uint8_t* body = wire.data() + 9;
+  const size_t body_len = wire.size() - 9;
+
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_TRUE(ctx != nullptr);
+  bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
+  ASSERT_TRUE(ssl != nullptr);
+
+  SSL_CLIENT_HELLO client_hello;
+  ASSERT_EQ(1, SSL_parse_client_hello(ssl.get(), &client_hello, body, body_len)) << client_name;
+
+  const std::string default_fp = JA4Fingerprinter::create(&client_hello);
+  const std::string tls_fp =
+      JA4Fingerprinter::create(&client_hello, JA4Fingerprinter::Protocol::TLS);
+  const std::string quic_fp =
+      JA4Fingerprinter::create(&client_hello, JA4Fingerprinter::Protocol::QUIC);
+  const std::string dtls_fp =
+      JA4Fingerprinter::create(&client_hello, JA4Fingerprinter::Protocol::DTLS);
+
+  // The no-arg overload is byte-identical to Protocol::TLS -- the default
+  // preserves prior behavior for every caller, including the listener filter.
+  EXPECT_EQ(default_fp, tls_fp) << client_name;
+
+  // Protocol arg drives the first character deterministically.
+  ASSERT_FALSE(tls_fp.empty()) << client_name;
+  ASSERT_FALSE(quic_fp.empty()) << client_name;
+  ASSERT_FALSE(dtls_fp.empty()) << client_name;
+  EXPECT_EQ(tls_fp[0], 't') << client_name;
+  EXPECT_EQ(quic_fp[0], 'q') << client_name;
+  EXPECT_EQ(dtls_fp[0], 'd') << client_name;
+
+  // Only the first character changes across protocol choices.
+  const std::string tls_tail = tls_fp.substr(1);
+  EXPECT_EQ(quic_fp.substr(1), tls_tail) << client_name;
+  EXPECT_EQ(dtls_fp.substr(1), tls_tail) << client_name;
 }
 
 TEST_F(TlsInspectorJA4Test, AlpnNonAlphanumericOldBehavior) {
