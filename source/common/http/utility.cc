@@ -1249,7 +1249,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value,
     // We do checking for each char in the string. If the current char is included in the defined
     // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded]
     // to the returned string one by one) started from the current index.
-    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
+    if (ch < ' ' || ch >= '~' || reserved_char_set.contains(ch)) {
       return PercentEncoding::encode(value, i, reserved_char_set);
     }
   }
@@ -1265,7 +1265,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value, const size
 
   for (size_t i = index; i < value.size(); ++i) {
     const char& ch = value[i];
-    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
+    if (ch < ' ' || ch >= '~' || reserved_char_set.contains(ch)) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
       absl::StrAppend(&encoded, fmt::format("%{:02X}", static_cast<const unsigned char&>(ch)));

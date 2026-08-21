@@ -121,7 +121,7 @@ envoy_cc_library(
 
 cpp_grpc_library(
     name = "handshaker_cc_grpc",
-    protos = ["@com_github_grpc_grpc//src/proto/grpc/gcp:alts_handshaker_proto"],
+    protos = ["@grpc//src/proto/grpc/gcp:alts_handshaker_proto"],
 )
 
 envoy_cc_library(

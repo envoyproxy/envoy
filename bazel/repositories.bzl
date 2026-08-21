@@ -1,7 +1,7 @@
-load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
-load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
+load("@googleapis//:repository_rules.bzl", "switched_rules_by_language")
+load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy.router.cluster_specifier_plugin.lua"]
 
@@ -81,6 +81,7 @@ def _cc_deps():
         patches = ["@envoy//bazel:grpc_httpjson_transcoding.patch"],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
+            "@com_google_googleapis": "@googleapis",
             "@com_google_protoconverter": "@proto-converter",
         },
     )
@@ -105,6 +106,7 @@ def _cc_deps():
         patches = ["@envoy//bazel:proto-field-extraction-protobuf-v35.patch"],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
+            "@com_google_googleapis": "@googleapis",
             "@ocp": "@ocp-diag-core",
         },
     )
@@ -116,6 +118,7 @@ def _cc_deps():
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
             "@ocp": "@ocp-diag-core",
+            "@com_google_googleapis": "@googleapis",
             "@com_google_protoconverter": "@proto-converter",
             "@com_google_protofieldextraction": "@proto-field-extraction",
         },
@@ -134,7 +137,7 @@ def _go_deps(skip_targets):
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
         external_http_archive(name = "io_bazel_rules_go")
-        external_http_archive("bazel_gazelle")
+        external_http_archive("gazelle")
 
 def _rust_deps():
     external_http_archive(
@@ -143,8 +146,9 @@ def _rust_deps():
         patches = ["@envoy//bazel:rules_rust.patch"],
     )
 
-def envoy_dependencies(skip_targets = []):
-    external_http_archive("platforms")
+def envoy_dependencies(skip_targets = [], bzlmod = False):
+    if not bzlmod:
+        external_http_archive("platforms")
 
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
@@ -187,7 +191,7 @@ def envoy_dependencies(skip_targets = []):
     _tcmalloc()
     _gperftools()
     _jemalloc()
-    _com_github_grpc_grpc()
+    _grpc()
     _rules_proto_grpc()
     _icu()
     _ipp_crypto()
@@ -274,6 +278,11 @@ def envoy_dependencies(skip_targets = []):
         go = True,
         python = True,
         grpc = True,
+        rules_override = {
+            "py_proto_library": ["@grpc//bazel:python_rules.bzl", ""],
+            "py_grpc_library": ["@grpc//bazel:python_rules.bzl", ""],
+            "cc_grpc_library": ["@grpc//bazel:cc_grpc_library.bzl", ""],
+        },
     )
 
 def _boringssl():
@@ -678,6 +687,7 @@ def _cpp2sky():
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
+        repo_mapping = {"@com_github_grpc_grpc": "@grpc"},
     )
 
 def _nlohmann_json():
@@ -734,19 +744,12 @@ def _com_google_protobuf():
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
-    for platform in PROTOC_VERSIONS:
-        # Ideally we dont use a private build artefact as done here.
-        # If `rules_proto` implements protoc toolchains in the future (currently it
-        # is there, but is empty) we should remove these and use that rule
-        # instead.
-        external_http_archive(
-            "com_google_protobuf_protoc_%s" % platform,
-            build_file = "@envoy//bazel/protoc:BUILD.protoc",
-        )
-
     external_http_archive(
         "com_google_protobuf",
-        patches = ["@envoy//bazel:protobuf.patch"],
+        patches = [
+            "@envoy//bazel:protobuf.patch",
+            "@envoy//bazel:protobuf_prebuilt_tool_integrity.patch",
+        ],
         patch_args = ["-p1"],
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
@@ -821,14 +824,16 @@ def _googleurl():
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
-def _com_github_grpc_grpc():
+def _grpc():
     external_http_archive(
-        name = "com_github_grpc_grpc",
+        name = "grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
+            "@com_google_googleapis": "@googleapis",
             "@com_github_cncf_xds": "@xds",
+            "@com_github_grpc_grpc": "@grpc",
             "@com_googlesource_code_re2": "@re2",
             "@openssl": "@boringssl",
         },
@@ -843,7 +848,15 @@ def _com_github_grpc_grpc():
     )
 
 def _rules_proto_grpc():
-    external_http_archive("rules_proto_grpc")
+    external_http_archive(
+        name = "rules_proto_grpc",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_proto_grpc.patch"],
+        repo_mapping = {
+            "@com_github_grpc_grpc": "@grpc",
+            "@bazel_gazelle": "@gazelle",
+        },
+    )
 
 def _re2():
     external_http_archive("re2")

@@ -129,7 +129,8 @@ TestServer::TestServer()
       port_(0) {
   std::string runfiles_error;
   runfiles_ = std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles>{
-      bazel::tools::cpp::runfiles::Runfiles::CreateForTest(&runfiles_error)};
+      bazel::tools::cpp::runfiles::Runfiles::CreateForTest(BAZEL_CURRENT_REPOSITORY,
+                                                           &runfiles_error)};
   RELEASE_ASSERT(TestEnvironment::getOptionalEnvVar("NORUNFILES").has_value() ||
                      runfiles_ != nullptr,
                  runfiles_error);

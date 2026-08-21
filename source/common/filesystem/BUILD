@@ -123,6 +123,7 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:default_socket_interface_lib",
+        "@abseil-cpp//absl/status",
     ] + select({
         "//bazel:windows_x86_64": [
             "//source/common/api:os_sys_calls_lib",

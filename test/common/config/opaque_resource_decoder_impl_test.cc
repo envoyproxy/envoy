@@ -14,7 +14,7 @@ namespace {
 
 class OpaqueResourceDecoderImplTest : public testing::Test {
 public:
-  std::pair<ProtobufTypes::MessagePtr, std::string>
+  std::pair<ArenaWrappedProto<Protobuf::Message>, std::string>
   decodeTypedResource(const envoy::config::endpoint::v3::ClusterLoadAssignment& typed_resource) {
     Protobuf::Any opaque_resource;
     std::ignore = opaque_resource.PackFrom(typed_resource);

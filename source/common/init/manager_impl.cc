@@ -83,7 +83,7 @@ void ManagerImpl::onTargetReady(absl::string_view target_name) {
          fmt::format("{} called back by target after initialization complete", target_name));
 
   // Decrease target_name count by 1.
-  ASSERT(target_names_count_.find(target_name) != target_names_count_.end());
+  ASSERT(target_names_count_.contains(target_name));
   if (--target_names_count_[target_name] == 0) {
     target_names_count_.erase(target_name);
   }

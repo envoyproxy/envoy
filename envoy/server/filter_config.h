@@ -234,6 +234,22 @@ public:
 };
 
 /**
+ * Extra context that is passed to the HTTP filter factories in addition to the
+ * ServerFactoryContext. This bundles the small pieces of per-call state that used to be passed as
+ * loose arguments, so that new state can be added without changing every factory signature.
+ *
+ * NOTE: this struct holds references only and must not outlive the objects it refers to. It is
+ * expected to be created on the stack at the call site.
+ */
+struct ExtraFactoryContext {
+  // Validation visitor to be used when parsing/validating the filter configuration.
+  ProtobufMessage::ValidationVisitor& visitor;
+  // Prefix for stat logging. May be empty for contexts where no stat prefix is available, such as
+  // route specific filter configurations.
+  const std::string& stats_prefix;
+};
+
+/**
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
@@ -250,6 +266,19 @@ public:
    */
   virtual ProtobufTypes::MessagePtr createEmptyRouteConfigProto() {
     return createEmptyConfigProto();
+  }
+
+  /**
+   * @param config supplies the general protobuf configuration for the filter.
+   * @param context supplies the filter's context.
+   * @param extra_context supplies the filter's extra context.
+   * @return RouteSpecificFilterConfigConstSharedPtr allow the filter to pre-process per route
+   * config. Returned object will be stored in the loaded route configuration.
+   */
+  virtual absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createHttpFilterRouteConfig(const Protobuf::Message& config, ServerFactoryContext& context,
+                              ExtraFactoryContext& extra_context) {
+    return createRouteSpecificFilterConfig(config, context, extra_context.visitor);
   }
 
   /**
@@ -337,15 +366,17 @@ public:
    *
    * @param config supplies the general Protobuf message to be marshaled into a filter-specific
    * configuration.
-   * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
+   * @param extra_context supplies the filter's extra context.
    * @return Http::FilterFactoryCb the factory creation function.
    */
   virtual absl::StatusOr<Http::FilterFactoryCb>
-  createHttpFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
-                                   Server::Configuration::ServerFactoryContext& context) {
+  createHttpFilterFactoryFromProto(const Protobuf::Message& config,
+                                   Server::Configuration::ServerFactoryContext& context,
+                                   ExtraFactoryContext& extra_context) {
     // Delegate to createFilterFactoryFromProtoWithServerContext for backwards compatibility.
-    return createFilterFactoryFromProtoWithServerContext(config, stat_prefix, context);
+    return createFilterFactoryFromProtoWithServerContext(config, extra_context.stats_prefix,
+                                                         context);
   }
 
   /**

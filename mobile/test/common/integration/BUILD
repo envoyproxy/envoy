@@ -84,6 +84,7 @@ envoy_cc_test_library(
     repository = "@envoy",
     deps = [
         "//library/common:engine_common_lib",
+        "@envoy//bazel:cpp_runfiles",
         "@envoy//source/common/listener_manager:listener_manager_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
@@ -228,6 +229,7 @@ envoy_cc_test_library(
     ],
     repository = "@envoy",
     deps = [
+        "@envoy//bazel:cpp_runfiles",
         "@envoy//source/common/event:libevent_lib",
         "@envoy//source/common/tls:context_config_lib",
         "@envoy//source/common/tls:context_lib",

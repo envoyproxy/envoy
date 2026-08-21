@@ -37,9 +37,11 @@ JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
                                    Router::RetryPolicyConstSharedPtr retry_policy,
                                    Server::Configuration::FactoryContext& context,
                                    CreateJwksFetcherCb create_fetcher_fn,
-                                   JwtAuthnFilterStats& stats, JwksDoneFetched done_fn)
+                                   Stats::Counter& fetch_success, Stats::Counter& fetch_failed,
+                                   JwksDoneFetched done_fn)
     : remote_jwks_(remote_jwks), retry_policy_(std::move(retry_policy)), context_(context),
-      create_fetcher_fn_(create_fetcher_fn), stats_(stats), done_fn_(done_fn),
+      create_fetcher_fn_(create_fetcher_fn), fetch_success_(fetch_success),
+      fetch_failed_(fetch_failed), done_fn_(done_fn),
       debug_name_(absl::StrCat("Jwks async fetching url=", remote_jwks_.http_uri().uri())) {
   // if async_fetch is not enabled, do nothing.
   if (!remote_jwks_.has_async_fetch()) {
@@ -101,7 +103,7 @@ void JwksAsyncFetcher::onJwksSuccess(Envoy::JwtVerify::JwksPtr&& jwks) {
   done_fn_(std::move(jwks));
   handleFetchDone();
   refetch_timer_->enableTimer(good_refetch_duration_);
-  stats_.jwks_fetch_success_.inc();
+  fetch_success_.inc();
 
   // Note: not to free fetcher_ within onJwksSuccess or onJwksError function.
   // They are passed to fetcher_->fetch() and are called by fetcher_ after fetch is done.
@@ -117,7 +119,7 @@ void JwksAsyncFetcher::onJwksError(Failure) {
   ENVOY_LOG(warn, "{}: failed", debug_name_);
   handleFetchDone();
   refetch_timer_->enableTimer(failed_refetch_duration_);
-  stats_.jwks_fetch_failed_.inc();
+  fetch_failed_.inc();
 
   // Note: not to free fetcher_ in this function. Please see comment at onJwksSuccess.
 }
