@@ -1,6 +1,7 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_swift_test")
 load("@rules_cc//cc:defs.bzl", "objc_library")
+load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -111,6 +112,7 @@ envoy_mobile_swift_test(
     },
     visibility = ["//visibility:public"],
     deps = [
+        ":proto_utils_lib",
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
         "//test/objective-c:envoy_test_server",
@@ -174,6 +176,7 @@ envoy_mobile_swift_test(
     },
     visibility = ["//visibility:public"],
     deps = [
+        ":proto_utils_lib",
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
         "//test/objective-c:envoy_test_server",
@@ -206,6 +209,7 @@ envoy_mobile_swift_test(
     },
     visibility = ["//visibility:public"],
     deps = [
+        ":proto_utils_lib",
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
         "//test/objective-c:envoy_test_server",
@@ -222,6 +226,7 @@ envoy_mobile_swift_test(
     },
     visibility = ["//visibility:public"],
     deps = [
+        ":proto_utils_lib",
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
         "//test/objective-c:envoy_test_server",
@@ -238,6 +243,7 @@ envoy_mobile_swift_test(
     },
     visibility = ["//visibility:public"],
     deps = [
+        ":proto_utils_lib",
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
         "//test/objective-c:envoy_test_server",
@@ -254,6 +260,7 @@ envoy_mobile_swift_test(
     },
     visibility = ["//visibility:public"],
     deps = [
+        ":proto_utils_lib",
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
         "//test/objective-c:envoy_test_server",
@@ -273,6 +280,16 @@ envoy_mobile_swift_test(
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",
         "//test/objective-c:envoy_test_server",
+    ],
+)
+
+swift_library(
+    name = "proto_utils_lib",
+    srcs = ["ProtoUtils.swift"],
+    testonly = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        "//library/swift:ios_lib",
     ],
 )
 
