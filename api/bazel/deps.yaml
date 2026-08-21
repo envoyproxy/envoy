@@ -50,7 +50,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-08-16"
+  release_date: "2026-08-21"
   use_category:
   - build
   - controlplane
