@@ -466,6 +466,10 @@ void SslSocket::onAsynchronousCertValidationComplete() {
 
 void SslSocket::onAsynchronousCertificateSelectionComplete() {
   ENVOY_CONN_LOG(debug, "Async cert selection completed", callbacks_->connection());
+  // The state may not be HandshakeBlockedOnAsyncOperation if the socket was closed or
+  // shut down while the asynchronous operation was in progress. For example, closeSocket()
+  // calls shutdownSsl(), which transitions the state to ShutdownSent. In this case,
+  // we should not attempt to resume the handshake.
   if (info_->state() == Ssl::SocketState::HandshakeBlockedOnAsyncOperation) {
     resumeHandshake();
   }
