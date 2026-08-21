@@ -11,6 +11,8 @@
 #include "envoy/http/codec.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/drain_aware_http2_client_connection.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/drain_registry.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/reverse_tunnel_codec_stats.h"
@@ -24,22 +26,24 @@ namespace Http {
 namespace ReverseTunnel {
 
 /**
- * Wraps the codec connection callbacks so the upstream (client) side observes a peer GOAWAY: a
- * received GOAWAY is logged and counted, then forwarded so the pool's normal drain handling is
- * preserved.
+ * Wraps the codec connection callbacks so the upstream (client) side observes a peer GOAWAY: the
+ * event is forwarded to the reverse-tunnel socket manager for reporter notification, then passed
+ * through to the pool's normal drain handling.
  */
 class DrainAwareClientCallbacks : public Envoy::Http::ConnectionCallbacks,
                                   public Logger::Loggable<Logger::Id::client> {
 public:
-  DrainAwareClientCallbacks(Envoy::Http::ConnectionCallbacks& inner,
-                            const ReverseTunnelUpstreamCodecStats& stats)
-      : inner_(inner), stats_(stats) {}
+  DrainAwareClientCallbacks(Envoy::Http::ConnectionCallbacks& inner, int fd)
+      : inner_(inner), fd_(fd) {}
 
   // Envoy::Http::ConnectionCallbacks
   void onGoAway(Envoy::Http::GoAwayErrorCode error_code) override {
     ENVOY_LOG(debug, "reverse_tunnel upstream codec: observed peer GOAWAY (error_code={})",
               static_cast<int>(error_code));
-    stats_.goaway_received_.inc();
+    if (auto* socket_manager =
+            Bootstrap::ReverseConnection::ReverseConnectionUtility::getThreadLocalSocketManager()) {
+      socket_manager->onGoAway(fd_);
+    }
     inner_.onGoAway(error_code);
   }
   void onSettings(Envoy::Http::ReceivedSettings& settings) override { inner_.onSettings(settings); }
@@ -49,13 +53,12 @@ public:
 
   // Drive onGoAway into the pool's active client so the pool drains THIS connection (no new
   // streams, in-flight finish, close when idle). Needed because our drain GOAWAY is emitted
-  // out-of-band, so the pool would not otherwise stop multiplexing onto it. This is a local drain,
-  // not a received peer GOAWAY, so goaway_received_ is left untouched.
+  // out-of-band, so the pool would not otherwise stop multiplexing onto it.
   void drainOwnPoolConnection() { inner_.onGoAway(Envoy::Http::GoAwayErrorCode::NoError); }
 
 private:
   Envoy::Http::ConnectionCallbacks& inner_;
-  const ReverseTunnelUpstreamCodecStats& stats_;
+  int fd_;
 };
 
 /**

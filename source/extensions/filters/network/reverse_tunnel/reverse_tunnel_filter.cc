@@ -31,18 +31,6 @@ namespace ReverseTunnel {
 
 namespace {
 
-Extensions::Bootstrap::ReverseConnection::UpstreamSocketManager* getThreadLocalSocketManager() {
-  const auto* acceptor = getAcceptor();
-  if (acceptor == nullptr) {
-    return nullptr;
-  }
-  auto* tls_registry = acceptor->getLocalRegistry();
-  if (tls_registry == nullptr) {
-    return nullptr;
-  }
-  return tls_registry->socketManager();
-}
-
 class RequestDecoderHandleImpl : public Http::RequestDecoderHandle {
 public:
   explicit RequestDecoderHandleImpl(Http::RequestDecoder& decoder) : decoder_(decoder) {}
@@ -186,7 +174,8 @@ bool ReverseTunnelFilterConfig::validateConnectionLimit(absl::string_view node_i
     return true;
   }
 
-  if (auto socket_manager = getThreadLocalSocketManager()) {
+  if (auto socket_manager =
+          Bootstrap::ReverseConnection::ReverseConnectionUtility::getThreadLocalSocketManager()) {
     return socket_manager->canAcceptConnection(node_id, tenant_id);
   }
   ENVOY_LOG(warn,
@@ -474,7 +463,8 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
 
   // Get tenant isolation setting from socket manager (configured at bootstrap level).
   bool tenant_isolation_enabled = false;
-  if (auto* socket_manager = getThreadLocalSocketManager()) {
+  if (auto* socket_manager =
+          Bootstrap::ReverseConnection::ReverseConnectionUtility::getThreadLocalSocketManager()) {
     tenant_isolation_enabled = socket_manager->tenantIsolationEnabled();
   }
 
@@ -653,7 +643,8 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   // Lookup the reverse tunnel acceptor socket interface to retrieve the TLS registry.
   // Note: This is a global lookup that should be thread-safe but may return nullptr
   // if the socket interface isn't registered or we're in a test environment.
-  auto* socket_manager = getThreadLocalSocketManager();
+  auto* socket_manager =
+      Bootstrap::ReverseConnection::ReverseConnectionUtility::getThreadLocalSocketManager();
   if (socket_manager == nullptr) {
     ENVOY_CONN_LOG(debug, "reverse_tunnel: socket manager not available, skipping socket reuse",
                    connection);
@@ -705,6 +696,7 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
           : std::string(cluster_id);
 
   ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
+  const int socket_fd = wrapped_socket->ioHandle().fdDoNotUse();
   socket_manager->addConnectionSocket(std::string(node_id), std::string(cluster_id),
                                       std::move(wrapped_socket), ping_seconds,
                                       /* rebalanced= */ config_->skipRebalancing(), tenant_id,
@@ -714,7 +706,8 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
 
   // Report the connection to the extension -> reporter.
   if (auto extension = socket_manager->getUpstreamExtension()) {
-    extension->reportConnection(socket_node_id, socket_cluster_id, tenant_id, initiation_time_ms);
+    extension->reportConnection(socket_node_id, socket_cluster_id, tenant_id, initiation_time_ms,
+                                socket_fd);
   }
 }
 
