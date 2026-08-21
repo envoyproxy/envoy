@@ -7,9 +7,8 @@
 #include "source/server/listener_hooks.h"
 
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
+#include "test/common/integration/fake_factory_contexts.h"
 #include "test/integration/autonomous_upstream.h"
-#include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/integration/server.h"
 
 #include "tools/cpp/runfiles/runfiles.h"
@@ -70,18 +69,17 @@ public:
   void onWorkersStarted() override {}
 
 private:
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Stats::IsolatedStoreImpl stats_store_;
   Event::GlobalTimeSystem time_system_;
   Api::ApiPtr api_;
+  Mobile::Test::FakeServerFactoryContext server_factory_context_;
+  Mobile::Test::FakeTransportSocketFactoryContext factory_context_;
   Network::Address::IpVersion version_;
   FakeUpstreamConfig upstream_config_;
   int port_;
   Thread::SkipAsserts skip_asserts_;
   ProcessWide process_wide_;
   Thread::MutexBasicLockable lock_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
   std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles_;
 
   // Either test_server_ will be set for test_server_type is a proxy, otherwise upstream_ will be
@@ -89,11 +87,11 @@ private:
   std::unique_ptr<AutonomousUpstream> upstream_;
   IntegrationTestServerPtr test_server_;
 
-  Network::DownstreamTransportSocketFactoryPtr createQuicUpstreamTlsContext(
-      testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&);
+  Network::DownstreamTransportSocketFactoryPtr
+  createQuicUpstreamTlsContext(Mobile::Test::FakeTransportSocketFactoryContext&);
 
-  Network::DownstreamTransportSocketFactoryPtr createUpstreamTlsContext(
-      testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&, bool);
+  Network::DownstreamTransportSocketFactoryPtr
+  createUpstreamTlsContext(Mobile::Test::FakeTransportSocketFactoryContext&, bool);
 };
 
 } // namespace Envoy

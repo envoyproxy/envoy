@@ -76,6 +76,7 @@ envoy_cc_test_library(
         "test_server.cc",
     ],
     hdrs = [
+        "fake_factory_contexts.h",
         "test_server.h",
     ],
     data = [
@@ -86,11 +87,13 @@ envoy_cc_test_library(
         "//library/common:engine_common_lib",
         "@envoy//bazel:cpp_runfiles",
         "@envoy//source/common/listener_manager:listener_manager_lib",
+        "@envoy//source/common/protobuf:message_validator_lib",
+        "@envoy//source/common/secret:secret_manager_impl_lib",
+        "@envoy//source/common/singleton:manager_impl_lib",
+        "@envoy//source/common/tls:context_lib",
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",
-        "@envoy//test/mocks/server:factory_context_mocks",
-        "@envoy//test/mocks/server:server_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
         "@envoy_build_config//:extension_registry",
     ] + envoy_select_signal_trace(

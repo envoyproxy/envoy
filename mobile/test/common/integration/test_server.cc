@@ -125,6 +125,8 @@ baseProxyConfig(Network::Address::IpVersion version, bool http, int port) {
 
 TestServer::TestServer()
     : api_(Api::createApiForTest(stats_store_, time_system_)),
+      server_factory_context_(*api_, time_system_, *stats_store_.rootScope()),
+      factory_context_(server_factory_context_, *stats_store_.rootScope()),
       version_(TestEnvironment::getIpVersionsForTest()[0]), upstream_config_(time_system_),
       port_(0) {
   std::string runfiles_error;
@@ -135,11 +137,6 @@ TestServer::TestServer()
                      runfiles_ != nullptr,
                  runfiles_error);
   TestEnvironment::setRunfiles(runfiles_.get());
-  ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-  ON_CALL(factory_context_, statsScope())
-      .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
-  ON_CALL(factory_context_.server_context_, sslContextManager())
-      .WillByDefault(testing::ReturnRef(context_manager_));
 
   Envoy::ExtensionRegistry::registerFactories();
 }
@@ -309,9 +306,8 @@ void TestServer::setResponse(const absl::flat_hash_map<std::string, std::string>
 }
 
 Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsContext(
-    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
+    Mobile::Test::FakeTransportSocketFactoryContext& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{server_factory_context_};
   tls_context.mutable_common_tls_context()->add_alpn_protocols("h3");
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -331,8 +327,7 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
 }
 
 Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContext(
-    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context,
-    bool add_alpn) {
+    Mobile::Test::FakeTransportSocketFactoryContext& factory_context, bool add_alpn) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -350,7 +345,8 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContex
       tls_context, factory_context, {}, false);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-      std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
+      std::move(cfg), server_factory_context_.sslContextManager(),
+      *upstream_stats_store->rootScope());
 }
 
 } // namespace Envoy
