@@ -46,6 +46,34 @@ public:
     )EOF");
   }
 
+  static std::string apiListener2Config() {
+    return R"EOF(
+name: api_listener_2
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 2
+api_listener:
+  api_listener:
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+    stat_prefix: hcm2
+    route_config:
+      virtual_hosts:
+        name: integration
+        routes:
+          route:
+            cluster: cluster_0
+          match:
+            prefix: "/"
+        domains: "*"
+      name: route_config_0
+    http_filters:
+      - name: router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      )EOF";
+  }
+
   static std::string apiListenerConfig() {
     return R"EOF(
 name: api_listener
@@ -207,6 +235,57 @@ TEST_P(ApiListenerIntegrationTest, FromWorkerThread) {
     http_api_listener.reset();
     cleanup_done.Notify();
   });
+  ASSERT_TRUE(cleanup_done.WaitForNotificationWithTimeout(absl::Seconds(1)));
+}
+
+TEST_P(ApiListenerIntegrationTest, MultipleApiListeners) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()->add_listeners()->MergeFrom(
+        Server::parseListenerFromV3Yaml(apiListener2Config()));
+  });
+  BaseIntegrationTest::initialize();
+
+  absl::Notification done;
+  Http::ApiListenerPtr http_api_listener;
+  Http::ApiListenerPtr http_api_listener_2;
+
+  test_server_->server().dispatcher().post([this, &done, &http_api_listener,
+                                            &http_api_listener_2]() -> void {
+    EXPECT_DEBUG_DEATH(test_server_->server().listenerManager().apiListener(), ".*");
+
+    // First listener
+    ASSERT_TRUE(test_server_->server().listenerManager().apiListener("api_listener").has_value());
+    ASSERT_EQ("api_listener",
+              test_server_->server().listenerManager().apiListener("api_listener")->get().name());
+    http_api_listener = test_server_->server()
+                            .listenerManager()
+                            .apiListener("api_listener")
+                            ->get()
+                            .createHttpApiListener(test_server_->server().dispatcher());
+    ASSERT_TRUE(http_api_listener != nullptr);
+
+    // Second listener
+    ASSERT_TRUE(test_server_->server().listenerManager().apiListener("api_listener_2").has_value());
+    ASSERT_EQ("api_listener_2",
+              test_server_->server().listenerManager().apiListener("api_listener_2")->get().name());
+    http_api_listener_2 = test_server_->server()
+                              .listenerManager()
+                              .apiListener("api_listener_2")
+                              ->get()
+                              .createHttpApiListener(test_server_->server().dispatcher());
+    ASSERT_TRUE(http_api_listener_2 != nullptr);
+
+    done.Notify();
+  });
+  ASSERT_TRUE(done.WaitForNotificationWithTimeout(absl::Seconds(1)));
+
+  absl::Notification cleanup_done;
+  test_server_->server().dispatcher().post(
+      [&cleanup_done, &http_api_listener, &http_api_listener_2]() {
+        http_api_listener.reset();
+        http_api_listener_2.reset();
+        cleanup_done.Notify();
+      });
   ASSERT_TRUE(cleanup_done.WaitForNotificationWithTimeout(absl::Seconds(1)));
 }
 
