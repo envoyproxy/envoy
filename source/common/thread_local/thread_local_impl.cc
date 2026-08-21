@@ -121,9 +121,15 @@ void InstanceImpl::SlotImpl::set(InitializeCb cb) {
   }
 
   // Handle main thread.
+<<<<<<< HEAD
   ASSERT(parent_.main_thread_dispatcher_ != nullptr,
          "main thread dispatcher must be registered before initializing thread local slots");
   setThreadLocal(index_, cb(*parent_.main_thread_dispatcher_));
+=======
+  if (parent_.main_thread_dispatcher_ != nullptr) {
+    setThreadLocal(index_, cb(*parent_.main_thread_dispatcher_));
+  }
+>>>>>>> 0a683fb684 (thread_local: refactor SlotImpl to use SlotSharedPtr and std::enable_shared_from_this)
 }
 
 void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_thread) {
