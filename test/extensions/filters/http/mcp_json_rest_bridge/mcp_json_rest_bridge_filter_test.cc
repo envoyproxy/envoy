@@ -1434,7 +1434,7 @@ tool_config:
 
   Protobuf::Struct expected_metadata;
   MessageUtil::loadFromJson(R"json({
-    "status": "mcp_json_rest_bridge_internal_tools_list_missing_config",
+    "status": "mcp_json_rest_bridge_internal_tools_list_passthrough",
     "method": "tools/list"
   })json",
                             expected_metadata);

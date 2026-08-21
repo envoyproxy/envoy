@@ -209,8 +209,8 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
     return BridgeStatusValues::REQUEST_TOOLS_CALL_PATH_TRAVERSAL_REJECTED;
   case BridgeStatus::InternalToolsCallInvalidHttpRule:
     return BridgeStatusValues::INTERNAL_TOOLS_CALL_INVALID_HTTP_RULE;
-  case BridgeStatus::InternalToolsListMissingConfig:
-    return BridgeStatusValues::INTERNAL_TOOLS_LIST_MISSING_CONFIG;
+  case BridgeStatus::InternalToolsListPassthrough:
+    return BridgeStatusValues::INTERNAL_TOOLS_LIST_PASSTHROUGH;
   case BridgeStatus::ResponseTooLarge:
     return BridgeStatusValues::RESPONSE_TOO_LARGE;
   case BridgeStatus::ResponseToolsCallInvalidUtf8:
@@ -919,7 +919,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         // be addressed later when the JSON parser is updated.
         mcp_operation_ = McpOperation::Unspecified;
         request_body_str_ = json_rpc.dump();
-        status_ = BridgeStatus::InternalToolsListMissingConfig;
+        status_ = BridgeStatus::InternalToolsListPassthrough;
         setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                        ? json_rpc[McpConstants::PARAMS_FIELD]
                                        : json::object());
