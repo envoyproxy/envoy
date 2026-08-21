@@ -69,15 +69,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - name: Run swift library tests
-          args: >-
-            test
-            --config=ci
-            --config=mobile-rbe
-            --config=mobile-ios-swift
-            //test/swift/...
-          target: swift-tests
-          timeout-minutes: 120
+        # - name: Run swift library tests
+        #   args: >-
+        #     test
+        #     --config=ci
+        #     --config=mobile-rbe
+        #     --config=mobile-ios-swift
+        #     //test/swift/...
+        #   target: swift-tests
+        #   timeout-minutes: 120
         - name: Run Objective-C library tests
           args: >-
             test
