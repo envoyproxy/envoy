@@ -106,22 +106,30 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 class PEMSecretReader : public SecretReader {
 public:
+  explicit PEMSecretReader(std::string key_id = "") : key_id_(std::move(key_id)) {}
   const std::string& clientSecret() const override { return TEST_RSA_PRIVATE_KEY_PEM; }
   const std::string& hmacSecret() const override { return TEST_HMAC_SECRET; }
+  const std::string& keyId() const override { return key_id_; }
+
+private:
+  const std::string key_id_;
 };
 
 class MockSecretReader : public SecretReader {
 public:
   MockSecretReader(std::string client_secret = "asdf_client_secret_fdsa",
-                   std::string hmac_secret = TEST_HMAC_SECRET)
-      : client_secret_(std::move(client_secret)), hmac_secret_(std::move(hmac_secret)) {}
+                   std::string hmac_secret = TEST_HMAC_SECRET, std::string key_id = "")
+      : client_secret_(std::move(client_secret)), hmac_secret_(std::move(hmac_secret)),
+        key_id_(std::move(key_id)) {}
 
   const std::string& clientSecret() const override { return client_secret_; }
   const std::string& hmacSecret() const override { return hmac_secret_; }
+  const std::string& keyId() const override { return key_id_; }
 
 private:
   const std::string client_secret_;
   const std::string hmac_secret_;
+  const std::string key_id_;
 };
 
 class MockOAuth2CookieValidator : public CookieValidator {
@@ -2027,64 +2035,6 @@ TEST_F(OAuth2Test, PrivateKeyJwtAudienceFromConfig) {
   EXPECT_EQ(config->jwtAssertionAudience(), "https://issuer.example.com");
 }
 
-TEST_F(OAuth2Test, PrivateKeyJwtKeyIdDefaultsToEmpty) {
-  // When key_id is not set, jwtKeyId() should return an empty string.
-  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
-  auto* endpoint = p.mutable_token_endpoint();
-  endpoint->set_cluster("auth.example.com");
-  endpoint->set_uri("auth.example.com/_oauth");
-  endpoint->mutable_timeout()->set_seconds(1);
-  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
-  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
-  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
-  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
-  p.set_forward_bearer_token(false);
-  p.set_auth_type(::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
-                      OAuth2Config_AuthType_PRIVATE_KEY_JWT);
-  p.mutable_private_key_jwt_config()->set_signing_algorithm(
-      ::envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::RS256);
-  p.mutable_private_key_jwt_config()->mutable_assertion_lifetime()->set_seconds(60);
-  // Do NOT set key_id.
-  auto* credentials = p.mutable_credentials();
-  credentials->set_client_id(TEST_CLIENT_ID);
-  credentials->mutable_token_secret()->set_name("secret");
-  credentials->mutable_hmac_secret()->set_name("hmac");
-
-  auto secret_reader = std::make_shared<MockSecretReader>();
-  FilterConfigSharedPtr config = makeFilterConfig(p, secret_reader).value();
-
-  EXPECT_EQ(config->jwtKeyId(), "");
-}
-
-TEST_F(OAuth2Test, PrivateKeyJwtKeyIdFromConfig) {
-  // When key_id is explicitly set, jwtKeyId() should return the configured value.
-  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
-  auto* endpoint = p.mutable_token_endpoint();
-  endpoint->set_cluster("auth.example.com");
-  endpoint->set_uri("auth.example.com/_oauth");
-  endpoint->mutable_timeout()->set_seconds(1);
-  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
-  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
-  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
-  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
-  p.set_forward_bearer_token(false);
-  p.set_auth_type(::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
-                      OAuth2Config_AuthType_PRIVATE_KEY_JWT);
-  p.mutable_private_key_jwt_config()->set_signing_algorithm(
-      ::envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::RS256);
-  p.mutable_private_key_jwt_config()->mutable_assertion_lifetime()->set_seconds(60);
-  p.mutable_private_key_jwt_config()->set_key_id("my-key-id-123");
-  auto* credentials = p.mutable_credentials();
-  credentials->set_client_id(TEST_CLIENT_ID);
-  credentials->mutable_token_secret()->set_name("secret");
-  credentials->mutable_hmac_secret()->set_name("hmac");
-
-  auto secret_reader = std::make_shared<MockSecretReader>();
-  FilterConfigSharedPtr config = makeFilterConfig(p, secret_reader).value();
-
-  EXPECT_EQ(config->jwtKeyId(), "my-key-id-123");
-}
-
 TEST_F(OAuth2Test, PrivateKeyJwtUsesCustomAudienceInAssertion) {
   // Build proto config with a custom assertion_audience.
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
@@ -2148,8 +2098,8 @@ TEST_F(OAuth2Test, PrivateKeyJwtUsesCustomAudienceInAssertion) {
   EXPECT_NE(std::string::npos, payload.find("\"aud\":\"https://issuer.example.com\""));
 }
 
-TEST_F(OAuth2Test, PrivateKeyJwtKeyIdIncludedInAssertionHeader) {
-  // Verify that when key_id is set, the JWT header includes the kid claim.
+TEST_F(OAuth2Test, PrivateKeyJwtKeyIdFromSecretIncludedInAssertionHeader) {
+  // Verify that when the secret carries a key ID, the JWT header includes the kid claim.
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
   auto* endpoint = p.mutable_token_endpoint();
   endpoint->set_cluster("auth.example.com");
@@ -2166,7 +2116,6 @@ TEST_F(OAuth2Test, PrivateKeyJwtKeyIdIncludedInAssertionHeader) {
   p.mutable_private_key_jwt_config()->set_signing_algorithm(
       ::envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::RS256);
   p.mutable_private_key_jwt_config()->mutable_assertion_lifetime()->set_seconds(60);
-  p.mutable_private_key_jwt_config()->set_key_id("test-kid-456");
   p.add_auth_scopes("user");
   auto* credentials = p.mutable_credentials();
   credentials->set_client_id(TEST_CLIENT_ID);
@@ -2175,7 +2124,7 @@ TEST_F(OAuth2Test, PrivateKeyJwtKeyIdIncludedInAssertionHeader) {
 
   MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
-  auto secret_reader = std::make_shared<PEMSecretReader>();
+  auto secret_reader = std::make_shared<PEMSecretReader>("test-kid-456");
   FilterConfigSharedPtr config = makeFilterConfig(p, secret_reader).value();
   init(config);
 
@@ -2211,7 +2160,7 @@ TEST_F(OAuth2Test, PrivateKeyJwtKeyIdIncludedInAssertionHeader) {
 }
 
 TEST_F(OAuth2Test, PrivateKeyJwtNoKeyIdOmitsKidFromHeader) {
-  // Verify that when key_id is not set, the JWT header does not include a kid claim.
+  // Verify that when the secret carries no key ID, the JWT header does not include a kid claim.
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
   auto* endpoint = p.mutable_token_endpoint();
   endpoint->set_cluster("auth.example.com");
@@ -2270,6 +2219,54 @@ TEST_F(OAuth2Test, PrivateKeyJwtNoKeyIdOmitsKidFromHeader) {
   ASSERT_EQ(jwt_parts.size(), 3);
   std::string header = Base64::decodeWithoutPadding(std::string(jwt_parts[0]));
   EXPECT_EQ(std::string::npos, header.find("kid"));
+}
+
+TEST_F(OAuth2Test, SdsSecretReaderMultiEntrySecretProvidesKeyAndKeyId) {
+  envoy::extensions::transport_sockets::tls::v3::GenericSecret client_secret;
+  (*client_secret.mutable_secrets())[std::string(PrivateKeySecretEntry)].set_inline_string(
+      "pem-data");
+  (*client_secret.mutable_secrets())[std::string(KeyIdSecretEntry)].set_inline_string("my-key-id");
+
+  envoy::extensions::transport_sockets::tls::v3::GenericSecret hmac_secret;
+  hmac_secret.mutable_secret()->set_inline_string("hmac");
+
+  SDSSecretReader reader(std::make_shared<Secret::GenericSecretConfigProviderImpl>(client_secret),
+                         std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
+                         factory_context_.server_factory_context_.threadLocal(),
+                         factory_context_.server_factory_context_.api());
+
+  EXPECT_EQ("pem-data", reader.clientSecret());
+  EXPECT_EQ("my-key-id", reader.keyId());
+  EXPECT_EQ("hmac", reader.hmacSecret());
+}
+
+TEST_F(OAuth2Test, SdsSecretReaderSingleValueSecretHasNoKeyId) {
+  envoy::extensions::transport_sockets::tls::v3::GenericSecret client_secret;
+  client_secret.mutable_secret()->set_inline_string("pem-data");
+
+  envoy::extensions::transport_sockets::tls::v3::GenericSecret hmac_secret;
+  hmac_secret.mutable_secret()->set_inline_string("hmac");
+
+  SDSSecretReader reader(std::make_shared<Secret::GenericSecretConfigProviderImpl>(client_secret),
+                         std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
+                         factory_context_.server_factory_context_.threadLocal(),
+                         factory_context_.server_factory_context_.api());
+
+  EXPECT_EQ("pem-data", reader.clientSecret());
+  EXPECT_EQ("", reader.keyId());
+}
+
+TEST_F(OAuth2Test, SdsSecretReaderMissingClientSecretProviderYieldsEmptyValues) {
+  envoy::extensions::transport_sockets::tls::v3::GenericSecret hmac_secret;
+  hmac_secret.mutable_secret()->set_inline_string("hmac");
+
+  SDSSecretReader reader(nullptr,
+                         std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
+                         factory_context_.server_factory_context_.threadLocal(),
+                         factory_context_.server_factory_context_.api());
+
+  EXPECT_EQ("", reader.clientSecret());
+  EXPECT_EQ("", reader.keyId());
 }
 
 TEST_F(OAuth2Test, RefreshTokenWithPrivateKeyJwt) {

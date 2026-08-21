@@ -130,7 +130,17 @@ message OAuth2Credentials {
   // This field is required unless :ref:`auth_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_type>`
   // is set to ``TLS_CLIENT_AUTH``, in which case authentication is done via the client certificate.
   // When ``auth_type`` is ``PRIVATE_KEY_JWT``, this field must contain the PEM-encoded private key
-  // used to sign the JWT client assertion.
+  // used to sign the JWT client assertion. The key may be supplied in either of two forms:
+  //
+  // * As a single-value generic secret holding the PEM-encoded private key. No ``kid`` header
+  //   parameter is included in the client assertion.
+  // * As a multi-entry generic secret with a ``private_key`` entry holding the PEM-encoded private
+  //   key and an optional ``key_id`` entry. When present, the ``key_id`` value is set as the
+  //   ``kid`` header parameter of the client assertion, per
+  //   `RFC 7515 Section 4.1.4 <https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.4>`_.
+  //   Identity providers use it to select the correct verification key when more than one key is
+  //   registered for the client. Distributing both in one secret means the key ID is always
+  //   rotated together with the key it identifies.
   transport_sockets.tls.v3.SdsSecretConfig token_secret = 2;
 
   // Configures how the secret token should be created.
@@ -198,19 +208,6 @@ message PrivateKeyJwtConfig {
   //
   // If not set, defaults to the configured ``token_endpoint`` URI.
   string assertion_audience = 3;
-
-  // Key ID to set as the ``kid`` header parameter of the JWT client assertion, per
-  // `RFC 7515 Section 4.1.4 <https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.4>`_.
-  // The ``kid`` is a hint indicating which key was used to sign the assertion, and is needed by
-  // identity providers that have more than one key registered for the client.
-  //
-  // This value is taken from the filter configuration and is not derived from the signing key, so
-  // it is not updated when the key is rotated via SDS. Update ``key_id`` in the filter
-  // configuration together with the key; a stale ``key_id`` causes the identity provider to
-  // reject the client assertion.
-  //
-  // If not set, the ``kid`` header parameter is omitted from the assertion.
-  string key_id = 4;
 }
 
 // Defines how an OAuth token is forwarded upstream.

@@ -684,7 +684,6 @@ FilterConfig::FilterConfig(
       jwt_assertion_audience_(proto_config.private_key_jwt_config().assertion_audience().empty()
                                   ? proto_config.token_endpoint().uri()
                                   : proto_config.private_key_jwt_config().assertion_audience()),
-      jwt_key_id_(proto_config.private_key_jwt_config().key_id()),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
@@ -1124,7 +1123,7 @@ absl::StatusOr<std::string> OAuth2Filter::getClientCredential() {
   auto assertion_result = ClientAssertion::create(
       config_->clientId(), config_->jwtAssertionAudience(), config_->clientSecret(),
       config_->jwtSigningAlgorithm(), config_->jwtAssertionLifetime(), time_source_, random_,
-      config_->jwtKeyId());
+      config_->keyId());
   if (!assertion_result.ok()) {
     return assertion_result.status();
   }

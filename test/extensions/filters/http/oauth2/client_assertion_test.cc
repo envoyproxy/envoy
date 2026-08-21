@@ -192,6 +192,53 @@ TEST_F(ClientAssertionTest, CustomLifetime) {
   EXPECT_NE(std::string::npos, payload_json.find("\"exp\":1300"));
 }
 
+TEST_F(ClientAssertionTest, CreateAssertionWithKeyId) {
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("test-jti-uuid"));
+
+  auto result =
+      ClientAssertion::create("my-client-id", "https://auth.example.com/token", RsaPrivateKeyPem,
+                              "RS256", std::chrono::seconds(60), test_time_, random_, "my-key-id");
+  ASSERT_OK(result);
+
+  std::vector<std::string> parts = absl::StrSplit(result.value(), '.');
+  ASSERT_EQ(3, parts.size());
+
+  const std::string header_json = Base64Url::decode(parts[0]);
+  EXPECT_NE(std::string::npos, header_json.find("\"kid\":\"my-key-id\""));
+  EXPECT_NE(std::string::npos, header_json.find("\"alg\":\"RS256\""));
+  EXPECT_NE(std::string::npos, header_json.find("\"typ\":\"JWT\""));
+}
+
+TEST_F(ClientAssertionTest, CreateAssertionWithoutKeyIdOmitsKid) {
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("test-jti-uuid"));
+
+  auto result =
+      ClientAssertion::create("my-client-id", "https://auth.example.com/token", RsaPrivateKeyPem,
+                              "RS256", std::chrono::seconds(60), test_time_, random_, "");
+  ASSERT_OK(result);
+
+  std::vector<std::string> parts = absl::StrSplit(result.value(), '.');
+  ASSERT_EQ(3, parts.size());
+
+  EXPECT_EQ(std::string::npos, Base64Url::decode(parts[0]).find("kid"));
+}
+
+TEST_F(ClientAssertionTest, KeyIdIsJsonEscaped) {
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("test-jti-uuid"));
+
+  auto result = ClientAssertion::create("my-client-id", "https://auth.example.com/token",
+                                        RsaPrivateKeyPem, "RS256", std::chrono::seconds(60),
+                                        test_time_, random_, R"(quote"injection)");
+  ASSERT_OK(result);
+
+  std::vector<std::string> parts = absl::StrSplit(result.value(), '.');
+  ASSERT_EQ(3, parts.size());
+
+  // The value must be escaped so it cannot break out of the JSON string.
+  const std::string header_json = Base64Url::decode(parts[0]);
+  EXPECT_NE(std::string::npos, header_json.find(R"("kid":"quote\"injection")"));
+}
+
 TEST_F(ClientAssertionTest, EmptyPrivateKey) {
   // uuid() is never reached — key import fails first.
   auto result = ClientAssertion::create("client", "https://auth.example.com/token", "", "RS256",
