@@ -124,6 +124,19 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "proto_streamer_speed_test",
+    srcs = ["proto_streamer_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/json:proto_streamer_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/proto:extraction_proto_cc_proto",
+        "//test/proto:sensitive_proto_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "json_utility_test",
     srcs = ["json_utility_test.cc"],
