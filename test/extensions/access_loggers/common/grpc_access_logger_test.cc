@@ -176,7 +176,6 @@ public:
           Protobuf::Struct message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
-          EXPECT_TRUE(message.fields().contains(key));
           EXPECT_THAT(message.fields(), Contains(IsStructNumber(key, count)));
         }));
   }
@@ -491,7 +490,6 @@ public:
               Protobuf::Struct message;
               Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
               EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
-              EXPECT_TRUE(message.fields().contains(key));
               EXPECT_THAT(message.fields(), Contains(IsStructNumber(key, count)));
               return nullptr; // We don't care about the returned request.
             }));
