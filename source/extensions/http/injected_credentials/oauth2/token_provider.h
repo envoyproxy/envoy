@@ -84,7 +84,7 @@ private:
   std::string token_;
   MonotonicTime token_expiry_time_;
   const Common::SecretReaderConstSharedPtr secret_reader_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotSharedPtr tls_;
   std::unique_ptr<OAuth2Client> oauth2_client_;
   std::string client_id_;
   const std::string oauth_scopes_;
