@@ -49,7 +49,7 @@ public:
       bool allow_failed = false, bool allow_missing = false) {
     absl::Status creation_status = absl::OkStatus();
     filter_config_ = std::make_shared<FilterConfigImpl>(
-        proto_config_, "", mock_factory_ctx_.server_factory_context_,
+        proto_config_, "", mock_factory_ctx_.server_factory_context_, mock_factory_ctx_.scope(),
         makeOptRef<Init::Manager>(mock_factory_ctx_.init_manager_), creation_status);
     ASSERT_TRUE(creation_status.ok()) << creation_status;
     raw_fetcher_ = new MockJwksFetcher;

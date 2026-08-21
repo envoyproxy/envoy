@@ -88,7 +88,7 @@ public:
 
     auto inline_jwks_or = Config::DataSource::read(jwt_provider_.local_jwks(), true, context.api());
     SET_AND_RETURN_IF_NOT_OK(inline_jwks_or.status(), creation_status);
-    const auto inline_jwks = std::move(inline_jwks_or.value());
+    const auto& inline_jwks = inline_jwks_or.value();
     if (!inline_jwks.empty()) {
       auto jwks = JwtVerify::Jwks::createFrom(inline_jwks, JwtVerify::Jwks::JWKS);
       if (jwks->getStatus() != Status::Ok) {

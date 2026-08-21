@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/init/manager.h"
 
 #include "source/common/jwt/jwks.h"
 #include "source/extensions/filters/http/common/jwks_fetcher.h"

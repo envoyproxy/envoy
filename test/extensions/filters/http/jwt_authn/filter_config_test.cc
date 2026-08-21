@@ -47,7 +47,7 @@ rules:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
   auto filter_conf = std::make_unique<FilterConfigImpl>(
-      proto_config, "", context.server_factory_context_,
+      proto_config, "", context.server_factory_context_, context.scope(),
       makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   ASSERT_TRUE(creation_status.ok());
 
@@ -85,7 +85,7 @@ rules:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
   auto filter_conf = std::make_unique<FilterConfigImpl>(
-      proto_config, "", context.server_factory_context_,
+      proto_config, "", context.server_factory_context_, context.scope(),
       makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   ASSERT_TRUE(creation_status.ok());
 
@@ -118,7 +118,7 @@ requirement_map:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_,
+  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_, context.scope(),
                                  makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
                                          "Wrong requirement_name: rr. It should be one of [r1]"));
@@ -155,7 +155,7 @@ requirement_map:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
   auto filter_conf = std::make_unique<FilterConfigImpl>(
-      proto_config, "", context.server_factory_context_,
+      proto_config, "", context.server_factory_context_, context.scope(),
       makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   ASSERT_TRUE(creation_status.ok());
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -193,7 +193,7 @@ rules:
   TestUtility::loadFromYaml(config, proto_config);
   absl::Status creation_status = absl::OkStatus();
   auto filter_conf = std::make_unique<FilterConfigImpl>(
-      proto_config, "", context.server_factory_context_,
+      proto_config, "", context.server_factory_context_, context.scope(),
       makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   ASSERT_TRUE(creation_status.ok());
 
@@ -236,7 +236,7 @@ filter_state_rules:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
   auto filter_conf = std::make_unique<FilterConfigImpl>(
-      proto_config, "", context.server_factory_context_,
+      proto_config, "", context.server_factory_context_, context.scope(),
       makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   ASSERT_TRUE(creation_status.ok());
 
@@ -292,7 +292,7 @@ requirement_map:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
   auto filter_conf = std::make_unique<FilterConfigImpl>(
-      proto_config, "", context.server_factory_context_,
+      proto_config, "", context.server_factory_context_, context.scope(),
       makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   ASSERT_TRUE(creation_status.ok());
 
@@ -348,7 +348,7 @@ providers:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_,
+  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_, context.scope(),
                                  makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   EXPECT_THAT(creation_status,
               HasStatus(absl::StatusCode::kOutOfRange, HasSubstr("Duration out-of-range")));
@@ -370,7 +370,7 @@ providers:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_,
+  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_, context.scope(),
                                  makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   EXPECT_THAT(creation_status,
               HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("invalid URI")));
@@ -392,7 +392,7 @@ providers:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_,
+  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_, context.scope(),
                                  makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   EXPECT_TRUE(creation_status.ok());
 }
@@ -415,7 +415,7 @@ providers:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_,
+  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_, context.scope(),
                                  makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   EXPECT_TRUE(creation_status.ok());
 }
@@ -458,7 +458,7 @@ providers:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_,
+  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_, context.scope(),
                                  makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   EXPECT_THAT(creation_status,
               HasStatus(absl::StatusCode::kInvalidArgument,
@@ -479,7 +479,7 @@ providers:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_,
+  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_, context.scope(),
                                  makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   EXPECT_THAT(creation_status,
               HasStatus(absl::StatusCode::kInvalidArgument,
@@ -504,7 +504,7 @@ providers:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_,
+  FilterConfigImpl filter_config(proto_config, "", context.server_factory_context_, context.scope(),
                                  makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   EXPECT_THAT(creation_status,
               HasStatus(absl::StatusCode::kOutOfRange, HasSubstr("Duration out-of-range")));
@@ -533,7 +533,7 @@ providers:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
   auto filter_conf = std::make_unique<FilterConfigImpl>(
-      proto_config, "", context.server_factory_context_,
+      proto_config, "", context.server_factory_context_, context.scope(),
       makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   ASSERT_TRUE(creation_status.ok());
   auto* jwks_data = filter_conf->getJwksCache().findByIssuer("issuer1");
@@ -563,7 +563,7 @@ providers:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigImpl filter(proto_config, "", context.server_factory_context_,
+  FilterConfigImpl filter(proto_config, "", context.server_factory_context_, context.scope(),
                           makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   EXPECT_THAT(
       creation_status,
