@@ -117,6 +117,53 @@ Lua script as follows:
     :linenos:
     :caption: :download:`lua-filter-override.yaml <_include/lua-filter-override.yaml>`
 
+.. _config_http_filters_lua_package_paths:
+
+Requiring Lua modules
+---------------------
+
+:ref:`source_codes <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>` selects
+which script a route runs; it does not make those scripts available to ``require``. To load a Lua
+module, add the location it lives in to the interpreter's search path with :ref:`package_paths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_paths>`, or, for modules which are
+loadable C libraries, :ref:`package_cpaths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_cpaths>`:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.lua
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+      package_paths:
+      - /etc/envoy/lua/?.lua
+      - /etc/envoy/lua/?/init.lua
+      package_cpaths:
+      - /etc/envoy/lua/?.so
+      default_source_code:
+        inline_string: |
+          local json = require("dkjson")
+
+          function envoy_on_request(request_handle)
+            -- Do something with json.
+          end
+
+Each entry is one Lua path pattern, in which ``?`` is replaced by the required module's name. The
+entries are joined with ``;`` in the order given and placed ahead of the interpreter's built-in
+search path, which is kept, so a module present in both places resolves to the configured copy.
+
+The patterns are in place before any configured code runs, including the run that validates the
+configuration at load time. A ``require`` at the top level of a script whose module cannot be found
+is therefore a configuration error rather than a per-request failure.
+
+A route which supplies its own :ref:`source_code
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` runs in its own Lua
+VM, which the filter-level patterns do not reach; configure :ref:`package_paths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.package_paths>` on the route as
+well. A route which selects a script by :ref:`name
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>` runs in the filter's VM and
+already has the filter-level patterns.
+
 Upstream Filter
 ---------------
 

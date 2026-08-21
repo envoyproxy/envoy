@@ -472,6 +472,19 @@ using Initializer = std::function<void(lua_State*)>;
 using InitializerList = std::vector<Initializer>;
 
 /**
+ * Additional module search patterns for a Lua state, prepended to the interpreter's built-in
+ * defaults so that a script can require() modules from locations the interpreter does not search
+ * on its own. Each member holds patterns already joined in Lua's own ';'-separated syntax, or is
+ * empty to leave that search path untouched.
+ */
+struct PackagePaths {
+  // Prepended to package.path, for modules that are Lua source.
+  std::string path;
+  // Prepended to package.cpath, for modules that are loadable C libraries.
+  std::string cpath;
+};
+
+/**
  * This class wraps a Lua state that can be used safely across threads. The model is that every
  * worker gets its own independent state. There is no truly global state that a script can access.
  * This is something that might be provided in the future via an API (not via Lua itself).
@@ -479,8 +492,11 @@ using InitializerList = std::vector<Initializer>;
 class ThreadLocalState : Logger::Loggable<Logger::Id::lua> {
 public:
   // creation_status is set (and construction stops early) if the supplied code cannot be parsed.
-  ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls,
-                   absl::Status& creation_status);
+  // package_paths is applied to every state this object creates, including the one the code is
+  // parsed on, so that a require() at the top level of the code resolves the same way there as it
+  // will on a worker.
+  ThreadLocalState(const std::string& code, const PackagePaths& package_paths,
+                   ThreadLocal::SlotAllocator& tls, absl::Status& creation_status);
 
   /**
    * @return CoroutinePtr a new coroutine.
@@ -527,7 +543,7 @@ public:
 
 private:
   struct LuaThreadLocal : public ThreadLocal::ThreadLocalObject {
-    LuaThreadLocal(const std::string& code);
+    LuaThreadLocal(const std::string& code, const PackagePaths& package_paths);
 
     CSmartPtr<lua_State, lua_close> state_;
     std::vector<int> global_slots_;
