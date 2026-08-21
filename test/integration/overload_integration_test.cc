@@ -937,6 +937,15 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
 class LoadShedPointIntegrationTest : public BaseOverloadIntegrationTest,
                                      public HttpProtocolIntegrationTest {
 protected:
+  void initializeOverloadManager(const envoy::config::overload::v3::OverloadManager& config) {
+    overload_manager_config_ = config;
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    initialize();
+    updateResource(0);
+  }
+
   void initializeOverloadManager(const envoy::config::overload::v3::LoadShedPoint& config) {
     setupOverloadManagerConfig(config);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {

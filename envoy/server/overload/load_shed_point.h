@@ -4,6 +4,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "source/common/singleton/const_singleton.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
