@@ -410,6 +410,22 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Add a native filter to this Envoy Client. The filter config is provided as binary-serialized
+  /// `google.protobuf.Any` bytes, which is required when building with lite protos.
+  ///
+  /// - parameter name:            Custom name to use for this filter factory. Useful for having
+  ///                              more meaningful trace logs, but not required. Should be unique
+  ///                              per factory registered.
+  /// - parameter typedConfigData: Binary-serialized `google.protobuf.Any` bytes for the filter.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addNativeFilter(name: String = UUID().uuidString, typedConfigData: Data) -> Self {
+    self.nativeFilterChain.append(
+      EnvoyNativeFilterConfig(name: name, typedConfigData: typedConfigData))
+    return self
+  }
+
   /// Add a string accessor to this Envoy Client.
   ///
   /// - parameter name:     the name of the accessor.
