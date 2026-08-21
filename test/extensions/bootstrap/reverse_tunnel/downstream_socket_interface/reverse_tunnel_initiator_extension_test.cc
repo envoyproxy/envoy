@@ -30,17 +30,16 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Contains;
+using testing::HasSubstr;
 using testing::Invoke;
+using testing::IsSupersetOf;
+using testing::Key;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-
-using testing::Contains;
-using testing::IsSupersetOf;
 using testing::UnorderedElementsAre;
 
-using testing::HasSubstr;
-using testing::Key;
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {

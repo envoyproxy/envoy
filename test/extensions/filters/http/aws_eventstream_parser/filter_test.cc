@@ -19,9 +19,8 @@
 #include "gtest/gtest.h"
 
 using testing::Contains;
-using testing::UnorderedElementsAre;
-
 using testing::IsSupersetOf;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {

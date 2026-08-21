@@ -48,11 +48,10 @@ using testing::Contains;
 using testing::Eq;
 using testing::Gt;
 using testing::HasSubstr;
-using testing::MatchesRegex;
-using testing::UnorderedElementsAre;
-
 using testing::IsSupersetOf;
 using testing::Key;
+using testing::MatchesRegex;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {

@@ -46,19 +46,17 @@ using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_SIGNATURE_LEN;
 using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
+using testing::Contains;
 using testing::ElementsAre;
+using testing::HasSubstr;
 using testing::Invoke;
+using testing::IsSupersetOf;
+using testing::Key;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-
-using testing::Contains;
-using testing::HasSubstr;
 using testing::UnorderedElementsAre;
 
-using testing::IsSupersetOf;
-
-using testing::Key;
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {

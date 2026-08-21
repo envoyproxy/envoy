@@ -14,10 +14,10 @@
 #include "gtest/gtest.h"
 
 using testing::Contains;
+using testing::IsSupersetOf;
 using testing::Key;
 using testing::UnorderedElementsAre;
 
-using testing::IsSupersetOf;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

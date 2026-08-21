@@ -11,6 +11,7 @@
 #include "gmock/gmock.h"
 
 using testing::_;
+using testing::Contains;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
@@ -29,8 +30,6 @@ MATCHER_P(MapEq, rhs, "") {
 using BufferFunction = std::function<void(::Envoy::Buffer::Instance&)>;
 
 #include "test/test_common/struct_matchers.h"
-
-using testing::Contains;
 
 namespace Envoy {
 namespace Extensions {

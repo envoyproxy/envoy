@@ -20,18 +20,16 @@
 #include "gmock/gmock.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
 using testing::_;
+using testing::Contains;
 using testing::Invoke;
+using testing::IsSupersetOf;
+using testing::Key;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
 #include "test/test_common/struct_matchers.h"
-
-using testing::Contains;
-
-using testing::IsSupersetOf;
-using testing::Key;
 
 namespace Envoy {
 namespace Extensions {

@@ -20,10 +20,9 @@
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::_;
+using testing::Contains;
 using testing::NiceMock;
 using testing::Return;
-
-using testing::Contains;
 
 namespace Envoy {
 namespace Extensions {

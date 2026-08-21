@@ -17,14 +17,13 @@
 
 #include "gmock/gmock.h"
 using testing::_;
+using testing::Contains;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
 #include "test/test_common/struct_matchers.h"
-
-using testing::Contains;
 
 namespace Envoy {
 namespace Extensions {

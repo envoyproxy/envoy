@@ -16,17 +16,15 @@
 
 #include "xds/type/matcher/v3/matcher.pb.h"
 
+using testing::Contains;
+using testing::IsSupersetOf;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
-
-#include "test/test_common/struct_matchers.h"
-
-using testing::Contains;
 using testing::UnorderedElementsAre;
 
-using testing::IsSupersetOf;
+#include "test/test_common/struct_matchers.h"
 
 namespace Envoy {
 namespace Extensions {

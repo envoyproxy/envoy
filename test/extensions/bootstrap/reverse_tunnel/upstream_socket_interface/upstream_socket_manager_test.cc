@@ -24,15 +24,13 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Contains;
+using testing::Eq;
 using testing::Invoke;
+using testing::IsSupersetOf;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-
-using testing::Contains;
-using testing::Eq;
-
-using testing::IsSupersetOf;
 
 namespace Envoy {
 namespace Extensions {

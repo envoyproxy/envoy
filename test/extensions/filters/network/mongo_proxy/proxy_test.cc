@@ -28,6 +28,7 @@
 using testing::_;
 using testing::AtLeast;
 using testing::Contains;
+using testing::ElementsAre;
 using testing::Invoke;
 using testing::Key;
 using testing::Matcher;
@@ -35,9 +36,6 @@ using testing::NiceMock;
 using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
-
-using testing::Contains;
-using testing::ElementsAre;
 
 namespace Envoy {
 namespace Extensions {

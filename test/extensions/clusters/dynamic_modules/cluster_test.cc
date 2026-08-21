@@ -34,9 +34,8 @@
 using testing::An;
 using testing::Contains;
 using testing::HasSubstr;
-using testing::UnorderedElementsAre;
-
 using testing::IsSupersetOf;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {

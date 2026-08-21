@@ -27,21 +27,19 @@
 #include "gmock/gmock.h"
 
 using testing::_;
+using testing::AllOf;
 using testing::AtLeast;
+using testing::Contains;
 using testing::Eq;
+using testing::Field;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
+using testing::IsSupersetOf;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrEq;
-
-using testing::AllOf;
-using testing::Contains;
-using testing::Field;
 using testing::UnorderedElementsAre;
-
-using testing::IsSupersetOf;
 
 namespace Envoy {
 namespace Extensions {

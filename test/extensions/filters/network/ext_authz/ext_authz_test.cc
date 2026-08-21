@@ -25,14 +25,13 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::A;
+using testing::Contains;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnRef;
 using testing::WithArgs;
-
-using testing::A;
-using testing::Contains;
 
 namespace Envoy {
 namespace Extensions {

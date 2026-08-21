@@ -13,22 +13,21 @@ using testing::_;
 using testing::An;
 using testing::AnyNumber;
 using testing::AtLeast;
+using testing::Bool;
+using testing::Contains;
 using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::IsNull;
 using testing::Mock;
+using testing::Optional;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrEq;
 
 #include "test/test_common/struct_matchers.h"
-
-using testing::Bool;
-using testing::Contains;
-using testing::IsNull;
-using testing::Optional;
-using testing::StrEq;
 
 namespace Envoy {
 namespace Http {

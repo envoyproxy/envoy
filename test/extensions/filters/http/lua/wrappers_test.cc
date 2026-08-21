@@ -16,16 +16,14 @@
 #include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
-using testing::Expectation;
-using testing::InSequence;
-using testing::ReturnPointee;
-using testing::ReturnRef;
-
 using testing::Contains;
 using testing::ElementsAre;
-using testing::UnorderedElementsAre;
-
+using testing::Expectation;
+using testing::InSequence;
 using testing::IsSupersetOf;
+using testing::ReturnPointee;
+using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {

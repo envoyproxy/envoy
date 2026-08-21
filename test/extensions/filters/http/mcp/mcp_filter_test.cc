@@ -10,9 +10,8 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
-using testing::UnorderedElementsAre;
-
 using testing::IsSupersetOf;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {

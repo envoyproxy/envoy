@@ -54,22 +54,20 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::InSequence;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
-using testing::MockFunction;
-using testing::NiceMock;
-using testing::Property;
-using testing::Return;
-using testing::ReturnRef;
-
 using testing::Bool;
 using testing::Contains;
 using testing::Eq;
-using testing::NotNull;
-using testing::UnorderedElementsAre;
-
+using testing::InSequence;
+using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::IsSupersetOf;
+using testing::MockFunction;
+using testing::NiceMock;
+using testing::NotNull;
+using testing::Property;
+using testing::Return;
+using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Router {

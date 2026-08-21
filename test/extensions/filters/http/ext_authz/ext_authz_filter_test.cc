@@ -41,6 +41,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::A;
 using testing::Contains;
 using testing::InSequence;
 using testing::Invoke;
@@ -48,8 +49,6 @@ using testing::Key;
 using testing::Not;
 using testing::Return;
 using testing::ReturnRef;
-
-using testing::A;
 
 namespace Envoy {
 namespace Extensions {
