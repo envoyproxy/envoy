@@ -3937,6 +3937,28 @@ TEST_F(OverrideTest, ClusterMetadataNamespacesOverride) {
               ElementsAre("more_specific_untyped_ns_2"));
 }
 
+TEST_F(OverrideTest, EmitClientSpanMerge) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_emit_client_span()->set_value(false);
+
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()->mutable_emit_client_span()->set_value(true);
+
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
+  FilterConfigPerRoute merged_route(route1, route2);
+
+  ASSERT_TRUE(merged_route.emitClientSpan().has_value());
+  EXPECT_TRUE(*merged_route.emitClientSpan());
+
+  // Empty more specific inherits from less specific.
+  ExtProcPerRoute empty_cfg;
+  FilterConfigPerRoute empty_route(empty_cfg, builder_, factory_context_);
+  FilterConfigPerRoute merged_inherited(route1, empty_route);
+  ASSERT_TRUE(merged_inherited.emitClientSpan().has_value());
+  EXPECT_FALSE(*merged_inherited.emitClientSpan());
+}
+
 // Verify that attempts to change headers that are not allowed to be changed
 // are ignored and a counter is incremented.
 TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {

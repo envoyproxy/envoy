@@ -371,6 +371,8 @@ public:
 
   bool keepContentLength() const { return allow_content_length_header_; }
 
+  bool emitClientSpan() const { return emit_client_span_; }
+
 private:
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
@@ -442,6 +444,7 @@ private:
   const bool graceful_grpc_close_ = false;
 
   const bool allow_content_length_header_ = false;
+  const bool emit_client_span_ = true;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -493,6 +496,8 @@ public:
   }
   const std::optional<bool>& failureModeAllow() const { return failure_mode_allow_; }
 
+  const std::optional<bool>& emitClientSpan() const { return emit_client_span_; }
+
   bool hasProcessingRequestModifierConfig() const {
     return processing_request_modifier_factory_cb_ != nullptr;
   }
@@ -519,6 +524,7 @@ private:
       untyped_cluster_metadata_forwarding_namespaces_;
   const std::optional<const std::vector<std::string>> typed_cluster_metadata_forwarding_namespaces_;
   const std::optional<bool> failure_mode_allow_;
+  const std::optional<bool> emit_client_span_;
 
   const std::function<std::unique_ptr<ProcessingRequestModifier>()>
       processing_request_modifier_factory_cb_;
@@ -562,7 +568,8 @@ public:
             config->typedClusterMetadataForwardingNamespaces(), config->keepContentLength()),
         processing_request_modifier_(config->createProcessingRequestModifier()),
         on_processing_response_(config->createOnProcessingResponse()),
-        failure_mode_allow_(config->failureModeAllow()) {}
+        failure_mode_allow_(config->failureModeAllow()),
+        emit_client_span_(config->emitClientSpan()) {}
 
   const FilterConfig& config() const { return *config_; }
   const envoy::config::core::v3::GrpcService& grpcServiceConfig() const {
@@ -762,6 +769,9 @@ private:
 
   // If true, the protocol configurations are already sent to the server.
   bool protocol_config_encoded_ = false;
+
+  // Whether to emit client-side spans for external processing requests.
+  bool emit_client_span_{true};
 };
 
 extern std::string responseCaseToString(
