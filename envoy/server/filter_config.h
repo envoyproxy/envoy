@@ -398,7 +398,7 @@ public:
   }
 
   /**
-   * @return bool true if this filter is a unified filter who implements
+   * @return bool true if this filter is a unified filter that implements
    * createHttpFilterFactoryFromProto to replace createFilterFactoryFromProto completely. This is
    * used to differentiate unified filters from legacy filters.
    */
