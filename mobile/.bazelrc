@@ -199,6 +199,7 @@ build:mobile-ios --config=ios
 build:mobile-ios --strategy=ProcessAndSign=sandboxed,local
 
 build:mobile-ios-swift --config=mobile-ios
+build:mobile-ios-swift --define=no_debug_info=1
 test:mobile-ios-swift --build_tests_only
 
 build:mobile-ios-obj-c --config=mobile-ios
