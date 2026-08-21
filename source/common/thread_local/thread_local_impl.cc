@@ -115,7 +115,10 @@ void InstanceImpl::SlotImpl::set(InitializeCb cb) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(!parent_.shutdown_);
 
+  initialize_cb_ = cb;
+
   for (Event::Dispatcher& dispatcher : parent_.registered_threads_) {
+    // See the header file comments for still_alive_guard_ for why we capture index_.
     dispatcher.post(wrapCallback(
         [index = index_, cb, &dispatcher]() -> void { setThreadLocal(index, cb(dispatcher)); }));
   }
@@ -137,6 +140,18 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
     ASSERT(!containsReference(registered_threads_, dispatcher));
     registered_threads_.push_back(dispatcher);
     dispatcher.post([&dispatcher] { thread_local_data_.dispatcher_ = &dispatcher; });
+    for (auto& weak_slot : slots_) {
+      if (auto slot = weak_slot.lock()) {
+        if (slot->initialize_cb_ != nullptr) {
+          dispatcher.post(
+              [weak_slot, cb = slot->initialize_cb_, index = slot->index_, &dispatcher]() -> void {
+                if (auto slot = weak_slot.lock()) {
+                  setThreadLocal(index, cb(dispatcher));
+                }
+              });
+        }
+      }
+    }
   }
 }
 
