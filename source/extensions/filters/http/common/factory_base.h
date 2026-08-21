@@ -256,6 +256,47 @@ private:
   }
 };
 
+template <class ConfigProto, class RouteConfigProto = ConfigProto>
+class UnifiedFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
+                           public Server::Configuration::NamedHttpFilterConfigFactory,
+                           public Server::Configuration::UpstreamHttpFilterConfigFactory {
+public:
+  UnifiedFactoryBase(const std::string& name)
+      : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
+
+  bool isUnifiedFilter() final { return true; }
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) final {
+    auto extra_context = Server::Configuration::ExtraFactoryContext::create(context, stats_prefix);
+    return createHttpFilterFactoryFromProto(proto_config, context.serverFactoryContext(),
+                                            extra_context);
+  }
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::UpstreamFactoryContext& context) final {
+    auto extra_context = Server::Configuration::ExtraFactoryContext::create(context, stats_prefix);
+    return createHttpFilterFactoryFromProto(proto_config, context.serverFactoryContext(),
+                                            extra_context);
+  }
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProto(
+      const Protobuf::Message& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) final {
+    return createHttpFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config, extra_context.visitor),
+        context, extra_context);
+  }
+
+  virtual absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const ConfigProto& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) PURE;
+};
+
 } // namespace Common
 } // namespace HttpFilters
 } // namespace Extensions
