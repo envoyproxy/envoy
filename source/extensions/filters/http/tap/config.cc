@@ -47,19 +47,12 @@ absl::StatusOr<Http::FilterFactoryCb> TapFilterFactory::createFilterFactory(
   };
 }
 
-absl::StatusOr<Http::FilterFactoryCb> TapFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(proto_config, stats_prefix, context.serverFactoryContext(),
-                             context.scope(), context.messageValidationVisitor());
-}
-
 absl::StatusOr<Http::FilterFactoryCb> TapFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactory(proto_config, extra_context.stats_prefix, context, context.scope(),
-                             context.messageValidationVisitor());
+  return createFilterFactory(proto_config, extra_context.stats_prefix, context,
+                             extra_context.scopeOr(context), extra_context.visitor);
 }
 
 /**

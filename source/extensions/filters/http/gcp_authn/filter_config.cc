@@ -36,16 +36,11 @@ absl::StatusOr<Http::FilterFactoryCb> GcpAuthnFilterFactory::createFilterFactory
   };
 }
 
-absl::StatusOr<Http::FilterFactoryCb> GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
-    const GcpAuthnFilterConfig& config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(config, stats_prefix, context.serverFactoryContext(), context.scope());
-}
-
 absl::StatusOr<Http::FilterFactoryCb> GcpAuthnFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const GcpAuthnFilterConfig& config, Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  return createFilterFactory(config, extra_context.stats_prefix, context, context.scope());
+  return createFilterFactory(config, extra_context.stats_prefix, context,
+                             extra_context.scopeOr(context));
 }
 
 /**
