@@ -10,6 +10,7 @@
 #include "envoy/network/listener.h"
 
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/server/active_listener_base.h"
 
 namespace Envoy {
@@ -98,7 +99,17 @@ public:
   // ActiveListenerImplBase
   void pauseListening() override { udp_listener_->disable(); }
   void resumeListening() override { udp_listener_->enable(); }
-  void shutdownListener(const Network::ExtraShutdownListenerOptions&) override {
+  void shutdownListener(const Network::ExtraShutdownListenerOptions& options) override {
+    if (options.non_dispatched_udp_packet_handler_) {
+      // Keep the listener alive during hot restart drain. Forward datagrams of unknown sessions to
+      // the child only when the guard is enabled, otherwise keep serving them locally on the
+      // draining parent rather than forwarding each over the hot restart RPC.
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.udp_hot_restart_session_handoff")) {
+        non_dispatched_udp_packet_handler_ = options.non_dispatched_udp_packet_handler_;
+      }
+      return;
+    }
     // The read filter should be deleted before the UDP listener is deleted.
     // The read filter refers to the UDP listener to send packets to downstream.
     // If the UDP listener is deleted before the read filter, the read filter may try to use it
@@ -117,17 +128,25 @@ public:
   void onFilterChainDrainStart(const std::list<const Network::FilterChain*>&) override {
     IS_ENVOY_BUG("unexpected call to onFilterChainDrainStart");
   }
-  void onListenerDrainStart() override { IS_ENVOY_BUG("unexpected call to onListenerDrainStart"); }
+  void onListenerDrainStart() override {}
 
   // Network::UdpListenerFilterManager
   void addReadFilter(Network::UdpListenerReadFilterPtr&& filter) override;
 
   // Network::UdpReadFilterCallbacks
   Network::UdpListener& udpListener() override;
+  Network::UdpHotRestartSessionHandlePtr
+  registerHotRestartSession(const Network::Address::InstanceConstSharedPtr& local_address,
+                            const Network::Address::InstanceConstSharedPtr& peer_address) override;
 
 private:
+  // Sessions a filter has registered on this worker. During a hot restart the parent keeps serving
+  // these and forwards datagrams of any other 4-tuple to the child instance.
+  absl::flat_hash_set<Network::UdpRecvData::LocalPeerAddresses> active_sessions_;
+  // Destroying the filters unregisters their sessions, which touches active_sessions_ above.
   std::list<Network::UdpListenerReadFilterPtr> read_filters_;
   Network::UdpPacketWriterPtr udp_packet_writer_;
+  OptRef<Network::NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
 };
 
 } // namespace Server

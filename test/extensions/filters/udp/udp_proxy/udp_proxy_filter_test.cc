@@ -280,6 +280,7 @@ public:
     ON_CALL(os_sys_calls_, supportsIpTransparent(_)).WillByDefault(Return(true));
     EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
+    EXPECT_CALL(callbacks_, registerHotRestartSession).Times(AtLeast(0));
     EXPECT_CALL(
         *factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_,
         address())

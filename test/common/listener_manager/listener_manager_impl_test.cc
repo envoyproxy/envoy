@@ -695,6 +695,16 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   addOrUpdateListener(listener_proto);
   EXPECT_EQ(1u, manager_->listeners().size());
+
+  // Stopping listeners must not close connectionless UDP listen sockets, so a hot restart
+  // parent can keep reading from them during drain.
+  EXPECT_CALL(*worker_, stopListener(_, _, _))
+      .WillOnce(Invoke([](Network::ListenerConfig&, const Network::ExtraShutdownListenerOptions&,
+                          std::function<void()> completion) { completion(); }));
+  EXPECT_CALL(server_.dispatcher_, post(_)).WillOnce([](Event::PostCb callback) { callback(); });
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(0u);
+  manager_->stopListeners(ListenerManager::StopListenersType::All, {});
+  EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AllowOnlyDefaultFilterChain) {
