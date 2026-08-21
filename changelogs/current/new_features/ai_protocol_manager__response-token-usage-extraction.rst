@@ -4,10 +4,11 @@ Added response-side LLM token-usage extraction to the
 Anthropic, and Gemini dialects are observed without stopping filter-chain
 iteration or mutating the response (extraction runs synchronously on the
 encode callbacks against a bounded side copy), and normalized usage is
-published as dynamic metadata (default namespace ``envoy.ai.token_usage``)
-in both forms: the authoritative typed record
-(:ref:`envoy.data.ai.v3.TokenUsage <envoy_v3_api_msg_data.ai.v3.TokenUsage>`)
-and an equivalent untyped ``Struct`` projection. Inspection is scoped to
+published as typed dynamic metadata (default namespace
+``envoy.ai.token_usage``): the authoritative record is
+:ref:`envoy.data.ai.v3.TokenUsage <envoy_v3_api_msg_data.ai.v3.TokenUsage>`,
+consumable via ext_proc typed metadata forwarding or any filter reading
+typed dynamic metadata. Inspection is scoped to
 routes carrying an
 :ref:`AiProtocolManagerPerRoute
 <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`

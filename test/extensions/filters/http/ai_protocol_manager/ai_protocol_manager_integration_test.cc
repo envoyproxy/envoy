@@ -366,7 +366,6 @@ TEST_P(AiProtocolManagerIntegrationTest, UpstreamHeaderAndTrailersNoBody) {
 class AiProtocolManagerResponseIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
   void initializeWithResponseHandling(bool upstream_filter) {
-    useAccessLog("%DYNAMIC_METADATA(envoy.ai.token_usage)%");
     config_helper_.prependFilter(R"EOF(
 name: envoy.filters.http.ai_protocol_manager
 typed_config:
@@ -390,6 +389,21 @@ typed_config:
     return Http::TestResponseHeaderMapImpl{{":status", "200"},
                                            {"content-type", std::string(content_type)}};
   }
+
+  // The publication is typed dynamic metadata, which no access-log formatter
+  // renders; end-to-end value fidelity is asserted through the ext_proc typed
+  // forwarding tests below. These tests verify publication accounting through
+  // the filter's stats, summed across scopes (the downstream and upstream
+  // placements prefix the same counter names differently).
+  uint64_t sumCounters(absl::string_view suffix) {
+    uint64_t total = 0;
+    for (const auto& counter : test_server_->counters()) {
+      if (absl::EndsWith(counter->name(), suffix)) {
+        total += counter->value();
+      }
+    }
+    return total;
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, AiProtocolManagerResponseIntegrationTest,
@@ -397,9 +411,9 @@ INSTANTIATE_TEST_SUITE_P(Protocols, AiProtocolManagerResponseIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // A streamed SSE response (downstream installation): usage from the terminal
-// include_usage chunk lands in dynamic metadata; the streamed bytes reach the
-// client unchanged.
-TEST_P(AiProtocolManagerResponseIntegrationTest, SseTokenUsageInAccessLog) {
+// include_usage chunk is published as typed dynamic metadata; the streamed
+// bytes reach the client unchanged.
+TEST_P(AiProtocolManagerResponseIntegrationTest, SseTokenUsagePublished) {
   initializeWithResponseHandling(/*upstream_filter=*/false);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -421,11 +435,8 @@ TEST_P(AiProtocolManagerResponseIntegrationTest, SseTokenUsageInAccessLog) {
   // Observe-only: the response body reaches the client byte-for-byte.
   EXPECT_EQ(chunk1 + chunk2, response->body());
 
-  const std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log, testing::HasSubstr("\"api_protocol\":\"OPENAI_CHAT_COMPLETIONS\""));
-  EXPECT_THAT(log, testing::HasSubstr("\"input_tokens\":19"));
-  EXPECT_THAT(log, testing::HasSubstr("\"output_tokens\":10"));
-  EXPECT_THAT(log, testing::HasSubstr("\"total_tokens\":29"));
+  EXPECT_EQ(sumCounters("ai_protocol_manager.token_usage_found"), 1);
+  EXPECT_EQ(sumCounters("ai_protocol_manager.token_usage_missing"), 0);
 }
 
 // The filter installed as an upstream (cluster) HTTP filter: metadata written
@@ -449,12 +460,7 @@ TEST_P(AiProtocolManagerResponseIntegrationTest, UpstreamFilterJsonTokenUsage) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ(body, response->body());
 
-  const std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log, testing::HasSubstr("\"api_protocol\":\"ANTHROPIC_MESSAGES\""));
-  EXPECT_THAT(log, testing::HasSubstr("\"input_tokens\":2095"));
-  EXPECT_THAT(log, testing::HasSubstr("\"output_tokens\":503"));
-  EXPECT_THAT(log, testing::HasSubstr("\"total_tokens\":2598"));
-  EXPECT_THAT(log, testing::HasSubstr("\"model\":\"claude-opus-5\""));
+  EXPECT_EQ(sumCounters("ai_protocol_manager.token_usage_found"), 1);
 }
 
 // Retries with the upstream installation: each attempt runs its own filter
@@ -497,9 +503,9 @@ TEST_P(AiProtocolManagerResponseIntegrationTest, RetryPublishesWinningAttemptOnl
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  const std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log, testing::HasSubstr("\"input_tokens\":7"));
-  EXPECT_THAT(log, testing::HasSubstr("\"output_tokens\":8"));
+  // Only the winning attempt's filter instance publishes.
+  EXPECT_EQ(sumCounters("ai_protocol_manager.token_usage_found"), 1);
+  EXPECT_EQ(sumCounters("ai_protocol_manager.token_usage_duplicate"), 0);
 }
 
 // Response-only installation on the cluster (no declared AI endpoints):
@@ -507,7 +513,6 @@ TEST_P(AiProtocolManagerResponseIntegrationTest, RetryPublishesWinningAttemptOnl
 // pending -- undeclared routes are passthrough by default, so nothing holds
 // the headers. Response extraction is unaffected.
 TEST_P(AiProtocolManagerResponseIntegrationTest, ResponseOnlyModeDoesNotHoldRequestHeaders) {
-  useAccessLog("%DYNAMIC_METADATA(envoy.ai.token_usage)%");
   config_helper_.prependFilter(R"EOF(
 name: envoy.filters.http.ai_protocol_manager
 typed_config:
@@ -539,9 +544,8 @@ typed_config:
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 
-  const std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log, testing::HasSubstr("\"total_tokens\":12"));
-  EXPECT_THAT(log, testing::HasSubstr("\"extraction_status\":\"COMPLETE\""));
+  EXPECT_EQ(sumCounters("ai_protocol_manager.token_usage_found"), 1);
+  EXPECT_EQ(sumCounters("ai_protocol_manager.token_usage_partial"), 0);
 }
 
 // Both placements at once (allowed by the API): the upstream instance
@@ -552,7 +556,6 @@ typed_config:
 // would have produced a visibly hybrid record (partial status with the
 // upstream's counts).
 TEST_P(AiProtocolManagerResponseIntegrationTest, BothPlacementsSinglePublication) {
-  useAccessLog("%DYNAMIC_METADATA(envoy.ai.token_usage)%");
   config_helper_.prependFilter(R"EOF(
 name: envoy.filters.http.ai_protocol_manager
 typed_config:
@@ -591,12 +594,10 @@ typed_config:
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 
-  const std::string log = waitForAccessLog(access_log_name_);
-  // The upstream instance's complete record, unmixed with the downstream
-  // instance's would-be partial one.
-  EXPECT_THAT(log, testing::HasSubstr("\"total_tokens\":29"));
-  EXPECT_THAT(log, testing::HasSubstr("\"extraction_status\":\"COMPLETE\""));
-  EXPECT_THAT(log, testing::HasSubstr("\"model\":\"gpt-4o\""));
+  // The upstream instance publishes once; the downstream instance sees the
+  // occupied namespace and skips instead of writing a second record.
+  EXPECT_EQ(sumCounters("ai_protocol_manager.token_usage_found"), 1);
+  EXPECT_EQ(sumCounters("ai_protocol_manager.token_usage_duplicate"), 1);
 }
 
 // Hedged requests: two upstream attempts are in flight concurrently, each
@@ -625,7 +626,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AiProtocolManagerHedgeIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AiProtocolManagerHedgeIntegrationTest, HedgedRequestPublishesWinnerOnly) {
-  useAccessLog("%DYNAMIC_METADATA(envoy.ai.token_usage)%");
   config_helper_.prependFilter(R"EOF(
 name: envoy.filters.http.ai_protocol_manager
 typed_config:
@@ -687,10 +687,14 @@ typed_config:
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  const std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log, testing::HasSubstr("\"input_tokens\":7"));
-  EXPECT_THAT(log, testing::HasSubstr("\"output_tokens\":8"));
-  EXPECT_THAT(log, testing::HasSubstr("\"extraction_status\":\"COMPLETE\""));
+  // Only the router-selected attempt's filter instance publishes.
+  uint64_t found = 0;
+  for (const auto& counter : test_server_->counters()) {
+    if (absl::EndsWith(counter->name(), "ai_protocol_manager.token_usage_found")) {
+      found += counter->value();
+    }
+  }
+  EXPECT_EQ(found, 1);
 }
 
 // The documented ext_proc consumer path: usage metadata written on the
@@ -735,12 +739,9 @@ public:
             if (!terminal || metadata_seen_.HasBeenNotified()) {
               continue;
             }
-            const auto& filter_metadata = request.metadata_context().filter_metadata();
-            const auto entry = filter_metadata.find("envoy.ai.token_usage");
             const auto& typed_metadata = request.metadata_context().typed_filter_metadata();
             const auto typed_entry = typed_metadata.find("envoy.ai.token_usage");
-            if (entry != filter_metadata.end() && typed_entry != typed_metadata.end()) {
-              captured_metadata_ = MessageUtil::getJsonStringFromMessageOrError(entry->second);
+            if (typed_entry != typed_metadata.end()) {
               ASSERT_TRUE(typed_entry->second.UnpackTo(&captured_typed_usage_));
               metadata_seen_.Notify();
             }
@@ -794,8 +795,6 @@ typed_config:
         ext_proc.mutable_processing_mode()->set_response_body_mode(
             envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::STREAMED);
       }
-      ext_proc.mutable_metadata_options()->mutable_forwarding_namespaces()->add_untyped(
-          "envoy.ai.token_usage");
       ext_proc.mutable_metadata_options()->mutable_forwarding_namespaces()->add_typed(
           "envoy.ai.token_usage");
 
@@ -837,10 +836,6 @@ typed_config:
 
   void expectUsageMetadataAtProcessor() {
     ASSERT_TRUE(metadata_seen_.WaitForNotificationWithTimeout(absl::Seconds(5)));
-    EXPECT_THAT(captured_metadata_, testing::HasSubstr("\"input_tokens\":5"));
-    EXPECT_THAT(captured_metadata_, testing::HasSubstr("\"output_tokens\":7"));
-    EXPECT_THAT(captured_metadata_, testing::HasSubstr("\"total_tokens\":12"));
-    EXPECT_THAT(captured_metadata_, testing::HasSubstr("\"api_protocol\":\"ANTHROPIC_MESSAGES\""));
     // The authoritative typed record arrives through the typed forwarding
     // namespace with full integer fidelity.
     EXPECT_EQ(captured_typed_usage_.input_tokens().value(), 5);
@@ -852,7 +847,6 @@ typed_config:
 
   Extensions::HttpFilters::ExternalProcessing::TestProcessor test_processor_;
   absl::Notification metadata_seen_;
-  std::string captured_metadata_;
   envoy::data::ai::v3::TokenUsage captured_typed_usage_;
 };
 

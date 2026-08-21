@@ -12,10 +12,9 @@ directions of a stream:
 * On the **response (encode) path** it can extract normalized LLM **token
   usage** from provider responses — OpenAI (Chat Completions and Responses
   API), Anthropic (Messages API), and Gemini (``generateContent`` /
-  ``streamGenerateContent``) — and publish it as dynamic metadata for
-  consumption by later filters (e.g. :ref:`ext_proc
-  <config_http_filters_ext_proc>` metadata forwarding), access loggers, and
-  CEL expressions.
+  ``streamGenerateContent``) — and publish it as typed dynamic metadata for
+  consumption by typed-metadata readers, e.g. :ref:`ext_proc
+  <config_http_filters_ext_proc>` metadata forwarding and other filters.
 
 Request and response processing are enabled independently, by the presence of
 :ref:`request_handling
@@ -240,33 +239,15 @@ Gemini's thoughts are summed into the canonical output.
   a pricing model.
 
 At end of stream the result is published under the metadata namespace
-(default ``envoy.ai.token_usage``) in **both metadata forms**:
-
-* **Typed dynamic metadata** — the authoritative record, an
-  :ref:`envoy.data.ai.v3.TokenUsage <envoy_v3_api_msg_data.ai.v3.TokenUsage>`
-  message with full ``uint64`` precision and enum-typed status fields. Typed
-  consumers (e.g. ext_proc via ``forwarding_namespaces.typed``) should prefer
-  it.
-* **An untyped Struct projection** — identical field names and values,
-  projected from the typed record, for consumers that read untyped metadata
-  only (``%DYNAMIC_METADATA%``, CEL). Its counts are double-backed and
-  therefore bounded to exactly-representable integers:
-
-.. code-block:: yaml
-
-  api_protocol: "ANTHROPIC_MESSAGES"  # the wire API, as an enum value name
-  model: "claude-opus-5"              # response-reported model, when present
-  input_tokens: 1200
-  output_tokens: 350
-  total_tokens: 1550                  # input + output; only when both are known
-  provider_total_tokens: 1550         # the provider's own total, always preserved
-  input_token_details:                # when reported; parts of input_tokens
-    cached_tokens: 800
-    cache_creation_tokens: 0
-    tool_use_tokens: 0
-  output_token_details:               # when reported; parts of output_tokens
-    reasoning_tokens: 120
-  extraction_status: "COMPLETE"       # COMPLETE | PARTIAL | FAILED
+(default ``envoy.ai.token_usage``) as **typed dynamic metadata**: an
+:ref:`envoy.data.ai.v3.TokenUsage <envoy_v3_api_msg_data.ai.v3.TokenUsage>`
+message with full ``uint64`` precision and enum-typed status fields. No
+untyped ``Struct`` mirror is emitted, so consumers that read only untyped
+metadata (``%DYNAMIC_METADATA%`` access-log formatters, CEL expressions)
+do not see this record; consume it through :ref:`ext_proc
+<config_http_filters_ext_proc>` typed metadata forwarding
+(``metadata_options.forwarding_namespaces.typed``) or a filter reading typed
+dynamic metadata, sharing the proto definition for safe parsing.
 
 ``api_protocol`` names the wire API the response spoke, deliberately not a
 provider identity: shape detection cannot distinguish an OpenAI-compatible
@@ -357,11 +338,8 @@ namespace alone is not sufficient:
     response_body_mode: STREAMED   # or response_trailer_mode: SEND
   metadata_options:
     forwarding_namespaces:
-      untyped:
+      typed:
       - envoy.ai.token_usage
-
-Consumers that only read metadata at end of stream (access loggers, CEL in
-access-log filters) are unaffected by ordering.
 
 Upstream (cluster) installation
 -------------------------------
@@ -374,9 +352,9 @@ retry or hedged attempt, with the caveats described under the request payload
 offload section above. Response token-usage extraction behaves identically in
 either chain.
 
-Dynamic metadata written from the upstream installation lands on the
-downstream stream's metadata and is visible to downstream filters, access
-loggers, and CEL exactly as in a downstream installation.
+Typed dynamic metadata written from the upstream installation lands on the
+downstream stream's metadata and is visible to downstream typed-metadata
+consumers exactly as in a downstream installation.
 
 .. note::
 
