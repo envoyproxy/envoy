@@ -76,7 +76,8 @@ public:
     }
 
     async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
-        config_, std::move(retry_policy), context_,
+        config_, std::move(retry_policy), context_.server_factory_context_,
+        makeOptRef<Init::Manager>(context_.init_manager_),
         [this](Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr, const RemoteJwks&) {
           return std::make_unique<MockJwksFetcher>(
               [this](Common::JwksFetcher::JwksReceiver& receiver) {

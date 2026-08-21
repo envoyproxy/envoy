@@ -36,7 +36,8 @@ class JwksAsyncFetcher : public Logger::Loggable<Logger::Id::jwt>,
 public:
   JwksAsyncFetcher(const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks,
                    Router::RetryPolicyConstSharedPtr retry_policy,
-                   Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
+                   Server::Configuration::ServerFactoryContext& context,
+                   OptRef<Init::Manager> init_manager, CreateJwksFetcherCb fetcher_fn,
                    Stats::Counter& fetch_success, Stats::Counter& fetch_failed,
                    JwksDoneFetched done_fn);
 
@@ -59,7 +60,7 @@ private:
   // the parsed retry policy
   const Router::RetryPolicyConstSharedPtr retry_policy_;
   // the factory context
-  Server::Configuration::FactoryContext& context_;
+  Server::Configuration::ServerFactoryContext& context_;
   // the jwks fetcher creator function
   const CreateJwksFetcherCb create_fetcher_fn_;
   // counters incremented on a successful and a failed fetch
