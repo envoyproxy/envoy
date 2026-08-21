@@ -742,6 +742,57 @@ TEST_F(ExtAuthzFilterHttpTest, HttpClientFactoryPerRouteHttpServiceOverride) {
   decoder_filter->onDestroy();
 }
 
+TEST_F(ExtAuthzFilterHttpTest, PerRouteEmitClientSpanConfiguration) {
+  const std::string per_route_config_yaml = R"EOF(
+  check_settings:
+    emit_client_span: false
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(per_route_config_yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  auto route_config = factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                              context.messageValidationVisitor());
+  EXPECT_OK(route_config);
+
+  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  EXPECT_TRUE(typed_config.emitClientSpan().has_value());
+  EXPECT_FALSE(typed_config.emitClientSpan().value());
+}
+
+TEST_F(ExtAuthzFilterHttpTest, PerRouteEmitClientSpanMerge) {
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute vh_proto;
+  TestUtility::loadFromYaml(R"EOF(
+  check_settings:
+    emit_client_span: false
+  )EOF",
+                            vh_proto);
+  FilterConfigPerRoute vh_config = makePerRoute(vh_proto);
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute route_proto;
+  TestUtility::loadFromYaml(R"EOF(
+  check_settings:
+    emit_client_span: true
+  )EOF",
+                            route_proto);
+  FilterConfigPerRoute route_config = makePerRoute(route_proto);
+
+  // More specific overrides less specific.
+  FilterConfigPerRoute merged(vh_config, route_config);
+  EXPECT_TRUE(merged.emitClientSpan().has_value());
+  EXPECT_TRUE(merged.emitClientSpan().value());
+
+  // Empty more specific inherits from less specific.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute empty_route_proto;
+  FilterConfigPerRoute empty_route_config = makePerRoute(empty_route_proto);
+  FilterConfigPerRoute merged_inherited(vh_config, empty_route_config);
+  EXPECT_TRUE(merged_inherited.emitClientSpan().has_value());
+  EXPECT_FALSE(merged_inherited.emitClientSpan().value());
+}
+
 class ExtAuthzFilterGrpcTest : public ExtAuthzFilterTest {
 public:
   void testFilterFactoryAndFilterWithGrpcClient(const std::string& ext_authz_config_yaml) {

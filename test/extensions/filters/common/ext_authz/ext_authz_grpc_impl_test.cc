@@ -691,6 +691,73 @@ TEST_F(ExtAuthzGrpcClientTest, TestGrpcClientResetOnComplete) {
   client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(), span_);
 }
 
+TEST_F(ExtAuthzGrpcClientTest, EmitClientSpanDefault) {
+  initialize();
+  EXPECT_TRUE(client_->emitClientSpan());
+
+  envoy::service::auth::v3::CheckRequest request;
+  EXPECT_CALL(*async_client_,
+              sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
+      .WillOnce(
+          Invoke([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                        Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
+            EXPECT_EQ(std::nullopt, options.sampled_);
+            return &async_request_;
+          }));
+
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client_->onSuccess(CheckResponsePtr(std::make_unique<envoy::service::auth::v3::CheckResponse>()),
+                     Tracing::NullSpan::instance());
+}
+
+TEST_F(ExtAuthzGrpcClientTest, EmitClientSpanDisabled) {
+  client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_,
+                                             /*emit_client_span=*/false);
+  EXPECT_FALSE(client_->emitClientSpan());
+
+  envoy::service::auth::v3::CheckRequest request;
+  EXPECT_CALL(*async_client_,
+              sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
+      .WillOnce(
+          Invoke([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                        Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
+            EXPECT_EQ(std::make_optional(false), options.sampled_);
+            return &async_request_;
+          }));
+
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client_->onSuccess(CheckResponsePtr(std::make_unique<envoy::service::auth::v3::CheckResponse>()),
+                     Tracing::NullSpan::instance());
+}
+
+TEST_F(ExtAuthzGrpcClientTest, SetEmitClientSpan) {
+  initialize();
+  EXPECT_TRUE(client_->emitClientSpan());
+
+  client_->setEmitClientSpan(false);
+  EXPECT_FALSE(client_->emitClientSpan());
+
+  envoy::service::auth::v3::CheckRequest request;
+  EXPECT_CALL(*async_client_,
+              sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
+      .WillOnce(
+          Invoke([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                        Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
+            EXPECT_EQ(std::make_optional(false), options.sampled_);
+            return &async_request_;
+          }));
+
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client_->onSuccess(CheckResponsePtr(std::make_unique<envoy::service::auth::v3::CheckResponse>()),
+                     Tracing::NullSpan::instance());
+}
+
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters
