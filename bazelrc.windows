@@ -1,3 +1,6 @@
+#############################################################################
+# Build flags for Windows build
+#############################################################################
   
 
 build:windows --extra_execution_platforms=//bazel/platforms:x64_windows-clang-cl
