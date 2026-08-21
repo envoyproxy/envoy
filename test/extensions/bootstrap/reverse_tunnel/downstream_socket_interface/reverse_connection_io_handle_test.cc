@@ -3436,6 +3436,64 @@ TEST_F(ReverseConnectionIOHandleTest, MarkTunnelDrainingDropsKeyAndDialsReplacem
   EXPECT_FALSE(getHostConnectionInfo(host).connection_keys.contains(connection_key));
 }
 
+// Unset maintain_interval uses the historical 10s re-check. initializeFileEvent immediately
+// runs maintainReverseConnections, which re-arms the retry timer with that interval plus
+// 15% upward jitter: 10000 + 3999 % 1500 = 10999.
+TEST_F(ReverseConnectionIOHandleTest, DefaultMaintainInterval) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  uint64_t retry_timeout =
+      ReverseConnectionUtility::addJitter(10000, 15, extension_->randomGenerator());
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(retry_timeout), _));
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+}
+
+// The interval is only visible when the handle re-arms its retry timer, so this goes through
+// createBootstrapExtension + socket() and checks the first enableTimer. 5s plus the fixture's
+// fixed jitter is 5000 + 3999 % 750 = 5249. The unique_ptr is kept so the initiator's cached
+// raw pointer stays valid.
+TEST_F(ReverseConnectionIOHandleTest, MaintainIntervalPassedOnFromExtension) {
+  auto socket_interface = std::make_unique<ReverseTunnelInitiator>(context_);
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+      DownstreamReverseConnectionSocketInterface extension_config;
+  extension_config.mutable_maintain_interval()->set_seconds(5);
+  auto extension = socket_interface->createBootstrapExtension(extension_config, context_);
+  ASSERT_NE(extension, nullptr);
+
+  ReverseConnectionAddress::ReverseConnectionConfig config;
+  config.src_cluster_id = "test-cluster";
+  config.src_node_id = "test-node";
+  config.src_tenant_id = "test-tenant";
+  config.remote_cluster = "remote-cluster";
+  config.connection_count = 1;
+
+  auto reverse_address = std::make_shared<ReverseConnectionAddress>(config);
+  auto socket = socket_interface->socket(Network::Socket::Type::Stream, reverse_address,
+                                         Network::SocketCreationOptions{});
+  ASSERT_NE(socket, nullptr);
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  ASSERT_NE(reverse_handle, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  uint64_t retry_timeout =
+      ReverseConnectionUtility::addJitter(5000, 15, extension_->randomGenerator());
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(retry_timeout), _));
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  reverse_handle->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                      Event::FileReadyType::Read);
+}
+
 // Draining an unknown connection key is a benign no-op: nothing is dropped and no immediate
 // replacement dial is triggered.
 TEST_F(ReverseConnectionIOHandleTest, MarkTunnelDrainingUnknownKeyIsNoOp) {
