@@ -31,12 +31,6 @@
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
-using testing::An;
-using testing::Contains;
-using testing::HasSubstr;
-using testing::IsSupersetOf;
-using testing::UnorderedElementsAre;
-
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -44,7 +38,14 @@ namespace DynamicModules {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
-using testing::Not;
+using ::testing::_;
+using ::testing::An;
+using ::testing::Contains;
+using ::testing::HasSubstr;
+using ::testing::IsSupersetOf;
+using ::testing::Not;
+using ::testing::Return;
+using ::testing::UnorderedElementsAre;
 
 // Test peer class to access private members of DynamicModuleCluster.
 // This must be outside the anonymous namespace to match the friend declaration.
@@ -87,9 +88,6 @@ public:
     lb.hosts_removed_ = removed;
   }
 };
-
-using testing::_;
-using ::testing::Return;
 
 namespace {
 
