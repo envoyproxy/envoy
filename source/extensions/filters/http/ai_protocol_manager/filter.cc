@@ -470,7 +470,7 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
   response_finalized_ = true;
 
   TokenUsage usage = response_handler_->usage();
-  usage.finalize(AdapterRegistry::get(usage.api_protocol));
+  finalizeUsage(usage);
   const bool degraded = response_handler_->degraded() || usage.canonicalizationOverflow();
   if (!usage.hasAny() && !degraded) {
     // Legitimately absent usage: e.g. an OpenAI stream without

@@ -4,7 +4,7 @@
 
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
 
-#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -69,6 +69,10 @@ public:
   // Marker checks are ordered from most to least structurally distinctive.
   static ApiProtocol detect(const nlohmann::json& json);
 };
+
+// Canonicalizes a finalized accumulation with its own protocol's adapter --
+// the one-liner every caller wants; see TokenUsage::finalize().
+void finalizeUsage(TokenUsage& usage);
 
 } // namespace AiProtocolManager
 } // namespace HttpFilters

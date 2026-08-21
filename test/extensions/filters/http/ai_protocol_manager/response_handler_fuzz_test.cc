@@ -89,8 +89,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   // Canonicalization must be fragmentation-independent too.
   TokenUsage a_final = a;
   TokenUsage b_final = b;
-  a_final.finalize(AdapterRegistry::get(a_final.api_protocol));
-  b_final.finalize(AdapterRegistry::get(b_final.api_protocol));
+  finalizeUsage(a_final);
+  finalizeUsage(b_final);
   FUZZ_ASSERT(a_final.input_tokens == b_final.input_tokens);
   FUZZ_ASSERT(a_final.output_tokens == b_final.output_tokens);
   FUZZ_ASSERT(a_final.total_tokens == b_final.total_tokens);

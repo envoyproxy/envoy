@@ -117,6 +117,8 @@ envoy_cc_library(
         ":json_readers_lib",
         ":schema_lib",
         ":token_usage_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
         "//source/extensions/filters/http/ai_protocol_manager/schema:openai_chat_completions_lib",
         "@abseil-cpp//absl/strings",
     ],

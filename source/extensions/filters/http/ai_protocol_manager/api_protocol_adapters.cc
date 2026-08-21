@@ -1,5 +1,7 @@
 #include <utility>
 
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema/openai_chat_completions.h"
@@ -95,8 +97,10 @@ class OpenAiChatCompletionsAdapter : public OpenAiAdapterBase {
 public:
   ApiProtocol protocol() const override { return ApiProtocol::OpenAiChatCompletions; }
   const PayloadSchema* schema() const override {
-    static const PayloadSchema openai_schema = OpenAI::createPayloadSchema();
-    return &openai_schema;
+    // Construct-on-first-use: schemas are non-trivially destructible, so a
+    // plain function-local static would register an exit-time destructor.
+    static const PayloadSchema* openai_schema = new PayloadSchema(OpenAI::createPayloadSchema());
+    return openai_schema;
   }
   // Terminates with the non-JSON `[DONE]` sentinel, handled before parsing.
   bool isTerminalEvent(const nlohmann::json&) const override { return false; }
@@ -232,25 +236,24 @@ public:
 } // namespace
 
 const ApiProtocolAdapter& AdapterRegistry::get(ApiProtocol protocol) {
-  static const NullAdapter null_adapter;
-  static const OpenAiChatCompletionsAdapter openai_chat_completions;
-  static const OpenAiResponsesAdapter openai_responses;
-  static const AnthropicMessagesAdapter anthropic_messages;
-  static const GeminiGenerateContentAdapter gemini_generate_content;
+  // Construct-on-first-use: adapters have virtual destructors, so plain
+  // function-local statics would register exit-time destructors.
   switch (protocol) {
   case ApiProtocol::OpenAiChatCompletions:
-    return openai_chat_completions;
+    CONSTRUCT_ON_FIRST_USE(OpenAiChatCompletionsAdapter);
   case ApiProtocol::OpenAiResponses:
-    return openai_responses;
+    CONSTRUCT_ON_FIRST_USE(OpenAiResponsesAdapter);
   case ApiProtocol::AnthropicMessages:
-    return anthropic_messages;
+    CONSTRUCT_ON_FIRST_USE(AnthropicMessagesAdapter);
   case ApiProtocol::GeminiGenerateContent:
-    return gemini_generate_content;
+    CONSTRUCT_ON_FIRST_USE(GeminiGenerateContentAdapter);
   case ApiProtocol::Unspecified:
     break;
   }
-  return null_adapter;
+  CONSTRUCT_ON_FIRST_USE(NullAdapter);
 }
+
+void finalizeUsage(TokenUsage& usage) { usage.finalize(AdapterRegistry::get(usage.api_protocol)); }
 
 // Detection stays centralized rather than delegated per adapter: the marker
 // checks are ordered from most to least structurally distinctive across

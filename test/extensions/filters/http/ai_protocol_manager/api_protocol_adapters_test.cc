@@ -222,7 +222,7 @@ TEST(ExtractAnthropicTest, NonStreaming) {
   EXPECT_EQ(usage.input_tokens, 2095);
   EXPECT_FALSE(usage.total_tokens.has_value());
   TokenUsage finalized = usage;
-  finalized.finalize(AdapterRegistry::get(finalized.api_protocol));
+  finalizeUsage(finalized);
   // Canonical inclusive input: 2095 uncached + 2051 cache writes + 1024
   // cache reads.
   EXPECT_EQ(finalized.input_tokens, 5170);
@@ -254,7 +254,7 @@ TEST(ExtractAnthropicTest, StreamingAccumulation) {
       parse(
           R"({"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":15}})")));
 
-  accumulated.finalize(AdapterRegistry::get(accumulated.api_protocol));
+  finalizeUsage(accumulated);
   EXPECT_EQ(accumulated.input_tokens, 2679);
   EXPECT_EQ(accumulated.output_tokens, 15);
   EXPECT_EQ(accumulated.total_tokens, 2694);
@@ -301,7 +301,7 @@ TEST(ExtractGeminiTest, UsageMetadata) {
        "modelVersion":"gemini-2.5-flash"})"));
   EXPECT_EQ(usage.output_tokens, 149); // Native candidates count, thoughts excluded.
   TokenUsage finalized = usage;
-  finalized.finalize(AdapterRegistry::get(finalized.api_protocol));
+  finalizeUsage(finalized);
   EXPECT_EQ(finalized.input_tokens, 6);
   // Canonical inclusive output: 149 candidates + 12 thoughts (Gemini reports
   // thoughts outside candidatesTokenCount).
@@ -322,7 +322,7 @@ TEST(ExtractGeminiTest, ToolUseAndThoughtsAccounting) {
       {"usageMetadata":{"promptTokenCount":6,"toolUsePromptTokenCount":5,
                         "candidatesTokenCount":149,"thoughtsTokenCount":12,
                         "totalTokenCount":172}})"));
-  usage.finalize(AdapterRegistry::get(usage.api_protocol));
+  finalizeUsage(usage);
   EXPECT_EQ(usage.input_tokens, 11);
   EXPECT_EQ(usage.output_tokens, 161);
   EXPECT_EQ(usage.total_tokens, 172);
@@ -337,7 +337,7 @@ TEST(ExtractAnthropicTest, CanonicalInclusiveAccounting) {
   auto usage = extractUsage(ApiProtocol::AnthropicMessages, parse(R"(
       {"type":"message","usage":{"input_tokens":100,"cache_creation_input_tokens":20,
        "cache_read_input_tokens":30,"output_tokens":10}})"));
-  usage.finalize(AdapterRegistry::get(usage.api_protocol));
+  finalizeUsage(usage);
   EXPECT_EQ(usage.input_tokens, 150);
   EXPECT_EQ(usage.cached_input_tokens, 30);
   EXPECT_EQ(usage.cache_creation_input_tokens, 20);
@@ -357,7 +357,7 @@ TEST(ExtractAnthropicTest, PartialInputUpdatePreservesCacheBuckets) {
   accumulated.merge(extractUsage(ApiProtocol::AnthropicMessages, parse(R"(
       {"type":"message_delta","delta":{"stop_reason":"end_turn"},
        "usage":{"input_tokens":100,"output_tokens":50}})")));
-  accumulated.finalize(AdapterRegistry::get(accumulated.api_protocol));
+  finalizeUsage(accumulated);
   EXPECT_EQ(accumulated.input_tokens, 150); // 100 + 30 + 20, not regressed to 100.
   EXPECT_EQ(accumulated.cached_input_tokens, 30);
   EXPECT_EQ(accumulated.cache_creation_input_tokens, 20);
@@ -374,7 +374,7 @@ TEST(ExtractGeminiTest, CumulativeChunksLastWins) {
       {"candidates":[{"content":{"parts":[{"text":"b"}]},"finishReason":"STOP"}],
        "usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":149,"totalTokenCount":155},
        "modelVersion":"gemini-2.5-flash"})")));
-  accumulated.finalize(AdapterRegistry::get(accumulated.api_protocol));
+  finalizeUsage(accumulated);
   EXPECT_EQ(accumulated.output_tokens, 149);
   EXPECT_EQ(accumulated.total_tokens, 155);
   EXPECT_EQ(accumulated.model, "gemini-2.5-flash");
@@ -458,7 +458,7 @@ TEST(TokenUsageTest, NullCountRegressionScenario) {
   merge(R"({"type":"message_start","message":{"usage":{"input_tokens":10,"output_tokens":3}}})");
   merge(R"({"type":"message_delta","delta":{"stop_reason":"end_turn"},)"
         R"("usage":{"output_tokens":null}})");
-  accumulated.finalize(AdapterRegistry::get(accumulated.api_protocol));
+  finalizeUsage(accumulated);
   EXPECT_EQ(accumulated.output_tokens, 3); // Earlier value survives...
   EXPECT_TRUE(degraded);                   // ...but the stream is flagged.
 }
@@ -470,13 +470,13 @@ TEST(TokenUsageTest, CanonicalizationOverflowIsSurfaced) {
   auto usage = extractUsage(ApiProtocol::AnthropicMessages, parse(R"(
       {"usage":{"input_tokens":9007199254740991,"cache_read_input_tokens":1,
                 "output_tokens":0}})"));
-  usage.finalize(AdapterRegistry::get(usage.api_protocol));
+  finalizeUsage(usage);
   EXPECT_FALSE(usage.input_tokens.has_value());
   EXPECT_TRUE(usage.canonicalizationOverflow());
 
   auto fine = extractUsage(ApiProtocol::AnthropicMessages, parse(R"(
       {"usage":{"input_tokens":100,"cache_read_input_tokens":1,"output_tokens":0}})"));
-  fine.finalize(AdapterRegistry::get(fine.api_protocol));
+  finalizeUsage(fine);
   EXPECT_FALSE(fine.canonicalizationOverflow());
 }
 
@@ -484,7 +484,7 @@ TEST(TokenUsageTest, MergeAfterFinalizeIsRejected) {
   TokenUsage usage;
   usage.api_protocol = ApiProtocol::AnthropicMessages;
   usage.input_tokens = 1;
-  usage.finalize(AdapterRegistry::get(usage.api_protocol));
+  finalizeUsage(usage);
   TokenUsage update;
   update.output_tokens = 2;
   EXPECT_DEBUG_DEATH(usage.merge(update), "");
@@ -497,12 +497,12 @@ TEST(TokenUsageTest, FinalizeIsSingleUse) {
   usage.cached_input_tokens = 30;
   usage.cache_creation_input_tokens = 20;
   usage.output_tokens = 10;
-  usage.finalize(AdapterRegistry::get(usage.api_protocol));
+  finalizeUsage(usage);
   EXPECT_EQ(usage.input_tokens, 150);
   EXPECT_EQ(usage.total_tokens, 160);
   // A second call must not re-add the cache buckets: it asserts in debug
   // builds and is a no-op in release builds.
-  EXPECT_DEBUG_DEATH(usage.finalize(AdapterRegistry::get(usage.api_protocol)), "");
+  EXPECT_DEBUG_DEATH(finalizeUsage(usage), "");
   EXPECT_EQ(usage.input_tokens, 150);
   EXPECT_EQ(usage.total_tokens, 160);
 }
@@ -539,19 +539,19 @@ TEST(TokenUsageTest, FinalizeComputesCanonicalTotal) {
   TokenUsage usage;
   usage.input_tokens = 3;
   usage.output_tokens = 4;
-  usage.finalize(AdapterRegistry::get(usage.api_protocol));
+  finalizeUsage(usage);
   EXPECT_EQ(usage.total_tokens, 7);
   EXPECT_FALSE(usage.provider_total_tokens.has_value());
 
   TokenUsage partial;
   partial.output_tokens = 4; // No input: the total cannot be computed.
-  partial.finalize(AdapterRegistry::get(partial.api_protocol));
+  finalizeUsage(partial);
   EXPECT_FALSE(partial.total_tokens.has_value());
 
   TokenUsage partial_with_reported;
   partial_with_reported.output_tokens = 4;
   partial_with_reported.total_tokens = 9; // Native total; components incomplete.
-  partial_with_reported.finalize(AdapterRegistry::get(partial_with_reported.api_protocol));
+  finalizeUsage(partial_with_reported);
   // The provider total never substitutes for the canonical sum; it is
   // preserved in its own field.
   EXPECT_FALSE(partial_with_reported.total_tokens.has_value());
@@ -567,7 +567,7 @@ TEST(TokenUsageTest, ProviderTotalPreservedSeparately) {
   usage.input_tokens = 3;
   usage.output_tokens = 4;
   usage.total_tokens = 100;
-  usage.finalize(AdapterRegistry::get(usage.api_protocol));
+  finalizeUsage(usage);
   EXPECT_EQ(usage.total_tokens, 7);
   EXPECT_EQ(usage.provider_total_tokens, 100);
 
@@ -576,7 +576,7 @@ TEST(TokenUsageTest, ProviderTotalPreservedSeparately) {
   agreeing.input_tokens = 3;
   agreeing.output_tokens = 4;
   agreeing.total_tokens = 7;
-  agreeing.finalize(AdapterRegistry::get(agreeing.api_protocol));
+  finalizeUsage(agreeing);
   EXPECT_EQ(agreeing.total_tokens, 7);
   EXPECT_EQ(agreeing.provider_total_tokens, 7);
 }
@@ -616,13 +616,13 @@ TEST(TokenUsageTest, ComputedTotalPublishedOnlyWhenDoubleExact) {
   TokenUsage in_range;
   in_range.input_tokens = uint64_t(9007199254740000);
   in_range.output_tokens = uint64_t(991);
-  in_range.finalize(AdapterRegistry::get(in_range.api_protocol));
+  finalizeUsage(in_range);
   EXPECT_EQ(in_range.total_tokens, uint64_t(9007199254740991)); // == 2^53-1, exact.
 
   TokenUsage out_of_range;
   out_of_range.input_tokens = uint64_t(9007199254740991);  // 2^53-1
   out_of_range.output_tokens = uint64_t(9007199254740990); // sum = 2^54-3, odd, inexact
-  out_of_range.finalize(AdapterRegistry::get(out_of_range.api_protocol));
+  finalizeUsage(out_of_range);
   EXPECT_FALSE(out_of_range.total_tokens.has_value());
 
   // With both components present but the sum unpublishable, a provider total
@@ -632,7 +632,7 @@ TEST(TokenUsageTest, ComputedTotalPublishedOnlyWhenDoubleExact) {
   out_of_range_reported.input_tokens = uint64_t(9007199254740991);
   out_of_range_reported.output_tokens = uint64_t(9007199254740991);
   out_of_range_reported.total_tokens = 5;
-  out_of_range_reported.finalize(AdapterRegistry::get(out_of_range_reported.api_protocol));
+  finalizeUsage(out_of_range_reported);
   EXPECT_FALSE(out_of_range_reported.total_tokens.has_value());
   EXPECT_EQ(out_of_range_reported.provider_total_tokens, 5);
 }

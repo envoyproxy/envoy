@@ -49,6 +49,9 @@ void TokenUsage::merge(const TokenUsage& update) {
 }
 
 void TokenUsage::finalize(const ApiProtocolAdapter& adapter) {
+  // Canonicalization rules are per dialect: the adapter must be the
+  // accumulator's own (finalizeUsage() in api_protocol_adapter.h wires this).
+  ASSERT(adapter.protocol() == api_protocol);
   // The summations below must not run twice.
   ASSERT(!finalized_);
   if (finalized_) {
