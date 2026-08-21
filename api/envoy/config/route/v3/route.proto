@@ -169,4 +169,21 @@ message Vhds {
 
   // Configuration source specifier for VHDS.
   core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // The default virtual host resources (domains) that are subscribed by VHDS at
+  // startup, before any on-demand update is requested.
+  //
+  // Each entry is either a single ``*`` to subscribe to all virtual hosts of the
+  // owning route configuration (wildcard), or a specific virtual host domain to
+  // subscribe to.
+  //
+  // Every entry is prefixed with the owning route configuration name (in the form
+  // ``<route_config_name>/<value>``) before the subscription is sent to the
+  // management server, matching the alias format that VHDS uses for on-demand
+  // updates. If this field is empty, no virtual host is subscribed by default and
+  // all virtual hosts are fetched on demand.
+  //
+  // The wildcard ``*`` subscribes to all virtual hosts. It cannot be combined with other
+  // entries.
+  repeated string default_resources = 2;
 }
