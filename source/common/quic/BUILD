@@ -288,6 +288,7 @@ envoy_cc_library(
         "//source/common/http/http3:codec_stats_lib",
         "//source/common/network:connection_base_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@quiche//:quic_core_connection_lib",
     ]),
 )

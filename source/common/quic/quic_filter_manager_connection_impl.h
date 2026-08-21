@@ -190,6 +190,12 @@ public:
   void incrementSentQuicResetStreamErrorStats(quic::QuicResetStreamError error, bool from_self,
                                               bool is_upstream);
 
+#ifndef ENVOY_ENABLE_UHV
+  // Latched value of the `validate_upstream_headers` runtime feature, read once per connection
+  // and consulted per stream when validating request headers.
+  bool shouldValidateUpstreamHeaders() const { return validate_upstream_headers_; }
+#endif
+
   bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override;
 
 protected:
