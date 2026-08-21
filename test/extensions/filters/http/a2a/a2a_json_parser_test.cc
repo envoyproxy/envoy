@@ -8,9 +8,11 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AllOf;
 using testing::Contains;
 using testing::ElementsAre;
 using testing::IsSupersetOf;
+using testing::Key;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
@@ -384,11 +386,11 @@ TEST_F(A2aJsonParserTest, ParseTasksListMissingOptionalFields) {
   ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
   EXPECT_EQ(parser_.getMethod(), "tasks/list");
-  EXPECT_THAT(parser_.metadata().fields(),
-              Contains(IsStructStruct("params", Contains(IsStructString("tenant", "mytenant")))));
+  // historyLength should not be present.
   EXPECT_THAT(
       parser_.metadata().fields(),
-      Contains(IsStructStruct("params", Not(Contains(IsStructNumber("historyLength", _))))));
+      Contains(IsStructStruct("params", AllOf(Contains(IsStructString("tenant", "mytenant")),
+                                              Not(Contains(Key("historyLength")))))));
 }
 
 TEST_F(A2aJsonParserTest, GetTaskRequest) {
