@@ -3389,44 +3389,6 @@ TEST_F(HttpConnectionManagerImplTest, QueryWithContentType) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// Disabling the runtime guard restores the previous behavior of forwarding the request.
-TEST_F(HttpConnectionManagerImplTest, QueryWithoutContentTypeRuntimeGuardDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.reject_query_method_without_content_type", "false"}});
-  setup();
-
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
-        FilterFactoryCb factory = createDecoderFilterFactoryCb(filter);
-        callbacks.setFilterConfigName("");
-        factory(callbacks);
-        return true;
-      }));
-  EXPECT_CALL(*filter, decodeHeaders(_, true))
-      .WillOnce(Invoke([](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
-        EXPECT_EQ("QUERY", headers.getMethodValue());
-        return FilterHeadersStatus::StopIteration;
-      }));
-
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
-    decoder_ = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{
-        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "QUERY"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
-    data.drain(4);
-    return Http::okStatus();
-  }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
-  EXPECT_CALL(*filter, onStreamComplete());
-  EXPECT_CALL(*filter, onDestroy());
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-}
-
 // No idle timeout when route idle timeout is implied at both global and
 // per-route level. The connection manager config is responsible for managing
 // the default configuration aspects.

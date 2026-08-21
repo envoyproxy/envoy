@@ -11,6 +11,4 @@ In addition, RFC 10008 Section 2 requires servers to fail a ``QUERY`` request wh
 ``Content-Type`` field is missing, so such a request is now rejected with a 400 and the response
 code detail ``query_missing_content_type``. This applies to every downstream protocol, including
 HTTP/2 and HTTP/3 where these requests were previously forwarded. Consistency between the declared
-media type and the request content is left to the origin server. This behavioral change can be
-temporarily reverted by setting runtime guard
-``envoy.reloadable_features.reject_query_method_without_content_type`` to ``false``.
+media type and the request content is left to the origin server.

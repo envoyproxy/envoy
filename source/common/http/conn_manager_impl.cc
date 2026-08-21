@@ -1500,9 +1500,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // content is a decision only the origin server can make. An empty field value is as absent as a
   // missing one. Section 2.1 calls for "a 4xx status code such as 400".
   if (HeaderUtility::isQuery(*request_headers_) &&
-      request_headers_->getContentTypeValue().empty() &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.reject_query_method_without_content_type")) {
+      request_headers_->getContentTypeValue().empty()) {
     sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt,
                    StreamInfo::ResponseCodeDetails::get().QueryMissingContentType);
     return;
