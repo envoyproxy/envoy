@@ -17,6 +17,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This cluster type is used to discover endpoints via DNS SRV records. The cluster will resolve the
 // SRV name specified in the configuration, and will use the resolved endpoints as cluster endpoints.
 //
+// Current limitations:
+// - Only c-ares DNS resolver is supported
+// - Only one SRV record is supported per cluster
+// - All resolved IP addresses will be added to cluster (acting like Strict DNS cluster)
+// - Both initial SRV record and subsequent A/AAAA records resolved via the same DNS resolver
+// - weight/priority are not supported
+//
 // Example:
 //
 // .. code-block:: yaml
