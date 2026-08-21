@@ -41,6 +41,33 @@ protected:
   std::unique_ptr<McpJsonParser> parser_;
 };
 
+TEST_F(McpJsonParserTest, MetaFieldWithDotInKey) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "tool",
+      "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28"
+      }
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+
+  const auto* meta = parser_->getNestedValue("params._meta");
+  ASSERT_NE(meta, nullptr);
+  ASSERT_TRUE(meta->has_struct_value());
+
+  const auto& fields = meta->struct_value().fields();
+  auto it = fields.find("io.modelcontextprotocol/protocolVersion");
+
+  ASSERT_NE(it, fields.end());
+  EXPECT_EQ(it->second.string_value(), "2026-07-28");
+}
+
 TEST_F(McpJsonParserTest, ValidJsonRpcRequest) {
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "id": 1})";
 
