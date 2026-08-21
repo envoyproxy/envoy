@@ -3,9 +3,11 @@
 #include <chrono>
 #include <ratio>
 
+#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -14,6 +16,8 @@
 #include "source/common/common/token_bucket_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -82,9 +86,11 @@ public:
   ShareProviderSharedPtr getShareProvider(const ProtoLocalClusterRateLimit& config) const;
   ~ShareProviderManager() override;
 
-  static ShareProviderManagerSharedPtr singleton(Event::Dispatcher& dispatcher,
-                                                 Upstream::ClusterManager& cm,
-                                                 Singleton::Manager& manager);
+  // `local_info` is only required by the WEIGHTED share mode, which needs to locate this Envoy
+  // instance among the local cluster's endpoints. Without it, WEIGHTED degrades to EVEN.
+  static ShareProviderManagerSharedPtr
+  singleton(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
+            Singleton::Manager& manager, OptRef<const LocalInfo::LocalInfo> local_info = {});
 
   class ShareMonitor : public ShareProvider {
   public:
@@ -93,12 +99,18 @@ public:
   using ShareMonitorSharedPtr = std::shared_ptr<ShareMonitor>;
 
 private:
-  ShareProviderManager(Event::Dispatcher& main_dispatcher, const Upstream::Cluster& cluster);
+  ShareProviderManager(Event::Dispatcher& main_dispatcher, const Upstream::Cluster& cluster,
+                       OptRef<const LocalInfo::LocalInfo> local_info);
 
   Event::Dispatcher& main_dispatcher_;
   const Upstream::Cluster& cluster_;
+  OptRef<const LocalInfo::LocalInfo> local_info_;
+  ShareMonitorSharedPtr even_share_monitor_;
+  // Keyed by ProtoLocalClusterRateLimit::SelfIdentifier, because monitors using different
+  // identities compute different shares. Populated on first use, so that a configuration which
+  // never asks for WEIGHTED does not pay for the per-membership-change walk of the host list.
+  mutable absl::flat_hash_map<int, ShareMonitorSharedPtr> weighted_share_monitors_;
   Envoy::Common::CallbackHandlePtr handle_;
-  ShareMonitorSharedPtr share_monitor_;
 };
 using ShareProviderManagerSharedPtr = std::shared_ptr<ShareProviderManager>;
 

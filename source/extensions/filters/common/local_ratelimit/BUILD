@@ -22,8 +22,10 @@ envoy_cc_library(
     hdrs = ["local_ratelimit_impl.h"],
     deps = [
         ":local_ratelimit_interface",
+        "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
+        "//envoy/local_info:local_info_interface",
         "//envoy/ratelimit:ratelimit_interface",
         "//source/common/common:thread_synchronizer_lib",
         "//source/common/common:token_bucket_impl_lib",

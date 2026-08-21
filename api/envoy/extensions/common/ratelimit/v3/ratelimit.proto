@@ -164,4 +164,51 @@ message LocalRateLimitDescriptor {
 // <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.local_cluster_name>` for more context
 // about local cluster.
 message LocalClusterRateLimit {
+  // How the configured token bucket is divided among the Envoy instances of the local cluster.
+  enum ShareMode {
+    // Each instance receives ``1 / N`` of the configured tokens, where ``N`` is the number of hosts
+    // in the local cluster. Endpoint ``load_balancing_weight`` is ignored.
+    EVEN = 0;
+
+    // Each instance receives ``own_weight / total_weight`` of the configured tokens, summing the
+    // :ref:`load_balancing_weight
+    // <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.load_balancing_weight>` of every host in
+    // the local cluster. Use this when the local cluster has heterogeneous weights, so that an
+    // instance's share of the bucket tracks its share of the traffic.
+    //
+    // This requires locating this instance among the endpoints of the local cluster, which is
+    // controlled by :ref:`self_identifier
+    // <envoy_v3_api_field_extensions.common.ratelimit.v3.LocalClusterRateLimit.self_identifier>`.
+    // If this instance cannot be located -- for example while the local cluster is still warming,
+    // or when the registered endpoints do not carry the identity being matched -- the share falls
+    // back to ``EVEN``, so that a single instance can never claim the whole bucket.
+    WEIGHTED = 1;
+  }
+
+  // How this Envoy instance is located among the endpoints of the local cluster. Only used when
+  // ``share_mode`` is ``WEIGHTED``.
+  enum SelfIdentifier {
+    // Match the IP of the local address of the Envoy process against the IP of the endpoint
+    // address. The port is not compared, because the address registered in service discovery
+    // typically carries the port of the application rather than the port this Envoy listens on.
+    //
+    // Endpoint addresses are not required to be unique, so if more than one endpoint of the local
+    // cluster matches, this instance is treated as not located rather than adopting the weight of
+    // an arbitrary one of them.
+    LOCAL_ADDRESS = 0;
+
+    // Match the :ref:`node id <envoy_v3_api_field_config.core.v3.Node.id>` against the
+    // :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` of the
+    // endpoint. Prefer this when the management server sets endpoint hostnames, because unlike an
+    // address a hostname identifies exactly one endpoint.
+    NODE_ID = 1;
+  }
+
+  // How the configured token bucket is divided among the instances of the local cluster. Defaults
+  // to ``EVEN``, which is the behavior of a configuration that does not set this field.
+  ShareMode share_mode = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // How this Envoy instance is located among the endpoints of the local cluster when ``share_mode``
+  // is ``WEIGHTED``. Defaults to ``LOCAL_ADDRESS``.
+  SelfIdentifier self_identifier = 2 [(validate.rules).enum = {defined_only: true}];
 }

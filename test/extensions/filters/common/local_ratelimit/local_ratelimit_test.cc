@@ -1,7 +1,9 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/test_runtime.h"
@@ -13,6 +15,8 @@
 
 using testing::_;
 using testing::NiceMock;
+using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -103,6 +107,229 @@ TEST(ShareProviderManagerTest, ShareProviderManagerTest) {
   EXPECT_EQ(2, provider->tokensPerFill(2));
   EXPECT_EQ(4, provider->tokensPerFill(4));
   EXPECT_EQ(8, provider->tokensPerFill(8));
+}
+
+class WeightedShareProviderManagerTest : public testing::Test {
+public:
+  WeightedShareProviderManagerTest() {
+    cm_.local_cluster_name_ = "local_cluster";
+    cm_.initializeClusters({"local_cluster"}, {});
+    mock_local_cluster_ = cm_.active_clusters_.at("local_cluster").get();
+
+    EXPECT_CALL(*mock_local_cluster_, prioritySet()).WillRepeatedly(ReturnRef(priority_set_));
+    ON_CALL(local_info_, address()).WillByDefault(Return(self_address_));
+    ON_CALL(local_info_, nodeName()).WillByDefault(ReturnRef(self_node_id_));
+  }
+
+  // Places `weights` on hosts 10.0.0.1, 10.0.0.2, ... of the local cluster's given priority. With
+  // `set_hostnames`, the endpoints are also named host-1, host-2, ... so that the second one
+  // carries this instance's node id as well as its address.
+  void setHosts(uint32_t priority, const std::vector<uint32_t>& weights,
+                bool set_hostnames = false) {
+    auto* host_set = priority_set_.getMockHostSet(priority);
+    host_set->hosts_.clear();
+    for (uint32_t i = 0; i < weights.size(); i++) {
+      const std::string url = fmt::format("tcp://10.0.0.{}:80", i + 1);
+      host_set->hosts_.push_back(
+          set_hostnames ? Upstream::makeTestHost(cluster_info_, fmt::format("host-{}", i + 1), url,
+                                                 weights[i])
+                        : Upstream::makeTestHost(cluster_info_, url, weights[i]));
+    }
+  }
+
+  WrapperedProvider weightedProvider(ProtoLocalClusterRateLimit::SelfIdentifier identifier =
+                                         ProtoLocalClusterRateLimit::LOCAL_ADDRESS) {
+    ProtoLocalClusterRateLimit config;
+    config.set_share_mode(ProtoLocalClusterRateLimit::WEIGHTED);
+    config.set_self_identifier(identifier);
+    return WrapperedProvider(share_provider_manager_->getShareProvider(config));
+  }
+
+  NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Upstream::MockPrioritySet> priority_set_;
+  Singleton::ManagerImpl manager_;
+  // 10.0.0.2 and host-2 are the second host that setHosts() creates.
+  Network::Address::InstanceConstSharedPtr self_address_{
+      Network::Utility::parseInternetAddressNoThrow("10.0.0.2")};
+  std::string self_node_id_{"host-2"};
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_info_{
+      new NiceMock<Upstream::MockClusterInfo>()};
+  const Upstream::MockCluster* mock_local_cluster_{};
+  ShareProviderManagerSharedPtr share_provider_manager_;
+};
+
+// The weighted share is this host's weight over the total weight of the local cluster.
+TEST_F(WeightedShareProviderManagerTest, WeightedShare) {
+  setHosts(0, {1, 3});
+  share_provider_manager_ =
+      ShareProviderManager::singleton(dispatcher_, cm_, manager_, local_info_);
+  ASSERT_NE(share_provider_manager_, nullptr);
+
+  auto provider = weightedProvider();
+
+  // 3 of 4 total weight.
+  EXPECT_EQ(3, provider.tokensPerFill(4));
+  EXPECT_EQ(6, provider.tokensPerFill(8));
+  EXPECT_EQ(1, provider.tokensPerFill(1)); // At least 1 token per fill.
+
+  // Scale the fleet up, keeping this host's weight. Now 3 of 10.
+  setHosts(0, {1, 3, 4, 2});
+  priority_set_.runUpdateCallbacks(0, {}, {});
+
+  EXPECT_EQ(3, provider.tokensPerFill(10));
+  EXPECT_EQ(6, provider.tokensPerFill(20));
+
+  // A weight-only change on this host is picked up: EDS reports weight changes through the same
+  // membership update callback, with no hosts added or removed.
+  setHosts(0, {1, 6, 4, 2});
+  priority_set_.runUpdateCallbacks(0, {}, {});
+
+  EXPECT_EQ(6, provider.tokensPerFill(13));
+}
+
+// Weights are summed across all priorities, matching what the even share mode counts.
+TEST_F(WeightedShareProviderManagerTest, WeightedShareAcrossPriorities) {
+  setHosts(0, {1, 3});
+  setHosts(1, {4});
+  share_provider_manager_ =
+      ShareProviderManager::singleton(dispatcher_, cm_, manager_, local_info_);
+
+  auto provider = weightedProvider();
+
+  // 3 of 8 total weight. Note priority 1's host is 10.0.0.1, not this host.
+  EXPECT_EQ(3, provider.tokensPerFill(8));
+}
+
+// With uniform weights, WEIGHTED reduces exactly to EVEN.
+TEST_F(WeightedShareProviderManagerTest, UniformWeightsMatchEvenShare) {
+  setHosts(0, {32, 32, 32, 32});
+  mock_local_cluster_->info_->endpoint_stats_.membership_total_.set(4);
+  share_provider_manager_ =
+      ShareProviderManager::singleton(dispatcher_, cm_, manager_, local_info_);
+
+  auto weighted = weightedProvider();
+  auto even =
+      WrapperedProvider(share_provider_manager_->getShareProvider(ProtoLocalClusterRateLimit()));
+
+  EXPECT_EQ(even.tokensPerFill(8), weighted.tokensPerFill(8));
+  EXPECT_EQ(2, weighted.tokensPerFill(8));
+}
+
+// An instance that cannot find itself in the local cluster falls back to an even share rather than
+// claiming the whole bucket.
+TEST_F(WeightedShareProviderManagerTest, SelfNotInLocalClusterFallsBackToEvenShare) {
+  ON_CALL(local_info_, address())
+      .WillByDefault(Return(Network::Utility::parseInternetAddressNoThrow("192.168.0.1")));
+  setHosts(0, {1, 3, 4, 2});
+  share_provider_manager_ =
+      ShareProviderManager::singleton(dispatcher_, cm_, manager_, local_info_);
+
+  auto provider = weightedProvider();
+
+  // 1/4, not the whole bucket.
+  EXPECT_EQ(2, provider.tokensPerFill(8));
+
+  // The fallback keeps tracking the host count.
+  setHosts(0, {1, 3});
+  priority_set_.runUpdateCallbacks(0, {}, {});
+  EXPECT_EQ(4, provider.tokensPerFill(8));
+}
+
+// Without local info there is no way to locate this instance, so WEIGHTED degrades to an even
+// share instead of handing out the whole bucket.
+TEST_F(WeightedShareProviderManagerTest, NoLocalInfoFallsBackToEvenShare) {
+  setHosts(0, {1, 3, 4, 2});
+  share_provider_manager_ = ShareProviderManager::singleton(dispatcher_, cm_, manager_);
+
+  auto provider = weightedProvider();
+
+  EXPECT_EQ(2, provider.tokensPerFill(8));
+}
+
+// An empty local cluster leaves the bucket undivided, matching the even share mode.
+TEST_F(WeightedShareProviderManagerTest, EmptyLocalCluster) {
+  setHosts(0, {});
+  share_provider_manager_ =
+      ShareProviderManager::singleton(dispatcher_, cm_, manager_, local_info_);
+
+  auto provider = weightedProvider();
+
+  EXPECT_EQ(8, provider.tokensPerFill(8));
+}
+
+// An explicit EVEN share mode is the same provider that an unset share mode returns, and it ignores
+// host weights.
+TEST_F(WeightedShareProviderManagerTest, ExplicitEvenShareModeIgnoresWeights) {
+  setHosts(0, {1, 3});
+  mock_local_cluster_->info_->endpoint_stats_.membership_total_.set(2);
+  share_provider_manager_ =
+      ShareProviderManager::singleton(dispatcher_, cm_, manager_, local_info_);
+
+  ProtoLocalClusterRateLimit config;
+  config.set_share_mode(ProtoLocalClusterRateLimit::EVEN);
+  EXPECT_EQ(share_provider_manager_->getShareProvider(config),
+            share_provider_manager_->getShareProvider(ProtoLocalClusterRateLimit()));
+
+  auto provider = WrapperedProvider(share_provider_manager_->getShareProvider(config));
+  EXPECT_EQ(4, provider.tokensPerFill(8));
+}
+
+// NODE_ID locates this instance by matching the node id against the endpoint hostname.
+TEST_F(WeightedShareProviderManagerTest, WeightedShareByNodeId) {
+  setHosts(0, {1, 3}, /*set_hostnames=*/true);
+  share_provider_manager_ =
+      ShareProviderManager::singleton(dispatcher_, cm_, manager_, local_info_);
+
+  auto provider = weightedProvider(ProtoLocalClusterRateLimit::NODE_ID);
+
+  // host-2 carries 3 of the 4 total weight.
+  EXPECT_EQ(6, provider.tokensPerFill(8));
+}
+
+// Endpoint hostnames are optional in EDS. Without them NODE_ID cannot locate this instance, so the
+// share falls back to even rather than to the whole bucket.
+TEST_F(WeightedShareProviderManagerTest, NodeIdWithoutEndpointHostnamesFallsBackToEvenShare) {
+  setHosts(0, {1, 3, 4, 2});
+  share_provider_manager_ =
+      ShareProviderManager::singleton(dispatcher_, cm_, manager_, local_info_);
+
+  auto provider = weightedProvider(ProtoLocalClusterRateLimit::NODE_ID);
+
+  EXPECT_EQ(2, provider.tokensPerFill(8));
+}
+
+// Endpoint addresses are not required to be unique, so a match on more than one endpoint is treated
+// as no match rather than adopting the weight of an arbitrary one of them.
+TEST_F(WeightedShareProviderManagerTest, AmbiguousSelfMatchFallsBackToEvenShare) {
+  auto* host_set = priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Upstream::makeTestHost(cluster_info_, "tcp://10.0.0.2:80", 3),
+                      Upstream::makeTestHost(cluster_info_, "tcp://10.0.0.2:81", 5)};
+  share_provider_manager_ =
+      ShareProviderManager::singleton(dispatcher_, cm_, manager_, local_info_);
+
+  auto provider = weightedProvider();
+
+  // 1/2 of the bucket, neither 3/8 nor 5/8.
+  EXPECT_EQ(4, provider.tokensPerFill(8));
+}
+
+// Each self identifier gets its own monitor, because they can locate different endpoints.
+TEST_F(WeightedShareProviderManagerTest, SelfIdentifiersGetDistinctProviders) {
+  auto* host_set = priority_set_.getMockHostSet(0);
+  // This instance's node id is on the endpoint that does not carry its address.
+  host_set->hosts_ = {Upstream::makeTestHost(cluster_info_, "host-2", "tcp://10.0.0.1:80", 1),
+                      Upstream::makeTestHost(cluster_info_, "host-9", "tcp://10.0.0.2:80", 3)};
+  share_provider_manager_ =
+      ShareProviderManager::singleton(dispatcher_, cm_, manager_, local_info_);
+
+  auto by_address = weightedProvider();
+  auto by_node_id = weightedProvider(ProtoLocalClusterRateLimit::NODE_ID);
+
+  EXPECT_NE(by_address.provider_, by_node_id.provider_);
+  EXPECT_EQ(6, by_address.tokensPerFill(8));
+  EXPECT_EQ(2, by_node_id.tokensPerFill(8));
 }
 
 class MockShareProvider : public ShareProvider {
