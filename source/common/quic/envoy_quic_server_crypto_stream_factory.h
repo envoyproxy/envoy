@@ -22,6 +22,12 @@ public:
       quic::QuicCryptoServerStreamBase::Helper* helper,
       OptRef<const Network::DownstreamTransportSocketFactory> transport_socket_factory,
       Event::Dispatcher& dispatcher) PURE;
+
+  // Whether crypto streams created by this factory validate client certificates against the
+  // filter chain's downstream TLS context. Connections on filter chains that require client
+  // certificates are rejected (fail closed) when the configured factory returns false, since
+  // QUICHE would otherwise accept the requested client certificate without any validation.
+  virtual bool supportsClientCertificateAuthentication() const { return false; }
 };
 
 } // namespace Quic

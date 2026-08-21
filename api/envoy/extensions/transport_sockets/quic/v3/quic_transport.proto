@@ -21,6 +21,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for Downstream QUIC transport socket. This provides Google's implementation of Google QUIC and IETF QUIC to Envoy.
 message QuicDownstreamTransport {
+  // Client certificate authentication is supported when :ref:`require_client_certificate
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`
+  // is set: the client certificate is requested during the handshake and validated against the
+  // configured validation context. Unlike TCP TLS, a validation context without
+  // ``require_client_certificate`` does not make the server request a client certificate over
+  // QUIC.
+  //
+  // When client certificates are required, QUIC connections are not resumed: every connection
+  // performs a full handshake and the client certificate is validated again. Session resumption
+  // and 0-RTT are therefore effectively disabled on filter chains that require client
+  // certificates, so a client identity is never attached to a resumed or 0-RTT connection without
+  // a fresh certificate validation.
   tls.v3.DownstreamTlsContext downstream_tls_context = 1
       [(validate.rules).message = {required: true}];
 
