@@ -22,20 +22,18 @@ Stats::Scope& upstreamWasmStatsScope(Server::Configuration::UpstreamFactoryConte
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                            Server::Configuration::FactoryContext& context)
     : Extensions::Common::Wasm::PluginConfig(config.config(), context.serverFactoryContext(),
-                                             context.scope(), context.initManager(),
-                                             context.direction(), false) {}
+                                             context.scope(), context.initManager(), false) {}
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                            Server::Configuration::UpstreamFactoryContext& context)
-    : Extensions::Common::Wasm::PluginConfig(
-          config.config(), context.serverFactoryContext(), upstreamWasmStatsScope(context),
-          context.initManager(), envoy::config::core::v3::TrafficDirection::OUTBOUND, false) {}
+    : Extensions::Common::Wasm::PluginConfig(config.config(), context.serverFactoryContext(),
+                                             upstreamWasmStatsScope(context), context.initManager(),
+                                             false) {}
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                            Server::Configuration::ServerFactoryContext& context)
-    : Extensions::Common::Wasm::PluginConfig(
-          config.config(), context, context.scope(), context.initManager(),
-          envoy::config::core::v3::TrafficDirection::OUTBOUND, false) {}
+    : Extensions::Common::Wasm::PluginConfig(config.config(), context, context.scope(),
+                                             context.initManager(), false) {}
 
 } // namespace Wasm
 } // namespace HttpFilters
