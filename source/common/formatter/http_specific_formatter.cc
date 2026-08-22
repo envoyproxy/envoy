@@ -6,12 +6,15 @@
 #include <string>
 #include <utility>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
 #include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/metadata.h"
+#include "source/common/crypto/utility.h"
 #include "source/common/formatter/coalesce_formatter.h"
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/status.h"
@@ -164,6 +167,40 @@ Protobuf::Value RequestHeaderFormatter::formatValue(const Context& context,
 void RequestHeaderFormatter::formatValueTo(ValueSink& sink, const Context& context,
                                            const StreamInfo::StreamInfo&) const {
   HeaderFormatter::formatValueTo(sink, context.requestHeaders());
+}
+
+RequestHeaderSha256Formatter::RequestHeaderSha256Formatter(absl::string_view main_header,
+                                                           absl::string_view alternative_header)
+    : main_header_(main_header), alternative_header_(alternative_header) {}
+
+std::optional<std::string>
+RequestHeaderSha256Formatter::format(const Context& context, const StreamInfo::StreamInfo&) const {
+  const auto headers = context.requestHeaders();
+  if (!headers.has_value()) {
+    return std::nullopt;
+  }
+
+  const auto find_non_empty_header = [&headers](const Http::LowerCaseString& name) {
+    const auto values = headers->get(name);
+    return values.empty() || values[0]->value().empty() ? nullptr : values[0];
+  };
+
+  const Http::HeaderEntry* header = find_non_empty_header(main_header_);
+  if (header == nullptr && !alternative_header_.get().empty()) {
+    header = find_non_empty_header(alternative_header_);
+  }
+  if (header == nullptr) {
+    return std::nullopt;
+  }
+
+  return Hex::encode(Common::Crypto::UtilitySingleton::get().getSha256Digest(
+      Buffer::OwnedImpl(header->value().getStringView())));
+}
+
+Protobuf::Value
+RequestHeaderSha256Formatter::formatValue(const Context& context,
+                                          const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::optionalStringValue(format(context, stream_info));
 }
 
 ResponseTrailerFormatter::ResponseTrailerFormatter(absl::string_view main_header,
@@ -554,6 +591,24 @@ BuiltInHttpCommandParser::getKnownFormatters() {
            RETURN_IF_NOT_OK(result.status());
            return std::make_unique<RequestHeaderFormatter>(result.value().first,
                                                            result.value().second, max_length);
+         }}},
+       {"REQ_SHA256",
+        {CommandSyntaxChecker::PARAMS_REQUIRED,
+         [](absl::string_view format,
+            std::optional<size_t>) -> absl::StatusOr<FormatterProviderPtr> {
+           auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
+           RETURN_IF_NOT_OK(result.status());
+           return std::make_unique<RequestHeaderSha256Formatter>(result.value().first,
+                                                                 result.value().second);
+         }}},
+       {"REQUEST_HEADER_SHA256",
+        {CommandSyntaxChecker::PARAMS_REQUIRED,
+         [](absl::string_view format,
+            std::optional<size_t>) -> absl::StatusOr<FormatterProviderPtr> {
+           auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
+           RETURN_IF_NOT_OK(result.status());
+           return std::make_unique<RequestHeaderSha256Formatter>(result.value().first,
+                                                                 result.value().second);
          }}},
        {"RESP", // Same as RESPONSE_HEADER and used for backward compatibility.
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,

@@ -108,6 +108,23 @@ public:
 };
 
 /**
+ * FormatterProvider for the SHA-256 digest of a request header.
+ */
+class RequestHeaderSha256Formatter : public FormatterProvider {
+public:
+  RequestHeaderSha256Formatter(absl::string_view main_header, absl::string_view alternative_header);
+
+  std::optional<std::string> format(const Context& context,
+                                    const StreamInfo::StreamInfo& stream_info) const override;
+  Protobuf::Value formatValue(const Context& context,
+                              const StreamInfo::StreamInfo& stream_info) const override;
+
+private:
+  Http::LowerCaseString main_header_;
+  Http::LowerCaseString alternative_header_;
+};
+
+/**
  * FormatterProvider for response headers.
  */
 class ResponseHeaderFormatter : public FormatterProvider, HeaderFormatter {
