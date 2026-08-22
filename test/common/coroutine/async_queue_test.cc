@@ -1639,6 +1639,67 @@ TEST_F(AsyncQueueTest, AsyncQueueMoveOnlyTypes) {
   EXPECT_EQ(**item2, 200);
 }
 
+TEST_F(AsyncQueueTest, ReentrantPushDuringDestructionCancelRequest) {
+  auto shared_cap = std::make_shared<SharedCapacity>(1);
+  auto q1 = std::make_unique<AsyncQueue<int>>(shared_cap);
+  AsyncQueue<int>* raw_q1 = q1.get();
+  AsyncQueue<int> q2(shared_cap);
+
+  // Fill capacity with q1
+  EXPECT_TRUE(q1->tryPush(1));
+
+  // q1 has two pending push waiters (which will be aborted when q1 is destroyed)
+  absl::Status q1_p1_status;
+  absl::Status q1_p2_status;
+  auto q1_p1_task = [&q1, &q1_p1_status]() -> Task<absl::Status> {
+    q1_p1_status = co_await q1->push(2);
+    co_return q1_p1_status;
+  };
+  auto q1_p2_task = [&q1, &q1_p2_status]() -> Task<absl::Status> {
+    q1_p2_status = co_await q1->push(3);
+    co_return q1_p2_status;
+  };
+  handles_.push_back(launch(q1_p1_task(), executor_, [](absl::Status status) {
+    EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  }));
+  handles_.push_back(launch(q1_p2_task(), executor_, [](absl::Status status) {
+    EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  }));
+
+  // q2 has a pending push waiter
+  bool reentrant_try_push_result = true;
+  absl::Status reentrant_push_status = absl::UnknownError("not executed");
+  auto q2_push_task = [&q2, raw_q1, &reentrant_try_push_result,
+                       &reentrant_push_status]() -> Task<absl::Status> {
+    CO_RETURN_IF_ERROR(co_await q2.push(10));
+    // When q2 gets capacity during q1's destruction, attempt reentrant push on q1
+    reentrant_try_push_result = raw_q1->tryPush(999);
+    reentrant_push_status = co_await raw_q1->push(1000);
+    co_return absl::OkStatus();
+  };
+
+  launchTaskOk(q2_push_task());
+  drain();
+
+  EXPECT_TRUE(q1_p1_status.ok()); // Default constructed (not yet completed)
+  EXPECT_TRUE(q1_p2_status.ok());
+
+  // Destroy q1. During cancelRequest / release, q2 is granted capacity and executes
+  // reentrant tryPush/push on q1.
+  q1.reset();
+  drain();
+
+  // q1 was closed/destroyed, so reentrant tryPush failed and push returned FailedPrecondition
+  EXPECT_FALSE(reentrant_try_push_result);
+  EXPECT_THAT(reentrant_push_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  EXPECT_THAT(q1_p1_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  EXPECT_THAT(q1_p2_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  EXPECT_EQ(q2.itemCount(), 1);
+  auto item = q2.tryPop();
+  ASSERT_TRUE(item.has_value());
+  EXPECT_EQ(*item, 10);
+}
+
 } // namespace
 } // namespace Coroutine
 } // namespace Envoy

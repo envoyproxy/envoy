@@ -212,23 +212,41 @@ public:
         size_func_(std::move(size_func)) {}
 
   ~AsyncQueue() {
+    *alive_ = false;
+    closed_ = true;
+
+    // 1. Cancel all pending capacity requests in reverse order so SharedCapacity
+    // will never attempt to grant capacity to any waiter of this dying queue.
     for (auto it = push_waiters_.rbegin(); it != push_waiters_.rend(); ++it) {
       if (it->capacity_waiter_it.has_value()) {
-        capacity_->cancelRequest(*it->capacity_waiter_it);
+        auto cap_it = *it->capacity_waiter_it;
         it->capacity_waiter_it.reset();
+        capacity_->cancelRequest(cap_it);
       }
     }
 
+    // 2. Release capacity held by queued items back to SharedCapacity before aborting waiters.
     if (current_size_ > 0) {
       uint64_t size = current_size_;
       current_size_ = 0;
       queue_.clear();
       capacity_->release(size);
     }
-    if (!closed_) {
-      close();
+
+    // 3. Complete pop waiters with EOF (nullopt).
+    while (!pop_waiters_.empty()) {
+      PopWaiterCallback waiter = std::move(pop_waiters_.front().callback);
+      pop_waiters_.pop_front();
+      waiter(std::nullopt);
     }
-    *alive_ = false;
+
+    // 4. Abort all pending push waiters with FailedPrecondition.
+    while (!push_waiters_.empty()) {
+      PushWaiter waiter = std::move(push_waiters_.front());
+      push_waiters_.pop_front();
+      PushWaiterCallback cb = std::move(waiter.callback);
+      cb(absl::FailedPreconditionError("queue closed"));
+    }
   }
 
   // AsyncQueue is non-copyable and non-movable.
@@ -304,7 +322,7 @@ public:
       return std::make_optional(std::move(queued.item));
     }
 
-    if (!push_waiters_.empty()) {
+    if (!closed_ && !push_waiters_.empty()) {
       PushWaiter waiter = std::move(push_waiters_.front());
       push_waiters_.pop_front();
       if (waiter.capacity_waiter_it.has_value()) {
@@ -339,20 +357,18 @@ public:
       }
     }
 
-    for (auto it = push_waiters_.rbegin(); it != push_waiters_.rend(); ++it) {
-      if (it->capacity_waiter_it.has_value()) {
-        auto cap_it = *it->capacity_waiter_it;
-        it->capacity_waiter_it.reset();
-        capacity_->cancelRequest(cap_it);
+    while (!push_waiters_.empty()) {
+      auto it = std::prev(push_waiters_.end());
+      PushWaiter waiter = std::move(*it);
+      push_waiters_.pop_back();
+
+      if (waiter.capacity_waiter_it.has_value()) {
+        capacity_->cancelRequest(*waiter.capacity_waiter_it);
         if (!*alive) {
           return;
         }
       }
-    }
 
-    while (!push_waiters_.empty()) {
-      PushWaiter waiter = std::move(push_waiters_.front());
-      push_waiters_.pop_front();
       PushWaiterCallback cb = std::move(waiter.callback);
       cb(absl::FailedPreconditionError("queue closed"));
       if (!*alive) {
@@ -371,6 +387,9 @@ private:
   }
 
   void onCapacityGranted(PushWaiterIt it) {
+    if (!*alive_ || closed_) {
+      return;
+    }
     auto alive = alive_;
     uint64_t size = it->size;
     current_size_ += size;
