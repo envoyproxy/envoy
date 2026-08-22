@@ -20,7 +20,10 @@ def api_dependencies(bzlmod = False):
     )
     external_http_archive(
         name = "com_github_chrusty_protoc_gen_jsonschema",
-        repo_mapping = {"@bazel_gazelle": "@gazelle"},
+        repo_mapping = {
+            "@bazel_gazelle": "@gazelle",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
     external_http_archive(
         name = "envoy_toolshed",
@@ -32,9 +35,11 @@ def api_dependencies(bzlmod = False):
 
     external_http_archive(
         name = "bazel_skylib",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
     external_http_archive(
         name = "rules_jvm_external",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
     external_http_archive(
         name = "com_envoyproxy_protoc_gen_validate",
@@ -44,16 +49,21 @@ def api_dependencies(bzlmod = False):
             "@bazel_gazelle": "@gazelle",
             "@com_google_absl": "@abseil-cpp",
             "@com_github_grpc_grpc": "@grpc",
+            "@com_google_protobuf": "@protobuf",
         },
     )
     external_http_archive(
         name = "googleapis",
-        repo_mapping = {"@com_github_grpc_grpc": "@grpc"},
+        repo_mapping = {
+            "@com_github_grpc_grpc": "@grpc",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
     external_http_archive(
         name = "xds",
         repo_mapping = {
             "@com_google_googleapis": "@googleapis",
+            "@com_google_protobuf": "@protobuf",
             "@com_github_grpc_grpc": "@grpc",
             "@com_googlesource_code_re2": "@re2",
         },
@@ -63,6 +73,7 @@ def api_dependencies(bzlmod = False):
     )
     external_http_archive(
         name = "rules_proto",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
     external_http_archive(
         name = "zipkin-api",
@@ -73,11 +84,17 @@ def api_dependencies(bzlmod = False):
         name = "opentelemetry-proto",
         location_name = "opentelemetry_proto",
         build_file_content = OPENTELEMETRY_BUILD_CONTENT,
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
     external_http_archive(
         name = "dev_cel",
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
@@ -130,8 +147,8 @@ alias(
 OPENTELEMETRY_BUILD_CONTENT = """
 load("@grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@grpc//bazel:python_rules.bzl", "py_proto_library", "py_grpc_library")
-load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library", "go_grpc_library")
 
 package(default_visibility = ["//visibility:public"])

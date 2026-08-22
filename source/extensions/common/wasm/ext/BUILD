@@ -1,5 +1,5 @@
-load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -93,7 +93,7 @@ proto_library(
     name = "node_subset_proto",
     srcs = ["node_subset.proto"],
     deps = [
-        "@com_google_protobuf//:struct_proto",
+        "@protobuf//:struct_proto",
     ],
 )
 
@@ -102,7 +102,7 @@ cc_proto_library(
     name = "node_subset_cc_proto",
     deps = [
         ":node_subset_proto",
-        # "@com_google_protobuf//:protoc_lib",
+        # "@protobuf//:protoc_lib",
     ],
 )
 

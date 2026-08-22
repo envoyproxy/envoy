@@ -3,8 +3,8 @@
 """
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
-load("@com_google_protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
 load("@envoy_toolshed//toolchains:utils.bzl", "get_proto_compiler", "use_proto_toolchain")
+load("@protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 

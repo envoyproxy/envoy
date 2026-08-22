@@ -504,7 +504,7 @@ TEST(ConfigTest, CreateFilterMissingConfig) {
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   const auto result =
-      config.createFilterFactoryFromProtoTyped(proto_config, "whatever", factory_context);
+      config.createFilterFactoryFromProto(proto_config, "whatever", factory_context);
   // Empty config is valid, config can be provided at route level.
   EXPECT_OK(result);
 }
