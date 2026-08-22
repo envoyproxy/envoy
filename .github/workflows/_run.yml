@@ -433,6 +433,8 @@ jobs:
         summary-post: ${{ inputs.summary-post }}
         upload-name: ${{ inputs.upload-name }}
         upload-path: ${{ inputs.upload-path }}
+        upload-junit-name: junit-xml-${{ inputs.target-name || inputs.target }}-${{ inputs.arch || 'x64' }}
+        upload-junit-path: container/envoy/*/generated/test-results/**/*.xml
         warning-match: ${{ inputs.warning-match }}
         working-directory: ${{ inputs.working-directory }}
       env:
