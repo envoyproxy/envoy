@@ -3,6 +3,7 @@
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/http/headers.h"
+#include "source/extensions/filters/http/cache_v2/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache_v2/cache_sessions.h"
 
 #include "test/extensions/filters/http/cache_v2/mocks.h"
@@ -150,6 +151,13 @@ protected:
   ActiveLookupRequestPtr testLookupRequestWithNoCache(absl::string_view path) {
     auto headers = requestHeaders(path);
     headers.addCopy("cache-control", "no-cache");
+    return testLookupRequest(headers);
+  }
+
+  ActiveLookupRequestPtr testLookupRequestWithIfNoneMatch(absl::string_view path,
+                                                          absl::string_view etag) {
+    auto headers = requestHeaders(path);
+    headers.setCopy(Http::CustomHeaders::get().IfNoneMatch, etag);
     return testLookupRequest(headers);
   }
 };
@@ -918,6 +926,433 @@ TEST_F(CacheSessionsTest, VaryHeaderInUpstreamResponseTreatedAsUncacheable) {
   pumpDispatcher();
   ASSERT_THAT(result, NotNull());
   EXPECT_THAT(result->status_, Eq(CacheEntryStatus::Uncacheable));
+}
+
+// Downstream If-None-Match handling. These tests cover cache fill request sanitization, fresh
+// cache hits, combined field lines, wildcard matching, explicit and stale-entry revalidation,
+// validator fallback, replacement representations returned by upstream, and request collapsing
+// across lookup, insertion, validation, and pass-through states.
+
+TEST_F(CacheSessionsTest, CacheMissRemovesIfNoneMatchFromCacheFillRequest) {
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("client-value")"),
+                          [](ActiveLookupResultPtr) {});
+  pumpDispatcher();
+  consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
+
+  ASSERT_THAT(fake_upstream_sent_headers_, ElementsAre(NotNull()));
+  EXPECT_THAT(*fake_upstream_sent_headers_[0], HasNoHeader("if-none-match"));
+}
+
+TEST_F(CacheSessionsTest, IfNoneMatchIsEvaluatedForEachCollapsedRequest) {
+  auto response_headers = cacheableResponseHeaders(5);
+  response_headers->setInline(CacheCustomHeaders::etag(), R"("selected")");
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(3);
+
+  ActiveLookupResultPtr weak_match, mismatch, wildcard;
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"(W/"selected")"),
+                          [&weak_match](ActiveLookupResultPtr r) { weak_match = std::move(r); });
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("different")"),
+                          [&mismatch](ActiveLookupResultPtr r) { mismatch = std::move(r); });
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", "*"),
+                          [&wildcard](ActiveLookupResultPtr r) { wildcard = std::move(r); });
+  pumpDispatcher();
+
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime();
+  consumeCallback(captured_lookup_callbacks_[0])(
+      LookupResult{std::make_unique<MockCacheReader>(),
+                   Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), nullptr,
+                   std::move(metadata), 5});
+  pumpDispatcher();
+
+  ASSERT_THAT(weak_match, NotNull());
+  EXPECT_THAT(weak_match->status_, Eq(CacheEntryStatus::FoundNotModified));
+  ASSERT_THAT(mismatch, NotNull());
+  EXPECT_THAT(mismatch->status_, Eq(CacheEntryStatus::Hit));
+  ASSERT_THAT(wildcard, NotNull());
+  EXPECT_THAT(wildcard->status_, Eq(CacheEntryStatus::FoundNotModified));
+
+  MockFunction<void(Http::ResponseHeaderMapPtr, EndStream)> weak_match_headers;
+  EXPECT_CALL(weak_match_headers,
+              Call(Pointee(AllOf(HasHeader(":status", "304"), HasNoHeader("content-length"))),
+                   EndStream::End));
+  weak_match->http_source_->getHeaders(weak_match_headers.AsStdFunction());
+
+  MockFunction<void(Http::ResponseHeaderMapPtr, EndStream)> mismatch_headers;
+  EXPECT_CALL(mismatch_headers,
+              Call(Pointee(AllOf(HasHeader(":status", "200"), HasHeader("content-length", "5"))),
+                   EndStream::More));
+  mismatch->http_source_->getHeaders(mismatch_headers.AsStdFunction());
+}
+
+TEST_F(CacheSessionsTest, IfNoneMatchCombinesMultipleFieldLines) {
+  auto response_headers = cacheableResponseHeaders();
+  response_headers->setInline(CacheCustomHeaders::etag(), R"("selected")");
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+
+  auto request_headers = requestHeaders("/a");
+  request_headers.addCopy(Http::CustomHeaders::get().IfNoneMatch, R"("different")");
+  request_headers.addCopy(Http::CustomHeaders::get().IfNoneMatch, R"(W/"selected")");
+  ActiveLookupResultPtr result;
+  cache_sessions_->lookup(testLookupRequest(request_headers),
+                          [&result](ActiveLookupResultPtr r) { result = std::move(r); });
+  pumpDispatcher();
+
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime();
+  consumeCallback(captured_lookup_callbacks_[0])(
+      LookupResult{std::make_unique<MockCacheReader>(),
+                   Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), nullptr,
+                   std::move(metadata), 0});
+  pumpDispatcher();
+
+  ASSERT_THAT(result, NotNull());
+  EXPECT_THAT(result->status_, Eq(CacheEntryStatus::FoundNotModified));
+}
+
+TEST_F(CacheSessionsTest, IfNoneMatchWildcardMatchesCachedResponseWithoutEtag) {
+  auto response_headers = cacheableResponseHeaders();
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+
+  ActiveLookupResultPtr result;
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", "*"),
+                          [&result](ActiveLookupResultPtr r) { result = std::move(r); });
+  pumpDispatcher();
+
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime();
+  consumeCallback(captured_lookup_callbacks_[0])(
+      LookupResult{std::make_unique<MockCacheReader>(),
+                   Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), nullptr,
+                   std::move(metadata), 0});
+  pumpDispatcher();
+
+  ASSERT_THAT(result, NotNull());
+  EXPECT_THAT(result->status_, Eq(CacheEntryStatus::FoundNotModified));
+}
+
+TEST_F(CacheSessionsTest, StaleCollapsedRequestsUseCachedValidatorThenEvaluateIndividually) {
+  auto response_headers = cacheableResponseHeaders(5);
+  response_headers->setInline(CacheCustomHeaders::etag(), R"("selected")");
+  response_headers->setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-age=0");
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
+
+  ActiveLookupResultPtr mismatch, match;
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("client-value")"),
+                          [&mismatch](ActiveLookupResultPtr r) { mismatch = std::move(r); });
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("selected")"),
+                          [&match](ActiveLookupResultPtr r) { match = std::move(r); });
+  pumpDispatcher();
+
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime() - std::chrono::seconds(1);
+  consumeCallback(captured_lookup_callbacks_[0])(
+      LookupResult{std::make_unique<MockCacheReader>(),
+                   Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), nullptr,
+                   std::move(metadata), 5});
+  pumpDispatcher();
+
+  ASSERT_THAT(fake_upstream_sent_headers_, ElementsAre(NotNull()));
+  // Cache validation must use the cached representation's ETag rather than the first downstream
+  // request's ETag.
+  EXPECT_THAT(*fake_upstream_sent_headers_[0], HasHeader("if-none-match", R"("selected")"));
+
+  auto validation_headers = std::make_unique<Http::TestResponseHeaderMapImpl>();
+  validation_headers->setStatus(304);
+  EXPECT_CALL(*mock_http_cache_, updateHeaders(_, KeyHasPath("/a"), _, _));
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(std::move(validation_headers),
+                                                           EndStream::End);
+  pumpDispatcher();
+
+  // Each downstream condition is evaluated after the shared validation completes.
+  ASSERT_THAT(mismatch, NotNull());
+  EXPECT_THAT(mismatch->status_, Eq(CacheEntryStatus::Validated));
+  ASSERT_THAT(match, NotNull());
+  EXPECT_THAT(match->status_, Eq(CacheEntryStatus::FoundNotModified));
+}
+
+TEST_F(CacheSessionsTest, IfNoneMatchWithNoCacheRevalidatesFreshEntryBeforeResponding) {
+  auto response_headers = cacheableResponseHeaders();
+  response_headers->setInline(CacheCustomHeaders::etag(), R"("selected")");
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+
+  auto request_headers = requestHeaders("/a");
+  request_headers.setCopy(Http::CustomHeaders::get().IfNoneMatch, R"("selected")");
+  request_headers.setCopy(Http::CustomHeaders::get().CacheControl, "no-cache");
+  ActiveLookupResultPtr result;
+  cache_sessions_->lookup(testLookupRequest(request_headers),
+                          [&result](ActiveLookupResultPtr r) { result = std::move(r); });
+  pumpDispatcher();
+
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime();
+  consumeCallback(captured_lookup_callbacks_[0])(
+      LookupResult{std::make_unique<MockCacheReader>(),
+                   Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), nullptr,
+                   std::move(metadata), 0});
+  pumpDispatcher();
+
+  ASSERT_THAT(result, IsNull());
+  ASSERT_THAT(fake_upstream_sent_headers_, ElementsAre(NotNull()));
+  EXPECT_THAT(*fake_upstream_sent_headers_[0], HasHeader("if-none-match", R"("selected")"));
+
+  auto validation_headers = std::make_unique<Http::TestResponseHeaderMapImpl>();
+  validation_headers->setStatus(304);
+  EXPECT_CALL(*mock_http_cache_, updateHeaders(_, KeyHasPath("/a"), _, _));
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(std::move(validation_headers),
+                                                           EndStream::End);
+  pumpDispatcher();
+
+  ASSERT_THAT(result, NotNull());
+  EXPECT_THAT(result->status_, Eq(CacheEntryStatus::FoundNotModified));
+}
+
+TEST_F(CacheSessionsTest, StaleIfNoneMatchWithoutCachedEtagUsesLastModifiedForValidation) {
+  constexpr absl::string_view last_modified = "Sun, 06 Nov 1994 08:49:37 GMT";
+  auto response_headers = cacheableResponseHeaders(5);
+  response_headers->setInline(CacheCustomHeaders::lastModified(), last_modified);
+  response_headers->setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-age=0");
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+
+  ActiveLookupResultPtr result;
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("client-value")"),
+                          [&result](ActiveLookupResultPtr r) { result = std::move(r); });
+  pumpDispatcher();
+
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime() - std::chrono::seconds(1);
+  consumeCallback(captured_lookup_callbacks_[0])(
+      LookupResult{std::make_unique<MockCacheReader>(),
+                   Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), nullptr,
+                   std::move(metadata), 5});
+  pumpDispatcher();
+
+  ASSERT_THAT(fake_upstream_sent_headers_, ElementsAre(NotNull()));
+  EXPECT_THAT(*fake_upstream_sent_headers_[0], HasNoHeader("if-none-match"));
+  EXPECT_THAT(*fake_upstream_sent_headers_[0], HasHeader("if-modified-since", last_modified));
+
+  auto validation_headers = std::make_unique<Http::TestResponseHeaderMapImpl>();
+  validation_headers->setStatus(304);
+  validation_headers->setInline(CacheCustomHeaders::lastModified(), last_modified);
+  EXPECT_CALL(*mock_http_cache_, updateHeaders(_, KeyHasPath("/a"), _, _));
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(std::move(validation_headers),
+                                                           EndStream::End);
+  pumpDispatcher();
+
+  ASSERT_THAT(result, NotNull());
+  EXPECT_THAT(result->status_, Eq(CacheEntryStatus::Validated));
+}
+
+TEST_F(CacheSessionsTest, StaleIfNoneMatchWithoutEtagOrLastModifiedUsesDateForValidation) {
+  constexpr absl::string_view date = "Sun, 06 Nov 1994 08:49:37 GMT";
+  auto response_headers = cacheableResponseHeaders(5);
+  response_headers->setDate(date);
+  response_headers->setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-age=0");
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+
+  ActiveLookupResultPtr result;
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("client-value")"),
+                          [&result](ActiveLookupResultPtr r) { result = std::move(r); });
+  pumpDispatcher();
+
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime() - std::chrono::seconds(1);
+  consumeCallback(captured_lookup_callbacks_[0])(
+      LookupResult{std::make_unique<MockCacheReader>(),
+                   Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), nullptr,
+                   std::move(metadata), 5});
+  pumpDispatcher();
+
+  ASSERT_THAT(fake_upstream_sent_headers_, ElementsAre(NotNull()));
+  EXPECT_THAT(*fake_upstream_sent_headers_[0], HasNoHeader("if-none-match"));
+  EXPECT_THAT(*fake_upstream_sent_headers_[0], HasHeader("if-modified-since", date));
+
+  auto validation_headers = std::make_unique<Http::TestResponseHeaderMapImpl>();
+  validation_headers->setStatus(304);
+  EXPECT_CALL(*mock_http_cache_, updateHeaders(_, KeyHasPath("/a"), _, _));
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(std::move(validation_headers),
+                                                           EndStream::End);
+  pumpDispatcher();
+
+  ASSERT_THAT(result, NotNull());
+  EXPECT_THAT(result->status_, Eq(CacheEntryStatus::Validated));
+}
+
+TEST_F(CacheSessionsTest, StaleIfNoneMatchEvaluatesNewRepresentationAfterValidationReturnsOk) {
+  auto cached_response_headers = cacheableResponseHeaders();
+  cached_response_headers->setInline(CacheCustomHeaders::etag(), R"("old")");
+  cached_response_headers->setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-age=0");
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
+  EXPECT_CALL(*mock_http_cache_, evict(_, KeyHasPath("/a")));
+
+  ActiveLookupResultPtr match, mismatch;
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("new")"),
+                          [&match](ActiveLookupResultPtr r) { match = std::move(r); });
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("different")"),
+                          [&mismatch](ActiveLookupResultPtr r) { mismatch = std::move(r); });
+  pumpDispatcher();
+
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime() - std::chrono::seconds(1);
+  consumeCallback(captured_lookup_callbacks_[0])(
+      LookupResult{std::make_unique<MockCacheReader>(),
+                   Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*cached_response_headers),
+                   nullptr, std::move(metadata), 0});
+  pumpDispatcher();
+
+  ASSERT_THAT(fake_upstream_sent_headers_, ElementsAre(NotNull()));
+  EXPECT_THAT(*fake_upstream_sent_headers_[0], HasHeader("if-none-match", R"("old")"));
+
+  auto new_response_headers = cacheableResponseHeaders();
+  new_response_headers->setInline(CacheCustomHeaders::etag(), R"("new")");
+  std::shared_ptr<CacheProgressReceiver> progress;
+  EXPECT_CALL(*mock_http_cache_,
+              insert(_, KeyHasPath("/a"), Pointee(IsSupersetOfHeaders(*new_response_headers)), _,
+                     IsNull(), _))
+      .WillOnce([&progress](Event::Dispatcher&, Key, Http::ResponseHeaderMapPtr, ResponseMetadata,
+                            HttpSourcePtr, std::shared_ptr<CacheProgressReceiver> receiver) {
+        progress = std::move(receiver);
+      });
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*new_response_headers), EndStream::End);
+  pumpDispatcher();
+
+  ASSERT_THAT(progress, NotNull());
+  progress->onHeadersInserted(
+      nullptr, Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*new_response_headers), true);
+  pumpDispatcher();
+
+  ASSERT_THAT(match, NotNull());
+  EXPECT_THAT(match->status_, Eq(CacheEntryStatus::FoundNotModified));
+  ASSERT_THAT(mismatch, NotNull());
+  EXPECT_THAT(mismatch->status_, Eq(CacheEntryStatus::Follower));
+}
+
+TEST_F(CacheSessionsTest, IfNoneMatchCollapsedCacheMissEvaluatesInsertedRepresentation) {
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
+
+  ActiveLookupResultPtr match, mismatch;
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("selected")"),
+                          [&match](ActiveLookupResultPtr r) { match = std::move(r); });
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("different")"),
+                          [&mismatch](ActiveLookupResultPtr r) { mismatch = std::move(r); });
+  pumpDispatcher();
+
+  consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
+
+  ASSERT_THAT(fake_upstream_sent_headers_, ElementsAre(NotNull()));
+  EXPECT_THAT(*fake_upstream_sent_headers_[0], HasNoHeader("if-none-match"));
+
+  auto response_headers = cacheableResponseHeaders();
+  response_headers->setInline(CacheCustomHeaders::etag(), R"("selected")");
+  std::shared_ptr<CacheProgressReceiver> progress;
+  EXPECT_CALL(
+      *mock_http_cache_,
+      insert(_, KeyHasPath("/a"), Pointee(IsSupersetOfHeaders(*response_headers)), _, IsNull(), _))
+      .WillOnce([&progress](Event::Dispatcher&, Key, Http::ResponseHeaderMapPtr, ResponseMetadata,
+                            HttpSourcePtr, std::shared_ptr<CacheProgressReceiver> receiver) {
+        progress = std::move(receiver);
+      });
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), EndStream::End);
+  pumpDispatcher();
+
+  ASSERT_THAT(progress, NotNull());
+  progress->onHeadersInserted(
+      nullptr, Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), true);
+  pumpDispatcher();
+
+  ASSERT_THAT(match, NotNull());
+  EXPECT_THAT(match->status_, Eq(CacheEntryStatus::FoundNotModified));
+  ASSERT_THAT(mismatch, NotNull());
+  EXPECT_THAT(mismatch->status_, Eq(CacheEntryStatus::Follower));
+}
+
+TEST_F(CacheSessionsTest, IfNoneMatchSubscriberJoinsValidationAlreadyInFlight) {
+  auto response_headers = cacheableResponseHeaders();
+  response_headers->setInline(CacheCustomHeaders::etag(), R"("selected")");
+  response_headers->setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-age=0");
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
+
+  ActiveLookupResultPtr match, mismatch;
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("selected")"),
+                          [&match](ActiveLookupResultPtr r) { match = std::move(r); });
+  pumpDispatcher();
+
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime() - std::chrono::seconds(1);
+  consumeCallback(captured_lookup_callbacks_[0])(
+      LookupResult{std::make_unique<MockCacheReader>(),
+                   Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), nullptr,
+                   std::move(metadata), 0});
+  pumpDispatcher();
+
+  ASSERT_THAT(fake_upstream_sent_headers_, ElementsAre(NotNull()));
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("different")"),
+                          [&mismatch](ActiveLookupResultPtr r) { mismatch = std::move(r); });
+  pumpDispatcher();
+  EXPECT_THAT(fake_upstream_sent_headers_, testing::SizeIs(1));
+
+  auto validation_headers = std::make_unique<Http::TestResponseHeaderMapImpl>();
+  validation_headers->setStatus(304);
+  EXPECT_CALL(*mock_http_cache_, updateHeaders(_, KeyHasPath("/a"), _, _));
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(std::move(validation_headers),
+                                                           EndStream::End);
+  pumpDispatcher();
+
+  ASSERT_THAT(match, NotNull());
+  EXPECT_THAT(match->status_, Eq(CacheEntryStatus::FoundNotModified));
+  ASSERT_THAT(mismatch, NotNull());
+  EXPECT_THAT(mismatch->status_, Eq(CacheEntryStatus::ValidatedFree));
+}
+
+TEST_F(CacheSessionsTest,
+       IfNoneMatchUncacheableFillRetriesEveryCollapsedRequestWithOriginalHeader) {
+  Mock::VerifyAndClearExpectations(mock_cacheable_response_checker_.get());
+  EXPECT_CALL(*mock_cacheable_response_checker_, isCacheableResponse)
+      .Times(testing::AnyNumber())
+      .WillRepeatedly(testing::Return(false));
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
+
+  ActiveLookupResultPtr first, second;
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("first")"),
+                          [&first](ActiveLookupResultPtr r) { first = std::move(r); });
+  cache_sessions_->lookup(testLookupRequestWithIfNoneMatch("/a", R"("second")"),
+                          [&second](ActiveLookupResultPtr r) { second = std::move(r); });
+  pumpDispatcher();
+
+  consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
+  ASSERT_THAT(fake_upstream_sent_headers_, ElementsAre(NotNull()));
+  EXPECT_THAT(*fake_upstream_sent_headers_[0], HasNoHeader("if-none-match"));
+
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(uncacheableResponseHeaders(),
+                                                           EndStream::End);
+  pumpDispatcher();
+
+  ASSERT_THAT(first, NotNull());
+  ASSERT_THAT(second, NotNull());
+  EXPECT_THAT(first->status_, Eq(CacheEntryStatus::Uncacheable));
+  EXPECT_THAT(second->status_, Eq(CacheEntryStatus::Uncacheable));
+  ASSERT_THAT(fake_upstream_sent_headers_, testing::SizeIs(3));
+  EXPECT_THAT(*fake_upstream_sent_headers_[1], HasHeader("if-none-match", R"("first")"));
+  EXPECT_THAT(*fake_upstream_sent_headers_[2], HasHeader("if-none-match", R"("second")"));
 }
 
 // TODO: UpdateHeadersSkipSpecificHeaders

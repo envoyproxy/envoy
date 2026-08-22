@@ -33,11 +33,13 @@ public:
   ActiveLookupRequest& lookup() const { return *lookup_; }
 
   void setContentLength(uint64_t l) { content_length_ = l; }
+  void setNotModified() { not_modified_ = true; }
 
 private:
   ActiveLookupRequestPtr lookup_;
   std::shared_ptr<CacheSession> entry_;
   uint64_t content_length_;
+  bool not_modified_ = false;
 };
 
 class CacheSession : public Logger::Loggable<Logger::Id::cache_filter>,
@@ -221,9 +223,9 @@ private:
   void validateCacheEntry(Event::Dispatcher& dispatcher) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
   void performUpstreamRequest() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
   void onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStream end_stream,
-                         bool range_header_was_stripped) ABSL_LOCKS_EXCLUDED(mu_);
+                         bool request_headers_were_modified) ABSL_LOCKS_EXCLUDED(mu_);
   void onUncacheable(Http::ResponseHeaderMapPtr headers, EndStream end_stream,
-                     bool range_header_was_stripped) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+                     bool request_headers_were_modified) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
   // For the unlikely case that cache config was modified while operations were in flight,
   // requests still in the lookup state are transformed to pass-through.
   // Requests for headers/body/trailers should be able to continue as the cache

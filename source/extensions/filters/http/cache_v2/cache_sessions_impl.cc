@@ -85,7 +85,24 @@ static Http::ResponseHeaderMapPtr notSatisfiableHeaders() {
   });
 }
 
+static void makeNotModified(Http::ResponseHeaderMap& headers) {
+  headers.setStatus(enumToInt(Http::Code::NotModified));
+  headers.removeContentLength();
+  headers.remove(Envoy::Http::Headers::get().ContentRange);
+  headers.removeTransferEncoding();
+}
+
 void ActiveLookupContext::getHeaders(GetHeadersCallback&& cb) {
+  if (not_modified_) {
+    entry_->wantHeaders(
+        dispatcher(), lookup().timestamp(),
+        [cb = std::move(cb)](Http::ResponseHeaderMapPtr headers, EndStream) mutable {
+          ASSERT(headers != nullptr, "it should be impossible for headers to be null");
+          makeNotModified(*headers);
+          cb(std::move(headers), EndStream::End);
+        });
+    return;
+  }
   std::optional<std::vector<RawByteRange>> ranges = lookup().parseRange();
   if (ranges) {
     // If it's a range request, inject the appropriate modified content-range and
@@ -269,6 +286,10 @@ void CacheSession::sendSuccessfulLookupResultTo(LookupSubscriber& subscriber,
   mu_.AssertHeld();
   ASSERT(state_ == State::Exists || state_ == State::Inserting);
   auto result = std::make_unique<ActiveLookupResult>();
+  if (subscriber.context_->lookup().ifNoneMatch(*entry_.response_headers_)) {
+    subscriber.context_->setNotModified();
+    status = CacheEntryStatus::FoundNotModified;
+  }
   result->status_ = status;
   result->http_source_ = std::move(subscriber.context_);
   subscriber.dispatcher().post(
@@ -647,21 +668,20 @@ void CacheSession::performUpstreamRequest() {
   ASSERT(!upstream_request_, "should only be one upstream request in flight");
   LookupSubscriber& first_sub = lookup_subscribers_.front();
   const ActiveLookupRequest& lookup = first_sub.context_->lookup();
-  Http::RequestHeaderMapPtr request_headers;
-  bool was_ranged_request = lookup.isRangeRequest();
-  if (was_ranged_request) {
-    request_headers = requestHeadersWithRangeRemoved(lookup.requestHeaders());
-  } else {
-    request_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(lookup.requestHeaders());
-  }
+  Http::RequestHeaderMapPtr request_headers =
+      requestHeadersWithRangeRemoved(lookup.requestHeaders());
+  const bool request_headers_were_modified = lookup.isRangeRequest() || lookup.hasIfNoneMatch();
+  // Fetch the complete representation for insertion. Each downstream condition is evaluated
+  // separately after the representation becomes available from the cache.
+  request_headers->removeInline(CacheCustomHeaders::ifNoneMatch());
   upstream_request_ = lookup.createUpstreamRequest();
   first_sub.dispatcher().post([upstream_request = upstream_request_.get(),
                                request_headers = std::move(request_headers), this,
-                               p = shared_from_this(), was_ranged_request]() mutable {
+                               p = shared_from_this(), request_headers_were_modified]() mutable {
     upstream_request->sendHeaders(std::move(request_headers));
-    upstream_request->getHeaders([this, p = std::move(p), was_ranged_request](
+    upstream_request->getHeaders([this, p = std::move(p), request_headers_were_modified](
                                      Http::ResponseHeaderMapPtr headers, EndStream end_stream) {
-      onUpstreamHeaders(std::move(headers), end_stream, was_ranged_request);
+      onUpstreamHeaders(std::move(headers), end_stream, request_headers_were_modified);
     });
   });
 }
@@ -733,19 +753,17 @@ void CacheSession::processSuccessfulValidation(Http::ResponseHeaderMapPtr header
 }
 
 void CacheSession::onUncacheable(Http::ResponseHeaderMapPtr headers, EndStream end_stream,
-                                 bool range_header_was_stripped) {
+                                 bool request_headers_were_modified) {
   // If it turned out to be not cacheable, mark it as such, pass the already
   // open connection to the first request, and give any other requests in flight
   // a pass-through to upstream.
-  // If the upstream request stripped off a range header from the downstream
-  // request in order to populate the cache, we'll have to drop that upstream
-  // request and just issue a new request for every downstream.
+  // If Range or If-None-Match was stripped from the upstream request in order to populate the
+  // cache, drop that modified stream and issue the original request for every downstream.
   mu_.AssertHeld();
   state_ = State::NotCacheable;
-  bool use_existing_stream = !range_header_was_stripped;
+  bool use_existing_stream = !request_headers_were_modified;
   if (!use_existing_stream) {
-    // Reset the upstream request if the request wanted a range and
-    // the upstream request didn't want a range.
+    // The modified upstream request cannot be passed through as the downstream response.
     upstream_request_ = nullptr;
   }
   for (LookupSubscriber& sub : lookup_subscribers_) {
@@ -770,7 +788,7 @@ void CacheSession::onUncacheable(Http::ResponseHeaderMapPtr headers, EndStream e
 }
 
 void CacheSession::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStream end_stream,
-                                     bool range_header_was_stripped) {
+                                     bool request_headers_were_modified) {
   absl::MutexLock lock(mu_);
   Event::Dispatcher& dispatcher = lookup_subscribers_.front().dispatcher();
   ASSERT(upstream_request_);
@@ -812,12 +830,12 @@ void CacheSession::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStre
     absl::SimpleAtoi(cl, &content_length_header_) || (content_length_header_ = 0);
   }
   if (!lookup_subscribers_.front().context_->lookup().isCacheableResponse(*headers)) {
-    return onUncacheable(std::move(headers), end_stream, range_header_was_stripped);
+    return onUncacheable(std::move(headers), end_stream, request_headers_were_modified);
   }
   if (VaryHeaderUtils::hasVary(*headers)) {
     // TODO(ravenblack): implement Vary header support.
     ENVOY_LOG(debug, "Vary header found in upstream response, treating as not cacheable");
-    return onUncacheable(std::move(headers), end_stream, range_header_was_stripped);
+    return onUncacheable(std::move(headers), end_stream, request_headers_were_modified);
   }
   auto cache_sessions = cache_sessions_.lock();
   if (!cache_sessions) {

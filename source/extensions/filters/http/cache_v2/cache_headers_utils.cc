@@ -243,7 +243,13 @@ void CacheHeadersUtils::injectValidationHeaders(
   if (etag_header) {
     absl::string_view etag = etag_header->value().getStringView();
     request_headers.setInline(CacheCustomHeaders::ifNoneMatch(), etag);
+  } else {
+    // If-None-Match takes precedence over If-Modified-Since. When the cached response has no ETag,
+    // remove the downstream condition so validation can fall back to the cached Last-Modified or
+    // Date value below.
+    request_headers.removeInline(CacheCustomHeaders::ifNoneMatch());
   }
+
   if (DateUtil::timePointValid(CacheHeadersUtils::httpTime(last_modified_header))) {
     // Valid Last-Modified header exists.
     absl::string_view last_modified = last_modified_header->value().getStringView();
