@@ -22,8 +22,6 @@ final class SendDataTests: XCTestCase {
     EnvoyTestServer.startHttp1Server()
     EnvoyTestServer.setHeadersAndData("x-response-foo", header_value: "aaa", response_body: "data")
 
-    // swiftlint:disable:next line_length
-    let assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
     let requestStringMatch = "match_me"
 
     let expectation = self.expectation(description: "Run called with expected http status")
@@ -33,9 +31,8 @@ final class SendDataTests: XCTestCase {
         print(msg, terminator: "")
       }
       .addNativeFilter(
-        name: "test_logger",
-        // swiftlint:disable:next line_length
-        typedConfig: "[\(assertionFilterType)] { match_config { http_request_generic_body_match: { patterns: { string_match: '\(requestStringMatch)'}}}}"
+        name: "envoy.filters.http.assertion",
+        typedConfigData: makeAssertionBodyMatchAnyProto(stringMatch: requestStringMatch)
       )
       .build()
 

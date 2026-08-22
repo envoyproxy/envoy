@@ -104,6 +104,7 @@ envoy_mobile_swift_test(
 envoy_mobile_swift_test(
     name = "key_value_store_test",
     srcs = [
+        "ProtoUtils.swift",
         "KeyValueStoreTest.swift",
     ],
     exec_properties = {
@@ -167,6 +168,7 @@ envoy_mobile_swift_test(
 envoy_mobile_swift_test(
     name = "send_data_test",
     srcs = [
+        "ProtoUtils.swift",
         "SendDataTest.swift",
     ],
     exec_properties = {
@@ -199,6 +201,7 @@ envoy_mobile_swift_test(
 envoy_mobile_swift_test(
     name = "send_trailers_test",
     srcs = [
+        "ProtoUtils.swift",
         "SendTrailersTest.swift",
     ],
     exec_properties = {
@@ -215,6 +218,7 @@ envoy_mobile_swift_test(
 envoy_mobile_swift_test(
     name = "set_event_tracker_test",
     srcs = [
+        "ProtoUtils.swift",
         "SetEventTrackerTest.swift",
     ],
     exec_properties = {
@@ -231,6 +235,7 @@ envoy_mobile_swift_test(
 envoy_mobile_swift_test(
     name = "set_event_tracker_test_no_tracker",
     srcs = [
+        "ProtoUtils.swift",
         "SetEventTrackerTestNoTracker.swift",
     ],
     exec_properties = {
@@ -247,6 +252,7 @@ envoy_mobile_swift_test(
 envoy_mobile_swift_test(
     name = "set_logger_test",
     srcs = [
+        "ProtoUtils.swift",
         "SetLoggerTest.swift",
     ],
     exec_properties = {
