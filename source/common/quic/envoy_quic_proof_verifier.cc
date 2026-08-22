@@ -121,7 +121,9 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   }
   if (result.status == ValidationResults::ValidationStatus::Successful) {
     if (verifyLeafCertMatchesHostname(*cert_view, hostname, error_details)) {
-      *details = std::make_unique<CertVerifyResult>(true);
+      // Hand the verifier-built chain (not the peer-sent list) to the details so the connection
+      // info can report the validated issuer.
+      *details = std::make_unique<CertVerifyResult>(true, std::move(result.validated_chain));
       return quic::QUIC_SUCCESS;
     }
   } else {
