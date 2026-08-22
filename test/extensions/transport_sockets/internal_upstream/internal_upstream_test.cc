@@ -44,7 +44,8 @@ class MockPassthroughState : public PassthroughState {
 public:
   MOCK_METHOD(void, initialize,
               (std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-               const StreamInfo::FilterState::Objects& filter_state_objects));
+               const StreamInfo::FilterState::Objects& filter_state_objects,
+               uint64_t connection_id));
   MOCK_METHOD(void, mergeInto,
               (envoy::config::core::v3::Metadata & metadata,
                StreamInfo::FilterState& filter_state));
@@ -91,9 +92,10 @@ TEST_F(InternalSocketTest, PassthroughStateInjected) {
   auto state = std::make_shared<NiceMock<MockPassthroughState>>();
   NiceMock<MockUserSpaceIoHandle> io_handle;
   EXPECT_CALL(io_handle, passthroughState()).WillRepeatedly(testing::Return(state));
-  EXPECT_CALL(*state, initialize(_, _))
+  EXPECT_CALL(*state, initialize(_, _, _))
       .WillOnce(Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                           const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
+                           const StreamInfo::FilterState::Objects& filter_state_objects,
+                           uint64_t) -> void {
         ASSERT_EQ("val",
                   metadata->filter_metadata().at("envoy.test").fields().at("key").string_value());
         ASSERT_EQ(1, filter_state_objects.size());
@@ -109,9 +111,10 @@ TEST_F(InternalSocketTest, EmptyPassthroughState) {
   auto state = std::make_shared<NiceMock<MockPassthroughState>>();
   NiceMock<MockUserSpaceIoHandle> io_handle;
   EXPECT_CALL(io_handle, passthroughState()).WillRepeatedly(testing::Return(state));
-  EXPECT_CALL(*state, initialize(_, _))
+  EXPECT_CALL(*state, initialize(_, _, _))
       .WillOnce(Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                           const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
+                           const StreamInfo::FilterState::Objects& filter_state_objects,
+                           uint64_t) -> void {
         ASSERT_EQ(nullptr, metadata);
         ASSERT_EQ(0, filter_state_objects.size());
       }));
