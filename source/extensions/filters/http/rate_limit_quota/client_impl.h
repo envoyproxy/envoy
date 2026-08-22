@@ -35,7 +35,9 @@ public:
       Envoy::ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_cache_tls)
       : global_client_(global_client), buckets_cache_tls_(buckets_cache_tls) {}
 
-  void createBucket(const BucketId& bucket_id, size_t id, const BucketAction& default_bucket_action,
+  void createBucket(const BucketId& bucket_id, size_t id,
+                    std::chrono::milliseconds reporting_interval,
+                    const BucketAction& default_bucket_action,
                     std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                     std::chrono::milliseconds fallback_ttl, bool initial_request_allowed) override;
   // Note: returns null if the global resources (client or bucket) are

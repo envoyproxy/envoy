@@ -311,9 +311,8 @@ protected:
   FakeHttpConnectionPtr rlqs_connection_;
   FakeStreamPtr rlqs_stream_;
   Cluster* rlqs_cluster_;
-  // TODO(bsurber): Implement report timing & usage aggregation based on each
-  // bucket's reporting_interval field. Currently this is not supported and all
-  // usage is reported on a hardcoded interval.
+  // The integration scenarios below use a five-second reporting interval.
+  // Per-bucket scheduling is covered by the global client unit tests.
   int report_interval_sec_ = 5;
   RateLimitStrategy deny_all_strategy;
   RateLimitStrategy allow_all_strategy;
