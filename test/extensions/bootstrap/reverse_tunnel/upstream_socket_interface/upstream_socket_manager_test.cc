@@ -18,12 +18,16 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Contains;
+using testing::Eq;
 using testing::Invoke;
+using testing::IsSupersetOf;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -319,14 +323,14 @@ TEST_F(TestUpstreamSocketManager, SetupLogPreservesOriginalIdentifiersWithTenant
           Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
             const auto& metadata = lifecycleMetadata(stream_info);
             EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
-            EXPECT_EQ(metadata.fields().at("event").string_value(),
-                      std::string(kLifecycleEventTunnelSetup));
-            EXPECT_EQ(metadata.fields().at("node_id").string_value(), "node-a");
-            EXPECT_EQ(metadata.fields().at("cluster_id").string_value(), "cluster-a");
-            EXPECT_EQ(metadata.fields().at("tenant_id").string_value(), "tenant-a");
-            EXPECT_EQ(metadata.fields().at("socket_state").string_value(),
-                      std::string(kLifecycleSocketStateIdle));
-            EXPECT_EQ(metadata.fields().at("fd").number_value(), fd);
+            EXPECT_THAT(
+                metadata.fields(),
+                IsSupersetOf(StructMatchers(
+                    IsStructString("event", std::string(kLifecycleEventTunnelSetup)),
+                    IsStructString("node_id", "node-a"), IsStructString("cluster_id", "cluster-a"),
+                    IsStructString("tenant_id", "tenant-a"),
+                    IsStructString("socket_state", std::string(kLifecycleSocketStateIdle)),
+                    IsStructNumber("fd", fd))));
             EXPECT_EQ(filterStateString(stream_info, kFilterStateNodeId), "node-a");
             EXPECT_EQ(filterStateString(stream_info, kFilterStateClusterId), "cluster-a");
             EXPECT_EQ(filterStateString(stream_info, kFilterStateTenantId), "tenant-a");
@@ -352,8 +356,9 @@ TEST_F(TestUpstreamSocketManager, SetupLogSurfacesInitiatorWorkerAndConnectionId
   EXPECT_CALL(*access_log, log(_, _))
       .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = lifecycleMetadata(stream_info);
-        EXPECT_EQ(metadata.fields().at("initiator_worker_id").string_value(), "worker_7");
-        EXPECT_EQ(metadata.fields().at("initiator_connection_id").string_value(), "9001");
+        EXPECT_THAT(metadata.fields(), IsSupersetOf(StructMatchers(
+                                           IsStructString("initiator_worker_id", "worker_7"),
+                                           IsStructString("initiator_connection_id", "9001"))));
         EXPECT_EQ(filterStateString(stream_info, kFilterStateInitiatorWorkerId), "worker_7");
         EXPECT_EQ(filterStateString(stream_info, kFilterStateInitiatorConnectionId), "9001");
       }))
@@ -402,33 +407,33 @@ TEST_F(TestUpstreamSocketManager, HandoffAndCloseLogsUseLifecycleMetadata) {
           Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
             const auto& metadata = lifecycleMetadata(stream_info);
             EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
-            EXPECT_EQ(metadata.fields().at("event").string_value(),
-                      std::string(kLifecycleEventTunnelSetup));
+            EXPECT_THAT(metadata.fields(),
+                        Contains(IsStructString("event", std::string(kLifecycleEventTunnelSetup))));
           }));
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(
-          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
-            const auto& metadata = lifecycleMetadata(stream_info);
-            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamPoolReady);
-            EXPECT_EQ(metadata.fields().at("event").string_value(),
-                      std::string(kLifecycleEventSocketHandoff));
-            EXPECT_EQ(metadata.fields().at("handoff_kind").string_value(),
-                      std::string(kLifecycleHandoffKindPoolToUpstream));
-            EXPECT_EQ(metadata.fields().at("socket_state").string_value(),
-                      std::string(kLifecycleSocketStateHandedOff));
-          }));
+      .WillOnce(Invoke([&](const Formatter::Context& context,
+                           const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamPoolReady);
+        EXPECT_THAT(
+            metadata.fields(),
+            IsSupersetOf(StructMatchers(
+                IsStructString("event", std::string(kLifecycleEventSocketHandoff)),
+                IsStructString("handoff_kind", std::string(kLifecycleHandoffKindPoolToUpstream)),
+                IsStructString("socket_state", std::string(kLifecycleSocketStateHandedOff)))));
+      }));
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(
-          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
-            const auto& metadata = lifecycleMetadata(stream_info);
-            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
-            EXPECT_EQ(metadata.fields().at("event").string_value(),
-                      std::string(kLifecycleEventTunnelClosed));
-            EXPECT_EQ(metadata.fields().at("close_reason").string_value(),
-                      StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
-            EXPECT_EQ(metadata.fields().at("socket_state").string_value(),
-                      std::string(kLifecycleSocketStateInUse));
-          }));
+      .WillOnce(Invoke([&](const Formatter::Context& context,
+                           const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
+        EXPECT_THAT(metadata.fields(),
+                    IsSupersetOf(StructMatchers(
+                        IsStructString("event", std::string(kLifecycleEventTunnelClosed)),
+                        IsStructString("close_reason",
+                                       StreamInfo::LocalCloseReasons::get().Http2PingTimeout),
+                        IsStructString("socket_state", std::string(kLifecycleSocketStateInUse)))));
+      }));
 
   socket_manager_->addConnectionSocket("node-b", "cluster-b", std::move(socket),
                                        std::chrono::seconds(30), false, "tenant-b");
@@ -1444,8 +1449,7 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadCallsReportDisconnection) {
                                        std::chrono::seconds(30), /*rebalanced=*/false);
 
   ASSERT_NE(reporter_ptr, nullptr);
-  EXPECT_CALL(*reporter_ptr,
-              reportDisconnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id)));
+  EXPECT_CALL(*reporter_ptr, reportDisconnectionEvent(Eq(node_id), Eq(cluster_id)));
   socket_manager_->markSocketDead(fd);
 }
 
@@ -1877,15 +1881,15 @@ TEST_F(TestUpstreamSocketManager, SendPingEmitsIdlePingSentEvent) {
       }));
 
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(
-          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
-            const auto& metadata = lifecycleMetadata(stream_info);
-            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
-            EXPECT_EQ(metadata.fields().at("event").string_value(),
-                      std::string(kLifecycleEventIdlePingSent));
-            EXPECT_EQ(metadata.fields().at("socket_state").string_value(),
-                      std::string(kLifecycleSocketStateIdle));
-          }));
+      .WillOnce(Invoke([&](const Formatter::Context& context,
+                           const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
+        EXPECT_THAT(metadata.fields(),
+                    IsSupersetOf(StructMatchers(
+                        IsStructString("event", std::string(kLifecycleEventIdlePingSent)),
+                        IsStructString("socket_state", std::string(kLifecycleSocketStateIdle)))));
+      }));
 
   socket_manager_->sendPingForConnection(123);
   extension_->setTestOnlyAccessLogs({});
@@ -1920,8 +1924,8 @@ TEST_F(TestUpstreamSocketManager, PingAckEmitsIdlePingAckEvent) {
           Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
             const auto& metadata = lifecycleMetadata(stream_info);
             EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
-            EXPECT_EQ(metadata.fields().at("event").string_value(),
-                      std::string(kLifecycleEventIdlePingAck));
+            EXPECT_THAT(metadata.fields(),
+                        Contains(IsStructString("event", std::string(kLifecycleEventIdlePingAck))));
           }));
 
   socket_manager_->onPingResponse(*mock_io_handle);
@@ -1948,9 +1952,10 @@ TEST_F(TestUpstreamSocketManager, PingMissEmitsIdlePingMissEvent) {
           Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
             const auto& metadata = lifecycleMetadata(stream_info);
             EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
-            EXPECT_EQ(metadata.fields().at("event").string_value(),
-                      std::string(kLifecycleEventIdlePingMiss));
-            EXPECT_EQ(metadata.fields().at("miss_count").string_value(), "1");
+            EXPECT_THAT(metadata.fields(),
+                        IsSupersetOf(StructMatchers(
+                            IsStructString("event", std::string(kLifecycleEventIdlePingMiss)),
+                            IsStructString("miss_count", "1"))));
           }));
 
   socket_manager_->onPingTimeout(123);
@@ -1975,12 +1980,12 @@ TEST_F(TestUpstreamSocketManager, PingTimeoutEmitsIdlePingTimeoutEvent) {
   // Miss twice (below threshold=3) -- expect idle_ping_miss events.
   EXPECT_CALL(*access_log, log(_, _))
       .Times(2)
-      .WillRepeatedly(
-          Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
-            const auto& metadata = lifecycleMetadata(stream_info);
-            EXPECT_EQ(metadata.fields().at("event").string_value(),
-                      std::string(kLifecycleEventIdlePingMiss));
-          }))
+      .WillRepeatedly(Invoke([&](const Formatter::Context&,
+                                 const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_THAT(metadata.fields(),
+                    Contains(IsStructString("event", std::string(kLifecycleEventIdlePingMiss))));
+      }))
       .RetiresOnSaturation();
   socket_manager_->onPingTimeout(123);
   socket_manager_->onPingTimeout(123);
@@ -1991,17 +1996,19 @@ TEST_F(TestUpstreamSocketManager, PingTimeoutEmitsIdlePingTimeoutEvent) {
   EXPECT_CALL(*access_log, log(_, _))
       .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = lifecycleMetadata(stream_info);
-        EXPECT_EQ(metadata.fields().at("event").string_value(),
-                  std::string(kLifecycleEventIdlePingTimeout));
-        EXPECT_EQ(metadata.fields().at("miss_count").string_value(), "3");
+        EXPECT_THAT(metadata.fields(),
+                    IsSupersetOf(StructMatchers(
+                        IsStructString("event", std::string(kLifecycleEventIdlePingTimeout)),
+                        IsStructString("miss_count", "3"))));
       }));
   EXPECT_CALL(*access_log, log(_, _))
       .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = lifecycleMetadata(stream_info);
-        EXPECT_EQ(metadata.fields().at("event").string_value(),
-                  std::string(kLifecycleEventTunnelClosed));
-        EXPECT_EQ(metadata.fields().at("close_reason").string_value(),
-                  std::string(kLifecycleCloseReasonIdlePingTimeout));
+        EXPECT_THAT(metadata.fields(),
+                    IsSupersetOf(StructMatchers(
+                        IsStructString("event", std::string(kLifecycleEventTunnelClosed)),
+                        IsStructString("close_reason",
+                                       std::string(kLifecycleCloseReasonIdlePingTimeout)))));
       }));
 
   socket_manager_->onPingTimeout(123);
@@ -2037,10 +2044,11 @@ TEST_F(TestUpstreamSocketManager, DestructorEmitsDeferredCloseLogs) {
   EXPECT_CALL(*access_log, log(_, _))
       .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = lifecycleMetadata(stream_info);
-        EXPECT_EQ(metadata.fields().at("event").string_value(),
-                  std::string(kLifecycleEventTunnelClosed));
-        EXPECT_EQ(metadata.fields().at("close_reason").string_value(),
-                  std::string(kLifecycleCloseReasonExplicitClose));
+        EXPECT_THAT(
+            metadata.fields(),
+            IsSupersetOf(StructMatchers(
+                IsStructString("event", std::string(kLifecycleEventTunnelClosed)),
+                IsStructString("close_reason", std::string(kLifecycleCloseReasonExplicitClose)))));
       }));
 
   socket_manager_.reset(); // Triggers destructor.

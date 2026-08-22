@@ -7,10 +7,13 @@
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::ElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -23,7 +26,7 @@ using ::envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldEx
 using ::Envoy::Http::MockStreamDecoderFilterCallbacks;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestRequestTrailerMapImpl;
-using ::testing::Eq;
+using testing::Eq;
 
 constexpr absl::string_view expected_metadata = R"pb(
 fields {
@@ -180,8 +183,7 @@ TEST_F(FilterTestExtractOk, MissingFieldProducesListValue) {
         const auto it = new_dynamic_metadata.fields().find("key.display_name");
         EXPECT_TRUE(it != new_dynamic_metadata.fields().end());
         const auto& value = it->second;
-        EXPECT_EQ(value.kind_case(), Protobuf::Value::KindCase::kListValue);
-        EXPECT_EQ(value.list_value().values_size(), 0);
+        EXPECT_THAT(value, IsStructValueList(ElementsAre()));
       });
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
 

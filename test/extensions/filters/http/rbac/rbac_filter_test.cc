@@ -20,14 +20,16 @@
 #include "gmock/gmock.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
 using testing::_;
+using testing::Contains;
 using testing::Invoke;
+using testing::IsSupersetOf;
+using testing::Key;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
-using testing::Contains;
-using testing::Key;
+#include "test/test_common/struct_matchers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -373,12 +375,11 @@ TEST_F(RoleBasedAccessControlFilterTest, AllowedDynamicMetadataStats) {
 
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
   ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("rules_stat_prefix_enforced_engine_result", "allowed")));
   ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
-  EXPECT_EQ(
-      "foo",
-      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("rules_stat_prefix_enforced_effective_policy_id", "foo")));
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, DeniedDynamicMetadataStats) {
@@ -393,12 +394,11 @@ TEST_F(RoleBasedAccessControlFilterTest, DeniedDynamicMetadataStats) {
   ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
   ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
-  EXPECT_EQ("denied",
-            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("rules_stat_prefix_enforced_engine_result", "denied")));
   ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
-  EXPECT_EQ(
-      "foo",
-      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("rules_stat_prefix_enforced_effective_policy_id", "foo")));
 }
 
 // Make sure dynamic metadata is written in the case that there's a shadow engine but no enforced
@@ -429,12 +429,12 @@ TEST_F(RoleBasedAccessControlFilterTest, ShadowOnlyDynamicMetadataStats) {
   ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
   ASSERT_TRUE(filter_meta.fields().contains("shadow_rules_prefix_shadow_engine_result"));
-  EXPECT_EQ("denied",
-            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("shadow_rules_prefix_shadow_engine_result", "denied")));
   ASSERT_TRUE(filter_meta.fields().contains("shadow_rules_prefix_shadow_effective_policy_id"));
-  EXPECT_EQ(
-      "shadow_rule",
-      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
+  EXPECT_THAT(
+      filter_meta.fields(),
+      Contains(IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "shadow_rule")));
 }
 
 // Make sure dynamic metadata is written in the case that there's an enforced engine but no shadow
@@ -467,12 +467,12 @@ TEST_F(RoleBasedAccessControlFilterTest, EnforcedOnlyDynamicMetadataStats) {
   ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
   ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
-  EXPECT_EQ("denied",
-            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("rules_stat_prefix_enforced_engine_result", "denied")));
   ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
-  EXPECT_EQ(
-      "enforced_policy",
-      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("rules_stat_prefix_enforced_effective_policy_id",
+                                      "enforced_policy")));
 }
 
 // Dynamic metadata metrics should only be written if there's a shadow engine and / or there's an
@@ -558,11 +558,10 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
-  EXPECT_EQ(
-      "bar",
-      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              IsSupersetOf(StructMatchers(
+                  IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"),
+                  IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"))));
   EXPECT_EQ("rbac_access_denied_matched_policy[none]", callbacks_.details());
   checkAccessLogMetadata(LogResult::Undecided);
 }
@@ -637,9 +636,9 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverrideDynamicMetadataStats)
   // We expect the route-specific rules and prefix to be used for the enforced
   // engine and the shadow rules and prefix to be used for the shadow engine.
   ASSERT_TRUE(filter_meta.fields().contains("override_rules_stat_prefix_enforced_engine_result"));
-  EXPECT_EQ(
-      "allowed",
-      filter_meta.fields().at("override_rules_stat_prefix_enforced_engine_result").string_value());
+  EXPECT_THAT(
+      filter_meta.fields(),
+      Contains(IsStructString("override_rules_stat_prefix_enforced_engine_result", "allowed")));
   ASSERT_TRUE(
       filter_meta.fields().contains("override_rules_stat_prefix_enforced_effective_policy_id"));
   EXPECT_EQ("foobar", filter_meta.fields()
@@ -702,20 +701,18 @@ TEST_F(RoleBasedAccessControlFilterTest, NoRouteLocalOverrideDynamicMetadataStat
 
   // We expect the base rules and prefix to be used since no route-specific stat was set up.
   ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("rules_stat_prefix_enforced_engine_result", "allowed")));
   ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
-  EXPECT_EQ(
-      "foobar",
-      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("rules_stat_prefix_enforced_effective_policy_id", "foobar")));
 
   ASSERT_TRUE(filter_meta.fields().contains("shadow_rules_prefix_shadow_engine_result"));
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed")));
   ASSERT_TRUE(filter_meta.fields().contains("shadow_rules_prefix_shadow_effective_policy_id"));
-  EXPECT_EQ(
-      "foobar",
-      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "foobar")));
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverrideWithPerRuleStats) {
@@ -972,11 +969,10 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherDenied) {
   EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
-  EXPECT_EQ(
-      "bar",
-      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              IsSupersetOf(StructMatchers(
+                  IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"),
+                  IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"))));
   EXPECT_EQ("rbac_access_denied_matched_policy[none]", callbacks_.details());
   checkAccessLogMetadata(LogResult::Undecided);
 }
@@ -1612,12 +1608,12 @@ TEST_F(RoleBasedAccessControlFilterTest, EnforcedEngineOnlyAllowsAccessMetadataT
   // Verify the metadata contents
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
   ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("rules_stat_prefix_enforced_engine_result", "allowed")));
   ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
-  EXPECT_EQ(
-      "enforced_only_policy",
-      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+  EXPECT_THAT(filter_meta.fields(),
+              Contains(IsStructString("rules_stat_prefix_enforced_effective_policy_id",
+                                      "enforced_only_policy")));
 }
 
 } // namespace

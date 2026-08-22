@@ -10,13 +10,13 @@
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Key;
-using testing::UnorderedElementsAre;
+using testing::Contains;
 
 namespace Envoy {
 namespace Extensions {
@@ -85,11 +85,13 @@ TEST_F(MappedAttributeBuilderTest, TwoKeysWithSameValue) {
   EXPECT_TRUE(builder_->modifyRequest(params, req));
 
   const auto& attributes = req.attributes().at("envoy.filters.http.ext_proc");
-  EXPECT_THAT(attributes.fields(), UnorderedElementsAre(Key("remapped.path"), Key("remapped.uri"),
-                                                        Key("remapped.address")));
-  EXPECT_EQ("/foo", attributes.fields().at("remapped.path").string_value());
-  EXPECT_EQ("/foo", attributes.fields().at("remapped.uri").string_value());
-  EXPECT_EQ("1.2.3.4:0", attributes.fields().at("remapped.address").string_value());
+  EXPECT_EQ(3, attributes.fields_size());
+  EXPECT_TRUE(attributes.fields().contains("remapped.path"));
+  EXPECT_THAT(attributes.fields(), Contains(IsStructString("remapped.path", "/foo")));
+  EXPECT_TRUE(attributes.fields().contains("remapped.uri"));
+  EXPECT_THAT(attributes.fields(), Contains(IsStructString("remapped.uri", "/foo")));
+  EXPECT_TRUE(attributes.fields().contains("remapped.address"));
+  EXPECT_THAT(attributes.fields(), Contains(IsStructString("remapped.address", "1.2.3.4:0")));
 }
 
 TEST_F(MappedAttributeBuilderTest, CelFilterState) {
@@ -113,8 +115,9 @@ TEST_F(MappedAttributeBuilderTest, CelFilterState) {
   EXPECT_TRUE(builder_->modifyRequest(params, req));
 
   const auto& attributes = req.attributes().at("envoy.filters.http.ext_proc");
-  EXPECT_THAT(attributes.fields(), UnorderedElementsAre(Key("filter_state_key")));
-  EXPECT_EQ("fs_value", attributes.fields().at("filter_state_key").string_value());
+  EXPECT_EQ(1, attributes.fields_size());
+  EXPECT_TRUE(attributes.fields().contains("filter_state_key"));
+  EXPECT_THAT(attributes.fields(), Contains(IsStructString("filter_state_key", "fs_value")));
 }
 
 TEST_F(MappedAttributeBuilderTest, CelDynamicMetadata) {
@@ -141,8 +144,9 @@ TEST_F(MappedAttributeBuilderTest, CelDynamicMetadata) {
   EXPECT_TRUE(builder_->modifyRequest(params, req));
 
   const auto& attributes = req.attributes().at("envoy.filters.http.ext_proc");
-  EXPECT_THAT(attributes.fields(), UnorderedElementsAre(Key("metadata_key")));
-  EXPECT_EQ("metadata_value", attributes.fields().at("metadata_key").string_value());
+  EXPECT_EQ(1, attributes.fields_size());
+  EXPECT_TRUE(attributes.fields().contains("metadata_key"));
+  EXPECT_THAT(attributes.fields(), Contains(IsStructString("metadata_key", "metadata_value")));
 }
 
 TEST_F(MappedAttributeBuilderTest, ModifiedOnceForInbound) {
@@ -191,8 +195,9 @@ TEST_F(MappedAttributeBuilderTest, ModifiedOnceForOutbound) {
   envoy::service::ext_proc::v3::ProcessingRequest req;
   EXPECT_TRUE(builder_->modifyRequest(params, req));
   const auto& attributes = req.attributes().at("envoy.filters.http.ext_proc");
-  EXPECT_THAT(attributes.fields(), UnorderedElementsAre(Key("key")));
-  EXPECT_EQ(200, attributes.fields().at("key").number_value());
+  EXPECT_EQ(1, attributes.fields_size());
+  EXPECT_TRUE(attributes.fields().contains("key"));
+  EXPECT_THAT(attributes.fields(), Contains(IsStructNumber("key", 200)));
 
   // Second call should do nothing and return false
   envoy::service::ext_proc::v3::ProcessingRequest req2;

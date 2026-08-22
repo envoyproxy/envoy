@@ -40,11 +40,15 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::ElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -108,7 +112,7 @@ using ::Envoy::Http::ExternalProcessing::SaveProcessingResponseFactory;
 using ::Envoy::Http::ExternalProcessing::SaveProcessingResponseFilterState;
 
 using ::testing::AnyNumber;
-using ::testing::Eq;
+using testing::Eq;
 using ::testing::Invoke;
 using ::testing::Return;
 using ::testing::ReturnRef;
@@ -3930,10 +3934,10 @@ TEST_F(OverrideTest, ClusterMetadataNamespacesOverride) {
 
   ASSERT_TRUE(merged_route.typedClusterMetadataForwardingNamespaces().has_value());
   EXPECT_THAT(*merged_route.typedClusterMetadataForwardingNamespaces(),
-              testing::ElementsAre("more_specific_typed_ns_2"));
+              ElementsAre("more_specific_typed_ns_2"));
   ASSERT_TRUE(merged_route.untypedClusterMetadataForwardingNamespaces().has_value());
   EXPECT_THAT(*merged_route.untypedClusterMetadataForwardingNamespaces(),
-              testing::ElementsAre("more_specific_untyped_ns_2"));
+              ElementsAre("more_specific_untyped_ns_2"));
 }
 
 // Verify that attempts to change headers that are not allowed to be changed
@@ -4438,7 +4442,7 @@ TEST_F(HttpFilterTest, EmitTypedDynamicMetadata) {
 
   Protobuf::Struct unpacked_val;
   ASSERT_TRUE(typed_metadata.at("envoy.filters.http.ext_proc").UnpackTo(&unpacked_val));
-  EXPECT_EQ("bar", unpacked_val.fields().at("foo").string_value());
+  EXPECT_THAT(unpacked_val.fields(), Contains(IsStructString("foo", "bar")));
 
   filter_->onDestroy();
 }

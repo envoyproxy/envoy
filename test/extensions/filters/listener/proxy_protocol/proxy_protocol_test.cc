@@ -31,6 +31,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -45,14 +46,15 @@ using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_SIGNATURE_LEN;
 using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
+using testing::Contains;
 using testing::ElementsAre;
+using testing::HasSubstr;
 using testing::Invoke;
+using testing::IsSupersetOf;
+using testing::Key;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-
-using testing::Contains;
-using testing::Key;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
@@ -1701,11 +1703,12 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEncodeAsBase64) {
   EXPECT_EQ(3, fields.size());
 
   // The raw TLV values (including the non utf8 characters) are encoded as base64.
-  EXPECT_EQ("Zv5vLmNvwQ==", fields.at("PP2 type authority").string_value());
-  EXPECT_EQ("AXZwYy0wwDV0ZXN0MmZhNmM2M2j5Nw==", fields.at("PP2 vpc id").string_value());
+  EXPECT_THAT(fields, IsSupersetOf(StructMatchers(
+                          IsStructString("PP2 type authority", "Zv5vLmNvwQ=="),
+                          IsStructString("PP2 vpc id", "AXZwYy0wwDV0ZXN0MmZhNmM2M2j5Nw=="))));
   // The default encoding sanitizes the value to a valid UTF-8 string: the non utf8 byte
   // 0xff is replaced with the `!` character.
-  EXPECT_EQ("!", fields.at("PP2 tlv1").string_value());
+  EXPECT_THAT(fields, Contains(IsStructString("PP2 tlv1", "!")));
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
@@ -2347,14 +2350,14 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateSerializeMethods) {
   ASSERT_NE(nullptr, proto);
   const auto* struct_proto = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(proto.get());
   ASSERT_NE(nullptr, struct_proto);
-  EXPECT_THAT(struct_proto->fields(), UnorderedElementsAre(Key("PP2 type authority")));
-  EXPECT_EQ("foo.com", struct_proto->fields().at("PP2 type authority").string_value());
+  EXPECT_THAT(struct_proto->fields(),
+              UnorderedElementsAre(IsStructString("PP2 type authority", "foo.com")));
 
   // Test serializeAsString
   auto json_str = tlv_obj->serializeAsString();
   ASSERT_TRUE(json_str.has_value());
-  EXPECT_THAT(json_str.value(), testing::HasSubstr("PP2 type authority"));
-  EXPECT_THAT(json_str.value(), testing::HasSubstr("foo.com"));
+  EXPECT_THAT(json_str.value(), HasSubstr("PP2 type authority"));
+  EXPECT_THAT(json_str.value(), HasSubstr("foo.com"));
 
   // Test getField with non-existent field
   auto non_existent = tlv_obj->getField("non_existent");

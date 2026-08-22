@@ -16,10 +16,15 @@
 
 #include "xds/type/matcher/v3/matcher.pb.h"
 
+using testing::Contains;
+using testing::IsSupersetOf;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
+
+#include "test/test_common/struct_matchers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -360,11 +365,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
 
   auto filter_meta =
       stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
-  EXPECT_EQ(
-      "bar",
-      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
+  EXPECT_THAT(
+      filter_meta.fields(),
+      UnorderedElementsAre(IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"),
+                           IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed")));
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, DelayDenied) {
@@ -495,11 +499,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherDenied) {
 
   auto filter_meta =
       stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
-  EXPECT_EQ(
-      "bar",
-      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
+  EXPECT_THAT(
+      filter_meta.fields(),
+      UnorderedElementsAre(IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"),
+                           IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed")));
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherNetworkNamespaceAllowed) {
