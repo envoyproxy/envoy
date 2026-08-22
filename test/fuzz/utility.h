@@ -136,10 +136,11 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
   // TODO(asraa): Speed up this function, which is slowed because of the use of mocks.
   testing::DefaultValue<const std::string&>::Set(EMPTY_STRING);
   auto test_stream_info = std::make_unique<TestStreamInfo>(time_source);
-  test_stream_info->metadata_ = stream_info.dynamic_metadata();
+  test_stream_info->metadata_ =
+      ArenaWrappedProto<envoy::config::core::v3::Metadata>(stream_info.dynamic_metadata());
   // Truncate recursive filter metadata fields.
   // TODO(asraa): Resolve MessageToJsonString failure on recursive filter metadata.
-  for (auto& pair : *test_stream_info->metadata_.mutable_filter_metadata()) {
+  for (auto& pair : *test_stream_info->metadata_->mutable_filter_metadata()) {
     std::string value;
     std::ignore = pair.second.SerializeToString(&value);
     std::ignore = pair.second.ParseFromString(value.substr(0, 128));

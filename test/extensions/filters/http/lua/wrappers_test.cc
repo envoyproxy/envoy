@@ -510,7 +510,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
 
   StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
-  (*stream_info.metadata_.mutable_filter_metadata())["envoy.pp"] = metadata;
+  (*stream_info.dynamicMetadata().mutable_filter_metadata())["envoy.pp"] = metadata;
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
 
@@ -800,7 +800,8 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataBasic) {
   any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
   std::ignore = any_metadata.PackFrom(test_struct);
 
-  (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.test.metadata"] = any_metadata;
+  (*stream_info.dynamicMetadata().mutable_typed_filter_metadata())["envoy.test.metadata"] =
+      any_metadata;
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -879,7 +880,8 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataComplexStructure) {
   any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
   std::ignore = any_metadata.PackFrom(complex_struct);
 
-  (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.complex.metadata"] = any_metadata;
+  (*stream_info.dynamicMetadata().mutable_typed_filter_metadata())["envoy.complex.metadata"] =
+      any_metadata;
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -916,7 +918,8 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataInvalidTypeUrl) {
   any_metadata.set_type_url("type.googleapis.com/invalid.unknown.Type");
   any_metadata.set_value("invalid_data");
 
-  (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.invalid.metadata"] = any_metadata;
+  (*stream_info.dynamicMetadata().mutable_typed_filter_metadata())["envoy.invalid.metadata"] =
+      any_metadata;
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
@@ -949,7 +952,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataUnpackFailure) {
   any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any_metadata.set_value("corrupted_protobuf_data_that_cannot_be_unpacked");
 
-  (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.corrupted.metadata"] =
+  (*stream_info.dynamicMetadata().mutable_typed_filter_metadata())["envoy.corrupted.metadata"] =
       any_metadata;
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
@@ -997,7 +1000,7 @@ TEST_F(LuaStreamInfoWrapperTest, IterateDynamicTypedMetadata) {
   Protobuf::Any any1;
   any1.set_type_url("type.googleapis.com/google.protobuf.Struct");
   std::ignore = any1.PackFrom(struct1);
-  (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.metadata.one"] = any1;
+  (*stream_info.dynamicMetadata().mutable_typed_filter_metadata())["envoy.metadata.one"] = any1;
 
   // Create second metadata entry
   Protobuf::Struct struct2;
@@ -1005,7 +1008,7 @@ TEST_F(LuaStreamInfoWrapperTest, IterateDynamicTypedMetadata) {
   Protobuf::Any any2;
   any2.set_type_url("type.googleapis.com/google.protobuf.Struct");
   std::ignore = any2.PackFrom(struct2);
-  (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.metadata.two"] = any2;
+  (*stream_info.dynamicMetadata().mutable_typed_filter_metadata())["envoy.metadata.two"] = any2;
 
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
