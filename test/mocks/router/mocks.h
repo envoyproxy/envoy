@@ -712,7 +712,8 @@ public:
   MockScopeKeyBuilder();
   ~MockScopeKeyBuilder() override;
 
-  MOCK_METHOD(ScopeKeyPtr, computeScopeKey, (const Http::HeaderMap&), (const));
+  MOCK_METHOD(ScopeKeyPtr, computeScopeKey,
+              (const Http::HeaderMap&, OptRef<const StreamInfo::StreamInfo>), (const));
 };
 
 class MockGenericConnPool : public GenericConnPool {

@@ -1706,8 +1706,8 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
-  auto scope_key =
-      connection_manager_.config_->scopeKeyBuilder()->computeScopeKey(*request_headers_);
+  auto scope_key = connection_manager_.config_->scopeKeyBuilder()->computeScopeKey(
+      *request_headers_, filter_manager_.streamInfo());
   snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(scope_key);
   if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);

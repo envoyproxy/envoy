@@ -221,8 +221,11 @@ MockScopedRouteConfigProvider::MockScopedRouteConfigProvider()
 MockScopedRouteConfigProvider::~MockScopedRouteConfigProvider() = default;
 
 MockScopeKeyBuilder::MockScopeKeyBuilder() {
-  ON_CALL(*this, computeScopeKey(_))
-      .WillByDefault(Invoke([](const Http::HeaderMap&) -> ScopeKeyPtr { return nullptr; }));
+  ON_CALL(*this, computeScopeKey(_, _))
+      .WillByDefault(
+          Invoke([](const Http::HeaderMap&, OptRef<const StreamInfo::StreamInfo>) -> ScopeKeyPtr {
+            return nullptr;
+          }));
 }
 MockScopeKeyBuilder::~MockScopeKeyBuilder() = default;
 

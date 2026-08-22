@@ -1333,11 +1333,30 @@ message ScopedRoutes {
         }
       }
 
+      // Specifies how a value should be extracted from dynamic filter state.
+      //
+      // The stored object must be a string accessor. Objects at any life span reachable from the
+      // stream are visible, including ``Connection`` life span objects written by a network filter.
+      message FilterStateExtractor {
+        // The filter state object key to read. If no object is stored under this key, or the
+        // stored object is not a string accessor, no fragment is produced and the resulting scope
+        // key will not match any scope.
+        string key = 1 [(validate.rules).string = {min_len: 1}];
+      }
+
       oneof type {
         option (validate.required) = true;
 
         // Specifies how a header field's value should be extracted.
         HeaderValueExtractor header_value_extractor = 1;
+
+        // Specifies how a filter state object's value should be extracted.
+        //
+        // .. note::
+        //
+        //   Filter state is not available on the on-demand scoped route discovery path, so a scope
+        //   key using this fragment will not trigger an on-demand SRDS update.
+        FilterStateExtractor filter_state = 2;
       }
     }
 
