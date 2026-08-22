@@ -40,6 +40,7 @@
 /api/bazel-*
 /bazel-*
 /ci/bazel-*
+/docs/bazel-*
 /mobile/bazel-*
 bazel.output.txt
 clang.bazelrc
