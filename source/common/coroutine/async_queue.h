@@ -388,26 +388,20 @@ private:
     auto it = push_waiters_.insert(
         push_waiters_.end(), PushWaiter{std::move(item), size, std::move(callback), std::nullopt});
     it->capacity_waiter_it =
-        capacity_->requestCapacity(size, [this, it]() { onCapacityGranted(it); });
+        capacity_->requestCapacity(size, [this,  alive = alive_, cap = capacity_, it]() {
+          if (!*alive) {
+            IS_ENVOY_BUG("capacity granted to a destroyed AsyncQueue");
+            cap->release(size);
+            return;
+          }
+          onCapacityGranted(it); });
     return it;
   }
 
   void onCapacityGranted(PushWaiterIt it) {
-    auto alive = alive_;
-    if (!*alive) {
-      capacity_->release(it->size);
-      return;
-    }
-
     it->capacity_waiter_it.reset();
 
-    if (closed_) {
-      capacity_->release(it->size);
-      PushWaiterCallback cb = std::move(it->callback);
-      push_waiters_.erase(it);
-      cb(absl::FailedPreconditionError("queue closed"));
-      return;
-    }
+    ENVOY_BUG(!closed_, "capacity granted to a closed AsyncQueue");
 
     uint64_t size = it->size;
     current_size_ += size;
