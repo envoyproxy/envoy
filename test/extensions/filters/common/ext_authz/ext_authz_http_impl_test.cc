@@ -1182,6 +1182,19 @@ TEST_F(ExtAuthzHttpClientTest, PathTransformationsWithEncodeRawHeaders) {
   }
 }
 
+// The HTTP client forwards the path from the check request verbatim; query string stripping
+// (controlled by ExtAuthz.strip_query_params) happens when the check request is built, so the
+// client applies the same behavior for HTTP and gRPC services.
+TEST_F(ExtAuthzHttpClientTest, ForwardsPathVerbatim) {
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/hello?name=value&foo=bar"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/hello?name=value&foo=bar");
+
+  // A pre-stripped path in the check request (built with strip_query_params) is forwarded as-is.
+  message_ptr = sendRequest({{":path", "/hello"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/hello");
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace Common
