@@ -3341,6 +3341,33 @@ TEST(LuaHttpFilterConfigTest, PackagePathsAbsentIsAConfigError) {
                                  testing::HasSubstr("module 'lua_filter_test_module' not found"))));
 }
 
+// A script from the source_codes map is a separate VM from default_source_code's, and gets the
+// filter-level patterns as well.
+TEST_F(LuaHttpFilterTest, PackagePathsForNamedSourceCode) {
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(R"EOF(
+    function envoy_on_request(request_handle)
+    end
+  )EOF");
+  envoy::config::core::v3::DataSource named_source;
+  named_source.set_inline_string(REQUIRE_MODULE_SCRIPT);
+  proto_config.mutable_source_codes()->insert({"named.lua", named_source});
+  proto_config.add_package_paths(writeFilterTestModule());
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  per_route_proto_config.set_name("named.lua");
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_config_.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ("from_the_module", request_headers.get_("module_value"));
+}
+
 // A route's inline source code gets its own VM, so it needs its own package path; the filter-level
 // one does not reach it.
 TEST_F(LuaHttpFilterTest, PackagePathsFromPerRouteConfig) {

@@ -150,8 +150,8 @@ message LuaPerRoute {
   // This route's inline source code gets its own VM, which is why it needs its own patterns: the
   // filter-level ones are not visible to it. Setting these has no effect when this route selects a
   // script by :ref:`name
-  // <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`, since that VM belongs
-  // to the filter and carries the filter-level patterns.
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`, or configures no script
+  // at all, since that VM belongs to the filter and carries the filter-level patterns.
   repeated string package_paths = 5 [(validate.rules).repeated = {items {string {min_len: 1}}}];
 
   // As :ref:`package_paths

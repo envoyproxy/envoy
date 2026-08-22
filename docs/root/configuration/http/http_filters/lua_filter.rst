@@ -156,13 +156,19 @@ The patterns are in place before any configured code runs, including the run tha
 configuration at load time. A ``require`` at the top level of a script whose module cannot be found
 is therefore a configuration error rather than a per-request failure.
 
+Passing that check is not the end of it: every worker builds its own Lua VM and runs the script
+again to do so, loading the modules independently, and those VMs are created after the
+configuration has been accepted. The files a script requires must therefore stay readable for as
+long as the process runs, not only while the configuration is being loaded.
+
 A route which supplies its own :ref:`source_code
 <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` runs in its own Lua
 VM, which the filter-level patterns do not reach; configure :ref:`package_paths
 <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.package_paths>` on the route as
 well. A route which selects a script by :ref:`name
-<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>` runs in the filter's VM and
-already has the filter-level patterns.
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`, or which configures no
+script at all, runs in a VM belonging to the filter and already has the filter-level patterns; its
+own patterns are unused.
 
 Upstream Filter
 ---------------
