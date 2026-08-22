@@ -52,7 +52,8 @@ public:
   OverloadActionState getState() const;
 
 private:
-  OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
+  OverloadAction(absl::string_view name,
+                 const Protobuf::RepeatedPtrField<envoy::config::overload::v3::Trigger>& triggers,
                  Stats::Scope& stats_scope, absl::Status& creation_status);
 
   using TriggerPtr = std::unique_ptr<Trigger>;
@@ -243,6 +244,22 @@ private:
   absl::flat_hash_map<std::string, std::unique_ptr<LoadShedPointImpl>> loadshed_points_;
 
   Event::ScaledTimerTypeMapConstSharedPtr timer_minimums_;
+
+  absl::flat_hash_map<Event::ScaledTimerType, std::unique_ptr<OverloadAction>> timer_triggers_;
+  std::unordered_multimap<std::string, Event::ScaledTimerType> resource_to_timer_triggers_;
+
+  using TimerTriggerCb = std::function<void(UnitFloat)>;
+  struct TimerTriggerCallback {
+    TimerTriggerCallback(Event::Dispatcher& dispatcher, TimerTriggerCb callback)
+        : dispatcher_(dispatcher), callback_(std::move(callback)) {}
+    Event::Dispatcher& dispatcher_;
+    TimerTriggerCb callback_;
+  };
+  using TimerTypeToCallbackMap =
+      std::unordered_multimap<Event::ScaledTimerType, TimerTriggerCallback,
+                              absl::Hash<Event::ScaledTimerType>>;
+  TimerTypeToCallbackMap timer_type_to_callbacks_;
+  absl::flat_hash_map<TimerTriggerCallback*, UnitFloat> timer_trigger_callbacks_to_flush_;
 
   absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>
       state_updates_to_flush_;

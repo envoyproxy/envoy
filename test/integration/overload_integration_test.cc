@@ -934,6 +934,151 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   EXPECT_TRUE(connect_callbacks.closed());
 }
 
+class PerTimerTriggersIntegrationTest : public OverloadIntegrationTest {
+protected:
+  PerTimerTriggersIntegrationTest() {
+    second_factory_ = std::make_unique<FakeResourceMonitorFactory2>();
+    inject_second_factory_ =
+        std::make_unique<Registry::InjectFactory<Server::Configuration::ResourceMonitorFactory>>(
+            *second_factory_);
+  }
+
+  void updateSecondResource(double pressure) {
+    auto* monitor = second_factory_->monitor();
+    ASSERT(monitor != nullptr);
+    monitor->setResourcePressure(pressure);
+  }
+
+  void initializeOverloadManager() {
+    overload_manager_config_ = TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(
+        R"EOF(
+        refresh_interval:
+          seconds: 0
+          nanos: 1000000
+        resource_monitors:
+          - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+            typed_config:
+              "@type": type.googleapis.com/test.common.config.DummyConfig
+          - name: "envoy.resource_monitors.testonly.fake_resource_monitor2"
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Timestamp
+        actions:
+          - name: "envoy.overload_actions.reduce_timeouts"
+            triggers:
+              - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+                scaled:
+                  scaling_threshold: 0.5
+                  saturation_threshold: 0.9
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+              timer_scale_factors:
+                - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+                  min_timeout: 5s
+                  triggers:
+                    - name: "envoy.resource_monitors.testonly.fake_resource_monitor2"
+                      scaled:
+                        scaling_threshold: 0.5
+                        saturation_threshold: 0.9
+                - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+                  min_timeout: 5s
+      )EOF");
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    config_helper_.addConfigModifier(
+        [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                cm) -> void {
+          cm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->MergeFrom(
+              ProtobufUtil::TimeUtil::SecondsToDuration(20));
+        });
+    initialize();
+    updateResource(0);
+    updateSecondResource(0);
+  }
+
+private:
+  class FakeResourceMonitorFactory2;
+  class FakeResourceMonitor2 : public Server::ResourceMonitor {
+  public:
+    FakeResourceMonitor2(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+    void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override {
+      Server::ResourceUsage usage;
+      usage.resource_pressure_ = pressure_;
+      callbacks.onSuccess(usage);
+    }
+    void setResourcePressure(double pressure) {
+      dispatcher_.post([this, pressure] { pressure_ = pressure; });
+    }
+
+  private:
+    Event::Dispatcher& dispatcher_;
+    double pressure_{0.0};
+  };
+
+  class FakeResourceMonitorFactory2 : public Server::Configuration::ResourceMonitorFactory {
+  public:
+    Server::ResourceMonitorPtr
+    createResourceMonitor(const Protobuf::Message&,
+                          Server::Configuration::ResourceMonitorFactoryContext& context) override {
+      auto monitor = std::make_unique<FakeResourceMonitor2>(context.mainThreadDispatcher());
+      monitor_ = monitor.get();
+      return monitor;
+    }
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return std::make_unique<Protobuf::Timestamp>();
+    }
+    std::string name() const override {
+      return "envoy.resource_monitors.testonly.fake_resource_monitor2";
+    }
+    FakeResourceMonitor2* monitor() const { return monitor_; }
+
+  private:
+    FakeResourceMonitor2* monitor_{nullptr};
+  };
+
+  std::unique_ptr<FakeResourceMonitorFactory2> second_factory_;
+  std::unique_ptr<Registry::InjectFactory<Server::Configuration::ResourceMonitorFactory>>
+      inject_second_factory_;
+};
+
+INSTANTIATE_TEST_SUITE_P(Protocols, PerTimerTriggersIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// Verifies that per-timer triggers drive each timer independently of the action-level triggers.
+// Config: HTTP_DOWNSTREAM_CONNECTION_IDLE has per-timer triggers pointing at
+// fake_resource_monitor2;
+//         HTTP_DOWNSTREAM_CONNECTION_MAX uses the action-level fake_resource_monitor.
+TEST_P(PerTimerTriggersIntegrationTest, PerTimerTriggersScaleIndependently) {
+  initializeOverloadManager();
+
+  // Saturate the action-level resource. This should drive the action-level scale_percent gauge
+  // (which covers HTTP_DOWNSTREAM_CONNECTION_MAX) to 100, but leave the idle timer's per-timer
+  // gauge at 0 because fake_resource_monitor2 is still at 0.
+  updateResource(0.9);
+  test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
+                             Eq(100));
+  test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_"
+                             "CONNECTION_IDLE.scale_percent",
+                             Eq(0));
+
+  // Now saturate the per-timer resource. The idle timer's gauge should reach 100 while the
+  // action-level gauge stays saturated — both are driven independently.
+  updateSecondResource(0.9);
+  test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_"
+                             "CONNECTION_IDLE.scale_percent",
+                             Eq(100));
+
+  // Drop the action-level resource back to 0. The action-level gauge should clear, but the idle
+  // timer's per-timer gauge must remain at 100 because fake_resource_monitor2 is still saturated.
+  updateResource(0);
+  test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
+                             Eq(0));
+  test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_"
+                             "CONNECTION_IDLE.scale_percent",
+                             Eq(100));
+}
+
 class LoadShedPointIntegrationTest : public BaseOverloadIntegrationTest,
                                      public HttpProtocolIntegrationTest {
 protected:
