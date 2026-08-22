@@ -1700,6 +1700,65 @@ TEST_F(AsyncQueueTest, ReentrantPushDuringDestructionCancelRequest) {
   EXPECT_EQ(*item, 10);
 }
 
+TEST_F(AsyncQueueTest, CancellationDuringCloseStep1DoesNotUAF) {
+  auto shared_cap = std::make_shared<SharedCapacity>(2);
+  AsyncQueue<TestByteItem, TestByteSizeFunc> q1(shared_cap);
+  AsyncQueue<TestByteItem, TestByteSizeFunc> q2(shared_cap);
+
+  // Fill capacity with 2 items, then pop 1 -> 1 unit occupied in q1, 1 unit free.
+  EXPECT_TRUE(q1.tryPush(TestByteItem{std::string(1, 'a')}));
+  EXPECT_TRUE(q1.tryPush(TestByteItem{std::string(1, 'b')}));
+  EXPECT_TRUE(q1.tryPop().has_value());
+  EXPECT_EQ(shared_cap->currentSize(), 1);
+
+  // q1 has two pending push waiters:
+  // w1 needs 2 units (suspends because only 1 unit free).
+  // w2 needs 1 unit (suspends because blocked behind w1).
+  absl::Status w1_status;
+  auto w1_task = [&q1, &w1_status]() -> Task<absl::Status> {
+    w1_status = co_await q1.push(TestByteItem{std::string(2, 'c')});
+    co_return w1_status;
+  };
+  handles_.push_back(launch(w1_task(), executor_, [](absl::Status s) {
+    EXPECT_THAT(s, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  }));
+
+  std::optional<DetachedHandle> h2;
+  absl::Status w2_status;
+  auto w2_task = [&q1, &w2_status]() -> Task<absl::Status> {
+    w2_status = co_await q1.push(TestByteItem{std::string(1, 'd')});
+    co_return w2_status;
+  };
+  h2.emplace(launch(w2_task(), executor_, [](absl::Status s) {
+    EXPECT_TRUE(absl::IsCancelled(s) || absl::IsFailedPrecondition(s));
+  }));
+
+  // q2 has a pending push waiter of 1 unit (fits within 1 unit free, but blocked behind w1).
+  // When q2 gets capacity during q1.close() Step 1, it cancels w2 on q1!
+  auto q2_push_task = [&q2, &h2]() -> Task<absl::Status> {
+    CO_RETURN_IF_ERROR(co_await q2.push(TestByteItem{std::string(1, 'e')}));
+    // Cancel w2 on q1 during q1's close() Step 1
+    if (h2.has_value()) {
+      h2->cancel();
+    }
+    co_return absl::OkStatus();
+  };
+
+  launchTaskOk(q2_push_task());
+  drain();
+
+  // Close q1: during Step 1, w1's cancelRequest unblocks q2, and q2 cancels w2!
+  q1.close();
+  drain();
+
+  EXPECT_THAT(w1_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  EXPECT_TRUE(absl::IsCancelled(w2_status));
+  EXPECT_EQ(q2.itemCount(), 1);
+  auto item = q2.tryPop();
+  ASSERT_TRUE(item.has_value());
+  EXPECT_EQ(item->data, "e");
+}
+
 } // namespace
 } // namespace Coroutine
 } // namespace Envoy

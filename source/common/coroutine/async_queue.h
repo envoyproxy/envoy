@@ -344,9 +344,11 @@ private:
     while (!pop_waiters_.empty()) {
       PopWaiterCallback waiter = std::move(pop_waiters_.front().callback);
       pop_waiters_.pop_front();
-      waiter(std::nullopt);
-      if (!release_queued_capacity && !*alive) {
-        return;
+      if (waiter) {
+        waiter(std::nullopt);
+        if (!release_queued_capacity && !*alive) {
+          return;
+        }
       }
     }
 
@@ -354,10 +356,12 @@ private:
     while (!push_waiters_.empty()) {
       PushWaiter waiter = std::move(push_waiters_.front());
       push_waiters_.pop_front();
-      PushWaiterCallback cb = std::move(waiter.callback);
-      cb(absl::FailedPreconditionError("queue closed"));
-      if (!release_queued_capacity && !*alive) {
-        return;
+      if (waiter.callback) {
+        PushWaiterCallback cb = std::move(waiter.callback);
+        cb(absl::FailedPreconditionError("queue closed"));
+        if (!release_queued_capacity && !*alive) {
+          return;
+        }
       }
     }
   }
@@ -392,13 +396,14 @@ private:
   }
 
   void removePushWaiter(PushWaiterIt it) {
-    if (closed_) {
-      return;
-    }
+    it->callback = nullptr;
     auto cap_it = it->capacity_waiter_it;
-    push_waiters_.erase(it);
+    it->capacity_waiter_it.reset();
     if (cap_it.has_value()) {
       capacity_->cancelRequest(*cap_it);
+    }
+    if (!closed_) {
+      push_waiters_.erase(it);
     }
   }
 
@@ -407,10 +412,10 @@ private:
   }
 
   void removePopWaiter(PopWaiterIt it) {
-    if (closed_) {
-      return;
+    it->callback = nullptr;
+    if (!closed_) {
+      pop_waiters_.erase(it);
     }
-    pop_waiters_.erase(it);
   }
 
   SharedCapacityPtr capacity_;
