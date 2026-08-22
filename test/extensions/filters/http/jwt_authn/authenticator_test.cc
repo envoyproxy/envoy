@@ -46,7 +46,7 @@ public:
   void createAuthenticator(
       JwtVerify::CheckAudience* check_audience = nullptr,
       const std::optional<std::string>& provider = std::make_optional<std::string>(ProviderName),
-      bool allow_failed = false, bool allow_missing = false) {
+      bool allow_failed = false, bool allow_missing = false, bool extract_only = false) {
     absl::Status creation_status = absl::OkStatus();
     filter_config_ =
         std::make_shared<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_, creation_status);
@@ -59,7 +59,7 @@ public:
         [this](Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr, const RemoteJwks&) {
           return std::move(fetcher_);
         },
-        filter_config_->timeSource());
+        filter_config_->timeSource(), extract_only);
     jwks_ = Jwks::createFrom(PublicKey, Jwks::JWKS);
     EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
   }
@@ -159,6 +159,23 @@ TEST_F(AuthenticatorTest, TestLifetimeConstraint) {
         {"Authorization", "Bearer " + std::string(NonExpiringToken)}};
     expectVerifyStatus(Status::JwtVerificationFail, non_expiring_headers);
   }
+}
+
+// In extract-only mode, an expired JWT's claims are decoded and forwarded WITHOUT any
+// validation and without ever fetching a JWKS. provider_ is nullopt, so the unverified token
+// is never inserted into the JWT cache.
+TEST_F(AuthenticatorTest, TestExtractOnlyWithoutValidationForwardsUnverifiedClaims) {
+  // provider = nullopt, allow_missing = true, extract_only = true (as the ExtractOnly verifier
+  // constructs it).
+  createAuthenticator(nullptr, std::nullopt, /*allow_failed=*/false, /*allow_missing=*/true,
+                      /*extract_only=*/true);
+  // No remote JWKS fetch must happen: extract-only never verifies.
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
+  Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(ExpiredToken)}};
+  expectVerifyStatus(Status::Ok, headers);
+  // The payload header and claim-to-header output are forwarded despite the token being expired.
+  EXPECT_TRUE(headers.has("sec-istio-auth-userinfo"));
+  EXPECT_EQ(headers.get_("x-jwt-claim-sub"), "test@example.com");
 }
 
 // This test validates a good JWT authentication with a remote Jwks.
