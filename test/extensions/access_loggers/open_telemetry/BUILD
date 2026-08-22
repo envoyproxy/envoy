@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     srcs = ["otlp_log_utils_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
+        "//source/common/formatter:serializer_lib",
         "//source/common/http:header_map_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",

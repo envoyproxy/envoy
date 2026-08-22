@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/secret:secret_provider_impl_lib",
         "//source/extensions/formatter/generic_secret:config",
+        "//test/common/formatter:formatter_test_utility_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:status_utility_lib",

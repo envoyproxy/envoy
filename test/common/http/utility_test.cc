@@ -171,6 +171,17 @@ TEST(HttpUtility, stripQueryString) {
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar/?x=1&y=2")), "/foo/bar/");
 }
 
+TEST(HttpUtility, stripQueryStringView) {
+  EXPECT_EQ(Utility::stripQueryStringView(""), "");
+  EXPECT_EQ(Utility::stripQueryStringView("?"), "");
+  EXPECT_EQ(Utility::stripQueryStringView("/"), "/");
+  EXPECT_EQ(Utility::stripQueryStringView("/?"), "/");
+  EXPECT_EQ(Utility::stripQueryStringView("/?x=1"), "/");
+  EXPECT_EQ(Utility::stripQueryStringView("/foo"), "/foo");
+  EXPECT_EQ(Utility::stripQueryStringView("/foo/bar?a=b&b=c"), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryStringView("/foo/bar/?x=1&y=2"), "/foo/bar/");
+}
+
 TEST(HttpUtility, replaceQueryString) {
   // Replace with nothing
   auto params = Utility::QueryParamsMulti();
@@ -218,6 +229,9 @@ TEST(HttpUtility, testQueryParamModification) {
   EXPECT_EQ(params.getFirstValue("a").value(), "1");
   EXPECT_EQ(params.getFirstValue("b").value(), "foo");
   EXPECT_FALSE(params.getFirstValue("d").has_value());
+  EXPECT_EQ(params.getFirstValueView("a").value(), "1");
+  EXPECT_EQ(params.getFirstValueView("b").value(), "foo");
+  EXPECT_FALSE(params.getFirstValueView("d").has_value());
   params.remove("b");
   EXPECT_EQ(params.toString(), "?a=1&a=2&c=4");
   params.overwrite("a", "bar");
