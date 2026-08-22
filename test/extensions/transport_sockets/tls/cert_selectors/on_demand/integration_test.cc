@@ -9,6 +9,7 @@
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
@@ -206,6 +207,8 @@ protected:
   bool mtls_{false};
   bool validation_sds_{false};
   std::string filter_state_value_;
+  // Certificate-level TLS parameters to attach to every certificate secret sent over SDS.
+  std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters> cert_tls_params_;
 
   envoy::extensions::transport_sockets::tls::v3::Secret makeSecret(absl::string_view name,
                                                                    absl::string_view cert) {
@@ -221,6 +224,9 @@ protected:
           absl::StrCat("test/config/integration/certs/", cert, "cert.pem")));
       tls_certificate->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(
           absl::StrCat("test/config/integration/certs/", cert, "key.pem")));
+      if (cert_tls_params_.has_value()) {
+        *tls_certificate->mutable_tls_params() = *cert_tls_params_;
+      }
     }
     return secret;
   }
@@ -713,6 +719,43 @@ TEST_P(OnDemandIntegrationTest, CertCompressionCacheAcrossContexts) {
     conn.reset();
   }
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+// Certificate-level tls_params delivered over SDS take effect on the on-demand path. The parameters
+// travel with the certificate config, so the context built for the secret carries them and the
+// handshaker applies them to the connection once the pending selection completes.
+//
+// The certificate restricts the ciphers to AES256 while the client offers the default suites, which
+// prefer AES128. The second connection repeats the handshake with the same certificate and no
+// tls_params, confirming that AES256 came from the certificate and not from the client's offer.
+TEST_P(OnDemandIntegrationTest, PerCertTlsParamsAppliedAfterAsyncSelection) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "Certificate-level tls_params are ignored on client certificates";
+  }
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters params;
+  params.add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  cert_tls_params_ = params;
+  setup();
+
+  auto conn = createClientConnection();
+  // The certificate is not available yet, so selection goes through the asynchronous path.
+  waitCertsRequested(1);
+  createXdsConnection();
+  auto& stream = waitSendSdsResponse("server");
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  EXPECT_EQ("ECDHE-RSA-AES256-GCM-SHA384", conn->ciphersuite().value_or(""));
+  conn.reset();
+
+  cert_tls_params_.reset();
+  sendSecret(stream, "server", "server");
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(2));
+
+  auto conn2 = createClientConnection();
+  conn2->waitForUpstreamConnection();
+  conn2->sendAndReceiveTlsData("hello", "world");
+  EXPECT_EQ("ECDHE-RSA-AES128-GCM-SHA256", conn2->ciphersuite().value_or(""));
+  conn2.reset();
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, OnDemandIntegrationTest,

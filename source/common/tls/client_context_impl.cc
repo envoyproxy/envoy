@@ -84,6 +84,12 @@ ClientContextImpl::ClientContextImpl(
     return;
   }
 
+  if (tls_contexts_[0].tls_params_.has_value()) {
+    ENVOY_LOG(warn, "tls_params on a client TlsCertificate is not supported; "
+                    "use context-level tls_params instead");
+    tls_contexts_[0].tls_params_.reset();
+  }
+
   if (!parsed_alpn_protocols_.empty()) {
     for (auto& ctx : tls_contexts_) {
       const int rc = SSL_CTX_set_alpn_protos(ctx.ssl_ctx_.get(), parsed_alpn_protocols_.data(),
