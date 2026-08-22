@@ -208,6 +208,9 @@ MockRouteConfigProvider::~MockRouteConfigProvider() = default;
 MockRouteConfigProviderManager::MockRouteConfigProviderManager() = default;
 MockRouteConfigProviderManager::~MockRouteConfigProviderManager() = default;
 
+MockVhdsConfigUpdateReceiver::MockVhdsConfigUpdateReceiver() = default;
+MockVhdsConfigUpdateReceiver::~MockVhdsConfigUpdateReceiver() = default;
+
 MockScopedConfig::MockScopedConfig() {
   ON_CALL(*this, getRouteConfig(_)).WillByDefault(Return(route_config_));
 }
