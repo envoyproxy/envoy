@@ -103,6 +103,10 @@ message Lua {
   // The patterns are in place before any configured code runs, including the run that validates
   // the configuration, so a ``require`` at the top level of a script whose module cannot be found
   // is rejected as a configuration error rather than failing per request.
+  //
+  // Each worker builds its own VM and runs the script again to do so, after the configuration has
+  // been accepted, so the files a script requires must stay readable for as long as the process
+  // runs and not only while the configuration is loaded.
   repeated string package_paths = 6 [(validate.rules).repeated = {items {string {min_len: 1}}}];
 
   // As :ref:`package_paths
