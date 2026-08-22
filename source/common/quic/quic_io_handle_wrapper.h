@@ -51,6 +51,12 @@ public:
     }
     return io_handle_.write(buffer);
   }
+  Api::IoCallUint64Result send(const void* buffer, size_t length) override {
+    if (closed_) {
+      return {0, Network::IoSocketError::getIoSocketEbadfError()};
+    }
+    return io_handle_.send(buffer, length);
+  }
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Envoy::Network::Address::Ip* self_ip,
                                   const Network::Address::Instance& peer_address) override {
