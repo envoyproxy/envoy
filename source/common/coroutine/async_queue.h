@@ -213,40 +213,7 @@ public:
 
   ~AsyncQueue() {
     *alive_ = false;
-    closed_ = true;
-
-    // 1. Cancel all pending capacity requests in reverse order so SharedCapacity
-    // will never attempt to grant capacity to any waiter of this dying queue.
-    for (auto it = push_waiters_.rbegin(); it != push_waiters_.rend(); ++it) {
-      if (it->capacity_waiter_it.has_value()) {
-        auto cap_it = *it->capacity_waiter_it;
-        it->capacity_waiter_it.reset();
-        capacity_->cancelRequest(cap_it);
-      }
-    }
-
-    // 2. Release capacity held by queued items back to SharedCapacity before aborting waiters.
-    if (current_size_ > 0) {
-      uint64_t size = current_size_;
-      current_size_ = 0;
-      queue_.clear();
-      capacity_->release(size);
-    }
-
-    // 3. Complete pop waiters with EOF (nullopt).
-    while (!pop_waiters_.empty()) {
-      PopWaiterCallback waiter = std::move(pop_waiters_.front().callback);
-      pop_waiters_.pop_front();
-      waiter(std::nullopt);
-    }
-
-    // 4. Abort all pending push waiters with FailedPrecondition.
-    while (!push_waiters_.empty()) {
-      PushWaiter waiter = std::move(push_waiters_.front());
-      push_waiters_.pop_front();
-      PushWaiterCallback cb = std::move(waiter.callback);
-      cb(absl::FailedPreconditionError("queue closed"));
-    }
+    closeInternal(/*release_queued_capacity=*/true);
   }
 
   // AsyncQueue is non-copyable and non-movable.
@@ -340,8 +307,11 @@ public:
 
   // Closes the queue for future pushes.
   // Queued items remain available for popping; once drained, pop() returns std::nullopt.
-  void close() {
-    if (closed_) {
+  void close() { closeInternal(/*release_queued_capacity=*/false); }
+
+private:
+  void closeInternal(bool release_queued_capacity) {
+    if (closed_ && !release_queued_capacity) {
       return;
     }
     closed_ = true;
@@ -355,35 +325,42 @@ public:
         auto cap_it = *it->capacity_waiter_it;
         it->capacity_waiter_it.reset();
         capacity_->cancelRequest(cap_it);
-        if (!*alive) {
+        if (!release_queued_capacity && !*alive) {
           return;
         }
       }
     }
 
-    // 2. Complete pop waiters with EOF (nullopt) since closed queue cannot accept new items.
+    // 2. On destruction, release capacity held by queued items back to SharedCapacity
+    // before aborting waiters.
+    if (release_queued_capacity && current_size_ > 0) {
+      uint64_t size = current_size_;
+      current_size_ = 0;
+      queue_.clear();
+      capacity_->release(size);
+    }
+
+    // 3. Complete pop waiters with EOF (nullopt) since closed queue cannot accept new items.
     while (!pop_waiters_.empty()) {
       PopWaiterCallback waiter = std::move(pop_waiters_.front().callback);
       pop_waiters_.pop_front();
       waiter(std::nullopt);
-      if (!*alive) {
+      if (!release_queued_capacity && !*alive) {
         return;
       }
     }
 
-    // 3. Abort all pending push waiters with FailedPrecondition.
+    // 4. Abort all pending push waiters with FailedPrecondition.
     while (!push_waiters_.empty()) {
       PushWaiter waiter = std::move(push_waiters_.front());
       push_waiters_.pop_front();
       PushWaiterCallback cb = std::move(waiter.callback);
       cb(absl::FailedPreconditionError("queue closed"));
-      if (!*alive) {
+      if (!release_queued_capacity && !*alive) {
         return;
       }
     }
   }
-
-private:
   PushWaiterIt addPushWaiter(T item, uint64_t size, PushWaiterCallback callback) {
     auto it = push_waiters_.insert(
         push_waiters_.end(), PushWaiter{std::move(item), size, std::move(callback), std::nullopt});
@@ -415,6 +392,9 @@ private:
   }
 
   void removePushWaiter(PushWaiterIt it) {
+    if (closed_) {
+      return;
+    }
     auto cap_it = it->capacity_waiter_it;
     push_waiters_.erase(it);
     if (cap_it.has_value()) {
@@ -426,7 +406,12 @@ private:
     return pop_waiters_.insert(pop_waiters_.end(), PopWaiter{std::move(callback)});
   }
 
-  void removePopWaiter(PopWaiterIt it) { pop_waiters_.erase(it); }
+  void removePopWaiter(PopWaiterIt it) {
+    if (closed_) {
+      return;
+    }
+    pop_waiters_.erase(it);
+  }
 
   SharedCapacityPtr capacity_;
   SizeFunc size_func_;
