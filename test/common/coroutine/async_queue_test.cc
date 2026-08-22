@@ -672,10 +672,16 @@ TEST_F(AsyncQueueTest, NullCallbackInRequestCapacityDefensiveHandling) {
   // In debug builds, passing a null callback triggers ASSERT.
   EXPECT_DEBUG_DEATH({ cap.requestCapacity(5, nullptr); }, "assert failure: cb != nullptr");
 
-  // Subsequent valid requests should operate normally and acquire capacity.
+  // Acquire capacity to fill it.
+  EXPECT_TRUE(cap.tryAcquire(10));
+  EXPECT_EQ(cap.currentSize(), 10);
+
+  // Subsequent valid requests should operate normally and acquire capacity when released.
   bool valid_called = false;
   cap.requestCapacity(5, [&valid_called]() { valid_called = true; });
-  cap.release(0); // Trigger processWaiters()
+  EXPECT_FALSE(valid_called);
+
+  cap.release(10); // Releases 10 units, triggers processWaiters(), grants req
   EXPECT_TRUE(valid_called);
   EXPECT_EQ(cap.currentSize(), 5);
 
@@ -1425,6 +1431,59 @@ TEST_F(AsyncQueueTest, QueueDestructionDuringPushCancellationUnblock) {
   EXPECT_TRUE(q2_push_done);
   EXPECT_EQ(q1, nullptr);
   EXPECT_EQ(shared_cap->currentSize(), 1);
+}
+
+TEST_F(AsyncQueueTest, SharedCapacityDirectAcquireRelease) {
+  auto cap = std::make_shared<SharedCapacity>(10);
+  EXPECT_EQ(cap->currentSize(), 0);
+  EXPECT_TRUE(cap->hasCapacity(10));
+  EXPECT_FALSE(cap->hasCapacity(11));
+
+  EXPECT_TRUE(cap->tryAcquire(4));
+  EXPECT_EQ(cap->currentSize(), 4);
+
+  EXPECT_TRUE(cap->tryAcquire(6));
+  EXPECT_EQ(cap->currentSize(), 10);
+
+  // Capacity full
+  EXPECT_FALSE(cap->tryAcquire(1));
+
+  cap->release(6);
+  EXPECT_EQ(cap->currentSize(), 4);
+
+  cap->release(4);
+  EXPECT_EQ(cap->currentSize(), 0);
+}
+
+TEST_F(AsyncQueueTest, SharedCapacityRequestAndCancel) {
+  auto cap = std::make_shared<SharedCapacity>(5);
+  EXPECT_TRUE(cap->tryAcquire(5));
+  EXPECT_EQ(cap->currentSize(), 5);
+
+  bool granted = false;
+  auto it = cap->requestCapacity(3, [&granted]() { granted = true; });
+  EXPECT_FALSE(granted);
+
+  // Cancel the request
+  cap->cancelRequest(it);
+
+  // Free capacity: since request was cancelled, no callback invoked
+  cap->release(5);
+  EXPECT_FALSE(granted);
+  EXPECT_EQ(cap->currentSize(), 0);
+
+  // Now queue a new request and grant it
+  EXPECT_TRUE(cap->tryAcquire(5));
+  cap->requestCapacity(3, [&granted]() { granted = true; });
+  EXPECT_FALSE(granted);
+
+  // Release: grants it2
+  cap->release(5);
+  EXPECT_TRUE(granted);
+  EXPECT_EQ(cap->currentSize(), 3);
+
+  cap->release(3);
+  EXPECT_EQ(cap->currentSize(), 0);
 }
 
 } // namespace
