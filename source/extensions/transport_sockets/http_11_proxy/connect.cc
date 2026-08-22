@@ -10,6 +10,8 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -69,8 +71,15 @@ UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
 }
 
 // Helper method to create a properly formatted CONNECT request with Host header.
-std::string UpstreamHttp11ConnectSocket::formatConnectRequest(absl::string_view target) {
-  return absl::StrCat("CONNECT ", target, " HTTP/1.1\r\n", "Host: ", target, "\r\n\r\n");
+std::string UpstreamHttp11ConnectSocket::formatConnectRequest(absl::string_view target,
+                                                              bool include_host_header,
+                                                              absl::string_view authorization) {
+  std::string connect_header = absl::StrCat("CONNECT ", target, " HTTP/1.1\r\n");
+  std::string host_header = include_host_header ? absl::StrCat("Host: ", target, "\r\n") : "";
+  std::string proxy_authorization_header =
+      !authorization.empty() ? absl::StrCat("Proxy-Authorization: ", authorization, "\r\n") : "";
+
+  return absl::StrCat(connect_header, host_header, proxy_authorization_header, "\r\n");
 }
 
 inline void UpstreamHttp11ConnectSocket::handleProxyInfoConnect(
@@ -82,10 +91,10 @@ inline void UpstreamHttp11ConnectSocket::handleProxyInfoConnect(
     if (!Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.http_11_proxy_connect_legacy_format")) {
       // RFC 9110 compliant CONNECT format that includes Host header.
-      header_buffer_.add(formatConnectRequest(target));
+      header_buffer_.add(formatConnectRequest(target, true /* include_host_header */));
     } else {
       // Legacy behavior: no Host header for backward compatibility.
-      header_buffer_.add(absl::StrCat("CONNECT ", target, " HTTP/1.1\r\n\r\n"));
+      header_buffer_.add(formatConnectRequest(target, false /* include_host_header */));
     }
     need_to_strip_connect_response_ = true;
   }
@@ -93,6 +102,24 @@ inline void UpstreamHttp11ConnectSocket::handleProxyInfoConnect(
 
 inline void UpstreamHttp11ConnectSocket::handleHostMetadataConnect(
     std::shared_ptr<const Upstream::HostDescription> host) {
+  // Look up the optional Proxy-Authorization value from the endpoint's typed metadata.
+  std::string authorization;
+  if (host->metadata() != nullptr) {
+    auto auth_it = host->metadata()->typed_filter_metadata().find(
+        Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH);
+    if (auth_it != host->metadata()->typed_filter_metadata().end()) {
+      Protobuf::StringValue auth_value;
+      if (MessageUtil::unpackTo(auth_it->second, auth_value).ok()) {
+        authorization = auth_value.value();
+      } else {
+        ENVOY_CONN_LOG(trace,
+                       "Failed to unpack Proxy-Authorization string from host metadata, "
+                       "proceeding with empty authorization",
+                       callbacks_->connection());
+      }
+    }
+  }
+
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http_11_proxy_connect_legacy_format")) {
     // Prefer <host-name>:<port> for RFC 9110 compliance, unless URI is <host-ip>:<port>.
@@ -103,11 +130,11 @@ inline void UpstreamHttp11ConnectSocket::handleHostMetadataConnect(
     } else {
       target = host->address()->asStringView();
     }
-    header_buffer_.add(formatConnectRequest(target));
+    header_buffer_.add(formatConnectRequest(target, true /* include_host_header */, authorization));
   } else {
     // Legacy behavior: <host-ip>:<port> format, no Host header for backward compatibility.
-    header_buffer_.add(
-        absl::StrCat("CONNECT ", host->address()->asStringView(), " HTTP/1.1\r\n\r\n"));
+    header_buffer_.add(formatConnectRequest(host->address()->asStringView(),
+                                            false /* include_host_header */, authorization));
   }
   need_to_strip_connect_response_ = true;
 }
