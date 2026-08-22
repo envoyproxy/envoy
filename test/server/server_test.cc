@@ -50,6 +50,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/crypto.h"
 
@@ -1486,12 +1487,12 @@ TEST_P(ServerInstanceImplTest, LogToFile) {
   Logger::Registry::getSink()->flush();
   std::string log = server_->api().fileSystem().fileReadToEnd(path).value();
   EXPECT_GT(log.size(), 0);
-  EXPECT_TRUE(log.find("LogToFile test string") != std::string::npos);
+  EXPECT_THAT(log, HasSubstr("LogToFile test string"));
 
   // Test that critical messages get immediately flushed
   ENVOY_LOG_MISC(critical, "LogToFile second test string");
   log = server_->api().fileSystem().fileReadToEnd(path).value();
-  EXPECT_TRUE(log.find("LogToFile second test string") != std::string::npos);
+  EXPECT_THAT(log, HasSubstr("LogToFile second test string"));
 }
 
 TEST_P(ServerInstanceImplTest, LogToFileError) {

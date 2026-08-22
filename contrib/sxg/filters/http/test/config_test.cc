@@ -7,6 +7,7 @@
 
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
 #include "contrib/sxg/filters/http/source/config.h"
@@ -20,6 +21,8 @@ namespace SXG {
 
 using testing::NiceMock;
 using testing::Return;
+
+using Envoy::StatusHelpers::HasStatus;
 
 namespace {
 
@@ -57,7 +60,7 @@ void expectCreateFilter(std::string yaml, bool is_sds_config) {
 
 // This loads one of the secrets in credentials, and fails the other one.
 void expectInvalidSecretConfig(const std::string& failed_secret_name,
-                               const std::string& exception_message) {
+                               const std::string& error_message) {
   const std::string yaml = R"YAML(
 certificate:
   name: certificate
@@ -80,9 +83,9 @@ validity_url: "/.sxg/validity.msg"
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, exception_message);
+  const auto cb_or_error = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_THAT(cb_or_error.status(),
+              HasStatus(absl::StatusCode::kInvalidArgument, testing::HasSubstr(error_message)));
 }
 
 } // namespace

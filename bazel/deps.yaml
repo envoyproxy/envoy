@@ -105,16 +105,6 @@ brotli:
   license: "MIT"
   license_url: "https://github.com/google/brotli/blob/v{version}/LICENSE"
 
-build_bazel_rules_apple:
-  project_name: "Apple Rules for Bazel"
-  project_desc: "Bazel rules for Apple platforms"
-  project_url: "https://github.com/bazelbuild/rules_apple"
-  release_date: "2025-03-14"
-  use_category:
-  - build
-  license: "Apache-2.0"
-  license_url: "https://github.com/bazelbuild/rules_apple/blob/{version}/LICENSE"
-
 buildtools:
   project_name: "Bazel build tools"
   project_desc: "Developer tools for working with Google's bazel buildtool."
@@ -212,32 +202,6 @@ colm:
   license: "MIT"
   license_url: "https://github.com/adrian-thurston/colm/blob/{version}/COPYING"
 
-com_google_protobuf:
-  project_name: "Protocol Buffers"
-  project_desc: "Language-neutral, platform-neutral extensible mechanism for serializing structured data"
-  project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2026-06-11"
-  use_category:
-  - dataplane_core
-  - controlplane
-  implied_untracked_deps:
-  - zlib
-  cpe: "cpe:2.3:a:google:protobuf:*"
-  license: "Protocol Buffers"
-  license_url: "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE"
-
-confluentinc_librdkafka:
-  project_name: "Kafka (C/C++ client)"
-  project_desc: "C/C++ client for Apache Kafka (open-source distributed event streaming platform)"
-  project_url: "https://github.com/confluentinc/librdkafka"
-  release_date: "2024-10-10"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.filters.network.kafka_mesh
-  license: "librdkafka"
-  license_url: "https://github.com/confluentinc/librdkafka/blob/v{version}/LICENSE"
-
 cpp2sky:
   project_name: "cpp2sky"
   project_desc: "C++ SDK for Apache SkyWalking"
@@ -311,7 +275,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-08-16"
+  release_date: "2026-08-21"
   use_category:
   - build
   - controlplane
@@ -515,6 +479,7 @@ grpc_httpjson_transcoding:
   project_name: "grpc-httpjson-transcoding"
   project_desc: "Library that supports transcoding so that HTTP/JSON can be converted to gRPC"
   project_url: "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding"
+  apparent_name: "grpc-httpjson-transcoding"
   release_date: "2025-05-07"
   use_category:
   - dataplane_ext
@@ -707,6 +672,18 @@ libprotobuf_mutator:
   - test_only
   license: "Apache-2.0"
   license_url: "https://github.com/google/libprotobuf-mutator/blob/v{version}/LICENSE"
+
+librdkafka:
+  project_name: "Kafka (C/C++ client)"
+  project_desc: "C/C++ client for Apache Kafka (open-source distributed event streaming platform)"
+  project_url: "https://github.com/confluentinc/librdkafka"
+  release_date: "2024-10-10"
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.network.kafka_mesh
+  license: "librdkafka"
+  license_url: "https://github.com/confluentinc/librdkafka/blob/v{version}/LICENSE"
 
 libsxg:
   project_name: "libsxg"
@@ -925,10 +902,26 @@ proto_processing:
   license: "Apache-2.0"
   license_url: "https://github.com/grpc-ecosystem/proto_processing_lib/blob/{version}/LICENSE"
 
+protobuf:
+  project_name: "Protocol Buffers"
+  project_desc: "Language-neutral, platform-neutral extensible mechanism for serializing structured data"
+  project_url: "https://developers.google.com/protocol-buffers"
+  apparent_name: com_google_protobuf
+  release_date: "2026-06-11"
+  use_category:
+  - dataplane_core
+  - controlplane
+  implied_untracked_deps:
+  - zlib
+  cpe: "cpe:2.3:a:google:protobuf:*"
+  license: "Protocol Buffers"
+  license_url: "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE"
+
 proxy_wasm_cpp_host:
   project_name: "WebAssembly for Proxies (C++ host implementation)"
   project_desc: "WebAssembly for Proxies (C++ host implementation)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-host"
+  apparent_name: proxy-wasm-cpp-host
   release_date: "2026-06-23"
   use_category:
   - dataplane_ext
@@ -949,6 +942,7 @@ proxy_wasm_cpp_sdk:
   project_name: "WebAssembly for Proxies (C++ SDK)"
   project_desc: "WebAssembly for Proxies (C++ SDK)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk"
+  apparent_name: proxy-wasm-cpp-sdk
   release_date: "2025-09-25"
   use_category:
   - dataplane_ext
@@ -969,6 +963,7 @@ proxy_wasm_rust_sdk:
   project_name: "WebAssembly for Proxies (Rust SDK)"
   project_desc: "WebAssembly for Proxies (Rust SDK)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-rust-sdk"
+  apparent_name: proxy-wasm-rust-sdk
   release_date: "2025-10-01"
   use_category:
   - test_only
@@ -1015,7 +1010,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-08-10"
+  release_date: "2026-08-20"
   use_category:
   - controlplane
   - dataplane_core
@@ -1045,6 +1040,16 @@ re2:
   - dataplane_core
   license: "BSD-3-Clause"
   license_url: "https://github.com/google/re2/blob/{version}/LICENSE"
+
+rules_apple:
+  project_name: "Apple Rules for Bazel"
+  project_desc: "Bazel rules for Apple platforms"
+  project_url: "https://github.com/bazelbuild/rules_apple"
+  release_date: "2025-03-14"
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_apple/blob/{version}/LICENSE"
 
 rules_cc:
   project_name: "C++ rules for Bazel"

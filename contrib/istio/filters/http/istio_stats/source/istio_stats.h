@@ -3,24 +3,24 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/extensions/filters/http/common/factory_base.h"
+
 #include "contrib/envoy/extensions/filters/http/istio_stats/v3/istio_stats.pb.h"
+#include "contrib/envoy/extensions/filters/http/istio_stats/v3/istio_stats.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace IstioStats {
 
-class IstioStatsFilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+class IstioStatsFilterConfigFactory : public Common::ExceptionFreeFactoryBase<stats::PluginConfig> {
 public:
-  std::string name() const override { return "envoy.filters.http.istio_stats"; }
+  IstioStatsFilterConfigFactory() : ExceptionFreeFactoryBase("envoy.filters.http.istio_stats") {}
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<stats::PluginConfig>();
-  }
-
+private:
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config, const std::string&,
-                               Server::Configuration::FactoryContext&) override;
+  createFilterFactoryFromProtoTyped(const stats::PluginConfig& proto_config, const std::string&,
+                                    Server::Configuration::FactoryContext&) override;
 };
 
 class IstioStatsNetworkFilterConfigFactory

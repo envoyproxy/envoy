@@ -11,18 +11,6 @@ namespace HttpFilters {
 namespace McpJsonRestBridge {
 
 absl::StatusOr<Http::FilterFactoryCb>
-McpJsonRestBridgeFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-        proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  // This filter does not use the factory context, so delegate to the server-context variant.
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           stats_prefix};
-  return createHttpFilterFactoryFromProtoTyped(proto_config, context.serverFactoryContext(),
-                                               extra_context);
-}
-
-absl::StatusOr<Http::FilterFactoryCb>
 McpJsonRestBridgeFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
         proto_config,
