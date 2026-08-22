@@ -1303,8 +1303,8 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
 
 // The scripts below emit whichever filter context the request resolved to, as a header, so that
 // the precedence between the filter-level and the per-route context is observable end to end.
-// tostring() is used so that an empty context is reported as "nil" rather than as a missing header,
-// which is what a disabled filter would look like.
+// `tostring()` is used so that an empty context is reported as "nil" rather than as a missing
+// header, which is what a disabled filter would look like.
 const std::string FILTER_AND_CODE_WITH_FILTER_CONTEXT =
     R"EOF(
 name: lua
