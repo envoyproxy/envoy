@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <numeric>
 #include <string>
 #include <type_traits>
