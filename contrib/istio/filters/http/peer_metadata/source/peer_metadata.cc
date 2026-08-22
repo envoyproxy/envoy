@@ -274,7 +274,7 @@ std::optional<PeerInfo> BaggageDiscoveryMethod::derivePeerInfo(const StreamInfo:
 }
 
 FilterConfig::FilterConfig(const io::istio::http::peer_metadata::Config& config,
-                           Server::Configuration::FactoryContext& factory_context)
+                           Server::Configuration::ServerFactoryContext& factory_context)
     : shared_with_upstream_(config.shared_with_upstream()),
       downstream_discovery_(buildDiscoveryMethods(config.downstream_discovery(),
                                                   buildAdditionalLabels(config.additional_labels()),
@@ -293,20 +293,18 @@ std::vector<DiscoveryMethodPtr> FilterConfig::buildDiscoveryMethods(
     const Protobuf::RepeatedPtrField<io::istio::http::peer_metadata::Config::DiscoveryMethod>&
         config,
     const absl::flat_hash_set<std::string>& additional_labels, bool downstream,
-    Server::Configuration::FactoryContext& factory_context) const {
+    Server::Configuration::ServerFactoryContext& factory_context) const {
   std::vector<DiscoveryMethodPtr> methods;
   methods.reserve(config.size());
   for (const auto& method : config) {
     switch (method.method_specifier_case()) {
     case io::istio::http::peer_metadata::Config::DiscoveryMethod::MethodSpecifierCase::
         kWorkloadDiscovery:
-      methods.push_back(
-          std::make_unique<XDSMethod>(downstream, factory_context.serverFactoryContext()));
+      methods.push_back(std::make_unique<XDSMethod>(downstream, factory_context));
       break;
     case io::istio::http::peer_metadata::Config::DiscoveryMethod::MethodSpecifierCase::
         kIstioHeaders:
-      methods.push_back(std::make_unique<MXMethod>(downstream, additional_labels,
-                                                   factory_context.serverFactoryContext()));
+      methods.push_back(std::make_unique<MXMethod>(downstream, additional_labels, factory_context));
       break;
     case io::istio::http::peer_metadata::Config::DiscoveryMethod::MethodSpecifierCase::kBaggage:
       if (downstream) {
@@ -337,20 +335,19 @@ std::vector<PropagationMethodPtr> FilterConfig::buildPropagationMethods(
     const Protobuf::RepeatedPtrField<io::istio::http::peer_metadata::Config::PropagationMethod>&
         config,
     const absl::flat_hash_set<std::string>& additional_labels, bool downstream,
-    Server::Configuration::FactoryContext& factory_context) const {
+    Server::Configuration::ServerFactoryContext& factory_context) const {
   std::vector<PropagationMethodPtr> methods;
   methods.reserve(config.size());
   for (const auto& method : config) {
     switch (method.method_specifier_case()) {
     case io::istio::http::peer_metadata::Config::PropagationMethod::MethodSpecifierCase::
         kIstioHeaders:
-      methods.push_back(
-          std::make_unique<MXPropagationMethod>(downstream, factory_context.serverFactoryContext(),
-                                                additional_labels, method.istio_headers()));
+      methods.push_back(std::make_unique<MXPropagationMethod>(
+          downstream, factory_context, additional_labels, method.istio_headers()));
       break;
     case io::istio::http::peer_metadata::Config::PropagationMethod::MethodSpecifierCase::kBaggage:
-      methods.push_back(std::make_unique<BaggagePropagationMethod>(
-          factory_context.serverFactoryContext(), method.baggage()));
+      methods.push_back(
+          std::make_unique<BaggagePropagationMethod>(factory_context, method.baggage()));
       break;
     default:
       break;
@@ -479,9 +476,10 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   return Http::FilterHeadersStatus::Continue;
 }
 
-absl::StatusOr<Http::FilterFactoryCb> FilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const io::istio::http::peer_metadata::Config& config, const std::string&,
-    Server::Configuration::FactoryContext& factory_context) {
+absl::StatusOr<Http::FilterFactoryCb> FilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
+    const io::istio::http::peer_metadata::Config& config,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::ExtraFactoryContext&) {
   auto filter_config = std::make_shared<FilterConfig>(config, factory_context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) {
     auto filter = std::make_shared<Filter>(filter_config);
