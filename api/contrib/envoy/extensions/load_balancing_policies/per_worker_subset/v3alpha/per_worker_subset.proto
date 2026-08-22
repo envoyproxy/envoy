@@ -1,0 +1,174 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.per_worker_subset.v3alpha;
+
+import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.per_worker_subset.v3alpha";
+option java_outer_classname = "PerWorkerSubsetProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/load_balancing_policies/per_worker_subset/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Per-Worker Subset Load Balancing Policy]
+// [#extension: envoy.load_balancing_policies.per_worker_subset]
+
+// Per-worker subset load balancer.
+//
+// Each Envoy worker thread maintains its own subset of upstream hosts and
+// load-balances requests across only that subset. The motivating use case is
+// upstream clusters with hundreds to thousands of hosts behind a short
+// server-side HTTP keepalive timeout: stock per-cluster load balancers will
+// eventually open a connection from every worker to every host, producing
+// tens of thousands of mostly-idle keepalive connections that the upstream
+// reaps. This policy caps per-worker fanout to K hosts so each connection
+// stays in active use inside the upstream's keepalive window.
+//
+// Fleet-wide upstream coverage is preserved: across W workers per Envoy and
+// E Envoys, each upstream host receives roughly ``(W*E)/N`` workers' worth
+// of traffic.
+//
+// The policy is two-axis:
+//
+// 1. :ref:`partitioning_strategy
+//    <envoy_v3_api_field_extensions.load_balancing_policies.per_worker_subset.v3alpha.PerWorkerSubset.partitioning_strategy>`
+//    selects how each worker's subset is derived from the cluster's host
+//    set.
+//
+// 2. :ref:`host_selection_strategy
+//    <envoy_v3_api_field_extensions.load_balancing_policies.per_worker_subset.v3alpha.PerWorkerSubset.host_selection_strategy>`
+//    selects how an individual host is picked on each ``chooseHost`` call
+//    within the worker's subset.
+//
+// Both axes are independent and can be combined freely.
+//
+// [#next-free-field: 6]
+message PerWorkerSubset {
+  enum PartitioningStrategy {
+    // Deterministic, non-overlapping slice of ``ceil(N/W)`` hosts from a
+    // stable address-sorted ordering, where ``N`` is the cluster's host
+    // count and ``W`` is the worker count. A process-local random starting
+    // offset rotates the assignment so the partition is not byte-identical
+    // across the fleet. Stability across Envoy restarts is not required.
+    // The slices cover all hosts, with up to ``W*K - N`` wrap-around
+    // assignments when ``N`` is not divisible by ``W``.
+    //
+    // Health-only updates do not change slice boundaries: partitioning is
+    // performed over the all-hosts list, then each worker filters its fixed
+    // slice by health. A host becoming unhealthy therefore affects only
+    // workers whose slice contains that host. Membership updates may change
+    // ``N`` or ``K`` and can repartition workers. ``subset_size`` is treated
+    // as a subsetting-disable threshold (see ``subset_size`` below). This is
+    // the default.
+    EQUAL_PARTITIONS = 0;
+
+    // Each worker independently samples ``subset_size`` hosts uniformly at
+    // random without replacement. The sampled membership is retained across
+    // health-only updates so a health transition does not rotate unrelated
+    // connections. Membership updates retain sampled hosts that still exist
+    // and fill only vacancies created by removed hosts. ``subset_size`` must
+    // be ``> 0`` in this mode.
+    RANDOM_PARTITIONS = 1;
+  }
+
+  // Within-subset host selection. Applies on top of either partitioning
+  // strategy.
+  //
+  // This contrib implementation intentionally exposes a small set of
+  // validated strategies rather than accepting an arbitrary nested load
+  // balancing policy. The inner policy operates on a synthetic
+  // single-priority, single-locality ``PrioritySet``, and not every Envoy
+  // load balancer is compatible with that constrained model.
+  // ``SIMPLE_ROUND_ROBIN`` also provides a low-overhead option that avoids
+  // constructing an inner stock load balancer per worker. A composable
+  // nested policy can be reconsidered if this extension moves into the core
+  // load-balancer set.
+  enum HostSelectionStrategy {
+    // proto3-default sentinel. Rejected by the factory at config-load
+    // time; operators must pick an explicit strategy. Exists so callers
+    // can distinguish "explicitly chose ROUND_ROBIN" from "field not
+    // set" at the proto layer.
+    UNSPECIFIED = 0;
+
+    // Minimal ``next_index_ % K`` round-robin over the worker's subset
+    // implemented inline. No weight handling, no slow-start, no locality.
+    // Pick this when the partition itself is the only thing required.
+    SIMPLE_ROUND_ROBIN = 1;
+
+    // Envoy's stock RoundRobin load balancer constructed against the
+    // worker's subset via a synthetic PrioritySet. Honors per-host weights
+    // (EDF scheduling) and ``slow_start_config``. The synthetic PrioritySet
+    // presents the subset as one locality, so locality-weighted balancing is
+    // intentionally not supported within the worker subset. Recommended
+    // default for tiers opting in.
+    ENVOY_ROUND_ROBIN = 2;
+
+    // Power-of-two-choices over active request counts (the algorithm
+    // implemented by Envoy's stock LeastRequest load balancer with
+    // ``choice_count=2``). Each ``chooseHost`` samples two random subset
+    // hosts and returns the one with fewer pending requests. Honors
+    // ``slow_start_config`` and weighted hosts.
+    ENVOY_P2C = 3;
+  }
+
+  // Interpretation depends on
+  // :ref:`partitioning_strategy
+  // <envoy_v3_api_field_extensions.load_balancing_policies.per_worker_subset.v3alpha.PerWorkerSubset.partitioning_strategy>`:
+  //
+  // ``EQUAL_PARTITIONS``: subset_size is a subsetting kill-switch. The
+  // actual K (hosts per worker) is auto-computed as ``ceil(N/W)`` on every
+  // membership update, where W is the resolved total worker count and N
+  // is the cluster's host count. When ``subset_size >= N`` the policy
+  // disables subsetting and each worker takes the entire cluster (the
+  // within-subset selection runs over the full cluster). The default of
+  // 0 means "always subset".
+  //
+  // ``RANDOM_PARTITIONS``: subset_size is K, the number of hosts each worker
+  // samples. Must be ``> 0`` in this mode. Setting it ``>= N`` degenerates
+  // to within-subset selection over the full set.
+  uint32 subset_size = 1;
+
+  // Partition strategy. Defaults to ``EQUAL_PARTITIONS``.
+  PartitioningStrategy partitioning_strategy = 2 [(validate.rules).enum = {defined_only: true}];
+
+  // Within-subset host selection. Required when the extension is
+  // instantiated; leaving this at the proto default (``UNSPECIFIED``) is
+  // rejected by the factory's ``loadConfig`` with ``InvalidArgumentError``.
+  HostSelectionStrategy host_selection_strategy = 3 [(validate.rules).enum = {defined_only: true}];
+
+  // Per-worker fallback threshold (percent points, ``[0, 100]``).
+  // When the healthy hosts in a worker's slice drop below this fraction of
+  // K, degraded hosts are added before considering unhealthy hosts. The
+  // worker uses the full slice (including unhealthy hosts) only when
+  // healthy plus degraded capacity still does not meet the threshold.
+  // Per-worker: workers fall back independently based on their own slice's
+  // health.
+  //
+  // * Unset: defaults to 50.
+  // * Set to 0: disables the percent check; healthy hosts are used when
+  //   present, otherwise degraded hosts, then the full slice.
+  // * Set to 100: degraded hosts are added as soon as healthy hosts alone
+  //   cannot fill the slice; the full slice is used if healthy plus degraded
+  //   still cannot fill it.
+  // * Values ``> 100``: rejected by the factory.
+  //
+  // Independent of the cluster's
+  // :ref:`common_lb_config.healthy_panic_threshold
+  // <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.healthy_panic_threshold>`
+  // -- this knob is scoped to the per-worker subset, not the whole
+  // cluster.
+  google.protobuf.UInt32Value fallback_threshold = 4 [(validate.rules).uint32 = {lte: 100}];
+
+  // Slow-start config forwarded to the inner stock LB when
+  // ``host_selection_strategy`` is ``ENVOY_ROUND_ROBIN`` or ``ENVOY_P2C``.
+  // ``SIMPLE_ROUND_ROBIN`` ignores it. Lives here, not at the cluster
+  // level, because Envoy ignores the legacy
+  // ``round_robin_lb_config.slow_start_config`` field when
+  // ``load_balancing_policy`` is set to a typed extension.
+  common.v3.SlowStartConfig slow_start_config = 5;
+}

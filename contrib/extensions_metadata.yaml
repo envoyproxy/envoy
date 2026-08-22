@@ -213,6 +213,13 @@ envoy.load_balancing_policies.peak_ewma:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.peak_ewma.v3alpha.PeakEwma
+envoy.load_balancing_policies.per_worker_subset:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.per_worker_subset.v3alpha.PerWorkerSubset
 envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service:
   categories:
   - envoy.bootstrap
