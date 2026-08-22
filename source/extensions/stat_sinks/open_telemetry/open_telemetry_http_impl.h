@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/http_service.pb.h"
+#include "envoy/extensions/stat_sinks/open_telemetry/v3/open_telemetry.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -22,9 +23,12 @@ class OpenTelemetryHttpMetricsExporter : public OtlpMetricsExporter,
                                          public Http::AsyncClient::Callbacks,
                                          public Logger::Loggable<Logger::Id::stats> {
 public:
-  OpenTelemetryHttpMetricsExporter(Upstream::ClusterManager& cluster_manager,
-                                   const envoy::config::core::v3::HttpService& http_service,
-                                   Server::Configuration::ServerFactoryContext& server_context);
+  OpenTelemetryHttpMetricsExporter(
+      Upstream::ClusterManager& cluster_manager,
+      const envoy::config::core::v3::HttpService& http_service,
+      Server::Configuration::ServerFactoryContext& server_context,
+      envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::Compression compression =
+          envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::NONE);
 
   // OtlpMetricsExporter
   void send(MetricsExportRequestPtr&& metrics) override;
@@ -35,8 +39,12 @@ public:
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
 private:
+  // Compresses the given body in place using gzip. Returns true on success.
+  bool compressBody(std::string& body) const;
+
   Upstream::ClusterManager& cluster_manager_;
   envoy::config::core::v3::HttpService http_service_;
+  const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::Compression compression_;
   // Track active HTTP requests to cancel them on destruction.
   Http::AsyncClientRequestTracker active_requests_;
   std::unique_ptr<Http::HttpServiceHeadersApplicator> headers_applicator_;

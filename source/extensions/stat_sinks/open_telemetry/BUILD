@@ -48,7 +48,9 @@ envoy_cc_library(
     hdrs = ["open_telemetry_http_impl.h"],
     deps = [
         ":open_telemetry_lib",
+        "//envoy/compression/compressor:compressor_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/http:async_client_lib",
         "//source/common/http:async_client_utility_lib",
         "//source/common/http:header_map_lib",
@@ -57,7 +59,9 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "//source/extensions/access_loggers/open_telemetry:otlp_log_utils_lib",
+        "//source/extensions/compression/gzip/compressor:compressor_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
     ],
 )
 
