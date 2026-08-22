@@ -14,8 +14,10 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/match_delegate:config",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
