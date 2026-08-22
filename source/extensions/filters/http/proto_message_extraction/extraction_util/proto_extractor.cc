@@ -149,13 +149,13 @@ ProtoExtractor::ExtractMessage(const Protobuf::field_extraction::MessageData& ra
   // If there are no fields to retain, no need to scrub and only populate @type
   // property.
   if (scrubber_ == nullptr) {
-    (*extracted_message_metadata.extracted_message.mutable_fields())[kTypeProperty]
+    (*extracted_message_metadata.extracted_message->mutable_fields())[kTypeProperty]
         .set_string_value(ProtobufUtil::converter::GetFullTypeWithUrl(message_type_->name()));
     return extracted_message_metadata;
   }
 
   bool success = ScrubToStruct(scrubber_.get(), *message_type_, *type_helper_, &message_copy,
-                               &extracted_message_metadata.extracted_message);
+                               extracted_message_metadata.extracted_message.get());
 
   if (!success) {
     ENVOY_LOG_MISC(debug, "Failed to extract message.");
@@ -170,7 +170,7 @@ ProtoExtractor::ExtractMessage(const Protobuf::field_extraction::MessageData& ra
     for (const std::string& path : redact_field_mask->second.paths()) {
       redact_paths_camel_case.push_back(ProtobufUtil::converter::ToCamelCase(path));
     }
-    RedactPaths(redact_paths_camel_case, &extracted_message_metadata.extracted_message);
+    RedactPaths(redact_paths_camel_case, extracted_message_metadata.extracted_message.get());
   }
   return extracted_message_metadata;
 }

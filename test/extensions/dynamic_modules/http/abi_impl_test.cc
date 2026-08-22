@@ -31,6 +31,9 @@
 
 #include "gmock/gmock.h"
 
+using testing::Contains;
+using testing::Key;
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -881,14 +884,14 @@ TEST(ABIImpl, SetDynamicMetadataStruct) {
   envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
       &filter, {ns.data(), ns.size()}, {serialized2.data(), serialized2.size()});
   EXPECT_EQ(metadata.filter_metadata().at(ns).fields().at("extra").string_value(), "bar");
-  EXPECT_TRUE(metadata.filter_metadata().at(ns).fields().contains("outer"));
+  EXPECT_THAT(metadata.filter_metadata().at(ns).fields(), Contains(Key("outer")));
 
   // A buffer that does not parse as a google.protobuf.Struct is a no-op (wire type 7 is invalid).
   const std::string garbage("\x0f", 1);
   envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(&filter, {ns.data(), ns.size()},
                                                                  {garbage.data(), garbage.size()});
-  EXPECT_TRUE(metadata.filter_metadata().at(ns).fields().contains("extra"));
-  EXPECT_TRUE(metadata.filter_metadata().at(ns).fields().contains("outer"));
+  EXPECT_THAT(metadata.filter_metadata().at(ns).fields(), Contains(Key("extra")));
+  EXPECT_THAT(metadata.filter_metadata().at(ns).fields(), Contains(Key("outer")));
 }
 
 TEST(ABIImpl, SetDynamicTypedMetadata) {
@@ -1216,9 +1219,9 @@ TEST(ABIImpl, metadata_keys) {
   for (const auto& key : keys) {
     key_names.insert(std::string(key.ptr, key.length));
   }
-  EXPECT_EQ(key_names.count("key1"), 1);
-  EXPECT_EQ(key_names.count("key2"), 1);
-  EXPECT_EQ(key_names.count("key3"), 1);
+  EXPECT_THAT(key_names, Contains("key1"));
+  EXPECT_THAT(key_names, Contains("key2"));
+  EXPECT_THAT(key_names, Contains("key3"));
 }
 
 TEST(ABIImpl, metadata_namespaces) {
@@ -1275,9 +1278,9 @@ TEST(ABIImpl, metadata_namespaces) {
   for (const auto& ns : namespaces) {
     ns_names.insert(std::string(ns.ptr, ns.length));
   }
-  EXPECT_EQ(ns_names.count("ns1"), 1);
-  EXPECT_EQ(ns_names.count("ns2"), 1);
-  EXPECT_EQ(ns_names.count("ns3"), 1);
+  EXPECT_THAT(ns_names, Contains("ns1"));
+  EXPECT_THAT(ns_names, Contains("ns2"));
+  EXPECT_THAT(ns_names, Contains("ns3"));
 }
 
 TEST(ABIImpl, metadata_string_batch) {

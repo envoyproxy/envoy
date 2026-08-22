@@ -18,13 +18,15 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
-
+#include "gmock/gmock.h"
 using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
+
+using testing::Contains;
 
 namespace Envoy {
 namespace Extensions {
@@ -2505,7 +2507,7 @@ TEST_F(DnsCacheImplTest, IterateHostMap) {
 
   EXPECT_EQ(hosts.size(), iterated_hosts.size());
   for (const auto& host : hosts) {
-    EXPECT_EQ(1, iterated_hosts.count(fmt::format("{}:{}", host.first, host.second)));
+    EXPECT_THAT(iterated_hosts, Contains(fmt::format("{}:{}", host.first, host.second)));
   }
 }
 

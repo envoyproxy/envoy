@@ -7,7 +7,11 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::Key;
 
 namespace Envoy {
 namespace Extensions {
@@ -36,7 +40,7 @@ TEST(TestWasmConfig, Basic) {
   auto wasm_config = WasmConfig(plugin_config);
   EXPECT_EQ(name, wasm_config.config().name());
   auto allowed_capabilities = wasm_config.allowedCapabilities();
-  EXPECT_NE(allowed_capabilities.find(function), allowed_capabilities.end());
+  EXPECT_THAT(allowed_capabilities, Contains(Key(function)));
   auto envs = wasm_config.environmentVariables();
   EXPECT_EQ(envs[host_env_key], host_env_value);
   EXPECT_EQ(envs[key], value);

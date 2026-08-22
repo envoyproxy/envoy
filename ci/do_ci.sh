@@ -276,9 +276,8 @@ function bazel_envoy_api_go_build() {
 
 function build_openssl() {
     BAZEL_BUILD_OPTIONS+=("--config=openssl")
-    # shellcheck disable=SC2207
-    # Append OpenSSL compat tests, and exclude quiche tests
-    TEST_TARGETS=("//compat/openssl/test/..." $(printf "%s\n" "${TEST_TARGETS[@]}" | grep -Fxv "@quiche//:ci_tests"))
+    # Append OpenSSL compat tests
+    TEST_TARGETS=("//compat/openssl/test/..." "${TEST_TARGETS[@]}")
     setup_clang_toolchain
     echo "Bazel fastbuild build with OpenSSL..."
     bazel_envoy_binary_build fastbuild
@@ -370,7 +369,6 @@ if [[ $# -ge 1 ]]; then
   COVERAGE_TEST_TARGETS=("$@")
   TEST_TARGETS=("$@")
 else
-  # Coverage test will add QUICHE tests by itself.
   COVERAGE_TEST_TARGETS=("//test/...")
   if [[ "${CI_TARGET}" == "release" || "${CI_TARGET}" == "release.test_only" ]]; then
     # We test contrib on release only.
@@ -378,7 +376,7 @@ else
   elif [[ "${CI_TARGET}" == "msan" ]]; then
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
   fi
-  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@quiche//:ci_tests")
+  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}")
 fi
 
 case $CI_TARGET in
@@ -661,13 +659,14 @@ case $CI_TARGET in
 
     deps)
         setup_clang_toolchain
-        echo "dependency validate_test..."
-        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-              //tools/dependency:validate_test
-        echo "verifying dependencies..."
-        # Validate dependency relationships between core/extensions and external deps.
-        time bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-             //tools/dependency:validate
+        echo "dependency metadata ordering..."
+        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/dependency:deps_order_test
+        echo "dependency validate_reachability_test..."
+        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/dependency:validate_reachability_test
+        echo "dependency graph structure..."
+        "${ENVOY_SRCDIR}/tools/dependency/validate_graph_structure.sh"
         # Validate repository metadata.
         echo "check repositories..."
         "${ENVOY_SRCDIR}/tools/check_repositories.sh"

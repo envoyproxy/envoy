@@ -113,7 +113,7 @@ public:
 class FilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   FilterConfig(const io::istio::http::peer_metadata::Config&,
-               Server::Configuration::FactoryContext&);
+               Server::Configuration::ServerFactoryContext&);
   void discoverDownstream(StreamInfo::StreamInfo&, Http::RequestHeaderMap&, Context&) const;
   void discoverUpstream(StreamInfo::StreamInfo&, Http::ResponseHeaderMap&, Context&) const;
   void injectDownstream(const StreamInfo::StreamInfo&, Http::ResponseHeaderMap&, Context&) const;
@@ -130,11 +130,11 @@ private:
   std::vector<DiscoveryMethodPtr> buildDiscoveryMethods(
       const Protobuf::RepeatedPtrField<io::istio::http::peer_metadata::Config::DiscoveryMethod>&,
       const absl::flat_hash_set<std::string>& additional_labels, bool downstream,
-      Server::Configuration::FactoryContext&) const;
+      Server::Configuration::ServerFactoryContext&) const;
   std::vector<PropagationMethodPtr> buildPropagationMethods(
       const Protobuf::RepeatedPtrField<io::istio::http::peer_metadata::Config::PropagationMethod>&,
       const absl::flat_hash_set<std::string>& additional_labels, bool downstream,
-      Server::Configuration::FactoryContext&) const;
+      Server::Configuration::ServerFactoryContext&) const;
   absl::flat_hash_set<std::string>
   buildAdditionalLabels(const Protobuf::RepeatedPtrField<std::string>&) const;
   StreamInfo::StreamSharingMayImpactPooling sharedWithUpstream() const {
@@ -164,17 +164,16 @@ private:
   Context ctx_;
 };
 
-class FilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+class FilterConfigFactory
+    : public Common::UnifiedFactoryBase<io::istio::http::peer_metadata::Config> {
 public:
-  std::string name() const override { return "envoy.filters.http.peer_metadata"; }
+  FilterConfigFactory() : UnifiedFactoryBase("envoy.filters.http.peer_metadata") {}
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<io::istio::http::peer_metadata::Config>();
-  }
-
+private:
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config, const std::string&,
-                               Server::Configuration::FactoryContext&) override;
+  createHttpFilterFactoryFromProtoTyped(const io::istio::http::peer_metadata::Config& proto_config,
+                                        Server::Configuration::ServerFactoryContext&,
+                                        Server::Configuration::ExtraFactoryContext&) override;
 };
 
 } // namespace PeerMetadata

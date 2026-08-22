@@ -31,6 +31,8 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -328,7 +330,7 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithCustomRequestPath) {
   wrapper.connect("test-tenant", "test-cluster", "test-node");
 
   const std::string encoded_request = captured_buffer.toString();
-  EXPECT_NE(encoded_request.find("GET /custom/handshake HTTP/1.1"), std::string::npos);
+  EXPECT_THAT(encoded_request, HasSubstr("GET /custom/handshake HTTP/1.1"));
 }
 
 // Test RCConnectionWrapper::connect() includes additional headers in the handshake request.
@@ -374,8 +376,8 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithAdditionalHeaders) {
   wrapper.connect("test-tenant", "test-cluster", "test-node");
 
   const std::string encoded_request = captured_buffer.toString();
-  EXPECT_NE(encoded_request.find("x-custom-auth: token123"), std::string::npos);
-  EXPECT_NE(encoded_request.find("x-request-id: abc-def"), std::string::npos);
+  EXPECT_THAT(encoded_request, HasSubstr("x-custom-auth: token123"));
+  EXPECT_THAT(encoded_request, HasSubstr("x-request-id: abc-def"));
 }
 
 // Test that additional headers with OVERWRITE_IF_EXISTS_OR_ADD replace existing headers.
@@ -423,7 +425,7 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersOverwrite) 
 
   const std::string encoded_request = captured_buffer.toString();
   // Verify the host was overwritten (not duplicated).
-  EXPECT_NE(encoded_request.find("host: custom-host:9090"), std::string::npos);
+  EXPECT_THAT(encoded_request, HasSubstr("host: custom-host:9090"));
   EXPECT_EQ(encoded_request.find("192.168.1.1:8080"), std::string::npos);
 }
 
@@ -477,7 +479,7 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersAddIfAbsent
   // "host" was already set, so ADD_IF_ABSENT should not add "should-not-appear".
   EXPECT_EQ(encoded_request.find("should-not-appear"), std::string::npos);
   // "x-new-header" was absent, so ADD_IF_ABSENT should add it.
-  EXPECT_NE(encoded_request.find("x-new-header: new-value"), std::string::npos);
+  EXPECT_THAT(encoded_request, HasSubstr("x-new-header: new-value"));
 }
 
 // Test OVERWRITE_IF_EXISTS: overwrites existing header, does nothing for absent header.
@@ -529,7 +531,7 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeAdditionalHeadersOverwriteIf
 
   const std::string encoded_request = captured_buffer.toString();
   // "host" existed, so OVERWRITE_IF_EXISTS should replace it.
-  EXPECT_NE(encoded_request.find("host: overwritten-host"), std::string::npos);
+  EXPECT_THAT(encoded_request, HasSubstr("host: overwritten-host"));
   EXPECT_EQ(encoded_request.find("192.168.1.1:8080"), std::string::npos);
   // "x-nonexistent" didn't exist, so OVERWRITE_IF_EXISTS should not add it.
   EXPECT_EQ(encoded_request.find("should-not-appear"), std::string::npos);
@@ -582,7 +584,7 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeFormatterHeaders) {
   wrapper.connect("test-tenant", "test-cluster", "test-node");
 
   const std::string encoded_request = captured_buffer.toString();
-  EXPECT_NE(encoded_request.find("authorization: Bearer TestFormatter"), std::string::npos);
+  EXPECT_THAT(encoded_request, HasSubstr("authorization: Bearer TestFormatter"));
 }
 
 // With formatters unset, additional_headers are applied literally including '%'
@@ -630,7 +632,7 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeLiteralHeaders) {
   wrapper.connect("test-tenant", "test-cluster", "test-node");
 
   const std::string encoded_request = captured_buffer.toString();
-  EXPECT_NE(encoded_request.find("x-literal: 100% literal"), std::string::npos);
+  EXPECT_THAT(encoded_request, HasSubstr("x-literal: 100% literal"));
 }
 
 // Exercises the full ReverseTunnelInitiator::socket() -> io_handle -> wrapper path. socket()
@@ -720,7 +722,7 @@ TEST_F(RCConnectionWrapperTest, HandshakeHeadersResolvedThroughSocketPathAfterIn
 
   const std::string encoded_request = captured_buffer.toString();
   // The live formatter resolves the value; the raw literal must not leak through.
-  EXPECT_NE(encoded_request.find("authorization: Bearer TestFormatter"), std::string::npos);
+  EXPECT_THAT(encoded_request, HasSubstr("authorization: Bearer TestFormatter"));
   EXPECT_EQ(encoded_request.find("%COMMAND_EXTENSION()%"), std::string::npos);
 }
 
@@ -878,10 +880,10 @@ TEST_F(RCConnectionWrapperTest, ConnectIncludesWorkerAndConnectionIdHeaders) {
   const std::string encoded_request = captured_buffer.toString();
 
   // The worker id is the connection's dispatcher name ("worker_0" in this fixture).
-  EXPECT_NE(encoded_request.find("x-envoy-reverse-tunnel-worker-id: worker_0"), std::string::npos)
+  EXPECT_THAT(encoded_request, HasSubstr("x-envoy-reverse-tunnel-worker-id: worker_0"))
       << "worker-id header not found in handshake request: " << encoded_request;
   // The connection id is the mocked connection id.
-  EXPECT_NE(encoded_request.find("x-envoy-reverse-tunnel-connection-id: 98765"), std::string::npos)
+  EXPECT_THAT(encoded_request, HasSubstr("x-envoy-reverse-tunnel-connection-id: 98765"))
       << "connection-id header not found in handshake request: " << encoded_request;
 }
 
