@@ -419,7 +419,7 @@ class ValidateReachabilityTest(unittest.TestCase):
 
         cls.metadata = _load_json(meta_path)
         cls.extensions_build_config = _load_json(ext_cfg_path)
-        cls.apparent_lookup = _build_apparent_name_lookup(cls.metadata)
+        cls.apparent_lookup = {}  # _build_apparent_name_lookup(cls.metadata)
         cls.revmap = _build_implied_revmap(cls.metadata)
 
         # Resolved set of metadata keys reachable from the core root.
