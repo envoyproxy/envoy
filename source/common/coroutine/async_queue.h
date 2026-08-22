@@ -348,6 +348,20 @@ public:
 
     auto alive = alive_;
 
+    // 1. Cancel all pending capacity requests in reverse order so SharedCapacity
+    // will never attempt to grant capacity to any waiter of this queue.
+    for (auto it = push_waiters_.rbegin(); it != push_waiters_.rend(); ++it) {
+      if (it->capacity_waiter_it.has_value()) {
+        auto cap_it = *it->capacity_waiter_it;
+        it->capacity_waiter_it.reset();
+        capacity_->cancelRequest(cap_it);
+        if (!*alive) {
+          return;
+        }
+      }
+    }
+
+    // 2. Complete pop waiters with EOF (nullopt) since closed queue cannot accept new items.
     while (!pop_waiters_.empty()) {
       PopWaiterCallback waiter = std::move(pop_waiters_.front().callback);
       pop_waiters_.pop_front();
@@ -357,18 +371,10 @@ public:
       }
     }
 
+    // 3. Abort all pending push waiters with FailedPrecondition.
     while (!push_waiters_.empty()) {
-      auto it = std::prev(push_waiters_.end());
-      PushWaiter waiter = std::move(*it);
-      push_waiters_.pop_back();
-
-      if (waiter.capacity_waiter_it.has_value()) {
-        capacity_->cancelRequest(*waiter.capacity_waiter_it);
-        if (!*alive) {
-          return;
-        }
-      }
-
+      PushWaiter waiter = std::move(push_waiters_.front());
+      push_waiters_.pop_front();
       PushWaiterCallback cb = std::move(waiter.callback);
       cb(absl::FailedPreconditionError("queue closed"));
       if (!*alive) {
@@ -387,10 +393,22 @@ private:
   }
 
   void onCapacityGranted(PushWaiterIt it) {
-    if (!*alive_ || closed_) {
+    auto alive = alive_;
+    if (!*alive) {
+      capacity_->release(it->size);
       return;
     }
-    auto alive = alive_;
+
+    it->capacity_waiter_it.reset();
+
+    if (closed_) {
+      capacity_->release(it->size);
+      PushWaiterCallback cb = std::move(it->callback);
+      push_waiters_.erase(it);
+      cb(absl::FailedPreconditionError("queue closed"));
+      return;
+    }
+
     uint64_t size = it->size;
     current_size_ += size;
     queue_.push_back(QueuedItem{std::move(it->item), size});
