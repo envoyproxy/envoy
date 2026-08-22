@@ -207,8 +207,52 @@ TEST_F(DynamicModuleClusterTest, CreationWithClusterConfig) {
   EXPECT_NE(nullptr, result->second);
 }
 
-// Test that a non-CLUSTER_PROVIDED lb_policy is rejected.
-TEST_F(DynamicModuleClusterTest, InvalidLbPolicy) {
+// Test that CLUSTER_PROVIDED lb_policy returns a non-null thread-aware LB.
+TEST_F(DynamicModuleClusterTest, ClusterProvidedLbPolicy) {
+  const std::string yaml = R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: test
+)EOF";
+
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // CLUSTER_PROVIDED should return a non-null thread-aware LB (module LB).
+  EXPECT_NE(nullptr, result->second);
+}
+
+// Test that LEAST_REQUEST lb_policy is accepted and returns nullptr thread-aware LB.
+TEST_F(DynamicModuleClusterTest, LeastRequestLbPolicy) {
+  const std::string yaml = R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: LEAST_REQUEST
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: test
+)EOF";
+
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // Native LB policies should return nullptr thread-aware LB.
+  EXPECT_EQ(nullptr, result->second);
+}
+
+// Test that ROUND_ROBIN lb_policy is accepted and returns nullptr thread-aware LB.
+TEST_F(DynamicModuleClusterTest, RoundRobinLbPolicy) {
   const std::string yaml = R"EOF(
 name: test_cluster
 connect_timeout: 0.25s
@@ -223,7 +267,76 @@ cluster_type:
 )EOF";
 
   auto result = createCluster(yaml);
-  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("CLUSTER_PROVIDED")));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // Native LB policies should return nullptr thread-aware LB.
+  EXPECT_EQ(nullptr, result->second);
+}
+
+// Test that RANDOM lb_policy is accepted and returns nullptr thread-aware LB.
+TEST_F(DynamicModuleClusterTest, RandomLbPolicy) {
+  const std::string yaml = R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: RANDOM
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: test
+)EOF";
+
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // Native LB policies should return nullptr thread-aware LB.
+  EXPECT_EQ(nullptr, result->second);
+}
+
+// Test that RING_HASH lb_policy is accepted and returns nullptr thread-aware LB.
+TEST_F(DynamicModuleClusterTest, RingHashLbPolicy) {
+  const std::string yaml = R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: RING_HASH
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: test
+)EOF";
+
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // Native LB policies should return nullptr thread-aware LB.
+  EXPECT_EQ(nullptr, result->second);
+}
+
+// Test that MAGLEV lb_policy is accepted and returns nullptr thread-aware LB.
+TEST_F(DynamicModuleClusterTest, MaglevLbPolicy) {
+  const std::string yaml = R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: MAGLEV
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: test
+)EOF";
+
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // Native LB policies should return nullptr thread-aware LB.
+  EXPECT_EQ(nullptr, result->second);
 }
 
 // Test that a missing module fails gracefully.
