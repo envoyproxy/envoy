@@ -1334,6 +1334,22 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlScalar) {
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("null"), "null_value: NULL_VALUE"));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("true"), "bool_value: true"));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("1"), "number_value: 1"));
+  // Plain (untagged) float/double literals are left as strings, preserving pre-existing
+  // behavior for configs that rely on this fallback (e.g. a string match `exact: 3.14`).
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("3.14"), "string_value: \"3.14\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml(".inf"), "string_value: \".inf\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("-.inf"), "string_value: \"-.inf\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml(".nan"), "string_value: \".nan\""));
+  // An explicit `!!float` tag opts a scalar into being parsed as a JSON number.
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("!!float 3.14"), "number_value: 3.14"));
+  // "1e2" is not a valid int64 literal, so this exercises the double-decode path specifically
+  // (as opposed to "!!float 1", which the preceding int64 check would already have claimed).
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("!!float 1e2"), "number_value: 100"));
+  EXPECT_TRUE(
+      checkProtoEquality(ValueUtil::loadFromYaml("!!float .inf"), "string_value: \"Infinity\""));
+  EXPECT_TRUE(
+      checkProtoEquality(ValueUtil::loadFromYaml("!!float -.inf"), "string_value: \"-Infinity\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("!!float .nan"), "string_value: \"NaN\""));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("9223372036854775807"),
                                  "string_value: \"9223372036854775807\""));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("\"foo\""), "string_value: \"foo\""));
