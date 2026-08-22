@@ -54,7 +54,10 @@ pub trait Cluster: Send + Sync {
   /// When returning `None`, Envoy will use the standard load balancer factory based on
   /// `lb_policy` + `common_lb_config` (e.g., zone-aware or locality-weighted routing).
   /// The module's `choose_host` hook will never be called if this returns `None`.
-  fn new_load_balancer(&self, envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>>;
+  fn new_load_balancer(
+    &self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>>;
 
   /// Called on the main thread when a new event is scheduled via
   /// [`EnvoyClusterScheduler::commit`] for this [`Cluster`].

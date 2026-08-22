@@ -144,7 +144,10 @@ impl Cluster for SyncHostSelectionCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
     Some(Box::new(SyncHostSelectionLb {
       hosts: self.hosts.clone(),
       index: AtomicUsize::new(0),
@@ -211,7 +214,10 @@ impl Cluster for AsyncHostSelectionCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
     Some(Box::new(AsyncHostSelectionLb {
       hosts: self.hosts.clone(),
     }))
@@ -301,7 +307,10 @@ impl Cluster for SchedulerHostUpdateCluster {
     scheduler.commit(ADD_HOST_EVENT_ID);
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
     Some(Box::new(SchedulerHostUpdateLb {
       hosts: self.hosts.clone(),
       membership_update_count: AtomicUsize::new(0),
@@ -380,7 +389,10 @@ impl Cluster for LifecycleCallbacksCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
     Some(Box::new(LifecycleCallbacksLb {
       hosts: self.hosts.clone(),
     }))
@@ -476,7 +488,10 @@ impl Cluster for RunOnAllWorkersCluster {
     scheduler.commit(RUN_ON_ALL_WORKERS_TRIGGER_EVENT_ID);
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
     Some(Box::new(RunOnAllWorkersLb {
       hosts: self.hosts.clone(),
     }))
@@ -561,7 +576,10 @@ impl Cluster for WorkerLocalRebuildCluster {
     scheduler.commit(WORKER_LOCAL_REBUILD_ADD_EVENT_ID);
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
     Some(Box::new(WorkerLocalRebuildLb {
       hosts: Vec::new(),
       index: 0,
@@ -675,7 +693,10 @@ impl Cluster for MemberUpdatePackedAddressCluster {
     scheduler.commit(PACKED_ADDRESS_ADD_EVENT_ID);
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
     Some(Box::new(MemberUpdatePackedAddressLb {
       hosts: Vec::new(),
       index: 0,
@@ -810,7 +831,10 @@ impl Cluster for WorkerTimerCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
     Some(Box::new(WorkerTimerLb {
       hosts: self.hosts.clone(),
       timer: None,
@@ -915,7 +939,10 @@ impl Cluster for NativeLbTestCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
     Some(Box::new(NativeLbTestLb {
       hosts: self.hosts.clone(),
       index: AtomicUsize::new(0),

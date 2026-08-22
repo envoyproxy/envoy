@@ -518,7 +518,8 @@ class DynamicModuleClusterNativeLbIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
 public:
-  DynamicModuleClusterNativeLbIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  DynamicModuleClusterNativeLbIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void initializeWithNativeLb() {
     TestEnvironment::setEnvVar(

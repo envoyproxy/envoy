@@ -295,8 +295,8 @@ cluster_type:
   EXPECT_EQ(nullptr, result->second);
 }
 
-// Test that thread-aware lb_policy like RING_HASH is rejected.
-TEST_F(DynamicModuleClusterTest, RingHashLbPolicyRejected) {
+// Test that RING_HASH lb_policy is accepted and returns nullptr thread-aware LB.
+TEST_F(DynamicModuleClusterTest, RingHashLbPolicy) {
   const std::string yaml = R"EOF(
 name: test_cluster
 connect_timeout: 0.25s
@@ -311,13 +311,14 @@ cluster_type:
 )EOF";
 
   auto result = createCluster(yaml);
-  ASSERT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("not valid for cluster type 'envoy.clusters.dynamic_modules'"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // Native LB policies should return nullptr thread-aware LB.
+  EXPECT_EQ(nullptr, result->second);
 }
 
-// Test that thread-aware lb_policy like MAGLEV is rejected.
-TEST_F(DynamicModuleClusterTest, MaglevLbPolicyRejected) {
+// Test that MAGLEV lb_policy is accepted and returns nullptr thread-aware LB.
+TEST_F(DynamicModuleClusterTest, MaglevLbPolicy) {
   const std::string yaml = R"EOF(
 name: test_cluster
 connect_timeout: 0.25s
@@ -332,9 +333,10 @@ cluster_type:
 )EOF";
 
   auto result = createCluster(yaml);
-  ASSERT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("not valid for cluster type 'envoy.clusters.dynamic_modules'"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // Native LB policies should return nullptr thread-aware LB.
+  EXPECT_EQ(nullptr, result->second);
 }
 
 // Test that a missing module fails gracefully.

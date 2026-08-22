@@ -903,21 +903,21 @@ DynamicModuleClusterFactory::createClusterWithConfig(
     const envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context) {
 
-  // Validate that the LB policy is one supported by dynamic_modules clusters.
-  // CLUSTER_PROVIDED (module LB) is always supported.
-  // LEAST_REQUEST, ROUND_ROBIN, RANDOM (native factory LB) are supported.
-  // Thread-aware policies (ring hash, maglev) are not supported.
+  // CLUSTER_PROVIDED uses the module's load balancer; the native policies use Envoy's factory
+  // load balancer, with the module supplying only host discovery.
   const auto policy = cluster.lb_policy();
   const bool is_module_lb = (policy == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
   const bool is_native_lb = (policy == envoy::config::cluster::v3::Cluster::LEAST_REQUEST ||
                              policy == envoy::config::cluster::v3::Cluster::ROUND_ROBIN ||
-                             policy == envoy::config::cluster::v3::Cluster::RANDOM);
+                             policy == envoy::config::cluster::v3::Cluster::RANDOM ||
+                             policy == envoy::config::cluster::v3::Cluster::RING_HASH ||
+                             policy == envoy::config::cluster::v3::Cluster::MAGLEV);
 
   if (!is_module_lb && !is_native_lb) {
     return absl::InvalidArgumentError(
         fmt::format("cluster: LB policy {} is not valid for cluster type "
-                    "'envoy.clusters.dynamic_modules'. Supported policies are "
-                    "CLUSTER_PROVIDED, LEAST_REQUEST, ROUND_ROBIN, and RANDOM.",
+                    "'envoy.clusters.dynamic_modules'. Supported policies are CLUSTER_PROVIDED, "
+                    "LEAST_REQUEST, ROUND_ROBIN, RANDOM, RING_HASH, and MAGLEV.",
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(policy)));
   }
 

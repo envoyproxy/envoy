@@ -69,7 +69,10 @@ impl Cluster for DynamicMetadataWriterCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
     Some(Box::new(DynamicMetadataWriterLb {
       hosts: self.hosts.clone(),
     }))
