@@ -73,7 +73,7 @@ public:
         &callbacks_, request_headers, std::move(context_extensions), std::move(metadata_context),
         envoy::config::core::v3::Metadata(), request, /*max_request_bytes=*/0,
         /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, include_peer_certificate,
-        want_tls_session != nullptr, labels, nullptr, nullptr);
+        want_tls_session != nullptr, /*strip_query_params=*/false, labels, nullptr, nullptr);
 
     EXPECT_EQ("source", request.attributes().source().principal());
     EXPECT_EQ("destination", request.attributes().destination().principal());
@@ -290,7 +290,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
-      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
+      /*include_tls_session=*/false, /*strip_query_params=*/false,
+      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_FALSE(request_.attributes().request().http().has_header_map());
@@ -319,7 +320,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithDuplicateHeaders) {
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
-      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
+      /*include_tls_session=*/false, /*strip_query_params=*/false,
+      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_FALSE(request_.attributes().request().http().has_header_map());
@@ -351,8 +353,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderAllowlist) {
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
-      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(),
-      createRequestHeaderAllowlist(), nullptr);
+      /*include_tls_session=*/false, /*strip_query_params=*/false,
+      Protobuf::Map<std::string, std::string>(), createRequestHeaderAllowlist(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_FALSE(request_.attributes().request().http().has_header_map());
@@ -389,8 +391,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderDenylist) {
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
-      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr,
-      createRequestHeaderDenylist());
+      /*include_tls_session=*/false, /*strip_query_params=*/false,
+      Protobuf::Map<std::string, std::string>(), nullptr, createRequestHeaderDenylist());
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_FALSE(request_.attributes().request().http().has_header_map());
@@ -429,8 +431,9 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderAllowlistAndDenylist) {
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
-      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(),
-      createRequestHeaderAllowlist(), createRequestHeaderDenylist());
+      /*include_tls_session=*/false, /*strip_query_params=*/false,
+      Protobuf::Map<std::string, std::string>(), createRequestHeaderAllowlist(),
+      createRequestHeaderDenylist());
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_FALSE(request_.attributes().request().http().has_header_map());
@@ -461,7 +464,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
-      /*include_tls_session=*/false, Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
+      /*include_tls_session=*/false, /*strip_query_params=*/false,
+      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_FALSE(request_.attributes().request().http().has_header_map());
@@ -483,7 +487,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_,
       buffer_->length(), /*pack_as_bytes=*/false, /*encode_raw_headers=*/false,
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
-      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
+      /*strip_query_params=*/false, Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
@@ -518,7 +522,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBodyPackAsBytes) {
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request_,
       buffer_->length(), /*pack_as_bytes=*/true, /*encode_raw_headers=*/false,
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
-      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
+      /*strip_query_params=*/false, Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
 
   // TODO(dio): Find a way to test this without using function from testing::internal namespace.
   testing::internal::CaptureStderr();
@@ -560,7 +564,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithHeadersAsBytes) {
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request,
       buffer_->length(), /*pack_as_bytes=*/false, /*encode_raw_headers=*/true,
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
-      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
+      /*strip_query_params=*/false, Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
 
   // Headers field should be empty since ext_authz should populate header_map INSTEAD.
   EXPECT_EQ(0, request.attributes().request().http().headers().size());
@@ -594,7 +598,7 @@ TEST_F(CheckRequestUtilsTest, HeadersAsBytesNoConcatentation) {
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request,
       buffer_->length(), /*pack_as_bytes=*/false, /*encode_raw_headers=*/true,
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
-      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
+      /*strip_query_params=*/false, Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
 
   EXPECT_EQ(0, request.attributes().request().http().headers().size());
   ASSERT_TRUE(request.attributes().request().http().has_header_map());
@@ -625,7 +629,7 @@ TEST_F(CheckRequestUtilsTest, HeadersAsBytesExistingPartialBodyHeader) {
       envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request,
       buffer_->length(), /*pack_as_bytes=*/false, /*encode_raw_headers=*/true,
       /*include_peer_certificate=*/false, /*include_tls_session=*/false,
-      Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
+      /*strip_query_params=*/false, Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
 
   EXPECT_EQ(0, request.attributes().request().http().headers().size());
   ASSERT_TRUE(request.attributes().request().http().has_header_map());
@@ -766,6 +770,67 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   EXPECT_CALL(*ssl_, sni()).WillOnce(ReturnRef(want_tls_session.sni()));
 
   callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
+}
+
+// Verify that createHttpCheck strips the query string from both the path field and the
+// forwarded :path header entry when strip_query_params is set, in both sanitized-headers
+// and raw-headers modes.
+TEST_F(CheckRequestUtilsTest, StripQueryParams) {
+  for (const bool encode_raw_headers : {false, true}) {
+    for (const bool strip_query_params : {false, true}) {
+      Http::TestRequestHeaderMapImpl request_headers{{":path", "/api?secret=1&foo=bar"},
+                                                     {"x-key", "value"}};
+
+      EXPECT_CALL(*ssl_, uriSanPeerCertificate())
+          .WillOnce(Return(std::vector<std::string>{"source"}));
+      EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+          .WillOnce(Return(std::vector<std::string>{"destination"}));
+      expectBasicHttp();
+
+      envoy::service::auth::v3::CheckRequest request;
+      CheckRequestUtils::createHttpCheck(
+          &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
+          envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request,
+          /*max_request_bytes=*/0, /*pack_as_bytes=*/false, encode_raw_headers,
+          /*include_peer_certificate=*/false, /*include_tls_session=*/false, strip_query_params,
+          Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
+
+      const std::string expected_path = strip_query_params ? "/api" : "/api?secret=1&foo=bar";
+
+      // The path field and the forwarded :path header entry carry the same path.
+      EXPECT_EQ(expected_path, request.attributes().request().http().path());
+      if (encode_raw_headers) {
+        EXPECT_EQ(0, request.attributes().request().http().headers().size());
+        expectHeadersInHeaderMap(request.attributes().request().http().header_map(),
+                                 {{":path", expected_path}, {"x-key", "value"}});
+      } else {
+        EXPECT_EQ(expected_path, request.attributes().request().http().headers().at(":path"));
+        EXPECT_EQ("value", request.attributes().request().http().headers().at("x-key"));
+        EXPECT_FALSE(request.attributes().request().http().has_header_map());
+      }
+    }
+  }
+}
+
+// A path without a query string is unchanged when strip_query_params is set.
+TEST_F(CheckRequestUtilsTest, StripQueryParamsNoQueryString) {
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/api"}};
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+  expectBasicHttp();
+
+  envoy::service::auth::v3::CheckRequest request;
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
+      envoy::config::core::v3::Metadata(), envoy::config::core::v3::Metadata(), request,
+      /*max_request_bytes=*/0, /*pack_as_bytes=*/false, /*encode_raw_headers=*/false,
+      /*include_peer_certificate=*/false, /*include_tls_session=*/false,
+      /*strip_query_params=*/true, Protobuf::Map<std::string, std::string>(), nullptr, nullptr);
+
+  EXPECT_EQ("/api", request.attributes().request().http().path());
+  EXPECT_EQ("/api", request.attributes().request().http().headers().at(":path"));
 }
 
 } // namespace
