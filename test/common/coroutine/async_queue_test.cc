@@ -10,6 +10,7 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -30,9 +31,104 @@ class AsyncQueueTest : public testing::Test {
 public:
   AsyncQueueTest() : executor_(std::make_shared<ManualExecutor>()) {}
 
+  void drain() { executor_->drain(); }
+
+  void launchTaskOk(Task<absl::Status> task) {
+    handles_.push_back(
+        launch(std::move(task), executor_, [](absl::Status status) { EXPECT_OK(status); }));
+  }
+
+  template <typename T, typename SizeFunc, typename U = T>
+  static Task<absl::Status> pushTask(AsyncQueue<T, SizeFunc>& queue, U item, bool* done = nullptr) {
+    CO_RETURN_IF_ERROR(co_await queue.push(std::move(item)));
+    if (done != nullptr) {
+      *done = true;
+    }
+    co_return absl::OkStatus();
+  }
+
+  template <typename T, typename SizeFunc, typename U = T, typename TrackType = T>
+  static Task<absl::Status> pushTrackTask(AsyncQueue<T, SizeFunc>& queue, U item,
+                                          std::vector<TrackType>* order_vec) {
+    TrackType tracked = item;
+    CO_RETURN_IF_ERROR(co_await queue.push(std::move(item)));
+    if (order_vec != nullptr) {
+      order_vec->push_back(std::move(tracked));
+    }
+    co_return absl::OkStatus();
+  }
+
+  template <typename T, typename SizeFunc>
+  static Task<absl::Status> popTask(AsyncQueue<T, SizeFunc>& queue,
+                                    std::optional<T>* out_val = nullptr, bool* eof_seen = nullptr) {
+    auto res = co_await queue.pop();
+    CO_RETURN_IF_ERROR(res.status());
+    if (res->has_value()) {
+      if (out_val != nullptr) {
+        *out_val = std::move(**res);
+      }
+    } else {
+      if (eof_seen != nullptr) {
+        *eof_seen = true;
+      }
+    }
+    co_return absl::OkStatus();
+  }
+
+  template <typename T, typename SizeFunc, typename Container>
+  static Task<absl::Status> popMultipleTask(AsyncQueue<T, SizeFunc>& queue, size_t count,
+                                            Container* out_vec) {
+    for (size_t i = 0; i < count; ++i) {
+      auto val_or = co_await queue.pop();
+      CO_RETURN_IF_ERROR(val_or.status());
+      if (!val_or->has_value()) {
+        break;
+      }
+      if (out_vec != nullptr) {
+        out_vec->push_back(std::move(**val_or));
+      }
+    }
+    co_return absl::OkStatus();
+  }
+
+  template <typename T, typename SizeFunc, typename U = T>
+  void launchPush(AsyncQueue<T, SizeFunc>& queue, U item, bool* done = nullptr) {
+    launchTaskOk(pushTask(queue, std::move(item), done));
+  }
+
+  template <typename T, typename SizeFunc, typename U = T, typename TrackType>
+  void launchPushTrack(AsyncQueue<T, SizeFunc>& queue, U item, std::vector<TrackType>& order_vec) {
+    launchTaskOk(pushTrackTask(queue, std::move(item), &order_vec));
+  }
+
+  template <typename T, typename SizeFunc>
+  void launchPop(AsyncQueue<T, SizeFunc>& queue, std::optional<T>* out_val = nullptr,
+                 bool* eof_seen = nullptr) {
+    launchTaskOk(popTask(queue, out_val, eof_seen));
+  }
+
+  template <typename T, typename SizeFunc>
+  void launchPop(AsyncQueue<T, SizeFunc>& queue, std::nullptr_t, bool* eof_seen) {
+    launchTaskOk(popTask(queue, static_cast<std::optional<T>*>(nullptr), eof_seen));
+  }
+
+  template <typename T, typename SizeFunc>
+  void launchPop(AsyncQueue<T, SizeFunc>& queue, std::optional<T>& out_val) {
+    launchPop(queue, &out_val, nullptr);
+  }
+
+  template <typename T, typename SizeFunc, typename Container>
+  void launchPopMultiple(AsyncQueue<T, SizeFunc>& queue, size_t count, Container& out_vec) {
+    launchTaskOk(popMultipleTask(queue, count, &out_vec));
+  }
+
   std::shared_ptr<ManualExecutor> executor_;
   std::vector<DetachedHandle> handles_;
 };
+
+// ============================================================================
+// 1. Basic Push, Pop, and FIFO Ordering
+// ============================================================================
 
 TEST_F(AsyncQueueTest, UnboundedQueuePushPopFIFO) {
   AsyncQueue<std::string> queue;
@@ -41,40 +137,23 @@ TEST_F(AsyncQueueTest, UnboundedQueuePushPopFIFO) {
   EXPECT_EQ(queue.currentSize(), 0);
   EXPECT_EQ(queue.itemCount(), 0);
 
-  bool push_done = false;
-  auto push_task = [&queue, &push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await queue.push("item1"));
-    CO_RETURN_IF_ERROR(co_await queue.push("item2"));
-    CO_RETURN_IF_ERROR(co_await queue.push("item3"));
-    push_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
-  EXPECT_TRUE(push_done);
+  bool push1_done = false;
+  bool push2_done = false;
+  bool push3_done = false;
+  launchPush(queue, "item1", &push1_done);
+  launchPush(queue, "item2", &push2_done);
+  launchPush(queue, "item3", &push3_done);
+  drain();
+  EXPECT_TRUE(push1_done);
+  EXPECT_TRUE(push2_done);
+  EXPECT_TRUE(push3_done);
   EXPECT_EQ(queue.itemCount(), 3);
   EXPECT_EQ(queue.currentSize(), 3);
 
   std::vector<std::string> received;
-  auto pop_task = [&queue, &received]() -> Task<absl::Status> {
-    for (int i = 0; i < 3; ++i) {
-      auto val_or = co_await queue.pop();
-      if (!val_or.ok() || !val_or->has_value()) {
-        break;
-      }
-      received.push_back(std::move(**val_or));
-    }
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(launch(pop_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
-  ASSERT_EQ(received.size(), 3);
-  EXPECT_EQ(received[0], "item1");
-  EXPECT_EQ(received[1], "item2");
-  EXPECT_EQ(received[2], "item3");
+  launchPopMultiple(queue, 3, received);
+  drain();
+  EXPECT_THAT(received, testing::ElementsAre("item1", "item2", "item3"));
   EXPECT_TRUE(queue.empty());
 }
 
@@ -96,9 +175,8 @@ TEST_F(AsyncQueueTest, BoundedQueueBlocksPusherWhenFull) {
     co_return absl::OkStatus();
   };
 
-  handles_.push_back(
-      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchTaskOk(push_task());
+  drain();
 
   // Pushes 1 and 2 completed; 3 is waiting in push_waiters_
   EXPECT_EQ(queue.itemCount(), 2);
@@ -106,17 +184,8 @@ TEST_F(AsyncQueueTest, BoundedQueueBlocksPusherWhenFull) {
 
   // Pop one item, which frees space and unblocks push of 3
   std::optional<int> pop1;
-  auto pop_task1 = [&queue, &pop1]() -> Task<absl::Status> {
-    auto val_or = co_await queue.pop();
-    if (val_or.ok() && val_or->has_value()) {
-      pop1 = std::move(**val_or);
-    }
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(pop_task1(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPop(queue, pop1);
+  drain();
   EXPECT_EQ(pop1, 1);
 
   // Now push of 3 has completed, and push of 4 suspended because queue is back to capacity (2,3)
@@ -125,23 +194,9 @@ TEST_F(AsyncQueueTest, BoundedQueueBlocksPusherWhenFull) {
 
   // Pop remaining items
   std::vector<int> remaining_popped;
-  auto drain_task = [&queue, &remaining_popped]() -> Task<absl::Status> {
-    for (int i = 0; i < 3; ++i) {
-      auto val_or = co_await queue.pop();
-      if (val_or.ok() && val_or->has_value()) {
-        remaining_popped.push_back(**val_or);
-      }
-    }
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(drain_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
-  ASSERT_EQ(remaining_popped.size(), 3);
-  EXPECT_EQ(remaining_popped[0], 2);
-  EXPECT_EQ(remaining_popped[1], 3);
-  EXPECT_EQ(remaining_popped[2], 4);
+  launchPopMultiple(queue, 3, remaining_popped);
+  drain();
+  EXPECT_THAT(remaining_popped, testing::ElementsAre(2, 3, 4));
   EXPECT_TRUE(queue.empty());
 }
 
@@ -154,35 +209,23 @@ TEST_F(AsyncQueueTest, AbstractCapacityUnitBytes) {
   bool push1_done = false;
   bool push2_done = false;
 
-  auto push_task = [&queue, &push1_done, &push2_done]() -> Task<absl::Status> {
-    // 60 bytes
-    CO_RETURN_IF_ERROR(co_await queue.push(TestByteItem{std::string(60, 'a')}));
-    push1_done = true;
-
-    // 50 bytes -> 60 + 50 = 110 > 100 bytes, suspends!
-    CO_RETURN_IF_ERROR(co_await queue.push(TestByteItem{std::string(50, 'b')}));
-    push2_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  // 60 bytes
+  launchPush(queue, TestByteItem{std::string(60, 'a')}, &push1_done);
+  // 50 bytes -> 60 + 50 = 110 > 100 bytes, suspends!
+  launchPush(queue, TestByteItem{std::string(50, 'b')}, &push2_done);
+  drain();
 
   EXPECT_TRUE(push1_done);
   EXPECT_FALSE(push2_done);
   EXPECT_EQ(queue.currentSize(), 60);
 
   // Pop first item (60 bytes)
-  auto pop_task = [&queue]() -> Task<absl::Status> {
-    auto val_or = co_await queue.pop();
-    EXPECT_TRUE(val_or.ok());
-    EXPECT_EQ((*val_or)->data.size(), 60);
-    co_return absl::OkStatus();
-  };
+  std::optional<TestByteItem> popped;
+  launchPop(queue, popped);
+  drain();
 
-  handles_.push_back(launch(pop_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  ASSERT_TRUE(popped.has_value());
+  EXPECT_EQ(popped->data.size(), 60);
 
   // Now push2 should have unblocked
   EXPECT_TRUE(push2_done);
@@ -194,27 +237,13 @@ TEST_F(AsyncQueueTest, DirectHandoffToWaitingPopper) {
   AsyncQueue<std::string> queue(1);
 
   std::optional<std::string> popped;
-  auto pop_task = [&queue, &popped]() -> Task<absl::Status> {
-    auto val_or = co_await queue.pop();
-    if (val_or.ok() && val_or->has_value()) {
-      popped = std::move(**val_or);
-    }
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(launch(pop_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPop(queue, popped);
+  drain();
   EXPECT_FALSE(popped.has_value());
 
   // Push directly hands off to the waiting popper without queueing
-  auto push_task = [&queue]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await queue.push("direct_message"));
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPush(queue, "direct_message");
+  drain();
   EXPECT_TRUE(popped.has_value());
   EXPECT_EQ(*popped, "direct_message");
   EXPECT_TRUE(queue.empty());
@@ -235,6 +264,10 @@ TEST_F(AsyncQueueTest, TryPushAndTryPop) {
   EXPECT_FALSE(queue.tryPop().has_value());
 }
 
+// ============================================================================
+// 2. Close and Cancellation Semantics
+// ============================================================================
+
 TEST_F(AsyncQueueTest, CloseSignalsEOF) {
   AsyncQueue<std::string> queue;
 
@@ -246,30 +279,14 @@ TEST_F(AsyncQueueTest, CloseSignalsEOF) {
 
   // First pop gets queued item
   std::optional<std::string> val1;
-  auto pop_task1 = [&queue, &val1]() -> Task<absl::Status> {
-    auto res = co_await queue.pop();
-    if (res.ok() && res->has_value()) {
-      val1 = std::move(**res);
-    }
-    co_return absl::OkStatus();
-  };
-  handles_.push_back(
-      launch(pop_task1(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPop(queue, val1);
+  drain();
   EXPECT_EQ(val1, "msg");
 
   // Second pop gets EOF (nullopt)
   bool eof_seen = false;
-  auto pop_task2 = [&queue, &eof_seen]() -> Task<absl::Status> {
-    auto res = co_await queue.pop();
-    if (res.ok() && !res->has_value()) {
-      eof_seen = true;
-    }
-    co_return absl::OkStatus();
-  };
-  handles_.push_back(
-      launch(pop_task2(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPop(queue, nullptr, &eof_seen);
+  drain();
   EXPECT_TRUE(eof_seen);
 }
 
@@ -283,12 +300,11 @@ TEST_F(AsyncQueueTest, CloseAbortsPushWaiters) {
     co_return absl::OkStatus();
   };
 
-  handles_.push_back(
-      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchTaskOk(push_task());
+  drain();
 
   queue.close();
-  executor_->drain();
+  drain();
 
   EXPECT_THAT(push_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
 }
@@ -304,7 +320,7 @@ TEST_F(AsyncQueueTest, PopCancellationUnregistersWaiter) {
 
   DetachedHandle handle =
       launch(pop_task(), executor_, [](absl::Status status) { EXPECT_OK(status); });
-  executor_->drain();
+  drain();
   EXPECT_FALSE(pop_result.has_value());
 
   // Cancel the pop operation
@@ -329,7 +345,7 @@ TEST_F(AsyncQueueTest, PushCancellationUnregistersWaiter) {
 
   DetachedHandle handle =
       launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); });
-  executor_->drain();
+  drain();
   EXPECT_FALSE(push_result.has_value());
 
   // Cancel the push operation
@@ -343,6 +359,10 @@ TEST_F(AsyncQueueTest, PushCancellationUnregistersWaiter) {
   EXPECT_EQ(*item, 1);
   EXPECT_TRUE(queue.empty());
 }
+
+// ============================================================================
+// 3. Shared Capacity Across Multiple Queues
+// ============================================================================
 
 TEST_F(AsyncQueueTest, SharedCapacityAcrossMultipleQueues) {
   auto shared_cap = std::make_shared<SharedCapacity>(3);
@@ -365,15 +385,8 @@ TEST_F(AsyncQueueTest, SharedCapacityAcrossMultipleQueues) {
 
   // Pushing into q2 should suspend
   bool q2_push_done = false;
-  auto push_task = [&q2, &q2_push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(40));
-    q2_push_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPush(q2, 40, &q2_push_done);
+  drain();
 
   EXPECT_FALSE(q2_push_done);
   EXPECT_EQ(shared_cap->currentSize(), 3);
@@ -383,7 +396,7 @@ TEST_F(AsyncQueueTest, SharedCapacityAcrossMultipleQueues) {
   ASSERT_TRUE(pop1.has_value());
   EXPECT_EQ(*pop1, 10);
 
-  executor_->drain();
+  drain();
   EXPECT_TRUE(q2_push_done);
   EXPECT_EQ(shared_cap->currentSize(), 3);
   EXPECT_EQ(q1.currentSize(), 1);
@@ -401,15 +414,8 @@ TEST_F(AsyncQueueTest, SharedCapacityByteBudgetAcrossChainedQueues) {
 
   // Push 30 bytes to q1 -> exceeds 100 byte limit, suspends
   bool q1_push_done = false;
-  auto push_task = [&q1, &q1_push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q1.push(TestByteItem{std::string(30, 'c')}));
-    q1_push_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPush(q1, TestByteItem{std::string(30, 'c')}, &q1_push_done);
+  drain();
 
   EXPECT_FALSE(q1_push_done);
 
@@ -418,7 +424,7 @@ TEST_F(AsyncQueueTest, SharedCapacityByteBudgetAcrossChainedQueues) {
   ASSERT_TRUE(pop_item.has_value());
   EXPECT_EQ(pop_item->data.size(), 40);
 
-  executor_->drain();
+  drain();
   // q1 unblocks and completes
   EXPECT_TRUE(q1_push_done);
   EXPECT_EQ(shared_cap->currentSize(), 90); // 60 + 30
@@ -434,21 +440,14 @@ TEST_F(AsyncQueueTest, SharedCapacityQueueDestructionReleasesCapacity) {
   EXPECT_EQ(shared_cap->currentSize(), 2);
 
   bool q2_push_done = false;
-  auto push_task = [&q2, &q2_push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(3));
-    q2_push_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPush(q2, 3, &q2_push_done);
+  drain();
   EXPECT_FALSE(q2_push_done);
 
   // Destroying q1 releases its 2 units from shared capacity
   q1.reset();
 
-  executor_->drain();
+  drain();
   EXPECT_TRUE(q2_push_done);
   EXPECT_EQ(shared_cap->currentSize(), 1);
 }
@@ -466,9 +465,8 @@ TEST_F(AsyncQueueTest, PushAndPopImmediateReturnAwaitableDirectly) {
     co_return absl::OkStatus();
   };
 
-  handles_.push_back(
-      launch(push_and_pop(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchTaskOk(push_and_pop());
+  drain();
   EXPECT_TRUE(queue.empty());
 }
 
@@ -483,16 +481,8 @@ TEST_F(AsyncQueueTest, DirectHandoffBypassesSharedCapacityWhenFull) {
 
   // Start waiting popper on q2
   std::optional<int> q2_popped;
-  auto pop_task = [&q2, &q2_popped]() -> Task<absl::Status> {
-    auto res = co_await q2.pop();
-    if (res.ok() && res->has_value()) {
-      q2_popped = **res;
-    }
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(launch(pop_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPop(q2, q2_popped);
+  drain();
   EXPECT_FALSE(q2_popped.has_value());
 
   // q2.tryPush should succeed via direct handoff even though SharedCapacity is full
@@ -513,15 +503,8 @@ TEST_F(AsyncQueueTest, PopHandoffFromWaitingPusherWhenCapacityFull) {
 
   // Push on q2 suspends because shared capacity is full
   bool q2_push_done = false;
-  auto push_task = [&q2, &q2_push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(200));
-    q2_push_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPush(q2, 200, &q2_push_done);
+  drain();
   EXPECT_FALSE(q2_push_done);
 
   // Pop on q2 should take directly from waiting pusher and unblock it immediately
@@ -579,87 +562,21 @@ TEST_F(AsyncQueueTest, ChainedQueuesPipelineStreamingUnderCapacityConstraint) {
     co_return absl::OkStatus();
   };
 
-  handles_.push_back(
-      launch(filter1_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(
-      launch(filter2_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(
-      launch(sink_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
+  launchTaskOk(filter1_task());
+  launchTaskOk(filter2_task());
+  launchTaskOk(sink_task());
 
   // Push 3 items into Q1
-  auto make_push_task = [&q1](int val) -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q1.push(val));
-    co_return absl::OkStatus();
-  };
-
   for (int i = 1; i <= 3; ++i) {
-    handles_.push_back(
-        launch(make_push_task(i), executor_, [](absl::Status status) { EXPECT_OK(status); }));
+    launchPush(q1, i);
   }
 
-  executor_->drain();
+  drain();
   q1.close();
-  executor_->drain();
+  drain();
 
   // (1*10+1=11, 2*10+1=21, 3*10+1=31)
-  ASSERT_EQ(sink_received.size(), 3);
-  EXPECT_EQ(sink_received[0], 11);
-  EXPECT_EQ(sink_received[1], 21);
-  EXPECT_EQ(sink_received[2], 31);
-}
-
-TEST_F(AsyncQueueTest, ReentrantReleaseDoesNotLoseWakeups) {
-  // Shared capacity limit = 2
-  auto shared_cap = std::make_shared<SharedCapacity>(2);
-  AsyncQueue<int> q1(shared_cap);
-  AsyncQueue<int> q2(shared_cap);
-
-  // Fill capacity with 2 items in q1
-  EXPECT_TRUE(q1.tryPush(1));
-  EXPECT_TRUE(q1.tryPush(2));
-  EXPECT_EQ(shared_cap->currentSize(), 2);
-
-  // Launch pusher 1 on q1 (suspended)
-  bool q1_push3_done = false;
-  auto q1_push_task = [&q1, &q1_push3_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q1.push(3));
-    // When q1 unblocks this push, immediately pop an item, triggering reentrant release!
-    auto popped = q1.tryPop();
-    EXPECT_TRUE(popped.has_value());
-    q1_push3_done = true;
-    co_return absl::OkStatus();
-  };
-
-  // Launch pusher on q2 (suspended)
-  bool q2_push_done = false;
-  auto q2_push_task = [&q2, &q2_push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(100));
-    q2_push_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(q1_push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(
-      launch(q2_push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
-
-  EXPECT_FALSE(q1_push3_done);
-  EXPECT_FALSE(q2_push_done);
-
-  // Pop from q1: frees 1 slot.
-  // This triggers notifySpaceAvailable() -> unblocks q1_push_task.
-  // q1_push_task runs and performs a re-entrant pop from q1 -> frees another slot while notifying!
-  // q2_push_task must also be unblocked without lost wakeup.
-  auto item = q1.tryPop();
-  ASSERT_TRUE(item.has_value());
-  EXPECT_EQ(*item, 1);
-
-  executor_->drain();
-
-  EXPECT_TRUE(q1_push3_done);
-  EXPECT_TRUE(q2_push_done);
-  EXPECT_EQ(shared_cap->currentSize(), 2);
+  EXPECT_THAT(sink_received, testing::ElementsAre(11, 21, 31));
 }
 
 TEST_F(AsyncQueueTest, GlobalTemporalFIFOCapacityDistribution) {
@@ -677,33 +594,21 @@ TEST_F(AsyncQueueTest, GlobalTemporalFIFOCapacityDistribution) {
 
   // Queue up 2 pushes per queue in interleaved temporal order:
   // q1_1, q2_1, q3_1, q1_2, q3_2, q2_2
-  auto make_push_task = [&](AsyncQueue<std::string>& q, std::string tag) -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q.push(tag));
-    order_granted.push_back(tag);
-    co_return absl::OkStatus();
-  };
+  launchPushTrack(q1, "q1_1", order_granted);
+  launchPushTrack(q2, "q2_1", order_granted);
+  launchPushTrack(q3, "q3_1", order_granted);
+  launchPushTrack(q1, "q1_2", order_granted);
+  launchPushTrack(q3, "q3_2", order_granted);
+  launchPushTrack(q2, "q2_2", order_granted);
 
-  handles_.push_back(launch(make_push_task(q1, "q1_1"), executor_,
-                            [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(launch(make_push_task(q2, "q2_1"), executor_,
-                            [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(launch(make_push_task(q3, "q3_1"), executor_,
-                            [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(launch(make_push_task(q1, "q1_2"), executor_,
-                            [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(launch(make_push_task(q3, "q3_2"), executor_,
-                            [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(launch(make_push_task(q2, "q2_2"), executor_,
-                            [](absl::Status status) { EXPECT_OK(status); }));
-
-  executor_->drain();
+  drain();
   EXPECT_TRUE(order_granted.empty());
 
   // Pop initial item to start granting capacity
   auto pop1 = q1.tryPop();
   ASSERT_TRUE(pop1.has_value());
   EXPECT_EQ(*pop1, "init");
-  executor_->drain();
+  drain();
 
   // Pop whichever queue currently holds the item to free capacity for the next in global FIFO order
   for (int i = 0; i < 6; ++i) {
@@ -714,18 +619,12 @@ TEST_F(AsyncQueueTest, GlobalTemporalFIFOCapacityDistribution) {
     } else if (!q3.empty()) {
       q3.tryPop();
     }
-    executor_->drain();
+    drain();
   }
 
   // All 6 pushes should have been granted in strict temporal global FIFO order across queues:
   // q1_1 -> q2_1 -> q3_1 -> q1_2 -> q3_2 -> q2_2
-  ASSERT_EQ(order_granted.size(), 6);
-  EXPECT_EQ(order_granted[0], "q1_1");
-  EXPECT_EQ(order_granted[1], "q2_1");
-  EXPECT_EQ(order_granted[2], "q3_1");
-  EXPECT_EQ(order_granted[3], "q1_2");
-  EXPECT_EQ(order_granted[4], "q3_2");
-  EXPECT_EQ(order_granted[5], "q2_2");
+  EXPECT_THAT(order_granted, testing::ElementsAre("q1_1", "q2_1", "q3_1", "q1_2", "q3_2", "q2_2"));
 }
 
 TEST_F(AsyncQueueTest, CancelCapacityRequestOnClose) {
@@ -742,15 +641,8 @@ TEST_F(AsyncQueueTest, CancelCapacityRequestOnClose) {
 
   // q2 tries to push and suspends
   bool q2_push_done = false;
-  auto q2_push_task = [&q2, &q2_push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(20));
-    q2_push_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(q2_push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPush(q2, 20, &q2_push_done);
+  drain();
   EXPECT_FALSE(q2_push_done);
 
   // Pop remaining item from closed q1 -> frees capacity
@@ -758,157 +650,42 @@ TEST_F(AsyncQueueTest, CancelCapacityRequestOnClose) {
   ASSERT_TRUE(val.has_value());
   EXPECT_EQ(*val, 10);
 
-  executor_->drain();
+  drain();
   // q2 should have received capacity notification and unblocked
   EXPECT_TRUE(q2_push_done);
   EXPECT_EQ(shared_cap->currentSize(), 1);
 }
 
-TEST_F(AsyncQueueTest, DestructionReleasesCapacityBeforeAbortingWaiters) {
-  auto shared_cap = std::make_shared<SharedCapacity>(2);
-  auto q1 = std::make_unique<AsyncQueue<int>>(shared_cap);
-  AsyncQueue<int> q2(shared_cap);
-
-  EXPECT_TRUE(q1->tryPush(1));
-  EXPECT_TRUE(q1->tryPush(2));
-  EXPECT_EQ(shared_cap->currentSize(), 2);
-
-  uint64_t cap_seen_in_error_handler = 999;
-  absl::Status q1_error_status;
-  auto q1_push_task = [&q1, &cap_seen_in_error_handler, &shared_cap,
-                       &q1_error_status]() -> Task<absl::Status> {
-    auto status = co_await q1->push(3);
-    q1_error_status = status;
-    if (!status.ok()) {
-      // In error handler, check what capacity is reported
-      cap_seen_in_error_handler = shared_cap->currentSize();
-    }
-    co_return status;
-  };
-
-  bool q2_push_done = false;
-  auto q2_push_task = [&q2, &q2_push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(10));
-    q2_push_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(launch(q1_push_task(), executor_, [](absl::Status status) {
-    EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
-  }));
-  handles_.push_back(
-      launch(q2_push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
-
-  // Reset q1, destroying it
-  q1.reset();
-  executor_->drain();
-
-  EXPECT_THAT(q1_error_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
-  // When q1's error handler ran, q1's capacity had already been released back to shared_cap
-  // (q2 then took 1 unit, so cap_seen_in_error_handler should be <= 1, definitely NOT 2)
-  EXPECT_LT(cap_seen_in_error_handler, 2);
-  EXPECT_TRUE(q2_push_done);
+TEST_F(AsyncQueueTest, HasCapacityOverflowProtection) {
+  SharedCapacity cap(100);
+  EXPECT_TRUE(cap.tryAcquire(50));
+  EXPECT_TRUE(cap.hasCapacity(50));
+  EXPECT_FALSE(cap.hasCapacity(51));
+  EXPECT_FALSE(cap.hasCapacity(std::numeric_limits<uint64_t>::max()));
+  EXPECT_FALSE(cap.hasCapacity(std::numeric_limits<uint64_t>::max() - 10));
 }
 
-TEST_F(AsyncQueueTest, SelfDestructionDuringPushUnblock) {
-  auto q = std::make_unique<AsyncQueue<int>>(1);
-  EXPECT_TRUE(q->tryPush(1)); // Fill queue
+TEST_F(AsyncQueueTest, NullCallbackInRequestCapacityDefensiveHandling) {
+  SharedCapacity cap(10);
+  EXPECT_EQ(cap.currentSize(), 0);
 
-  bool push_completed = false;
-  auto push_task = [&q, &push_completed]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q->push(2));
-    push_completed = true;
-    // Destroy the queue immediately upon unblock
-    q.reset();
-    co_return absl::OkStatus();
-  };
+  // In debug builds, passing a null callback triggers ASSERT.
+  EXPECT_DEBUG_DEATH({ cap.requestCapacity(5, nullptr); }, "assert failure: cb != nullptr");
 
-  handles_.push_back(
-      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
-  EXPECT_FALSE(push_completed);
+  // Subsequent valid requests should operate normally and acquire capacity.
+  bool valid_called = false;
+  cap.requestCapacity(5, [&valid_called]() { valid_called = true; });
+  cap.release(0); // Trigger processWaiters()
+  EXPECT_TRUE(valid_called);
+  EXPECT_EQ(cap.currentSize(), 5);
 
-  // Pop item 1: this unblocks pusher for item 2, which then immediately calls q.reset()!
-  // This must execute safely without Use-After-Free.
-  auto val = q->tryPop();
-  ASSERT_TRUE(val.has_value());
-  EXPECT_EQ(*val, 1);
-
-  executor_->drain();
-  EXPECT_TRUE(push_completed);
-  EXPECT_EQ(q, nullptr);
+  cap.release(5);
+  EXPECT_EQ(cap.currentSize(), 0);
 }
 
-TEST_F(AsyncQueueTest, SelfDestructionDuringClose) {
-  auto q = std::make_unique<AsyncQueue<int>>(1);
-  EXPECT_TRUE(q->tryPush(1)); // Fill queue
-
-  bool handler_ran = false;
-  auto push_task = [&q, &handler_ran]() -> Task<absl::Status> {
-    auto status = co_await q->push(2);
-    if (!status.ok()) {
-      handler_ran = true;
-      // Reset queue on close error
-      q.reset();
-    }
-    co_return status;
-  };
-
-  handles_.push_back(launch(push_task(), executor_, [](absl::Status status) {
-    EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
-  }));
-  executor_->drain();
-  EXPECT_FALSE(handler_ran);
-
-  // Close queue, which aborts push waiter, which then deletes q
-  q->close();
-  executor_->drain();
-
-  EXPECT_TRUE(handler_ran);
-  EXPECT_EQ(q, nullptr);
-}
-
-TEST_F(AsyncQueueTest, DynamicQueueCreationDuringNotification) {
-  auto shared_cap = std::make_shared<SharedCapacity>(2);
-  auto q1 = std::make_unique<AsyncQueue<int>>(shared_cap);
-  EXPECT_TRUE(q1->tryPush(1));
-  EXPECT_TRUE(q1->tryPush(2));
-
-  std::unique_ptr<AsyncQueue<int>> dynamic_q;
-  bool dynamic_push_done = false;
-
-  auto push_task = [&q1, &shared_cap, &dynamic_q, &dynamic_push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q1->push(3));
-    // Create a new AsyncQueue dynamically while notification was running
-    dynamic_q = std::make_unique<AsyncQueue<int>>(shared_cap);
-    // Queue is full (items 2 and 3 in q1), so pushing into dynamic_q suspends
-    CO_RETURN_IF_ERROR(co_await dynamic_q->push(100));
-    dynamic_push_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
-  EXPECT_FALSE(dynamic_push_done);
-
-  // Pop item 1 from q1 -> unblocks push(3) to q1, dynamic_q created and waits on push(100)
-  EXPECT_TRUE(q1->tryPop().has_value());
-  executor_->drain();
-  EXPECT_FALSE(dynamic_push_done);
-  ASSERT_NE(dynamic_q, nullptr);
-
-  // Pop item 2 from q1 -> frees capacity -> dynamic_q receives space notification and unblocks
-  EXPECT_TRUE(q1->tryPop().has_value());
-  executor_->drain();
-
-  EXPECT_TRUE(dynamic_push_done);
-  EXPECT_EQ(dynamic_q->itemCount(), 1);
-  auto item = dynamic_q->tryPop();
-  ASSERT_TRUE(item.has_value());
-  EXPECT_EQ(*item, 100);
-}
+// ============================================================================
+// 4. Fairness, Head-of-Line Blocking, and Starvation Prevention
+// ============================================================================
 
 TEST_F(AsyncQueueTest, FairnessPreservedAcrossDynamicQueueDestruction) {
   // Shared capacity limit = 1 unit
@@ -923,63 +700,49 @@ TEST_F(AsyncQueueTest, FairnessPreservedAcrossDynamicQueueDestruction) {
 
   std::vector<std::string> order_granted;
 
-  auto make_push_task = [&](AsyncQueue<std::string>& q, std::string tag) -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q.push(tag));
-    order_granted.push_back(tag);
-    co_return absl::OkStatus();
-  };
-
   // Launch pushes in order: q0, q1, q2
-  handles_.push_back(launch(make_push_task(*q0, "q0_push"), executor_,
-                            [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(launch(make_push_task(*q1, "q1_push"), executor_,
-                            [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(launch(make_push_task(*q2, "q2_push"), executor_,
-                            [](absl::Status status) { EXPECT_OK(status); }));
+  launchPushTrack(*q0, "q0_push", order_granted);
+  launchPushTrack(*q1, "q1_push", order_granted);
+  launchPushTrack(*q2, "q2_push", order_granted);
 
-  executor_->drain();
+  drain();
   EXPECT_TRUE(order_granted.empty());
 
   // Pop q0_init. This starts notification round: q0 gets space and unblocks q0_push.
   auto pop0 = q0->tryPop();
   ASSERT_TRUE(pop0.has_value());
   EXPECT_EQ(*pop0, "q0_init");
-  executor_->drain();
+  drain();
 
-  ASSERT_EQ(order_granted.size(), 1);
-  EXPECT_EQ(order_granted[0], "q0_push");
+  EXPECT_THAT(order_granted, testing::ElementsAre("q0_push"));
 
   // Now destroy q0. In doing so, q0's callback is removed, shifting q1 and q2 in the array.
   // Next in round-robin order MUST be q1, not q2.
   q0.reset();
-  executor_->drain();
+  drain();
 
   // Add another push to q1 to test ordering
-  handles_.push_back(launch(make_push_task(*q1, "q1_push2"), executor_,
-                            [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPushTrack(*q1, "q1_push2", order_granted);
+  drain();
 
   // q1 should get the space next
-  ASSERT_EQ(order_granted.size(), 2);
-  EXPECT_EQ(order_granted[1], "q1_push");
+  EXPECT_THAT(order_granted, testing::ElementsAre("q0_push", "q1_push"));
 
   // Now pop q1's item -> q2 MUST get space next, NOT q1_push2.
   auto pop1 = q1->tryPop();
   ASSERT_TRUE(pop1.has_value());
   EXPECT_EQ(*pop1, "q1_push");
-  executor_->drain();
+  drain();
 
-  ASSERT_EQ(order_granted.size(), 3);
-  EXPECT_EQ(order_granted[2], "q2_push");
+  EXPECT_THAT(order_granted, testing::ElementsAre("q0_push", "q1_push", "q2_push"));
 
   // Now pop q2's item -> q1_push2 gets space next
   auto pop2 = q2->tryPop();
   ASSERT_TRUE(pop2.has_value());
   EXPECT_EQ(*pop2, "q2_push");
-  executor_->drain();
+  drain();
 
-  ASSERT_EQ(order_granted.size(), 4);
-  EXPECT_EQ(order_granted[3], "q1_push2");
+  EXPECT_THAT(order_granted, testing::ElementsAre("q0_push", "q1_push", "q2_push", "q1_push2"));
 }
 
 TEST_F(AsyncQueueTest, DirectHandoffInTryPopUnblocksSubsequentWaiters) {
@@ -996,24 +759,10 @@ TEST_F(AsyncQueueTest, DirectHandoffInTryPopUnblocksSubsequentWaiters) {
   bool push2_done = false;
 
   // Push 1 on q2: 20 bytes -> exceeds 10 bytes capacity, suspends
-  auto push1_task = [&q2, &push1_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(TestByteItem{std::string(20, 'b')}));
-    push1_done = true;
-    co_return absl::OkStatus();
-  };
-
+  launchPush(q2, TestByteItem{std::string(20, 'b')}, &push1_done);
   // Push 2 on q2: 2 bytes -> would fit in 5 free units, but suspended behind push 1
-  auto push2_task = [&q2, &push2_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(TestByteItem{std::string(2, 'c')}));
-    push2_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(push1_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(
-      launch(push2_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPush(q2, TestByteItem{std::string(2, 'c')}, &push2_done);
+  drain();
 
   EXPECT_FALSE(push1_done);
   EXPECT_FALSE(push2_done);
@@ -1023,7 +772,7 @@ TEST_F(AsyncQueueTest, DirectHandoffInTryPopUnblocksSubsequentWaiters) {
   ASSERT_TRUE(popped.has_value());
   EXPECT_EQ(popped->data.size(), 20);
 
-  executor_->drain();
+  drain();
 
   EXPECT_TRUE(push1_done);
   // Push 2 must now be unblocked immediately because it fits within the 5 free units
@@ -1051,18 +800,11 @@ TEST_F(AsyncQueueTest, PushCancellationUnblocksSubsequentWaiters) {
     co_return *push1_status;
   };
 
-  // Push 2 on q2: 3 bytes -> would fit in 5 free units, but suspended behind push 1
-  auto push2_task = [&q2, &push2_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(TestByteItem{std::string(3, 'c')}));
-    push2_done = true;
-    co_return absl::OkStatus();
-  };
-
   DetachedHandle h1 = launch(push1_task(), executor_,
                              [](absl::Status status) { EXPECT_TRUE(absl::IsCancelled(status)); });
-  handles_.push_back(
-      launch(push2_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  // Push 2 on q2: 3 bytes -> would fit in 5 free units, but suspended behind push 1
+  launchPush(q2, TestByteItem{std::string(3, 'c')}, &push2_done);
+  drain();
 
   EXPECT_FALSE(push1_status.has_value());
   EXPECT_FALSE(push2_done);
@@ -1072,7 +814,7 @@ TEST_F(AsyncQueueTest, PushCancellationUnblocksSubsequentWaiters) {
   ASSERT_TRUE(push1_status.has_value());
   EXPECT_TRUE(absl::IsCancelled(*push1_status));
 
-  executor_->drain();
+  drain();
 
   // Push 2 should now be unblocked immediately
   EXPECT_TRUE(push2_done);
@@ -1094,25 +836,11 @@ TEST_F(AsyncQueueTest, LargeChunkAntiStarvation) {
   bool small_push_done = false;
 
   // Waiter 1 (q1): large chunk of 80 bytes (exceeds 40 free bytes, so suspends)
-  auto large_push_task = [&q1, &large_push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q1.push(TestByteItem{std::string(80, 'b')}));
-    large_push_done = true;
-    co_return absl::OkStatus();
-  };
-
+  launchPush(q1, TestByteItem{std::string(80, 'b')}, &large_push_done);
   // Waiter 2 (q2): small chunk of 20 bytes (would fit into 40 free bytes, but behind Waiter 1 in
   // FIFO)
-  auto small_push_task = [&q2, &small_push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(TestByteItem{std::string(20, 'c')}));
-    small_push_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(large_push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(
-      launch(small_push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPush(q2, TestByteItem{std::string(20, 'c')}, &small_push_done);
+  drain();
 
   // Strict Head-of-Line FIFO: small push MUST NOT bypass the large push ahead of it
   EXPECT_FALSE(large_push_done);
@@ -1124,7 +852,7 @@ TEST_F(AsyncQueueTest, LargeChunkAntiStarvation) {
   ASSERT_TRUE(item.has_value());
   EXPECT_EQ(item->data.size(), 60);
 
-  executor_->drain();
+  drain();
 
   // Now both should have been granted in order:
   // 1. Large chunk (80 bytes) granted first -> currentSize becomes 80
@@ -1151,24 +879,11 @@ TEST_F(AsyncQueueTest, OversizedChunkAdmissionAfterDrain) {
 
   // Waiter 1 (q2): oversized chunk of 100 bytes (> maxSize 50).
   // Because current_size == 30 > 0, it suspends and waits in the wait queue.
-  auto oversized_push_task = [&q2, &oversized_push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(TestByteItem{std::string(100, 'b')}));
-    oversized_push_done = true;
-    co_return absl::OkStatus();
-  };
+  launchPush(q2, TestByteItem{std::string(100, 'b')}, &oversized_push_done);
 
   // Waiter 2 (q1): normal chunk of 10 bytes (behind oversized chunk in wait queue)
-  auto normal_push_task = [&q1, &normal_push_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q1.push(TestByteItem{std::string(10, 'c')}));
-    normal_push_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(oversized_push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(
-      launch(normal_push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchPush(q1, TestByteItem{std::string(10, 'c')}, &normal_push_done);
+  drain();
 
   EXPECT_FALSE(oversized_push_done);
   EXPECT_FALSE(normal_push_done);
@@ -1178,7 +893,7 @@ TEST_F(AsyncQueueTest, OversizedChunkAdmissionAfterDrain) {
   ASSERT_TRUE(item1.has_value());
   EXPECT_EQ(item1->data.size(), 30);
 
-  executor_->drain();
+  drain();
 
   // Oversized chunk is granted when current_size == 0
   EXPECT_TRUE(oversized_push_done);
@@ -1191,7 +906,7 @@ TEST_F(AsyncQueueTest, OversizedChunkAdmissionAfterDrain) {
   ASSERT_TRUE(item2.has_value());
   EXPECT_EQ(item2->data.size(), 100);
 
-  executor_->drain();
+  drain();
 
   // Now normal chunk of 10 bytes is admitted
   EXPECT_TRUE(normal_push_done);
@@ -1220,28 +935,18 @@ TEST_F(AsyncQueueTest, CancellationOfHeadAndMiddleWaitersInGlobalWaitlist) {
   std::optional<absl::Status> w2_status;
   bool w3_done = false;
 
-  auto w1_task = [&q2, &w1_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(101));
-    w1_done = true;
-    co_return absl::OkStatus();
-  };
+  launchPush(q2, 101, &w1_done);
 
   auto w2_task = [&q3, &w2_status]() -> Task<absl::Status> {
     w2_status = co_await q3.push(102);
     co_return *w2_status;
   };
 
-  auto w3_task = [&q2, &w3_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2.push(103));
-    w3_done = true;
-    co_return absl::OkStatus();
-  };
+  launchPush(q2, 103, &w3_done);
 
-  handles_.push_back(launch(w1_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
   DetachedHandle h2 = launch(w2_task(), executor_,
                              [](absl::Status status) { EXPECT_TRUE(absl::IsCancelled(status)); });
-  handles_.push_back(launch(w3_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  drain();
 
   EXPECT_FALSE(w1_done);
   EXPECT_FALSE(w2_status.has_value());
@@ -1254,14 +959,14 @@ TEST_F(AsyncQueueTest, CancellationOfHeadAndMiddleWaitersInGlobalWaitlist) {
 
   // Pop 1 item from q1 -> frees 1 unit -> w1 (head) should be granted
   EXPECT_TRUE(q1.tryPop().has_value());
-  executor_->drain();
+  drain();
 
   EXPECT_TRUE(w1_done);
   EXPECT_FALSE(w3_done);
 
   // Pop 1 item from q1 -> frees 1 unit -> w3 (tail) should be granted (since w2 was cancelled)
   EXPECT_TRUE(q1.tryPop().has_value());
-  executor_->drain();
+  drain();
 
   EXPECT_TRUE(w3_done);
   EXPECT_EQ(q2.itemCount(), 2);
@@ -1282,19 +987,12 @@ TEST_F(AsyncQueueTest, CancellationOfHeadAndMiddleWaitersInGlobalWaitlist) {
     co_return *head_status;
   };
 
-  // Next waiter needs 2 units (fits within 3 free units, but blocked by head)
-  bool next_done = false;
-  auto next_task = [&q_bytes, &next_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q_bytes.push(TestByteItem{std::string(2, 'y')}));
-    next_done = true;
-    co_return absl::OkStatus();
-  };
-
   DetachedHandle h_head = launch(
       head_task(), executor_, [](absl::Status status) { EXPECT_TRUE(absl::IsCancelled(status)); });
-  handles_.push_back(
-      launch(next_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  // Next waiter needs 2 units (fits within 3 free units, but blocked by head)
+  bool next_done = false;
+  launchPush(q_bytes, TestByteItem{std::string(2, 'y')}, &next_done);
+  drain();
 
   EXPECT_FALSE(head_status.has_value());
   EXPECT_FALSE(next_done);
@@ -1304,8 +1002,197 @@ TEST_F(AsyncQueueTest, CancellationOfHeadAndMiddleWaitersInGlobalWaitlist) {
   ASSERT_TRUE(head_status.has_value());
   EXPECT_TRUE(absl::IsCancelled(*head_status));
 
-  executor_->drain();
+  drain();
   EXPECT_TRUE(next_done);
+}
+
+// ============================================================================
+// 5. Reentrancy, Lifecycle, and Complex Destruction Edge Cases
+// ============================================================================
+
+TEST_F(AsyncQueueTest, ReentrantReleaseDoesNotLoseWakeups) {
+  // Shared capacity limit = 2
+  auto shared_cap = std::make_shared<SharedCapacity>(2);
+  AsyncQueue<int> q1(shared_cap);
+  AsyncQueue<int> q2(shared_cap);
+
+  // Fill capacity with 2 items in q1
+  EXPECT_TRUE(q1.tryPush(1));
+  EXPECT_TRUE(q1.tryPush(2));
+  EXPECT_EQ(shared_cap->currentSize(), 2);
+
+  // Launch pusher 1 on q1 (suspended)
+  bool q1_push3_done = false;
+  auto q1_push_task = [&q1, &q1_push3_done]() -> Task<absl::Status> {
+    CO_RETURN_IF_ERROR(co_await q1.push(3));
+    // When q1 unblocks this push, immediately pop an item, triggering reentrant release!
+    auto popped = q1.tryPop();
+    EXPECT_TRUE(popped.has_value());
+    q1_push3_done = true;
+    co_return absl::OkStatus();
+  };
+
+  // Launch pusher on q2 (suspended)
+  bool q2_push_done = false;
+
+  launchTaskOk(q1_push_task());
+  launchPush(q2, 100, &q2_push_done);
+  drain();
+
+  EXPECT_FALSE(q1_push3_done);
+  EXPECT_FALSE(q2_push_done);
+
+  // Pop from q1: frees 1 slot.
+  // This triggers notifySpaceAvailable() -> unblocks q1_push_task.
+  // q1_push_task runs and performs a re-entrant pop from q1 -> frees another slot while notifying!
+  // q2_push_task must also be unblocked without lost wakeup.
+  auto item = q1.tryPop();
+  ASSERT_TRUE(item.has_value());
+  EXPECT_EQ(*item, 1);
+
+  drain();
+
+  EXPECT_TRUE(q1_push3_done);
+  EXPECT_TRUE(q2_push_done);
+  EXPECT_EQ(shared_cap->currentSize(), 2);
+}
+
+TEST_F(AsyncQueueTest, DestructionReleasesCapacityBeforeAbortingWaiters) {
+  auto shared_cap = std::make_shared<SharedCapacity>(2);
+  auto q1 = std::make_unique<AsyncQueue<int>>(shared_cap);
+  AsyncQueue<int> q2(shared_cap);
+
+  EXPECT_TRUE(q1->tryPush(1));
+  EXPECT_TRUE(q1->tryPush(2));
+  EXPECT_EQ(shared_cap->currentSize(), 2);
+
+  uint64_t cap_seen_in_error_handler = 999;
+  absl::Status q1_error_status;
+  auto q1_push_task = [&q1, &cap_seen_in_error_handler, &shared_cap,
+                       &q1_error_status]() -> Task<absl::Status> {
+    auto status = co_await q1->push(3);
+    q1_error_status = status;
+    if (!status.ok()) {
+      // In error handler, check what capacity is reported
+      cap_seen_in_error_handler = shared_cap->currentSize();
+    }
+    co_return status;
+  };
+
+  bool q2_push_done = false;
+  launchPush(q2, 10, &q2_push_done);
+
+  handles_.push_back(launch(q1_push_task(), executor_, [](absl::Status status) {
+    EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  }));
+  drain();
+
+  // Reset q1, destroying it
+  q1.reset();
+  drain();
+
+  EXPECT_THAT(q1_error_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  // When q1's error handler ran, q1's capacity had already been released back to shared_cap
+  // (q2 then took 1 unit, so cap_seen_in_error_handler should be <= 1, definitely NOT 2)
+  EXPECT_LT(cap_seen_in_error_handler, 2);
+  EXPECT_TRUE(q2_push_done);
+}
+
+TEST_F(AsyncQueueTest, SelfDestructionDuringPushUnblock) {
+  auto q = std::make_unique<AsyncQueue<int>>(1);
+  EXPECT_TRUE(q->tryPush(1)); // Fill queue
+
+  bool push_completed = false;
+  auto push_task = [&q, &push_completed]() -> Task<absl::Status> {
+    CO_RETURN_IF_ERROR(co_await q->push(2));
+    push_completed = true;
+    // Destroy the queue immediately upon unblock
+    q.reset();
+    co_return absl::OkStatus();
+  };
+
+  launchTaskOk(push_task());
+  drain();
+  EXPECT_FALSE(push_completed);
+
+  // Pop item 1: this unblocks pusher for item 2, which then immediately calls q.reset()!
+  // This must execute safely without Use-After-Free.
+  auto val = q->tryPop();
+  ASSERT_TRUE(val.has_value());
+  EXPECT_EQ(*val, 1);
+
+  drain();
+  EXPECT_TRUE(push_completed);
+  EXPECT_EQ(q, nullptr);
+}
+
+TEST_F(AsyncQueueTest, SelfDestructionDuringClose) {
+  auto q = std::make_unique<AsyncQueue<int>>(1);
+  EXPECT_TRUE(q->tryPush(1)); // Fill queue
+
+  bool handler_ran = false;
+  auto push_task = [&q, &handler_ran]() -> Task<absl::Status> {
+    auto status = co_await q->push(2);
+    if (!status.ok()) {
+      handler_ran = true;
+      // Reset queue on close error
+      q.reset();
+    }
+    co_return status;
+  };
+
+  handles_.push_back(launch(push_task(), executor_, [](absl::Status status) {
+    EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  }));
+  drain();
+  EXPECT_FALSE(handler_ran);
+
+  // Close queue, which aborts push waiter, which then deletes q
+  q->close();
+  drain();
+
+  EXPECT_TRUE(handler_ran);
+  EXPECT_EQ(q, nullptr);
+}
+
+TEST_F(AsyncQueueTest, DynamicQueueCreationDuringNotification) {
+  auto shared_cap = std::make_shared<SharedCapacity>(2);
+  auto q1 = std::make_unique<AsyncQueue<int>>(shared_cap);
+  EXPECT_TRUE(q1->tryPush(1));
+  EXPECT_TRUE(q1->tryPush(2));
+
+  std::unique_ptr<AsyncQueue<int>> dynamic_q;
+  bool dynamic_push_done = false;
+
+  auto push_task = [&q1, &shared_cap, &dynamic_q, &dynamic_push_done]() -> Task<absl::Status> {
+    CO_RETURN_IF_ERROR(co_await q1->push(3));
+    // Create a new AsyncQueue dynamically while notification was running
+    dynamic_q = std::make_unique<AsyncQueue<int>>(shared_cap);
+    // Queue is full (items 2 and 3 in q1), so pushing into dynamic_q suspends
+    CO_RETURN_IF_ERROR(co_await dynamic_q->push(100));
+    dynamic_push_done = true;
+    co_return absl::OkStatus();
+  };
+
+  launchTaskOk(push_task());
+  drain();
+  EXPECT_FALSE(dynamic_push_done);
+
+  // Pop item 1 from q1 -> unblocks push(3) to q1, dynamic_q created and waits on push(100)
+  EXPECT_TRUE(q1->tryPop().has_value());
+  drain();
+  EXPECT_FALSE(dynamic_push_done);
+  ASSERT_NE(dynamic_q, nullptr);
+
+  // Pop item 2 from q1 -> frees capacity -> dynamic_q receives space notification and unblocks
+  EXPECT_TRUE(q1->tryPop().has_value());
+  drain();
+
+  EXPECT_TRUE(dynamic_push_done);
+  EXPECT_EQ(dynamic_q->itemCount(), 1);
+  auto item = dynamic_q->tryPop();
+  ASSERT_TRUE(item.has_value());
+  EXPECT_EQ(*item, 100);
 }
 
 TEST_F(AsyncQueueTest, DirectHandoffAndQueueDestructionCleanup) {
@@ -1326,33 +1213,20 @@ TEST_F(AsyncQueueTest, DirectHandoffAndQueueDestructionCleanup) {
   bool q3_w_done = false;
 
   // q2 pushes w1
-  auto q2_w1_task = [&q2, &q2_w1_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q2->push(10));
-    q2_w1_done = true;
-    co_return absl::OkStatus();
-  };
+  launchPush(*q2, 10, &q2_w1_done);
 
   // q2 pushes w2
   auto q2_w2_task = [&q2, &q2_w2_status]() -> Task<absl::Status> {
     q2_w2_status = co_await q2->push(20);
     co_return q2_w2_status;
   };
-
-  // q3 pushes w3
-  auto q3_w_task = [&q3, &q3_w_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q3.push(30));
-    q3_w_done = true;
-    co_return absl::OkStatus();
-  };
-
-  handles_.push_back(
-      launch(q2_w1_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
   handles_.push_back(launch(q2_w2_task(), executor_, [](absl::Status status) {
     EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
   }));
-  handles_.push_back(
-      launch(q3_w_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+
+  // q3 pushes w3
+  launchPush(q3, 30, &q3_w_done);
+  drain();
 
   EXPECT_FALSE(q2_w1_done);
   EXPECT_FALSE(q3_w_done);
@@ -1366,25 +1240,16 @@ TEST_F(AsyncQueueTest, DirectHandoffAndQueueDestructionCleanup) {
 
   // Destroy q2: cancels q2_w2 and aborts it with precondition error
   q2.reset();
-  executor_->drain();
+  drain();
   EXPECT_THAT(q2_w2_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
 
   // Now pop 1 item from q1 -> frees 1 unit -> q3_w should be granted
   EXPECT_TRUE(q1.tryPop().has_value());
-  executor_->drain();
+  drain();
 
   EXPECT_TRUE(q3_w_done);
   EXPECT_EQ(q3.itemCount(), 1);
   EXPECT_EQ(shared_cap->currentSize(), 5); // 4 in q1 + 1 in q3
-}
-
-TEST_F(AsyncQueueTest, HasCapacityOverflowProtection) {
-  SharedCapacity cap(100);
-  EXPECT_TRUE(cap.tryAcquire(50));
-  EXPECT_TRUE(cap.hasCapacity(50));
-  EXPECT_FALSE(cap.hasCapacity(51));
-  EXPECT_FALSE(cap.hasCapacity(std::numeric_limits<uint64_t>::max()));
-  EXPECT_FALSE(cap.hasCapacity(std::numeric_limits<uint64_t>::max() - 10));
 }
 
 TEST_F(AsyncQueueTest, DestructionWithMultiplePendingPushWaitersDoesNotGrantCapacityToDyingQueue) {
@@ -1414,22 +1279,15 @@ TEST_F(AsyncQueueTest, DestructionWithMultiplePendingPushWaitersDoesNotGrantCapa
     co_return q2_w2_status;
   };
 
-  // q3 pushes w3: 2 units (would fit in 9 free units, but suspended behind q2's waiters)
-  auto q3_w_task = [&q3, &q3_w_done]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await q3.push(TestByteItem{std::string(2, 'd')}));
-    q3_w_done = true;
-    co_return absl::OkStatus();
-  };
-
   handles_.push_back(launch(q2_w1_task(), executor_, [](absl::Status status) {
     EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
   }));
   handles_.push_back(launch(q2_w2_task(), executor_, [](absl::Status status) {
     EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
   }));
-  handles_.push_back(
-      launch(q3_w_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  // q3 pushes w3: 2 units (would fit in 9 free units, but suspended behind q2's waiters)
+  launchPush(q3, TestByteItem{std::string(2, 'd')}, &q3_w_done);
+  drain();
 
   EXPECT_FALSE(q3_w_done);
 
@@ -1437,7 +1295,7 @@ TEST_F(AsyncQueueTest, DestructionWithMultiplePendingPushWaitersDoesNotGrantCapa
   // Both q2_w1 and q2_w2 must be cancelled from SharedCapacity without w2 being granted to q2,
   // and q3_w must be granted the capacity immediately upon unblocking the head!
   q2.reset();
-  executor_->drain();
+  drain();
 
   EXPECT_THAT(q2_w1_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
   EXPECT_THAT(q2_w2_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
@@ -1493,10 +1351,10 @@ TEST_F(AsyncQueueTest, DeepReentrantPushPopChainsAcrossMultipleQueues) {
     co_return absl::OkStatus();
   };
 
-  handles_.push_back(launch(task1(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(launch(task2(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  handles_.push_back(launch(task3(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchTaskOk(task1());
+  launchTaskOk(task2());
+  launchTaskOk(task3());
+  drain();
 
   EXPECT_TRUE(execution_order.empty());
 
@@ -1505,25 +1363,20 @@ TEST_F(AsyncQueueTest, DeepReentrantPushPopChainsAcrossMultipleQueues) {
   ASSERT_TRUE(item.has_value());
   EXPECT_EQ(*item, 1);
 
-  executor_->drain();
+  drain();
 
   // Tasks 1, 2, 3 have their initial pushes granted in order (1, 3, 5).
   // Then Task 1's re-entrant push to q2 is granted (2).
   // Task 2's re-entrant push to q3 is now waiting at the head of the wait queue.
-  ASSERT_EQ(execution_order.size(), 4);
-  EXPECT_EQ(execution_order[0], 1);
-  EXPECT_EQ(execution_order[1], 3);
-  EXPECT_EQ(execution_order[2], 5);
-  EXPECT_EQ(execution_order[3], 2);
+  EXPECT_THAT(execution_order, testing::ElementsAre(1, 3, 5, 2));
 
   // Pop from q2: frees 1 slot -> Task 2's re-entrant push to q3 is granted (4)
   auto item2 = q2.tryPop();
   ASSERT_TRUE(item2.has_value());
 
-  executor_->drain();
+  drain();
 
-  ASSERT_EQ(execution_order.size(), 5);
-  EXPECT_EQ(execution_order[4], 4);
+  EXPECT_THAT(execution_order, testing::ElementsAre(1, 3, 5, 2, 4));
 }
 
 TEST_F(AsyncQueueTest, QueueDestructionDuringPushCancellationUnblock) {
@@ -1555,9 +1408,8 @@ TEST_F(AsyncQueueTest, QueueDestructionDuringPushCancellationUnblock) {
 
   DetachedHandle h1 = launch(q1_push_task(), executor_,
                              [](absl::Status status) { EXPECT_TRUE(absl::IsCancelled(status)); });
-  handles_.push_back(
-      launch(q2_push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
-  executor_->drain();
+  launchTaskOk(q2_push_task());
+  drain();
 
   EXPECT_FALSE(q1_push_status.has_value());
   EXPECT_FALSE(q2_push_done);
@@ -1569,28 +1421,10 @@ TEST_F(AsyncQueueTest, QueueDestructionDuringPushCancellationUnblock) {
   ASSERT_TRUE(q1_push_status.has_value());
   EXPECT_TRUE(absl::IsCancelled(*q1_push_status));
 
-  executor_->drain();
+  drain();
   EXPECT_TRUE(q2_push_done);
   EXPECT_EQ(q1, nullptr);
   EXPECT_EQ(shared_cap->currentSize(), 1);
-}
-
-TEST_F(AsyncQueueTest, NullCallbackInRequestCapacityDefensiveHandling) {
-  SharedCapacity cap(10);
-  EXPECT_EQ(cap.currentSize(), 0);
-
-  // In debug builds, passing a null callback triggers ASSERT.
-  EXPECT_DEBUG_DEATH({ cap.requestCapacity(5, nullptr); }, "assert failure: cb != nullptr");
-
-  // Subsequent valid requests should operate normally and acquire capacity.
-  bool valid_called = false;
-  cap.requestCapacity(5, [&valid_called]() { valid_called = true; });
-  cap.release(0); // Trigger processWaiters()
-  EXPECT_TRUE(valid_called);
-  EXPECT_EQ(cap.currentSize(), 5);
-
-  cap.release(5);
-  EXPECT_EQ(cap.currentSize(), 0);
 }
 
 } // namespace
