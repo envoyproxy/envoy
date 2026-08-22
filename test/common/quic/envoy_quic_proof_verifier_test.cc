@@ -105,7 +105,7 @@ protected:
   std::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
       std::nullopt};
   NiceMock<Stats::MockStore> store_;
-  Server::Configuration::MockServerFactoryContext factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
   Ssl::MockCertificateValidationContextConfig cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
