@@ -23,7 +23,7 @@ public:
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
-  SlotPtr allocateSlot() override;
+  SlotSharedPtr allocateSlot() override;
   void registerThread(Event::Dispatcher& dispatcher, bool main_thread) override;
   void shutdownGlobalThreading() override;
   void shutdownThread() override;
@@ -34,7 +34,7 @@ private:
   // On destruction returns the slot index to the deferred delete queue (detaches it). This allows
   // a slot to be destructed on the main thread while controlling the lifetime of the underlying
   // slot as callbacks drain from workers.
-  struct SlotImpl : public Slot {
+  struct SlotImpl : public Slot, public std::enable_shared_from_this<SlotImpl> {
     SlotImpl(InstanceImpl& parent, uint32_t index);
     ~SlotImpl() override;
     std::function<void()> wrapCallback(const std::function<void()>& cb);
@@ -54,19 +54,6 @@ private:
 
     InstanceImpl& parent_;
     const uint32_t index_;
-    // The following is used to safely verify via weak_ptr that this slot is still alive. This
-    // does not prevent all races if a callback does not capture appropriately, but it does fix
-    // the common case of a slot destroyed immediately before anything is posted to a worker.
-    // NOTE: The general safety model of a slot is that it is destroyed immediately on the main
-    //       thread. This means that *all* captures must not reference the slot object directly.
-    //       this is why index_ is captured manually in callbacks that require it.
-    // NOTE: When the slot is destroyed, the index is immediately recycled. This is safe because
-    //       any new posts for a recycled index must come after any previous callbacks for the
-    //       previous owner of the index.
-    // TODO(mattklein123): Add clang-tidy analysis rule to check that "this" is not captured by
-    // a TLS function call. This check will not prevent all bad captures, but it will at least
-    // make the programmer more aware of potential issues.
-    std::shared_ptr<bool> still_alive_guard_;
   };
 
   struct ThreadLocalData {
@@ -82,7 +69,7 @@ private:
   static thread_local ThreadLocalData thread_local_data_;
 
   Thread::MainThread main_thread_;
-  std::vector<Slot*> slots_;
+  std::vector<std::weak_ptr<SlotImpl>> slots_;
   // A collection of indices of freed slots.
   std::vector<uint32_t> free_slot_indexes_;
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
