@@ -24,6 +24,7 @@
 #include "test/common/tls/test_data/no_san_cert_info.h"
 #include "test/common/tls/test_data/san_dns3_cert_info.h"
 #include "test/common/tls/test_data/san_ip_cert_info.h"
+#include "test/common/tls/test_data/selfsigned_cert_info.h"
 #include "test/common/tls/test_data/unittest_cert_info.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -2129,7 +2130,9 @@ common_tls_context:
 
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), 1787339648);
+  const auto cert_expiry =
+      TestUtility::parseTime(TEST_SELFSIGNED_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  EXPECT_EQ(gauge_opt->get().value(), absl::ToUnixSeconds(cert_expiry));
 }
 
 TEST_F(CertificateExpirationMetricsTest, ClientCertificateExpirationMetrics) {
@@ -2162,7 +2165,9 @@ common_tls_context:
 
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), 1787339648);
+  const auto cert_expiry =
+      TestUtility::parseTime(TEST_SELFSIGNED_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  EXPECT_EQ(gauge_opt->get().value(), absl::ToUnixSeconds(cert_expiry));
 }
 
 } // namespace Tls

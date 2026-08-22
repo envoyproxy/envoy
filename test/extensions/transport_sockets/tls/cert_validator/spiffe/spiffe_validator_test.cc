@@ -18,6 +18,8 @@
 
 #include "test/common/tls/cert_validator/test_common.h"
 #include "test/common/tls/ssl_test_utility.h"
+#include "test/common/tls/test_data/ca_cert_info.h"
+#include "test/common/tls/test_data/intermediate_ca_cert_info.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
@@ -27,6 +29,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/status/status.h"
+#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "include/nlohmann/json.hpp"
@@ -1010,9 +1013,13 @@ typed_config:
         filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.pem"
   )EOF"),
                        time_system));
-  EXPECT_EQ(20686, validator().daysUntilFirstCertExpires().value());
+  // intermediate_ca_cert.pem is the first of the two trust bundles to expire.
+  const auto first_expiry =
+      TestUtility::parseTime(TEST_INTERMEDIATE_CA_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  const int64_t days_from_epoch = absl::ToInt64Hours(first_expiry - absl::UnixEpoch()) / 24;
+  EXPECT_EQ(days_from_epoch, validator().daysUntilFirstCertExpires().value());
   time_system.setSystemTime(std::chrono::milliseconds(864000000));
-  EXPECT_EQ(20676, validator().daysUntilFirstCertExpires().value());
+  EXPECT_EQ(days_from_epoch - 10, validator().daysUntilFirstCertExpires().value());
 }
 
 TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpiresExpired) {
@@ -1526,7 +1533,9 @@ typed_config:
 
   auto gauge_opt = store().findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), 1787339642);
+  EXPECT_EQ(gauge_opt->get().value(),
+            absl::ToUnixSeconds(
+                TestUtility::parseTime(TEST_CA_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT")));
 }
 
 // Verify that a URI SAN matcher with an unregistered custom string matcher extension
