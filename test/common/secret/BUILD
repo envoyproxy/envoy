@@ -75,3 +75,15 @@ envoy_cc_test(
         "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "secret_provider_impl_test",
+    srcs = ["secret_provider_impl_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/secret:secret_provider_impl_lib",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
