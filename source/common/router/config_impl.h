@@ -1390,6 +1390,7 @@ public:
   }
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
+  const Formatter::CommandParserPtrVector& commandParsers() const { return command_parsers_; }
 
 private:
   CommonConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
@@ -1397,6 +1398,7 @@ private:
                    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
                    absl::Status& creation_status);
   std::vector<Http::LowerCaseString> internal_only_headers_;
+  Formatter::CommandParserPtrVector command_parsers_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   const std::string name_;

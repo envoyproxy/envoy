@@ -142,7 +142,14 @@ absl::StatusOr<HeaderParserPtr> HeaderParser::configure(
 absl::StatusOr<HeaderParserPtr>
 HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
                         const Protobuf::RepeatedPtrField<std::string>& headers_to_remove) {
-  auto parser_or_error = configure(headers_to_add);
+  return configure(headers_to_add, headers_to_remove, Formatter::CommandParserPtrVector{});
+}
+
+absl::StatusOr<HeaderParserPtr>
+HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
+                        const Protobuf::RepeatedPtrField<std::string>& headers_to_remove,
+                        const Formatter::CommandParserPtrVector& command_parsers) {
+  auto parser_or_error = configure(headers_to_add, command_parsers);
   RETURN_IF_NOT_OK_REF(parser_or_error.status());
   HeaderParserPtr header_parser = std::move(parser_or_error.value());
 
