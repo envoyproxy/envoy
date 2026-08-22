@@ -20,9 +20,7 @@ namespace Http {
 struct HttpAttachContext : public Envoy::ConnectionPool::AttachContext {
   HttpAttachContext(Http::ResponseDecoder* d, Http::ConnectionPool::Callbacks* c)
       : decoder_(d), callbacks_(c) {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
-      decoder_handle_ = d->createResponseDecoderHandle();
-    }
+    decoder_handle_ = d->createResponseDecoderHandle();
   }
 
   Http::ResponseDecoder* decoder_;
@@ -150,7 +148,6 @@ public:
   void close(Network::ConnectionCloseType type, absl::string_view details) override {
     codec_client_->close(type, details);
   }
-  virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
   virtual Http::RequestEncoder&
   newStreamEncoder(Http::ResponseDecoderHandlePtr response_decoder_handle) PURE;
   void onEvent(Network::ConnectionEvent event) override {
@@ -234,7 +231,6 @@ public:
 
   // ConnPoolImpl::ActiveClient
   bool closingWithIncompleteStream() const override;
-  RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
   RequestEncoder& newStreamEncoder(ResponseDecoderHandlePtr response_decoder_handle) override;
 
   // CodecClientCallbacks
