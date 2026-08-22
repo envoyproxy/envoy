@@ -974,6 +974,21 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+.. _config_access_log_format_req_sha256:
+
+``%REQUEST_HEADER_SHA256(X?Y)%`` / ``%REQ_SHA256(X?Y)%``
+  HTTP
+    The lowercase hexadecimal SHA-256 digest of an HTTP request header. ``X`` is the main request
+    header and ``Y`` is an optional alternative. If ``X`` is absent or empty, the value of ``Y`` is
+    used instead. If neither header has a nonempty value, ``"-"`` appears in the access logs.
+
+    This formatter can be used to correlate requests or construct consistent-hashing keys without
+    copying a sensitive header value into another request header or log field. A SHA-256 digest is
+    not keyed, so values with low entropy may remain vulnerable to guessing.
+
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%RESPONSE_HEADER(X?Y):Z%`` / ``%RESP(X?Y):Z%``
   HTTP
     Same as ``%REQUEST_HEADER(X?Y):Z%`` but taken from HTTP response headers.
