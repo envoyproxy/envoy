@@ -396,14 +396,15 @@ private:
   }
 
   void removePushWaiter(PushWaiterIt it) {
-    it->callback = nullptr;
     auto cap_it = it->capacity_waiter_it;
-    it->capacity_waiter_it.reset();
+    if (closed_) {
+      it->callback = nullptr;
+      it->capacity_waiter_it.reset();
+    } else {
+      push_waiters_.erase(it);
+    }
     if (cap_it.has_value()) {
       capacity_->cancelRequest(*cap_it);
-    }
-    if (!closed_) {
-      push_waiters_.erase(it);
     }
   }
 
