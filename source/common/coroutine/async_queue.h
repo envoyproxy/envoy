@@ -394,7 +394,8 @@ private:
             cap->release(size);
             return;
           }
-          onCapacityGranted(it); });
+          onCapacityGranted(it);
+        });
     return it;
   }
 
