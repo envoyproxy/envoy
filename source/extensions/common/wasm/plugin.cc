@@ -14,15 +14,18 @@ envoy::extensions::wasm::v3::PluginConfig
 normalizeConfig(const envoy::extensions::wasm::v3::PluginConfig& config) {
   // The capability restrictions are applied when the Wasm VM is created and are shared by every
   // plugin running in it, so they belong to the VM configuration. The plugin level field is
-  // deprecated in favor of the VM level one: honor it only when the VM configuration doesn't set
-  // its own restrictions.
-  if (!config.has_capability_restriction_config() ||
-      config.vm_config().has_capability_restriction_config()) {
+  // deprecated in favor of the VM level one: move it there and clear it, so that the VM level field
+  // is the only place the restrictions are ever read from.
+  if (!config.has_capability_restriction_config()) {
     return config;
   }
   envoy::extensions::wasm::v3::PluginConfig normalized = config;
-  *normalized.mutable_vm_config()->mutable_capability_restriction_config() =
-      config.capability_restriction_config();
+  // The VM level restrictions win when both are set.
+  if (!config.vm_config().has_capability_restriction_config()) {
+    *normalized.mutable_vm_config()->mutable_capability_restriction_config() =
+        config.capability_restriction_config();
+  }
+  normalized.clear_capability_restriction_config();
   return normalized;
 }
 

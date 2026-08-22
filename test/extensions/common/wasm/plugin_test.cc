@@ -64,7 +64,8 @@ TEST(TestWasmConfig, VmLevelCapabilityRestriction) {
       Contains(Key("proxy_log")));
 }
 
-// The deprecated plugin level capability restrictions are copied into the VM configuration.
+// The deprecated plugin level capability restrictions are moved into the VM configuration, leaving
+// the VM level field as the only place the restrictions can be read from.
 TEST(TestWasmConfig, DeprecatedPluginLevelCapabilityRestriction) {
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   plugin_config.mutable_capability_restriction_config()->mutable_allowed_capabilities()->insert(
@@ -75,6 +76,7 @@ TEST(TestWasmConfig, DeprecatedPluginLevelCapabilityRestriction) {
   EXPECT_THAT(
       wasm_config.config().vm_config().capability_restriction_config().allowed_capabilities(),
       Contains(Key("proxy_log")));
+  EXPECT_FALSE(wasm_config.config().has_capability_restriction_config());
 }
 
 // The VM level capability restrictions win when both are set.
@@ -90,6 +92,7 @@ TEST(TestWasmConfig, VmLevelCapabilityRestrictionWins) {
   auto wasm_config = WasmConfig(plugin_config);
   EXPECT_THAT(wasm_config.allowedCapabilities(), Contains(Key("proxy_on_vm_start")));
   EXPECT_THAT(wasm_config.allowedCapabilities(), Not(Contains(Key("proxy_log"))));
+  EXPECT_FALSE(wasm_config.config().has_capability_restriction_config());
 }
 
 // A configuration without any capability restriction leaves the VM unrestricted, and no empty VM
