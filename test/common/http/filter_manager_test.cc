@@ -392,18 +392,21 @@ TEST_F(FilterManagerTest, OnLocalReply) {
       .WillOnce(Invoke(
           [&](const StreamFilterBase::LocalReplyData& local_reply_data) -> Http::LocalErrorStatus {
             EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            EXPECT_EQ(local_reply_data.body_, "body");
             return Http::LocalErrorStatus::Continue;
           }));
   EXPECT_CALL(*stream_filter, onLocalReply(_))
       .WillOnce(Invoke(
           [&](const StreamFilterBase::LocalReplyData& local_reply_data) -> Http::LocalErrorStatus {
             EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            EXPECT_EQ(local_reply_data.body_, "body");
             return LocalErrorStatus::ContinueAndResetStream;
           }));
   EXPECT_CALL(*encoder_filter, onLocalReply(_))
       .WillOnce(Invoke(
           [&](const StreamFilterBase::LocalReplyData& local_reply_data) -> Http::LocalErrorStatus {
             EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            EXPECT_EQ(local_reply_data.body_, "body");
             return Http::LocalErrorStatus::Continue;
           }));
   EXPECT_CALL(filter_manager_callbacks_, resetStream(_, _));

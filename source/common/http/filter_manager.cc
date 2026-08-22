@@ -1044,7 +1044,7 @@ void DownstreamFilterManager::sendLocalReply(
   }
 
   streamInfo().setResponseCodeDetails(details);
-  StreamFilterBase::LocalReplyData data{code, grpc_status, details, false};
+  StreamFilterBase::LocalReplyData data{code, grpc_status, details, false, body};
   onLocalReply(data);
   if (data.reset_imminent_) {
     ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. onLocalReply requested reset.", *this,
