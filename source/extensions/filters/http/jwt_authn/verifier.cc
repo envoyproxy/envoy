@@ -394,8 +394,8 @@ public:
                                       ? std::string(kDefaultVerificationStatusHeader)
                                       : extract_config.verification_status_header())) {
     ENVOY_LOG(info,
-              "JWT filter configured for claim extraction only. "
-              "Header '{}' will be set to 'false' when JWT verification fails.",
+              "JWT filter configured for claim extraction only. A present JWT's claims are "
+              "forwarded without verification and header '{}' flags them as unverified.",
               verification_status_header_.get());
   }
 
@@ -427,11 +427,23 @@ public:
           ctximpl.addExtractedData(name, extracted_data);
         },
         [this, &ctximpl, jwt_present](const Status& status) {
-          ENVOY_LOG(debug, "JWT extraction completed with status: {}, treating as success",
-                    static_cast<int>(status));
-          // A JWT was present and its claims were forwarded without verification: signal
-          // downstream that the forwarded claims are unverified.
-          if (jwt_present &&
+          ENVOY_LOG(debug, "JWT extraction completed with status: {}", static_cast<int>(status));
+          // Decide whether to flag the forwarded claims as unverified.
+          //
+          // When extract-only forwarding is active the authenticator never verifies and always
+          // reports Ok, so the header keys off token presence: a present JWT means its claims
+          // were forwarded without verification.
+          //
+          // When that guard is disabled the authenticator falls back to the normal
+          // verify-then-report path, so we reproduce the original failure-based semantics:
+          // set the header only on a real verification failure. Status::Ok means verification
+          // succeeded and Status::JwtMissed (collapsed by allow_missing) means no token.
+          const bool forwards_unverified = Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.jwt_authn_extract_only_forwards_unverified_claims");
+          const bool flag_unverified = forwards_unverified
+                                           ? jwt_present
+                                           : (status != Status::Ok && status != Status::JwtMissed);
+          if (flag_unverified &&
               Runtime::runtimeFeatureEnabled(
                   "envoy.reloadable_features.jwt_authn_add_verification_status_header")) {
             ctximpl.headers().setCopy(verification_status_header_, kVerificationStatusValue);

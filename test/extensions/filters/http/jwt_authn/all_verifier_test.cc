@@ -804,6 +804,38 @@ TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, GuardDisabledDropsUn
   EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kExampleHeader));
 }
 
+// With the guard disabled the status header must also revert to the old failure-based semantics:
+// a genuinely verified JWT must NOT be branded unverified.
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest,
+       GuardDisabledStatusHeaderNotSetOnGoodJwt) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.jwt_authn_extract_only_forwards_unverified_claims", "false"}});
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // Guard off: the normal verify path runs and this token verifies successfully, so the header
+  // must not be set (it would falsely brand a verified JWT as unverified).
+  EXPECT_TRUE(headers.get_("x-jwt-signature-verified").empty());
+}
+
+// With the guard disabled, a JWT that fails verification still gets the status header set — the
+// original failure-based semantics.
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, GuardDisabledStatusHeaderSetOnBadJwt) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.jwt_authn_extract_only_forwards_unverified_claims", "false"}});
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // Guard off: the normal verify path reports the real failure, so the header is set to "false".
+  EXPECT_EQ(headers.get_("x-jwt-signature-verified"), "false");
+}
+
 class ExtractOnlyWithoutValidationInOrListTest : public AllVerifierTest {
 protected:
   void SetUp() override {
