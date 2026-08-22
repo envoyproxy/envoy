@@ -27,39 +27,51 @@ template <typename T> struct DefaultItemSize {
 /**
  * SharedCapacity manages a shared capacity limit across one or more AsyncQueue instances.
  * Capacity is measured in abstract units (e.g. item count, bytes, or memory weight).
+ *
+ * Requests for capacity are queued in a global FIFO wait queue when capacity is exhausted,
+ * preventing starvation of large allocations and ensuring fair temporal ordering.
  */
 class SharedCapacity {
 public:
-  using SpaceCallback = absl::AnyInvocable<void()>;
+  using GrantCallback = absl::AnyInvocable<void()>;
+
+private:
+  struct Waiter {
+    uint64_t size;
+    GrantCallback cb;
+  };
+
+public:
+  using WaiterIterator = std::list<Waiter>::iterator;
 
   explicit SharedCapacity(std::optional<uint64_t> max_size = std::nullopt);
   ~SharedCapacity();
+
+  SharedCapacity(const SharedCapacity&) = delete;
+  SharedCapacity& operator=(const SharedCapacity&) = delete;
+  SharedCapacity(SharedCapacity&&) = delete;
+  SharedCapacity& operator=(SharedCapacity&&) = delete;
 
   std::optional<uint64_t> maxSize() const { return max_size_; }
   uint64_t currentSize() const { return current_size_; }
 
   bool hasCapacity(uint64_t additional_size) const;
-  void acquire(uint64_t size);
   void release(uint64_t size);
 
-  uint64_t addSpaceAvailableCallback(SpaceCallback cb);
-  void removeSpaceAvailableCallback(uint64_t id);
+  bool tryAcquire(uint64_t size);
+  WaiterIterator requestCapacity(uint64_t size, GrantCallback cb);
+  void cancelRequest(WaiterIterator it);
 
 private:
-  void notifySpaceAvailable();
-  void cleanupRemoved();
-
-  struct CallbackEntry {
-    SpaceCallback cb;
-    uint64_t id;
-    bool removed{false};
-  };
+  bool canAcquire(uint64_t size) const;
+  void acquire(uint64_t size);
+  void processWaiters();
 
   const std::optional<uint64_t> max_size_;
   uint64_t current_size_{0};
-  std::vector<CallbackEntry> callbacks_;
-  uint64_t next_callback_id_{0};
-  bool notifying_{false};
+  std::list<Waiter> waiters_;
+  bool processing_waiters_{false};
+  std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
 };
 
 using SharedCapacityPtr = std::shared_ptr<SharedCapacity>;
@@ -94,6 +106,7 @@ private:
     T item;
     uint64_t size;
     PushWaiterCallback callback;
+    std::optional<SharedCapacity::WaiterIterator> capacity_waiter_it;
   };
 
   using PopWaiterCallback = absl::AnyInvocable<void(absl::StatusOr<std::optional<T>>)>;
@@ -196,22 +209,26 @@ public:
   explicit AsyncQueue(SharedCapacityPtr capacity, SizeFunc size_func = SizeFunc{})
       : capacity_(capacity != nullptr ? std::move(capacity)
                                       : std::make_shared<SharedCapacity>(std::nullopt)),
-        size_func_(std::move(size_func)) {
-    callback_id_ = capacity_->addSpaceAvailableCallback([this]() { maybeUnblockPushers(); });
-  }
+        size_func_(std::move(size_func)) {}
 
   ~AsyncQueue() {
-    if (callback_id_ != 0) {
-      capacity_->removeSpaceAvailableCallback(callback_id_);
-      callback_id_ = 0;
+    for (auto it = push_waiters_.rbegin(); it != push_waiters_.rend(); ++it) {
+      if (it->capacity_waiter_it.has_value()) {
+        capacity_->cancelRequest(*it->capacity_waiter_it);
+        it->capacity_waiter_it.reset();
+      }
+    }
+
+    if (current_size_ > 0) {
+      uint64_t size = current_size_;
+      current_size_ = 0;
+      queue_.clear();
+      capacity_->release(size);
     }
     if (!closed_) {
       close();
     }
-    if (current_size_ > 0) {
-      capacity_->release(current_size_);
-      current_size_ = 0;
-    }
+    *alive_ = false;
   }
 
   // AsyncQueue is non-copyable and non-movable.
@@ -262,11 +279,10 @@ public:
     }
 
     uint64_t item_size = size_func_(item);
-    if (!capacity_->hasCapacity(item_size) && (capacity_->currentSize() != 0 || !queue_.empty())) {
+    if (!capacity_->tryAcquire(item_size)) {
       return false;
     }
 
-    capacity_->acquire(item_size);
     current_size_ += item_size;
     queue_.push_back(QueuedItem{std::forward<U>(item), item_size});
     return true;
@@ -291,8 +307,14 @@ public:
     if (!push_waiters_.empty()) {
       PushWaiter waiter = std::move(push_waiters_.front());
       push_waiters_.pop_front();
-      waiter.callback(absl::OkStatus());
-      return std::make_optional(std::move(waiter.item));
+      if (waiter.capacity_waiter_it.has_value()) {
+        capacity_->cancelRequest(*waiter.capacity_waiter_it);
+        waiter.capacity_waiter_it.reset();
+      }
+      T item = std::move(waiter.item);
+      PushWaiterCallback cb = std::move(waiter.callback);
+      cb(absl::OkStatus());
+      return std::make_optional(std::move(item));
     }
 
     return std::nullopt;
@@ -306,52 +328,73 @@ public:
     }
     closed_ = true;
 
-    if (queue_.empty()) {
-      while (!pop_waiters_.empty()) {
-        PopWaiterCallback waiter = std::move(pop_waiters_.front().callback);
-        pop_waiters_.pop_front();
-        waiter(std::nullopt);
+    auto alive = alive_;
+
+    while (!pop_waiters_.empty()) {
+      PopWaiterCallback waiter = std::move(pop_waiters_.front().callback);
+      pop_waiters_.pop_front();
+      waiter(std::nullopt);
+      if (!*alive) {
+        return;
+      }
+    }
+
+    for (auto it = push_waiters_.rbegin(); it != push_waiters_.rend(); ++it) {
+      if (it->capacity_waiter_it.has_value()) {
+        auto cap_it = *it->capacity_waiter_it;
+        it->capacity_waiter_it.reset();
+        capacity_->cancelRequest(cap_it);
+        if (!*alive) {
+          return;
+        }
       }
     }
 
     while (!push_waiters_.empty()) {
-      PushWaiterCallback waiter = std::move(push_waiters_.front().callback);
+      PushWaiter waiter = std::move(push_waiters_.front());
       push_waiters_.pop_front();
-      waiter(absl::FailedPreconditionError("queue closed"));
+      PushWaiterCallback cb = std::move(waiter.callback);
+      cb(absl::FailedPreconditionError("queue closed"));
+      if (!*alive) {
+        return;
+      }
     }
   }
 
 private:
-  PushWaiterIt addPushWaiter(T item, uint64_t size,
-                             absl::AnyInvocable<void(absl::Status)> callback) {
-    return push_waiters_.insert(push_waiters_.end(),
-                                PushWaiter{std::move(item), size, std::move(callback)});
+  PushWaiterIt addPushWaiter(T item, uint64_t size, PushWaiterCallback callback) {
+    auto it = push_waiters_.insert(
+        push_waiters_.end(), PushWaiter{std::move(item), size, std::move(callback), std::nullopt});
+    it->capacity_waiter_it =
+        capacity_->requestCapacity(size, [this, it]() { onCapacityGranted(it); });
+    return it;
   }
 
-  void removePushWaiter(PushWaiterIt it) { push_waiters_.erase(it); }
+  void onCapacityGranted(PushWaiterIt it) {
+    auto alive = alive_;
+    uint64_t size = it->size;
+    current_size_ += size;
+    queue_.push_back(QueuedItem{std::move(it->item), size});
+
+    PushWaiterCallback cb = std::move(it->callback);
+    push_waiters_.erase(it);
+
+    cb(absl::OkStatus());
+  }
+
+  void removePushWaiter(PushWaiterIt it) {
+    auto cap_it = it->capacity_waiter_it;
+    push_waiters_.erase(it);
+    if (cap_it.has_value()) {
+      capacity_->cancelRequest(*cap_it);
+    }
+  }
 
   PopWaiterIt addPopWaiter(PopWaiterCallback callback) {
     return pop_waiters_.insert(pop_waiters_.end(), PopWaiter{std::move(callback)});
   }
 
   void removePopWaiter(PopWaiterIt it) { pop_waiters_.erase(it); }
-
-  void maybeUnblockPushers() {
-    while (!push_waiters_.empty()) {
-      const PushWaiter& front = push_waiters_.front();
-      if (capacity_->hasCapacity(front.size) || (capacity_->currentSize() == 0 && queue_.empty())) {
-        PushWaiter waiter = std::move(push_waiters_.front());
-        push_waiters_.pop_front();
-
-        capacity_->acquire(waiter.size);
-        current_size_ += waiter.size;
-        queue_.push_back(QueuedItem{std::move(waiter.item), waiter.size});
-        waiter.callback(absl::OkStatus());
-      } else {
-        break;
-      }
-    }
-  }
 
   SharedCapacityPtr capacity_;
   SizeFunc size_func_;
@@ -360,7 +403,7 @@ private:
   PushWaiterList push_waiters_;
   PopWaiterList pop_waiters_;
   bool closed_{false};
-  uint64_t callback_id_{0};
+  std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
 };
 
 } // namespace Coroutine
