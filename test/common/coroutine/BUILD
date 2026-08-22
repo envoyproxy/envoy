@@ -57,6 +57,21 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "async_queue_test",
+    srcs = ["async_queue_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":manual_executor_lib",
+        "//source/common/coroutine:async_queue_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/common/coroutine:task_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/status",
+    ],
+)
+
 # Echo-server micro-benchmark: a callback state machine vs. a coroutine body, both
 # over a real dispatcher + IoHandle, driven by a shared blocking two-thread client.
 envoy_cc_benchmark_binary(

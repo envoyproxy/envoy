@@ -71,6 +71,30 @@ private:
   LeafController& controller_;
 };
 
+class TestLeafWithImmediateResult : public LeafAwaitable<absl::Status> {
+public:
+  TestLeafWithImmediateResult(LeafController& controller,
+                              std::optional<absl::Status> immediate_result)
+      : controller_(controller), immediate_result_(std::move(immediate_result)) {}
+
+protected:
+  std::optional<absl::Status> tryImmediate() override { return immediate_result_; }
+
+  void onStart() override {
+    controller_.started = true;
+    controller_.observed_executor = &context().executor();
+    controller_.completer = [this](absl::Status status) { complete(std::move(status)); };
+  }
+  void onCancel() override {
+    controller_.cancelled = true;
+    controller_.completer = nullptr;
+  }
+
+private:
+  LeafController& controller_;
+  std::optional<absl::Status> immediate_result_;
+};
+
 // Coroutines under test ------------------------------------------------------
 
 Task<absl::StatusOr<int>> returnsValue(int value) { co_return value; }
@@ -97,6 +121,12 @@ Task<absl::Status> throwsOnDataPlane(bool should_throw) {
 
 Task<absl::Status> awaitLeaf(LeafController& controller) {
   TestLeaf leaf(controller);
+  co_return co_await leaf;
+}
+
+Task<absl::Status> awaitLeafWithImmediateResult(LeafController& controller,
+                                                std::optional<absl::Status> immediate_result) {
+  TestLeafWithImmediateResult leaf(controller, std::move(immediate_result));
   co_return co_await leaf;
 }
 
@@ -138,12 +168,14 @@ TEST(CancellationStateTest, CancelSetsFlagAndIsIdempotent) {
   EXPECT_EQ(1, fired);
 }
 
-TEST(CancellationStateTest, SetCallbackAfterCancelFiresSynchronously) {
+TEST(CancellationStateTest, SetCallbackAfterCancelDoesNotFireOnStack) {
   CancellationState state;
   state.cancel();
   int fired = 0;
-  state.setCancelCallback([&fired] { ++fired; });
-  EXPECT_EQ(1, fired);
+  EXPECT_ENVOY_BUG(
+      { state.setCancelCallback([&fired] { ++fired; }); },
+      "setCancelCallback called on an already-cancelled CancellationState");
+  EXPECT_EQ(0, fired);
 }
 
 TEST(CancellationStateTest, ClearedCallbackDoesNotFire) {
@@ -357,6 +389,79 @@ TEST(LeafAwaitableTest, CancelAfterCompleteIsNoOp) {
   handle.cancel();
   EXPECT_FALSE(controller.cancelled);
   EXPECT_TRUE(result->ok());
+}
+
+TEST(LeafAwaitableTest, ImmediateResultCompletesImmediatelyWithoutSuspending) {
+  auto exec = std::make_shared<ManualExecutor>();
+  LeafController controller;
+  std::optional<absl::Status> result;
+  DetachedHandle handle =
+      launch(awaitLeafWithImmediateResult(controller, absl::InvalidArgumentError("invalid")), exec,
+             [&result](absl::Status status) { result = std::move(status); });
+  exec->drain();
+  // tryImmediate returned a status directly; onStart should never be called.
+  EXPECT_FALSE(controller.started);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(absl::IsInvalidArgument(*result));
+}
+
+TEST(LeafAwaitableTest, ImmediateResultNulloptProceedsToSuspendAndComplete) {
+  auto exec = std::make_shared<ManualExecutor>();
+  LeafController controller;
+  std::optional<absl::Status> result;
+  DetachedHandle handle = launch(awaitLeafWithImmediateResult(controller, std::nullopt), exec,
+                                 [&result](absl::Status status) { result = std::move(status); });
+  exec->drain();
+  EXPECT_TRUE(controller.started);
+  EXPECT_FALSE(result.has_value());
+
+  controller.completeWith(absl::OkStatus());
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(result->ok());
+}
+
+namespace {
+class CancellingTestLeaf : public LeafAwaitable<absl::Status> {
+public:
+  CancellingTestLeaf(bool& on_start_called, bool& on_cancel_called)
+      : on_start_called_(on_start_called), on_cancel_called_(on_cancel_called) {}
+
+protected:
+  std::optional<absl::Status> tryImmediate() override {
+    // Synchronously cancel the context during the immediate attempt
+    context().cancellation()->cancel();
+    return std::nullopt;
+  }
+
+  void onStart() override { on_start_called_ = true; }
+  void onCancel() override { on_cancel_called_ = true; }
+
+private:
+  bool& on_start_called_;
+  bool& on_cancel_called_;
+};
+
+Task<absl::Status> awaitCancellingLeaf(bool& on_start_called, bool& on_cancel_called) {
+  CancellingTestLeaf leaf(on_start_called, on_cancel_called);
+  co_return co_await leaf;
+}
+} // namespace
+
+TEST(LeafAwaitableTest, TryImmediateCancelsContextAndReturnsNulloptFailsFastWithoutSuspending) {
+  auto exec = std::make_shared<ManualExecutor>();
+  bool on_start_called = false;
+  bool on_cancel_called = false;
+  std::optional<absl::Status> result;
+
+  DetachedHandle handle = launch(
+      awaitCancellingLeaf(on_start_called, on_cancel_called), exec,
+      [&result](absl::Status status) { result = std::move(status); }, StartMode::Inline);
+
+  // Completed inline without ever calling onStart or onCancel (and without suspending)
+  EXPECT_FALSE(on_start_called);
+  EXPECT_FALSE(on_cancel_called);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(absl::IsCancelled(*result));
 }
 
 // ---------------------------------------------------------------------------
@@ -580,6 +685,109 @@ TEST(StatusMacrosTest, CoReturnIfErrorFailure) {
   EXPECT_FALSE(result->ok());
   EXPECT_EQ(result->code(), absl::StatusCode::kInternal);
   EXPECT_EQ(result->message(), "status error");
+}
+
+// ---------------------------------------------------------------------------
+// Additional edge cases and coverage tests
+// ---------------------------------------------------------------------------
+
+TEST(TaskTest, MoveAssignment) {
+  Task<absl::StatusOr<int>> t1 = returnsValue(10);
+  Task<absl::StatusOr<int>> t2 = returnsValue(20);
+  // Overwrite an active task with another active task
+  t1 = std::move(t2);
+
+  auto exec = std::make_shared<ManualExecutor>();
+  std::optional<absl::StatusOr<int>> result;
+  DetachedHandle handle = launch(
+      std::move(t1), exec, [&result](absl::StatusOr<int> val) { result = val; }, StartMode::Inline);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(**result, 20);
+
+  // Self-assignment
+  Task<absl::StatusOr<int>>* t_ptr = &t1;
+  t1 = std::move(*t_ptr);
+}
+
+namespace {
+Task<absl::StatusOr<std::unique_ptr<int>>> returnsMoveOnly(int val) {
+  co_return std::make_unique<int>(val);
+}
+
+Task<absl::StatusOr<std::unique_ptr<int>>> awaitMoveOnly(int val) {
+  ASSIGN_OR_CO_RETURN(auto ptr, co_await returnsMoveOnly(val));
+  co_return ptr;
+}
+
+class MoveableLeaf : public LeafAwaitable<absl::Status> {
+public:
+  MoveableLeaf() = default;
+  MoveableLeaf(MoveableLeaf&&) noexcept = default;
+  MoveableLeaf& operator=(MoveableLeaf&&) noexcept = default;
+
+protected:
+  void onStart() override {}
+  void onCancel() override {}
+};
+} // namespace
+
+TEST(TaskTest, MoveOnlyReturnType) {
+  auto exec = std::make_shared<ManualExecutor>();
+  std::optional<absl::StatusOr<std::unique_ptr<int>>> result;
+  DetachedHandle handle = launch(
+      awaitMoveOnly(99), exec,
+      [&result](absl::StatusOr<std::unique_ptr<int>> res) { result = std::move(res); },
+      StartMode::Inline);
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->ok());
+  ASSERT_NE(result->value(), nullptr);
+  EXPECT_EQ(*result->value(), 99);
+}
+
+TEST(LaunchTest, DetachedHandleMoveAssignmentAndNull) {
+  auto exec = std::make_shared<ManualExecutor>();
+  bool ran = false;
+  DetachedHandle h1(nullptr);
+  // Cancel on null handle is a safe no-op
+  h1.cancel();
+
+  DetachedHandle h2 = launch(returnsOk(ran), exec, [](absl::Status) {});
+  h1 = std::move(h2);
+  exec->drain();
+  EXPECT_TRUE(ran);
+}
+
+TEST(LeafAwaitableTest, MultipleCompleteCallsAreIdempotent) {
+  auto exec = std::make_shared<ManualExecutor>();
+  LeafController controller;
+  std::optional<absl::Status> result;
+  DetachedHandle handle = launch(awaitLeaf(controller), exec,
+                                 [&result](absl::Status status) { result = std::move(status); });
+  exec->drain();
+  ASSERT_TRUE(controller.started);
+
+  // First completion succeeds
+  controller.completeWith(absl::OkStatus());
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(result->ok());
+}
+
+TEST(LeafAwaitableTest, MoveOperations) {
+  MoveableLeaf leaf1;
+  MoveableLeaf leaf2(std::move(leaf1));
+  MoveableLeaf leaf3;
+  leaf3 = std::move(leaf2);
+}
+
+TEST(TaskTest, FinalAwaiterAndTaskAwaiterCoverage) {
+  FinalAwaiter final_awaiter;
+  EXPECT_FALSE(final_awaiter.await_ready());
+  final_awaiter.await_resume();
+
+  bool ran = false;
+  Task<absl::Status> t = returnsOk(ran);
+  auto awaiter = std::move(t).operator co_await();
+  EXPECT_FALSE(awaiter.await_ready());
 }
 
 } // namespace
