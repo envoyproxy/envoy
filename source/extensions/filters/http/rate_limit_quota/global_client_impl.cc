@@ -107,8 +107,8 @@ void getUsageFromBucket(const CachedBucket& cached_bucket, TimeSource& time_sour
   while (!cached_last_report.compare_exchange_weak(last_report, now, std::memory_order_relaxed)) {
   }
 
-  usage.mutable_time_elapsed()->set_seconds(
-      std::chrono::duration_cast<std::chrono::seconds>(now - last_report).count());
+  usage.mutable_time_elapsed()->MergeFrom(
+      Protobuf::util::TimeUtil::NanosecondsToDuration((now - last_report).count()));
 }
 
 // Read a specific bucket's aggregated usage & build it into a UsageReports
@@ -152,7 +152,7 @@ RateLimitQuotaUsageReports GlobalRateLimitClientImpl::buildReports() {
 }
 
 void GlobalRateLimitClientImpl::createBucket(const BucketId& bucket_id, size_t id,
-                                             std::chrono::milliseconds reporting_interval,
+                                             std::chrono::nanoseconds reporting_interval,
                                              const BucketAction& default_bucket_action,
                                              std::unique_ptr<RateLimitStrategy> fallback_action,
                                              std::chrono::milliseconds fallback_ttl,
@@ -168,7 +168,7 @@ void GlobalRateLimitClientImpl::createBucket(const BucketId& bucket_id, size_t i
 }
 
 void GlobalRateLimitClientImpl::createBucketImpl(const BucketId& bucket_id, size_t id,
-                                                 std::chrono::milliseconds reporting_interval,
+                                                 std::chrono::nanoseconds reporting_interval,
                                                  const BucketAction& default_bucket_action,
                                                  std::unique_ptr<RateLimitStrategy> fallback_action,
                                                  std::chrono::milliseconds fallback_ttl,

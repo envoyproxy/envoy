@@ -775,6 +775,11 @@ uint64_t DurationUtil::durationToMilliseconds(const Protobuf::Duration& duration
   return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
 }
 
+std::chrono::nanoseconds DurationUtil::durationToNanoseconds(const Protobuf::Duration& duration) {
+  validateDuration(duration);
+  return std::chrono::nanoseconds(Protobuf::util::TimeUtil::DurationToNanoseconds(duration));
+}
+
 absl::StatusOr<uint64_t>
 DurationUtil::durationToMillisecondsNoThrow(const Protobuf::Duration& duration) {
   const absl::Status result = validateDurationNoThrow(duration);

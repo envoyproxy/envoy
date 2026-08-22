@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <numeric>
 #include <string>
 #include <type_traits>
@@ -749,6 +750,14 @@ public:
    * @throw EnvoyException when duration is out-of-range.
    */
   static uint64_t durationToMilliseconds(const Protobuf::Duration& duration);
+
+  /**
+   * Same as DurationUtil::durationToMilliseconds, returning nanosecond precision.
+   * @param duration protobuf.
+   * @return duration in nanoseconds.
+   * @throw EnvoyException when duration is out-of-range.
+   */
+  static std::chrono::nanoseconds durationToNanoseconds(const Protobuf::Duration& duration);
 
   /**
    * Same as DurationUtil::durationToMilliseconds but does not throw an exception.

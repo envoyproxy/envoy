@@ -451,7 +451,7 @@ TEST_F(GlobalClientTest, BasicUsageReporting) {
 }
 
 TEST_F(GlobalClientTest, ReportingTimerRoundsPositiveDelayUp) {
-  const auto reporting_interval = std::chrono::seconds(1);
+  const auto reporting_interval = std::chrono::milliseconds(1000);
   mock_stream_client->expectStreamCreation(1);
   mock_stream_client->expectTimerCreations(reporting_interval);
   EXPECT_CALL(mock_stream_client->stream_, sendMessageRaw_(_, false));
@@ -469,6 +469,41 @@ TEST_F(GlobalClientTest, ReportingTimerRoundsPositiveDelayUp) {
   waitForNotification(cb_ptr_->report_sent);
 }
 
+TEST_F(GlobalClientTest, ReportingTimeElapsedPreservesNanoseconds) {
+  const auto reporting_interval = std::chrono::milliseconds(500);
+  std::vector<RateLimitQuotaUsageReports> sent_reports;
+  mock_stream_client->expectStreamCreation(1);
+  mock_stream_client->expectTimerCreations(reporting_interval);
+  EXPECT_CALL(mock_stream_client->stream_, sendMessageRaw_(_, false))
+      .WillRepeatedly(testing::Invoke([&](Buffer::InstancePtr& request, bool) {
+        RateLimitQuotaUsageReports report;
+        ASSERT_TRUE(report.ParseFromArray(static_cast<char*>(request->linearize(request->length())),
+                                          request->length()));
+        sent_reports.push_back(std::move(report));
+      }));
+
+  cb_ptr_->expectBuckets({sample_id_hash_});
+  global_client_->createBucket(sample_bucket_id_, sample_id_hash_, reporting_interval,
+                               default_allow_action, nullptr, std::chrono::milliseconds::zero(),
+                               true);
+  cb_ptr_->waitForExpectedBuckets();
+
+  advanceTime(reporting_interval);
+  mock_stream_client->timer_->invokeCallback();
+  waitForNotification(cb_ptr_->report_sent);
+  ASSERT_EQ(sent_reports.size(), 2);
+  EXPECT_EQ(sent_reports[1].bucket_quota_usages(0).time_elapsed().seconds(), 0);
+  EXPECT_EQ(sent_reports[1].bucket_quota_usages(0).time_elapsed().nanos(), 500000000);
+
+  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
+  advanceTime(std::chrono::milliseconds(1500));
+  mock_stream_client->timer_->invokeCallback();
+  waitForNotification(cb_ptr_->report_sent);
+  ASSERT_EQ(sent_reports.size(), 3);
+  EXPECT_EQ(sent_reports[2].bucket_quota_usages(0).time_elapsed().seconds(), 1);
+  EXPECT_EQ(sent_reports[2].bucket_quota_usages(0).time_elapsed().nanos(), 500000000);
+}
+
 TEST_F(GlobalClientTest, PerBucketReportingIntervalsPreserveUsage) {
   BucketId sample_bucket_id2;
   (*sample_bucket_id2.mutable_bucket())["mock_id_key"] = "mutable_id_value3";
@@ -477,8 +512,8 @@ TEST_F(GlobalClientTest, PerBucketReportingIntervalsPreserveUsage) {
   BucketAction default_allow_action2 = default_allow_action;
   *default_allow_action2.mutable_bucket_id() = sample_bucket_id2;
 
-  const auto short_interval = std::chrono::seconds(1);
-  const auto long_interval = std::chrono::seconds(5);
+  const auto short_interval = std::chrono::milliseconds(1000);
+  const auto long_interval = std::chrono::milliseconds(5000);
   mock_stream_client->expectStreamCreation(1);
   mock_stream_client->expectTimerCreations(long_interval);
   EXPECT_CALL(mock_stream_client->stream_,
@@ -1401,8 +1436,8 @@ TEST_F(GlobalClientTest, TestAbandonActionReschedulesRemainingBucket) {
   BucketAction short_default_action = default_allow_action;
   *short_default_action.mutable_bucket_id() = short_bucket_id;
 
-  const auto short_interval = std::chrono::seconds(1);
-  const auto long_interval = std::chrono::seconds(5);
+  const auto short_interval = std::chrono::milliseconds(1000);
+  const auto long_interval = std::chrono::milliseconds(5000);
   mock_stream_client->expectStreamCreation(1);
   mock_stream_client->expectTimerCreations(long_interval);
   EXPECT_CALL(mock_stream_client->stream_, sendMessageRaw_(_, false)).Times(2);

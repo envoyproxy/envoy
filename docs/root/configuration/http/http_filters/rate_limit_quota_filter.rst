@@ -32,8 +32,9 @@ The RLQS is expected to update the assignment before the TTL runs out. If RLQS f
 has expired, the filter can be configured to continue using the last quota assignment or fall back to a value predefined in the
 :ref:`expired assignment configuration <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.expired_assignment_behavior>`.
 
-The rate limit quota filter reports the request load for each bucket to the RLQS with the configured ``reporting_interval``. The RLQS may rebalance quota assignments based on the request
-load that each Envoy receives and push new quota assignments to Envoy instances.
+The rate limit quota filter reports the request load for each bucket to the RLQS with that bucket's configured
+``reporting_interval``. The RLQS may rebalance quota assignments based on the request load that each Envoy receives
+and push new quota assignments to Envoy instances.
 
 Failure modes
 ^^^^^^^^^^^^^

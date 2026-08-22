@@ -184,8 +184,8 @@ RateLimitQuotaFilter::recordBucketUsage(const Matcher::ActionConstSharedPtr& mat
   std::chrono::milliseconds expiration_fallback_ttl =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::seconds(expiration_fallback_ttl_secs));
-  const std::chrono::milliseconds reporting_interval(
-      DurationUtil::durationToMilliseconds(match_action.bucketSettings().reporting_interval()));
+  const std::chrono::nanoseconds reporting_interval(
+      DurationUtil::durationToNanoseconds(match_action.bucketSettings().reporting_interval()));
 
   // When seeing a new bucket for the first time, request its addition to
   // the global cache. This will be done by the main thread.
