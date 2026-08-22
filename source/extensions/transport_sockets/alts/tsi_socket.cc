@@ -17,14 +17,14 @@ namespace TransportSockets {
 namespace Alts {
 
 TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
-                     Network::TransportSocketPtr&& raw_socket, bool downstream)
+                     Network::TransportSocketPtr&& raw_socket, bool downstream, absl::string_view target_name)
     : handshaker_factory_(handshaker_factory), handshake_validator_(handshake_validator),
-      raw_buffer_socket_(std::move(raw_socket)), downstream_(downstream) {}
+      raw_buffer_socket_(std::move(raw_socket)), downstream_(downstream), target_name_(target_name) {}
 
 TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
-                     bool downstream)
+                     bool downstream, absl::string_view target_name)
     : TsiSocket(handshaker_factory, handshake_validator,
-                std::make_unique<Network::RawBufferSocket>(), downstream) {
+                std::make_unique<Network::RawBufferSocket>(), downstream, target_name) {
   raw_read_buffer_.setWatermarks(default_max_frame_size_);
 }
 
@@ -66,7 +66,7 @@ Network::PostIoAction TsiSocket::doHandshakeNext() {
     handshaker_ =
         handshaker_factory_(callbacks_->connection().dispatcher(),
                             callbacks_->connection().connectionInfoProvider().localAddress(),
-                            callbacks_->connection().connectionInfoProvider().remoteAddress());
+                            callbacks_->connection().connectionInfoProvider().remoteAddress(), target_name_);
     if (!handshaker_) {
       ENVOY_CONN_LOG(warn, "TSI: failed to create handshaker", callbacks_->connection());
       callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
@@ -365,7 +365,11 @@ bool TsiSocketFactory::implementsSecureTransport() const { return true; }
 Network::TransportSocketPtr
 TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr,
                                         Upstream::HostDescriptionConstSharedPtr) const {
-  return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_, false);
+  std::string target_name;
+  if (options != nullptr && options->serverNameOverride().has_value()) {
+    target_name = *options->serverNameOverride();
+  }
+  return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_, false, target_name);
 }
 
 Network::TransportSocketPtr TsiSocketFactory::createDownstreamTransportSocket() const {
