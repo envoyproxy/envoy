@@ -58,11 +58,21 @@ public:
       return true;
     }
     result_ = tryImmediate();
-    return result_.has_value();
+    if (result_.has_value()) {
+      return true;
+    }
+    // Re-check cancellation: tryImmediate() may have synchronously triggered cancellation.
+    return context_->cancellation()->cancelled();
   }
 
-  void await_suspend(std::coroutine_handle<> continuation) {
+  bool await_suspend(std::coroutine_handle<> continuation) {
     continuation_ = continuation;
+    if (context_->cancellation()->cancelled()) {
+      // If already cancelled, do not suspend and do not call onStart().
+      // Returning false immediately resumes the coroutine on the current stack,
+      // which will invoke await_resume() and return abortedValue().
+      return false;
+    }
     // Register the cancel action while this is the pending leaf.
     context_->cancellation()->setCancelCallback([this] {
       cancelling_ = true;
@@ -70,6 +80,7 @@ public:
       finish(abortedValue());
     });
     onStart(); // derived kicks off the async op; must eventually call complete().
+    return true;
   }
 
   // [[nodiscard]]: the result carries success/failure/cancellation, so a

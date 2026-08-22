@@ -29,7 +29,7 @@ template <typename T> struct DefaultItemSize {
  * Capacity is measured in abstract units (e.g. item count, bytes, or memory weight).
  *
  * Requests for capacity are queued in a global FIFO wait queue when capacity is exhausted,
- * preventing starvation of large allocations and ensuring fair temporal ordering.
+ * preventing starvation of large allocations and preserving strict chronological arrival ordering.
  */
 class SharedCapacity {
 public:

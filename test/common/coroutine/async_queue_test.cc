@@ -651,7 +651,7 @@ TEST_F(AsyncQueueTest, CancelCapacityRequestOnClose) {
   EXPECT_EQ(*val, 10);
 
   drain();
-  // q2 should have received capacity notification and unblocked
+  // q2 should have been granted capacity by processWaiters() and unblocked
   EXPECT_TRUE(q2_push_done);
   EXPECT_EQ(shared_cap->currentSize(), 1);
 }
@@ -690,10 +690,10 @@ TEST_F(AsyncQueueTest, NullCallbackInRequestCapacityDefensiveHandling) {
 }
 
 // ============================================================================
-// 4. Fairness, Head-of-Line Blocking, and Starvation Prevention
+// 4. Global FIFO Ordering, Head-of-Line Blocking, and Starvation Prevention
 // ============================================================================
 
-TEST_F(AsyncQueueTest, FairnessPreservedAcrossDynamicQueueDestruction) {
+TEST_F(AsyncQueueTest, GlobalFIFOOrderPreservedAcrossDynamicQueueDestruction) {
   // Shared capacity limit = 1 unit
   auto shared_cap = std::make_shared<SharedCapacity>(1);
   auto q0 = std::make_unique<AsyncQueue<std::string>>(shared_cap);
@@ -714,7 +714,7 @@ TEST_F(AsyncQueueTest, FairnessPreservedAcrossDynamicQueueDestruction) {
   drain();
   EXPECT_TRUE(order_granted.empty());
 
-  // Pop q0_init. This starts notification round: q0 gets space and unblocks q0_push.
+  // Pop q0_init: frees capacity and grants space to the head waiter (q0_push).
   auto pop0 = q0->tryPop();
   ASSERT_TRUE(pop0.has_value());
   EXPECT_EQ(*pop0, "q0_init");
@@ -722,19 +722,21 @@ TEST_F(AsyncQueueTest, FairnessPreservedAcrossDynamicQueueDestruction) {
 
   EXPECT_THAT(order_granted, testing::ElementsAre("q0_push"));
 
-  // Now destroy q0. In doing so, q0's callback is removed, shifting q1 and q2 in the array.
-  // Next in round-robin order MUST be q1, not q2.
+  // Now destroy q0. Destroying q0 cleans up its resources without disrupting
+  // the wait queue. In global FIFO order, the next waiter to receive capacity
+  // MUST be q1_push, not q2_push.
   q0.reset();
   drain();
 
-  // Add another push to q1 to test ordering
+  // Add another push to q1 to test ordering: it queues at the tail behind q2_push.
   launchPushTrack(*q1, "q1_push2", order_granted);
   drain();
 
-  // q1 should get the space next
+  // q1_push was at the head of the wait queue, so it gets granted next.
   EXPECT_THAT(order_granted, testing::ElementsAre("q0_push", "q1_push"));
 
-  // Now pop q1's item -> q2 MUST get space next, NOT q1_push2.
+  // Now pop q1's item -> frees capacity; q2_push was ahead of q1_push2 in FIFO order,
+  // so q2_push MUST get space next, NOT q1_push2.
   auto pop1 = q1->tryPop();
   ASSERT_TRUE(pop1.has_value());
   EXPECT_EQ(*pop1, "q1_push");
@@ -742,7 +744,7 @@ TEST_F(AsyncQueueTest, FairnessPreservedAcrossDynamicQueueDestruction) {
 
   EXPECT_THAT(order_granted, testing::ElementsAre("q0_push", "q1_push", "q2_push"));
 
-  // Now pop q2's item -> q1_push2 gets space next
+  // Now pop q2's item -> frees capacity; q1_push2 is now at the head and gets space next.
   auto pop2 = q2->tryPop();
   ASSERT_TRUE(pop2.has_value());
   EXPECT_EQ(*pop2, "q2_push");
@@ -1049,9 +1051,9 @@ TEST_F(AsyncQueueTest, ReentrantReleaseDoesNotLoseWakeups) {
   EXPECT_FALSE(q2_push_done);
 
   // Pop from q1: frees 1 slot.
-  // This triggers notifySpaceAvailable() -> unblocks q1_push_task.
-  // q1_push_task runs and performs a re-entrant pop from q1 -> frees another slot while notifying!
-  // q2_push_task must also be unblocked without lost wakeup.
+  // This triggers processWaiters() -> unblocks q1_push_task.
+  // q1_push_task runs and performs a re-entrant pop from q1 -> frees another slot while
+  // processWaiters() is running! q2_push_task must also be unblocked without lost wakeup.
   auto item = q1.tryPop();
   ASSERT_TRUE(item.has_value());
   EXPECT_EQ(*item, 1);
@@ -1161,7 +1163,7 @@ TEST_F(AsyncQueueTest, SelfDestructionDuringClose) {
   EXPECT_EQ(q, nullptr);
 }
 
-TEST_F(AsyncQueueTest, DynamicQueueCreationDuringNotification) {
+TEST_F(AsyncQueueTest, DynamicQueueCreationDuringGrant) {
   auto shared_cap = std::make_shared<SharedCapacity>(2);
   auto q1 = std::make_unique<AsyncQueue<int>>(shared_cap);
   EXPECT_TRUE(q1->tryPush(1));
@@ -1172,7 +1174,7 @@ TEST_F(AsyncQueueTest, DynamicQueueCreationDuringNotification) {
 
   auto push_task = [&q1, &shared_cap, &dynamic_q, &dynamic_push_done]() -> Task<absl::Status> {
     CO_RETURN_IF_ERROR(co_await q1->push(3));
-    // Create a new AsyncQueue dynamically while notification was running
+    // Create a new AsyncQueue dynamically while processWaiters() was running
     dynamic_q = std::make_unique<AsyncQueue<int>>(shared_cap);
     // Queue is full (items 2 and 3 in q1), so pushing into dynamic_q suspends
     CO_RETURN_IF_ERROR(co_await dynamic_q->push(100));
@@ -1190,7 +1192,7 @@ TEST_F(AsyncQueueTest, DynamicQueueCreationDuringNotification) {
   EXPECT_FALSE(dynamic_push_done);
   ASSERT_NE(dynamic_q, nullptr);
 
-  // Pop item 2 from q1 -> frees capacity -> dynamic_q receives space notification and unblocks
+  // Pop item 2 from q1 -> frees capacity -> dynamic_q is granted capacity and unblocks
   EXPECT_TRUE(q1->tryPop().has_value());
   drain();
 

@@ -168,12 +168,14 @@ TEST(CancellationStateTest, CancelSetsFlagAndIsIdempotent) {
   EXPECT_EQ(1, fired);
 }
 
-TEST(CancellationStateTest, SetCallbackAfterCancelFiresSynchronously) {
+TEST(CancellationStateTest, SetCallbackAfterCancelDoesNotFireOnStack) {
   CancellationState state;
   state.cancel();
   int fired = 0;
-  state.setCancelCallback([&fired] { ++fired; });
-  EXPECT_EQ(1, fired);
+  EXPECT_ENVOY_BUG(
+      { state.setCancelCallback([&fired] { ++fired; }); },
+      "setCancelCallback called on an already-cancelled CancellationState");
+  EXPECT_EQ(0, fired);
 }
 
 TEST(CancellationStateTest, ClearedCallbackDoesNotFire) {
@@ -416,6 +418,50 @@ TEST(LeafAwaitableTest, ImmediateResultNulloptProceedsToSuspendAndComplete) {
   controller.completeWith(absl::OkStatus());
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(result->ok());
+}
+
+namespace {
+class CancellingTestLeaf : public LeafAwaitable<absl::Status> {
+public:
+  CancellingTestLeaf(bool& on_start_called, bool& on_cancel_called)
+      : on_start_called_(on_start_called), on_cancel_called_(on_cancel_called) {}
+
+protected:
+  std::optional<absl::Status> tryImmediate() override {
+    // Synchronously cancel the context during the immediate attempt
+    context().cancellation()->cancel();
+    return std::nullopt;
+  }
+
+  void onStart() override { on_start_called_ = true; }
+  void onCancel() override { on_cancel_called_ = true; }
+
+private:
+  bool& on_start_called_;
+  bool& on_cancel_called_;
+};
+
+Task<absl::Status> awaitCancellingLeaf(bool& on_start_called, bool& on_cancel_called) {
+  CancellingTestLeaf leaf(on_start_called, on_cancel_called);
+  co_return co_await leaf;
+}
+} // namespace
+
+TEST(LeafAwaitableTest, TryImmediateCancelsContextAndReturnsNulloptFailsFastWithoutSuspending) {
+  auto exec = std::make_shared<ManualExecutor>();
+  bool on_start_called = false;
+  bool on_cancel_called = false;
+  std::optional<absl::Status> result;
+
+  DetachedHandle handle = launch(
+      awaitCancellingLeaf(on_start_called, on_cancel_called), exec,
+      [&result](absl::Status status) { result = std::move(status); }, StartMode::Inline);
+
+  // Completed inline without ever calling onStart or onCancel (and without suspending)
+  EXPECT_FALSE(on_start_called);
+  EXPECT_FALSE(on_cancel_called);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(absl::IsCancelled(*result));
 }
 
 // ---------------------------------------------------------------------------

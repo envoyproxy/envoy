@@ -22,6 +22,7 @@ envoy_cc_library(
     hdrs = ["context.h"],
     deps = [
         ":executor_lib",
+        "//source/common/common:assert_lib",
         "@abseil-cpp//absl/functional:any_invocable",
     ],
 )
