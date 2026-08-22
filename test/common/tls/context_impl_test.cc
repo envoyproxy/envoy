@@ -23,6 +23,7 @@
 #include "test/common/tls/test_data/no_san_cert_info.h"
 #include "test/common/tls/test_data/san_dns3_cert_info.h"
 #include "test/common/tls/test_data/san_ip_cert_info.h"
+#include "test/common/tls/test_data/selfsigned_cert_info.h"
 #include "test/common/tls/test_data/unittest_cert_info.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -2808,9 +2809,13 @@ common_tls_context:
   std::string expected_metric_name =
       absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
 
+  auto cert_expiry =
+      TestUtility::parseTime(TEST_SELFSIGNED_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  uint64_t expected_expiry = absl::ToUnixSeconds(cert_expiry);
+
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), 1787339648);
+  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
 }
 
 TEST_F(CertificateExpirationMetricsTest, ClientCertificateExpirationMetrics) {
@@ -2841,9 +2846,13 @@ common_tls_context:
   std::string expected_metric_name =
       absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
 
+  auto cert_expiry =
+      TestUtility::parseTime(TEST_SELFSIGNED_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  uint64_t expected_expiry = absl::ToUnixSeconds(cert_expiry);
+
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), 1787339648);
+  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
 }
 
 } // namespace Tls
