@@ -43,7 +43,7 @@ public:
   ~MockRateLimitClient() override = default;
 
   MOCK_METHOD(void, createBucket,
-              (const BucketId& bucket_id, size_t id, std::chrono::nanoseconds reporting_interval,
+              (const BucketId& bucket_id, size_t id, std::chrono::milliseconds reporting_interval,
                const BucketAction& default_bucket_action,
                std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                std::chrono::milliseconds fallback_ttl, bool initial_request_allowed),

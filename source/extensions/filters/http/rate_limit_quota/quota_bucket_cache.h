@@ -48,7 +48,7 @@ struct QuotaUsage {
 // cache are in separate pointers to enable separate pointer-swapping.
 struct CachedBucket {
   CachedBucket(const BucketId& bucket_id, std::shared_ptr<QuotaUsage> quota_usage,
-               std::chrono::nanoseconds reporting_interval,
+               std::chrono::milliseconds reporting_interval,
                std::unique_ptr<BucketAction> cached_action,
                std::shared_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                std::chrono::milliseconds fallback_ttl, const BucketAction& default_action,
@@ -66,7 +66,7 @@ struct CachedBucket {
   std::shared_ptr<QuotaUsage> quota_usage;
 
   // The interval between usage reports for this bucket.
-  std::chrono::nanoseconds reporting_interval;
+  std::chrono::milliseconds reporting_interval;
 
   // Cached action from the RLQS server's last response that gave an updated
   // assignment for this ID'd bucket. Can be null if no assignment has been
@@ -108,7 +108,7 @@ public:
 
   // Safe creation & getting of global buckets.
   virtual void createBucket(const BucketId& bucket_id, size_t id,
-                            std::chrono::nanoseconds reporting_interval,
+                            std::chrono::milliseconds reporting_interval,
                             const BucketAction& default_bucket_action,
                             std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                             std::chrono::milliseconds fallback_ttl,

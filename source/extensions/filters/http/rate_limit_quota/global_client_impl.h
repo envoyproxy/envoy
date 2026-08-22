@@ -89,7 +89,7 @@ public:
   // by the main thread. Pointer swaps to TLS make the resources readable to
   // worker threads' LocalRateLimitClientImpl instances.
   void createBucket(const BucketId& bucket_id, size_t id,
-                    std::chrono::nanoseconds reporting_interval,
+                    std::chrono::milliseconds reporting_interval,
                     const BucketAction& default_bucket_action,
                     std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                     std::chrono::milliseconds fallback_ttl, bool initial_request_allowed);
@@ -121,7 +121,7 @@ private:
   // Helpers to execute in the main thread, triggered by public interfaces or by
   // internal flows.
   void createBucketImpl(const BucketId& bucket_id, size_t id,
-                        std::chrono::nanoseconds reporting_interval,
+                        std::chrono::milliseconds reporting_interval,
                         const BucketAction& default_bucket_action,
                         std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                         std::chrono::milliseconds fallback_ttl, bool initial_request_allowed);

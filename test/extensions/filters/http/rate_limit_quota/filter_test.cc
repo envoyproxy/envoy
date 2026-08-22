@@ -502,6 +502,46 @@ TEST_F(FilterTest, DecodeHeadersWithoutCachedAssignment) {
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
 }
 
+TEST_F(FilterTest, DecodeHeadersConvertsSubsecondReportingInterval) {
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
+  auto* typed_config = matcher.mutable_matcher_list()
+                           ->mutable_matchers(0)
+                           ->mutable_on_match()
+                           ->mutable_action()
+                           ->mutable_typed_config();
+  envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings settings;
+  ASSERT_TRUE(typed_config->UnpackTo(&settings));
+  settings.mutable_reporting_interval()->set_seconds(0);
+  settings.mutable_reporting_interval()->set_nanos(500000000);
+  ASSERT_TRUE(typed_config->PackFrom(settings));
+
+  addMatcherConfig(matcher);
+  createFilter();
+  const absl::flat_hash_map<std::string, std::string> custom_value_pairs = {
+      {"environment", "staging"}, {"group", "envoy"}};
+  buildCustomHeader(custom_value_pairs);
+
+  BucketId bucket_id =
+      bucketIdFromMap({{"environment", "staging"}, {"group", "envoy"}, {"name", "prod"}});
+  const size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  BucketAction expected_action;
+  expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+  *expected_action.mutable_bucket_id() = bucket_id;
+
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id), bucket_id_hash,
+                           std::chrono::milliseconds(500), ProtoEq(expected_action),
+                           testing::IsNull(), std::chrono::milliseconds::zero(), true))
+      .WillOnce(Return());
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, false),
+            Envoy::Http::FilterHeadersStatus::Continue);
+}
+
 TEST_F(FilterTest, DecodeHeaderWithCachedAllow) {
   addMatcherConfig(MatcherConfigType::Valid);
   createFilter();

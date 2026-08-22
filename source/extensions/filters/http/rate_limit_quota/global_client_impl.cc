@@ -152,7 +152,7 @@ RateLimitQuotaUsageReports GlobalRateLimitClientImpl::buildReports() {
 }
 
 void GlobalRateLimitClientImpl::createBucket(const BucketId& bucket_id, size_t id,
-                                             std::chrono::nanoseconds reporting_interval,
+                                             std::chrono::milliseconds reporting_interval,
                                              const BucketAction& default_bucket_action,
                                              std::unique_ptr<RateLimitStrategy> fallback_action,
                                              std::chrono::milliseconds fallback_ttl,
@@ -168,7 +168,7 @@ void GlobalRateLimitClientImpl::createBucket(const BucketId& bucket_id, size_t i
 }
 
 void GlobalRateLimitClientImpl::createBucketImpl(const BucketId& bucket_id, size_t id,
-                                                 std::chrono::nanoseconds reporting_interval,
+                                                 std::chrono::milliseconds reporting_interval,
                                                  const BucketAction& default_bucket_action,
                                                  std::unique_ptr<RateLimitStrategy> fallback_action,
                                                  std::chrono::milliseconds fallback_ttl,
