@@ -56,7 +56,7 @@ bool SharedCapacity::tryAcquire(uint64_t size) {
 SharedCapacity::WaiterIterator SharedCapacity::requestCapacity(uint64_t size, GrantCallback cb) {
   ASSERT(cb != nullptr);
   // Defensive fallback: if an invalid callback is passed in release builds, return
-  // waiters_.end() without enqueuing. This ensures:
+  // waiters_.end() without queuing. This ensures:
   // 1. processWaiters() will never encounter or attempt to invoke a null callback.
   // 2. cancelRequest(waiters_.end()) safely early-exits as a no-op if the caller
   //    subsequently attempts cancellation on the returned iterator.

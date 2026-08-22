@@ -641,6 +641,109 @@ TEST(StatusMacrosTest, CoReturnIfErrorFailure) {
   EXPECT_EQ(result->message(), "status error");
 }
 
+// ---------------------------------------------------------------------------
+// Additional edge cases and coverage tests
+// ---------------------------------------------------------------------------
+
+TEST(TaskTest, MoveAssignment) {
+  Task<absl::StatusOr<int>> t1 = returnsValue(10);
+  Task<absl::StatusOr<int>> t2 = returnsValue(20);
+  // Overwrite an active task with another active task
+  t1 = std::move(t2);
+
+  auto exec = std::make_shared<ManualExecutor>();
+  std::optional<absl::StatusOr<int>> result;
+  DetachedHandle handle = launch(
+      std::move(t1), exec, [&result](absl::StatusOr<int> val) { result = val; }, StartMode::Inline);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(**result, 20);
+
+  // Self-assignment
+  Task<absl::StatusOr<int>>* t_ptr = &t1;
+  t1 = std::move(*t_ptr);
+}
+
+namespace {
+Task<absl::StatusOr<std::unique_ptr<int>>> returnsMoveOnly(int val) {
+  co_return std::make_unique<int>(val);
+}
+
+Task<absl::StatusOr<std::unique_ptr<int>>> awaitMoveOnly(int val) {
+  ASSIGN_OR_CO_RETURN(auto ptr, co_await returnsMoveOnly(val));
+  co_return ptr;
+}
+
+class MoveableLeaf : public LeafAwaitable<absl::Status> {
+public:
+  MoveableLeaf() = default;
+  MoveableLeaf(MoveableLeaf&&) noexcept = default;
+  MoveableLeaf& operator=(MoveableLeaf&&) noexcept = default;
+
+protected:
+  void onStart() override {}
+  void onCancel() override {}
+};
+} // namespace
+
+TEST(TaskTest, MoveOnlyReturnType) {
+  auto exec = std::make_shared<ManualExecutor>();
+  std::optional<absl::StatusOr<std::unique_ptr<int>>> result;
+  DetachedHandle handle = launch(
+      awaitMoveOnly(99), exec,
+      [&result](absl::StatusOr<std::unique_ptr<int>> res) { result = std::move(res); },
+      StartMode::Inline);
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->ok());
+  ASSERT_NE(result->value(), nullptr);
+  EXPECT_EQ(*result->value(), 99);
+}
+
+TEST(LaunchTest, DetachedHandleMoveAssignmentAndNull) {
+  auto exec = std::make_shared<ManualExecutor>();
+  bool ran = false;
+  DetachedHandle h1(nullptr);
+  // Cancel on null handle is a safe no-op
+  h1.cancel();
+
+  DetachedHandle h2 = launch(returnsOk(ran), exec, [](absl::Status) {});
+  h1 = std::move(h2);
+  exec->drain();
+  EXPECT_TRUE(ran);
+}
+
+TEST(LeafAwaitableTest, MultipleCompleteCallsAreIdempotent) {
+  auto exec = std::make_shared<ManualExecutor>();
+  LeafController controller;
+  std::optional<absl::Status> result;
+  DetachedHandle handle = launch(awaitLeaf(controller), exec,
+                                 [&result](absl::Status status) { result = std::move(status); });
+  exec->drain();
+  ASSERT_TRUE(controller.started);
+
+  // First completion succeeds
+  controller.completeWith(absl::OkStatus());
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(result->ok());
+}
+
+TEST(LeafAwaitableTest, MoveOperations) {
+  MoveableLeaf leaf1;
+  MoveableLeaf leaf2(std::move(leaf1));
+  MoveableLeaf leaf3;
+  leaf3 = std::move(leaf2);
+}
+
+TEST(TaskTest, FinalAwaiterAndTaskAwaiterCoverage) {
+  FinalAwaiter final_awaiter;
+  EXPECT_FALSE(final_awaiter.await_ready());
+  final_awaiter.await_resume();
+
+  bool ran = false;
+  Task<absl::Status> t = returnsOk(ran);
+  auto awaiter = std::move(t).operator co_await();
+  EXPECT_FALSE(awaiter.await_ready());
+}
+
 } // namespace
 } // namespace Coroutine
 } // namespace Envoy

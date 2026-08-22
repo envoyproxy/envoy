@@ -1486,6 +1486,157 @@ TEST_F(AsyncQueueTest, SharedCapacityRequestAndCancel) {
   EXPECT_EQ(cap->currentSize(), 0);
 }
 
+TEST_F(AsyncQueueTest, SharedCapacityOversizedOccupancyHasCapacity) {
+  SharedCapacity cap(10);
+  // Allowed when empty even if larger than max_size
+  EXPECT_TRUE(cap.tryAcquire(15));
+  EXPECT_EQ(cap.currentSize(), 15);
+  // current_size_ > max_size_, hasCapacity must return false
+  EXPECT_FALSE(cap.hasCapacity(1));
+  EXPECT_FALSE(cap.hasCapacity(0));
+}
+
+TEST_F(AsyncQueueTest, SharedCapacityReleaseUnderflowAssert) {
+  SharedCapacity cap(10);
+  EXPECT_TRUE(cap.tryAcquire(5));
+  EXPECT_DEBUG_DEATH({ cap.release(10); }, "assert failure: current_size_ >= size");
+}
+
+TEST_F(AsyncQueueTest, SharedCapacityCancelMiddleWaiter) {
+  SharedCapacity cap(10);
+  EXPECT_TRUE(cap.tryAcquire(10));
+
+  bool g1 = false, g2 = false, g3 = false;
+  cap.requestCapacity(5, [&g1]() { g1 = true; });
+  auto w2 = cap.requestCapacity(5, [&g2]() { g2 = true; });
+  cap.requestCapacity(5, [&g3]() { g3 = true; });
+
+  // Cancel middle waiter (is_head == false)
+  cap.cancelRequest(w2);
+  EXPECT_FALSE(g1);
+  EXPECT_FALSE(g2);
+  EXPECT_FALSE(g3);
+
+  // Release 5 units -> grants w1
+  cap.release(5);
+  EXPECT_TRUE(g1);
+  EXPECT_FALSE(g2);
+  EXPECT_FALSE(g3);
+
+  // Release another 5 units -> grants w3 (w2 was skipped)
+  cap.release(5);
+  EXPECT_TRUE(g3);
+  EXPECT_FALSE(g2);
+}
+
+TEST_F(AsyncQueueTest, SharedCapacitySelfDestructionInCallback) {
+  auto cap = std::make_shared<SharedCapacity>(10);
+  EXPECT_TRUE(cap->tryAcquire(10));
+
+  bool granted = false;
+  cap->requestCapacity(5, [&cap, &granted]() {
+    granted = true;
+    cap.reset(); // Destroy SharedCapacity while inside processWaiters()
+  });
+
+  cap->release(10);
+  EXPECT_TRUE(granted);
+  EXPECT_EQ(cap, nullptr);
+}
+
+TEST_F(AsyncQueueTest, SharedCapacityReentrancyInCallback) {
+  SharedCapacity cap(10);
+  EXPECT_TRUE(cap.tryAcquire(10));
+
+  bool g1 = false, g2 = false;
+  cap.requestCapacity(5, [&cap, &g1]() {
+    g1 = true;
+    // Synchronously release capacity from inside the grant callback
+    cap.release(5);
+  });
+  cap.requestCapacity(5, [&g2]() { g2 = true; });
+
+  cap.release(10);
+  EXPECT_TRUE(g1);
+  EXPECT_TRUE(g2);
+  EXPECT_EQ(cap.currentSize(), 5);
+}
+
+TEST_F(AsyncQueueTest, AsyncQueueNullSharedCapacityPointerFallback) {
+  AsyncQueue<int> q(nullptr);
+  EXPECT_FALSE(q.maxSize().has_value());
+  EXPECT_TRUE(q.empty());
+  EXPECT_EQ(q.itemCount(), 0);
+  EXPECT_EQ(q.currentSize(), 0);
+  EXPECT_FALSE(q.closed());
+  EXPECT_NE(q.capacity(), nullptr);
+}
+
+TEST_F(AsyncQueueTest, AsyncQueueCloseIdempotentAndClosedOperations) {
+  AsyncQueue<int> q(5);
+  EXPECT_TRUE(q.tryPush(1));
+  q.close();
+  EXPECT_TRUE(q.closed());
+
+  // Second close is a no-op
+  q.close();
+  EXPECT_TRUE(q.closed());
+
+  // tryPush on closed queue returns false
+  EXPECT_FALSE(q.tryPush(2));
+
+  // Items before close can still be popped
+  auto item = q.tryPop();
+  ASSERT_TRUE(item.has_value());
+  EXPECT_EQ(*item, 1);
+
+  // tryPop on drained closed queue returns std::nullopt
+  EXPECT_FALSE(q.tryPop().has_value());
+}
+
+TEST_F(AsyncQueueTest, AsyncQueuePushPopAwaitableOnClosedQueueImmediate) {
+  AsyncQueue<int> q(5);
+  q.close();
+
+  // push on closed queue fast-fails with FailedPreconditionError
+  std::optional<absl::Status> push_result;
+  DetachedHandle h1 = launch(
+      [](AsyncQueue<int>& queue) -> Task<absl::Status> { co_return co_await queue.push(10); }(q),
+      executor_, [&push_result](absl::Status s) { push_result = std::move(s); }, StartMode::Inline);
+  ASSERT_TRUE(push_result.has_value());
+  EXPECT_TRUE(absl::IsFailedPrecondition(*push_result));
+
+  // pop on empty closed queue immediately returns EOF
+  std::optional<absl::StatusOr<std::optional<int>>> pop_result;
+  DetachedHandle h2 = launch(
+      [](AsyncQueue<int>& queue) -> Task<absl::StatusOr<std::optional<int>>> {
+        co_return co_await queue.pop();
+      }(q),
+      executor_,
+      [&pop_result](absl::StatusOr<std::optional<int>> res) { pop_result = std::move(res); },
+      StartMode::Inline);
+  ASSERT_TRUE(pop_result.has_value());
+  ASSERT_TRUE(pop_result->ok());
+  EXPECT_FALSE(pop_result->value().has_value());
+}
+
+TEST_F(AsyncQueueTest, AsyncQueueMoveOnlyTypes) {
+  AsyncQueue<std::unique_ptr<int>> q(2);
+  EXPECT_TRUE(q.tryPush(std::make_unique<int>(100)));
+  EXPECT_TRUE(q.tryPush(std::make_unique<int>(200)));
+  EXPECT_FALSE(q.tryPush(std::make_unique<int>(300)));
+
+  auto item1 = q.tryPop();
+  ASSERT_TRUE(item1.has_value());
+  ASSERT_NE(*item1, nullptr);
+  EXPECT_EQ(**item1, 100);
+
+  auto item2 = q.tryPop();
+  ASSERT_TRUE(item2.has_value());
+  ASSERT_NE(*item2, nullptr);
+  EXPECT_EQ(**item2, 200);
+}
+
 } // namespace
 } // namespace Coroutine
 } // namespace Envoy
