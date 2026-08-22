@@ -35,6 +35,11 @@ protected:
   void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
 
+  void requestRst() override {
+    if (io_handle_ != nullptr && io_handle_->isOpen()) {
+      io_handle_->requestRst();
+    }
+  }
   void close() override {
     if (io_handle_ != nullptr && io_handle_->isOpen()) {
       io_handle_->close();
@@ -110,11 +115,14 @@ public:
     ASSERT(io_handle_ != nullptr);
     return *io_handle_;
   }
+  void requestRst() override {
+    if (io_handle_ != nullptr && io_handle_->isOpen()) {
+      io_handle_->requestRst();
+    }
+  }
   void close() override {
-    if (io_handle_ != nullptr) {
-      if (io_handle_->isOpen()) {
-        io_handle_->close();
-      }
+    if (io_handle_ != nullptr && io_handle_->isOpen()) {
+      io_handle_->close();
     }
   }
   bool isOpen() const override {
