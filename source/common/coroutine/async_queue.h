@@ -246,15 +246,29 @@ public:
   // Non-blocking synchronous push attempt.
   // Returns true if pushed, false if capacity exceeded or closed.
   template <typename U = T> bool tryPush(U&& item) {
-    if (closed_ || !push_waiters_.empty()) {
+    if (closed_) {
       return false;
     }
+
+    if (!pop_waiters_.empty()) {
+      PopWaiterCallback waiter = std::move(pop_waiters_.front().callback);
+      pop_waiters_.pop_front();
+      waiter(std::make_optional(std::forward<U>(item)));
+      return true;
+    }
+
+    if (!push_waiters_.empty()) {
+      return false;
+    }
+
     uint64_t item_size = size_func_(item);
     if (!capacity_->hasCapacity(item_size) && (capacity_->currentSize() != 0 || !queue_.empty())) {
       return false;
     }
 
-    enqueueOrDeliver(std::forward<U>(item), item_size);
+    capacity_->acquire(item_size);
+    current_size_ += item_size;
+    queue_.push_back(QueuedItem{std::forward<U>(item), item_size});
     return true;
   }
 
@@ -266,15 +280,22 @@ public:
   // Non-blocking synchronous pop attempt.
   // Returns the front item if present, std::nullopt if queue is empty.
   std::optional<T> tryPop() {
-    if (queue_.empty()) {
-      return std::nullopt;
+    if (!queue_.empty()) {
+      QueuedItem queued = std::move(queue_.front());
+      queue_.pop_front();
+      current_size_ -= queued.size;
+      capacity_->release(queued.size);
+      return std::make_optional(std::move(queued.item));
     }
 
-    QueuedItem queued = std::move(queue_.front());
-    queue_.pop_front();
-    current_size_ -= queued.size;
-    capacity_->release(queued.size);
-    return std::make_optional(std::move(queued.item));
+    if (!push_waiters_.empty()) {
+      PushWaiter waiter = std::move(push_waiters_.front());
+      push_waiters_.pop_front();
+      waiter.callback(absl::OkStatus());
+      return std::make_optional(std::move(waiter.item));
+    }
+
+    return std::nullopt;
   }
 
   // Closes the queue for future pushes.
@@ -301,19 +322,6 @@ public:
   }
 
 private:
-  template <typename U = T> void enqueueOrDeliver(U&& item, uint64_t item_size) {
-    if (!pop_waiters_.empty()) {
-      PopWaiterCallback waiter = std::move(pop_waiters_.front().callback);
-      pop_waiters_.pop_front();
-      waiter(std::make_optional(std::forward<U>(item)));
-      return;
-    }
-
-    capacity_->acquire(item_size);
-    current_size_ += item_size;
-    queue_.push_back(QueuedItem{std::forward<U>(item), item_size});
-  }
-
   PushWaiterIt addPushWaiter(T item, uint64_t size,
                              absl::AnyInvocable<void(absl::Status)> callback) {
     return push_waiters_.insert(push_waiters_.end(),
@@ -335,7 +343,9 @@ private:
         PushWaiter waiter = std::move(push_waiters_.front());
         push_waiters_.pop_front();
 
-        enqueueOrDeliver(std::move(waiter.item), waiter.size);
+        capacity_->acquire(waiter.size);
+        current_size_ += waiter.size;
+        queue_.push_back(QueuedItem{std::move(waiter.item), waiter.size});
         waiter.callback(absl::OkStatus());
       } else {
         break;

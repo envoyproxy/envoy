@@ -472,6 +472,142 @@ TEST_F(AsyncQueueTest, PushAndPopImmediateReturnAwaitableDirectly) {
   EXPECT_TRUE(queue.empty());
 }
 
+TEST_F(AsyncQueueTest, DirectHandoffBypassesSharedCapacityWhenFull) {
+  auto shared_cap = std::make_shared<SharedCapacity>(1);
+  AsyncQueue<int> q1(shared_cap);
+  AsyncQueue<int> q2(shared_cap);
+
+  // Fill shared capacity using q1
+  EXPECT_TRUE(q1.tryPush(100));
+  EXPECT_EQ(shared_cap->currentSize(), 1);
+
+  // Start waiting popper on q2
+  std::optional<int> q2_popped;
+  auto pop_task = [&q2, &q2_popped]() -> Task<absl::Status> {
+    auto res = co_await q2.pop();
+    if (res.ok() && res->has_value()) {
+      q2_popped = **res;
+    }
+    co_return absl::OkStatus();
+  };
+
+  handles_.push_back(launch(pop_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
+  executor_->drain();
+  EXPECT_FALSE(q2_popped.has_value());
+
+  // q2.tryPush should succeed via direct handoff even though SharedCapacity is full
+  EXPECT_TRUE(q2.tryPush(200));
+  EXPECT_TRUE(q2_popped.has_value());
+  EXPECT_EQ(*q2_popped, 200);
+  EXPECT_EQ(shared_cap->currentSize(), 1);
+  EXPECT_TRUE(q2.empty());
+}
+
+TEST_F(AsyncQueueTest, PopHandoffFromWaitingPusherWhenCapacityFull) {
+  auto shared_cap = std::make_shared<SharedCapacity>(1);
+  AsyncQueue<int> q1(shared_cap);
+  AsyncQueue<int> q2(shared_cap);
+
+  // Fill capacity with q1
+  EXPECT_TRUE(q1.tryPush(100));
+
+  // Push on q2 suspends because shared capacity is full
+  bool q2_push_done = false;
+  auto push_task = [&q2, &q2_push_done]() -> Task<absl::Status> {
+    CO_RETURN_IF_ERROR(co_await q2.push(200));
+    q2_push_done = true;
+    co_return absl::OkStatus();
+  };
+
+  handles_.push_back(
+      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
+  executor_->drain();
+  EXPECT_FALSE(q2_push_done);
+
+  // Pop on q2 should take directly from waiting pusher and unblock it immediately
+  std::optional<int> val = q2.tryPop();
+  ASSERT_TRUE(val.has_value());
+  EXPECT_EQ(*val, 200);
+  EXPECT_TRUE(q2_push_done);
+  EXPECT_EQ(shared_cap->currentSize(), 1); // Held by q1
+}
+
+TEST_F(AsyncQueueTest, ChainedQueuesPipelineStreamingUnderCapacityConstraint) {
+  // 3-stage pipeline sharing 1 capacity unit: Q1 -> F1 -> Q2 -> F2 -> Q3 -> Sink
+  auto shared_cap = std::make_shared<SharedCapacity>(1);
+  AsyncQueue<int> q1(shared_cap);
+  AsyncQueue<int> q2(shared_cap);
+  AsyncQueue<int> q3(shared_cap);
+
+  std::vector<int> sink_received;
+
+  // Filter 1: pops from q1, multiplies by 10, pushes to q2
+  auto filter1_task = [&q1, &q2]() -> Task<absl::Status> {
+    while (true) {
+      auto item_or = co_await q1.pop();
+      if (!item_or.ok() || !item_or->has_value()) {
+        q2.close();
+        break;
+      }
+      CO_RETURN_IF_ERROR(co_await q2.push(**item_or * 10));
+    }
+    co_return absl::OkStatus();
+  };
+
+  // Filter 2: pops from q2, adds 1, pushes to q3
+  auto filter2_task = [&q2, &q3]() -> Task<absl::Status> {
+    while (true) {
+      auto item_or = co_await q2.pop();
+      if (!item_or.ok() || !item_or->has_value()) {
+        q3.close();
+        break;
+      }
+      CO_RETURN_IF_ERROR(co_await q3.push(**item_or + 1));
+    }
+    co_return absl::OkStatus();
+  };
+
+  // Sink: pops from q3, collects into sink_received
+  auto sink_task = [&q3, &sink_received]() -> Task<absl::Status> {
+    while (true) {
+      auto item_or = co_await q3.pop();
+      if (!item_or.ok() || !item_or->has_value()) {
+        break;
+      }
+      sink_received.push_back(**item_or);
+    }
+    co_return absl::OkStatus();
+  };
+
+  handles_.push_back(
+      launch(filter1_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
+  handles_.push_back(
+      launch(filter2_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
+  handles_.push_back(
+      launch(sink_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
+
+  // Push 3 items into Q1
+  auto make_push_task = [&q1](int val) -> Task<absl::Status> {
+    CO_RETURN_IF_ERROR(co_await q1.push(val));
+    co_return absl::OkStatus();
+  };
+
+  for (int i = 1; i <= 3; ++i) {
+    handles_.push_back(
+        launch(make_push_task(i), executor_, [](absl::Status status) { EXPECT_OK(status); }));
+  }
+
+  executor_->drain();
+  q1.close();
+  executor_->drain();
+
+  // (1*10+1=11, 2*10+1=21, 3*10+1=31)
+  ASSERT_EQ(sink_received.size(), 3);
+  EXPECT_EQ(sink_received[0], 11);
+  EXPECT_EQ(sink_received[1], 21);
+  EXPECT_EQ(sink_received[2], 31);
+}
+
 } // namespace
 } // namespace Coroutine
 } // namespace Envoy
