@@ -185,7 +185,10 @@ TEST_F(ProviderVerifierTest, TestMissedJWT) {
   EXPECT_FALSE(headers.has("x-jwt-claim-nested"));
 }
 
-// This test verifies that JWT must be issued by the provider specified in the requirement.
+// Provider-scoped Extractors only sanitize headers for their own providers. The live filter path
+// additionally sanitizes the union of every provider's payload/claim headers in
+// Filter::decodeHeaders before verifier selection, so the spoofed headers below would already be
+// gone on a real request; this test pins Extractor/requirement scoping in isolation.
 TEST_F(ProviderVerifierTest, TestTokenRequirementProviderMismatch) {
   const char config[] = R"(
 providers:
