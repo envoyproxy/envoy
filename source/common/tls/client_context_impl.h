@@ -57,8 +57,8 @@ public:
   const std::vector<Ssl::TlsContext>& getTlsContexts() const override { return tls_contexts_; };
 
   // Ssl::ClientContext
+  // Restricted to single-context callers.
   const Ssl::TlsContext& getTlsContext() const override {
-    // Client contexts always have exactly one TLS context; enforced in the constructor.
     ASSERT(tls_contexts_.size() == 1);
     return tls_contexts_[0];
   }
