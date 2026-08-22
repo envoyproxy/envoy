@@ -30,8 +30,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.6",
-        sha256 = "4c949b54da816e83673028faf28831206f0ef3a28fc4eb95cc01a5275d85cfe6",
+        version = "0.4.8",
+        sha256 = "f887fd8cc8bd2853692b00d1973da1a249396e1751883f34c688cb661874def3",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -393,7 +393,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "googletest-{version}",
         urls = ["https://github.com/google/googletest/releases/download/v{version}/googletest-{version}.tar.gz"],
     ),
-    com_google_protobuf = dict(
+    protobuf = dict(
         version = "35.1",
         # When upgrading the protobuf library, please re-run
         # test/common/json:gen_excluded_unicodes to recompute the ranges
@@ -537,8 +537,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "90a1e2218164586d4dc711bb9639a313d95de9df",
-        sha256 = "42336ae13c29d687ad9458e230bc56cc7e36f5ffc02ee78541929e6e165c8c90",
+        version = "7bcd48d56214c477885a5af4f3c25f95e74214b7",
+        sha256 = "805df5cd7431004b1e146d3ee3f8ac8a881d27f153232d7a3f67662e992fcc51",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),

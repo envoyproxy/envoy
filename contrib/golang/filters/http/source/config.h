@@ -18,19 +18,19 @@ constexpr char CanonicalName[] = "envoy.filters.http.golang";
  * Config registration for the golang extensions  filter. @see
  * NamedHttpFilterConfigFactory.
  */
-class GolangFilterConfig : public Common::ExceptionFreeFactoryBase<
+class GolangFilterConfig : public Common::UnifiedFactoryBase<
                                envoy::extensions::filters::http::golang::v3alpha::Config,
                                envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute> {
 public:
-  GolangFilterConfig() : ExceptionFreeFactoryBase(CanonicalName) {}
+  GolangFilterConfig() : UnifiedFactoryBase(CanonicalName) {}
 
 private:
   Server::ServerLifecycleNotifier::HandlePtr handler_;
 
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::FactoryContext& factory_context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

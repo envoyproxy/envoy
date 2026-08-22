@@ -9,10 +9,10 @@ using istio::envoy::config::filter::http::alpn::v2alpha1::FilterConfig;
 namespace Envoy {
 namespace Http {
 namespace Alpn {
-absl::StatusOr<Http::FilterFactoryCb> AlpnConfigFactory::createFilterFactoryFromProtoTyped(
-    const FilterConfig& proto_config, const std::string&,
-    Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(proto_config, context.serverFactoryContext().clusterManager());
+absl::StatusOr<Http::FilterFactoryCb> AlpnConfigFactory::createHttpFilterFactoryFromProtoTyped(
+    const FilterConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
+  return createFilterFactory(proto_config, context.clusterManager());
 }
 
 Http::FilterFactoryCb

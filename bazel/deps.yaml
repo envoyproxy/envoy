@@ -202,20 +202,6 @@ colm:
   license: "MIT"
   license_url: "https://github.com/adrian-thurston/colm/blob/{version}/COPYING"
 
-com_google_protobuf:
-  project_name: "Protocol Buffers"
-  project_desc: "Language-neutral, platform-neutral extensible mechanism for serializing structured data"
-  project_url: "https://developers.google.com/protocol-buffers"
-  release_date: "2026-06-11"
-  use_category:
-  - dataplane_core
-  - controlplane
-  implied_untracked_deps:
-  - zlib
-  cpe: "cpe:2.3:a:google:protobuf:*"
-  license: "Protocol Buffers"
-  license_url: "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE"
-
 cpp2sky:
   project_name: "cpp2sky"
   project_desc: "C++ SDK for Apache SkyWalking"
@@ -289,7 +275,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-08-16"
+  release_date: "2026-08-21"
   use_category:
   - build
   - controlplane
@@ -916,6 +902,21 @@ proto_processing:
   license: "Apache-2.0"
   license_url: "https://github.com/grpc-ecosystem/proto_processing_lib/blob/{version}/LICENSE"
 
+protobuf:
+  project_name: "Protocol Buffers"
+  project_desc: "Language-neutral, platform-neutral extensible mechanism for serializing structured data"
+  project_url: "https://developers.google.com/protocol-buffers"
+  apparent_name: com_google_protobuf
+  release_date: "2026-06-11"
+  use_category:
+  - dataplane_core
+  - controlplane
+  implied_untracked_deps:
+  - zlib
+  cpe: "cpe:2.3:a:google:protobuf:*"
+  license: "Protocol Buffers"
+  license_url: "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE"
+
 proxy_wasm_cpp_host:
   project_name: "WebAssembly for Proxies (C++ host implementation)"
   project_desc: "WebAssembly for Proxies (C++ host implementation)"
@@ -1009,7 +1010,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-08-10"
+  release_date: "2026-08-20"
   use_category:
   - controlplane
   - dataplane_core
