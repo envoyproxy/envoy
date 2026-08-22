@@ -15,6 +15,8 @@
 
 #include "source/common/common/interval_value.h"
 
+#include "absl/types/span.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -327,6 +329,17 @@ public:
    * @return socket options specific to this factory that should be applied to all sockets.
    */
   virtual const Network::Socket::OptionsSharedPtr& socketOptions() const PURE;
+
+  /**
+   * Initializes routing of UDP packets to the correct worker. Called once when a listener is added
+   * or updated, after the listen sockets are created. Implementations may register init targets
+   * with the listener's init manager.
+   * Only called if envoy.restart_features.defer_worker_routing_init is enabled.
+   * @param listen_socket_factories the listener's socket factories, one per address.
+   * @return a status indicating if an error occurred.
+   */
+  virtual absl::Status initializeWorkerRouting(
+      absl::Span<const Network::ListenSocketFactoryPtr> listen_socket_factories) PURE;
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;

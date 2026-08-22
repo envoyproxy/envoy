@@ -33,6 +33,10 @@ namespace Filter {
 class TcpListenerFilterConfigProviderManagerImpl;
 } // namespace Filter
 
+namespace Quic {
+class QuicStatNames;
+} // namespace Quic
+
 namespace Server {
 
 /**
@@ -165,6 +169,19 @@ public:
   createQuicListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
+
+  /**
+   * Creates the UDP listener factory of a UDP listener according to the listener config.
+   * @param config supplies the listener config.
+   * @param concurrency the number of workers.
+   * @param quic_stat_names supplies the QUIC stat names.
+   * @param context supplies the listener factory context.
+   * @return the UDP listener factory or an error status.
+   */
+  virtual absl::StatusOr<Network::ActiveUdpListenerFactoryPtr>
+  createUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
+                           uint32_t concurrency, Quic::QuicStatNames& quic_stat_names,
+                           Configuration::ListenerFactoryContext& context) PURE;
 
   /**
    * @return DrainManagerPtr a new drain manager.
