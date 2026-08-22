@@ -388,7 +388,7 @@ private:
     auto it = push_waiters_.insert(
         push_waiters_.end(), PushWaiter{std::move(item), size, std::move(callback), std::nullopt});
     it->capacity_waiter_it =
-        capacity_->requestCapacity(size, [this,  alive = alive_, cap = capacity_, it]() {
+        capacity_->requestCapacity(size, [this, size, alive = alive_, cap = capacity_, it]() {
           if (!*alive) {
             IS_ENVOY_BUG("capacity granted to a destroyed AsyncQueue");
             cap->release(size);
