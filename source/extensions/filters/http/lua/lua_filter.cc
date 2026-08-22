@@ -810,6 +810,20 @@ int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaBase64Decode(lua_State* state) {
+  absl::string_view input = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  std::string output;
+  if (!absl::Base64Unescape(input, &output)) {
+    // Returning nil rather than raising keeps a malformed value recoverable by the script, which
+    // is the common case when the input came from a header or an upstream response body.
+    lua_pushnil(state);
+    return 1;
+  }
+  lua_pushlstring(state, output.data(), output.size());
+
+  return 1;
+}
+
 int StreamHandleWrapper::luaTimestamp(lua_State* state) {
   auto now = time_source_.systemTime().time_since_epoch();
 
