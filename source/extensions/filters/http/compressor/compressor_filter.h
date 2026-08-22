@@ -6,7 +6,9 @@
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/type/matcher/v3/string.pb.h"
 
+#include "source/common/common/matchers.h"
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_protos.h"
@@ -68,7 +70,8 @@ public:
     DirectionConfig(
         const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig&
             proto_config,
-        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+        Server::Configuration::CommonFactoryContext& context);
 
     virtual ~DirectionConfig() = default;
 
@@ -79,6 +82,7 @@ public:
     uint32_t minimumLength() const { return min_content_length_; }
     bool isMinimumContentLength(const Http::RequestOrResponseHeaderMap& headers) const;
     bool isContentTypeAllowed(const Http::RequestOrResponseHeaderMap& headers) const;
+    bool isContentTypeAllowed(absl::string_view normalized_content_type) const;
 
   protected:
     const Runtime::FeatureFlag compression_enabled_;
@@ -91,10 +95,14 @@ public:
     static uint32_t contentLengthUint(Protobuf::uint32 length);
 
     static StringUtil::CaseUnorderedSet
-    contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
+    contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types, bool has_matchers);  
+    static std::vector<Matchers::StringMatcherPtr>
+    contentTypeMatcherList(const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& matchers,
+                           Server::Configuration::CommonFactoryContext& context);
 
     const uint32_t min_content_length_;
     const StringUtil::CaseUnorderedSet content_type_values_;
+    const std::vector<Matchers::StringMatcherPtr> content_type_matchers_;
     const CompressorStats stats_;
   };
 
@@ -102,7 +110,8 @@ public:
   public:
     RequestDirectionConfig(
         const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+        Server::Configuration::CommonFactoryContext& context);
 
     bool compressionEnabled() const override { return is_set_ && compression_enabled_.enabled(); }
 
@@ -114,7 +123,8 @@ public:
   public:
     ResponseDirectionConfig(
         const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+        const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+        Server::Configuration::CommonFactoryContext& context);
 
     bool compressionEnabled() const override { return compression_enabled_.enabled(); }
     const ResponseCompressorStats& responseStats() const { return response_stats_; }
@@ -148,7 +158,8 @@ public:
   CompressorFilterConfig(
       const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
       const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-      Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory);
+      Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory,
+      Server::Configuration::CommonFactoryContext& context);
 
   Envoy::Compression::Compressor::CompressorPtr makeCompressor();
 

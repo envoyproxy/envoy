@@ -10,6 +10,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "benchmark/benchmark.h"
 #include "gmock/gmock.h"
@@ -108,6 +109,7 @@ CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
                                                const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   const auto level =
       static_cast<Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel>(
@@ -120,7 +122,7 @@ CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockGzipCompressorFactory>(level, strategy, window_bits, memory_level);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
-      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory));
+      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory), context);
 
   return config;
 }
@@ -130,13 +132,14 @@ CompressorFilterConfigSharedPtr makeZstdConfig(Stats::IsolatedStoreImpl& stats,
                                                const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   const auto level = params.level;
   const auto strategy = params.strategy;
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockZstdCompressorFactory>(level, strategy);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
-      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory));
+      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory), context);
 
   return config;
 }
@@ -146,12 +149,13 @@ CompressorFilterConfigSharedPtr makeBrotliConfig(Stats::IsolatedStoreImpl& stats
                                                  const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   const auto quality = params.level;
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockBrotliCompressorFactory>(quality);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
-      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory));
+      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory), context);
 
   return config;
 }
