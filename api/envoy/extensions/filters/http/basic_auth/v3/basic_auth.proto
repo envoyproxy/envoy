@@ -29,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       user1:{SHA}hashed_user1_password
 //       user2:{SHA}hashed_user2_password
 //
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message BasicAuth {
   // Username-password pairs used to verify user credentials in the "Authorization" header.
   // The value needs to be the htpasswd format.
@@ -71,12 +71,30 @@ message BasicAuth {
   // other authentication methods (e.g. JWT) and using a downstream RBAC filter to enforce
   // OR semantics.
   bool emit_dynamic_metadata = 5;
+
+  // The realm to use in the ``WWW-Authenticate`` response header when authentication fails.
+  // The value is placed verbatim into ``WWW-Authenticate: Basic realm="<value>"``.
+  //
+  // If not specified, Envoy falls back to using the full request URI
+  // (scheme + authority + path, truncated to 256 characters), which differs per path and
+  // prevents browsers from reusing cached credentials across paths on the same origin.
+  // Set a fixed realm to enable correct credential caching. The realm pattern dose not
+  // allow DEL, 32 C0 control chars including CRLF injection chars.
+  string realm = 6 [(validate.rules).string = {pattern: "^[^\\x00-\\x1f\\x7f]*$"}];
 }
 
 // Extra settings that may be added to per-route configuration for
 // a virtual host or a cluster.
+// [#next-free-field: 3]
 message BasicAuthPerRoute {
   // Username-password pairs for this route.
   config.core.v3.DataSource users = 1
       [(validate.rules).message = {required: true}, (udpa.annotations.sensitive) = true];
+
+  // Per-route realm override for the ``WWW-Authenticate`` response header. If set, takes
+  // precedence over the filter-level ``BasicAuth.realm``. Same escaping semantics apply.
+  // If neither this nor the filter-level realm is set, the full request URI is used.
+  // Set a fixed realm to enable correct credential caching. The realm pattern dose not
+  // allow DEL, 32 C0 control chars including CRLF injection chars.
+  string realm = 2 [(validate.rules).string = {pattern: "^[^\\x00-\\x1f\\x7f]*$"}];
 }
