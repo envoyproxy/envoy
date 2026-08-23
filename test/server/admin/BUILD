@@ -184,6 +184,31 @@ envoy_cc_benchmark_binary(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "config_dump_handler_speed_test",
+    srcs = envoy_select_admin_functionality(["config_dump_handler_speed_test.cc"]),
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/event:libevent_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/server/admin:admin_lib",
+        "//source/server/admin:config_tracker_lib",
+        "//test/mocks/server:admin_stream_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/test_common:proto_filler_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "utils_test",
     srcs = envoy_select_admin_functionality(["utils_test.cc"]),
