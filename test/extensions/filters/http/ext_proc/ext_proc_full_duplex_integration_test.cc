@@ -1128,13 +1128,10 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionWithTra
 // must receive the request body exactly once.
 TEST_P(ExtProcIntegrationTest, FullDuplexStreamedNoDuplicateBodyOnRetry) {
   // Enable retry policy on the route.
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        auto* route = hcm.mutable_route_config()
-                          ->mutable_virtual_hosts(0)
-                          ->mutable_routes(0)
-                          ->mutable_route();
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                              v3::HttpConnectionManager& hcm) {
+        auto* route =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
         auto* retry_policy = route->mutable_retry_policy();
         retry_policy->set_retry_on("5xx");
         retry_policy->mutable_num_retries()->set_value(1);
@@ -1142,8 +1139,7 @@ TEST_P(ExtProcIntegrationTest, FullDuplexStreamedNoDuplicateBodyOnRetry) {
 
   const std::string body_sent = "hello world";
   // Send body with end_of_stream=false, then send trailers separately.
-  IntegrationStreamDecoderPtr response =
-      initAndSendDataDuplexStreamedMode(body_sent, false);
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, false);
   Http::TestRequestTrailerMapImpl request_trailers{{"x-test-trailer", "yes"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
@@ -1171,8 +1167,7 @@ TEST_P(ExtProcIntegrationTest, FullDuplexStreamedNoDuplicateBodyOnRetry) {
 
   // ext_proc server sends back header response, body responses, then trailer response.
   serverSendHeaderResp();
-  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_,
-                                   false, false, body_sent);
+  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_, false, false, body_sent);
   serverSendTrailerRespDuplexStreamed(processor_stream_);
 
   // First upstream attempt, return 503 to trigger retry.

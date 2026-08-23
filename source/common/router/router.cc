@@ -2474,8 +2474,8 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
-  upstream_requests_.front()->acceptHeadersFromRouter(
-      !retry_buffer_ && !downstream_trailers_ && downstream_end_stream_);
+  upstream_requests_.front()->acceptHeadersFromRouter(!retry_buffer_ && !downstream_trailers_ &&
+                                                      downstream_end_stream_);
   // It's possible we got immediately reset which means the upstream request we just
   // added to the front of the list might have been removed, so we need to check to make
   // sure we don't send data on the wrong request.
