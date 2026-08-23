@@ -61,11 +61,10 @@ public:
   template <typename T, typename SizeFunc>
   static Task<absl::Status> popTask(AsyncQueue<T, SizeFunc>& queue,
                                     std::optional<T>* out_val = nullptr, bool* eof_seen = nullptr) {
-    auto res = co_await queue.pop();
-    CO_RETURN_IF_ERROR(res.status());
-    if (res->has_value()) {
+    ASSIGN_OR_CO_RETURN(auto res, co_await queue.pop());
+    if (res.has_value()) {
       if (out_val != nullptr) {
-        *out_val = std::move(**res);
+        *out_val = std::move(*res);
       }
     } else {
       if (eof_seen != nullptr) {
@@ -79,13 +78,12 @@ public:
   static Task<absl::Status> popMultipleTask(AsyncQueue<T, SizeFunc>& queue, size_t count,
                                             Container* out_vec) {
     for (size_t i = 0; i < count; ++i) {
-      auto val_or = co_await queue.pop();
-      CO_RETURN_IF_ERROR(val_or.status());
-      if (!val_or->has_value()) {
+      ASSIGN_OR_CO_RETURN(auto val_or, co_await queue.pop());
+      if (!val_or.has_value()) {
         break;
       }
       if (out_vec != nullptr) {
-        out_vec->push_back(std::move(**val_or));
+        out_vec->push_back(std::move(*val_or));
       }
     }
     co_return absl::OkStatus();
@@ -537,12 +535,12 @@ TEST_F(AsyncQueueTest, ChainedQueuesPipelineStreamingUnderCapacityConstraint) {
   // Filter 1: pops from q1, multiplies by 10, pushes to q2
   auto filter1_task = [&q1, &q2]() -> Task<absl::Status> {
     while (true) {
-      auto item_or = co_await q1.pop();
-      if (!item_or.ok() || !item_or->has_value()) {
+      ASSIGN_OR_CO_RETURN(auto item_or, co_await q1.pop());
+      if (!item_or.has_value()) {
         q2.close();
         break;
       }
-      CO_RETURN_IF_ERROR(co_await q2.push(**item_or * 10));
+      CO_RETURN_IF_ERROR(co_await q2.push(*item_or * 10));
     }
     co_return absl::OkStatus();
   };
@@ -550,12 +548,12 @@ TEST_F(AsyncQueueTest, ChainedQueuesPipelineStreamingUnderCapacityConstraint) {
   // Filter 2: pops from q2, adds 1, pushes to q3
   auto filter2_task = [&q2, &q3]() -> Task<absl::Status> {
     while (true) {
-      auto item_or = co_await q2.pop();
-      if (!item_or.ok() || !item_or->has_value()) {
+      ASSIGN_OR_CO_RETURN(auto item_or, co_await q2.pop());
+      if (!item_or.has_value()) {
         q3.close();
         break;
       }
-      CO_RETURN_IF_ERROR(co_await q3.push(**item_or + 1));
+      CO_RETURN_IF_ERROR(co_await q3.push(*item_or + 1));
     }
     co_return absl::OkStatus();
   };
@@ -563,11 +561,11 @@ TEST_F(AsyncQueueTest, ChainedQueuesPipelineStreamingUnderCapacityConstraint) {
   // Sink: pops from q3, collects into sink_received
   auto sink_task = [&q3, &sink_received]() -> Task<absl::Status> {
     while (true) {
-      auto item_or = co_await q3.pop();
-      if (!item_or.ok() || !item_or->has_value()) {
+      ASSIGN_OR_CO_RETURN(auto item_or, co_await q3.pop());
+      if (!item_or.has_value()) {
         break;
       }
-      sink_received.push_back(**item_or);
+      sink_received.push_back(*item_or);
     }
     co_return absl::OkStatus();
   };

@@ -66,11 +66,9 @@ Task<absl::Status> SharedCapacity::acquire(uint64_t size) {
 
   bool first_wait = true;
   while (it != waiters_.begin() || !canAcquire(size)) {
-    auto status = co_await (first_wait ? capacity_event_.wait() : capacity_event_.waitFront());
+    CO_RETURN_IF_ERROR(
+        co_await (first_wait ? capacity_event_.wait() : capacity_event_.waitFront()));
     first_wait = false;
-    if (!status.ok()) {
-      co_return status;
-    }
     if (!*alive) {
       co_return absl::FailedPreconditionError("SharedCapacity is destroyed");
     }

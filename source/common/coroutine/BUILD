@@ -101,6 +101,7 @@ envoy_cc_library(
     deps = [
         ":async_event_lib",
         ":leaf_awaitable_lib",
+        ":status_macros_lib",
         ":task_lib",
         "//source/common/common:assert_lib",
         "@abseil-cpp//absl/cleanup",

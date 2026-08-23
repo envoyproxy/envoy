@@ -13,6 +13,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/coroutine/async_event.h"
 #include "source/common/coroutine/leaf_awaitable.h"
+#include "source/common/coroutine/status_macros.h"
 #include "source/common/coroutine/task.h"
 
 #include "absl/cleanup/cleanup.h"
@@ -150,10 +151,7 @@ public:
     auto alive = alive_;
     auto cap = capacity_;
 
-    auto status = co_await cap->acquire(size);
-    if (!status.ok()) {
-      co_return status; // Cancelled
-    }
+    CO_RETURN_IF_ERROR(co_await cap->acquire(size));
 
     if (!*alive || closed_) {
       cap->release(size);
@@ -192,10 +190,7 @@ public:
       if (closed_) {
         co_return std::optional<T>(std::nullopt); // EOF
       }
-      auto status = co_await items_event_.wait();
-      if (!status.ok()) {
-        co_return status; // Cancelled
-      }
+      CO_RETURN_IF_ERROR(co_await items_event_.wait());
       if (!*alive) {
         co_return std::optional<T>(std::nullopt);
       }
