@@ -76,7 +76,7 @@ public:
   // `co_await leaf;` that drops it is almost always a bug.
   [[nodiscard]] T await_resume() {
     // On the fail-fast path (await_ready true) await_suspend never ran, so
-    // result_ is empty.
+    // result_ is empty and we resume with the aborted value.
     return result_ ? std::move(*result_) : abortedValue();
   }
 
