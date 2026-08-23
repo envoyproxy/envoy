@@ -58,17 +58,32 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "async_event_test",
+    srcs = ["async_event_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":manual_executor_lib",
+        "//source/common/coroutine:async_event_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/common/coroutine:task_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/status",
+    ],
+)
+
+envoy_cc_test(
     name = "async_queue_test",
     srcs = ["async_queue_test.cc"],
     rbe_pool = "6gig",
     deps = [
         ":manual_executor_lib",
         "//source/common/coroutine:async_queue_lib",
-        "//source/common/coroutine:launch_lib",
-        "//source/common/coroutine:task_lib",
+        "//source/common/coroutine:coroutine_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 

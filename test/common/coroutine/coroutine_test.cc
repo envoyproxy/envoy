@@ -71,30 +71,6 @@ private:
   LeafController& controller_;
 };
 
-class TestLeafWithImmediateResult : public LeafAwaitable<absl::Status> {
-public:
-  TestLeafWithImmediateResult(LeafController& controller,
-                              std::optional<absl::Status> immediate_result)
-      : controller_(controller), immediate_result_(std::move(immediate_result)) {}
-
-protected:
-  std::optional<absl::Status> tryImmediate() override { return immediate_result_; }
-
-  void onStart() override {
-    controller_.started = true;
-    controller_.observed_executor = &context().executor();
-    controller_.completer = [this](absl::Status status) { complete(std::move(status)); };
-  }
-  void onCancel() override {
-    controller_.cancelled = true;
-    controller_.completer = nullptr;
-  }
-
-private:
-  LeafController& controller_;
-  std::optional<absl::Status> immediate_result_;
-};
-
 // Coroutines under test ------------------------------------------------------
 
 Task<absl::StatusOr<int>> returnsValue(int value) { co_return value; }
@@ -121,12 +97,6 @@ Task<absl::Status> throwsOnDataPlane(bool should_throw) {
 
 Task<absl::Status> awaitLeaf(LeafController& controller) {
   TestLeaf leaf(controller);
-  co_return co_await leaf;
-}
-
-Task<absl::Status> awaitLeafWithImmediateResult(LeafController& controller,
-                                                std::optional<absl::Status> immediate_result) {
-  TestLeafWithImmediateResult leaf(controller, std::move(immediate_result));
   co_return co_await leaf;
 }
 
@@ -389,79 +359,6 @@ TEST(LeafAwaitableTest, CancelAfterCompleteIsNoOp) {
   handle.cancel();
   EXPECT_FALSE(controller.cancelled);
   EXPECT_TRUE(result->ok());
-}
-
-TEST(LeafAwaitableTest, ImmediateResultCompletesImmediatelyWithoutSuspending) {
-  auto exec = std::make_shared<ManualExecutor>();
-  LeafController controller;
-  std::optional<absl::Status> result;
-  DetachedHandle handle =
-      launch(awaitLeafWithImmediateResult(controller, absl::InvalidArgumentError("invalid")), exec,
-             [&result](absl::Status status) { result = std::move(status); });
-  exec->drain();
-  // tryImmediate returned a status directly; onStart should never be called.
-  EXPECT_FALSE(controller.started);
-  ASSERT_TRUE(result.has_value());
-  EXPECT_TRUE(absl::IsInvalidArgument(*result));
-}
-
-TEST(LeafAwaitableTest, ImmediateResultNulloptProceedsToSuspendAndComplete) {
-  auto exec = std::make_shared<ManualExecutor>();
-  LeafController controller;
-  std::optional<absl::Status> result;
-  DetachedHandle handle = launch(awaitLeafWithImmediateResult(controller, std::nullopt), exec,
-                                 [&result](absl::Status status) { result = std::move(status); });
-  exec->drain();
-  EXPECT_TRUE(controller.started);
-  EXPECT_FALSE(result.has_value());
-
-  controller.completeWith(absl::OkStatus());
-  ASSERT_TRUE(result.has_value());
-  EXPECT_TRUE(result->ok());
-}
-
-namespace {
-class CancellingTestLeaf : public LeafAwaitable<absl::Status> {
-public:
-  CancellingTestLeaf(bool& on_start_called, bool& on_cancel_called)
-      : on_start_called_(on_start_called), on_cancel_called_(on_cancel_called) {}
-
-protected:
-  std::optional<absl::Status> tryImmediate() override {
-    // Synchronously cancel the context during the immediate attempt
-    context().cancellation()->cancel();
-    return std::nullopt;
-  }
-
-  void onStart() override { on_start_called_ = true; }
-  void onCancel() override { on_cancel_called_ = true; }
-
-private:
-  bool& on_start_called_;
-  bool& on_cancel_called_;
-};
-
-Task<absl::Status> awaitCancellingLeaf(bool& on_start_called, bool& on_cancel_called) {
-  CancellingTestLeaf leaf(on_start_called, on_cancel_called);
-  co_return co_await leaf;
-}
-} // namespace
-
-TEST(LeafAwaitableTest, TryImmediateCancelsContextAndReturnsNulloptFailsFastWithoutSuspending) {
-  auto exec = std::make_shared<ManualExecutor>();
-  bool on_start_called = false;
-  bool on_cancel_called = false;
-  std::optional<absl::Status> result;
-
-  DetachedHandle handle = launch(
-      awaitCancellingLeaf(on_start_called, on_cancel_called), exec,
-      [&result](absl::Status status) { result = std::move(status); }, StartMode::Inline);
-
-  // Completed inline without ever calling onStart or onCancel (and without suspending)
-  EXPECT_FALSE(on_start_called);
-  EXPECT_FALSE(on_cancel_called);
-  ASSERT_TRUE(result.has_value());
-  EXPECT_TRUE(absl::IsCancelled(*result));
 }
 
 // ---------------------------------------------------------------------------

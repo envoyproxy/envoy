@@ -51,19 +51,8 @@ public:
   LeafAwaitable& operator=(const LeafAwaitable&) = delete;
   virtual ~LeafAwaitable() = default;
 
-  // Fail-fast: if the scope is already cancelled, or if an immediate non-blocking attempt
-  // produces a result, don't even start/suspend.
-  bool await_ready() {
-    if (context_->cancellation()->cancelled()) {
-      return true;
-    }
-    result_ = tryImmediate();
-    if (result_.has_value()) {
-      return true;
-    }
-    // Re-check cancellation: tryImmediate() may have synchronously triggered cancellation.
-    return context_->cancellation()->cancelled();
-  }
+  // Fail-fast: if the scope is already cancelled, don't even start/suspend.
+  bool await_ready() const { return context_->cancellation()->cancelled(); }
 
   bool await_suspend(std::coroutine_handle<> continuation) {
     continuation_ = continuation;
@@ -87,7 +76,7 @@ public:
   // `co_await leaf;` that drops it is almost always a bug.
   [[nodiscard]] T await_resume() {
     // On the fail-fast path (await_ready true) await_suspend never ran, so
-    // result_ is empty (if cancelled) or contains the value from tryImmediate().
+    // result_ is empty.
     return result_ ? std::move(*result_) : abortedValue();
   }
 
@@ -99,13 +88,6 @@ protected:
   // Derived implements these:
   virtual void onStart() PURE;  // launch the op; arrange to call complete(value).
   virtual void onCancel() PURE; // cancel the pending op (honor its cancel contract).
-
-  // Optional non-blocking / immediate attempt: derived classes can perform an immediate
-  // operation (such as a non-blocking read, write, or queue check). If the operation completes
-  // immediately (with success or failure), returning a value avoids suspension overhead and
-  // resumes the coroutine directly. Returning std::nullopt indicates that the operation must
-  // suspend and arrange asynchronous completion via onStart().
-  virtual std::optional<T> tryImmediate() { return std::nullopt; }
 
   // Called by derived when the real event fires.
   void complete(T value) {
