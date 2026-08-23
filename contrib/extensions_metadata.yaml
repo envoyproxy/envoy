@@ -206,6 +206,13 @@ envoy.filters.http.alpn:
   status: alpha
   type_urls:
   - istio.envoy.config.filter.http.alpn.v2alpha1.FilterConfig
+envoy.filters.http.ws_local_ratelimit:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.ws_local_ratelimit.v3alpha.WsLocalRateLimit
 envoy.load_balancing_policies.peak_ewma:
   categories:
   - envoy.load_balancing_policies

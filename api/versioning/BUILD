@@ -22,6 +22,7 @@ proto_library(
         "//contrib/envoy/extensions/filters/http/peak_ewma/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/peer_metadata/v3:pkg",
         "//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg",
+        "//contrib/envoy/extensions/filters/http/ws_local_ratelimit/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/listener/postgres_inspector/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/client_ssl_auth/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/codecs/kafka/v3:pkg",

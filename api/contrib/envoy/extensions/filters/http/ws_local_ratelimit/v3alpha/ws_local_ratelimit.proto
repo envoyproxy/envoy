@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.ws_local_ratelimit.v3alpha;
+
+import "envoy/type/v3/token_bucket.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.ws_local_ratelimit.v3alpha";
+option java_outer_classname = "WsLocalRatelimitProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/http/ws_local_ratelimit/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: WebSocket local rate limit HTTP filter]
+//
+// Rate limits WebSocket data frames (text, binary, continuation) on a per-WebSocket-session
+// basis. Unlike the generic local rate limit filter, this filter has no descriptor matching and
+// no shared/global bucket: the ``token_bucket`` configured here is instantiated fresh for every
+// WebSocket session, so each session is always rate limited independently - including multiple
+// sessions multiplexed as separate streams over one HTTP/2 or HTTP/3 downstream connection.
+// [#extension: envoy.filters.http.ws_local_ratelimit]
+
+message WsLocalRateLimit {
+  // The prefix to use when emitting statistics.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The token bucket applied to each WebSocket session. A new bucket instance is created per
+  // session; there is no bucket shared across sessions, even when multiple sessions are
+  // multiplexed over the same downstream connection.
+  type.v3.TokenBucket token_bucket = 2 [(validate.rules).message = {required: true}];
+
+  // Optional message sent back to the downstream client, in a WebSocket text frame, whenever a
+  // data frame is rejected by the rate limiter. If unset (the default), the rejected frame is
+  // simply dropped and no response is sent to the client.
+  string rejection_message = 3;
+}
