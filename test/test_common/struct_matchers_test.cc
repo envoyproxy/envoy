@@ -44,6 +44,17 @@ TEST(StructMatchersTest, MatchesValues) {
   EXPECT_THAT(value.fields(), Contains(IsStructString(HasSubstr("key"), HasSubstr("value"))));
 }
 
+TEST(StructMatchersTest, MatchesStructFields) {
+  Protobuf::Map<std::string, Protobuf::Struct> metadata;
+  (*metadata["someKey"].mutable_fields())["apiIdentifier"].set_string_value("test-api");
+  (*metadata["someKey"].mutable_fields())["extHost"].set_string_value("test-host");
+
+  EXPECT_THAT(metadata,
+              Contains(IsStructField(
+                  "someKey", UnorderedElementsAre(IsStructString("apiIdentifier", "test-api"),
+                                                  IsStructString("extHost", "test-host")))));
+}
+
 TEST(StructMatchersTest, MatchesValueTypes) {
   Protobuf::Struct value = makeTestStruct();
   (*value.mutable_fields())["number"].set_number_value(1.5);
