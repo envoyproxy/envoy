@@ -3397,7 +3397,7 @@ TEST_F(RouterTest, RetryBufferDoesNotDuplicateBodyOnContinueDecodingReplay) {
   const std::string body("hello world");
   Buffer::OwnedImpl buf(body);
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(encoder1, encodeData(BufferString(body), false)).Times(1);
+  EXPECT_CALL(encoder1, encodeData(BufferString(body), false));
   EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
   router_->decodeData(buf, false);
   EXPECT_EQ(callbacks_.decodingBuffer(), nullptr);

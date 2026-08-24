@@ -1129,13 +1129,13 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionWithTra
 TEST_P(ExtProcIntegrationTest, FullDuplexStreamedNoDuplicateBodyOnRetry) {
   // Enable retry policy on the route.
   config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                              v3::HttpConnectionManager& hcm) {
-        auto* route =
-            hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
-        auto* retry_policy = route->mutable_retry_policy();
-        retry_policy->set_retry_on("5xx");
-        retry_policy->mutable_num_retries()->set_value(1);
-      });
+                                          v3::HttpConnectionManager& hcm) {
+    auto* route =
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+    auto* retry_policy = route->mutable_retry_policy();
+    retry_policy->set_retry_on("5xx");
+    retry_policy->mutable_num_retries()->set_value(1);
+  });
 
   const std::string body_sent = "hello world";
   // Send body with end_of_stream=false, then send trailers separately.
