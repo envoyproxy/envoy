@@ -34,6 +34,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/health_checker_factory_context.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
@@ -106,12 +107,14 @@ class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {
 public:
   using HttpHealthCheckerImpl::HttpHealthCheckerImpl;
 
-  Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& conn_data) override {
-    return createCodecClient_(conn_data);
+  Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& conn_data,
+                                       Http::CodecType codec_type) override {
+    return createCodecClient_(conn_data, codec_type);
   };
 
   // HttpHealthCheckerImpl
-  MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
+  MOCK_METHOD(Http::CodecClient*, createCodecClient_,
+              (Upstream::Host::CreateConnectionData&, Http::CodecType));
 
   Http::CodecType codecClientType() { return codec_client_type_; }
 };
@@ -129,6 +132,8 @@ public:
     NiceMock<Http::MockRequestEncoder> request_encoder_;
     Http::ResponseDecoder* stream_response_callbacks_{};
     CodecClientForTest* codec_client_{};
+    // The codec type the health checker asked for when creating the codec client.
+    Http::CodecType requested_codec_type_{Http::CodecType::HTTP1};
   };
 
   using TestSessionPtr = std::unique_ptr<TestSession>;
@@ -683,27 +688,28 @@ public:
           connection_index_.pop_front();
           return test_sessions_[index]->client_connection_;
         }));
-    EXPECT_CALL(*health_checker_, createCodecClient_(_))
-        .WillRepeatedly(
-            Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
-              if (!health_check_map.empty()) {
-                const auto& health_check_config =
-                    health_check_map.at(conn_data.host_description_->address()->asString());
-                // To make sure health checker checks the correct port.
-                EXPECT_EQ(health_check_config.port_value(),
-                          conn_data.host_description_->healthCheckAddress()->ip()->port());
-              }
-              const uint32_t index = codec_index_.front();
-              codec_index_.pop_front();
-              TestSession& test_session = *test_sessions_[index];
-              std::shared_ptr<Upstream::MockClusterInfo> cluster{
-                  new NiceMock<Upstream::MockClusterInfo>()};
-              Event::MockDispatcher dispatcher_;
-              test_session.codec_client_ = new CodecClientForTest(
-                  Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
-                  nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
-              return test_session.codec_client_;
-            }));
+    EXPECT_CALL(*health_checker_, createCodecClient_(_, _))
+        .WillRepeatedly(Invoke([&](Upstream::Host::CreateConnectionData& conn_data,
+                                   Http::CodecType codec_type) -> Http::CodecClient* {
+          if (!health_check_map.empty()) {
+            const auto& health_check_config =
+                health_check_map.at(conn_data.host_description_->address()->asString());
+            // To make sure health checker checks the correct port.
+            EXPECT_EQ(health_check_config.port_value(),
+                      conn_data.host_description_->healthCheckAddress()->ip()->port());
+          }
+          const uint32_t index = codec_index_.front();
+          codec_index_.pop_front();
+          TestSession& test_session = *test_sessions_[index];
+          test_session.requested_codec_type_ = codec_type;
+          std::shared_ptr<Upstream::MockClusterInfo> cluster{
+              new NiceMock<Upstream::MockClusterInfo>()};
+          Event::MockDispatcher dispatcher_;
+          test_session.codec_client_ = new CodecClientForTest(
+              Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
+              nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+          return test_session.codec_client_;
+        }));
   }
 
   void expectStreamCreate(size_t index) {
@@ -770,6 +776,31 @@ public:
 
   void expectSessionCreate() { expectSessionCreate(health_checker_map_); }
   void expectClientCreate(size_t index) { expectClientCreate(index, health_checker_map_); }
+
+  // Makes the connection for `index` look like a TLS connection that negotiates `alpn`. The health
+  // checker then defers creating the codec client until the handshake completes, so that the codec
+  // can be chosen from the negotiated protocol.
+  void expectTlsConnection(size_t index, const std::string& alpn) {
+    TestSession& test_session = *test_sessions_[index];
+    Ssl::ConnectionInfoConstSharedPtr ssl_info =
+        std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+    ON_CALL(*test_session.client_connection_, ssl()).WillByDefault(Return(ssl_info));
+    ON_CALL(*test_session.client_connection_, nextProtocol()).WillByDefault(Return(alpn));
+  }
+
+  // Completes the handshake on the connection for `index`, which is when the codec client is
+  // created and the health check request is sent.
+  void completeHandshake(size_t index) {
+    test_sessions_[index]->client_connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  }
+
+  // The codec mock for `index` is normally owned by the codec client created for that session. In
+  // tests where the handshake never completes no codec client is created, so the fixture takes
+  // ownership instead. The mock stays valid for expectations set afterwards and is verified and
+  // freed with the fixture.
+  void expectNoCodecClient(size_t index) {
+    unattached_codecs_.emplace_back(test_sessions_[index]->codec_);
+  }
 
   void expectSuccessStartFailedFailFirst(
       const std::optional<std::string>& health_checked_cluster = std::optional<std::string>()) {
@@ -851,6 +882,8 @@ public:
   }
 
   std::vector<TestSessionPtr> test_sessions_;
+  // Codec mocks that no codec client ever took ownership of, see expectNoCodecClient().
+  std::vector<std::unique_ptr<Http::MockClientConnection>> unattached_codecs_;
   std::shared_ptr<TestHttpHealthCheckerImpl> health_checker_;
   std::list<uint32_t> connection_index_;
   std::list<uint32_t> codec_index_;
@@ -1609,6 +1642,458 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
+}
+
+// A connection that negotiates h2 is health checked over HTTP/2 even though HTTP/1.1 is
+// configured.
+TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedHttp2WithHttp1Configured) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectTlsConnection(0, "h2");
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  // The codec cannot be chosen until the handshake completes.
+  EXPECT_EQ(nullptr, test_sessions_[0]->codec_client_);
+  completeHandshake(0);
+  EXPECT_EQ(Http::CodecType::HTTP2, test_sessions_[0]->requested_codec_type_);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+// The health check request must not be encoded inline while the connection is being handed to a
+// codec client. It is sent from the session's own connection callback instead, which runs after
+// the codec client has handled the same Connected event and armed the cluster idle timer, so that
+// creating the stream disables that timer for as long as the request is in flight. The observer
+// below is registered ahead of both of those callbacks, so it can only prove that no stream
+// exists yet at handover time; the relative order of the codec client and the session is fixed by
+// the order attachCodecClient() registers them.
+TEST_F(HttpHealthCheckerImplTest, AlpnRequestNotSentDuringConnectionHandoff) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectTlsConnection(0, "h2");
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  // Registered after the session's pending connection callback, and therefore before the callbacks
+  // that the codec client and the session add when the connection is handed over to a codec
+  // client. This observes the connection in between the two.
+  NiceMock<Network::MockConnectionCallbacks> observer;
+  test_sessions_[0]->client_connection_->addConnectionCallbacks(observer);
+  bool observed = false;
+  EXPECT_CALL(observer, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) {
+        observed = true;
+        // The codec client has been created, but no stream has been created on it yet.
+        EXPECT_NE(nullptr, test_sessions_[0]->codec_client_);
+        EXPECT_EQ(nullptr, test_sessions_[0]->stream_response_callbacks_);
+      }));
+
+  completeHandshake(0);
+  EXPECT_TRUE(observed);
+  EXPECT_NE(nullptr, test_sessions_[0]->stream_response_callbacks_);
+  // The connection outlives this scope, so detach the observer before it goes away.
+  test_sessions_[0]->client_connection_->removeConnectionCallbacks(observer);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+// The mirror image: a connection that negotiates http/1.1 is health checked over HTTP/1.1 even
+// though HTTP/2 is configured.
+TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedHttp1WithHttp2Configured) {
+  setupNoServiceValidationHCWithHttp2();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectTlsConnection(0, "http/1.1");
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  // The codec cannot be chosen until the handshake completes.
+  EXPECT_EQ(nullptr, test_sessions_[0]->codec_client_);
+  completeHandshake(0);
+  EXPECT_EQ(Http::CodecType::HTTP1, test_sessions_[0]->requested_codec_type_);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+// A peer that does not do ALPN falls back to the configured codec.
+TEST_F(HttpHealthCheckerImplTest, AlpnNotNegotiatedFallsBackToConfiguredCodec) {
+  setupNoServiceValidationHCWithHttp2();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectTlsConnection(0, "");
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  // The codec cannot be chosen until the handshake completes.
+  EXPECT_EQ(nullptr, test_sessions_[0]->codec_client_);
+  completeHandshake(0);
+  EXPECT_EQ(Http::CodecType::HTTP2, test_sessions_[0]->requested_codec_type_);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+// A protocol this health checker cannot speak also falls back to the configured codec.
+TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedUnknownProtocolFallsBackToConfiguredCodec) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectTlsConnection(0, "h3");
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  // The codec cannot be chosen until the handshake completes.
+  EXPECT_EQ(nullptr, test_sessions_[0]->codec_client_);
+  completeHandshake(0);
+  EXPECT_EQ(Http::CodecType::HTTP1, test_sessions_[0]->requested_codec_type_);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+// A plaintext connection cannot negotiate anything, so the codec client is created up front and
+// the request is sent while the connection is still being established, as it always has been.
+TEST_F(HttpHealthCheckerImplTest, PlaintextConnectionUsesConfiguredCodecUpFront) {
+  setupNoServiceValidationHCWithHttp2();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  // No ssl() on the connection, and nextProtocol() is never consulted.
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, nextProtocol()).Times(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  // No Connected event was needed.
+  ASSERT_NE(nullptr, test_sessions_[0]->codec_client_);
+  EXPECT_EQ(Http::CodecType::HTTP2, test_sessions_[0]->requested_codec_type_);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+// An HTTP/3 health check keeps creating the codec client up front: the QUIC stack picks the ALPN
+// protocol itself.
+TEST_F(HttpHealthCheckerImplTest, Http3ConfiguredCreatesCodecClientUpFront) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      codec_client_type: Http3
+    )EOF";
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectTlsConnection(0, "h2");
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, nextProtocol()).Times(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  ASSERT_NE(nullptr, test_sessions_[0]->codec_client_);
+  EXPECT_EQ(Http::CodecType::HTTP3, test_sessions_[0]->requested_codec_type_);
+}
+
+// When the guard is disabled the negotiated protocol is ignored and the codec client is created up
+// front, as it was before.
+TEST_F(HttpHealthCheckerImplTest, AlpnNegotiationDisabledByRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.health_check_use_negotiated_protocol", "false"}});
+
+  setupNoServiceValidationHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectTlsConnection(0, "h2");
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, nextProtocol()).Times(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  ASSERT_NE(nullptr, test_sessions_[0]->codec_client_);
+  EXPECT_EQ(Http::CodecType::HTTP1, test_sessions_[0]->requested_codec_type_);
+}
+
+// A connection that fails to establish is reported as a network failure straight away, rather than
+// waiting for the health check to time out.
+TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionRemoteClose) {
+  setupNoServiceValidationHCOneUnhealthy();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectTlsConnection(0, "h2");
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  expectNoCodecClient(0);
+
+  // The handshake never completes; the peer closes the connection instead. No stream is created.
+  EXPECT_CALL(*test_sessions_[0]->codec_, newStream(_)).Times(0);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true, _));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _, _));
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::ACTIVE_HC_TIMEOUT));
+}
+
+// A handshake that never completes is reported as a timeout, and the connection being established
+// is aborted.
+TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionTimeout) {
+  setupNoServiceValidationHCOneUnhealthy();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectTlsConnection(0, "h2");
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  expectNoCodecClient(0);
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true, _));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _, _));
+  test_sessions_[0]->timeout_timer_->invokeCallback();
+
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::ACTIVE_HC_TIMEOUT));
+  // Exactly one failure is recorded: the abort that the timeout triggers is expected.
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+
+  // The next interval establishes a fresh connection.
+  expectClientCreate(0);
+  expectTlsConnection(0, "h2");
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  test_sessions_[0]->interval_timer_->invokeCallback();
+  completeHandshake(0);
+  EXPECT_EQ(Http::CodecType::HTTP2, test_sessions_[0]->requested_codec_type_);
+}
+
+// A transport socket that reports the handshake as complete via ConnectedZeroRtt is handled the
+// same as Connected; otherwise the session would sit on the pending connection until it timed out.
+TEST_F(HttpHealthCheckerImplTest, AlpnConnectedZeroRttSelectsNegotiatedCodec) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectTlsConnection(0, "h2");
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::ConnectedZeroRtt);
+  EXPECT_EQ(Http::CodecType::HTTP2, test_sessions_[0]->requested_codec_type_);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+// A locally closed pending connection is reported as a network failure, same as a remote close.
+TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionLocalClose) {
+  setupNoServiceValidationHCOneUnhealthy();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectTlsConnection(0, "h2");
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  expectNoCodecClient(0);
+
+  EXPECT_CALL(*test_sessions_[0]->codec_, newStream(_)).Times(0);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true, _));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _, _));
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
+
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
+}
+
+// The negotiated codec is decided once per connection: a reused connection does not renegotiate.
+TEST_F(HttpHealthCheckerImplTest, AlpnNegotiatedCodecReusedAcrossIntervals) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, _)).Times(testing::AnyNumber());
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectTlsConnection(0, "h2");
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+  completeHandshake(0);
+  EXPECT_EQ(Http::CodecType::HTTP2, test_sessions_[0]->requested_codec_type_);
+  Http::CodecClient* first_codec_client = test_sessions_[0]->codec_client_;
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _))
+      .Times(testing::AnyNumber());
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .Times(testing::AnyNumber());
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+
+  // The second interval reuses the connection: no new connection, no new codec client, and the
+  // request is sent without waiting for another handshake.
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).Times(0);
+  EXPECT_CALL(*health_checker_, createCodecClient_(_, _)).Times(0);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  test_sessions_[0]->interval_timer_->invokeCallback();
+  EXPECT_EQ(first_codec_client, test_sessions_[0]->codec_client_);
+}
+
+// The health checker is destroyed while a handshake is still in flight.
+TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionDeletedWhileConnecting) {
+  setupNoServiceValidationHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectTlsConnection(0, "h2");
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  expectNoCodecClient(0);
+
+  // The connection being established is aborted, and the abort is not reported as a failure.
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
+  health_checker_.reset();
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+}
+
+// Removing the host from the health check completion callback while the pending connection is
+// being torn down must not use freed memory.
+TEST_F(HttpHealthCheckerImplTest, AlpnPendingConnectionHostRemovedInFailureCallback) {
+  setupNoServiceValidationHCOneUnhealthy();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectTlsConnection(0, "h2");
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  expectNoCodecClient(0);
+
+  EXPECT_CALL(*this, onHostStatus(_, _)).WillOnce(Invoke([&](HostSharedPtr host, HealthTransition) {
+    cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
+    cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, {host});
+  }));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer()).Times(testing::AnyNumber());
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true, _));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _, _));
+  test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckSetsCorrectLastHcPassTime) {
@@ -2769,7 +3254,7 @@ TEST_F(HttpHealthCheckerImplTest, AddDisableHC) {
   TestSessionPtr new_test_session(new TestSession());
   test_sessions_.emplace_back(std::move(new_test_session));
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).Times(0);
-  EXPECT_CALL(*health_checker_, createCodecClient_(_)).Times(0);
+  EXPECT_CALL(*health_checker_, createCodecClient_(_, _)).Times(0);
 
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_disable_active_health_check(true);
@@ -3672,7 +4157,7 @@ public:
     Upstream::Host::CreateConnectionData data;
     data.connection_ = std::move(connection);
     data.host_description_ = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-    return std::unique_ptr<Http::CodecClient>(createCodecClient(data));
+    return std::unique_ptr<Http::CodecClient>(createCodecClient(data, codec_client_type_));
   }
 };
 
