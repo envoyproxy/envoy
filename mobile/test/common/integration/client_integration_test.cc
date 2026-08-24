@@ -30,11 +30,9 @@
 #include "library/common/internal_engine.h"
 #include "library/common/network/network_types.h"
 #include "library/common/network/proxy_settings.h"
+#include "library/common/types/c_types.h"
 #include "quiche/common/quiche_endian.h"
-#include "quiche/quic/core/quic_data_reader.h"
-#include "quiche/quic/core/quic_framer.h"
 #include "quiche/quic/core/scone.h"
-#include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -1946,70 +1944,66 @@ TEST_P(ClientIntegrationTest, HttpsWithEarlyData) {
   }
 }
 
+// Synthesizes a self-contained 7-byte SCONE long-header packet.
+static std::string buildSconeHeader(uint8_t signal) {
+  uint8_t first_byte = static_cast<uint8_t>(0xc0 | ((signal >> 1) & 0x3f));
+  quic::QuicVersionLabel version =
+      (signal & 0x01) ? quic::kSconeVersionHigh : quic::kSconeVersionLow;
+  std::string header;
+  header.push_back(static_cast<char>(first_byte));
+  uint32_t net_version = quiche::QuicheEndian::HostToNet32(version);
+  header.append(reinterpret_cast<const char*>(&net_version), sizeof(net_version));
+  header.push_back(0); // 0-length DCID
+  header.push_back(0); // 0-length SCID
+  return header;
+}
+
 class MockRecvMsgOsSysCalls : public Api::OsSysCallsImpl {
 public:
-  MockRecvMsgOsSysCalls() {
-    ON_CALL(*this, recvmsg(_, _, _))
-        .WillByDefault(Invoke([this](os_fd_t sockfd, msghdr* msg, int flags) {
-          auto result = Api::OsSysCallsImpl::recvmsg(sockfd, msg, flags);
-          if (result.return_value_ <= 0 || scone_bandwidth_.load() == -1) {
-            return result;
-          }
+  Api::SysCallSizeResult recvmsg(os_fd_t sockfd, msghdr* msg, int flags) override {
+    auto result = Api::OsSysCallsImpl::recvmsg(sockfd, msg, flags);
+    if (result.return_value_ <= 0 || scone_bandwidth_.load() == -1) {
+      return result;
+    }
 
-          if (upstream_address_ != nullptr && msg != nullptr && msg->msg_name != nullptr) {
-            auto addr_or_error = Network::Address::addressFromSockAddr(
-                *reinterpret_cast<const sockaddr_storage*>(msg->msg_name), msg->msg_namelen);
-            if (!addr_or_error.ok() || *addr_or_error.value() != *upstream_address_) {
-              return result;
-            }
-          }
+    if (msg == nullptr || msg->msg_name == nullptr || msg->msg_namelen == 0 ||
+        msg->msg_iov == nullptr || msg->msg_iovlen == 0 || msg->msg_iov[0].iov_base == nullptr) {
+      return result;
+    }
 
-          int16_t bandwidth = scone_bandwidth_.exchange(-1);
-          if (bandwidth == -1) {
-            return result;
-          }
+    uint32_t target_port = upstream_port_.load();
+    if (target_port != 0) {
+      auto addr_or_error = Network::Address::addressFromSockAddr(
+          *reinterpret_cast<const sockaddr_storage*>(msg->msg_name), msg->msg_namelen);
+      if (!addr_or_error.ok() || addr_or_error.value()->ip() == nullptr ||
+          addr_or_error.value()->ip()->port() != target_port) {
+        return result;
+      }
+    }
 
-          const char* old_buffer = reinterpret_cast<const char*>(msg->msg_iov[0].iov_base);
-          size_t old_len = result.return_value_;
+    int16_t bandwidth = scone_bandwidth_.exchange(-1);
+    if (bandwidth == -1) {
+      return result;
+    }
 
-          std::vector<char> new_buffer(old_len);
-          if (quic::test::MaybeUpdateSconePacket(old_buffer, new_buffer.data(), old_len,
-                                                 static_cast<uint8_t>(bandwidth))) {
-            memcpy(msg->msg_iov[0].iov_base, new_buffer.data(), old_len);
-            return result;
-          }
+    std::string scone_header = buildSconeHeader(static_cast<uint8_t>(bandwidth));
+    size_t old_len = result.return_value_;
+    if (scone_header.length() + old_len > msg->msg_iov[0].iov_len) {
+      return result;
+    }
 
-          uint8_t signal = static_cast<uint8_t>(bandwidth);
-          uint8_t scone_first_byte = static_cast<uint8_t>(0x80 | ((signal >> 1) & 0x3f));
-          quic::QuicVersionLabel scone_version =
-              (signal & 0x01) ? quic::kSconeVersionHigh : quic::kSconeVersionLow;
+    const char* old_buffer = reinterpret_cast<const char*>(msg->msg_iov[0].iov_base);
+    std::vector<char> coalesced(scone_header.length() + old_len);
+    memcpy(coalesced.data(), scone_header.data(), scone_header.length());
+    memcpy(coalesced.data() + scone_header.length(), old_buffer, old_len);
 
-          std::string scone_header;
-          scone_header.push_back(static_cast<char>(scone_first_byte));
-          uint32_t net_version = quiche::QuicheEndian::HostToNet32(scone_version);
-          scone_header.append(reinterpret_cast<const char*>(&net_version), sizeof(net_version));
-          scone_header.push_back(0); // 0-length DCID
-          scone_header.push_back(0); // 0-length SCID
-
-          if (scone_header.length() + old_len > msg->msg_iov[0].iov_len) {
-            return result;
-          }
-
-          std::vector<char> coalesced(scone_header.length() + old_len);
-          memcpy(coalesced.data(), scone_header.data(), scone_header.length());
-          memcpy(coalesced.data() + scone_header.length(), old_buffer, old_len);
-
-          memcpy(msg->msg_iov[0].iov_base, coalesced.data(), coalesced.size());
-          result.return_value_ = coalesced.size();
-          return result;
-        }));
+    memcpy(msg->msg_iov[0].iov_base, coalesced.data(), coalesced.size());
+    result.return_value_ = coalesced.size();
+    return result;
   }
 
-  MOCK_METHOD(Api::SysCallSizeResult, recvmsg, (os_fd_t sockfd, msghdr* msg, int flags),
-              (override));
-
   std::atomic<int16_t> scone_bandwidth_{-1};
-  Network::Address::InstanceConstSharedPtr upstream_address_{nullptr};
+  std::atomic<uint32_t> upstream_port_{0};
 };
 
 TEST_P(ClientIntegrationTest, SconeValuePropagation) {
@@ -2018,18 +2012,19 @@ TEST_P(ClientIntegrationTest, SconeValuePropagation) {
   }
 
   const uint8_t signal_initial = 2;
-  const int64_t bandwidth_initial = 126;
+  const int64_t bandwidth_initial = quic::GetSconeBandwidths()[signal_initial].ToKBitsPerSecond();
   const uint8_t signal_throttled = 0;
-  const int64_t bandwidth_throttled = 100;
+  const int64_t bandwidth_throttled =
+      quic::GetSconeBandwidths()[signal_throttled].ToKBitsPerSecond();
 
   MockRecvMsgOsSysCalls sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
 
   builder_.enableScone(true);
   initialize();
-  sys_calls.upstream_address_ = fake_upstreams_[0]->localAddress();
+  sys_calls.upstream_port_.store(fake_upstreams_[0]->localAddress()->ip()->port());
 
-  // 1. Stream 1: Receives initial bandwidth (126 kbps)
+  // 1. Stream 1: Receives initial bandwidth
   int64_t captured_scone_max_kbps1 = -1;
   int64_t captured_scone_timestamp_ms1 = -1;
   uint64_t connection_id_1 = 0;
@@ -2079,7 +2074,7 @@ TEST_P(ClientIntegrationTest, SconeValuePropagation) {
   EXPECT_EQ(captured_scone_timestamp_ms2, captured_scone_timestamp_ms1);
   EXPECT_EQ(connection_id_2, connection_id_1);
 
-  // 3. Stream 3: Bandwidth changes dynamically (throttled to 100 kbps)
+  // 3. Stream 3: Bandwidth changes dynamically
   int64_t captured_scone_max_kbps3 = -1;
   int64_t captured_scone_timestamp_ms3 = -1;
   uint64_t connection_id_3 = 0;
@@ -2115,14 +2110,14 @@ TEST_P(ClientIntegrationTest, SconeValuePropagationDelayed) {
 
   autonomous_upstream_ = false;
   const uint8_t signal = 2;
-  const int64_t expected_bandwidth = 126;
+  const int64_t expected_bandwidth = quic::GetSconeBandwidths()[signal].ToKBitsPerSecond();
 
   MockRecvMsgOsSysCalls sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
 
   builder_.enableScone(true);
   initialize();
-  sys_calls.upstream_address_ = fake_upstreams_[0]->localAddress();
+  sys_calls.upstream_port_.store(fake_upstreams_[0]->localAddress()->ip()->port());
 
   int64_t captured_scone_max_kbps_headers = -1;
   int64_t captured_scone_max_kbps_data = -1;
@@ -2191,16 +2186,16 @@ TEST_P(ClientIntegrationTest, SconeValuePropagationMultipleUpdates) {
 
   autonomous_upstream_ = false;
   const uint8_t signal_1 = 0;
-  const int64_t expected_bandwidth_1 = 100;
+  const int64_t expected_bandwidth_1 = quic::GetSconeBandwidths()[signal_1].ToKBitsPerSecond();
   const uint8_t signal_2 = 2;
-  const int64_t expected_bandwidth_2 = 126;
+  const int64_t expected_bandwidth_2 = quic::GetSconeBandwidths()[signal_2].ToKBitsPerSecond();
 
   MockRecvMsgOsSysCalls sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
 
   builder_.enableScone(true);
   initialize();
-  sys_calls.upstream_address_ = fake_upstreams_[0]->localAddress();
+  sys_calls.upstream_port_.store(fake_upstreams_[0]->localAddress()->ip()->port());
 
   int64_t captured_scone_max_kbps_headers = -1;
   int64_t captured_scone_max_kbps_data = -1;
@@ -2276,7 +2271,7 @@ TEST_P(ClientIntegrationTest, SconeDisabled) {
 
   builder_.enableScone(false);
   initialize();
-  sys_calls.upstream_address_ = fake_upstreams_[0]->localAddress();
+  sys_calls.upstream_port_.store(fake_upstreams_[0]->localAddress()->ip()->port());
 
   int64_t captured_scone_max_kbps = 0;
   int64_t captured_scone_timestamp_ms = 0;
