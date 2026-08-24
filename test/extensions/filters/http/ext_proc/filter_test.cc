@@ -47,9 +47,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Contains;
-using testing::ElementsAre;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -76,8 +73,6 @@ public:
 };
 
 namespace {
-
-using ::testing::ReturnRef;
 
 using ::envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
 using ::envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
@@ -112,7 +107,9 @@ using ::Envoy::Http::ExternalProcessing::SaveProcessingResponseFactory;
 using ::Envoy::Http::ExternalProcessing::SaveProcessingResponseFilterState;
 
 using ::testing::AnyNumber;
-using testing::Eq;
+using ::testing::Contains;
+using ::testing::ElementsAre;
+using ::testing::Eq;
 using ::testing::Invoke;
 using ::testing::Return;
 using ::testing::ReturnRef;

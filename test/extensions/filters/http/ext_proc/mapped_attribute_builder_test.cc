@@ -16,8 +16,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Contains;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -27,6 +25,7 @@ namespace {
 using Envoy::Http::ExternalProcessing::MappedAttributeBuilder;
 using MappedAttributeBuilderProto = ::envoy::extensions::http::ext_proc::
     processing_request_modifiers::mapped_attribute_builder::v3::MappedAttributeBuilder;
+using testing::Contains;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
