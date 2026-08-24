@@ -87,6 +87,7 @@ public:
       : executor_(std::move(executor)), cancel_(std::move(cancel)) {}
 
   Executor& executor() const { return *executor_; }
+  const std::shared_ptr<Executor>& executorShared() const { return executor_; }
   const CancellationStatePtr& cancellation() const { return cancel_; }
 
 private:
