@@ -48,17 +48,25 @@ FilterConfigImpl::FilterConfigImpl(
   // Validate the provider URI, which the PGV annotations cannot express either: the PGV well-known
   // regex for URI is not implemented in C++, otherwise we could add a PGV rule instead of checking
   // the URI manually.
+  JwtProviderList all_providers;
+  all_providers.reserve(proto_config_.providers().size());
   for (const auto& provider_pair : proto_config_.providers()) {
-    const auto provider_value = std::get<1>(provider_pair);
+    const auto& provider_value = provider_pair.second;
+    all_providers.push_back(&provider_value);
     if (provider_value.has_remote_jwks()) {
       absl::string_view provider_uri = provider_value.remote_jwks().http_uri().uri();
       Http::Utility::Url url;
       if (!url.initialize(provider_uri, /*is_connect=*/false)) {
         creation_status = absl::InvalidArgumentError(fmt::format(
-            "Provider '{}' has an invalid URI: '{}'", std::get<0>(provider_pair), provider_uri));
+            "Provider '{}' has an invalid URI: '{}'", provider_pair.first, provider_uri));
         return;
       }
     }
+  }
+  // Union of every provider's forward_payload_header and claim_to_headers names. Built once so
+  // Filter::decodeHeaders can sanitize before any verifier bypass path returns Continue.
+  if (!all_providers.empty()) {
+    header_sanitizer_ = Extractor::create(all_providers);
   }
 
   std::vector<std::string> names;

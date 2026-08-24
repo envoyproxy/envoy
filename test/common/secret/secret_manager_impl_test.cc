@@ -1174,6 +1174,44 @@ TEST_F(SecretManagerImplTest, DeprecatedSanMatcher) {
             cvc_config->subjectAltNameMatchers()[3].san_type());
 }
 
+TEST_F(SecretManagerImplTest, SdsDynamicSecretWarmFalseSubscriptionOnce) {
+  SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+
+  envoy::config::core::v3::ConfigSource config_source;
+
+  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+      .WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
+
+  // 1st call: creates provider and starts subscription.
+  auto secret_provider1 = secret_manager->findOrCreateTlsCertificateProvider(
+      config_source, "abc.com", secret_context.server_context_, {}, false);
+
+  auto* subscription =
+      secret_context.server_context_.cluster_manager_.subscription_factory_.subscription_;
+  ASSERT_NE(subscription, nullptr);
+
+  // Expect that start() is NOT called again on the subscription.
+  EXPECT_CALL(*subscription, start(_)).Times(0);
+
+  // 2nd call: should reuse provider and NOT call start() again.
+  auto secret_provider2 = secret_manager->findOrCreateTlsCertificateProvider(
+      config_source, "abc.com", secret_context.server_context_, {}, false);
+
+  EXPECT_EQ(secret_provider1, secret_provider2);
+
+  // 3rd call: a warming provider must be distinct since its init target should not
+  // become ready until the secret is received.
+  auto secret_provider3 = secret_manager->findOrCreateTlsCertificateProvider(
+      config_source, "abc.com", secret_context.server_context_, {}, true);
+
+  EXPECT_NE(secret_provider2, secret_provider3);
+}
+
 } // namespace
 } // namespace Secret
 } // namespace Envoy

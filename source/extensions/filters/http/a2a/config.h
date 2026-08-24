@@ -11,15 +11,11 @@ namespace HttpFilters {
 namespace A2a {
 
 class A2aFilterConfigFactory
-    : public Common::ExceptionFreeFactoryBase<envoy::extensions::filters::http::a2a::v3::A2a> {
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::a2a::v3::A2a> {
 public:
-  A2aFilterConfigFactory() : ExceptionFreeFactoryBase("envoy.filters.http.a2a") {}
+  A2aFilterConfigFactory() : UnifiedFactoryBase("envoy.filters.http.a2a") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::a2a::v3::A2a& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::a2a::v3::A2a& proto_config,
       Server::Configuration::ServerFactoryContext& context,

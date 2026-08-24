@@ -217,6 +217,11 @@ Api::IoCallUint64Result IoHandleImpl::write(Buffer::Instance& buffer) {
   return {total_bytes_to_write, Api::IoError::none()};
 }
 
+Api::IoCallUint64Result IoHandleImpl::send(const void* buffer, size_t length) {
+  Buffer::RawSlice slice{const_cast<void*>(buffer), length};
+  return writev(&slice, 1);
+}
+
 Api::IoCallUint64Result IoHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,
                                               const Network::Address::Ip*,
                                               const Network::Address::Instance&) {

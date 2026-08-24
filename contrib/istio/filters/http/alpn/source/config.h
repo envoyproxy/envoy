@@ -12,15 +12,16 @@ namespace Alpn {
 /**
  * Config registration for the alpn filter.
  */
-class AlpnConfigFactory : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
+class AlpnConfigFactory : public Extensions::HttpFilters::Common::UnifiedFactoryBase<
                               istio::envoy::config::filter::http::alpn::v2alpha1::FilterConfig> {
 public:
-  AlpnConfigFactory() : ExceptionFreeFactoryBase("istio.alpn") {}
+  AlpnConfigFactory() : UnifiedFactoryBase("istio.alpn") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const istio::envoy::config::filter::http::alpn::v2alpha1::FilterConfig& proto_config,
-      const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   Http::FilterFactoryCb createFilterFactory(
       const istio::envoy::config::filter::http::alpn::v2alpha1::FilterConfig& config_pb,

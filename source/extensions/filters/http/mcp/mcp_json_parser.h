@@ -163,7 +163,7 @@ private:
   bool requiredFieldsCollected() const;
 
   // Store field in temp storage
-  void storeField(const std::string& path, const Protobuf::Value& value);
+  void storeField(const std::string& path, absl::string_view name, const Protobuf::Value& value);
 
   // Copy selected fields from temp to final
   void copySelectedFields();
