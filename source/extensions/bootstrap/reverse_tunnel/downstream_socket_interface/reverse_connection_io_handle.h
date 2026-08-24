@@ -185,6 +185,9 @@ public:
    */
   Api::IoCallUint64Result close() override;
 
+  /** Stop reverse-connection maintenance on listener teardown. */
+  void resetFileEvents() override;
+
   /**
    * Triggers the reverse connection workflow.
    * @param dispatcher the event dispatcher.

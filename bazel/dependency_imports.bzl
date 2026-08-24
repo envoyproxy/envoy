@@ -10,7 +10,7 @@ load("@envoy_toolshed//coverage/grcov:grcov_repository.bzl", "grcov_repository")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
 load("@gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
-load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
+load("@proxy-wasm-rust-sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@rules_buf//buf:repositories.bzl", "rules_buf_toolchains")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
@@ -220,6 +220,7 @@ def envoy_dependency_imports(
         importpath = "github.com/planetscale/vtprotobuf",
         sum = "h1:ujRGEVWJEoaxQ+8+HMl8YEpGaDAgohgZxJ5S+d2TTFQ=",
         version = "v0.6.1-0.20240409071808-615f978279ca",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     go_repository(
@@ -227,6 +228,7 @@ def envoy_dependency_imports(
         importpath = "github.com/envoyproxy/protoc-gen-validate",
         sum = "h1:TvGH1wof4H33rezVKWSpqKz5NXWg5VPuZ0uONDT6eb4=",
         version = "v1.3.0",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     rules_proto_grpc_toolchains()

@@ -41,6 +41,7 @@ envoy_cc_library(
         "//envoy/ssl:context_manager_interface",
         "//source/common/access_log:access_log_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:base_logger_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:runtime_utility_lib",

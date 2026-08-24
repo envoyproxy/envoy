@@ -80,7 +80,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterDefaultValues) {
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(2);
+  EXPECT_CALL(context, messageValidationVisitor());
   GeoipFilterFactory factory;
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(filter_config, "geoip", context).value();
@@ -105,7 +105,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto) {
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(2);
+  EXPECT_CALL(context, messageValidationVisitor());
   GeoipFilterFactory factory;
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(filter_config, "geoip", context).value();
@@ -131,10 +131,8 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithCorrectProto2) {
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   GeoipFilterFactory factory;
-  // Built before the expectation below so that only the factory's own calls are counted.
   Server::Configuration::ExtraFactoryContext extra_context{
       context.server_factory_context_.messageValidationVisitor(), "geoip"};
-  EXPECT_CALL(context.server_factory_context_, messageValidationVisitor()).Times(2);
   Http::FilterFactoryCb cb = factory
                                  .createHttpFilterFactoryFromProto(
                                      filter_config, context.server_factory_context_, extra_context)
@@ -171,6 +169,8 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigUnknownProvider) {
   std::string filter_config_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.unknown"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
   GeoipFilterConfig filter_config;
 
@@ -178,10 +178,10 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigUnknownProvider) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   GeoipFilterFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProtoTyped(filter_config, "geoip", context).IgnoreError(),
+      factory.createFilterFactoryFromProto(filter_config, "geoip", context).IgnoreError(),
       Envoy::EnvoyException,
       "Didn't find a registered implementation for 'envoy.geoip_providers.unknown' with type URL: "
-      "''");
+      "'google.protobuf.Struct'");
 }
 
 TEST(GeoipFilterConfigTest, GeoipFilterConfigWithIpAddressHeader) {
@@ -199,7 +199,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigWithIpAddressHeader) {
   GeoipFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(2);
+  EXPECT_CALL(context, messageValidationVisitor());
   GeoipFilterFactory factory;
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(filter_config, "geoip", context).value();
@@ -227,7 +227,7 @@ TEST(GeoipFilterConfigTest, GeoipFilterConfigMutualExclusionXffAndIpAddressHeade
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   GeoipFilterFactory factory;
-  auto status_or = factory.createFilterFactoryFromProtoTyped(filter_config, "geoip", context);
+  auto status_or = factory.createFilterFactoryFromProto(filter_config, "geoip", context);
   EXPECT_THAT(status_or,
               HasStatusMessage(
                   "Only one of xff_config or custom_header_config can be set in the geoip filter "

@@ -131,10 +131,10 @@ void ossl_dlopen(int expected_major, int expected_minor) {
     exit(ELIBACC);
   }
 
-  if (!set_mem_fn(ossl_malloc, ossl_realloc, ossl_free)) {
-    bssl_compat_error("CRYPTO_set_mem_functions() failed\n");
-    exit(ELIBACC);
-  }
+  // In some circumstances, libcrypto will perform allocations during dlopen(),
+  // in which case this CRYPTO_set_mem_functions() call will always fail, so we
+  // have to let it fail silently rather than exiting.
+  set_mem_fn(ossl_malloc, ossl_realloc, ossl_free);
 
   // Load libssl.so *after* calling CRYPTO_set_mem_functions() just in case
   // libssl.so has any library constructors that call OPENSSL_malloc().

@@ -164,7 +164,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:wasm_lib",
-        "@proxy_wasm_cpp_host//:base_lib",
+        "@proxy-wasm-cpp-host//:base_lib",
     ],
 )
 
