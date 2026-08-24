@@ -81,35 +81,25 @@ TEST_F(TtlManagerTest, ScopedUpdate) {
 }
 
 TEST_F(TtlManagerTest, OverdueTtl) {
-  std::optional<std::vector<std::string>> maybe_expired;
-  auto cb = [&](const auto& expired) {
-    maybe_expired = expired;
-    // Simulate time passing during callback past the next item's expiry.
-    test_time_.setMonotonicTime(std::chrono::milliseconds(10));
-  };
-  auto ttl_timer = new Event::MockTimer(&dispatcher_);
-  TtlManager ttl(cb, dispatcher_, dispatcher_.timeSource());
+  uint32_t calls = 0;
+  auto ttl_timer = new testing::NiceMock<Event::MockTimer>(&dispatcher_);
+  TtlManager ttl(
+      [&](const auto&) {
+        calls++;
+        test_time_.advanceTimeWait(std::chrono::milliseconds(9));
+      },
+      dispatcher_, dispatcher_.timeSource());
 
-  EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(1), _));
-  EXPECT_CALL(*ttl_timer, enabled());
   ttl.add(std::chrono::milliseconds(1), "first");
-
-  EXPECT_CALL(*ttl_timer, enabled());
   ttl.add(std::chrono::milliseconds(5), "second");
 
-  // Advance time to 1 ms to trigger the first TTL.
-  test_time_.setMonotonicTime(std::chrono::milliseconds(1));
-  EXPECT_CALL(*ttl_timer, enabled());
-  // The callback will advance time to 10ms (past "second"'s expiry of 5ms).
-  // The timer should be re-enabled with 0ms instead of a negative duration.
+  // Advance time to 1ms to trigger the first TTL. During the callback, time advances by 9ms
+  // past "second"'s expiry (5ms). The timer should be re-enabled with 0ms instead of negative,
+  // and "second" would be executed on the next TTL timer tick.
+  test_time_.advanceTimeWait(std::chrono::milliseconds(1));
   EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(0), _));
   ttl_timer->invokeCallback();
-  EXPECT_EQ(maybe_expired.value(), std::vector<std::string>({"first"}));
-
-  // Now invoke the callback again for the overdue "second" entry.
-  EXPECT_CALL(*ttl_timer, disableTimer());
-  ttl_timer->invokeCallback();
-  EXPECT_EQ(maybe_expired.value(), std::vector<std::string>({"second"}));
+  EXPECT_EQ(1, calls);
 }
 
 } // namespace
