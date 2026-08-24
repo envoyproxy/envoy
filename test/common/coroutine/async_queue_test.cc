@@ -335,12 +335,12 @@ TEST_F(AsyncQueueTest, CloseAbortsPushWaiters) {
 
 TEST_F(AsyncQueueTest, AsyncQueueCloseIdempotent) {
   AsyncQueue<int> queue;
-  EXPECT_FALSE(queue.isClosed());
+  EXPECT_FALSE(queue.closed());
   queue.close();
-  EXPECT_TRUE(queue.isClosed());
+  EXPECT_TRUE(queue.closed());
   // Idempotent second close
   queue.close();
-  EXPECT_TRUE(queue.isClosed());
+  EXPECT_TRUE(queue.closed());
 }
 
 TEST_F(AsyncQueueTest, PopCancellationUnregistersWaiter) {
@@ -369,13 +369,13 @@ TEST_F(AsyncQueueTest, PopCancellationUnregistersWaiter) {
 
 TEST_F(AsyncQueueTest, PushCancellationUnregistersWaiter) {
   // Shared capacity limit = 10 units
-  auto shared_cap = std::make_shared<SharedCapacity>(10);
+  auto shared_cap = std::make_shared<Capacity>(10);
   AsyncQueue<TestByteItem, TestByteSizeFunc> q1(shared_cap);
   AsyncQueue<TestByteItem, TestByteSizeFunc> q2(shared_cap);
 
   // Fill 5 units in q1 -> shared_cap has 5 units free
   EXPECT_TRUE(q1.tryPush(TestByteItem{std::string(5, 'a')}));
-  EXPECT_EQ(shared_cap->currentSize(), 5);
+  EXPECT_EQ(shared_cap->currentPermits(), 5);
 
   std::optional<absl::Status> push1_status;
   bool push2_done = false;
@@ -405,15 +405,15 @@ TEST_F(AsyncQueueTest, PushCancellationUnregistersWaiter) {
   // Push 2 must now be unblocked immediately because push 1 is cancelled
   EXPECT_TRUE(push2_done);
   EXPECT_EQ(q2.itemCount(), 1);
-  EXPECT_EQ(shared_cap->currentSize(), 8); // 5 + 3
+  EXPECT_EQ(shared_cap->currentPermits(), 8); // 5 + 3
 }
 
 // ============================================================================
 // 3. Shared Capacity Across Multiple Queues & Pipelines
 // ============================================================================
 
-TEST_F(AsyncQueueTest, SharedCapacityAcrossMultipleQueues) {
-  auto shared_cap = std::make_shared<SharedCapacity>(3);
+TEST_F(AsyncQueueTest, CapacityAcrossMultipleQueues) {
+  auto shared_cap = std::make_shared<Capacity>(3);
   AsyncQueue<int> q1(shared_cap);
   AsyncQueue<int> q2(shared_cap);
 
@@ -427,7 +427,7 @@ TEST_F(AsyncQueueTest, SharedCapacityAcrossMultipleQueues) {
   EXPECT_TRUE(q1.tryPush(30));
 
   // Total shared capacity (3 items) reached.
-  EXPECT_EQ(shared_cap->currentSize(), 3);
+  EXPECT_EQ(shared_cap->currentPermits(), 3);
   EXPECT_EQ(q1.currentSize(), 2);
   EXPECT_EQ(q2.currentSize(), 1);
 
@@ -437,7 +437,7 @@ TEST_F(AsyncQueueTest, SharedCapacityAcrossMultipleQueues) {
   drain();
 
   EXPECT_FALSE(q2_push_done);
-  EXPECT_EQ(shared_cap->currentSize(), 3);
+  EXPECT_EQ(shared_cap->currentPermits(), 3);
 
   // Pop from q1, which frees 1 slot in shared capacity and unblocks q2's push
   auto pop1 = q1.tryPop();
@@ -446,19 +446,19 @@ TEST_F(AsyncQueueTest, SharedCapacityAcrossMultipleQueues) {
 
   drain();
   EXPECT_TRUE(q2_push_done);
-  EXPECT_EQ(shared_cap->currentSize(), 3);
+  EXPECT_EQ(shared_cap->currentPermits(), 3);
   EXPECT_EQ(q1.currentSize(), 1);
   EXPECT_EQ(q2.currentSize(), 2);
 }
 
-TEST_F(AsyncQueueTest, SharedCapacityByteBudgetAcrossChainedQueues) {
-  auto shared_cap = std::make_shared<SharedCapacity>(100);
+TEST_F(AsyncQueueTest, CapacityByteBudgetAcrossChainedQueues) {
+  auto shared_cap = std::make_shared<Capacity>(100);
   AsyncQueue<TestByteItem, TestByteSizeFunc> q1(shared_cap);
   AsyncQueue<TestByteItem, TestByteSizeFunc> q2(shared_cap);
 
   EXPECT_TRUE(q1.tryPush(TestByteItem{std::string(60, 'a')}));
   EXPECT_TRUE(q2.tryPush(TestByteItem{std::string(40, 'b')}));
-  EXPECT_EQ(shared_cap->currentSize(), 100);
+  EXPECT_EQ(shared_cap->currentPermits(), 100);
 
   // Push 30 bytes to q1 -> exceeds 100 byte limit, suspends
   bool q1_push_done = false;
@@ -475,17 +475,17 @@ TEST_F(AsyncQueueTest, SharedCapacityByteBudgetAcrossChainedQueues) {
   drain();
   // q1 unblocks and completes
   EXPECT_TRUE(q1_push_done);
-  EXPECT_EQ(shared_cap->currentSize(), 90); // 60 + 30
+  EXPECT_EQ(shared_cap->currentPermits(), 90); // 60 + 30
 }
 
-TEST_F(AsyncQueueTest, SharedCapacityQueueDestructionReleasesCapacity) {
-  auto shared_cap = std::make_shared<SharedCapacity>(2);
+TEST_F(AsyncQueueTest, CapacityQueueDestructionReleasesCapacity) {
+  auto shared_cap = std::make_shared<Capacity>(2);
   auto q1 = std::make_unique<AsyncQueue<int>>(shared_cap);
   AsyncQueue<int> q2(shared_cap);
 
   EXPECT_TRUE(q1->tryPush(1));
   EXPECT_TRUE(q1->tryPush(2));
-  EXPECT_EQ(shared_cap->currentSize(), 2);
+  EXPECT_EQ(shared_cap->currentPermits(), 2);
 
   bool q2_push_done = false;
   launchPush(q2, 3, &q2_push_done);
@@ -497,17 +497,17 @@ TEST_F(AsyncQueueTest, SharedCapacityQueueDestructionReleasesCapacity) {
 
   drain();
   EXPECT_TRUE(q2_push_done);
-  EXPECT_EQ(shared_cap->currentSize(), 1);
+  EXPECT_EQ(shared_cap->currentPermits(), 1);
 }
 
-TEST_F(AsyncQueueTest, DirectHandoffBypassesSharedCapacityWhenFull) {
-  auto shared_cap = std::make_shared<SharedCapacity>(1);
+TEST_F(AsyncQueueTest, DirectHandoffBypassesCapacityWhenFull) {
+  auto shared_cap = std::make_shared<Capacity>(1);
   AsyncQueue<int> q1(shared_cap);
   AsyncQueue<int> q2(shared_cap);
 
   // Fill shared capacity using q1
   EXPECT_TRUE(q1.tryPush(100));
-  EXPECT_EQ(shared_cap->currentSize(), 1);
+  EXPECT_EQ(shared_cap->currentPermits(), 1);
 
   // Start waiting popper on q2
   std::optional<int> q2_popped;
@@ -515,17 +515,17 @@ TEST_F(AsyncQueueTest, DirectHandoffBypassesSharedCapacityWhenFull) {
   drain();
   EXPECT_FALSE(q2_popped.has_value());
 
-  // q2.tryPush should succeed via direct handoff even though SharedCapacity is full
+  // q2.tryPush should succeed via direct handoff even though Capacity is full
   EXPECT_TRUE(q2.tryPush(200));
   EXPECT_TRUE(q2_popped.has_value());
   EXPECT_EQ(*q2_popped, 200);
-  EXPECT_EQ(shared_cap->currentSize(), 1);
+  EXPECT_EQ(shared_cap->currentPermits(), 1);
   EXPECT_TRUE(q2.empty());
 }
 
 TEST_F(AsyncQueueTest, ChainedQueuesPipelineStreamingUnderCapacityConstraint) {
   // 3-stage pipeline sharing 1 capacity unit: Q1 -> F1 -> Q2 -> F2 -> Q3 -> Sink
-  auto shared_cap = std::make_shared<SharedCapacity>(1);
+  auto shared_cap = std::make_shared<Capacity>(1);
   AsyncQueue<int> q1(shared_cap);
   AsyncQueue<int> q2(shared_cap);
   AsyncQueue<int> q3(shared_cap);
@@ -589,14 +589,14 @@ TEST_F(AsyncQueueTest, ChainedQueuesPipelineStreamingUnderCapacityConstraint) {
 
 TEST_F(AsyncQueueTest, GlobalTemporalFIFOCapacityDistribution) {
   // Shared capacity limit = 1 unit
-  auto shared_cap = std::make_shared<SharedCapacity>(1);
+  auto shared_cap = std::make_shared<Capacity>(1);
   AsyncQueue<std::string> q1(shared_cap);
   AsyncQueue<std::string> q2(shared_cap);
   AsyncQueue<std::string> q3(shared_cap);
 
   // Initial fill
   EXPECT_TRUE(q1.tryPush("init"));
-  EXPECT_EQ(shared_cap->currentSize(), 1);
+  EXPECT_EQ(shared_cap->currentPermits(), 1);
 
   std::vector<std::string> order_granted;
 
@@ -649,13 +649,13 @@ TEST_F(AsyncQueueTest, GlobalTemporalFIFOCapacityDistribution) {
 
 TEST_F(AsyncQueueTest, LargeChunkAntiStarvation) {
   // Shared capacity limit = 100 bytes
-  auto shared_cap = std::make_shared<SharedCapacity>(100);
+  auto shared_cap = std::make_shared<Capacity>(100);
   AsyncQueue<TestByteItem, TestByteSizeFunc> q1(shared_cap);
   AsyncQueue<TestByteItem, TestByteSizeFunc> q2(shared_cap);
 
   // Fill 60 bytes in q1 (40 bytes free in shared_cap)
   EXPECT_TRUE(q1.tryPush(TestByteItem{std::string(60, 'a')}));
-  EXPECT_EQ(shared_cap->currentSize(), 60);
+  EXPECT_EQ(shared_cap->currentPermits(), 60);
 
   bool large_push_done = false;
   bool small_push_done = false;
@@ -670,7 +670,7 @@ TEST_F(AsyncQueueTest, LargeChunkAntiStarvation) {
   // Strict Head-of-Line FIFO: small push MUST NOT bypass the large push ahead of it
   EXPECT_FALSE(large_push_done);
   EXPECT_FALSE(small_push_done);
-  EXPECT_EQ(shared_cap->currentSize(), 60);
+  EXPECT_EQ(shared_cap->currentPermits(), 60);
 
   // Pop 60 bytes from q1 -> current_size becomes 0 -> 100 bytes free
   auto item = q1.tryPop();
@@ -684,20 +684,20 @@ TEST_F(AsyncQueueTest, LargeChunkAntiStarvation) {
   // 2. Small chunk (20 bytes) granted second -> currentSize becomes 100 (80 + 20)
   EXPECT_TRUE(large_push_done);
   EXPECT_TRUE(small_push_done);
-  EXPECT_EQ(shared_cap->currentSize(), 100);
+  EXPECT_EQ(shared_cap->currentPermits(), 100);
   EXPECT_EQ(q1.itemCount(), 1);
   EXPECT_EQ(q2.itemCount(), 1);
 }
 
 TEST_F(AsyncQueueTest, OversizedChunkAdmissionAfterDrain) {
   // Shared capacity limit = 50 bytes
-  auto shared_cap = std::make_shared<SharedCapacity>(50);
+  auto shared_cap = std::make_shared<Capacity>(50);
   AsyncQueue<TestByteItem, TestByteSizeFunc> q1(shared_cap);
   AsyncQueue<TestByteItem, TestByteSizeFunc> q2(shared_cap);
 
   // q1 holds 30 bytes
   EXPECT_TRUE(q1.tryPush(TestByteItem{std::string(30, 'a')}));
-  EXPECT_EQ(shared_cap->currentSize(), 30);
+  EXPECT_EQ(shared_cap->currentPermits(), 30);
 
   bool oversized_push_done = false;
   bool normal_push_done = false;
@@ -724,7 +724,7 @@ TEST_F(AsyncQueueTest, OversizedChunkAdmissionAfterDrain) {
   EXPECT_TRUE(oversized_push_done);
   // Normal chunk is still waiting because current_size is 100 >= 50
   EXPECT_FALSE(normal_push_done);
-  EXPECT_EQ(shared_cap->currentSize(), 100);
+  EXPECT_EQ(shared_cap->currentPermits(), 100);
 
   // Pop the oversized chunk from q2 -> current_size becomes 0
   auto item2 = q2.tryPop();
@@ -735,42 +735,49 @@ TEST_F(AsyncQueueTest, OversizedChunkAdmissionAfterDrain) {
 
   // Now normal chunk is granted
   EXPECT_TRUE(normal_push_done);
-  EXPECT_EQ(shared_cap->currentSize(), 10);
+  EXPECT_EQ(shared_cap->currentPermits(), 10);
 }
 
 // ============================================================================
-// 5. Direct SharedCapacity Semaphore Semantics
+// 5. Direct Capacity Semaphore Semantics
 // ============================================================================
 
-TEST_F(AsyncQueueTest, SharedCapacityDirectAcquireRelease) {
-  auto cap = std::make_shared<SharedCapacity>(2);
-  EXPECT_TRUE(cap->tryAcquire(2));
-  EXPECT_FALSE(cap->tryAcquire(1));
-  EXPECT_EQ(cap->currentSize(), 2);
+TEST_F(AsyncQueueTest, CapacityDirectAcquireRelease) {
+  auto cap = std::make_shared<Capacity>(2);
+  auto res1 = cap->tryAcquire(2);
+  EXPECT_TRUE(res1.has_value());
+  EXPECT_FALSE(cap->tryAcquire(1).has_value());
+  EXPECT_EQ(cap->currentPermits(), 2);
 
-  cap->release(1);
-  EXPECT_EQ(cap->currentSize(), 1);
-  EXPECT_TRUE(cap->tryAcquire(1));
+  res1->release();
+  EXPECT_EQ(cap->currentPermits(), 0);
 
-  cap->release(2);
-  EXPECT_EQ(cap->currentSize(), 0);
+  auto res2 = cap->tryAcquire(1);
+  EXPECT_TRUE(res2.has_value());
+  EXPECT_EQ(cap->currentPermits(), 1);
+
+  res2->release();
+  EXPECT_EQ(cap->currentPermits(), 0);
 }
 
-TEST_F(AsyncQueueTest, SharedCapacityRequestAndCancel) {
-  auto cap = std::make_shared<SharedCapacity>(1);
-  EXPECT_TRUE(cap->tryAcquire(1));
+TEST_F(AsyncQueueTest, CapacityRequestAndCancel) {
+  auto cap = std::make_shared<Capacity>(1);
+  auto init_res = cap->tryAcquire(1);
+  EXPECT_TRUE(init_res.has_value());
 
   bool task1_done = false;
   bool task2_done = false;
   std::optional<absl::Status> task1_status;
 
   auto t1 = [&]() -> Task<absl::Status> {
-    task1_status = co_await cap->acquire(1);
+    auto res = co_await cap->acquire(1);
+    task1_status = res.status();
     task1_done = true;
     co_return *task1_status;
   };
+  std::optional<CapacityReservation> task2_res;
   auto t2 = [&]() -> Task<absl::Status> {
-    CO_RETURN_IF_ERROR(co_await cap->acquire(1));
+    ASSIGN_OR_CO_RETURN(task2_res, co_await cap->acquire(1));
     task2_done = true;
     co_return absl::OkStatus();
   };
@@ -790,11 +797,11 @@ TEST_F(AsyncQueueTest, SharedCapacityRequestAndCancel) {
   EXPECT_TRUE(absl::IsCancelled(*task1_status));
 
   // Release capacity: task2 (now head) must unblock
-  cap->release(1);
+  init_res->release();
   drain();
 
   EXPECT_TRUE(task2_done);
-  EXPECT_EQ(cap->currentSize(), 1);
+  EXPECT_EQ(cap->currentPermits(), 1);
 }
 
 TEST_F(AsyncQueueTest, PushOnClosedQueueReturnsError) {
@@ -812,13 +819,15 @@ TEST_F(AsyncQueueTest, PushOnClosedQueueReturnsError) {
   EXPECT_THAT(push_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
 }
 
-TEST_F(AsyncQueueTest, SharedCapacityDestructionAbortsAcquireWaiters) {
-  auto cap = std::make_shared<SharedCapacity>(1);
-  EXPECT_TRUE(cap->tryAcquire(1));
+TEST_F(AsyncQueueTest, CapacityDestructionAbortsAcquireWaiters) {
+  auto cap = std::make_shared<Capacity>(1);
+  auto init_res = cap->tryAcquire(1);
+  EXPECT_TRUE(init_res.has_value());
 
   absl::Status waiter_status;
   auto acquire_task = [&cap, &waiter_status]() -> Task<absl::Status> {
-    waiter_status = co_await cap->acquire(1);
+    auto res = co_await cap->acquire(1);
+    waiter_status = res.status();
     co_return waiter_status;
   };
 
@@ -826,23 +835,206 @@ TEST_F(AsyncQueueTest, SharedCapacityDestructionAbortsAcquireWaiters) {
   drain();
   EXPECT_TRUE(waiter_status.ok());
 
-  // Destroy cap
+  // Destroy cap while waiter is pending
   cap.reset();
   drain();
   EXPECT_THAT(waiter_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
 }
 
-TEST_F(AsyncQueueTest, SharedCapacityReleaseZero) {
-  auto cap = std::make_shared<SharedCapacity>(10);
-  EXPECT_TRUE(cap->tryAcquire(5));
-  EXPECT_EQ(cap->currentSize(), 5);
+TEST_F(AsyncQueueTest, CapacityReleaseZero) {
+  auto cap = std::make_shared<Capacity>(10);
+  auto res = cap->tryAcquire(5);
+  EXPECT_TRUE(res.has_value());
+  EXPECT_EQ(cap->currentPermits(), 5);
 
   // Release 0 is a no-op
   cap->release(0);
-  EXPECT_EQ(cap->currentSize(), 5);
+  EXPECT_EQ(cap->currentPermits(), 5);
 
-  cap->release(5);
-  EXPECT_EQ(cap->currentSize(), 0);
+  res->release();
+  EXPECT_EQ(cap->currentPermits(), 0);
+}
+
+// ============================================================================
+// 6. Ownership, Move Semantics, and PushAccessor
+// ============================================================================
+
+TEST_F(AsyncQueueTest, AsyncQueueMoveSemantics) {
+  AsyncQueue<std::string> q1(2);
+  EXPECT_TRUE(q1.tryPush("msg1"));
+
+  // Move construct q2 from q1
+  AsyncQueue<std::string> q2 = std::move(q1);
+  EXPECT_EQ(q2.itemCount(), 1);
+  EXPECT_TRUE(q2.tryPush("msg2"));
+
+  // Pop from moved-to queue
+  auto pop1 = q2.tryPop();
+  ASSERT_TRUE(pop1.has_value());
+  EXPECT_EQ(*pop1, "msg1");
+
+  auto pop2 = q2.tryPop();
+  ASSERT_TRUE(pop2.has_value());
+  EXPECT_EQ(*pop2, "msg2");
+
+  // Move assignment
+  AsyncQueue<std::string> q3(2);
+  q3 = std::move(q2);
+  EXPECT_TRUE(q3.tryPush("msg3"));
+  auto pop3 = q3.tryPop();
+  ASSERT_TRUE(pop3.has_value());
+  EXPECT_EQ(*pop3, "msg3");
+}
+
+TEST_F(AsyncQueueTest, PushAccessorBasicPushAndPop) {
+  AsyncQueue<std::string> queue(2);
+  auto pusher = queue.pushAccessor();
+
+  EXPECT_FALSE(pusher.closed());
+  EXPECT_TRUE(pusher.empty());
+  EXPECT_EQ(pusher.currentSize(), 0);
+
+  EXPECT_TRUE(pusher.tryPush("item1"));
+  EXPECT_EQ(queue.itemCount(), 1);
+  EXPECT_EQ(pusher.itemCount(), 1);
+
+  bool push2_done = false;
+  auto push_task = [&pusher, &push2_done]() -> Task<absl::Status> {
+    CO_RETURN_IF_ERROR(co_await pusher.push("item2"));
+    push2_done = true;
+    co_return absl::OkStatus();
+  };
+  handles_.push_back(
+      launch(push_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
+  drain();
+  EXPECT_TRUE(push2_done);
+
+  // Pop from the owner (queue)
+  std::vector<std::string> popped;
+  launchPopMultiple(queue, 2, popped);
+  drain();
+  EXPECT_THAT(popped, testing::ElementsAre("item1", "item2"));
+}
+
+TEST_F(AsyncQueueTest, PushAccessorDestructionSafety) {
+  auto queue = std::make_unique<AsyncQueue<int>>(2);
+  auto pusher = queue->pushAccessor();
+
+  EXPECT_TRUE(pusher.tryPush(10));
+  EXPECT_FALSE(pusher.closed());
+
+  // Destroy the owner queue
+  queue.reset();
+
+  // PushAccessor should now detect that the underlying queue is destroyed
+  EXPECT_TRUE(pusher.closed());
+  EXPECT_FALSE(pusher.tryPush(20));
+
+  absl::Status push_status;
+  auto push_task = [&pusher, &push_status]() -> Task<absl::Status> {
+    push_status = co_await pusher.push(30);
+    co_return push_status;
+  };
+  handles_.push_back(launch(push_task(), executor_, [](absl::Status) {}));
+  drain();
+  EXPECT_THAT(push_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+}
+
+TEST_F(AsyncQueueTest, MultiplePushersSinglePopper) {
+  // Multiple producers, one consumer (the owner queue)
+  AsyncQueue<std::string> queue(10);
+  auto p1 = queue.pushAccessor();
+  auto p2 = queue.pushAccessor();
+  auto p3 = queue.pushAccessor();
+
+  EXPECT_TRUE(p1.tryPush("p1_msg"));
+  EXPECT_TRUE(p2.tryPush("p2_msg"));
+  EXPECT_TRUE(p3.tryPush("p3_msg"));
+  EXPECT_EQ(queue.itemCount(), 3);
+
+  std::vector<std::string> received;
+  launchPopMultiple(queue, 3, received);
+  drain();
+  EXPECT_THAT(received, testing::ElementsAre("p1_msg", "p2_msg", "p3_msg"));
+}
+
+TEST_F(AsyncQueueTest, PushAccessorClose) {
+  AsyncQueue<int> queue;
+  auto pusher = queue.pushAccessor();
+
+  EXPECT_TRUE(pusher.tryPush(1));
+  pusher.close();
+
+  EXPECT_TRUE(queue.closed());
+  EXPECT_TRUE(pusher.closed());
+  EXPECT_FALSE(pusher.tryPush(2));
+
+  // Pop remaining item then EOF
+  auto item = queue.tryPop();
+  ASSERT_TRUE(item.has_value());
+  EXPECT_EQ(*item, 1);
+  EXPECT_FALSE(queue.tryPop().has_value());
+}
+
+TEST_F(AsyncQueueTest, DirectResumptionSynchronousExecution) {
+  AsyncQueue<int> queue(1);
+  std::optional<int> popped_value;
+  bool popper_resumed = false;
+
+  auto popper_task = [&]() -> Task<absl::Status> {
+    ASSIGN_OR_CO_RETURN(auto item, co_await queue.pop());
+    popped_value = item;
+    popper_resumed = true;
+    co_return absl::OkStatus();
+  };
+
+  // Launch popper, which suspends waiting for item
+  handles_.push_back(
+      launch(popper_task(), executor_, [](absl::Status status) { EXPECT_OK(status); }));
+  drain();
+  EXPECT_FALSE(popper_resumed);
+  EXPECT_FALSE(popped_value.has_value());
+
+  // Push synchronously wakes up the popper inline during push!
+  EXPECT_TRUE(queue.tryPush(42));
+  EXPECT_TRUE(popper_resumed);
+  EXPECT_EQ(popped_value, 42);
+  EXPECT_TRUE(queue.empty());
+}
+
+TEST_F(AsyncQueueTest, PushPopRendezvousWhenBlockedOnCapacity) {
+  // Shared capacity limit = 1 item
+  auto shared_cap = std::make_shared<Capacity>(1);
+  AsyncQueue<std::string> queue(shared_cap);
+
+  // Fill capacity directly
+  auto init_res = shared_cap->tryAcquire(1);
+  ASSERT_TRUE(init_res.has_value());
+  EXPECT_EQ(shared_cap->currentPermits(), 1);
+
+  // Push into queue: capacity is full, so pusher suspends
+  bool push_done = false;
+  launchPush(queue, "rendezvous_item", &push_done);
+  drain();
+  EXPECT_FALSE(push_done);
+  EXPECT_EQ(queue.itemCount(), 0); // Not yet committed with capacity
+
+  // Pop arrives while pusher is blocked on capacity:
+  // pop() steals the item directly via rendezvous!
+  std::optional<std::string> popped;
+  launchPop(queue, popped);
+  drain();
+
+  EXPECT_EQ(popped, "rendezvous_item");
+
+  // Releasing capacity unblocks the suspended pusher, which observes the item was
+  // already delivered and completes cleanly with OkStatus without re-buffering.
+  init_res->release();
+  drain();
+
+  EXPECT_TRUE(push_done);
+  EXPECT_EQ(shared_cap->currentPermits(), 0);
+  EXPECT_TRUE(queue.empty());
 }
 
 } // namespace

@@ -112,7 +112,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "async_queue_lib",
-    srcs = ["async_queue.cc"],
     hdrs = ["async_queue.h"],
     deps = [
         ":leaf_awaitable_lib",
