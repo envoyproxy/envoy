@@ -16,6 +16,7 @@
 using testing::Contains;
 using testing::IsSupersetOf;
 using testing::Key;
+using testing::Pair;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
@@ -695,14 +696,11 @@ TEST_F(NetworkExtProcFilterTest, UntypedMetadataForwarding) {
             // Verify the request has metadata
             EXPECT_TRUE(request.has_metadata());
 
-            // Verify it has the test-namespace but not other-namespace
-            const auto& metadata = request.metadata().filter_metadata();
-            EXPECT_THAT(metadata, UnorderedElementsAre(Key("test-namespace")));
-
-            // Verify the key-value pairs within test-namespace
-            const auto& test_ns = metadata.at("test-namespace");
-            EXPECT_TRUE(test_ns.fields().contains("key1"));
-            EXPECT_THAT(test_ns.fields(), Contains(IsStructString("key1", "value1")));
+            // Verify it has the expected test-namespace and key-value pair.
+            EXPECT_THAT(request.metadata().filter_metadata(),
+                        UnorderedElementsAre(
+                            Pair("test-namespace",
+                                 HasStructFields(Contains(IsStructString("key1", "value1"))))));
           }));
 
   EXPECT_CALL(*client_, start(_, _, _, _))
@@ -797,11 +795,9 @@ TEST_F(NetworkExtProcFilterTest, BothTypedAndUntypedMetadataForwarding) {
             EXPECT_TRUE(request.has_metadata());
 
             // Verify untyped metadata
-            const auto& filter_metadata = request.metadata().filter_metadata();
-            EXPECT_THAT(filter_metadata, Contains(Key("untyped-ns")));
-            const auto& untyped_ns = filter_metadata.at("untyped-ns");
-            EXPECT_TRUE(untyped_ns.fields().contains("key1"));
-            EXPECT_THAT(untyped_ns.fields(), Contains(IsStructString("key1", "value1")));
+            EXPECT_THAT(request.metadata().filter_metadata(),
+                        Contains(Pair("untyped-ns", HasStructFields(Contains(
+                                                        IsStructString("key1", "value1"))))));
 
             // Verify typed metadata
             const auto& typed_metadata = request.metadata().typed_filter_metadata();

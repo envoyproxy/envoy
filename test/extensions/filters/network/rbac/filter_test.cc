@@ -19,6 +19,7 @@
 using testing::Contains;
 using testing::IsSupersetOf;
 using testing::NiceMock;
+using testing::Pair;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
@@ -221,12 +222,12 @@ on_no_match:
   }
 
   void checkAccessLogMetadata(bool expected) {
-    auto filter_meta = stream_info_.dynamicMetadata().filter_metadata().at(
-        Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
-    EXPECT_EQ(expected,
-              filter_meta.fields()
-                  .at(Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey)
-                  .bool_value());
+    EXPECT_THAT(
+        stream_info_.dynamicMetadata().filter_metadata(),
+        Contains(Pair(Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace,
+                      HasStructFields(Contains(IsStructBool(
+                          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey,
+                          expected))))));
   }
 
   void setMetadata() {
@@ -363,12 +364,12 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
             config_->stats().shadow_allowed_.name());
   EXPECT_EQ("tcp.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
-  auto filter_meta =
-      stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
   EXPECT_THAT(
-      filter_meta.fields(),
-      UnorderedElementsAre(IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"),
-                           IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed")));
+      stream_info_.dynamicMetadata().filter_metadata(),
+      Contains(Pair(NetworkFilterNames::get().Rbac,
+                    HasStructFields(UnorderedElementsAre(
+                        IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"),
+                        IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"))))));
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, DelayDenied) {
@@ -497,12 +498,12 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherDenied) {
             config_->stats().shadow_allowed_.name());
   EXPECT_EQ("tcp.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
-  auto filter_meta =
-      stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
   EXPECT_THAT(
-      filter_meta.fields(),
-      UnorderedElementsAre(IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"),
-                           IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed")));
+      stream_info_.dynamicMetadata().filter_metadata(),
+      Contains(Pair(NetworkFilterNames::get().Rbac,
+                    HasStructFields(UnorderedElementsAre(
+                        IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar"),
+                        IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"))))));
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherNetworkNamespaceAllowed) {

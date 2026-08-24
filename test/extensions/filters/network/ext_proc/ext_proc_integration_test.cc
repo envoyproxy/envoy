@@ -18,6 +18,7 @@
 using testing::Contains;
 using testing::IsSupersetOf;
 using testing::Key;
+using testing::Pair;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
@@ -866,14 +867,10 @@ TEST_P(NetworkExtProcFilterIntegrationTest, UntypedMetadataForwarding) {
 
   // Verify metadata is present
   EXPECT_TRUE(request.has_metadata());
-  EXPECT_THAT(request.metadata().filter_metadata(), Contains(Key("test-namespace")));
-
-  // Verify metadata values
-  const auto& metadata = request.metadata().filter_metadata().at("test-namespace");
-  EXPECT_TRUE(metadata.fields().contains("key1"));
-  EXPECT_TRUE(metadata.fields().contains("key2"));
-  EXPECT_THAT(metadata.fields(), UnorderedElementsAre(IsStructString("key1", "value1"),
-                                                      IsStructString("key2", "value2")));
+  EXPECT_THAT(request.metadata().filter_metadata(),
+              Contains(Pair("test-namespace", HasStructFields(UnorderedElementsAre(
+                                                  IsStructString("key1", "value1"),
+                                                  IsStructString("key2", "value2"))))));
 
   sendReadGrpcMessage("client_data_inspected", true, true);
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
@@ -907,13 +904,10 @@ TEST_P(NetworkExtProcFilterIntegrationTest, MultipleUntypedNamespaces) {
               UnorderedElementsAre(Key("namespace1"), Key("namespace2")));
 
   // Verify metadata values
-  const auto& metadata1 = request.metadata().filter_metadata().at("namespace1");
-  EXPECT_TRUE(metadata1.fields().contains("key1"));
-  EXPECT_THAT(metadata1.fields(), Contains(IsStructString("key1", "value1")));
-
-  const auto& metadata2 = request.metadata().filter_metadata().at("namespace2");
-  EXPECT_TRUE(metadata2.fields().contains("key2"));
-  EXPECT_THAT(metadata2.fields(), Contains(IsStructString("key2", "value2")));
+  EXPECT_THAT(request.metadata().filter_metadata(),
+              UnorderedElementsAre(
+                  Pair("namespace1", HasStructFields(Contains(IsStructString("key1", "value1")))),
+                  Pair("namespace2", HasStructFields(Contains(IsStructString("key2", "value2"))))));
 
   sendReadGrpcMessage("client_data_inspected", true, true);
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
@@ -1036,10 +1030,9 @@ TEST_P(NetworkExtProcFilterIntegrationTest, BothTypedAndUntypedMetadataForwardin
   EXPECT_TRUE(request.has_metadata());
 
   // Verify untyped metadata
-  EXPECT_THAT(request.metadata().filter_metadata(), Contains(Key("untyped-ns")));
-  const auto& untyped_metadata = request.metadata().filter_metadata().at("untyped-ns");
-  EXPECT_TRUE(untyped_metadata.fields().contains("key1"));
-  EXPECT_THAT(untyped_metadata.fields(), Contains(IsStructString("key1", "value1")));
+  EXPECT_THAT(
+      request.metadata().filter_metadata(),
+      Contains(Pair("untyped-ns", HasStructFields(Contains(IsStructString("key1", "value1"))))));
 
   // Verify typed metadata
   EXPECT_THAT(request.metadata().typed_filter_metadata(), Contains(Key("typed-ns")));

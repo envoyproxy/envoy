@@ -53,6 +53,7 @@ using testing::Invoke;
 using testing::IsSupersetOf;
 using testing::Key;
 using testing::NiceMock;
+using testing::Pair;
 using testing::Return;
 using testing::ReturnRef;
 using testing::UnorderedElementsAre;
@@ -1529,14 +1530,10 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsLargeThanInitMaxReadBytes) {
   write(data, sizeof(data));
   expectData("DATA");
 
-  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
-  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
-  EXPECT_THAT(metadata, UnorderedElementsAre(Key(ProxyProtocol)));
-
-  auto fields = metadata.at(ProxyProtocol).fields();
-  EXPECT_THAT(fields, UnorderedElementsAre(Key("PP2 type authority")));
-  auto value_s = fields.at("PP2 type authority").string_value();
-  EXPECT_EQ(tlv_data, value_s);
+  EXPECT_THAT(
+      server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
+      UnorderedElementsAre(Pair(ProxyProtocol, HasStructFields(UnorderedElementsAre(IsStructString(
+                                                   "PP2 type authority", tlv_data))))));
 
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
@@ -1567,16 +1564,12 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataName
   write(data, sizeof(data));
   expectData("DATA");
 
-  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
-
-  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
-  EXPECT_THAT(metadata, UnorderedElementsAre(Key("We need a different metadata namespace")));
-
-  auto fields = metadata.at("We need a different metadata namespace").fields();
-  EXPECT_THAT(fields, UnorderedElementsAre(Key("PP2 type authority")));
-
-  auto value_s = fields.at("PP2 type authority").string_value();
-  ASSERT_THAT(value_s, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
+  EXPECT_THAT(
+      server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
+      UnorderedElementsAre(Pair(
+          "We need a different metadata namespace",
+          HasStructFields(UnorderedElementsAre(IsStructString(
+              "PP2 type authority", ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d)))))));
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
@@ -1621,25 +1614,19 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
   write(data, sizeof(data));
   expectData("DATA");
 
-  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
-  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
-
-  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
-  EXPECT_THAT(metadata, UnorderedElementsAre(Key(ProxyProtocol)));
-
-  auto fields = metadata.at(ProxyProtocol).fields();
-  EXPECT_THAT(fields, UnorderedElementsAre(Key("PP2 type authority"), Key("PP2 vpc id")));
-
   const char replacement = 0x21;
-  auto value_type_authority = fields.at("PP2 type authority").string_value();
   // Non utf8 characters have been replaced with `0x21` (`!` character).
-  ASSERT_THAT(value_type_authority,
-              ElementsAre(0x66, replacement, 0x6f, 0x2e, 0x63, 0x6f, replacement));
-
-  auto value_vpc_id = fields.at("PP2 vpc id").string_value();
-  ASSERT_THAT(value_vpc_id,
-              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, replacement, 0x35, 0x74, 0x65, 0x73,
-                          0x74, 0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, replacement, 0x37));
+  EXPECT_THAT(
+      server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
+      UnorderedElementsAre(Pair(
+          ProxyProtocol,
+          HasStructFields(UnorderedElementsAre(
+              IsStructString("PP2 type authority",
+                             ElementsAre(0x66, replacement, 0x6f, 0x2e, 0x63, 0x6f, replacement)),
+              IsStructString("PP2 vpc id",
+                             ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, replacement, 0x35,
+                                         0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61, 0x36, 0x63,
+                                         0x36, 0x33, 0x68, replacement, 0x37))))));
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
@@ -1696,19 +1683,13 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEncodeAsBase64) {
   write(data, sizeof(data));
   expectData("DATA");
 
-  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
-  EXPECT_THAT(metadata, UnorderedElementsAre(Key(ProxyProtocol)));
-
-  auto fields = metadata.at(ProxyProtocol).fields();
-  EXPECT_EQ(3, fields.size());
-
-  // The raw TLV values (including the non utf8 characters) are encoded as base64.
-  EXPECT_THAT(fields, IsSupersetOf(StructMatchers(
-                          IsStructString("PP2 type authority", "Zv5vLmNvwQ=="),
-                          IsStructString("PP2 vpc id", "AXZwYy0wwDV0ZXN0MmZhNmM2M2j5Nw=="))));
-  // The default encoding sanitizes the value to a valid UTF-8 string: the non utf8 byte
-  // 0xff is replaced with the `!` character.
-  EXPECT_THAT(fields, Contains(IsStructString("PP2 tlv1", "!")));
+  EXPECT_THAT(
+      server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
+      UnorderedElementsAre(
+          Pair(ProxyProtocol, HasStructFields(UnorderedElementsAre(
+                                  IsStructString("PP2 type authority", "Zv5vLmNvwQ=="),
+                                  IsStructString("PP2 vpc id", "AXZwYy0wwDV0ZXN0MmZhNmM2M2j5Nw=="),
+                                  IsStructString("PP2 tlv1", "!"))))));
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
@@ -1768,19 +1749,17 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEmitTypedAndUntypedM
               ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35, 0x74, 0x65, 0x73, 0x74,
                           0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37));
 
-  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
-  EXPECT_THAT(metadata, UnorderedElementsAre(Key(ProxyProtocol)));
-
-  auto fields = metadata.at(ProxyProtocol).fields();
-  EXPECT_THAT(fields, UnorderedElementsAre(Key("PP2 type authority"), Key("PP2 vpc id")));
-
-  value_type_authority = fields.at("PP2 type authority").string_value();
-  ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
-
-  value_type_vpc_id = fields.at("PP2 vpc id").string_value();
-  ASSERT_THAT(value_type_vpc_id,
-              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35, 0x74, 0x65, 0x73, 0x74,
-                          0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37));
+  EXPECT_THAT(
+      server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
+      UnorderedElementsAre(Pair(
+          ProxyProtocol,
+          HasStructFields(UnorderedElementsAre(
+              IsStructString("PP2 type authority",
+                             ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d)),
+              IsStructString("PP2 vpc id",
+                             ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35, 0x74,
+                                         0x65, 0x73, 0x74, 0x32, 0x66, 0x61, 0x36, 0x63, 0x36,
+                                         0x33, 0x68, 0x61, 0x37))))));
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
@@ -1828,22 +1807,19 @@ TEST_P(ProxyProtocolTest,
 
   EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
 
-  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
-  EXPECT_THAT(metadata, UnorderedElementsAre(Key(ProxyProtocol)));
-
-  auto fields = metadata.at(ProxyProtocol).fields();
-  EXPECT_THAT(fields, UnorderedElementsAre(Key("PP2 type authority"), Key("PP2 vpc id")));
-
   const char replacement = 0x21;
-  auto value_type_authority = fields.at("PP2 type authority").string_value();
   // Non utf8 characters have been replaced with `0x21` (`!` character).
-  ASSERT_THAT(value_type_authority,
-              ElementsAre(0x66, replacement, 0x6f, 0x2e, 0x63, 0x6f, replacement));
-
-  auto value_type_vpc_id = fields.at("PP2 vpc id").string_value();
-  ASSERT_THAT(value_type_vpc_id,
-              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, replacement, 0x35, 0x74, 0x65, 0x73,
-                          0x74, 0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, replacement, 0x37));
+  EXPECT_THAT(
+      server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
+      UnorderedElementsAre(Pair(
+          ProxyProtocol,
+          HasStructFields(UnorderedElementsAre(
+              IsStructString("PP2 type authority",
+                             ElementsAre(0x66, replacement, 0x6f, 0x2e, 0x63, 0x6f, replacement)),
+              IsStructString("PP2 vpc id",
+                             ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, replacement, 0x35,
+                                         0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61, 0x36, 0x63,
+                                         0x36, 0x33, 0x68, replacement, 0x37))))));
 
   auto typed_metadata = server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata();
   EXPECT_THAT(typed_metadata, UnorderedElementsAre(Key(ProxyProtocol)));
@@ -1900,14 +1876,11 @@ TEST_P(ProxyProtocolTest, V2WillNotOverwriteTLV) {
 
   EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
 
-  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
-  EXPECT_THAT(metadata, UnorderedElementsAre(Key(ProxyProtocol)));
-
-  auto fields = metadata.at(ProxyProtocol).fields();
-  EXPECT_THAT(fields, UnorderedElementsAre(Key("PP2 type authority")));
-
-  auto value_type_authority = fields.at("PP2 type authority").string_value();
-  ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
+  EXPECT_THAT(server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
+              UnorderedElementsAre(
+                  Pair(ProxyProtocol, HasStructFields(UnorderedElementsAre(IsStructString(
+                                          "PP2 type authority", ElementsAre(0x66, 0x6f, 0x6f, 0x2e,
+                                                                            0x63, 0x6f, 0x6d)))))));
 
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
@@ -2257,12 +2230,10 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateDefaultBehavior) {
   expectData("DATA");
 
   // Verify dynamic metadata is populated
-  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
-  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
-  EXPECT_THAT(metadata, Contains(Key("envoy.filters.listener.proxy_protocol")));
-  auto fields = metadata.at("envoy.filters.listener.proxy_protocol").fields();
-  EXPECT_EQ(2, fields.size());
-  EXPECT_THAT(fields, UnorderedElementsAre(Key("PP2 type authority"), Key("aws_vpce_id")));
+  EXPECT_THAT(server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
+              UnorderedElementsAre(Pair("envoy.filters.listener.proxy_protocol",
+                                        HasStructFields(UnorderedElementsAre(
+                                            Key("PP2 type authority"), Key("aws_vpce_id"))))));
 
   // Verify filter state is NOT populated with TLV object
   constexpr absl::string_view kFilterStateKey = "envoy.network.proxy_protocol.tlv";
@@ -2299,12 +2270,10 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToDynamicMetadataExplicit) {
   expectData("DATA");
 
   // Verify dynamic metadata is populated
-  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
-  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
-  EXPECT_THAT(metadata, Contains(Key("envoy.filters.listener.proxy_protocol")));
-  auto fields = metadata.at("envoy.filters.listener.proxy_protocol").fields();
-  EXPECT_EQ(1, fields.size());
-  EXPECT_THAT(fields, UnorderedElementsAre(Key("PP2 type authority")));
+  EXPECT_THAT(
+      server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
+      UnorderedElementsAre(Pair("envoy.filters.listener.proxy_protocol",
+                                HasStructFields(UnorderedElementsAre(Key("PP2 type authority"))))));
 
   // Verify filter state is NOT populated with TLV object
   constexpr absl::string_view kFilterStateKey = "envoy.network.proxy_protocol.tlv";

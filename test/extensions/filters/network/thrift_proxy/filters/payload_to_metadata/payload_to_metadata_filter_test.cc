@@ -12,6 +12,7 @@
 #include "gtest/gtest.h"
 
 using testing::Contains;
+using testing::Pair;
 
 namespace Envoy {
 namespace Extensions {
@@ -26,7 +27,6 @@ MATCHER_P(MapEq, rhs, "") {
   const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
-    EXPECT_NE(obj.fields().find(entry.first), obj.fields().end());
     EXPECT_THAT(obj.fields(), Contains(IsStructString(entry.first, entry.second)));
   }
   return true;
@@ -36,7 +36,6 @@ MATCHER_P(MapEqNum, rhs, "") {
   const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
-    EXPECT_NE(obj.fields().find(entry.first), obj.fields().end());
     EXPECT_THAT(obj.fields(), Contains(IsStructNumber(entry.first, entry.second)));
   }
   return true;
