@@ -9,13 +9,13 @@ load("@envoy_toolshed//compile:sanitizer_libs.bzl", "setup_sanitizer_libs")
 load("@envoy_toolshed//coverage/grcov:grcov_repository.bzl", "grcov_repository")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
 load("@gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
-load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@proxy-wasm-rust-sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@rules_buf//buf:repositories.bzl", "rules_buf_toolchains")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
+load("@rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
 load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_repository")
@@ -117,6 +117,7 @@ def envoy_dependency_imports(
         name = "org_golang_google_grpc",
         build_file_proto_mode = "disable",
         importpath = "google.golang.org/grpc",
+        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
         sum = "h1:aHQeeJbo8zAkAa3pRzrVjZlbz6uSfeOXlJNQM0RAbz0=",
         version = "v1.68.0",
         build_directives = [
@@ -130,6 +131,7 @@ def envoy_dependency_imports(
     go_repository(
         name = "org_golang_x_net",
         importpath = "golang.org/x/net",
+        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
         sum = "h1:Mb7Mrk043xzHgnRM88suvJFwzVrRfHEHJEl5/71CKw0=",
         version = "v0.34.0",
         build_directives = [
@@ -142,18 +144,21 @@ def envoy_dependency_imports(
     go_repository(
         name = "org_golang_x_sys",
         importpath = "golang.org/x/sys",
+        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
         sum = "h1:3yZWxaJjBmCWXqhN1qh02AkOnCQ1poK6oF+a7xWL6Gc=",
         version = "v0.38.0",
     )
     go_repository(
         name = "org_golang_x_text",
         importpath = "golang.org/x/text",
+        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
         sum = "h1:zyQAAkrwaneQ066sspRyJaG9VNi/YJ1NfzcGB3hZ/qo=",
         version = "v0.21.0",
     )
     go_repository(
         name = "org_golang_google_genproto_googleapis_api",
         importpath = "google.golang.org/genproto/googleapis/api",
+        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
         sum = "h1:+2XxjfsAu6vqFxwGBRcHiMaDCuZiqXGDUDVWVtrFAnE=",
         version = "v0.0.0-20251029180050-ab9386a59fda",
         build_directives = [
@@ -163,6 +168,7 @@ def envoy_dependency_imports(
     go_repository(
         name = "org_golang_google_genproto_googleapis_rpc",
         importpath = "google.golang.org/genproto/googleapis/rpc",
+        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
         sum = "h1:i/Q+bfisr7gq6feoJnS/DlpdwEL4ihp41fvRiM3Ork0=",
         version = "v0.0.0-20251029180050-ab9386a59fda",
     )
@@ -170,12 +176,14 @@ def envoy_dependency_imports(
         name = "org_golang_google_protobuf",
         build_file_proto_mode = "disable",
         importpath = "google.golang.org/protobuf",
+        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
         sum = "h1:AYd7cD/uASjIL6Q9LiTjz8JLcrh/88q5UObnmY3aOOE=",
         version = "v1.36.10",
     )
     go_repository(
         name = "xds_go",
         importpath = "github.com/cncf/xds/go",
+        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
         sum = "h1:gt7U1Igw0xbJdyaCM5H2CnlAlPSkzrhsebQB6WQWjLA=",
         version = "v0.0.0-20251110193048-8bfbf64dc13e",
         build_directives = [
@@ -185,12 +193,14 @@ def envoy_dependency_imports(
     go_repository(
         name = "dev_cel_expr",
         importpath = "cel.dev/expr",
+        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
         sum = "h1:1KrZg61W6TWSxuNZ37Xy49ps13NUovb66QLprthtwi4=",
         version = "v0.25.1",
     )
     go_repository(
         name = "com_github_spf13_afero",
         importpath = "github.com/spf13/afero",
+        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
         sum = "h1:EaGW2JJh15aKOejeuJ+wpFSHnbd7GE6Wvp3TsNhb6LY=",
         version = "v1.10.0",
         build_directives = [
@@ -202,6 +212,7 @@ def envoy_dependency_imports(
     go_repository(
         name = "com_github_lyft_protoc_gen_star_v2",
         importpath = "github.com/lyft/protoc-gen-star/v2",
+        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
         sum = "h1:sIXJOMrYnQZJu7OB7ANSF4MYri2fTEGIsRLz6LwI4xE=",
         version = "v2.0.4-0.20230330145011-496ad1ac90a4",
         build_directives = [
@@ -212,6 +223,7 @@ def envoy_dependency_imports(
     go_repository(
         name = "com_github_iancoleman_strcase",
         importpath = "github.com/iancoleman/strcase",
+        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
         sum = "h1:nTXanmYxhfFAMjZL34Ov6gkzEsSJZ5DbhxWjvSASxEI=",
         version = "v0.3.0",
     )
@@ -220,7 +232,10 @@ def envoy_dependency_imports(
         importpath = "github.com/planetscale/vtprotobuf",
         sum = "h1:ujRGEVWJEoaxQ+8+HMl8YEpGaDAgohgZxJ5S+d2TTFQ=",
         version = "v0.6.1-0.20240409071808-615f978279ca",
-        repo_mapping = {"@com_google_protobuf": "@protobuf"},
+        repo_mapping = {
+            "@com_google_protobuf": "@protobuf",
+            "@io_bazel_rules_go": "@rules_go",
+        },
     )
 
     go_repository(
@@ -228,7 +243,10 @@ def envoy_dependency_imports(
         importpath = "github.com/envoyproxy/protoc-gen-validate",
         sum = "h1:TvGH1wof4H33rezVKWSpqKz5NXWg5VPuZ0uONDT6eb4=",
         version = "v1.3.0",
-        repo_mapping = {"@com_google_protobuf": "@protobuf"},
+        repo_mapping = {
+            "@com_google_protobuf": "@protobuf",
+            "@io_bazel_rules_go": "@rules_go",
+        },
     )
 
     rules_proto_grpc_toolchains()

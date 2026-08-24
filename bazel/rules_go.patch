@@ -1,0 +1,408 @@
+diff --git a/go/def.bzl b/go/def.bzl
+index 9b3719fe..0b6bd321 100755
+--- a/go/def.bzl
++++ b/go/def.bzl
+@@ -220,4 +220,4 @@ def go_wrap_sdk(**_kwargs):
+ 
+ def _moved(name):
+     fail(name + " has moved. Please load from " +
+-         " @io_bazel_rules_go//go:deps.bzl instead of def.bzl.")
++         " @rules_go//go:deps.bzl instead of def.bzl.")
+diff --git a/go/private/BUILD.sdk.bazel b/go/private/BUILD.sdk.bazel
+index 952b0111..a8219013 100755
+--- a/go/private/BUILD.sdk.bazel
++++ b/go/private/BUILD.sdk.bazel
+@@ -1,4 +1,4 @@
+-load("@io_bazel_rules_go//go/private:sdk_build_defs.bzl", "STDLIB_SRCS_EXCLUDE", "define_sdk_repository_targets")
++load("@rules_go//go/private:sdk_build_defs.bzl", "STDLIB_SRCS_EXCLUDE", "define_sdk_repository_targets")
+ 
+ package(default_visibility = ["//visibility:public"])
+ 
+diff --git a/go/private/common.bzl b/go/private/common.bzl
+index 83441838..1a98b793 100755
+--- a/go/private/common.bzl
++++ b/go/private/common.bzl
+@@ -12,7 +12,7 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-GO_TOOLCHAIN = "@io_bazel_rules_go//go:toolchain"
++GO_TOOLCHAIN = "@rules_go//go:toolchain"
+ GO_TOOLCHAIN_LABEL = Label(GO_TOOLCHAIN)
+ 
+ go_exts = [
+diff --git a/go/private/context.bzl b/go/private/context.bzl
+index 049b8ec0..7ecf4ea9 100755
+--- a/go/private/context.bzl
++++ b/go/private/context.bzl
+@@ -751,9 +751,9 @@ def go_context(
+ 
+ def _go_context_data_impl(ctx):
+     if "race" in ctx.features:
+-        print("WARNING: --features=race is no longer supported. Use --@io_bazel_rules_go//go/config:race instead.")
++        print("WARNING: --features=race is no longer supported. Use --@rules_go//go/config:race instead.")
+     if "msan" in ctx.features:
+-        print("WARNING: --features=msan is no longer supported. Use --@io_bazel_rules_go//go/config:msan instead.")
++        print("WARNING: --features=msan is no longer supported. Use --@rules_go//go/config:msan instead.")
+ 
+     return [
+         GoContextInfo(
+diff --git a/go/private/experimental/BUILD.bootstrap.sdk.bazel b/go/private/experimental/BUILD.bootstrap.sdk.bazel
+index 60241502..98c89360 100755
+--- a/go/private/experimental/BUILD.bootstrap.sdk.bazel
++++ b/go/private/experimental/BUILD.bootstrap.sdk.bazel
+@@ -1,5 +1,5 @@
+-load("@io_bazel_rules_go//go/private:experimental/bootstrap_rules.bzl", "experimental_bootstrap_go_sdk")
+-load("@io_bazel_rules_go//go/private:sdk_build_defs.bzl", "STDLIB_SRCS_EXCLUDE", "define_sdk_repository_targets")
++load("@rules_go//go/private:experimental/bootstrap_rules.bzl", "experimental_bootstrap_go_sdk")
++load("@rules_go//go/private:sdk_build_defs.bzl", "STDLIB_SRCS_EXCLUDE", "define_sdk_repository_targets")
+ 
+ package(default_visibility = ["//visibility:public"])
+ 
+diff --git a/go/private/go_toolchain.bzl b/go/private/go_toolchain.bzl
+index 8cbcadd8..73741a81 100755
+--- a/go/private/go_toolchain.bzl
++++ b/go/private/go_toolchain.bzl
+@@ -246,8 +246,8 @@ def declare_bazel_toolchains(
+             continue
+ 
+         cgo_constraints = (
+-            "@io_bazel_rules_go//go/toolchain:cgo_off",
+-            "@io_bazel_rules_go//go/toolchain:cgo_on",
++            "@rules_go//go/toolchain:cgo_off",
++            "@rules_go//go/toolchain:cgo_on",
+         )
+         constraints = [c for c in p.constraints if c not in cgo_constraints]
+ 
+@@ -256,8 +256,8 @@ def declare_bazel_toolchains(
+             name = prefix + "go_" + p.name,
+             toolchain_type = GO_TOOLCHAIN,
+             exec_compatible_with = [
+-                "@io_bazel_rules_go//go/toolchain:" + exec_goos,
+-                "@io_bazel_rules_go//go/toolchain:" + exec_goarch,
++                "@rules_go//go/toolchain:" + exec_goos,
++                "@rules_go//go/toolchain:" + exec_goarch,
+             ],
+             target_compatible_with = constraints,
+             target_settings = [
+diff --git a/go/private/mode.bzl b/go/private/mode.bzl
+index a95f5f83..71404852 100755
+--- a/go/private/mode.bzl
++++ b/go/private/mode.bzl
+@@ -67,7 +67,7 @@ def validate_mode(mode):
+             fail("msan instrumentation can't be enabled when cgo is disabled. Check that pure is not set to \"off\" and a C/C++ toolchain is configured.")
+         if mode.linkmode in LINKMODES_REQUIRING_EXTERNAL_LINKING and mode.goos != "wasip1":
+             fail(("linkmode '{}' can't be used when cgo is disabled. Check that pure is not set to \"off\" and that a C/C++ toolchain is configured for " +
+-                  "your current platform. If you defined a custom platform, make sure that it has the @io_bazel_rules_go//go/toolchain:cgo_on constraint value.").format(mode.linkmode))
++                  "your current platform. If you defined a custom platform, make sure that it has the @rules_go//go/toolchain:cgo_on constraint value.").format(mode.linkmode))
+ 
+ def installsuffix(mode):
+     s = mode.goos + "_" + mode.goarch
+diff --git a/go/private/nogo.bzl b/go/private/nogo.bzl
+index 3baf1174..f28cd9b9 100755
+--- a/go/private/nogo.bzl
++++ b/go/private/nogo.bzl
+@@ -12,7 +12,7 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-DEFAULT_NOGO = "@io_bazel_rules_go//:default_nogo"
++DEFAULT_NOGO = "@rules_go//:default_nogo"
+ NOGO_DEFAULT_INCLUDES = ["@@//:__subpackages__"]
+ NOGO_DEFAULT_EXCLUDES = []
+ 
+diff --git a/go/private/platforms.bzl b/go/private/platforms.bzl
+index 57a26803..55bc9ca4 100755
+--- a/go/private/platforms.bzl
++++ b/go/private/platforms.bzl
+@@ -156,7 +156,7 @@ CGO_GOOS_GOARCH = {
+ 
+ def _generate_constraints(names, bazel_constraints):
+     return {
+-        name: bazel_constraints.get(name, "@io_bazel_rules_go//go/toolchain:" + name)
++        name: bazel_constraints.get(name, "@rules_go//go/toolchain:" + name)
+         for name in names
+     }
+ 
+@@ -174,7 +174,7 @@ def _generate_platforms():
+             name = goos + "_" + goarch,
+             goos = goos,
+             goarch = goarch,
+-            constraints = constraints + ["@io_bazel_rules_go//go/toolchain:cgo_off"],
++            constraints = constraints + ["@rules_go//go/toolchain:cgo_off"],
+             cgo = False,
+         ))
+         if (goos, goarch) in CGO_GOOS_GOARCH:
+@@ -185,7 +185,7 @@ def _generate_platforms():
+                 name = goos + "_" + goarch + "_cgo",
+                 goos = goos,
+                 goarch = goarch,
+-                constraints = constraints + ["@io_bazel_rules_go//go/toolchain:cgo_on"] + mingw,
++                constraints = constraints + ["@rules_go//go/toolchain:cgo_on"] + mingw,
+                 cgo = True,
+             ))
+ 
+diff --git a/go/private/repositories.bzl b/go/private/repositories.bzl
+index 865c41fd..4a75db7c 100755
+--- a/go/private/repositories.bzl
++++ b/go/private/repositories.bzl
+@@ -364,9 +364,16 @@ _go_host_compatible_s_d_k_label = repository_rule(
+     },
+ )
+ 
++def _with_rules_go_repo_mapping(kwargs):
++    kwargs = dict(kwargs)
++    repo_mapping = dict(kwargs.pop("repo_mapping", {}))
++    repo_mapping["@io_bazel_rules_go"] = "@rules_go"
++    kwargs["repo_mapping"] = repo_mapping
++    return kwargs
++
+ def _maybe(repo_rule, name, **kwargs):
+     if name not in native.existing_rules():
+-        repo_rule(name = name, **kwargs)
++        repo_rule(name = name, **_with_rules_go_repo_mapping(kwargs))
+ 
+ def _always(repo_rule, name, **kwargs):
+-    repo_rule(name = name, **kwargs)
++    repo_rule(name = name, **_with_rules_go_repo_mapping(kwargs))
+diff --git a/go/private/rules/binary.bzl b/go/private/rules/binary.bzl
+index 3bea8597..bb591d43 100755
+--- a/go/private/rules/binary.bzl
++++ b/go/private/rules/binary.bzl
+@@ -397,7 +397,7 @@ def _go_binary_kwargs(go_cc_aspects = []):
+                 or `auto`. If `auto`, pure mode is enabled when no C/C++
+                 toolchain is configured or when cross-compiling. It's usually better to
+                 control this on the command line with
+-                `--@io_bazel_rules_go//go/config:pure`. See [mode attributes], specifically
++                `--@rules_go//go/config:pure`. See [mode attributes], specifically
+                 [pure].
+                 """,
+             ),
+@@ -406,7 +406,7 @@ def _go_binary_kwargs(go_cc_aspects = []):
+                 doc = """Controls whether a binary is statically linked. May be one of `on`,
+                 `off`, or `auto`. Not available on all platforms or in all
+                 modes. It's usually better to control this on the command line with
+-                `--@io_bazel_rules_go//go/config:static`. See [mode attributes],
++                `--@rules_go//go/config:static`. See [mode attributes],
+                 specifically [static].
+                 """,
+             ),
+@@ -415,7 +415,7 @@ def _go_binary_kwargs(go_cc_aspects = []):
+                 doc = """Controls whether code is instrumented for race detection. May be one of
+                 `on`, `off`, or `auto`. Not available when cgo is
+                 disabled. In most cases, it's better to control this on the command line with
+-                `--@io_bazel_rules_go//go/config:race`. See [mode attributes], specifically
++                `--@rules_go//go/config:race`. See [mode attributes], specifically
+                 [race].
+                 """,
+             ),
+@@ -424,7 +424,7 @@ def _go_binary_kwargs(go_cc_aspects = []):
+                 doc = """Controls whether code is instrumented for memory sanitization. May be one of
+                 `on`, `off`, or `auto`. Not available when cgo is
+                 disabled. In most cases, it's better to control this on the command line with
+-                `--@io_bazel_rules_go//go/config:msan`. See [mode attributes], specifically
++                `--@rules_go//go/config:msan`. See [mode attributes], specifically
+                 [msan].
+                 """,
+             ),
+@@ -474,7 +474,7 @@ def _go_binary_kwargs(go_cc_aspects = []):
+             "pgoprofile": attr.label(
+                 allow_files = True,
+                 doc = """Provides a pprof file to be used for profile guided optimization when compiling go targets.
+-                A pprof file can also be provided via `--@io_bazel_rules_go//go/config:pgoprofile=<label of a pprof file>`.
++                A pprof file can also be provided via `--@rules_go//go/config:pgoprofile=<label of a pprof file>`.
+                 Profile guided optimization is only supported on go 1.20+.
+                 See https://go.dev/doc/pgo for more information.
+                 """,
+diff --git a/go/private/rules/cross.bzl b/go/private/rules/cross.bzl
+index d21b0d27..53533ea8 100755
+--- a/go/private/rules/cross.bzl
++++ b/go/private/rules/cross.bzl
+@@ -113,7 +113,7 @@ _go_cross_kwargs = {
+             matches the specified version will be used for compiling the given
+             `target`. If unspecified, the `target` will be compiled with the same
+             SDK as it would've with the original `go_binary` rule.
+-            Transitions `target` by changing the `--@io_bazel_rules_go//go/toolchain:sdk_version`
++            Transitions `target` by changing the `--@rules_go//go/toolchain:sdk_version`
+             build flag to the value provided for `sdk_version` here.
+             """,
+         ),
+diff --git a/go/private/rules/test.bzl b/go/private/rules/test.bzl
+index d65b5ca2..f6b7f367 100755
+--- a/go/private/rules/test.bzl
++++ b/go/private/rules/test.bzl
+@@ -403,7 +403,7 @@ _go_test_kwargs = {
+             or `auto`. If `auto`, pure mode is enabled when no C/C++
+             toolchain is configured or when cross-compiling. It's usually better to
+             control this on the command line with
+-            `--@io_bazel_rules_go//go/config:pure`. See [mode attributes], specifically
++            `--@rules_go//go/config:pure`. See [mode attributes], specifically
+             [pure].
+             """,
+         ),
+@@ -412,7 +412,7 @@ _go_test_kwargs = {
+             doc = """Controls whether a binary is statically linked. May be one of `on`,
+             `off`, or `auto`. Not available on all platforms or in all
+             modes. It's usually better to control this on the command line with
+-            `--@io_bazel_rules_go//go/config:static`. See [mode attributes],
++            `--@rules_go//go/config:static`. See [mode attributes],
+             specifically [static].
+             """,
+         ),
+@@ -421,7 +421,7 @@ _go_test_kwargs = {
+             doc = """Controls whether code is instrumented for race detection. May be one of
+             `on`, `off`, or `auto`. Not available when cgo is
+             disabled. In most cases, it's better to control this on the command line with
+-            `--@io_bazel_rules_go//go/config:race`. See [mode attributes], specifically
++            `--@rules_go//go/config:race`. See [mode attributes], specifically
+             [race].
+             """,
+         ),
+@@ -430,7 +430,7 @@ _go_test_kwargs = {
+             doc = """Controls whether code is instrumented for memory sanitization. May be one of
+             `on`, `off`, or `auto`. Not available when cgo is
+             disabled. In most cases, it's better to control this on the command line with
+-            `--@io_bazel_rules_go//go/config:msan`. See [mode attributes], specifically
++            `--@rules_go//go/config:msan`. See [mode attributes], specifically
+             [msan].
+             """,
+         ),
+diff --git a/go/private/rules/transition.bzl b/go/private/rules/transition.bzl
+index 809ede69..8f0e78d4 100755
+--- a/go/private/rules/transition.bzl
++++ b/go/private/rules/transition.bzl
+@@ -102,7 +102,7 @@ def _go_transition_impl(settings, attr):
+             fail("invalid goos, goarch pair: {}, {}".format(goos, goarch))
+         if cgo and (goos, goarch) not in CGO_GOOS_GOARCH:
+             fail('pure is "off" but cgo is not supported on {} {}'.format(goos, goarch))
+-        platform = "@io_bazel_rules_go//go/toolchain:{}_{}{}".format(goos, goarch, "_cgo" if cgo else "")
++        platform = "@rules_go//go/toolchain:{}_{}{}".format(goos, goarch, "_cgo" if cgo else "")
+         settings["//command_line_option:platforms"] = platform
+ 
+     tags = getattr(attr, "gotags", [])
+diff --git a/go/private/sdk.bzl b/go/private/sdk.bzl
+index 087b0b42..14db1be3 100755
+--- a/go/private/sdk.bzl
++++ b/go/private/sdk.bzl
+@@ -260,7 +260,7 @@ def go_toolchains_build_file_content(
+         fail("all lists must have the same length")
+ 
+     loads = [
+-        """load("@io_bazel_rules_go//go/private:go_toolchain.bzl", "declare_bazel_toolchains")""",
++        """load("@rules_go//go/private:go_toolchain.bzl", "declare_bazel_toolchains")""",
+     ]
+     chunks = [
+         """package(default_visibility = ["//visibility:public"])""",
+diff --git a/go/private/sdk_build_defs.bzl b/go/private/sdk_build_defs.bzl
+index beee5796..ee4b0c5a 100755
+--- a/go/private/sdk_build_defs.bzl
++++ b/go/private/sdk_build_defs.bzl
+@@ -12,12 +12,12 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-load("@io_bazel_rules_go//go:def.bzl", "go_sdk")
+-load("@io_bazel_rules_go//go/private:common.bzl", "RULES_GO_STDLIB_PREFIX")
+-load("@io_bazel_rules_go//go/private:go_toolchain.bzl", "declare_go_toolchains")
+-load("@io_bazel_rules_go//go/private/rules:binary.bzl", "go_tool_binary")
+-load("@io_bazel_rules_go//go/private/rules:sdk.bzl", "package_list")
+-load("@io_bazel_rules_go//go/private/rules:transition.bzl", "non_go_reset_target")
++load("@rules_go//go:def.bzl", "go_sdk")
++load("@rules_go//go/private:common.bzl", "RULES_GO_STDLIB_PREFIX")
++load("@rules_go//go/private:go_toolchain.bzl", "declare_go_toolchains")
++load("@rules_go//go/private/rules:binary.bzl", "go_tool_binary")
++load("@rules_go//go/private/rules:sdk.bzl", "package_list")
++load("@rules_go//go/private/rules:transition.bzl", "non_go_reset_target")
+ 
+ STDLIB_SRCS_EXCLUDE = [
+     "src/**/*_test.go",
+@@ -64,7 +64,7 @@ def define_sdk_repository_targets(
+ 
+     go_tool_binary(
+         name = "builder",
+-        srcs = ["@io_bazel_rules_go//go/tools/builders:builder_srcs"],
++        srcs = ["@rules_go//go/tools/builders:builder_srcs"],
+         exec_compatible_with = exec_compatible_with,
+         ldflags = "-X main.rulesGoStdlibPrefix={}".format(RULES_GO_STDLIB_PREFIX),
+         # The .exe suffix is required on Windows and harmless on other platforms.
+diff --git a/go/private/tools/files_equal_test.bzl b/go/private/tools/files_equal_test.bzl
+index 0e716829..ffac94ba 100755
+--- a/go/private/tools/files_equal_test.bzl
++++ b/go/private/tools/files_equal_test.bzl
+@@ -33,7 +33,7 @@ def files_equal_test(name, golden, actual, error_message = None, **kwargs):
+         visibility = ["//visibility:private"],
+         cmd = r"""cat >$@ <<'eof'
+ #!/usr/bin/env bash
+-# sh_test() source, generated by @io_bazel_rules_go//go/private/tools/files_equal_test.bzl
++# sh_test() source, generated by @rules_go//go/private/tools/files_equal_test.bzl
+ 
+ ### 1. initialize the Bash runfiles library
+ 
+diff --git a/go/runfiles/BUILD.bazel b/go/runfiles/BUILD.bazel
+index 58e3b9bf..632df966 100755
+--- a/go/runfiles/BUILD.bazel
++++ b/go/runfiles/BUILD.bazel
+@@ -12,7 +12,7 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
++load("@rules_go//go:def.bzl", "go_library", "go_test")
+ 
+ go_library(
+     name = "runfiles",
+diff --git a/go/toolchain/toolchains.bzl b/go/toolchain/toolchains.bzl
+index b4e070cf..6a342da7 100755
+--- a/go/toolchain/toolchains.bzl
++++ b/go/toolchain/toolchains.bzl
+@@ -34,7 +34,7 @@ def declare_constraints():
+     @bazel_tools//platforms:default_platform will be used most of the time).
+     """
+     for goos, constraint in GOOS_CONSTRAINTS.items():
+-        if constraint.startswith("@io_bazel_rules_go//go/toolchain:"):
++        if constraint.startswith("@rules_go//go/toolchain:"):
+             native.constraint_value(
+                 name = goos,
+                 constraint_setting = "@platforms//os:os",
+@@ -46,7 +46,7 @@ def declare_constraints():
+             )
+ 
+     for goarch, constraint in GOARCH_CONSTRAINTS.items():
+-        if constraint.startswith("@io_bazel_rules_go//go/toolchain:"):
++        if constraint.startswith("@rules_go//go/toolchain:"):
+             native.constraint_value(
+                 name = goarch,
+                 constraint_setting = "@platforms//cpu:cpu",
+diff --git a/go/tools/builders/BUILD.bazel b/go/tools/builders/BUILD.bazel
+index ae68ab5d..ebfcb7c4 100755
+--- a/go/tools/builders/BUILD.bazel
++++ b/go/tools/builders/BUILD.bazel
+@@ -148,7 +148,7 @@ go_source(
+     ],
+     # //go/tools/builders:nogo_srcs is considered a different target by
+     # Bazel's visibility check than
+-    # @io_bazel_rules_go//go/tools/builders:nogo_srcs. Only the latter is
++    # @rules_go//go/tools/builders:nogo_srcs. Only the latter is
+     # allowed to depend on
+     # @org_golang_x_tools//go/analysis/internal/facts:go_tool_library.
+     tags = ["manual"],
+diff --git a/go/tools/gopackagesdriver/pkgjson/BUILD.bazel b/go/tools/gopackagesdriver/pkgjson/BUILD.bazel
+index cbd012b1..8ee41696 100755
+--- a/go/tools/gopackagesdriver/pkgjson/BUILD.bazel
++++ b/go/tools/gopackagesdriver/pkgjson/BUILD.bazel
+@@ -1,4 +1,4 @@
+-load("@io_bazel_rules_go//go/private/rules:transition.bzl", "go_reset_target")
++load("@rules_go//go/private/rules:transition.bzl", "go_reset_target")
+ load("//go:def.bzl", "go_binary", "go_library")
+ 
+ filegroup(
+diff --git a/go/tools/internal/stdlib_tags/BUILD.bazel b/go/tools/internal/stdlib_tags/BUILD.bazel
+index 37b8f2a4..f0e68786 100755
+--- a/go/tools/internal/stdlib_tags/BUILD.bazel
++++ b/go/tools/internal/stdlib_tags/BUILD.bazel
+@@ -1,4 +1,4 @@
+-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
++load("@rules_go//go:def.bzl", "go_binary", "go_library")
+ 
+ go_library(
+     name = "stdlib_tags_lib",
