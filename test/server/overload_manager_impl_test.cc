@@ -826,6 +826,69 @@ TEST_F(OverloadManagerImplTest, ShrinkHeapWithoutTypedConfig) {
   EXPECT_FALSE(config_opt.has_value());
 }
 
+TEST_F(OverloadManagerImplTest, ShutdownWithTypedConfig) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "envoy.overload_actions.shutdown"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ShutdownConfig
+          saturation_duration: 300s
+          max_jitter: 60s
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager(createOverloadManager(config));
+  auto config_opt = manager->getShutdownConfig();
+  ASSERT_TRUE(config_opt.has_value());
+  EXPECT_EQ(config_opt->saturation_duration().seconds(), 300);
+  EXPECT_EQ(config_opt->max_jitter().seconds(), 60);
+}
+
+TEST_F(OverloadManagerImplTest, ShutdownWithoutTypedConfig) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "envoy.overload_actions.shutdown"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          ".* requires a ShutdownConfig typed_config.");
+}
+
+TEST_F(OverloadManagerImplTest, ShutdownWithoutSaturationDuration) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "envoy.overload_actions.shutdown"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ShutdownConfig
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "SaturationDuration: value is required");
+}
+
 TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithoutAction) {
   const std::string config = R"EOF(
     actions:

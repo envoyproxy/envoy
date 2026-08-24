@@ -40,6 +40,8 @@ public:
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(std::optional<envoy::config::overload::v3::ShrinkHeapConfig>, getShrinkHeapConfig, (),
               (const, override));
+  MOCK_METHOD(std::optional<envoy::config::overload::v3::ShutdownConfig>, getShutdownConfig, (),
+              (const, override));
 
   testing::NiceMock<MockThreadLocalOverloadState> overload_state_;
 };

@@ -48,6 +48,7 @@
 
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
+#include "source/server/overload_shutdown.h"
 #include "source/server/worker_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -428,6 +429,7 @@ private:
   std::unique_ptr<HdsDelegateApi> hds_delegate_;
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;
+  std::unique_ptr<OverloadShutdown> overload_shutdown_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
   std::unique_ptr<Http::HttpServerPropertiesCacheManager> http_server_properties_cache_manager_;
   Envoy::MutexTracer* mutex_tracer_;

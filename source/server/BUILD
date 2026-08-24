@@ -339,6 +339,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "overload_shutdown_lib",
+    srcs = ["overload_shutdown.cc"],
+    hdrs = ["overload_shutdown.h"],
+    deps = [
+        "//envoy/event:timer_interface",
+        "//envoy/server:drain_manager_interface",
+        "//envoy/server:instance_interface",
+        "//envoy/server/overload:overload_manager_interface",
+        "//envoy/stats:stats_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/stats:symbol_table_lib",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "factory_context_lib",
     srcs = ["factory_context_impl.cc"],
     hdrs = ["factory_context_impl.h"],
@@ -397,6 +414,7 @@ envoy_cc_library(
         ":configuration_lib",
         ":listener_hooks_lib",
         ":listener_manager_factory_lib",
+        ":overload_shutdown_lib",
         ":regex_engine_lib",
         ":utils_lib",
         ":worker_lib",

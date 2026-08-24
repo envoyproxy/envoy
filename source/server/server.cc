@@ -698,6 +698,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   null_overload_manager_ = createNullOverloadManager();
 
   maybeCreateHeapShrinker();
+  overload_shutdown_ =
+      std::make_unique<OverloadShutdown>(*this, *overload_manager_, *stats_store_.rootScope());
 
   for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
     auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
