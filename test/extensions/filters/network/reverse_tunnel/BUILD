@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
     "envoy_package",
 )
 load(
@@ -10,6 +11,11 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_cc_library(
+    name = "jwt_test_data_lib",
+    hdrs = ["jwt_test_data.h"],
+)
 
 envoy_extension_cc_test(
     name = "config_test",
@@ -32,12 +38,16 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.reverse_tunnel"],
     rbe_pool = "6gig",
     deps = [
+        ":jwt_test_data_lib",
+        "//source/common/jwt:jwt_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stream_info:uint64_accessor_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
+        "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//source/extensions/filters/network/reverse_tunnel:reverse_tunnel_filter_lib",
         "//test/common/tls:mock_ssl_handshaker_lib",
+        "//test/extensions/filters/http/common:mock_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/reverse_tunnel_reporting_service:reporter_mocks",
@@ -49,6 +59,8 @@ envoy_extension_cc_test(
         "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/common/jwks/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/reverse_tunnel/v3:pkg_cc_proto",
     ],
 )
@@ -70,6 +82,7 @@ envoy_extension_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        ":jwt_test_data_lib",
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
@@ -84,6 +97,7 @@ envoy_extension_cc_test(
         "//test/common/http/http2:http2_frame",
         "//test/integration:integration_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",

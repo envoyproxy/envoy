@@ -250,6 +250,7 @@ envoy_cc_library(
         "//envoy/config:typed_config_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
+        "//envoy/init:manager_interface",
         "//envoy/server:transport_socket_config_interface",
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/singleton:manager_interface",

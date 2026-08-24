@@ -24,25 +24,49 @@ FilterConfigImpl::FilterConfigImpl(
 
   ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
 
+  // claim_name and claim_path are two ways of naming the same thing, so requiring exactly one
+  // avoids having to define a precedence between them. PGV cannot express this constraint. This
+  // check runs before JwksCache::create() so that the cache never resolves a claim path for an
+  // entry which is about to be rejected.
+  for (const auto& provider_pair : proto_config_.providers()) {
+    for (const auto& claim_to_header : std::get<1>(provider_pair).claim_to_headers()) {
+      if (claim_to_header.claim_name().empty() == claim_to_header.claim_path().empty()) {
+        creation_status = absl::InvalidArgumentError(
+            fmt::format("Provider '{}' has a claim_to_headers entry for header '{}' which does "
+                        "not set exactly one of claim_name and claim_path",
+                        std::get<0>(provider_pair), claim_to_header.header_name()));
+        return;
+      }
+    }
+  }
+
   auto jwks_cache_or =
       JwksCache::create(proto_config_, context, Common::JwksFetcher::create, stats_);
   SET_AND_RETURN_IF_NOT_OK(jwks_cache_or.status(), creation_status);
   jwks_cache_ = std::move(jwks_cache_or.value());
 
-  // Validate provider URIs.
-  // Note that the PGV well-known regex for URI is not implemented in C++, otherwise we could add a
-  // PGV rule instead of doing this check manually.
+  // Validate the provider URI, which the PGV annotations cannot express either: the PGV well-known
+  // regex for URI is not implemented in C++, otherwise we could add a PGV rule instead of checking
+  // the URI manually.
+  JwtProviderList all_providers;
+  all_providers.reserve(proto_config_.providers().size());
   for (const auto& provider_pair : proto_config_.providers()) {
-    const auto provider_value = std::get<1>(provider_pair);
+    const auto& provider_value = provider_pair.second;
+    all_providers.push_back(&provider_value);
     if (provider_value.has_remote_jwks()) {
       absl::string_view provider_uri = provider_value.remote_jwks().http_uri().uri();
       Http::Utility::Url url;
       if (!url.initialize(provider_uri, /*is_connect=*/false)) {
         creation_status = absl::InvalidArgumentError(fmt::format(
-            "Provider '{}' has an invalid URI: '{}'", std::get<0>(provider_pair), provider_uri));
+            "Provider '{}' has an invalid URI: '{}'", provider_pair.first, provider_uri));
         return;
       }
     }
+  }
+  // Union of every provider's forward_payload_header and claim_to_headers names. Built once so
+  // Filter::decodeHeaders can sanitize before any verifier bypass path returns Continue.
+  if (!all_providers.empty()) {
+    header_sanitizer_ = Extractor::create(all_providers);
   }
 
   std::vector<std::string> names;

@@ -14,6 +14,7 @@
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
@@ -171,6 +172,15 @@ protected:
   Stats::TestUtil::TestStore store_;
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
+};
+
+class LegacyParserServerConnectionImpl : public Http1::ServerConnectionImpl {
+public:
+  using Http1::ServerConnectionImpl::ServerConnectionImpl;
+
+  void useLegacyParser() {
+    parser_ = std::make_unique<Http1::LegacyHttpParserImpl>(Http1::MessageType::Request, this);
+  }
 };
 
 class Http1ServerConnectionImplTest : public Http1CodecTestBase {
@@ -951,6 +961,43 @@ TEST_F(Http1ServerConnectionImplTest, Http10) {
   EXPECT_EQ(Protocol::Http10, codec_->protocol());
 }
 
+TEST_F(Http1ServerConnectionImplTest, ConnectWithoutAuthorityUsesHttp11WithLegacyParser) {
+  codec_settings_.accept_http_10_ = true;
+  auto legacy_codec = std::make_unique<LegacyParserServerConnectionImpl>(
+      connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+      max_request_headers_count_, headers_with_underscores_action_, overload_manager_);
+  legacy_codec->useLegacyParser();
+  codec_ = std::move(legacy_codec);
+
+  MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+  EXPECT_CALL(decoder,
+              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+
+  Buffer::OwnedImpl buffer("CONNECT  HTTP/1.1\r\n"
+                           "Host: foo.bar.com:80\r\n"
+                           "foo: bar\r\n"
+                           "baz: fuz\r\n"
+                           "\r\n");
+  const auto status = codec_->dispatch(buffer);
+
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ("http/1.1 protocol error: HPE_INVALID_VERSION", status.message());
+  EXPECT_EQ(Protocol::Http11, codec_->protocol());
+  EXPECT_EQ("http1.codec_error", response_encoder->getStream().responseDetails());
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+  response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "400"}}, true);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\n\r\n", output);
+}
+
 TEST_F(Http1ServerConnectionImplTest, Http10HostAdded) {
   codec_settings_.accept_http_10_ = true;
   codec_settings_.default_host_for_http_10_ = "example.com";
@@ -1330,6 +1377,37 @@ TEST_F(Http1ServerConnectionImplTest, AllowCustomMethod) {
   Buffer::OwnedImpl headers("host: example.com\r\nfoo: bar\r\n\r\n");
   status = codec_->dispatch(headers);
   EXPECT_OK(status);
+}
+
+// The QUERY method of RFC 10008 is accepted without `allow_custom_methods`, and its mandatory
+// request content is delivered to the decoder.
+TEST_F(Http1ServerConnectionImplTest, QueryMethodWithContentLength) {
+  initialize();
+
+  MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{{":authority", "example.com"},
+                                            {":path", "/search"},
+                                            {":method", "QUERY"},
+                                            {"content-type", "application/sql"},
+                                            {"content-length", "9"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+
+  Buffer::OwnedImpl expected_data1("SELECT 1;");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data1), false));
+
+  Buffer::OwnedImpl expected_data2;
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), true));
+
+  Buffer::OwnedImpl buffer("QUERY /search HTTP/1.1\r\nhost: example.com\r\n"
+                           "content-type: application/sql\r\ncontent-length: 9\r\n\r\nSELECT 1;");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_OK(status);
+  EXPECT_EQ(0U, buffer.length());
 }
 
 TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {

@@ -358,7 +358,7 @@ uint16_t ConnectionInfoImplBase::ciphersuiteId() const {
   return static_cast<uint16_t>(SSL_CIPHER_get_id(cipher));
 }
 
-std::string ConnectionInfoImplBase::ciphersuiteString() const {
+absl::string_view ConnectionInfoImplBase::ciphersuiteString() const {
   const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl());
   if (cipher == nullptr) {
     return {};
@@ -523,7 +523,7 @@ const std::string& ConnectionInfoImplBase::sessionId() const {
 
     unsigned int session_id_length = 0;
     const uint8_t* session_id = SSL_SESSION_get_id(session, &session_id_length);
-    return Hex::encode(absl::Span(session_id, session_id_length));
+    return Hex::encode(absl::Span<const uint8_t>(session_id, session_id_length));
   });
 }
 

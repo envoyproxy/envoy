@@ -19,6 +19,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -514,9 +516,9 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
   span->injectContext(request_headers, Tracing::UpstreamContext());
   auto header = request_headers.get(xRayTraceHeader().key());
   ASSERT_FALSE(!header.has_value());
-  EXPECT_NE(header.value().find("Root="), absl::string_view::npos);
-  EXPECT_NE(header.value().find("Parent="), absl::string_view::npos);
-  EXPECT_NE(header.value().find("Sampled=1"), absl::string_view::npos);
+  EXPECT_THAT(header.value(), HasSubstr("Root="));
+  EXPECT_THAT(header.value(), HasSubstr("Parent="));
+  EXPECT_THAT(header.value(), HasSubstr("Sampled=1"));
 }
 
 TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
@@ -532,9 +534,9 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
   span->injectContext(request_headers, Tracing::UpstreamContext());
   auto header = request_headers.get(xRayTraceHeader().key());
   ASSERT_FALSE(!header.has_value());
-  EXPECT_NE(header.value().find("Root="), absl::string_view::npos);
-  EXPECT_NE(header.value().find("Parent="), absl::string_view::npos);
-  EXPECT_NE(header.value().find("Sampled=0"), absl::string_view::npos);
+  EXPECT_THAT(header.value(), HasSubstr("Root="));
+  EXPECT_THAT(header.value(), HasSubstr("Parent="));
+  EXPECT_THAT(header.value(), HasSubstr("Sampled=0"));
 }
 
 TEST_F(XRayTracerTest, TraceIDFormatTest) {

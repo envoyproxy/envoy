@@ -100,6 +100,7 @@ envoy_extension_cc_test_binary(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
+        "//bazel:cpp_runfiles",
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
