@@ -2,7 +2,6 @@
 
 #include <cstdint>
 
-#include "envoy/common/exception.h"
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 
 #include "source/common/http/header_utility.h"
