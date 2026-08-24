@@ -64,9 +64,6 @@ public:
   virtual void onEndStream() PURE;
 
   const TokenUsage& usage() const { return usage_; }
-  // Surrenders the accumulator (avoids copying it out for publication);
-  // call only after onEndStream(), and at most once.
-  TokenUsage takeUsage() { return std::move(usage_); }
   bool parsingComplete() const { return parsing_complete_; }
   // Extraction lost input this stream; accumulated usage may be stale or
   // incomplete and publishes as `extraction_status: partial`.
@@ -121,8 +118,10 @@ private:
 
   // Line-state for the incremental event-boundary scanner. An SSE event ends
   // at a blank line; lines terminate with LF, CR, or CRLF.
-  // TODO(botengyao): extract this SSE event decoder to source/common/http/sse
-  // so it can be shared (e.g. with sse_to_metadata).
+  // TODO(botengyao): this bounded incremental decoder belongs in
+  // source/common/http/sse next to SseParser, shared with sse_to_metadata, so
+  // SSE framing semantics (CR/LF, BOM, EOF) have a single owner; coordinate
+  // with HTTP maintainers before extracting it.
   enum class ScanState {
     LineStart,   // At the start of a line; nothing on it yet.
     LineContent, // The current line has at least one content byte.

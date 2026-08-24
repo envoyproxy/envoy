@@ -125,14 +125,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "payload_view_lib",
-    hdrs = ["payload_view.h"],
-    deps = [
-        ":token_usage_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "response_handler_lib",
     srcs = ["response_handler.cc"],
     hdrs = ["response_handler.h"],
@@ -173,7 +165,6 @@ envoy_cc_library(
         ":filter_chain_bridge_lib",
         ":json_with_ext_buf_lib",
         ":json_with_ext_buf_parser_lib",
-        ":payload_view_lib",
         ":response_handler_lib",
         ":schema_lib",
         "//envoy/http:codes_interface",

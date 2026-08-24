@@ -12,7 +12,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
-#include "source/extensions/filters/http/ai_protocol_manager/payload_view.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include "absl/strings/match.h"
@@ -75,13 +74,12 @@ envoy::type::ai::v3::ApiProtocol typedApiProtocol(ApiProtocol protocol) {
   return envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED;
 }
 
-// Converts a completed response's view once into the authoritative typed
+// Converts the finalized accumulator once into the authoritative typed
 // record (envoy.data.ai.v3.TokenUsage). A record with no counts at all is
 // status-only and publishes as FAILED.
-envoy::data::ai::v3::TokenUsage typedUsage(const ResponsePayloadView& view) {
-  const TokenUsage& usage = view.usage();
+envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degraded) {
   envoy::data::ai::v3::TokenUsage typed;
-  typed.set_api_protocol(typedApiProtocol(view.protocol()));
+  typed.set_api_protocol(typedApiProtocol(usage.api_protocol));
   if (!usage.model.empty()) {
     typed.set_model(usage.model);
   }
@@ -110,8 +108,8 @@ envoy::data::ai::v3::TokenUsage typedUsage(const ResponsePayloadView& view) {
   if (!usage.hasAny()) {
     typed.set_extraction_status(envoy::data::ai::v3::TokenUsage::FAILED);
   } else {
-    typed.set_extraction_status(view.degraded() ? envoy::data::ai::v3::TokenUsage::PARTIAL
-                                                : envoy::data::ai::v3::TokenUsage::COMPLETE);
+    typed.set_extraction_status(degraded ? envoy::data::ai::v3::TokenUsage::PARTIAL
+                                         : envoy::data::ai::v3::TokenUsage::COMPLETE);
   }
   return typed;
 }
@@ -256,10 +254,10 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
     if (isAiEndpoint()) {
       // TODO(penguingao): Support validating payload schema on the fly as the Wuffs parser
       // streams and parses chunks, rejecting invalid fields early before end_stream.
-      const RequestPayloadView view(route_request_protocol_, request_json_);
-      if (const PayloadSchema* payload_schema = view.adapter().schema();
+      if (const PayloadSchema* payload_schema =
+              AdapterRegistry::get(route_request_protocol_).schema();
           payload_schema != nullptr) {
-        const absl::Status validation_status = payload_schema->validateRequest(view.document());
+        const absl::Status validation_status = payload_schema->validateRequest(request_json_);
         if (!validation_status.ok()) {
           rejectInvalidPayload(validation_status);
           return false;
@@ -471,9 +469,7 @@ Http::FilterTrailersStatus AiProtocolManagerFilter::encodeTrailers(Http::Respons
 void AiProtocolManagerFilter::finalizeResponseHandling() {
   response_finalized_ = true;
 
-  // Take (not copy) the accumulator: the handler is done, and publication is
-  // the accumulation's last reader.
-  TokenUsage usage = response_handler_->takeUsage();
+  TokenUsage usage = response_handler_->usage();
   finalizeUsage(usage);
   const bool degraded = response_handler_->degraded() || usage.canonicalizationOverflow();
   if (!usage.hasAny() && !degraded) {
@@ -509,8 +505,7 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
   // over the parsed payload) lands. The filter core then only orchestrates
   // transport, and publication becomes an ordered, configurable chain entry
   // like any other payload feature.
-  const ResponsePayloadView view(usage, degraded);
-  const envoy::data::ai::v3::TokenUsage typed = typedUsage(view);
+  const envoy::data::ai::v3::TokenUsage typed = typedUsage(usage, degraded);
   // In both roles streamInfo() resolves to the downstream request's
   // StreamInfo. Under retries/hedging only the router-selected attempt
   // streams to a clean end of stream, so only the winner reaches this write.
