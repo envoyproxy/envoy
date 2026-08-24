@@ -70,6 +70,10 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Upstream {
 
@@ -4673,9 +4677,7 @@ TEST(PrioritySet, BatchUpdateMemberCallbackFiresOnce) {
 
   auto member_update_cb = priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) {
     member_cb_count++;
-    EXPECT_EQ(2, dirty_priorities.size());
-    EXPECT_TRUE(dirty_priorities.contains(0));
-    EXPECT_TRUE(dirty_priorities.contains(1));
+    EXPECT_THAT(dirty_priorities, UnorderedElementsAre(0, 1));
     dirty_priorities.clear();
   });
 
@@ -5908,7 +5910,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
       []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::Struct>(); },
       [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
         const auto& msg_struct = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(msg);
-        EXPECT_TRUE(msg_struct.fields().contains("option"));
+        EXPECT_THAT(msg_struct.fields(), Contains(Key("option")));
 
         return protocol_options;
       });

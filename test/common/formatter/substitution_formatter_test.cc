@@ -38,8 +38,12 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::Key;
 
 namespace Envoy {
 namespace Formatter {
@@ -47,6 +51,8 @@ namespace {
 
 using ::Envoy::StatusHelpers::IsOk;
 using StatusHelpers::HasStatus;
+using StatusHelpers::HasStatusCode;
+using testing::AnyOf;
 using testing::Const;
 using testing::ContainsRegex;
 using testing::HasSubstr;
@@ -61,18 +67,32 @@ using testing::StartsWith;
 // Helper class to test StreamInfoFormatter.
 class StreamInfoFormatter : public FormatterProvider {
 public:
+  // This constructor expects well formed format.
   StreamInfoFormatter(const std::string& command, const std::string& sub_command = "",
                       std::optional<size_t> max_length = std::nullopt) {
     DefaultBuiltInStreamInfoCommandParserFactory factory;
     auto parser = factory.createCommandParser();
     auto formatter_or = parser->parse(command, sub_command, max_length);
-    if (!formatter_or.ok()) {
-      throwEnvoyExceptionOrPanic(std::string(formatter_or.status().message()));
-    }
+    ASSERT(formatter_or.ok(), std::string(formatter_or.status().message()));
     formatter_ = std::move(formatter_or).value();
-    if (formatter_ == nullptr) {
-      throwEnvoyExceptionOrPanic(fmt::format("Not supported command in StreamInfo: {}", command));
+    ASSERT(formatter_ != nullptr, fmt::format("Not supported command in StreamInfo: {}", command));
+  }
+
+  explicit StreamInfoFormatter(FormatterProviderPtr formatter) : formatter_(std::move(formatter)) {}
+
+  // Factory method is for testing cases with malformed format.
+  static absl::StatusOr<StreamInfoFormatter>
+  create(const std::string& command, const std::string& sub_command = "",
+         std::optional<size_t> max_length = std::nullopt) {
+    DefaultBuiltInStreamInfoCommandParserFactory factory;
+    auto parser = factory.createCommandParser();
+    auto formatter = parser->parse(command, sub_command, max_length);
+    RETURN_IF_NOT_OK(formatter.status());
+    if (*formatter == nullptr) {
+      return absl::InvalidArgumentError(
+          fmt::format("Not supported command in StreamInfo: {}", command));
     }
+    return StreamInfoFormatter(std::move(*formatter));
   }
 
   // FormatterProvider
@@ -293,7 +313,8 @@ TEST(SubstitutionFormatterTest, inFlightDuration) {
 }
 
 TEST(SubstitutionFormatterTest, streamInfoFormatter) {
-  EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
+  EXPECT_THAT(StreamInfoFormatter::create("unknown_field"),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
 
   // Used to replace the default one in the upstream info.
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
@@ -1418,7 +1439,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
       StreamInfoFormatter format("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "24");
       auto result = format.format({}, stream_info);
       if (result.has_value()) {
-        EXPECT_TRUE(result.value().find('/') != std::string::npos);
+        EXPECT_THAT(result.value(), HasSubstr("/"));
       }
     }
   }
@@ -1430,8 +1451,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
       StreamInfoFormatter format("DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT", "16");
       auto result = format.format({}, stream_info);
       if (result.has_value()) {
-        EXPECT_TRUE(result.value().find("127.0.0.0/16") != std::string::npos ||
-                    result.value().find('/') != std::string::npos);
+        EXPECT_THAT(result.value(), AnyOf(HasSubstr("127.0.0.0/16"), HasSubstr("/")));
       }
     }
   }
@@ -1686,27 +1706,27 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        { StreamInfoFormatter upstream_format("COMMON_DURATION"); }, EnvoyException,
-        "COMMON_DURATION requires parameters");
+    EXPECT_THAT(
+        StreamInfoFormatter::create("COMMON_DURATION"),
+        HasStatus(absl::StatusCode::kInvalidArgument, "COMMON_DURATION requires parameters"));
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        { StreamInfoFormatter duration_format("COMMON_DURATION", "a"); }, EnvoyException,
-        "Invalid common duration configuration: a.");
+    EXPECT_THAT(
+        StreamInfoFormatter::create("COMMON_DURATION", "a"),
+        HasStatus(absl::StatusCode::kInvalidArgument, "Invalid common duration configuration: a."));
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        { StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:c:d"); }, EnvoyException,
-        "Invalid common duration configuration: a:b:c:d.");
+    EXPECT_THAT(StreamInfoFormatter::create("COMMON_DURATION", "a:b:c:d"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "Invalid common duration configuration: a:b:c:d."));
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        { StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:zs"); }, EnvoyException,
-        "Invalid common duration precision: zs.");
+    EXPECT_THAT(
+        StreamInfoFormatter::create("COMMON_DURATION", "a:b:zs"),
+        HasStatus(absl::StatusCode::kInvalidArgument, "Invalid common duration precision: zs."));
   }
 
   {
@@ -1903,7 +1923,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 }
 
 TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
-  EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
+  EXPECT_THAT(StreamInfoFormatter::create("unknown_field"),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -4845,7 +4866,7 @@ void verifyStructOutput(Protobuf::Struct output,
     EXPECT_EQ(output.fields().at(pair.first).string_value(), pair.second);
   }
   for (const auto& pair : output.fields()) {
-    EXPECT_TRUE(expected_map.contains(pair.first));
+    EXPECT_THAT(expected_map, Contains(Key(pair.first)));
   }
 }
 

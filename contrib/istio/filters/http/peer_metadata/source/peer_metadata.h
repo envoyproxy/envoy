@@ -164,17 +164,16 @@ private:
   Context ctx_;
 };
 
-class FilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+class FilterConfigFactory
+    : public Common::ExceptionFreeFactoryBase<io::istio::http::peer_metadata::Config> {
 public:
-  std::string name() const override { return "envoy.filters.http.peer_metadata"; }
+  FilterConfigFactory() : ExceptionFreeFactoryBase("envoy.filters.http.peer_metadata") {}
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<io::istio::http::peer_metadata::Config>();
-  }
-
+private:
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config, const std::string&,
-                               Server::Configuration::FactoryContext&) override;
+  createFilterFactoryFromProtoTyped(const io::istio::http::peer_metadata::Config& proto_config,
+                                    const std::string&,
+                                    Server::Configuration::FactoryContext&) override;
 };
 
 } // namespace PeerMetadata

@@ -11,13 +11,13 @@ namespace HttpFilters {
 namespace PeakEwma {
 
 class PeakEwmaFilterConfigFactory
-    : public Extensions::HttpFilters::Common::FactoryBase<
+    : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::peak_ewma::v3alpha::PeakEwmaConfig> {
 public:
-  PeakEwmaFilterConfigFactory() : FactoryBase("envoy.filters.http.peak_ewma") {}
+  PeakEwmaFilterConfigFactory() : ExceptionFreeFactoryBase("envoy.filters.http.peak_ewma") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::peak_ewma::v3alpha::PeakEwmaConfig& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

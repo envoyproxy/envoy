@@ -2,7 +2,12 @@
 
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Json {
@@ -67,7 +72,8 @@ TEST_F(JsonRpcFieldExtractorTest, ExtractFields) {
   EXPECT_EQ("method1", extractor.getMethod());
 
   const auto& fields = metadata.fields();
-  EXPECT_EQ(4, fields.size());
+  EXPECT_THAT(fields,
+              UnorderedElementsAre(Key("jsonrpc"), Key("method"), Key("params"), Key("id")));
   EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
   EXPECT_EQ("method1", fields.at("method").string_value());
   EXPECT_EQ(1, fields.at("id").number_value());
@@ -97,7 +103,8 @@ TEST_F(JsonRpcFieldExtractorTest, NestedField) {
   EXPECT_EQ("method2", extractor.getMethod());
 
   const auto& fields = metadata.fields();
-  EXPECT_EQ(4, fields.size());
+  EXPECT_THAT(fields,
+              UnorderedElementsAre(Key("jsonrpc"), Key("method"), Key("params"), Key("id")));
   EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
   EXPECT_EQ("method2", fields.at("method").string_value());
   EXPECT_EQ(2, fields.at("id").number_value());
@@ -130,7 +137,8 @@ TEST_F(JsonRpcFieldExtractorTest, ListFieldSupported) {
   EXPECT_EQ("method_list", extractor.getMethod());
 
   const auto& fields = metadata.fields();
-  EXPECT_EQ(4, fields.size());
+  EXPECT_THAT(fields,
+              UnorderedElementsAre(Key("jsonrpc"), Key("method"), Key("params"), Key("id")));
   EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
   EXPECT_EQ("method_list", fields.at("method").string_value());
   EXPECT_EQ(3, fields.at("id").number_value());
@@ -170,7 +178,8 @@ TEST_F(JsonRpcFieldExtractorTest, NestedListField) {
   EXPECT_EQ("method_list", extractor.getMethod());
 
   const auto& fields = metadata.fields();
-  EXPECT_EQ(4, fields.size());
+  EXPECT_THAT(fields,
+              UnorderedElementsAre(Key("jsonrpc"), Key("method"), Key("params"), Key("id")));
   EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
   EXPECT_EQ("method_list", fields.at("method").string_value());
   EXPECT_EQ(5, fields.at("id").number_value());
@@ -210,7 +219,8 @@ TEST_F(JsonRpcFieldExtractorTest, AllTypes) {
   EXPECT_EQ("method_types", extractor.getMethod());
 
   const auto& fields = metadata.fields();
-  EXPECT_EQ(4, fields.size());
+  EXPECT_THAT(fields,
+              UnorderedElementsAre(Key("jsonrpc"), Key("method"), Key("params"), Key("id")));
   EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
   EXPECT_EQ("method_types", fields.at("method").string_value());
   EXPECT_EQ(4, fields.at("id").number_value());
@@ -254,7 +264,7 @@ TEST_F(JsonRpcFieldExtractorTest, NoListSupport) {
   EXPECT_EQ("method_list", extractor.getMethod());
 
   const auto& fields = metadata.fields();
-  EXPECT_EQ(3, fields.size());
+  EXPECT_THAT(fields, UnorderedElementsAre(Key("jsonrpc"), Key("method"), Key("id")));
   EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
   EXPECT_EQ("method_list", fields.at("method").string_value());
   EXPECT_EQ(3, fields.at("id").number_value());
@@ -290,14 +300,14 @@ TEST_F(JsonRpcFieldExtractorTest, EarlyStop) {
   EXPECT_EQ("early_stop_method", extractor.getMethod());
 
   const auto& fields = metadata.fields();
-  EXPECT_EQ(4, fields.size());
+  EXPECT_THAT(fields,
+              UnorderedElementsAre(Key("jsonrpc"), Key("method"), Key("params"), Key("id")));
   EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
   EXPECT_EQ("early_stop_method", fields.at("method").string_value());
   EXPECT_EQ(6, fields.at("id").number_value());
   const auto& params = fields.at("params").struct_value().fields();
-  EXPECT_TRUE(params.contains("foo"));
+  EXPECT_THAT(params, Contains(Key("foo")));
   EXPECT_EQ("bar", params.at("foo").string_value());
-  EXPECT_FALSE(fields.contains("ignored_param"));
 }
 
 TEST_F(JsonRpcFieldExtractorTest, EarlyStopNotification) {
@@ -320,11 +330,9 @@ TEST_F(JsonRpcFieldExtractorTest, EarlyStopNotification) {
   EXPECT_EQ("notification", extractor.getMethod());
 
   const auto& fields = metadata.fields();
-  EXPECT_EQ(2, fields.size());
+  EXPECT_THAT(fields, UnorderedElementsAre(Key("jsonrpc"), Key("method")));
   EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
   EXPECT_EQ("notification", fields.at("method").string_value());
-  EXPECT_FALSE(fields.contains("id"));
-  EXPECT_FALSE(fields.contains("ignored_param"));
 }
 
 TEST_F(JsonRpcFieldExtractorTest, InvalidJsonRpcMissingVersion) {
@@ -368,14 +376,10 @@ TEST_F(JsonRpcFieldExtractorTest, ResponseWithResult) {
   extractor.finalizeExtraction();
 
   EXPECT_TRUE(extractor.isValidJsonRpc());
-  EXPECT_TRUE(metadata.fields().contains("result"));
   EXPECT_EQ("success", metadata.fields().at("result").string_value());
-  EXPECT_TRUE(metadata.fields().contains("id"));
   EXPECT_EQ(1, metadata.fields().at("id").number_value());
-  EXPECT_TRUE(metadata.fields().contains("jsonrpc"));
   EXPECT_EQ("2.0", metadata.fields().at("jsonrpc").string_value());
-  EXPECT_FALSE(metadata.fields().contains("error"));
-  EXPECT_FALSE(metadata.fields().contains("method"));
+  EXPECT_THAT(metadata.fields(), UnorderedElementsAre(Key("result"), Key("id"), Key("jsonrpc")));
 }
 
 TEST_F(JsonRpcFieldExtractorTest, ResponseWithError) {
@@ -394,18 +398,14 @@ TEST_F(JsonRpcFieldExtractorTest, ResponseWithError) {
   extractor.finalizeExtraction();
 
   EXPECT_TRUE(extractor.isValidJsonRpc());
-  EXPECT_FALSE(metadata.fields().contains("result"));
-  EXPECT_TRUE(metadata.fields().contains("error"));
+  EXPECT_THAT(metadata.fields(), UnorderedElementsAre(Key("error"), Key("id"), Key("jsonrpc")));
   EXPECT_TRUE(metadata.fields().at("error").has_struct_value());
   EXPECT_EQ(-32602,
             metadata.fields().at("error").struct_value().fields().at("code").number_value());
   EXPECT_EQ("Invalid parameters",
             metadata.fields().at("error").struct_value().fields().at("message").string_value());
-  EXPECT_TRUE(metadata.fields().contains("id"));
   EXPECT_EQ(1, metadata.fields().at("id").number_value());
-  EXPECT_TRUE(metadata.fields().contains("jsonrpc"));
   EXPECT_EQ("2.0", metadata.fields().at("jsonrpc").string_value());
-  EXPECT_FALSE(metadata.fields().contains("method"));
 }
 
 TEST_F(JsonRpcFieldExtractorTest, InvalidJsonRpcResponseMissingResultAndError) {

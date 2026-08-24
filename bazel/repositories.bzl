@@ -1,6 +1,7 @@
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load("@googleapis//:repository_rules.bzl", "switched_rules_by_language")
+load(":envoy_build_config.bzl", "default_envoy_build_config")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy.router.cluster_specifier_plugin.lua"]
@@ -60,18 +61,6 @@ def external_http_archive(name, **kwargs):
         locations = REPOSITORY_LOCATIONS,
         **kwargs
     )
-
-def _default_envoy_build_config_impl(ctx):
-    ctx.file("WORKSPACE", "")
-    ctx.file("BUILD.bazel", "")
-    ctx.symlink(ctx.attr.config, "extensions_build_config.bzl")
-
-default_envoy_build_config = repository_rule(
-    implementation = _default_envoy_build_config_impl,
-    attrs = {
-        "config": attr.label(default = "@envoy//source/extensions:extensions_build_config.bzl"),
-    },
-)
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
@@ -238,7 +227,11 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
     _proxy_wasm_cpp_host()
     _emsdk()
     _rules_fuzzing()
-    external_http_archive("proxy_wasm_rust_sdk")
+    external_http_archive(
+        name = "proxy-wasm-rust-sdk",
+        location_name = "proxy_wasm_rust_sdk",
+        repo_mapping = {"@proxy_wasm_rust_sdk": "@proxy-wasm-rust-sdk"},
+    )
     _cel_cpp()
     _perfetto()
     _rules_ruby()
@@ -866,23 +859,32 @@ def _re2():
 
 def _proxy_wasm_cpp_sdk():
     external_http_archive(
-        name = "proxy_wasm_cpp_sdk",
+        name = "proxy-wasm-cpp-sdk",
+        location_name = "proxy_wasm_cpp_sdk",
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:proxy_wasm_cpp_sdk.patch",
             "@envoy//bazel:proxy_wasm_cpp_sdk-protobuf-v35.patch",
         ],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@proxy_wasm_cpp_sdk": "@proxy-wasm-cpp-sdk",
+        },
     )
 
 def _proxy_wasm_cpp_host():
     external_http_archive(
-        name = "proxy_wasm_cpp_host",
+        name = "proxy-wasm-cpp-host",
+        location_name = "proxy_wasm_cpp_host",
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:proxy_wasm_cpp_host.patch",
         ],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@proxy_wasm_cpp_host": "@proxy-wasm-cpp-host",
+            "@proxy_wasm_cpp_sdk": "@proxy-wasm-cpp-sdk",
+        },
     )
 
 def _emsdk():
@@ -939,10 +941,13 @@ def _toolchains_llvm():
 def _wasmtime():
     external_http_archive(
         name = "wasmtime",
-        build_file = "@proxy_wasm_cpp_host//:bazel/external/wasmtime.BUILD",
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        build_file = "@proxy-wasm-cpp-host//:bazel/external/wasmtime.BUILD",
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@proxy_wasm_cpp_host": "@proxy-wasm-cpp-host",
+        },
         patches = [
-            "@proxy_wasm_cpp_host//:bazel/external/prefixed_wasmtime.patch",
+            "@proxy-wasm-cpp-host//:bazel/external/prefixed_wasmtime.patch",
         ],
         patch_args = ["-p1"],
     )

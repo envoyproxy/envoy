@@ -20,6 +20,8 @@
 
 using namespace std::chrono_literals;
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -423,7 +425,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenTlsClientAuthNoClientSecret) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             const std::string body = message->body().toString();
             EXPECT_EQ(std::string::npos, body.find("client_secret="));
-            EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
+            EXPECT_THAT(body, HasSubstr("client_id=client_id"));
             EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
             callbacks_.push_back(&cb);
             return &request_;
@@ -443,7 +445,7 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenTlsClientAuthNoClientSecret) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             const std::string body = message->body().toString();
             EXPECT_EQ(std::string::npos, body.find("client_secret="));
-            EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
+            EXPECT_THAT(body, HasSubstr("client_id=client_id"));
             EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
             callbacks_.push_back(&cb);
             return &request_;
@@ -613,11 +615,11 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenPrivateKeyJwtHasClientAssertion) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             const std::string body = message->body().toString();
             EXPECT_EQ(std::string::npos, body.find("client_secret="));
-            EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
-            EXPECT_NE(std::string::npos,
-                      body.find("client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-"
-                                "assertion-type%3Ajwt-bearer"));
-            EXPECT_NE(std::string::npos, body.find("client_assertion=test_jwt_assertion"));
+            EXPECT_THAT(body, HasSubstr("client_id=client_id"));
+            EXPECT_THAT(body,
+                        HasSubstr("client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-"
+                                  "assertion-type%3Ajwt-bearer"));
+            EXPECT_THAT(body, HasSubstr("client_assertion=test_jwt_assertion"));
             EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
             callbacks_.push_back(&cb);
             return &request_;
@@ -638,11 +640,11 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenPrivateKeyJwtHasClientAssertio
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             const std::string body = message->body().toString();
             EXPECT_EQ(std::string::npos, body.find("client_secret="));
-            EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
-            EXPECT_NE(std::string::npos,
-                      body.find("client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-"
-                                "assertion-type%3Ajwt-bearer"));
-            EXPECT_NE(std::string::npos, body.find("client_assertion=test_jwt_assertion"));
+            EXPECT_THAT(body, HasSubstr("client_id=client_id"));
+            EXPECT_THAT(body,
+                        HasSubstr("client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-"
+                                  "assertion-type%3Ajwt-bearer"));
+            EXPECT_THAT(body, HasSubstr("client_assertion=test_jwt_assertion"));
             EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
             callbacks_.push_back(&cb);
             return &request_;
@@ -754,7 +756,7 @@ TEST_F(OAuth2ClientTest, TestGetAccessTokenPlusInSecret) {
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             const std::string body = message->body().toString();
-            EXPECT_NE(std::string::npos, body.find("client_secret=abc%2Bdef"));
+            EXPECT_THAT(body, HasSubstr("client_secret=abc%2Bdef"));
             EXPECT_EQ(std::string::npos, body.find("client_secret=abc+def"));
             callbacks_.push_back(&cb);
             return &request_;
@@ -772,7 +774,7 @@ TEST_F(OAuth2ClientTest, TestGetAccessTokenPlusInClientId) {
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             const std::string body = message->body().toString();
-            EXPECT_NE(std::string::npos, body.find("client_id=id%2Btest"));
+            EXPECT_THAT(body, HasSubstr("client_id=id%2Btest"));
             EXPECT_EQ(std::string::npos, body.find("client_id=id+test"));
             callbacks_.push_back(&cb);
             return &request_;
@@ -790,7 +792,7 @@ TEST_F(OAuth2ClientTest, TestRefreshAccessTokenPlusInRefreshToken) {
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             const std::string body = message->body().toString();
-            EXPECT_NE(std::string::npos, body.find("refresh_token=tok%2Ben"));
+            EXPECT_THAT(body, HasSubstr("refresh_token=tok%2Ben"));
             EXPECT_EQ(std::string::npos, body.find("refresh_token=tok+en"));
             callbacks_.push_back(&cb);
             return &request_;
