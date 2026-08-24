@@ -162,7 +162,7 @@ private:
   bool always_deny_default_{false};
   // If true, an exhausted shadow mode descriptor doesn't stop the evaluation of the remaining
   // descriptors and the default token bucket.
-  const bool shadow_mode_no_short_circuit_{};
+  const bool shadow_mode_no_short_circuit_{false};
 };
 
 class AlwaysDenyLocalRateLimiter : public LocalRateLimiter {
