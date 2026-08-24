@@ -14,7 +14,10 @@ DEPENDENCY_ANNOTATIONS = [
     "extensions",
 
     # Additional dependencies loaded transitively via this dependency that are not tracked in
-    # Envoy (see the external dependency at the given version for information).
+    # Envoy (see the external dependency at the given version for information). Names listed
+    # here carry no metadata of their own; a transitive dependency that *is* tracked instead
+    # gets its own top-level entry with a used_by list, and must not appear in any
+    # implied_untracked_deps list.
     "implied_untracked_deps",
 
     # Project metadata.
@@ -34,6 +37,16 @@ DEPENDENCY_ANNOTATIONS = [
     # Possible values are documented in the USE_CATEGORIES list below.
     # This attribute is mandatory for each dependecy.
     "use_category",
+
+    # For a dependency that is only reached transitively (it is not a direct
+    # dependency), the list of tracked dependencies through which it is loaded.
+    # Such entries are tracked in their own right — they carry their own
+    # metadata (cpe, use_category, extensions, ...) — as opposed to
+    # implied_untracked_deps, which declares transitives we carry no metadata
+    # for. A name must never appear both as a top-level entry and in any
+    # implied_untracked_deps list, and every name listed in used_by must be a
+    # top-level metadata key.
+    "used_by",
 
     # The dependency version. This may be either a tagged release (preferred)
     # or git SHA (as an exception when no release tagged version is suitable).

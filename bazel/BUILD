@@ -964,16 +964,21 @@ json_data(
 json_merge(
     name = "legacy_all_repository_locations",
     srcs = [":legacy_all_repository_locations_version_info"],
+    # Union of version-carrying deps and metadata-only entries: tracked
+    # transitive deps (annotated with `used_by`) have no entry in
+    # repository_locations.bzl but must still surface in the merged output so
+    # that their metadata (cpe, use_category, ...) reaches validation and CVE
+    # scanning.
     filter = """
     .[0] as $versions
     | .[1] as $metadata1
     | .[2] as $metadata2
     | ($metadata1 * $metadata2) as $metadata
-    | $versions
+    | ($versions + $metadata)
     | keys
     | reduce .[] as $k ({};
         . + {($k): (
-          ($versions[$k] + ($metadata[$k] // {}))
+          ((($versions[$k] // {}) + ($metadata[$k] // {})))
           | .version as $ver
           | if .license_url and $ver then
               .license_url |= (
