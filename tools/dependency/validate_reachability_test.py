@@ -321,15 +321,14 @@ def validate_control_plane_deps(deps, metadata, apparent_lookup, revmap):
 
 
 def validate_extension_deps(deps, metadata, apparent_lookup, revmap, extensions_build_config,
-                             core_deps):
-    """Per-extension marginal deps must carry an ext/observability/other/api category.
+                            core_deps):
+    """Per-extension deps must carry an ext/observability/other/api category.
 
     ``extensions_build_config`` is a dict mapping extension-name -> target label.
 
-    ``core_deps`` is the set of resolved metadata keys that are reachable from
-    the core (non-extension) root.  Extension-marginal deps are those reachable
-    from the all-extensions root but *not* in ``core_deps``; this restores the
-    original ``deps(ext) − deps(core)`` semantics from validate.py.
+    ``core_deps`` is retained for API compatibility but extension attribution is
+    intentionally computed for all deps, including deps also reachable from the
+    core root.
 
     A consumer target is attributed to extension package ``pkg`` when the
     consumer label falls within the ``pkg`` subtree — i.e. starts with
@@ -345,46 +344,48 @@ def validate_extension_deps(deps, metadata, apparent_lookup, revmap, extensions_
             pkg = m.group(1)
             pkg_to_ext.setdefault(pkg, []).append(ext_name)
 
-    # For each extension package, collect the marginal deps it introduces.
-    # A dep is "core" (non-marginal) if its resolved key appears in core_deps.
-    # The consumer→extension attribution uses subtree matching so that targets
-    # in sub-packages of the extension's config package are attributed correctly.
-    ext_pkg_deps: dict = {}
+    # Build dep -> extension-name attribution from consumer targets.
+    dep_to_extensions: dict = {}
     for dep_data in deps.values():
         key = _resolve_dep_name(dep_data["name"], apparent_lookup, revmap)
-        if key in core_deps:
-            continue
         for consumer in dep_data["consumers"]:
             target = consumer["target"]
-            for pkg in pkg_to_ext:
+            for pkg, ext_names in pkg_to_ext.items():
                 if _is_under_package(target, pkg):
-                    ext_pkg_deps.setdefault(pkg, set()).add(key)
+                    dep_to_extensions.setdefault(key, set()).update(ext_names)
 
     errors = []
-    for pkg, ext_names in pkg_to_ext.items():
-        for dep_key in ext_pkg_deps.get(pkg, set()):
-            meta = metadata.get(dep_key)
-            if not meta:
-                continue
-            use_category = meta.get("use_category", [])
-            valid_category = any(
-                c in use_category
-                for c in ["dataplane_ext", "observability_ext", "other", "api"]
+    for dep_key, ext_names in dep_to_extensions.items():
+        meta = metadata.get(dep_key)
+        if not meta:
+            continue
+        use_category = meta.get("use_category", [])
+        valid_category = any(
+            c in use_category
+            for c in ["dataplane_ext", "observability_ext", "other", "api"]
+        )
+        sorted_ext_names = sorted(ext_names)
+        if not valid_category:
+            errors.append(
+                "Extension %s depends on %s with use_category %s "
+                "not including dataplane_ext/observability_ext/api/other"
+                % (sorted_ext_names[0], dep_key, use_category)
             )
-            if not valid_category:
+        if "extensions" not in meta:
+            errors.append(
+                "Dependency %s is consumed by extensions %s but has no extensions allowlist; "
+                "add an extensions list containing these names"
+                % (dep_key, sorted_ext_names)
+            )
+            continue
+
+        for ext_name in sorted_ext_names:
+            if ext_name not in meta["extensions"]:
                 errors.append(
-                    "Extension %s (package %s) depends on %s with use_category %s "
-                    "not including dataplane_ext/observability_ext/api/other"
-                    % (ext_names[0], pkg, dep_key, use_category)
+                    "Extension %s depends on %s but %s does not list %s "
+                    "in its extensions allowlist"
+                    % (ext_name, dep_key, dep_key, ext_name)
                 )
-            if "extensions" in meta:
-                for ext_name in ext_names:
-                    if ext_name not in meta["extensions"]:
-                        errors.append(
-                            "Extension %s depends on %s but %s does not list %s "
-                            "in its extensions allowlist"
-                            % (ext_name, dep_key, dep_key, ext_name)
-                        )
 
     if errors:
         raise AssertionError(
@@ -462,6 +463,96 @@ class ValidateReachabilityTest(unittest.TestCase):
             self.extensions_build_config,
             self.core_deps,
         )
+
+
+class ValidateExtensionDepsUnitTest(unittest.TestCase):
+
+    def setUp(self):
+        self.extensions_build_config = {
+            "envoy.filters.network.foo": "//source/extensions/filters/network/foo:config",
+            "envoy.filters.network.bar": "//source/extensions/filters/network/bar:config",
+        }
+
+    def _run_validate(self, deps, metadata, core_deps=None):
+        validate_extension_deps(
+            deps=deps,
+            metadata=metadata,
+            apparent_lookup=_build_apparent_name_lookup(metadata),
+            revmap=_build_implied_revmap(metadata),
+            extensions_build_config=self.extensions_build_config,
+            core_deps=core_deps or set(),
+        )
+
+    def test_extension_deps_with_correct_allowlist(self):
+        deps = {
+            "1": {
+                "name": "dep_a",
+                "consumers": [{"target": "//source/extensions/filters/network/foo:impl"}],
+            }
+        }
+        metadata = {
+            "dep_a": {
+                "use_category": ["dataplane_ext"],
+                "extensions": ["envoy.filters.network.foo"],
+            }
+        }
+
+        self._run_validate(deps, metadata)
+
+    def test_extension_deps_missing_allowlist_entry_fails(self):
+        deps = {
+            "1": {
+                "name": "dep_a",
+                "consumers": [
+                    {"target": "//source/extensions/filters/network/foo:impl"},
+                    {"target": "//source/extensions/filters/network/bar:impl"},
+                ],
+            }
+        }
+        metadata = {
+            "dep_a": {
+                "use_category": ["dataplane_ext"],
+                "extensions": ["envoy.filters.network.foo"],
+            }
+        }
+
+        with self.assertRaisesRegex(AssertionError, "does not list"):
+            self._run_validate(deps, metadata)
+
+    def test_extension_deps_missing_extensions_key_fails(self):
+        deps = {
+            "1": {
+                "name": "dep_a",
+                "consumers": [{"target": "//source/extensions/filters/network/foo:impl"}],
+            }
+        }
+        metadata = {"dep_a": {"use_category": ["dataplane_ext"]}}
+
+        with self.assertRaisesRegex(AssertionError, "has no extensions allowlist"):
+            self._run_validate(deps, metadata)
+
+    def test_extension_deps_missing_extensions_key_without_consumers_passes(self):
+        deps = {
+            "1": {
+                "name": "dep_a",
+                "consumers": [{"target": "//source/common/http:impl"}],
+            }
+        }
+        metadata = {"dep_a": {"use_category": ["dataplane_ext"]}}
+
+        self._run_validate(deps, metadata)
+
+    def test_extension_deps_core_reachable_dep_is_still_validated(self):
+        deps = {
+            "1": {
+                "name": "dep_a",
+                "consumers": [{"target": "//source/extensions/filters/network/foo:impl"}],
+            }
+        }
+        metadata = {"dep_a": {"use_category": ["dataplane_ext"]}}
+
+        with self.assertRaisesRegex(AssertionError, "has no extensions allowlist"):
+            self._run_validate(deps, metadata, core_deps={"dep_a"})
 
 
 if __name__ == "__main__":
