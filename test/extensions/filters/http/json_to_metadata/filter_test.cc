@@ -16,8 +16,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Contains;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -42,6 +40,7 @@ MATCHER_P2(MapEqType, rhs, getter, "") {
 }
 
 using testing::_;
+using testing::Contains;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
