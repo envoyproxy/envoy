@@ -18,6 +18,7 @@ import (
 func init() {
 	sdk.RegisterHttpFilterConfigFactories(map[string]shared.HttpFilterConfigFactory{
 		"passthrough":                  &PassthroughConfigFactory{},
+		"local_reply_response_headers": &LocalReplyResponseHeadersConfigFactory{},
 		"header_callbacks_on_creation": &HeaderCallbacksOnCreationConfigFactory{},
 		"header_callbacks":             &HeaderCallbacksConfigFactory{},
 		"per_route_config":             &PerRouteConfigFactory{},
@@ -100,6 +101,36 @@ func (p *ConfigSchedulerFilter) OnRequestHeaders(headers shared.HeaderMap,
 // -----------------------------------------------------------------------------
 // Passthrough
 // -----------------------------------------------------------------------------
+
+// LocalReplyResponseHeadersConfigFactory builds a filter that only records that its
+// response-headers callback ran. Used to check that the callback still fires when the response is a
+// local reply the module did not send, such as a `direct_response` route.
+type LocalReplyResponseHeadersConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *LocalReplyResponseHeadersConfigFactory) Create(_ shared.HttpFilterConfigHandle,
+	_ []byte) (shared.HttpFilterFactory, error) {
+	return &LocalReplyResponseHeadersFilterFactory{}, nil
+}
+
+type LocalReplyResponseHeadersFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *LocalReplyResponseHeadersFilterFactory) Create(shared.HttpFilterHandle) shared.HttpFilter {
+	return &LocalReplyResponseHeadersFilter{}
+}
+
+type LocalReplyResponseHeadersFilter struct {
+	shared.EmptyHttpFilter
+}
+
+func (f *LocalReplyResponseHeadersFilter) OnResponseHeaders(headers shared.HeaderMap,
+	_ bool) shared.HeadersStatus {
+	headers.Set("on-response-headers", "called")
+	return shared.HeadersStatusContinue
+}
 
 type PassthroughConfigFactory struct {
 	shared.EmptyHttpFilterConfigFactory
