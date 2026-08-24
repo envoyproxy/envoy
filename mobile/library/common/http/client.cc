@@ -412,6 +412,8 @@ void Client::DirectStream::saveLatestStreamIntel() {
 
   const Envoy::Quic::SconeState* scone_state =
       info.filterState().getDataReadOnly<Envoy::Quic::SconeState>(Envoy::Quic::SconeStateKey);
+  // If SconeState is not present on the stream filter state, fall back to checking
+  // the upstream connection's filter state where EnvoyQuicClientSession records SCONE updates.
   if (!scone_state && info.upstreamInfo() && info.upstreamInfo()->upstreamFilterState()) {
     scone_state =
         info.upstreamInfo()->upstreamFilterState()->getDataReadOnly<Envoy::Quic::SconeState>(

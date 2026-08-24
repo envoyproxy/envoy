@@ -1984,6 +1984,7 @@ TEST_P(ClientIntegrationTest, SconeValuePropagation) {
 
   int64_t captured_scone_max_kbps = -1;
   int64_t captured_scone_timestamp_ms = -1;
+  int64_t captured_connection_id1 = -1;
 
   EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
   stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap& headers, bool,
@@ -1992,6 +1993,7 @@ TEST_P(ClientIntegrationTest, SconeValuePropagation) {
     cc_.status_ = absl::StrCat(headers.getStatusValue());
     captured_scone_max_kbps = intel.scone_max_kbps;
     captured_scone_timestamp_ms = intel.scone_timestamp_ms;
+    captured_connection_id1 = intel.connection_id;
   };
 
   stream_ = createNewStream(std::move(stream_callbacks));
@@ -2003,16 +2005,28 @@ TEST_P(ClientIntegrationTest, SconeValuePropagation) {
 
   EXPECT_EQ(captured_scone_max_kbps, expected_bandwidth);
   EXPECT_GT(captured_scone_timestamp_ms, 0);
+  EXPECT_GE(captured_connection_id1, 0);
 
-  int64_t captured_scone_max_kbps2 = -1;
-  int64_t captured_scone_timestamp_ms2 = -1;
+  int64_t captured_scone_max_kbps2_headers = -1;
+  int64_t captured_scone_timestamp_ms2_headers = -1;
+  int64_t captured_connection_id2 = -1;
+  int64_t captured_scone_max_kbps2_data = -1;
+  int64_t captured_scone_timestamp_ms2_data = -1;
+
   EnvoyStreamCallbacks stream_callbacks2 = createDefaultStreamCallbacks();
   stream_callbacks2.on_headers_ = [&](const Http::ResponseHeaderMap& headers, bool,
                                       envoy_stream_intel intel) {
     cc_.on_headers_calls_++;
     cc_.status_ = absl::StrCat(headers.getStatusValue());
-    captured_scone_max_kbps2 = intel.scone_max_kbps;
-    captured_scone_timestamp_ms2 = intel.scone_timestamp_ms;
+    captured_scone_max_kbps2_headers = intel.scone_max_kbps;
+    captured_scone_timestamp_ms2_headers = intel.scone_timestamp_ms;
+    captured_connection_id2 = intel.connection_id;
+  };
+  stream_callbacks2.on_data_ = [&](const Buffer::Instance&, uint64_t, bool,
+                                   envoy_stream_intel intel) {
+    cc_.on_data_calls_++;
+    captured_scone_max_kbps2_data = intel.scone_max_kbps;
+    captured_scone_timestamp_ms2_data = intel.scone_timestamp_ms;
   };
 
   ConditionalInitializer terminal_callback2;
@@ -2024,8 +2038,11 @@ TEST_P(ClientIntegrationTest, SconeValuePropagation) {
 
   terminal_callback2.waitReady();
 
-  EXPECT_EQ(captured_scone_max_kbps2, expected_bandwidth);
-  EXPECT_GT(captured_scone_timestamp_ms2, 0);
+  EXPECT_EQ(captured_scone_max_kbps2_headers, expected_bandwidth);
+  EXPECT_GT(captured_scone_timestamp_ms2_headers, 0);
+  EXPECT_EQ(captured_connection_id1, captured_connection_id2);
+  EXPECT_EQ(captured_scone_max_kbps2_data, expected_bandwidth);
+  EXPECT_GT(captured_scone_timestamp_ms2_data, 0);
 }
 
 TEST_P(ClientIntegrationTest, SconeValuePropagationDelayed) {

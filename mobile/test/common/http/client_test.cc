@@ -1073,8 +1073,8 @@ TEST_P(ClientTest, SaveLatestStreamIntelPopulatesSconeFromUpstreamFilterState) {
   scone_state->timestamp_ms = 54321;
   auto upstream_filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  upstream_filter_state->setData(
-      Quic::SconeStateKey, scone_state, StreamInfo::FilterState::LifeSpan::Connection);
+  upstream_filter_state->setData(Quic::SconeStateKey, scone_state,
+                                 StreamInfo::FilterState::LifeSpan::Connection);
   stream_info_.upstream_info_->setUpstreamFilterState(upstream_filter_state);
 
   auto stream_ptr = getDirectStream(stream_);
@@ -1105,8 +1105,8 @@ TEST_P(ClientTest, SaveLatestStreamIntelPopulatesSconePrecedence) {
   upstream_scone->timestamp_ms = 23456;
   auto upstream_filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  upstream_filter_state->setData(
-      Quic::SconeStateKey, upstream_scone, StreamInfo::FilterState::LifeSpan::Connection);
+  upstream_filter_state->setData(Quic::SconeStateKey, upstream_scone,
+                                 StreamInfo::FilterState::LifeSpan::Connection);
   stream_info_.upstream_info_->setUpstreamFilterState(upstream_filter_state);
 
   auto stream_ptr = getDirectStream(stream_);
