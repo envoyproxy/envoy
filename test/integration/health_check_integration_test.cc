@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
 #include "source/common/upstream/health_discovery_service.h"
@@ -86,7 +87,12 @@ public:
     for (auto& cluster : clusters_) {
       auto config = upstreamConfig();
       config.upstream_protocol_ = upstream_protocol_;
-      cluster.host_upstream_ = std::make_unique<FakeUpstream>(0, version_, config);
+      // A TLS host upstream is needed to exercise ALPN negotiation; createUpstreamTlsContext()
+      // offers the ALPN identifier matching `config.upstream_protocol_`.
+      cluster.host_upstream_ =
+          host_upstream_tls_ ? std::make_unique<FakeUpstream>(createUpstreamTlsContext(config), 0,
+                                                              version_, config)
+                             : std::make_unique<FakeUpstream>(0, version_, config);
       cluster.external_host_upstream_ = std::make_unique<FakeUpstream>(0, version_, config);
       cluster.cluster_ = ConfigHelper::buildStaticCluster(
           cluster.name_, cluster.host_upstream_->localAddress()->ip()->port(),
@@ -131,12 +137,32 @@ public:
     return health_check;
   }
 
+  // Adds an upstream TLS transport socket to `cluster`, offering `alpn_protocols` on the handshake.
+  void addUpstreamTls(envoy::config::cluster::v3::Cluster& cluster,
+                      const std::vector<std::string>& alpn_protocols) {
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    // The test certs are for *.lyft.com, so make sure SNI matches.
+    tls_context.set_sni("foo.lyft.com");
+    tls_context.mutable_common_tls_context()
+        ->mutable_validation_context()
+        ->mutable_trusted_ca()
+        ->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+    for (const auto& alpn : alpn_protocols) {
+      tls_context.mutable_common_tls_context()->add_alpn_protocols(alpn);
+    }
+    cluster.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+    std::ignore = cluster.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+  }
+
   // The number of clusters and their names must match the clusters in the CDS integration test
   // configuration.
   static constexpr size_t clusters_num_ = 2;
   std::array<ClusterData, clusters_num_> clusters_{{{"cluster_1"}, {"cluster_2"}}};
   Network::Address::IpVersion ip_version_;
   Http::CodecType upstream_protocol_;
+  // Whether the health checked host upstreams terminate TLS.
+  bool host_upstream_tls_{false};
 };
 
 struct HttpHealthCheckIntegrationTestParams {
@@ -1066,6 +1092,134 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttpWithBinaryPayloa
   test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+// Health checking over TLS, where the codec is selected from the protocol negotiated by ALPN and
+// `codec_client_type` is used only when nothing is negotiated.
+class HttpHealthCheckAlpnIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HealthCheckIntegrationTestBase {
+public:
+  HttpHealthCheckAlpnIntegrationTest() : HealthCheckIntegrationTestBase(GetParam()) {}
+
+  void TearDown() override {
+    cleanupHostConnections();
+    cleanUpXdsConnection();
+  }
+
+  // Brings up a TLS host upstream that speaks `upstream_protocol` and offers the matching ALPN
+  // identifier. `cluster_alpn_protocols` is the static list on the cluster's TLS context and
+  // `health_check_alpn_protocols` the health check's `tls_options` override; either may be empty.
+  // What the health check connection advertises follows from those two exactly as it does today,
+  // since this change adds nothing of its own.
+  void initTlsHealthCheck(Http::CodecType upstream_protocol,
+                          const std::vector<std::string>& cluster_alpn_protocols,
+                          const std::vector<std::string>& health_check_alpn_protocols,
+                          envoy::type::v3::CodecClientType codec_client_type,
+                          uint32_t timeout_seconds = 30) {
+    host_upstream_tls_ = true;
+    upstream_protocol_ = upstream_protocol;
+    initialize();
+
+    auto& cluster_data = clusters_[0];
+    addUpstreamTls(cluster_data.cluster_, cluster_alpn_protocols);
+    auto* health_check = addHealthCheck(cluster_data.cluster_);
+    health_check->mutable_timeout()->set_seconds(timeout_seconds);
+    health_check->mutable_http_health_check()->set_path("/healthcheck");
+    health_check->mutable_http_health_check()->set_codec_client_type(codec_client_type);
+    for (const auto& alpn : health_check_alpn_protocols) {
+      health_check->mutable_tls_options()->add_alpn_protocols(alpn);
+    }
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                               {cluster_data.cluster_},
+                                                               {cluster_data.cluster_}, {}, "55");
+  }
+
+  // Waits for a health check probe on the host upstream and answers it with a 200. The upstream
+  // only produces a stream if Envoy spoke the protocol the upstream negotiated, which is what
+  // makes these tests discriminating.
+  void expectHealthCheckProbeAndRespond() {
+    auto& cluster_data = clusters_[0];
+    ASSERT_TRUE(cluster_data.host_upstream_->waitForHttpConnection(
+        *dispatcher_, cluster_data.host_fake_connection_));
+    ASSERT_TRUE(cluster_data.host_fake_connection_->waitForNewStream(*dispatcher_,
+                                                                     cluster_data.host_stream_));
+    ASSERT_TRUE(cluster_data.host_stream_->waitForEndStream(*dispatcher_));
+    EXPECT_EQ(cluster_data.host_stream_->headers().getPathValue(), "/healthcheck");
+
+    cluster_data.host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}},
+                                             true);
+    test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
+    EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  }
+
+  // Waits for a health check connection, verifies that no probe is ever decoded on it - which is
+  // only the case when Envoy spoke a protocol the upstream does not - and that the check is
+  // reported as failing. A probe that was decoded but never answered would also time out into a
+  // failure, so checking the counters alone would not tell the two apart.
+  void expectHealthCheckFailureWithoutProbe() {
+    auto& cluster_data = clusters_[0];
+    ASSERT_TRUE(cluster_data.host_upstream_->waitForHttpConnection(
+        *dispatcher_, cluster_data.host_fake_connection_));
+    FakeStreamPtr stream;
+    EXPECT_FALSE(cluster_data.host_fake_connection_->waitForNewStream(
+        *dispatcher_, stream, std::chrono::milliseconds(500)));
+    test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
+    EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, HttpHealthCheckAlpnIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// The handshake settles on h2, so the health check is sent over HTTP/2 even though HTTP/1.1 is
+// configured. Before the negotiated protocol was honored, Envoy sent HTTP/1.1 here and the HTTP/2
+// upstream never produced a stream.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, NegotiatedHttp2WithHttp1Configured) {
+  initTlsHealthCheck(Http::CodecType::HTTP2, {"h2", "http/1.1"}, {},
+                     envoy::type::v3::CodecClientType::HTTP1);
+  expectHealthCheckProbeAndRespond();
+}
+
+// The mirror image: the handshake settles on http/1.1, so the health check is sent over HTTP/1.1
+// even though HTTP/2 is configured.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, NegotiatedHttp1WithHttp2Configured) {
+  initTlsHealthCheck(Http::CodecType::HTTP1, {"h2", "http/1.1"}, {},
+                     envoy::type::v3::CodecClientType::HTTP2);
+  expectHealthCheckProbeAndRespond();
+}
+
+// `tls_options.alpn_protocols` overrides the cluster's list, so the health check offers only
+// http/1.1 and negotiates it, and the probe follows. This is the configuration from the issue:
+// `codec_client_type: HTTP2` alongside `tls_options.alpn_protocols: ["http/1.1"]`, which used to
+// fail forever.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, TlsOptionsAlpnOverridesClusterAlpn) {
+  initTlsHealthCheck(Http::CodecType::HTTP1, {"h2"}, {"http/1.1"},
+                     envoy::type::v3::CodecClientType::HTTP2);
+  expectHealthCheckProbeAndRespond();
+}
+
+// With no ALPN configured anywhere the health check advertises nothing, nothing is negotiated, and
+// `codec_client_type` is used: Envoy speaks HTTP/1.1 to the HTTP/2 upstream, which never decodes a
+// probe, and the check fails. Were any ALPN added to the connection, h2 would be negotiated and a
+// probe would arrive, so this pins that the change adds none.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, NoAlpnConfiguredUsesCodecClientType) {
+  initTlsHealthCheck(Http::CodecType::HTTP2, {}, {}, envoy::type::v3::CodecClientType::HTTP1,
+                     /*timeout_seconds=*/1);
+  expectHealthCheckFailureWithoutProbe();
+}
+
+// With the runtime guard disabled the negotiated protocol is ignored: Envoy speaks HTTP/1.1 to an
+// upstream that negotiated h2, which never decodes a probe, and the health check fails.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, RuntimeGuardDisabledIgnoresNegotiatedProtocol) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.health_check_use_negotiated_protocol", "false");
+  initTlsHealthCheck(Http::CodecType::HTTP2, {"h2", "http/1.1"}, {},
+                     envoy::type::v3::CodecClientType::HTTP1, /*timeout_seconds=*/1);
+  expectHealthCheckFailureWithoutProbe();
 }
 
 } // namespace

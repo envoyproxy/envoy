@@ -19,6 +19,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
@@ -41,6 +42,23 @@ getMethod(const envoy::config::core::v3::RequestMethod config_method) {
   }
 
   return config_method;
+}
+
+bool useNegotiatedProtocol() {
+  return Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.health_check_use_negotiated_protocol");
+}
+
+// Maps the protocol negotiated by ALPN to a codec type, falling back to `default_codec_type` when
+// nothing was negotiated or the negotiated protocol is not one this health checker can speak.
+Http::CodecType codecTypeFromAlpn(absl::string_view alpn, Http::CodecType default_codec_type) {
+  if (alpn == Http::Utility::AlpnNames::get().Http11) {
+    return Http::CodecType::HTTP1;
+  }
+  if (alpn == Http::Utility::AlpnNames::get().Http2) {
+    return Http::CodecType::HTTP2;
+  }
+  return default_codec_type;
 }
 
 } // namespace
@@ -200,8 +218,16 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecType codec_client_type) {
   PANIC_DUE_TO_CORRUPT_ENUM
 }
 
-Http::Protocol HttpHealthCheckerImpl::protocol() const {
+Http::Protocol HttpHealthCheckerImpl::configuredProtocol() const {
   return codecClientTypeToProtocol(codec_client_type_);
+}
+
+bool HttpHealthCheckerImpl::negotiateCodec() const {
+  // `codec_client_type: HTTP3` keeps its existing behavior and is never switched to another codec
+  // by what the handshake negotiates. This check is what enforces that: health check connections
+  // are plain TCP (see HostImplBase::createConnection), so with HTTP/3 configured on a TLS cluster
+  // the connection can still negotiate `h2` or `http/1.1`.
+  return codec_client_type_ != Http::CodecType::HTTP3 && useNegotiatedProtocol();
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
@@ -217,14 +243,26 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
   ASSERT(client_ == nullptr);
+  ASSERT(pending_connection_ == nullptr);
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onDeferredDelete() {
+  resetPendingConnection();
   if (client_) {
     // If there is an active request it will get reset, so make sure we ignore the reset.
     expect_reset_ = true;
     client_->close(Network::ConnectionCloseType::Abort);
   }
+}
+
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::resetPendingConnection() {
+  if (pending_connection_ == nullptr) {
+    return;
+  }
+  pending_connection_->removeConnectionCallbacks(pending_connection_callback_impl_);
+  pending_connection_->close(Network::ConnectionCloseType::Abort);
+  pending_host_description_.reset();
+  parent_.dispatcher_.deferredDelete(std::move(pending_connection_));
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
@@ -263,12 +301,37 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
     response_headers_.reset();
     response_body_->drain(response_body_->length());
     parent_.dispatcher_.deferredDelete(std::move(client_));
+    // The connection can be closed in between the codec client being attached and this session
+    // being told that it is connected, in which case the request was never sent. Close events are
+    // always delivered to every callback, so clearing this here is enough to keep it from leaking
+    // into the next interval.
+    send_request_on_connected_ = false;
+    return;
+  }
+
+  if (send_request_on_connected_) {
+    // The codec client was attached to a connection that was already established, so it is being
+    // told that it is connected by this very event, and it arms its idle timer when it is. The
+    // request is sent from here - after the codec client has seen the event - so that creating the
+    // stream disables that idle timer for as long as the health check is in flight.
+    ASSERT(event == Network::ConnectionEvent::Connected ||
+           event == Network::ConnectionEvent::ConnectedZeroRtt);
+    send_request_on_connected_ = false;
+    sendRequest();
   }
 }
 
 // TODO(lilika) : Support connection pooling
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
+  // A new attempt starts with nothing outstanding: the request for this attempt is sent either
+  // below or, for a connection whose codec is chosen from ALPN, from onEvent().
+  send_request_on_connected_ = false;
   if (!client_) {
+    ASSERT(pending_connection_ == nullptr);
+    // Nothing about what the connection advertises changes: the health check offers whatever the
+    // cluster's TLS context or `tls_options` configure, as it always has. What is new is that the
+    // protocol the peer selects from that list is used to choose the codec.
+    const bool negotiate_codec = parent_.negotiateCodec();
     Upstream::Host::CreateConnectionData conn =
         host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
                                            parent_.transportSocketMatchMetadata().get());
@@ -279,13 +342,98 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       handleFailure(envoy::data::core::v3::NETWORK);
       return;
     }
-    client_.reset(parent_.createCodecClient(conn));
-    client_->addConnectionCallbacks(connection_callback_impl_);
-    client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
+
+    // ALPN is only negotiated on secure transports. Without one the configured codec is the only
+    // possible answer, so the codec client is created up front and the request is sent while the
+    // connection is still being established, as it has always been.
+    if (negotiate_codec && conn.connection_->ssl() != nullptr) {
+      // Reset these before connecting: a leftover `expect_reset_` from a previous timeout would
+      // otherwise suppress the failure for this attempt.
+      expect_reset_ = false;
+      reuse_connection_ = parent_.reuse_connection_;
+      pending_host_description_ = conn.host_description_;
+      pending_connection_ = std::move(conn.connection_);
+      pending_connection_->addConnectionCallbacks(pending_connection_callback_impl_);
+      // Apply the connection settings that the codec client would otherwise have applied before
+      // connecting, so that the connect and the handshake behave as they did when the codec client
+      // was created up front.
+      pending_connection_->detectEarlyCloseWhenReadDisabled(false);
+      pending_connection_->noDelay(true);
+      // The codec is chosen from the negotiated protocol and the request is sent once the
+      // connection is established. See onPendingConnectionEvent().
+      pending_connection_->connect();
+      return;
+    }
+
+    attachCodecClient(conn, parent_.codec_client_type_);
     expect_reset_ = false;
     reuse_connection_ = parent_.reuse_connection_;
   }
 
+  sendRequest();
+}
+
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::attachCodecClient(
+    Upstream::Host::CreateConnectionData& data, Http::CodecType codec_type) {
+  client_.reset(parent_.createCodecClient(data, codec_type));
+  client_->addConnectionCallbacks(connection_callback_impl_);
+  client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
+  protocol_ = codecClientTypeToProtocol(codec_type);
+}
+
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onPendingConnectionEvent(
+    Network::ConnectionEvent event) {
+  ASSERT(pending_connection_ != nullptr);
+
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    ENVOY_CONN_LOG(debug, "connect failure reason={} health_flags={}", *pending_connection_,
+                   pending_connection_->transportFailureReason(),
+                   HostUtility::healthFlagsToString(*host_));
+    pending_connection_->removeConnectionCallbacks(pending_connection_callback_impl_);
+    pending_host_description_.reset();
+    parent_.dispatcher_.deferredDelete(std::move(pending_connection_));
+    if (!expect_reset_) {
+      // handleFailure() may deferred delete this session, so nothing may be touched afterwards.
+      handleFailure(envoy::data::core::v3::NETWORK);
+    }
+    return;
+  }
+
+  // Connected means the handshake completed. ConnectedZeroRtt means only that early data may be
+  // sent, so the protocol read below is the one from the resumed session rather than a freshly
+  // negotiated one, and it is not revisited when the handshake does complete. Handling it here
+  // still beats leaving the session waiting for its timeout. No transport socket that this health
+  // checker can reach raises it today: only QUIC does, and HTTP/3 is excluded above.
+  if (event != Network::ConnectionEvent::Connected &&
+      event != Network::ConnectionEvent::ConnectedZeroRtt) {
+    return;
+  }
+
+  // The negotiated protocol - if any - is now known. Anything other than a protocol this health
+  // checker can speak falls back to the configured codec.
+  const std::string alpn = pending_connection_->nextProtocol();
+  const Http::CodecType codec_type = codecTypeFromAlpn(alpn, parent_.codec_client_type_);
+  ENVOY_CONN_LOG(debug, "health check negotiated alpn='{}', using {}", *pending_connection_, alpn,
+                 Http::Utility::getProtocolString(codecClientTypeToProtocol(codec_type)));
+
+  // Hand the established connection over to a codec client. Adding and removing connection
+  // callbacks while this event is being delivered is safe, and the callbacks added here - the
+  // codec client's and then this session's - will each see the same event once this returns.
+  pending_connection_->removeConnectionCallbacks(pending_connection_callback_impl_);
+  Upstream::Host::CreateConnectionData data{std::move(pending_connection_),
+                                            std::move(pending_host_description_)};
+  attachCodecClient(data, codec_type);
+
+  // The codec client is told that it is connected by this same event and arms its idle timer when
+  // it is. Setting this only now means the request is sent from onEvent(), after the codec client
+  // has handled that event, so that creating the stream disables the idle timer again. The
+  // connection is necessarily still open here: CodecClient::connect() asserts as much for a
+  // connection that is handed over already established.
+  send_request_on_connected_ = true;
+}
+
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::sendRequest() {
   Http::RequestEncoder* request_encoder = &client_->newStream(*this);
   request_encoder->getStream().addCallbacks(*this);
   request_in_flight_ = true;
@@ -474,6 +622,15 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   request_in_flight_ = false;
+  if (pending_connection_) {
+    ENVOY_CONN_LOG(debug, "connect timeout health_flags={}", *pending_connection_,
+                   HostUtility::healthFlagsToString(*host_));
+    // The caller records the timeout as a failure. resetPendingConnection() detaches the callbacks
+    // before closing, so the close it triggers is not reported a second time.
+    resetPendingConnection();
+    return;
+  }
+
   if (client_) {
     ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
                    HostUtility::healthFlagsToString(*host_));
@@ -500,10 +657,10 @@ HttpHealthCheckerImpl::codecClientType(const envoy::type::v3::CodecClientType& t
 }
 
 Http::CodecClient*
-ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  return new Http::CodecClientProd(codec_client_type_, std::move(data.connection_),
-                                   data.host_description_, dispatcher_, random_generator_,
-                                   transportSocketOptions());
+ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data,
+                                             Http::CodecType codec_type) {
+  return new Http::CodecClientProd(codec_type, std::move(data.connection_), data.host_description_,
+                                   dispatcher_, random_generator_, transportSocketOptions());
 }
 
 } // namespace Upstream
