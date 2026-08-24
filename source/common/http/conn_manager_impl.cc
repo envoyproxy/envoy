@@ -1494,6 +1494,18 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     return;
   }
 
+  // RFC 10008 Section 2: "Servers MUST fail the request if the Content-Type request field is
+  // missing or is inconsistent with the request content." Only the missing case is enforced here;
+  // whether the media type is consistent with, supported by, or processable for the request
+  // content is a decision only the origin server can make. An empty field value is as absent as a
+  // missing one. Section 2.1 calls for "a 4xx status code such as 400".
+  if (HeaderUtility::isQuery(*request_headers_) &&
+      request_headers_->getContentTypeValue().empty()) {
+    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().QueryMissingContentType);
+    return;
+  }
+
 #ifndef ENVOY_ENABLE_UHV
   // In UHV mode path normalization is done in the UHV
   // Path sanitization should happen before any path access other than the above sanity check.

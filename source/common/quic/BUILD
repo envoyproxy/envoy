@@ -670,6 +670,7 @@ envoy_cc_library(
         "//envoy/network:udp_packet_writer_handler_interface",
         "//source/common/network:io_socket_error_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/runtime:runtime_lib",
         "@quiche//:quic_platform",
     ]) + select({
