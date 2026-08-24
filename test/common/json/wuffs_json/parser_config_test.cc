@@ -272,10 +272,10 @@ TEST(CaptureAllScalarsTest, PerValueAndTotalBudgetsCompose) {
 // Structural spec matching (matchesPatternPath)
 // ============================================================================
 
-// SpecMatchingHandler is the executable templat to convert spec.segments to PatternSegments once at
-// config time, then match at each scalar callback with that callback's depth — zero allocations,
-// and collision-free (see the hostile-key test below).
-
+// SpecMatchingHandler is the executable template for spec-based extraction: hold the
+// spec's segments from config time, then match at each scalar callback — zero
+// allocations, and collision-free (see the hostile-key test below).
+//
 // Captures exactly the scalar values (strings, numbers, booleans, nulls)
 // whose root-to-here chain structurally matches the spec's segments; each
 // completed capture is terminated with ';'.
