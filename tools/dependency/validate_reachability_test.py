@@ -322,19 +322,25 @@ def validate_control_plane_deps(deps, metadata, apparent_lookup, revmap):
 
 def validate_extension_deps(deps, metadata, apparent_lookup, revmap, extensions_build_config,
                             core_deps):
-    """Per-extension deps must carry an ext/observability/other/api category.
+    """Per-extension marginal deps must carry an ext/observability/other/api category.
 
     ``extensions_build_config`` is a dict mapping extension-name -> target label.
 
-    ``core_deps`` is retained for API compatibility but extension attribution is
-    intentionally computed for all deps, including deps also reachable from the
-    core root.
+    ``core_deps`` is the set of resolved metadata keys that are reachable from
+    the core (non-extension) root.  Extension-marginal deps are those reachable
+    from the all-extensions root but *not* in ``core_deps``; this restores the
+    original ``deps(ext) − deps(core)`` semantics from validate.py.
 
     A consumer target is attributed to extension package ``pkg`` when the
     consumer label falls within the ``pkg`` subtree — i.e. starts with
     ``pkg + "/"`` (sub-package) or ``pkg + ":"`` (target in the package itself).
     A consumer may match multiple extension packages; it is attributed to all
     of them (broadest possible coverage).
+
+    When a dep has attributed extension consumers, an ``extensions`` allowlist
+    is required: omitting the key entirely must not silently disable the
+    allowlist check.  Deps with no attributed extension consumers are
+    unaffected, so ``extensions`` remains optional in general.
     """
     # Build package-path -> [extension-name] mapping from the config.
     pkg_to_ext: dict = {}
@@ -344,10 +350,15 @@ def validate_extension_deps(deps, metadata, apparent_lookup, revmap, extensions_
             pkg = m.group(1)
             pkg_to_ext.setdefault(pkg, []).append(ext_name)
 
-    # Build dep -> extension-name attribution from consumer targets.
+    # Build dep -> extension-name attribution from consumer targets.  A dep is
+    # "core" (non-marginal) if its resolved key appears in core_deps; those are
+    # covered by the dataplane/controlplane checks and are skipped here so that
+    # this check retains its deps(ext) − deps(core) semantics.
     dep_to_extensions: dict = {}
     for dep_data in deps.values():
         key = _resolve_dep_name(dep_data["name"], apparent_lookup, revmap)
+        if key in core_deps:
+            continue
         for consumer in dep_data["consumers"]:
             target = consumer["target"]
             for pkg, ext_names in pkg_to_ext.items():
@@ -542,7 +553,13 @@ class ValidateExtensionDepsUnitTest(unittest.TestCase):
 
         self._run_validate(deps, metadata)
 
-    def test_extension_deps_core_reachable_dep_is_still_validated(self):
+    def test_extension_deps_core_reachable_dep_is_skipped(self):
+        """Core-reachable deps are non-marginal and are not validated here.
+
+        This preserves the deps(ext) − deps(core) semantics documented in the
+        module docstring; such deps are covered by the dataplane/controlplane
+        checks instead.
+        """
         deps = {
             "1": {
                 "name": "dep_a",
@@ -551,8 +568,7 @@ class ValidateExtensionDepsUnitTest(unittest.TestCase):
         }
         metadata = {"dep_a": {"use_category": ["dataplane_ext"]}}
 
-        with self.assertRaisesRegex(AssertionError, "has no extensions allowlist"):
-            self._run_validate(deps, metadata, core_deps={"dep_a"})
+        self._run_validate(deps, metadata, core_deps={"dep_a"})
 
 
 if __name__ == "__main__":
