@@ -8,6 +8,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/coroutine/context.h"
+#include "source/common/coroutine/status_macros.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"

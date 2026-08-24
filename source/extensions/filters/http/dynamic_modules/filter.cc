@@ -3,6 +3,10 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/event/dispatcher.h"
+
+#include "source/common/event/deferred_task.h"
+
 #include "absl/container/inlined_vector.h"
 
 namespace Envoy {
@@ -10,7 +14,10 @@ namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
 
-DynamicModuleHttpFilter::~DynamicModuleHttpFilter() { destroy(); }
+DynamicModuleHttpFilter::~DynamicModuleHttpFilter() {
+  // In a well-formed filter chain onDestroy() has already run and this is a no-op.
+  destroy();
+}
 
 void DynamicModuleHttpFilter::initializeInModuleFilter() {
   ASSERT(in_module_filter_ == nullptr);
@@ -33,6 +40,8 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 
 void DynamicModuleHttpFilter::onDestroy() {
   destroyed_ = true;
+  // Read before the cache is cleared below, because destroy() defers the module hook onto it.
+  OptRef<Event::Dispatcher> worker_dispatcher = makeOptRefFromPtr(dispatcher());
   // Clear the cached dispatcher so any concurrent foreign-thread `commit()` short-circuits.
   cached_dispatcher_.store(nullptr, std::memory_order_release);
   // Pair with the register in maybeRegisterDownstreamWatermarkCallbacks(); the underlying
@@ -41,15 +50,16 @@ void DynamicModuleHttpFilter::onDestroy() {
     decoder_callbacks_->removeDownstreamWatermarkCallbacks(*this);
     downstream_watermark_callbacks_registered_ = false;
   }
-  destroy();
+  destroy(worker_dispatcher);
 };
 
-void DynamicModuleHttpFilter::destroy() {
+void DynamicModuleHttpFilter::destroy(OptRef<Event::Dispatcher> dispatcher) {
   if (in_module_filter_ == nullptr) {
     return;
   }
 
-  config_->on_http_filter_destroy_(in_module_filter_);
+  // Detach from the module first so that nothing below can re-enter an event hook.
+  const envoy_dynamic_module_type_http_filter_module_ptr in_module_filter = in_module_filter_;
   in_module_filter_ = nullptr;
 
   // Cancel all pending one-shot callouts.
@@ -79,6 +89,20 @@ void DynamicModuleHttpFilter::destroy() {
   decoder_callbacks_ = nullptr;
   encoder_callbacks_ = nullptr;
   downstream_watermark_callbacks_registered_ = false;
+
+  // A module event hook can end the stream, which tears the filter chain down on the module's own
+  // stack, so the in-module filter has to outlive that hook. Deferring the destroy hook also keeps
+  // this filter alive, since the module can still call back into it from the hook.
+  if (dispatcher.has_value()) {
+    if (DynamicModuleHttpFilterSharedPtr self = weak_from_this().lock()) {
+      Event::DeferredTaskUtil::deferredRun(
+          *dispatcher, [self = std::move(self), in_module_filter]() {
+            self->config_->on_http_filter_destroy_(in_module_filter);
+          });
+      return;
+    }
+  }
+  config_->on_http_filter_destroy_(in_module_filter);
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bool end_of_stream) {
@@ -188,6 +212,10 @@ envoy_dynamic_module_type_http_callout_init_result
 DynamicModuleHttpFilter::sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
                                          Http::RequestMessagePtr&& message,
                                          uint64_t timeout_milliseconds) {
+  // A callout registered after destroy() has drained the pending ones would never be cancelled.
+  if (destroyed_) {
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
   Upstream::ThreadLocalCluster* cluster =
       config_->cluster_manager_.getThreadLocalCluster(cluster_name);
   if (!cluster) {
@@ -328,6 +356,10 @@ envoy_dynamic_module_type_http_callout_init_result
 DynamicModuleHttpFilter::startHttpStream(uint64_t* stream_id_out, absl::string_view cluster_name,
                                          Http::RequestMessagePtr&& message, bool end_stream,
                                          uint64_t timeout_milliseconds) {
+  // A stream started after destroy() has drained the pending ones would never be reset.
+  if (destroyed_) {
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
   // Get the cluster.
   Upstream::ThreadLocalCluster* cluster =
       config_->cluster_manager_.getThreadLocalCluster(cluster_name);

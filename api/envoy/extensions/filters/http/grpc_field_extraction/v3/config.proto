@@ -139,6 +139,37 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // 	  "baz":[
 // 	  ]
 // 	}
+//
+// Normalizing the metadata key
+// ----------------------------
+//
+// By default the dynamic metadata key is the field path. ``metadata_key`` overrides it, which
+// allows different gRPC methods to write the same logical value under a common key.
+//
+// .. code-block:: json
+//
+// 	{
+// 	  "descriptor_set":{},
+// 	  "extractions_by_method":{
+// 	     "pkg.svc.Method":{
+// 	        "request_field_extractions":{
+// 	           "nested.bar":{
+// 	              "metadata_key":"bar"
+// 	           }
+// 	        }
+// 	     }
+// 	  }
+// 	}
+//
+// writes
+//
+// .. code-block:: json
+//
+// 	{
+// 	  "bar":[
+// 	     "val_bar1", "val_bar2"
+// 	  ]
+// 	}
 
 message GrpcFieldExtractionConfig {
   // The proto descriptor set binary for the gRPC services.
@@ -187,4 +218,14 @@ message RequestFieldValueDisposition {
     // Unimplemented. Uses "envoy.filters.http.grpc_field_extraction" for now.
     string dynamic_metadata = 1;
   }
+
+  // The key that the extracted value is written to within the dynamic metadata.
+  // If empty, the field path (the key of ``request_field_extractions``) is used.
+  //
+  // This is useful for normalizing the metadata written by different gRPC methods whose
+  // request messages name the same logical field differently.
+  //
+  // Within a single gRPC method, two field extractions must not resolve to the same
+  // metadata key, otherwise the configuration is rejected.
+  string metadata_key = 2;
 }

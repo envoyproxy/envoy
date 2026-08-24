@@ -11,6 +11,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -18,6 +19,8 @@ using testing::ByMove;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+
+using testing::Contains;
 
 namespace Envoy {
 namespace Extensions {
@@ -1924,7 +1927,7 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestAggregationCounter) {
   for (const auto& req : requests_) {
     for (const auto& metric : req->resource_metrics(0).scope_metrics(0).metrics()) {
       for (const auto& dp : metric.sum().data_points()) {
-        EXPECT_EQ(expected_values.count(dp.as_int()), 1);
+        EXPECT_THAT(expected_values, Contains(dp.as_int()));
         expected_values.erase(dp.as_int());
       }
     }
@@ -1983,7 +1986,7 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestAggregationHistogram) {
   for (const auto& req : requests_) {
     for (const auto& metric : req->resource_metrics(0).scope_metrics(0).metrics()) {
       for (const auto& dp : metric.histogram().data_points()) {
-        EXPECT_EQ(expected_counts.count(dp.count()), 1);
+        EXPECT_THAT(expected_counts, Contains(dp.count()));
         expected_counts.erase(dp.count());
         if (dp.count() == 1) {
           EXPECT_EQ(dp.sum(), 10.0);

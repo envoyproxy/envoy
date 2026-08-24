@@ -89,6 +89,7 @@ public:
       const std::vector<std::string>& untyped_forwarding_namespaces,
       const std::vector<std::string>& typed_forwarding_namespaces,
       const std::vector<std::string>& untyped_receiving_namespaces,
+      const std::vector<std::string>& typed_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
       const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
       bool allow_content_length_header)
@@ -97,6 +98,7 @@ public:
         untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
         typed_forwarding_namespaces_(&typed_forwarding_namespaces),
         untyped_receiving_namespaces_(&untyped_receiving_namespaces),
+        typed_receiving_namespaces_(&typed_receiving_namespaces),
         untyped_cluster_metadata_forwarding_namespaces_(
             &untyped_cluster_metadata_forwarding_namespaces),
         typed_cluster_metadata_forwarding_namespaces_(
@@ -152,6 +154,13 @@ public:
   };
   void setUntypedReceivingMetadataNamespaces(const std::vector<std::string>& ns) {
     untyped_receiving_namespaces_ = &ns;
+  };
+
+  const std::vector<std::string>& typedReceivingMetadataNamespaces() const {
+    return *typed_receiving_namespaces_;
+  };
+  void setTypedReceivingMetadataNamespaces(const std::vector<std::string>& ns) {
+    typed_receiving_namespaces_ = &ns;
   };
   const std::vector<std::string>& untypedClusterMetadataForwardingNamespaces() const {
     return *untyped_cluster_metadata_forwarding_namespaces_;
@@ -404,6 +413,7 @@ protected:
   const std::vector<std::string>* untyped_forwarding_namespaces_{};
   const std::vector<std::string>* typed_forwarding_namespaces_{};
   const std::vector<std::string>* untyped_receiving_namespaces_{};
+  const std::vector<std::string>* typed_receiving_namespaces_{};
   const std::vector<std::string>* untyped_cluster_metadata_forwarding_namespaces_{};
   const std::vector<std::string>* typed_cluster_metadata_forwarding_namespaces_{};
 
@@ -533,12 +543,14 @@ public:
       const std::vector<std::string>& untyped_forwarding_namespaces,
       const std::vector<std::string>& typed_forwarding_namespaces,
       const std::vector<std::string>& untyped_receiving_namespaces,
+      const std::vector<std::string>& typed_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
       const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
       bool allow_content_length_header)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
-                       untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
+                       untyped_receiving_namespaces, typed_receiving_namespaces,
+                       untyped_cluster_metadata_forwarding_namespaces,
                        typed_cluster_metadata_forwarding_namespaces, allow_content_length_header) {
     setProcessingModeInternal(mode);
   }
@@ -681,12 +693,14 @@ public:
       const std::vector<std::string>& untyped_forwarding_namespaces,
       const std::vector<std::string>& typed_forwarding_namespaces,
       const std::vector<std::string>& untyped_receiving_namespaces,
+      const std::vector<std::string>& typed_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
       const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
       bool allow_content_length_header)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
-                       untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
+                       untyped_receiving_namespaces, typed_receiving_namespaces,
+                       untyped_cluster_metadata_forwarding_namespaces,
                        typed_cluster_metadata_forwarding_namespaces, allow_content_length_header) {
     setProcessingModeInternal(mode);
   }

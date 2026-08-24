@@ -40,7 +40,7 @@ bool SupportedCommands::validateCommandSubcommands(const std::string& command,
   // Validate the subcommand against the allowlist
   const auto& allowed_subcommands = it->second;
 
-  return allowed_subcommands.find(subcommand) != allowed_subcommands.end();
+  return allowed_subcommands.contains(subcommand);
 }
 
 } // namespace Redis

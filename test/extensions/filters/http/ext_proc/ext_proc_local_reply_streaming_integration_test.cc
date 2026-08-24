@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include <utility>
 
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
@@ -27,6 +30,13 @@ using Http::LowerCaseString;
 
 class ExtProcLocalReplyStreamingIntegrationTest : public ExtProcIntegrationTest {
 public:
+  void SetUp() override {
+    if (!IsEnvoyGrpc()) {
+      GTEST_SKIP()
+          << "Google gRPC client is not supported for local reply streaming integration tests";
+    }
+  }
+
   void sendLocalResponseBody(bool end_of_stream) {
     ProcessingResponse body_response;
     auto streamed_response =
