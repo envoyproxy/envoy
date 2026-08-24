@@ -60,8 +60,13 @@ constexpr absl::string_view KeyIdSecretEntry = "key_id";
 class SecretReader {
 public:
   virtual ~SecretReader() = default;
+  // The OAuth client secret sent to the token endpoint by the auth types that use a shared
+  // secret. Only ever the single-value form of ``token_secret``.
   virtual const std::string& clientSecret() const PURE;
   virtual const std::string& hmacSecret() const PURE;
+  // The PEM-encoded key used to sign the JWT client assertion, taken from the ``private_key``
+  // entry of a multi-entry ``token_secret``, or from a single-value secret.
+  virtual const std::string& privateKey() const PURE;
   // The key ID distributed alongside the signing key in a multi-entry ``token_secret``, or an
   // empty string when the secret does not carry one.
   virtual const std::string& keyId() const PURE;
@@ -84,15 +89,18 @@ public:
                                   std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)),
         empty_client_secret_("") {}
   const std::string& clientSecret() const override {
+    return client_secret_ ? client_secret_->secret() : empty_client_secret_;
+  }
+  const std::string& hmacSecret() const override { return hmac_secret_->secret(); }
+  const std::string& privateKey() const override {
     if (client_secret_ == nullptr) {
       return empty_client_secret_;
     }
-    // A single-value secret carries the credential directly; a multi-entry secret carries it in a
-    // named entry alongside the key ID.
+    // A single-value secret holds the key directly; a multi-entry secret holds it in a named
+    // entry alongside the key ID.
     const std::string& value = client_secret_->secret();
     return value.empty() ? client_secret_->secret(PrivateKeySecretEntry) : value;
   }
-  const std::string& hmacSecret() const override { return hmac_secret_->secret(); }
   const std::string& keyId() const override {
     return client_secret_ ? client_secret_->secret(KeyIdSecretEntry) : empty_client_secret_;
   }
@@ -217,12 +225,19 @@ public:
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string hmacSecret() const { return secret_reader_->hmacSecret(); }
+  std::string privateKey() const { return secret_reader_->privateKey(); }
   std::string keyId() const { return secret_reader_->keyId(); }
   // The secrets are loaded asynchronously if per-route configurations are used, so the filter needs
   // to check if the secrets are available before processing the request.
   bool requiredSecretsAvailable() const {
-    return !secret_reader_->hmacSecret().empty() &&
-           (auth_type_ == AuthType::TlsClientAuth || !secret_reader_->clientSecret().empty());
+    if (secret_reader_->hmacSecret().empty()) {
+      return false;
+    }
+    if (auth_type_ == AuthType::TlsClientAuth) {
+      return true;
+    }
+    return auth_type_ == AuthType::PrivateKeyJwt ? !secret_reader_->privateKey().empty()
+                                                 : !secret_reader_->clientSecret().empty();
   }
   FilterStats& stats() const { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }

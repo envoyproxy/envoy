@@ -9,7 +9,6 @@
 #include "source/common/common/base64.h"
 #include "source/common/common/macros.h"
 #include "source/common/http/message_impl.h"
-#include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_protos.h"
@@ -109,6 +108,7 @@ public:
   explicit PEMSecretReader(std::string key_id = "") : key_id_(std::move(key_id)) {}
   const std::string& clientSecret() const override { return TEST_RSA_PRIVATE_KEY_PEM; }
   const std::string& hmacSecret() const override { return TEST_HMAC_SECRET; }
+  const std::string& privateKey() const override { return TEST_RSA_PRIVATE_KEY_PEM; }
   const std::string& keyId() const override { return key_id_; }
 
 private:
@@ -124,6 +124,7 @@ public:
 
   const std::string& clientSecret() const override { return client_secret_; }
   const std::string& hmacSecret() const override { return hmac_secret_; }
+  const std::string& privateKey() const override { return client_secret_; }
   const std::string& keyId() const override { return key_id_; }
 
 private:
@@ -2094,7 +2095,7 @@ TEST_F(OAuth2Test, PrivateKeyJwtUsesCustomAudienceInAssertion) {
   // Decode the JWT assertion and verify the aud claim is the custom audience.
   std::vector<absl::string_view> jwt_parts = absl::StrSplit(captured_assertion, '.');
   ASSERT_EQ(jwt_parts.size(), 3);
-  std::string payload = Base64::decodeWithoutPadding(std::string(jwt_parts[1]));
+  std::string payload = Base64Url::decode(std::string(jwt_parts[1]));
   EXPECT_NE(std::string::npos, payload.find("\"aud\":\"https://issuer.example.com\""));
 }
 
@@ -2155,7 +2156,7 @@ TEST_F(OAuth2Test, PrivateKeyJwtKeyIdFromSecretIncludedInAssertionHeader) {
   // Decode the JWT header and verify the kid claim is present.
   std::vector<absl::string_view> jwt_parts = absl::StrSplit(captured_assertion, '.');
   ASSERT_EQ(jwt_parts.size(), 3);
-  std::string header = Base64::decodeWithoutPadding(std::string(jwt_parts[0]));
+  std::string header = Base64Url::decode(std::string(jwt_parts[0]));
   EXPECT_NE(std::string::npos, header.find("\"kid\":\"test-kid-456\""));
 }
 
@@ -2217,7 +2218,7 @@ TEST_F(OAuth2Test, PrivateKeyJwtNoKeyIdOmitsKidFromHeader) {
   // Decode the JWT header and verify no kid claim is present.
   std::vector<absl::string_view> jwt_parts = absl::StrSplit(captured_assertion, '.');
   ASSERT_EQ(jwt_parts.size(), 3);
-  std::string header = Base64::decodeWithoutPadding(std::string(jwt_parts[0]));
+  std::string header = Base64Url::decode(std::string(jwt_parts[0]));
   EXPECT_EQ(std::string::npos, header.find("kid"));
 }
 
@@ -2235,7 +2236,10 @@ TEST_F(OAuth2Test, SdsSecretReaderMultiEntrySecretProvidesKeyAndKeyId) {
                          factory_context_.server_factory_context_.threadLocal(),
                          factory_context_.server_factory_context_.api());
 
-  EXPECT_EQ("pem-data", reader.clientSecret());
+  // The PEM is reachable only as the signing key — never as an OAuth client secret, which the
+  // non-JWT auth types would send to the token endpoint.
+  EXPECT_EQ("", reader.clientSecret());
+  EXPECT_EQ("pem-data", reader.privateKey());
   EXPECT_EQ("my-key-id", reader.keyId());
   EXPECT_EQ("hmac", reader.hmacSecret());
 }
@@ -2253,6 +2257,7 @@ TEST_F(OAuth2Test, SdsSecretReaderSingleValueSecretHasNoKeyId) {
                          factory_context_.server_factory_context_.api());
 
   EXPECT_EQ("pem-data", reader.clientSecret());
+  EXPECT_EQ("pem-data", reader.privateKey());
   EXPECT_EQ("", reader.keyId());
 }
 
@@ -2266,6 +2271,7 @@ TEST_F(OAuth2Test, SdsSecretReaderMissingClientSecretProviderYieldsEmptyValues) 
                          factory_context_.server_factory_context_.api());
 
   EXPECT_EQ("", reader.clientSecret());
+  EXPECT_EQ("", reader.privateKey());
   EXPECT_EQ("", reader.keyId());
 }
 

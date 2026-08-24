@@ -1121,7 +1121,7 @@ absl::StatusOr<std::string> OAuth2Filter::getClientCredential() {
   }
 
   auto assertion_result = ClientAssertion::create(
-      config_->clientId(), config_->jwtAssertionAudience(), config_->clientSecret(),
+      config_->clientId(), config_->jwtAssertionAudience(), config_->privateKey(),
       config_->jwtSigningAlgorithm(), config_->jwtAssertionLifetime(), time_source_, random_,
       config_->keyId());
   if (!assertion_result.ok()) {

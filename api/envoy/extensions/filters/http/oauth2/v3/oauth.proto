@@ -141,6 +141,9 @@ message OAuth2Credentials {
   //   Identity providers use it to select the correct verification key when more than one key is
   //   registered for the client. Distributing both in one secret means the key ID is always
   //   rotated together with the key it identifies.
+  //
+  // The multi-entry form is only read when ``auth_type`` is ``PRIVATE_KEY_JWT``. The other auth
+  // types read the single-value form only.
   transport_sockets.tls.v3.SdsSecretConfig token_secret = 2;
 
   // Configures how the secret token should be created.
