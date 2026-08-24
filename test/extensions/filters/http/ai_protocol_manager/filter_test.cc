@@ -436,6 +436,8 @@ public:
   }
 
   void TearDown() override {
+    // Only typed metadata is published; an untyped write anywhere is a bug.
+    EXPECT_TRUE(metadata_writes_.empty());
     if (filter_ != nullptr) {
       filter_->onDestroy();
     }
@@ -460,14 +462,7 @@ public:
     return counter != nullptr ? counter->value() : 0;
   }
 
-  const Protobuf::Struct* singleMetadataWrite(const std::string& expected_namespace) {
-    if (metadata_writes_.size() != 1 || metadata_writes_[0].first != expected_namespace) {
-      return nullptr;
-    }
-    return &metadata_writes_[0].second;
-  }
-
-  // The authoritative typed record published alongside the Struct projection.
+  // The authoritative typed record.
   std::optional<envoy::data::ai::v3::TokenUsage>
   singleTypedWrite(const std::string& expected_namespace) {
     if (typed_metadata_writes_.size() != 1 ||
@@ -508,25 +503,13 @@ TEST_F(AiProtocolManagerFilterResponseTest, SseUsagePublishedAtEndOfStream) {
            false);
   sendData("data: [DONE]\n\n", true);
 
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  const auto& fields = metadata->fields();
-  EXPECT_EQ(fields.at("api_protocol").string_value(), "OPENAI_CHAT_COMPLETIONS");
-  EXPECT_EQ(fields.at("model").string_value(), "gpt-4o");
-  EXPECT_EQ(fields.at("input_tokens").number_value(), 19);
-  EXPECT_EQ(fields.at("output_tokens").number_value(), 10);
-  EXPECT_EQ(fields.at("total_tokens").number_value(), 29);
-  // The provider total is always preserved, agreeing or not.
-  EXPECT_EQ(fields.at("provider_total_tokens").number_value(), 29);
-  EXPECT_EQ(fields.at("extraction_status").string_value(), "COMPLETE");
   EXPECT_EQ(counterValue("token_usage_found"), 1);
   EXPECT_EQ(counterValue("token_usage_total_mismatch"), 0);
 
-  // The authoritative typed record carries the same values with full uint64
-  // presence semantics.
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
   EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  // The provider total is always preserved, agreeing or not.
   EXPECT_EQ(typed->model(), "gpt-4o");
   EXPECT_EQ(typed->input_tokens().value(), 19);
   EXPECT_EQ(typed->output_tokens().value(), 10);
@@ -559,10 +542,10 @@ TEST_F(AiProtocolManagerFilterResponseTest, PartialUsageReportsExtractionStatus)
                "\"candidatesTokenCount\":149,\"totalTokenCount\":155}}\n\n",
            true);
 
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  EXPECT_EQ(metadata->fields().at("total_tokens").number_value(), 22); // Stale snapshot.
-  EXPECT_EQ(metadata->fields().at("extraction_status").string_value(), "PARTIAL");
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->total_tokens().value(), 22); // Stale snapshot.
+  EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::PARTIAL);
   EXPECT_EQ(counterValue("sse_event_too_large"), 1);
 }
 
@@ -578,7 +561,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentLengthOverCapSkipsExtraction)
       {":status", "200"}, {"content-type", "application/json"}, {"content-length", "100"}};
   EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
   sendData(std::string(100, 'x'), true); // Passes through untouched, uninspected.
-  EXPECT_TRUE(metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty());
   EXPECT_EQ(counterValue("response_body_too_large"), 1);
   EXPECT_EQ(counterValue("response_parse_error"), 0); // Never buffered or parsed.
 }
@@ -603,12 +586,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, ExtractionFailurePublishesStatusOnly
                "\"total_tokens\":3}}\n\n",
            true);
 
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  EXPECT_EQ(metadata->fields().at("extraction_status").string_value(), "FAILED");
-  EXPECT_EQ(metadata->fields().at("api_protocol").string_value(), "OPENAI_CHAT_COMPLETIONS");
-  EXPECT_EQ(metadata->fields().at("model").string_value(), "gpt-4o");
-  EXPECT_EQ(metadata->fields().count("total_tokens"), 0); // No counts recovered.
   EXPECT_EQ(counterValue("token_usage_failed"), 1);
   EXPECT_EQ(counterValue("token_usage_partial"), 0);
   EXPECT_EQ(counterValue("token_usage_found"), 0);
@@ -618,6 +595,8 @@ TEST_F(AiProtocolManagerFilterResponseTest, ExtractionFailurePublishesStatusOnly
   ASSERT_TRUE(typed.has_value());
   EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
   EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  EXPECT_EQ(typed->model(), "gpt-4o");
+  EXPECT_FALSE(typed->has_total_tokens()); // No counts recovered.
   EXPECT_FALSE(typed->has_input_tokens());
 }
 
@@ -628,7 +607,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, AbsentUsagePublishesNothing) {
   sendData("data: {\"object\":\"chat.completion.chunk\",\"choices\":[{\"delta\":{}}],"
            "\"usage\":null}\n\ndata: [DONE]\n\n",
            true);
-  EXPECT_TRUE(metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty());
   EXPECT_EQ(counterValue("token_usage_missing"), 1);
   EXPECT_EQ(counterValue("token_usage_partial"), 0);
 }
@@ -641,7 +620,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, EligibleHeadersOnlyResponseCountsMis
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"content-type", "application/json"}};
   EXPECT_EQ(filter_->encodeHeaders(headers, true), Http::FilterHeadersStatus::Continue);
   EXPECT_EQ(counterValue("token_usage_missing"), 1);
-  EXPECT_TRUE(metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty());
 }
 
 // A syntactically valid final document whose known count fields are unusable
@@ -656,33 +635,34 @@ TEST_F(AiProtocolManagerFilterResponseTest, MalformedPresentUsageFieldMarksParti
            "\"totalTokenCount\":\"155\"}}\n\n",
            true);
 
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  EXPECT_EQ(metadata->fields().at("total_tokens").number_value(), 22); // Stale snapshot.
-  EXPECT_EQ(metadata->fields().at("extraction_status").string_value(), "PARTIAL");
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->total_tokens().value(), 22); // Stale snapshot.
+  EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::PARTIAL);
   EXPECT_EQ(counterValue("malformed_usage_field"), 1);
   EXPECT_EQ(counterValue("token_usage_partial"), 1);
 }
 
 // With the filter installed in both chains (allowed by the API), the first
-// publication owns the namespace: StreamInfo merges Structs per namespace, so
-// a second write would blend two observations into one hybrid record.
+// publication owns the namespace: a second write would leave consumers with
+// an ambiguous record.
 TEST_F(AiProtocolManagerFilterResponseTest, DuplicatePublicationSkipped) {
   setup();
   // Simulate the upstream installation having already published.
-  Protobuf::Struct prior;
-  (*prior.mutable_fields())["model"].set_string_value("model-a");
-  (*prior.mutable_fields())["total_tokens"].set_number_value(100);
-  (*encoder_callbacks_.stream_info_.metadata_.mutable_filter_metadata())["envoy.ai.token_usage"] =
-      prior;
+  envoy::data::ai::v3::TokenUsage prior;
+  prior.set_model("model-a");
+  prior.mutable_total_tokens()->set_value(100);
+  Protobuf::Any prior_any;
+  MessageUtil::packFrom(prior_any, prior);
+  (*encoder_callbacks_.stream_info_.metadata_
+        .mutable_typed_filter_metadata())["envoy.ai.token_usage"] = prior_any;
 
   sendHeaders("application/json");
   sendData("{\"object\":\"chat.completion\",\"usage\":{\"prompt_tokens\":3,"
            "\"completion_tokens\":4,\"total_tokens\":7}}",
            true);
 
-  EXPECT_TRUE(metadata_writes_.empty()); // No second write, no hybrid merge.
-  EXPECT_TRUE(typed_metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty()); // No second write.
   EXPECT_EQ(counterValue("token_usage_duplicate"), 1);
   EXPECT_EQ(counterValue("token_usage_found"), 0);
 }
@@ -696,11 +676,11 @@ TEST_F(AiProtocolManagerFilterResponseTest, InconsistentProviderTotalSurfaced) {
            "\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":4,\"total_tokens\":100}}",
            true);
 
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  EXPECT_EQ(metadata->fields().at("total_tokens").number_value(), 7);
-  EXPECT_EQ(metadata->fields().at("provider_total_tokens").number_value(), 100);
-  EXPECT_EQ(metadata->fields().at("extraction_status").string_value(), "COMPLETE");
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->total_tokens().value(), 7);
+  EXPECT_EQ(typed->provider_total_tokens().value(), 100);
+  EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::COMPLETE);
   EXPECT_EQ(counterValue("token_usage_total_mismatch"), 1);
 }
 
@@ -719,12 +699,12 @@ TEST_F(AiProtocolManagerFilterResponseTest, SseAnthropicComputedTotal) {
            "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n",
            true);
 
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  EXPECT_EQ(metadata->fields().at("input_tokens").number_value(), 2679);
-  EXPECT_EQ(metadata->fields().at("output_tokens").number_value(), 15);
-  EXPECT_EQ(metadata->fields().at("total_tokens").number_value(), 2694);
-  EXPECT_EQ(metadata->fields().at("api_protocol").string_value(), "ANTHROPIC_MESSAGES");
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->input_tokens().value(), 2679);
+  EXPECT_EQ(typed->output_tokens().value(), 15);
+  EXPECT_EQ(typed->total_tokens().value(), 2694);
+  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
 }
 
 // A JSON body (Gemini generateContent) is parsed at end of stream.
@@ -738,22 +718,15 @@ TEST_F(AiProtocolManagerFilterResponseTest, JsonBodyGemini) {
            "\"modelVersion\":\"gemini-2.5-flash\"}",
            true);
 
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  EXPECT_EQ(metadata->fields().at("input_tokens").number_value(), 6);
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->input_tokens().value(), 6);
   // Canonical inclusive output: 149 candidates + 12 thoughts.
-  EXPECT_EQ(metadata->fields().at("output_tokens").number_value(), 161);
-  EXPECT_EQ(metadata->fields().at("total_tokens").number_value(), 167);
-  // Breakdown counts project as nested Structs, mirroring the typed record.
-  EXPECT_EQ(metadata->fields()
-                .at("output_token_details")
-                .struct_value()
-                .fields()
-                .at("reasoning_tokens")
-                .number_value(),
-            12);
-  EXPECT_EQ(metadata->fields().at("api_protocol").string_value(), "GEMINI_GENERATE_CONTENT");
-  EXPECT_EQ(metadata->fields().at("model").string_value(), "gemini-2.5-flash");
+  EXPECT_EQ(typed->output_tokens().value(), 161);
+  EXPECT_EQ(typed->total_tokens().value(), 167);
+  EXPECT_EQ(typed->output_token_details().reasoning_tokens().value(), 12);
+  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+  EXPECT_EQ(typed->model(), "gemini-2.5-flash");
 }
 
 // Reviewer merge-gate case: an ordinary long OpenAI Responses generation
@@ -778,10 +751,10 @@ TEST_F(AiProtocolManagerFilterResponseTest, LargeOpenAiResponsesTerminalEventDef
                "\"total_tokens\":21037}}}\n\n",
            true);
 
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  EXPECT_EQ(metadata->fields().at("input_tokens").number_value(), 37);
-  EXPECT_EQ(metadata->fields().at("output_tokens").number_value(), 21000);
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->input_tokens().value(), 37);
+  EXPECT_EQ(typed->output_tokens().value(), 21000);
   EXPECT_EQ(counterValue("sse_event_too_large"), 0);
   EXPECT_EQ(counterValue("token_usage_found"), 1);
 }
@@ -795,7 +768,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, TrailersFinalize) {
            false);
   Http::TestResponseTrailerMapImpl trailers{{"grpc-status", "0"}};
   EXPECT_EQ(filter_->encodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
-  EXPECT_NE(singleMetadataWrite("envoy.ai.token_usage"), nullptr);
+  EXPECT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
 }
 
 // A JSON response whose body ends via trailers (no end_stream data frame) is
@@ -808,10 +781,10 @@ TEST_F(AiProtocolManagerFilterResponseTest, JsonResponseEndingInTrailers) {
   Http::TestResponseTrailerMapImpl trailers{{"grpc-status", "0"}};
   EXPECT_EQ(filter_->encodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
 
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  EXPECT_EQ(metadata->fields().at("input_tokens").number_value(), 5);
-  EXPECT_EQ(metadata->fields().at("output_tokens").number_value(), 7);
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->input_tokens().value(), 5);
+  EXPECT_EQ(typed->output_tokens().value(), 7);
   EXPECT_EQ(counterValue("token_usage_found"), 1);
 }
 
@@ -823,9 +796,9 @@ TEST_F(AiProtocolManagerFilterResponseTest, EmptyTerminalDataFrameFinalizes) {
   sendData("{\"type\":\"message\",\"usage\":{\"input_tokens\":3,\"output_tokens\":4}}",
            /*end_stream=*/false);
   sendData("", /*end_stream=*/true);
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  EXPECT_EQ(metadata->fields().at("total_tokens").number_value(), 7);
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->total_tokens().value(), 7);
 }
 
 // A stream that resets before end-of-stream publishes nothing: no metadata,
@@ -838,7 +811,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ResetDoesNotPublish) {
            /*end_stream=*/false);
   filter_->onDestroy();
   filter_.reset();
-  EXPECT_TRUE(metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty());
   EXPECT_EQ(counterValue("token_usage_found"), 0);
   EXPECT_EQ(counterValue("token_usage_missing"), 0);
 }
@@ -851,7 +824,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, UsageAbsentCountsMissing) {
   sendData("data: {\"object\":\"chat.completion.chunk\",\"choices\":[{\"delta\":{}}],"
            "\"usage\":null}\n\ndata: [DONE]\n\n",
            true);
-  EXPECT_TRUE(metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty());
   EXPECT_EQ(counterValue("token_usage_missing"), 1);
   EXPECT_EQ(counterValue("token_usage_found"), 0);
 }
@@ -862,9 +835,9 @@ TEST_F(AiProtocolManagerFilterResponseTest, DefaultApiProtocolConfig) {
   setup("{default_api_protocol: ANTHROPIC_MESSAGES}");
   sendHeaders("application/json");
   sendData("{\"usage\":{\"input_tokens\":5,\"output_tokens\":7}}", true);
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  EXPECT_EQ(metadata->fields().at("api_protocol").string_value(), "ANTHROPIC_MESSAGES");
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
 }
 
 // Token usage is scoped to declared routes by default: with
@@ -880,7 +853,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, RouteScopingDefaultsToConfiguredRout
   sendData("{\"object\":\"chat.completion\",\"usage\":{\"prompt_tokens\":3,"
            "\"completion_tokens\":4,\"total_tokens\":7}}",
            true);
-  EXPECT_TRUE(metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty());
   EXPECT_EQ(counterValue("token_usage_found"), 0);
   EXPECT_EQ(counterValue("token_usage_missing"), 0);
 
@@ -892,7 +865,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, RouteScopingDefaultsToConfiguredRout
   sendData("{\"object\":\"chat.completion\",\"usage\":{\"prompt_tokens\":3,"
            "\"completion_tokens\":4,\"total_tokens\":7}}",
            true);
-  ASSERT_NE(singleMetadataWrite("envoy.ai.token_usage"), nullptr);
+  ASSERT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
   EXPECT_EQ(counterValue("token_usage_found"), 1);
 }
 
@@ -912,9 +885,9 @@ TEST_F(AiProtocolManagerFilterResponseTest, PerRouteProtocolPrecedence) {
   sendHeaders("application/json");
   sendData(ambiguous, true);
   {
-    const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-    ASSERT_NE(metadata, nullptr);
-    EXPECT_EQ(metadata->fields().at("api_protocol").string_value(), "ANTHROPIC_MESSAGES");
+    const auto typed = singleTypedWrite("envoy.ai.token_usage");
+    ASSERT_TRUE(typed.has_value());
+    EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   }
 
   // route request > default_api_protocol.
@@ -925,9 +898,9 @@ TEST_F(AiProtocolManagerFilterResponseTest, PerRouteProtocolPrecedence) {
   sendHeaders("application/json");
   sendData(ambiguous, true);
   {
-    const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-    ASSERT_NE(metadata, nullptr);
-    EXPECT_EQ(metadata->fields().at("api_protocol").string_value(), "ANTHROPIC_MESSAGES");
+    const auto typed = singleTypedWrite("envoy.ai.token_usage");
+    ASSERT_TRUE(typed.has_value());
+    EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   }
 }
 
@@ -936,7 +909,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, CustomMetadataNamespace) {
   setup("{metadata_namespace: custom.ns}");
   sendHeaders("application/json");
   sendData("{\"type\":\"message\",\"usage\":{\"input_tokens\":1,\"output_tokens\":2}}", true);
-  EXPECT_NE(singleMetadataWrite("custom.ns"), nullptr);
+  EXPECT_TRUE(singleTypedWrite("custom.ns").has_value());
 }
 
 // Non-2xx responses, unsupported content types, and headers-only responses are
@@ -945,18 +918,18 @@ TEST_F(AiProtocolManagerFilterResponseTest, UninspectedResponses) {
   setup();
   sendHeaders("text/event-stream", "502");
   sendData("data: {\"usageMetadata\":{\"promptTokenCount\":1}}\n\n", true);
-  EXPECT_TRUE(metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty());
   EXPECT_EQ(counterValue("token_usage_missing"), 0);
 
   setup();
   sendHeaders("text/plain");
   sendData("hello", true);
-  EXPECT_TRUE(metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty());
 
   setup();
   Http::TestResponseHeaderMapImpl headers{{":status", "204"}};
   EXPECT_EQ(filter_->encodeHeaders(headers, true), Http::FilterHeadersStatus::Continue);
-  EXPECT_TRUE(metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty());
 }
 
 // Compressed responses cannot be inspected: any non-identity content-encoding
@@ -971,7 +944,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, CompressedResponseSkipped) {
   sendData("\x1f\x8b\x08\x00"
            "compressed-bytes",
            true);
-  EXPECT_TRUE(metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty());
   EXPECT_EQ(counterValue("unsupported_content_encoding"), 1);
   EXPECT_EQ(counterValue("response_parse_error"), 0);
   EXPECT_EQ(counterValue("token_usage_missing"), 0);
@@ -991,7 +964,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentEncodingMatrix) {
                                             {"content-encoding", "gzip"}};
     EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
     sendData("{}", true);
-    EXPECT_TRUE(metadata_writes_.empty());
+    EXPECT_TRUE(typed_metadata_writes_.empty());
     EXPECT_EQ(counterValue("unsupported_content_encoding"), 1);
   }
   // Comma-separated codings in one entry.
@@ -1002,7 +975,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentEncodingMatrix) {
                                             {"content-encoding", "identity, gzip"}};
     EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
     sendData("{}", true);
-    EXPECT_TRUE(metadata_writes_.empty());
+    EXPECT_TRUE(typed_metadata_writes_.empty());
     // The fixture's stats store persists across setup() calls: cumulative.
     EXPECT_EQ(counterValue("unsupported_content_encoding"), 2);
   }
@@ -1015,7 +988,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentEncodingMatrix) {
                                             {"content-encoding", "identity"}};
     EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
     sendData("{\"type\":\"message\",\"usage\":{\"input_tokens\":5,\"output_tokens\":7}}", true);
-    EXPECT_NE(singleMetadataWrite("envoy.ai.token_usage"), nullptr);
+    EXPECT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
     EXPECT_EQ(counterValue("unsupported_content_encoding"), 2); // Unchanged.
   }
   // Empty list elements are malformed and disqualify the response.
@@ -1026,7 +999,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentEncodingMatrix) {
                                             {"content-encoding", "identity,,identity"}};
     EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
     sendData("{}", true);
-    EXPECT_TRUE(metadata_writes_.empty());
+    EXPECT_TRUE(typed_metadata_writes_.empty());
     EXPECT_EQ(counterValue("unsupported_content_encoding"), 3);
   }
   // Compressed but never-eligible content type: no handler and no stat.
@@ -1036,7 +1009,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentEncodingMatrix) {
         {":status", "200"}, {"content-type", "text/plain"}, {"content-encoding", "gzip"}};
     EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
     sendData("hello", true);
-    EXPECT_TRUE(metadata_writes_.empty());
+    EXPECT_TRUE(typed_metadata_writes_.empty());
     EXPECT_EQ(counterValue("unsupported_content_encoding"), 3); // Unchanged.
   }
 }
@@ -1050,14 +1023,6 @@ TEST_F(AiProtocolManagerFilterResponseTest, InputTokenDetailsPublished) {
            "\"usage\":{\"input_tokens\":100,\"output_tokens\":7,"
            "\"cache_read_input_tokens\":30,\"cache_creation_input_tokens\":20}}",
            true);
-
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  const auto& details = metadata->fields().at("input_token_details").struct_value().fields();
-  EXPECT_EQ(details.at("cached_tokens").number_value(), 30);
-  EXPECT_EQ(details.at("cache_creation_tokens").number_value(), 20);
-  // Canonical inclusive input: 100 uncached + 30 cache reads + 20 cache writes.
-  EXPECT_EQ(metadata->fields().at("input_tokens").number_value(), 150);
 
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
@@ -1095,10 +1060,10 @@ TEST_F(AiProtocolManagerFilterResponseTest, OversizedBodyWithoutContentLengthFai
   EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
   sendData(std::string(100, 'x'), true);
 
-  const auto* metadata = singleMetadataWrite("envoy.ai.token_usage");
-  ASSERT_NE(metadata, nullptr);
-  EXPECT_EQ(metadata->fields().at("api_protocol").string_value(), "API_PROTOCOL_UNSPECIFIED");
-  EXPECT_EQ(metadata->fields().at("extraction_status").string_value(), "FAILED");
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED);
+  EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
   EXPECT_EQ(counterValue("response_body_too_large"), 1);
   EXPECT_EQ(counterValue("token_usage_failed"), 1);
 }
@@ -1114,7 +1079,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, DisabledWithoutConfig) {
            "\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2,\"total_tokens\":3}}\n\n"
            "data: [DONE]\n\n",
            true);
-  EXPECT_TRUE(metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty());
 
   setupWithProto(envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager());
   sendHeaders("text/event-stream");
@@ -1122,7 +1087,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, DisabledWithoutConfig) {
            "\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2,\"total_tokens\":3}}\n\n"
            "data: [DONE]\n\n",
            true);
-  EXPECT_TRUE(metadata_writes_.empty());
+  EXPECT_TRUE(typed_metadata_writes_.empty());
   EXPECT_EQ(counterValue("token_usage_found"), 0);
   EXPECT_EQ(counterValue("token_usage_missing"), 0);
 }

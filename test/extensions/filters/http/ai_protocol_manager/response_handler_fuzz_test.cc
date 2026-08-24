@@ -2,6 +2,7 @@
 #include <string>
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/response_handler.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -88,8 +89,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   // Canonicalization must be fragmentation-independent too.
   TokenUsage a_final = a;
   TokenUsage b_final = b;
-  a_final.finalize();
-  b_final.finalize();
+  finalizeUsage(a_final);
+  finalizeUsage(b_final);
   FUZZ_ASSERT(a_final.input_tokens == b_final.input_tokens);
   FUZZ_ASSERT(a_final.output_tokens == b_final.output_tokens);
   FUZZ_ASSERT(a_final.total_tokens == b_final.total_tokens);

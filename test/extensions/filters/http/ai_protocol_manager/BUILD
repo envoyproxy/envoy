@@ -77,13 +77,15 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "token_usage_extractor_test",
-    srcs = ["token_usage_extractor_test.cc"],
+    name = "api_protocol_adapters_test",
+    srcs = ["api_protocol_adapters_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
     rbe_pool = "6gig",
     deps = [
         "//source/common/json:json_loader_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:token_usage_extractor_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:api_protocol_adapters_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:schema_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:token_usage_lib",
         "//test/test_common:utility_lib",
     ],
 )

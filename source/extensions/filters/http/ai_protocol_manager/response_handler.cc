@@ -67,12 +67,13 @@ bool ResponseHandler::processDocument(const nlohmann::json& json) {
     return false;
   }
   if (format_ == ApiProtocol::Unspecified) {
-    format_ = TokenUsageExtractor::detectFormat(json);
+    format_ = AdapterRegistry::detect(json);
     if (format_ == ApiProtocol::Unspecified) {
       return false; // Not discriminating; a later document may be.
     }
   }
-  const ExtractionResult result = TokenUsageExtractor::extract(format_, json);
+  const ApiProtocolAdapter& adapter = AdapterRegistry::get(format_);
+  const ExtractionResult result = adapter.extractUsage(json);
   usage_.merge(result.usage);
   if (result.malformed) {
     // A corrupt document must not leave an earlier accumulated snapshot
@@ -80,7 +81,7 @@ bool ResponseHandler::processDocument(const nlohmann::json& json) {
     stats_.malformed_usage_field_.inc();
     degraded_ = true;
   }
-  return TokenUsageExtractor::isTerminalEvent(format_, json);
+  return adapter.isTerminalEvent(json);
 }
 
 std::optional<uint64_t> SseResponseHandler::scanView(absl::string_view data) {

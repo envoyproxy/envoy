@@ -10,8 +10,9 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
-#include "source/extensions/filters/http/ai_protocol_manager/schema/schema_registry.h"
+#include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
@@ -57,14 +58,6 @@ bool contentEncodingIsIdentity(const Http::ResponseHeaderMap& headers) {
   return true;
 }
 
-void setCount(Protobuf::Struct& metadata, absl::string_view key,
-              const std::optional<uint64_t>& value) {
-  if (value.has_value()) {
-    (*metadata.mutable_fields())[std::string(key)].set_number_value(
-        static_cast<double>(value.value()));
-  }
-}
-
 envoy::type::ai::v3::ApiProtocol typedApiProtocol(ApiProtocol protocol) {
   switch (protocol) {
   case ApiProtocol::OpenAiChatCompletions:
@@ -82,8 +75,7 @@ envoy::type::ai::v3::ApiProtocol typedApiProtocol(ApiProtocol protocol) {
 }
 
 // Converts the finalized accumulator once into the authoritative typed
-// record (envoy.data.ai.v3.TokenUsage); the untyped Struct is projected
-// from it, never built independently. A record with no counts at all is
+// record (envoy.data.ai.v3.TokenUsage). A record with no counts at all is
 // status-only and publishes as FAILED.
 envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degraded) {
   envoy::data::ai::v3::TokenUsage typed;
@@ -120,55 +112,6 @@ envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degrade
                                          : envoy::data::ai::v3::TokenUsage::COMPLETE);
   }
   return typed;
-}
-
-// The untyped Struct projection: the typed record's fields and enum-value
-// names mirrored key-for-key, for consumers that only read untyped metadata
-// (%DYNAMIC_METADATA%, CEL). Counts are double-backed here; the typed record
-// carries full uint64 precision.
-Protobuf::Struct structProjection(const envoy::data::ai::v3::TokenUsage& typed) {
-  Protobuf::Struct metadata;
-  auto& fields = *metadata.mutable_fields();
-  fields["api_protocol"].set_string_value(
-      envoy::type::ai::v3::ApiProtocol_Name(typed.api_protocol()));
-  if (!typed.model().empty()) {
-    fields["model"].set_string_value(typed.model());
-  }
-  const auto set_count = [&metadata](absl::string_view key, bool present, uint64_t value) {
-    if (present) {
-      setCount(metadata, key, value);
-    }
-  };
-  set_count("input_tokens", typed.has_input_tokens(), typed.input_tokens().value());
-  set_count("output_tokens", typed.has_output_tokens(), typed.output_tokens().value());
-  set_count("total_tokens", typed.has_total_tokens(), typed.total_tokens().value());
-  set_count("provider_total_tokens", typed.has_provider_total_tokens(),
-            typed.provider_total_tokens().value());
-  const auto set_detail = [](Protobuf::Struct& target, absl::string_view key, bool present,
-                             uint64_t value) {
-    if (present) {
-      setCount(target, key, value);
-    }
-  };
-  if (typed.has_input_token_details()) {
-    const auto& details = typed.input_token_details();
-    Protobuf::Struct& details_struct = *fields["input_token_details"].mutable_struct_value();
-    set_detail(details_struct, "cached_tokens", details.has_cached_tokens(),
-               details.cached_tokens().value());
-    set_detail(details_struct, "cache_creation_tokens", details.has_cache_creation_tokens(),
-               details.cache_creation_tokens().value());
-    set_detail(details_struct, "tool_use_tokens", details.has_tool_use_tokens(),
-               details.tool_use_tokens().value());
-  }
-  if (typed.has_output_token_details()) {
-    const auto& details = typed.output_token_details();
-    Protobuf::Struct& details_struct = *fields["output_token_details"].mutable_struct_value();
-    set_detail(details_struct, "reasoning_tokens", details.has_reasoning_tokens(),
-               details.reasoning_tokens().value());
-  }
-  fields["extraction_status"].set_string_value(
-      envoy::data::ai::v3::TokenUsage::ExtractionStatus_Name(typed.extraction_status()));
-  return metadata;
 }
 
 } // namespace
@@ -311,7 +254,8 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
     if (isAiEndpoint()) {
       // TODO(penguingao): Support validating payload schema on the fly as the Wuffs parser
       // streams and parses chunks, rejecting invalid fields early before end_stream.
-      if (const PayloadSchema* payload_schema = SchemaRegistry::getSchema(route_request_protocol_);
+      if (const PayloadSchema* payload_schema =
+              AdapterRegistry::get(route_request_protocol_).schema();
           payload_schema != nullptr) {
         const absl::Status validation_status = payload_schema->validateRequest(request_json_);
         if (!validation_status.ok()) {
@@ -526,7 +470,7 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
   response_finalized_ = true;
 
   TokenUsage usage = response_handler_->usage();
-  usage.finalize();
+  finalizeUsage(usage);
   const bool degraded = response_handler_->degraded() || usage.canonicalizationOverflow();
   if (!usage.hasAny() && !degraded) {
     // Legitimately absent usage: e.g. an OpenAI stream without
@@ -535,12 +479,11 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
     return;
   }
 
-  // setDynamicMetadata *merges* Structs per namespace, so two publications
-  // for one stream (both-placement installs) would blend two observations
-  // into one hybrid record. First writer wins: the upstream instance
-  // publishes first, later instances skip.
+  // Two publications for one stream (both-placement installs) would leave
+  // consumers with an ambiguous record. First writer wins: the upstream
+  // instance publishes first, later instances skip.
   const auto& existing_metadata =
-      encoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+      encoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
   if (existing_metadata.contains(config_->metadataNamespace())) {
     ENVOY_LOG(debug,
               "ai_protocol_manager: namespace {} already published for this stream "
@@ -551,22 +494,19 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
   }
 
   // Convert the finalized accumulator once into the authoritative typed
-  // record; both the typed publication and the untyped Struct projection come
-  // from it. When extraction failed outright the record is status-only
-  // (api_protocol/model/extraction_status, no counts), letting consumers
-  // distinguish "failed to extract" from "no usage supplied".
+  // record (envoy.data.ai.v3.TokenUsage). When extraction failed outright the
+  // record is status-only (api_protocol/model/extraction_status, no counts),
+  // letting consumers distinguish "failed to extract" from "no usage
+  // supplied". Only typed metadata is published: consumers with full-fidelity
+  // needs (ext_proc typed forwarding, filters reading typed metadata) share
+  // the proto definition; no untyped Struct mirror is emitted.
   const envoy::data::ai::v3::TokenUsage typed = typedUsage(usage, degraded);
   // In both roles streamInfo() resolves to the downstream request's
   // StreamInfo. Under retries/hedging only the router-selected attempt
   // streams to a clean end of stream, so only the winner reaches this write.
-  // Typed metadata is the authoritative record; the Struct projection under
-  // the same namespace serves %DYNAMIC_METADATA%/CEL, which read untyped
-  // metadata only, so the same-key precedence rule never bites in practice.
   Protobuf::Any typed_any;
   MessageUtil::packFrom(typed_any, typed);
   encoder_callbacks_->streamInfo().setDynamicTypedMetadata(config_->metadataNamespace(), typed_any);
-  encoder_callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(),
-                                                      structProjection(typed));
 
   if (!usage.hasAny()) {
     config_->stats().token_usage_failed_.inc();

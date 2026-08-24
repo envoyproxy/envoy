@@ -85,16 +85,42 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "token_usage_extractor_lib",
-    srcs = ["token_usage_extractor.cc"],
-    hdrs = ["token_usage_extractor.h"],
+    name = "json_readers_lib",
+    srcs = ["json_readers.cc"],
+    hdrs = ["json_readers.h"],
     deps = [
-        ":json_with_ext_buf_lib",
-        "//source/common/common:assert_lib",
         "//source/common/singleton:const_singleton",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
+    name = "token_usage_lib",
+    srcs = ["token_usage.cc"],
+    hdrs = [
+        "api_protocol_adapter.h",
+        "token_usage.h",
+    ],
+    deps = [
+        ":json_readers_lib",
+        "//envoy/common:pure_lib",
+        "//source/common/common:assert_lib",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
-        "@abseil-cpp//absl/types:variant",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
+    name = "api_protocol_adapters_lib",
+    srcs = ["api_protocol_adapters.cc"],
+    deps = [
+        ":json_readers_lib",
+        ":schema_lib",
+        ":token_usage_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/extensions/filters/http/ai_protocol_manager/schema:openai_chat_completions_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -103,8 +129,9 @@ envoy_cc_library(
     srcs = ["response_handler.cc"],
     hdrs = ["response_handler.h"],
     deps = [
+        ":api_protocol_adapters_lib",
         ":json_with_ext_buf_parser_lib",
-        ":token_usage_extractor_lib",
+        ":token_usage_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/common:pure_lib",
         "//envoy/stats:stats_macros",
@@ -148,7 +175,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/http/ai_protocol_manager/schema:schema_registry_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
