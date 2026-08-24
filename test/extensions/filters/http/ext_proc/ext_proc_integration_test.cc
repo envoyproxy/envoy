@@ -44,13 +44,14 @@
 #include "gtest/gtest.h"
 #include "ocpdiag/core/testing/status_matchers.h"
 
+using testing::_;
 using testing::Contains;
 using testing::Eq;
 using testing::Gt;
 using testing::HasSubstr;
 using testing::IsSupersetOf;
-using testing::Key;
 using testing::MatchesRegex;
+using testing::Pair;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
@@ -4020,7 +4021,7 @@ TEST_P(ExtProcIntegrationTest, SendClusterMetadata) {
               Contains(IsStructString("some_string", "some_value")));
 
   const auto& typed_filter_metadata = received_metadata.typed_filter_metadata();
-  EXPECT_THAT(typed_filter_metadata, Contains(Key("cluster_ns_typed")));
+  EXPECT_THAT(typed_filter_metadata, Contains(Pair("cluster_ns_typed", _)));
 
   processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
@@ -4201,11 +4202,15 @@ TEST_P(ExtProcIntegrationTest, RequestAttributeVirtualHostMetadataIsTextProto) {
         resp.mutable_request_headers();
 
         EXPECT_TRUE(req.has_request_headers());
-        EXPECT_EQ(req.attributes().size(), 1);
-        const auto& proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_THAT(proto_struct.fields(), Contains(Key("xds.virtual_host_metadata")));
-        const auto& metadata_textproto =
-            proto_struct.fields().at("xds.virtual_host_metadata").string_value();
+        EXPECT_THAT(req.attributes(),
+                    UnorderedElementsAre(IsStructField(
+                        "envoy.filters.http.ext_proc",
+                        UnorderedElementsAre(IsStructString("xds.virtual_host_metadata", _)))));
+        const auto& metadata_textproto = req.attributes()
+                                             .at("envoy.filters.http.ext_proc")
+                                             .fields()
+                                             .at("xds.virtual_host_metadata")
+                                             .string_value();
         envoy::config::core::v3::Metadata parsed_metadata;
         const bool parsed =
             Protobuf::TextFormat::ParseFromString(metadata_textproto, &parsed_metadata);
