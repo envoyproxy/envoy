@@ -144,6 +144,11 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
   return {bytes_written, IoSocketError::none()};
 }
 
+Api::IoCallUint64Result IoUringSocketHandleImpl::send(const void* buffer, size_t length) {
+  Buffer::RawSlice slice{const_cast<void*>(buffer), length};
+  return writev(&slice, 1);
+}
+
 Api::IoCallUint64Result IoUringSocketHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,
                                                          const Address::Ip*,
                                                          const Address::Instance&) {
