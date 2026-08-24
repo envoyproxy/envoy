@@ -31,6 +31,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
@@ -42,6 +43,9 @@ using testing::Invoke;
 using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
+
+using testing::Contains;
+using testing::Key;
 
 namespace Envoy {
 namespace Network {
@@ -857,14 +861,14 @@ TEST_F(ExecInNetnsTest, Basic) {
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_syscalls);
 
   EXPECT_CALL(os_syscalls, close(_)).WillRepeatedly(Invoke([this](int fd) -> Api::SysCallIntResult {
-    EXPECT_TRUE(fake_fd_map_.contains(fd));
+    EXPECT_THAT(fake_fd_map_, Contains(Key(fd)));
     fake_fd_map_.erase(fd);
     return {0, 0};
   }));
 
   EXPECT_CALL(linux_os_syscalls, setns(_, Eq(CLONE_NEWNET)))
       .WillRepeatedly(([this](int fd, int) -> Api::SysCallIntResult {
-        EXPECT_TRUE(fake_fd_map_.contains(fd));
+        EXPECT_THAT(fake_fd_map_, Contains(Key(fd)));
         current_netns_ = fake_fd_map_[fd];
         return {0, 0};
       }));

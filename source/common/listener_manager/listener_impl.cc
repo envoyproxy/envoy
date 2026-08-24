@@ -295,9 +295,22 @@ generateListenerStatsScope(const envoy::config::listener::v3::Listener& config,
     }
   }
 
-  Stats::ScopeSharedPtr scope = stats.createScope("", false, {}, scope_matcher);
-  Stats::ScopeSharedPtr listener_scope = stats.createScope(
-      fmt::format("listener.{}.", listenerStatsScope(config)), false, {}, std::move(scope_matcher));
+  Stats::ScopeSharedPtr scope =
+      stats.createScopeWithTaggedName({}, {}, {}, false, {}, scope_matcher);
+
+  // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
+  const std::string observability_name = listenerStatsScope(config);
+  Stats::ScopeSharedPtr listener_scope;
+  if (observability_name != "admin") {
+    // TODO(wbpcode): for the 'admin' listener, we won't extract the listener address as a tag.
+    listener_scope = stats.createScopeWithTaggedName(
+        "listener",
+        {Stats::TagStringView{Config::TagNames::get().LISTENER_ADDRESS, observability_name}},
+        fmt::format("listener.{}.", observability_name), false, {}, std::move(scope_matcher));
+  } else {
+    listener_scope = stats.createScopeWithTaggedName("listener.admin.", {}, {}, false, {},
+                                                     std::move(scope_matcher));
+  }
 
   return std::make_pair(std::move(scope), std::move(listener_scope));
 }
@@ -504,13 +517,15 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 }
 
+SINGLETON_MANAGER_REGISTRATION(fcds_shared_filter_chain_manager);
+
 std::shared_ptr<FcdsSharedFilterChainManager>
 ListenerImpl::maybeCreateFilterChainManager(const envoy::config::listener::v3::Listener& config) {
   if (config.has_fcds_config()) {
     return parent_.server_.serverFactoryContext()
         .singletonManager()
         .getTyped<FcdsSharedFilterChainManager>(
-            std::string(FcdsSharedFilterChainManagerName),
+            SINGLETON_MANAGER_REGISTERED_NAME(fcds_shared_filter_chain_manager),
             [this]() -> Singleton::InstanceSharedPtr {
               return std::make_shared<FcdsSharedFilterChainManager>(
                   parent_.server_.serverFactoryContext(), *parent_.factory_);

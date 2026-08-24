@@ -1,4 +1,5 @@
 load(":type_whisperer.bzl", "type_whisperer_aspect")
+load(":utils.bzl", "normalize_workspace_name")
 
 def _type_database_impl(ctx):
     type_db_deps = []
@@ -8,7 +9,7 @@ def _type_database_impl(ctx):
     proto_repositories = ctx.attr.proto_repositories
 
     def _descriptor_set(dep):
-        ws_name = dep.owner.workspace_name
+        ws_name = normalize_workspace_name(dep.owner.workspace_name)
         if (not ws_name) or ws_name in proto_repositories:
             return dep.path
 

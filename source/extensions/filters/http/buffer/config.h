@@ -13,18 +13,13 @@ namespace BufferFilter {
 /**
  * Config registration for the buffer filter.
  */
-class BufferFilterFactory
-    : public Common::DualFactoryBase<envoy::extensions::filters::http::buffer::v3::Buffer,
-                                     envoy::extensions::filters::http::buffer::v3::BufferPerRoute> {
+class BufferFilterFactory : public Common::UnifiedFactoryBase<
+                                envoy::extensions::filters::http::buffer::v3::Buffer,
+                                envoy::extensions::filters::http::buffer::v3::BufferPerRoute> {
 public:
-  BufferFilterFactory() : DualFactoryBase("envoy.filters.http.buffer") {}
+  BufferFilterFactory() : UnifiedFactoryBase("envoy.filters.http.buffer") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config,
-      const std::string& stats_prefix, DualInfo,
-      Server::Configuration::ServerFactoryContext& context) override;
-
   absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config,
       Server::Configuration::ServerFactoryContext& context,

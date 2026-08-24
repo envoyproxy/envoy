@@ -13,31 +13,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-absl::StatusOr<Http::FilterFactoryCb> IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& proto_config,
-    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-
-  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config = IpTaggingFilterConfig::create(
-      proto_config, stat_prefix, context.serverFactoryContext().singletonManager(), context.scope(),
-      context.serverFactoryContext().runtime(), context.serverFactoryContext().api(),
-      context.serverFactoryContext().threadLocal(),
-      context.serverFactoryContext().mainThreadDispatcher(), context.messageValidationVisitor());
-  RETURN_IF_NOT_OK_REF(config.status());
-  return
-      [config = std::move(config.value())](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(std::make_shared<IpTaggingFilter>(config));
-      };
-}
-
 absl::StatusOr<Http::FilterFactoryCb> IpTaggingFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& proto_config,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
 
   absl::StatusOr<IpTaggingFilterConfigSharedPtr> config = IpTaggingFilterConfig::create(
-      proto_config, extra_context.stats_prefix, context.singletonManager(), context.scope(),
-      context.runtime(), context.api(), context.threadLocal(), context.mainThreadDispatcher(),
-      context.messageValidationVisitor());
+      proto_config, extra_context.stats_prefix, context.singletonManager(),
+      extra_context.scopeOr(context), context.runtime(), context.api(), context.threadLocal(),
+      context.mainThreadDispatcher(), extra_context.visitor);
   RETURN_IF_NOT_OK_REF(config.status());
   return
       [config = std::move(config.value())](Http::FilterChainFactoryCallbacks& callbacks) -> void {
