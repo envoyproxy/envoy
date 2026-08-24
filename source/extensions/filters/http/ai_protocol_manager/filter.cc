@@ -500,6 +500,11 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
   // supplied". Only typed metadata is published: consumers with full-fidelity
   // needs (ext_proc typed forwarding, filters reading typed metadata) share
   // the proto definition; no untyped Struct mirror is emitted.
+  // TODO(botengyao): move this dynamic-metadata publication into a built-in
+  // AI payload filter once the payload filter manager (the in-filter chain
+  // over the parsed payload) lands. The filter core then only orchestrates
+  // transport, and publication becomes an ordered, configurable chain entry
+  // like any other payload feature.
   const envoy::data::ai::v3::TokenUsage typed = typedUsage(usage, degraded);
   // In both roles streamInfo() resolves to the downstream request's
   // StreamInfo. Under retries/hedging only the router-selected attempt
