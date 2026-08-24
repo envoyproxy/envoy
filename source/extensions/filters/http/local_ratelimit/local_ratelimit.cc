@@ -121,7 +121,8 @@ FilterConfig::FilterConfig(
     // If the local cluster name is set then the relevant cluster must exist or the cluster
     // manager will fail to initialize.
     share_provider_manager_ = Filters::Common::LocalRateLimit::ShareProviderManager::singleton(
-        dispatcher_, context.clusterManager(), context.singletonManager(), context.localInfo());
+        dispatcher_, context.clusterManager(), context.singletonManager(), context.localInfo(),
+        context.serverScope());
     if (!share_provider_manager_) {
       creation_status = absl::InvalidArgumentError(
           "local_cluster_rate_limit is set but no local cluster is present");
