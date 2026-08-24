@@ -49,6 +49,11 @@ RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_return_stop_iteration);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_stream_close_optimization);
+// When a filter drains the current data frame into the filter-manager buffer via
+// addDecoded/EncodedData() and then returns Continue (e.g. a wasm filter resuming after buffering),
+// forward that buffered data down the chain instead of the now-empty frame, so the frame is not
+// lost. See https://github.com/envoyproxy/envoy/issues/46841
+RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_continue);
 RUNTIME_GUARD(envoy_reloadable_features_generic_proxy_codec_buffer_limit);
 RUNTIME_GUARD(envoy_reloadable_features_get_header_tag_from_header_map);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
