@@ -77,6 +77,10 @@ MATCHER_P2(IsStructField, key, expected, "") {
          ::testing::ExplainMatchResult(expected, arg.second.fields(), result_listener);
 }
 
+MATCHER_P(HasStructFields, expected, "") {
+  return ::testing::ExplainMatchResult(expected, arg.fields(), result_listener);
+}
+
 using StructField = Protobuf::MapPair<std::string, Protobuf::Value>;
 
 template <typename... MatcherT>
