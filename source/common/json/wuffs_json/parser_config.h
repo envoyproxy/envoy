@@ -14,6 +14,7 @@ namespace Json {
 namespace Wuffs {
 
 // Parsed representation of the JSON field path used for customized target extraction.
+// TODO(tyxia) Add per-field capture.
 struct ExtractFieldSpec {
   // Each segment is a dict key or an [] wildcard. Pass straight to
   // WuffsJsonCursor::matchesPatternPath — no conversion needed.
@@ -83,11 +84,6 @@ struct ParserConfig {
   // that would push the running total over the budget is dropped; a later
   // smaller value that still fits is captured. 0 = no total limit.
   size_t max_total_scalar_bytes{0};
-
-  // Maximum byte span for a single captured container-element byte range. An
-  // element whose [token_start, token_end) span exceeds this budget is not
-  // recorded; parsing continues. 0 = no per-element limit.
-  size_t max_element_capture_bytes{0};
 
   // When true, capture every scalar value (strings, numbers, booleans, nulls)
   // at any depth. The cursor rejects nesting deeper than kMaxTrackedDepth - 1,

@@ -606,8 +606,7 @@ TEST(StructuralMatchTest, PatternLengthMustEqualCursorDepth) {
 // [token_start, token_end) — the production shape for messages[] passthrough.
 class ContainerRangeHandler : public MockHandler {
 public:
-  explicit ContainerRangeHandler(const ExtractFieldSpec& spec, const ParserConfig& config = {})
-      : max_element_capture_bytes_(config.max_element_capture_bytes), pattern_(spec.segments) {}
+  explicit ContainerRangeHandler(const ExtractFieldSpec& spec) : pattern_(spec.segments) {}
 
   void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
 
@@ -619,10 +618,7 @@ public:
   }
   void onContainerClose(int depth, size_t token_end) override {
     if (depth == open_depth_) {
-      if (max_element_capture_bytes_ == 0 ||
-          token_end - range_start_ <= max_element_capture_bytes_) {
-        ranges_.emplace_back(range_start_, token_end);
-      }
+      ranges_.emplace_back(range_start_, token_end);
       open_depth_ = -1;
     }
   }
@@ -630,7 +626,6 @@ public:
   const std::vector<std::pair<size_t, size_t>>& ranges() const { return ranges_; }
 
 private:
-  const size_t max_element_capture_bytes_; // 0 = no per-element limit
   std::vector<WuffsJsonCursor::PatternSegment> pattern_;
   const WuffsJsonCursor* cursor_{nullptr};
   int open_depth_{-1};
@@ -654,50 +649,6 @@ TEST(StructuralMatchTest, ContainerSpecCapturesElementByteRanges) {
             R"({"role":"user"})");
   EXPECT_EQ(json.substr(h.ranges()[1].first, h.ranges()[1].second - h.ranges()[1].first),
             R"({"role":"tool"})");
-}
-
-// max_element_capture_bytes rejects container elements whose byte span exceeds
-// the budget. Parsing continues past the rejected element, and later elements
-// that fit are still captured.
-TEST(StructuralMatchTest, ElementBudgetRejectsOversizedElements) {
-  auto spec = parseExtractFieldSpec("messages[]");
-  ASSERT_TRUE(spec.ok());
-
-  ParserConfig cfg;
-  cfg.max_element_capture_bytes = 9; // {"r":"x"} == 9 bytes; {"r":"toolong"} == 15 bytes
-
-  ContainerRangeHandler h(*spec, cfg);
-  WuffsJsonCursor cursor(h);
-  h.setCursor(&cursor);
-  // Three elements: fits (9 B), over budget (15 B), fits (9 B).
-  constexpr absl::string_view json = R"({"messages":[{"r":"x"},{"r":"toolong"},{"r":"y"}]})";
-  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
-
-  // First and third elements captured; second rejected.
-  ASSERT_EQ(h.ranges().size(), 2u);
-  EXPECT_EQ(json.substr(h.ranges()[0].first, h.ranges()[0].second - h.ranges()[0].first),
-            R"({"r":"x"})");
-  EXPECT_EQ(json.substr(h.ranges()[1].first, h.ranges()[1].second - h.ranges()[1].first),
-            R"({"r":"y"})");
-}
-
-// An element whose byte span equals the budget exactly is still captured.
-TEST(StructuralMatchTest, ElementBudgetExactLimitIsAccepted) {
-  auto spec = parseExtractFieldSpec("messages[]");
-  ASSERT_TRUE(spec.ok());
-
-  ParserConfig cfg;
-  cfg.max_element_capture_bytes = 9; // {"r":"x"} == exactly 9 bytes
-
-  ContainerRangeHandler h(*spec, cfg);
-  WuffsJsonCursor cursor(h);
-  h.setCursor(&cursor);
-  constexpr absl::string_view json = R"({"messages":[{"r":"x"}]})";
-  ASSERT_TRUE(cursor.feed(json, /*closed=*/true).ok());
-
-  ASSERT_EQ(h.ranges().size(), 1u);
-  EXPECT_EQ(json.substr(h.ranges()[0].first, h.ranges()[0].second - h.ranges()[0].first),
-            R"({"r":"x"})");
 }
 
 // Pins the coupling asserted in the parseExtractFieldSpec doc: pass the
