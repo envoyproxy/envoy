@@ -479,7 +479,7 @@ Api::SysCallIntResult OsSysCallsWithMockedDns::getaddrinfo(const char* node,
     }
     return {0, 0};
   }
-  if (nonexisting_addresses_.find(node) != nonexisting_addresses_.end()) {
+  if (nonexisting_addresses_.contains(node)) {
     return {EAI_NONAME, 0};
   }
   std::cerr << "Mock DNS does not have entry for: " << node << std::endl;

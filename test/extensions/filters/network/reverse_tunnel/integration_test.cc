@@ -5,20 +5,29 @@
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
+#include "envoy/http/codec.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 #include "test/common/http/http2/http2_frame.h"
+#include "test/extensions/filters/network/reverse_tunnel/jwt_test_data.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::Eq;
 using testing::Ge;
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -278,13 +287,11 @@ void ReverseTunnelFilterIntegrationTest::completeReverseTunnelHandshake(
   std::string handshake_request;
   ASSERT_TRUE(connection.waitForData(FakeRawConnection::waitForInexactMatch("\r\n\r\n"),
                                      &handshake_request));
-  EXPECT_NE(handshake_request.find("GET /reverse_connections/request HTTP/1.1"), std::string::npos);
-  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-node-id: e2e-node"), std::string::npos);
-  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-cluster-id: e2e-cluster"),
-            std::string::npos);
-  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-tenant-id: e2e-tenant"),
-            std::string::npos);
-  EXPECT_NE(handshake_request.find("x-envoy-reverse-tunnel-initiation-time:"), std::string::npos);
+  EXPECT_THAT(handshake_request, HasSubstr("GET /reverse_connections/request HTTP/1.1"));
+  EXPECT_THAT(handshake_request, HasSubstr("x-envoy-reverse-tunnel-node-id: e2e-node"));
+  EXPECT_THAT(handshake_request, HasSubstr("x-envoy-reverse-tunnel-cluster-id: e2e-cluster"));
+  EXPECT_THAT(handshake_request, HasSubstr("x-envoy-reverse-tunnel-tenant-id: e2e-tenant"));
+  EXPECT_THAT(handshake_request, HasSubstr("x-envoy-reverse-tunnel-initiation-time:"));
 
   ASSERT_TRUE(connection.write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"));
 }
@@ -1635,14 +1642,15 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ConnectionLimitRejectsBeyondCap) {
   client1->waitForData("HTTP/1.1 200 OK");
   test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
-  // Second connection for the same node exceeds the cap (1 is not < 1) -> rejected with 403.
+  // Second connection for the same node exceeds the cap (1 is not < 1) -> rejected with 429.
   std::string req2 = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
                                                     "capped-node", "test-cluster", "test-tenant");
   IntegrationTcpClientPtr client2 = makeTcpConnection(lookupPort("listener_0"));
   (void)client2->write(req2);
-  client2->waitForData("HTTP/1.1 403 Forbidden");
+  client2->waitForData("HTTP/1.1 429 Too Many Requests");
   client2->waitForDisconnect();
-  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
+  test_server_->waitForCounter("reverse_tunnel.handshake.rejected", Ge(1));
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Eq(0));
 
   // A different node has its own independent count and is still accepted.
   std::string req3 = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
@@ -1673,6 +1681,9 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ConnectionLimitAllowsWithinCap) {
       "GET", "/reverse_connections/request", "within-node", "test-cluster", "test-tenant")));
   client2->waitForData("HTTP/1.1 200 OK");
   test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(2));
+
+  test_server_->waitForCounter("reverse_tunnel.handshake.rejected", Eq(0));
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Eq(0));
 
   client1->close();
   client2->close();
@@ -1729,9 +1740,10 @@ cluster_type:
   IntegrationTcpClientPtr client_a2 = makeTcpConnection(lookupPort("listener_0"));
   (void)client_a2->write(createHttpRequestWithRtHeaders(
       "GET", "/reverse_connections/request", "shared-node", "shared-cluster", "tenant-a"));
-  client_a2->waitForData("HTTP/1.1 403 Forbidden");
+  client_a2->waitForData("HTTP/1.1 429 Too Many Requests");
   client_a2->waitForDisconnect();
-  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Ge(1));
+  test_server_->waitForCounter("reverse_tunnel.handshake.rejected", Ge(1));
+  test_server_->waitForCounter("reverse_tunnel.handshake.validation_failed", Eq(0));
 
   // tenant-b on the same node is an independent scope -> accepted.
   IntegrationTcpClientPtr client_b1 = makeTcpConnection(lookupPort("listener_0"));
@@ -1742,6 +1754,215 @@ cluster_type:
 
   client_a1->close();
   client_b1->close();
+}
+
+// Inline JWT handshake authentication (jwt_validator), end to end.
+
+std::string makeJwtHandshakeRequest(absl::string_view authorization) {
+  std::string req = "GET /reverse_connections/request HTTP/1.1\r\n";
+  req += "Host: localhost\r\n";
+  req += "x-envoy-reverse-tunnel-node-id: n\r\n";
+  req += "x-envoy-reverse-tunnel-cluster-id: c\r\n";
+  req += "x-envoy-reverse-tunnel-tenant-id: t\r\n";
+  if (!authorization.empty()) {
+    req += "authorization: " + std::string(authorization) + "\r\n";
+  }
+  req += "Content-Length: 0\r\n\r\n";
+  return req;
+}
+
+// A valid token verified against an inline JWKS completes the handshake (200).
+TEST_P(ReverseTunnelFilterIntegrationTest, JwtLocalJwksValidTokenAccepted) {
+  const std::string jwt_config = fmt::format(R"(
+          jwt_validator:
+            issuer: "{}"
+            local_jwks:
+              inline_string: '{}')",
+                                             kIssuer, kTestJwks);
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", jwt_config);
+  initialize();
+
+  const std::string request = makeJwtHandshakeRequest(absl::StrCat("Bearer ", kGoodToken));
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  if (!tcp_client->write(request)) {
+    tcp_client->waitForData("HTTP/1.1 200 OK");
+    return;
+  }
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+}
+
+// A missing token is rejected with 401 before the socket is registered.
+TEST_P(ReverseTunnelFilterIntegrationTest, JwtLocalJwksMissingTokenRejected) {
+  const std::string jwt_config = fmt::format(R"(
+          jwt_validator:
+            issuer: "{}"
+            local_jwks:
+              inline_string: '{}')",
+                                             kIssuer, kTestJwks);
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", jwt_config);
+  initialize();
+
+  const std::string request = makeJwtHandshakeRequest(/*authorization=*/"");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  if (!tcp_client->write(request)) {
+    tcp_client->waitForData("HTTP/1.1 401 Unauthorized");
+    return;
+  }
+  tcp_client->waitForData("HTTP/1.1 401 Unauthorized");
+  tcp_client->close();
+}
+
+// With remote_jwks pointing at an unreachable cluster the JWKS is never fetched, so even a valid
+// token is rejected and the socket is not registered. fast_listener keeps listener activation from
+// blocking on the fetch.
+TEST_P(ReverseTunnelFilterIntegrationTest, JwtRemoteJwksUnavailableRejectsValidToken) {
+  const std::string loopback = Network::Test::getLoopbackAddressString(GetParam());
+  config_helper_.addConfigModifier([loopback](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->set_name("jwks_cluster");
+    cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    cluster->mutable_connect_timeout()->set_seconds(1);
+    auto* la = cluster->mutable_load_assignment();
+    la->set_cluster_name("jwks_cluster");
+    auto* addr = la->add_endpoints()
+                     ->add_lb_endpoints()
+                     ->mutable_endpoint()
+                     ->mutable_address()
+                     ->mutable_socket_address();
+    // Unreachable: a closed port on loopback so the fetch fails and no keys are ever cached.
+    addr->set_address(loopback);
+    addr->set_port_value(1);
+  });
+  const std::string jwt_config = fmt::format(R"(
+          jwt_validator:
+            issuer: "{}"
+            remote_jwks:
+              http_uri:
+                uri: "https://jwks.example.com/keys"
+                cluster: "jwks_cluster"
+                timeout: 1s
+              async_fetch:
+                fast_listener: true)",
+                                             kIssuer);
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", jwt_config);
+  initialize();
+
+  // Assert the fetch actually failed before driving the handshake, so this exercises the
+  // fetch-failure path rather than merely the not-yet-fetched path.
+  test_server_->waitForCounter("reverse_tunnel.handshake.jwt_jwks_fetch_failed", Ge(1));
+
+  const std::string request = makeJwtHandshakeRequest(absl::StrCat("Bearer ", kGoodToken));
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  if (!tcp_client->write(request)) {
+    tcp_client->waitForData("HTTP/1.1 401 Unauthorized");
+    return;
+  }
+  tcp_client->waitForData("HTTP/1.1 401 Unauthorized");
+  tcp_client->close();
+}
+
+// Serves the remote JWKS from a fake upstream so the full remote_jwks flow (fetch -> cache ->
+// verify) runs end to end. Modeled on jwt_authn's RemoteJwksIntegrationTest.
+class ReverseTunnelJwtRemoteIntegrationTest : public ReverseTunnelFilterIntegrationTest {
+public:
+  void createUpstreams() override {
+    ReverseTunnelFilterIntegrationTest::createUpstreams();
+    // fake_upstreams_[1] serves the JWKS; jwks_cluster is wired to it in the test below.
+    addFakeUpstream(Http::CodecType::HTTP1);
+  }
+
+  void waitForJwksResponse(const std::string& status, const std::string& jwks_body) {
+    AssertionResult result =
+        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_jwks_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_jwks_connection_->waitForNewStream(*dispatcher_, jwks_request_);
+    RELEASE_ASSERT(result, result.message());
+    result = jwks_request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
+    Http::TestResponseHeaderMapImpl response_headers{{":status", status}};
+    jwks_request_->encodeHeaders(response_headers, false);
+    Buffer::OwnedImpl response_data(jwks_body);
+    jwks_request_->encodeData(response_data, true);
+  }
+
+  FakeHttpConnectionPtr fake_jwks_connection_;
+  FakeStreamPtr jwks_request_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseTunnelJwtRemoteIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// End to end: the JWKS is fetched from a live (fake) upstream, cached, and used to verify the
+// handshake token, which is accepted (200).
+TEST_P(ReverseTunnelJwtRemoteIntegrationTest, ValidTokenAcceptedAfterFetch) {
+  // Wire jwks_cluster to the JWKS fake upstream by cloning the default cluster (port
+  // auto-assigned).
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* jwks_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    jwks_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    jwks_cluster->set_name("jwks_cluster");
+  });
+  const std::string jwt_config = fmt::format(R"(
+          jwt_validator:
+            issuer: "{}"
+            remote_jwks:
+              http_uri:
+                uri: "https://jwks.example.com/keys"
+                cluster: "jwks_cluster"
+                timeout: 5s
+              async_fetch:
+                fast_listener: true)",
+                                             kIssuer);
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", jwt_config);
+  initialize();
+
+  // The background fetch (kicked at listener init) reaches the fake upstream; serve the JWKS and
+  // wait for it to be cached before driving the handshake.
+  waitForJwksResponse("200", std::string(kTestJwks));
+  test_server_->waitForCounter("reverse_tunnel.handshake.jwt_jwks_fetch_success", Ge(1));
+
+  const std::string request = makeJwtHandshakeRequest(absl::StrCat("Bearer ", kGoodToken));
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  if (!tcp_client->write(request)) {
+    tcp_client->waitForData("HTTP/1.1 200 OK");
+    return;
+  }
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+}
+
+// Without async_fetch the listener waits for the first fetch (init target). Serve the JWKS during
+// init so the listener comes up, then a valid token is accepted.
+TEST_P(ReverseTunnelJwtRemoteIntegrationTest, InitTargetBlocksUntilFetched) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* jwks_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    jwks_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    jwks_cluster->set_name("jwks_cluster");
+  });
+  const std::string jwt_config = fmt::format(R"(
+          jwt_validator:
+            issuer: "{}"
+            remote_jwks:
+              http_uri:
+                uri: "https://jwks.example.com/keys"
+                cluster: "jwks_cluster"
+                timeout: 5s)",
+                                             kIssuer);
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", jwt_config);
+  // Listener init blocks on the fetch, so serve the JWKS from within initialize().
+  on_server_init_function_ = [this]() { waitForJwksResponse("200", std::string(kTestJwks)); };
+  initialize();
+
+  const std::string request = makeJwtHandshakeRequest(absl::StrCat("Bearer ", kGoodToken));
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  if (!tcp_client->write(request)) {
+    tcp_client->waitForData("HTTP/1.1 200 OK");
+    return;
+  }
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
 }
 
 } // namespace

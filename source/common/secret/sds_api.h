@@ -120,6 +120,7 @@ private:
   Config::SubscriptionFactory& subscription_factory_;
   TimeSource& time_source_;
   SecretData secret_data_;
+  bool started_{false};
   std::unique_ptr<Filesystem::Watcher> watcher_;
 };
 

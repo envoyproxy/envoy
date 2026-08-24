@@ -1249,7 +1249,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value,
     // We do checking for each char in the string. If the current char is included in the defined
     // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded]
     // to the returned string one by one) started from the current index.
-    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
+    if (ch < ' ' || ch >= '~' || reserved_char_set.contains(ch)) {
       return PercentEncoding::encode(value, i, reserved_char_set);
     }
   }
@@ -1265,7 +1265,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value, const size
 
   for (size_t i = index; i < value.size(); ++i) {
     const char& ch = value[i];
-    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
+    if (ch < ' ' || ch >= '~' || reserved_char_set.contains(ch)) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
       absl::StrAppend(&encoded, fmt::format("%{:02X}", static_cast<const unsigned char&>(ch)));
@@ -1508,6 +1508,10 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
 }
 
 bool Utility::isSafeRequest(const Http::RequestHeaderMap& request_headers) {
+  // TODO(guy-with-a-why): consider QUERY here. RFC 10008 Section 2 makes QUERY safe and
+  // idempotent, but callers of this function additionally rely on a safe request having no
+  // content: it gates sending a request over 0-RTT early data and auto-enables retry on 425.
+  // QUERY always has content, so adding it changes both behaviors and needs its own change.
   absl::string_view method = request_headers.getMethodValue();
   return method == Http::Headers::get().MethodValues.Get ||
          method == Http::Headers::get().MethodValues.Head ||

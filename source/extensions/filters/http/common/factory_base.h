@@ -24,6 +24,16 @@ public:
   }
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createHttpFilterRouteConfig(const Protobuf::Message& proto_config,
+                              Server::Configuration::ServerFactoryContext& context,
+                              Server::Configuration::ExtraFactoryContext& extra_context) override {
+    return createHttpFilterRouteConfigTyped(
+        MessageUtil::downcastAndValidate<const RouteConfigProto&>(proto_config,
+                                                                  extra_context.visitor),
+        context, extra_context);
+  }
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
                                   Server::Configuration::ServerFactoryContext& context,
                                   ProtobufMessage::ValidationVisitor& validator) override {
@@ -48,6 +58,14 @@ public:
 
 protected:
   CommonFactoryBase(const std::string& name) : name_(name) {}
+
+  virtual absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createHttpFilterRouteConfigTyped(const RouteConfigProto& proto_config,
+                                   Server::Configuration::ServerFactoryContext& context,
+                                   Server::Configuration::ExtraFactoryContext& extra_context) {
+    // Delegate to createRouteSpecificFilterConfigTyped for backwards compatibility.
+    return createRouteSpecificFilterConfigTyped(proto_config, context, extra_context.visitor);
+  }
 
   virtual absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const RouteConfigProto&,
@@ -88,21 +106,21 @@ public:
         stats_prefix, server_context);
   }
 
-  absl::StatusOr<Envoy::Http::FilterFactoryCb>
-  createHttpFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                   const std::string& stats_prefix,
-                                   Server::Configuration::ServerFactoryContext& context) override {
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProto(
+      const Protobuf::Message& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override {
     return createHttpFilterFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config,
                                                              context.messageValidationVisitor()),
-        stats_prefix, context);
+        context, extra_context);
   }
   virtual absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createHttpFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                        const std::string& stats_prefix,
-                                        Server::Configuration::ServerFactoryContext& context) {
+                                        Server::Configuration::ServerFactoryContext& context,
+                                        Server::Configuration::ExtraFactoryContext& extra_context) {
     // Delegate to createFilterFactoryFromProtoWithServerContextTyped for backwards compatibility.
-    return createFilterFactoryFromProtoWithServerContextTyped(proto_config, stats_prefix, context);
+    return createFilterFactoryFromProtoWithServerContextTyped(proto_config,
+                                                              extra_context.stats_prefix, context);
   }
 
   [[deprecated("Use createHttpFilterFactoryFromProtoTyped instead")]]
@@ -135,22 +153,21 @@ public:
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) PURE;
 
-  absl::StatusOr<Envoy::Http::FilterFactoryCb>
-  createHttpFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                   const std::string& stats_prefix,
-                                   Server::Configuration::ServerFactoryContext& context) override {
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProto(
+      const Protobuf::Message& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override {
     return createHttpFilterFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config,
                                                              context.messageValidationVisitor()),
-        stats_prefix, context);
+        context, extra_context);
   }
   virtual absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createHttpFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                        const std::string& stats_prefix,
-                                        Server::Configuration::ServerFactoryContext& context) {
+                                        Server::Configuration::ServerFactoryContext& context,
+                                        Server::Configuration::ExtraFactoryContext& extra_context) {
     UNREFERENCED_PARAMETER(proto_config);
-    UNREFERENCED_PARAMETER(stats_prefix);
     UNREFERENCED_PARAMETER(context);
+    UNREFERENCED_PARAMETER(extra_context);
     return absl::InvalidArgumentError(
         "Creating HTTP filter factory from server factory context is not supported");
   }
@@ -211,21 +228,21 @@ public:
         stats_prefix, server_context);
   }
 
-  absl::StatusOr<Envoy::Http::FilterFactoryCb>
-  createHttpFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                   const std::string& stats_prefix,
-                                   Server::Configuration::ServerFactoryContext& context) override {
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProto(
+      const Protobuf::Message& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override {
     return createHttpFilterFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config,
                                                              context.messageValidationVisitor()),
-        stats_prefix, context);
+        context, extra_context);
   }
   virtual absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createHttpFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                        const std::string& stats_prefix,
-                                        Server::Configuration::ServerFactoryContext& context) {
+                                        Server::Configuration::ServerFactoryContext& context,
+                                        Server::Configuration::ExtraFactoryContext& extra_context) {
     // Delegate to createFilterFactoryFromProtoWithServerContextTyped for backwards compatibility.
-    return createFilterFactoryFromProtoWithServerContextTyped(proto_config, stats_prefix, context);
+    return createFilterFactoryFromProtoWithServerContextTyped(proto_config,
+                                                              extra_context.stats_prefix, context);
   }
 
 private:
@@ -237,6 +254,47 @@ private:
         "DualFactoryBase: creating filter factory from server factory context is not supported");
     return nullptr;
   }
+};
+
+template <class ConfigProto, class RouteConfigProto = ConfigProto>
+class UnifiedFactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
+                           public Server::Configuration::NamedHttpFilterConfigFactory,
+                           public Server::Configuration::UpstreamHttpFilterConfigFactory {
+public:
+  UnifiedFactoryBase(const std::string& name)
+      : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
+
+  bool isUnifiedFilter() final { return true; }
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::FactoryContext& context) final {
+    auto extra_context = Server::Configuration::ExtraFactoryContext::create(context, stats_prefix);
+    return createHttpFilterFactoryFromProto(proto_config, context.serverFactoryContext(),
+                                            extra_context);
+  }
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               const std::string& stats_prefix,
+                               Server::Configuration::UpstreamFactoryContext& context) final {
+    auto extra_context = Server::Configuration::ExtraFactoryContext::create(context, stats_prefix);
+    return createHttpFilterFactoryFromProto(proto_config, context.serverFactoryContext(),
+                                            extra_context);
+  }
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProto(
+      const Protobuf::Message& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) final {
+    return createHttpFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config, extra_context.visitor),
+        context, extra_context);
+  }
+
+  virtual absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const ConfigProto& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) PURE;
 };
 
 } // namespace Common

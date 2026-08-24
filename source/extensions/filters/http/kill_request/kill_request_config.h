@@ -14,15 +14,16 @@ namespace KillRequest {
  * Config registration for KillRequestFilter. @see NamedHttpFilterConfigFactory.
  */
 class KillRequestFilterFactory
-    : public Common::ExceptionFreeFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::kill_request::v3::KillRequest> {
 public:
-  KillRequestFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.kill_request") {}
+  KillRequestFilterFactory() : UnifiedFactoryBase("envoy.filters.http.kill_request") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

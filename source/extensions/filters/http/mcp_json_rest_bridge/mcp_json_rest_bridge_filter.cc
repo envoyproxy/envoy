@@ -185,52 +185,6 @@ std::array<EndpointKey, 4> getEndpointLookupKeys(absl::string_view host, absl::s
 
 } // namespace
 
-absl::string_view bridgeStatusToString(BridgeStatus status) {
-  switch (status) {
-  case BridgeStatus::Ok:
-    return BridgeStatusValues::OK;
-  case BridgeStatus::RequestNotPost:
-    return BridgeStatusValues::REQUEST_NOT_POST;
-  case BridgeStatus::RequestTooLarge:
-    return BridgeStatusValues::REQUEST_TOO_LARGE;
-  case BridgeStatus::RequestFailedToParseJsonRpc:
-    return BridgeStatusValues::REQUEST_FAILED_TO_PARSE_JSON_RPC;
-  case BridgeStatus::RequestUnsupportedProtocolVersion:
-    return BridgeStatusValues::REQUEST_UNSUPPORTED_PROTOCOL_VERSION;
-  case BridgeStatus::RequestInitializeNotValid:
-    return BridgeStatusValues::REQUEST_INITIALIZE_NOT_VALID;
-  case BridgeStatus::RequestMethodNotSupported:
-    return BridgeStatusValues::REQUEST_METHOD_NOT_SUPPORTED;
-  case BridgeStatus::RequestMethodNotFound:
-    return BridgeStatusValues::REQUEST_METHOD_NOT_FOUND;
-  case BridgeStatus::RequestMethodNotString:
-    return BridgeStatusValues::REQUEST_METHOD_NOT_STRING;
-  case BridgeStatus::RequestIdNotFound:
-    return BridgeStatusValues::REQUEST_ID_NOT_FOUND;
-  case BridgeStatus::RequestToolParamsNotFound:
-    return BridgeStatusValues::REQUEST_TOOL_PARAMS_NOT_FOUND;
-  case BridgeStatus::RequestToolNameNotFound:
-    return BridgeStatusValues::REQUEST_TOOL_NAME_NOT_FOUND;
-  case BridgeStatus::RequestUnknownTool:
-    return BridgeStatusValues::REQUEST_UNKNOWN_TOOL;
-  case BridgeStatus::RequestToolArgumentsInvalid:
-    return BridgeStatusValues::REQUEST_TOOL_ARGUMENTS_INVALID;
-  case BridgeStatus::RequestToolTranscodingFailure:
-    return BridgeStatusValues::REQUEST_TOOL_TRANSCODING_FAILURE;
-  case BridgeStatus::RequestPassthrough:
-    return BridgeStatusValues::REQUEST_PASSTHROUGH;
-  case BridgeStatus::ResponseTooLarge:
-    return BridgeStatusValues::RESPONSE_TOO_LARGE;
-  case BridgeStatus::ResponseInvalidUtf8:
-    return BridgeStatusValues::RESPONSE_INVALID_UTF8;
-  case BridgeStatus::ResponseBackendError:
-    return BridgeStatusValues::RESPONSE_BACKEND_ERROR;
-  case BridgeStatus::ResponseFailedToParseJsonRpc:
-    return BridgeStatusValues::RESPONSE_FAILED_TO_PARSE_JSON_RPC;
-  }
-  return "UNKNOWN";
-}
-
 McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
         proto_config)
@@ -489,6 +443,11 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   const auto* per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
           decoder_callbacks_);
+  if (config_->perRouteOnly() && per_route_config == nullptr) {
+    mcp_operation_ = McpOperation::Unspecified;
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   bool has_endpoint = false;
   if (per_route_config != nullptr) {
     has_endpoint = per_route_config->hasEndpoint(server_name, path);
@@ -509,7 +468,8 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
     ENVOY_STREAM_LOG(warn, "Only POST method is supported for MCP. Received: {}",
                      *decoder_callbacks_, request_headers.getMethodValue());
     sendErrorResponse(
-        Http::Code::MethodNotAllowed, BridgeStatus::RequestNotPost, "Method Not Allowed",
+        Http::Code::MethodNotAllowed, BridgeStatus::HttpRequestMethodNotPost,
+        "HTTP Method Not Allowed",
         [](Http::ResponseHeaderMap& response_headers) {
           response_headers.addCopy(Http::LowerCaseString("allow"),
                                    Http::Headers::get().MethodValues.Post);
@@ -591,21 +551,25 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
     break;
   }
 
+  const int response_code = getResponseCode(response_headers);
   // Streaming mode: pre-build the JSON-RPC prefix/suffix, strip Content-Length
   // (final size is unknown), and let the headers flow through immediately so
   // the client can start receiving data without waiting for the full body.
   if (mcp_operation_ == McpOperation::ToolsCall && text_content_streaming_enabled_) {
     is_sse_response_ = isSseContentType(response_headers.getContentTypeValue());
-    const int status_code = getResponseCode(response_headers);
     // Overwrite response code to 200 OK unless it is 401 or 403. Non-200 responses
     // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
     // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
     // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
-    if (status_code != static_cast<int>(Http::Code::Unauthorized) &&
-        status_code != static_cast<int>(Http::Code::Forbidden)) {
+    // Note on 400 Bad Request: While the MCP authorization spec also includes HTTP 400 for
+    // certain authorization errors, we assume authorization checks (e.g., OAuth token
+    // validation) occur in filters before MCP transcoding, so any 400 error from the REST
+    // backend is assumed to be an API error and is transformed into a standard JSON-RPC error.
+    if (response_code != static_cast<int>(Http::Code::Unauthorized) &&
+        response_code != static_cast<int>(Http::Code::Forbidden)) {
       response_headers.setStatus(enumToInt(Http::Code::OK));
     }
-    buildStreamingPrefixAndSuffix(status_code >= static_cast<int>(Http::Code::BadRequest));
+    buildStreamingPrefixAndSuffix(response_code >= static_cast<int>(Http::Code::BadRequest));
     response_headers.removeContentLength();
     response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
     return Http::FilterHeadersStatus::Continue;
@@ -614,7 +578,6 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
   if (end_stream) {
     // Backend returned a headers-only response (e.g., 204 No Content). Synthesize a JSON-RPC
     // response body so MCP clients don't hang waiting for a body that will never arrive.
-    const int response_code = getResponseCode(response_headers);
     const bool is_error = response_code >= static_cast<int>(Http::Code::BadRequest);
     std::string synthetic;
     if (mcp_operation_ == McpOperation::ToolsCall) {
@@ -628,9 +591,17 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
       };
       synthetic = ret.dump();
     }
-    // HTTP/2 disallows a body on 204/304. Promote to 200 so the synthesized body can be delivered.
-    if (response_code == static_cast<int>(Http::Code::NoContent) || response_code == 304) {
-      response_headers.setStatus(static_cast<uint64_t>(Http::Code::OK));
+    // Overwrite response code to 200 OK unless it is 401 or 403. Non-200 responses
+    // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
+    // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
+    // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+    // Note on 400 Bad Request: While the MCP authorization spec also includes HTTP 400 for
+    // certain authorization errors, we assume authorization checks (e.g., OAuth token
+    // validation) occur in filters before MCP transcoding, so any 400 error from the REST
+    // backend is assumed to be an API error and is transformed into a standard JSON-RPC error.
+    if (response_code != static_cast<int>(Http::Code::Unauthorized) &&
+        response_code != static_cast<int>(Http::Code::Forbidden)) {
+      response_headers.setStatus(enumToInt(Http::Code::OK));
     }
     response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
     response_headers.setContentLength(synthetic.size());
@@ -672,7 +643,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
                         getResponseCode(encoder_callbacks_->responseHeaders()));
     mcp_operation_ = McpOperation::OperationFailed;
     decoder_callbacks_->sendLocalReply(
-        Http::Code::InternalServerError, error_json.dump(),
+        Http::Code::OK, error_json.dump(),
         [](Http::ResponseHeaderMap& headers) {
           headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
         },
@@ -780,63 +751,59 @@ void McpJsonRestBridgeFilter::serveToolsListLocal(
     ASSERT(false, "serveToolsListLocal requires an RPC ID");
   }
 
-  size_t reserve_size = sizeof("{\"jsonrpc\":\"2.0\",\"id\":") - 1 + request_id_json.size() +
-                        sizeof(",\"result\":{\"tools\":[") - 1 + sizeof("]}}") - 1;
+  std::vector<std::unique_ptr<std::string>> owned_response_fragments;
+  std::vector<absl::string_view> response_fragments;
 
-  for (const auto* tool : tools) {
-    reserve_size += sizeof("{\"name\":") - 1 + nlohmann::json(tool->name()).dump().size();
-
-    if (!tool->tool_list_config().title().empty()) {
-      reserve_size += sizeof(",\"title\":") - 1 +
-                      nlohmann::json(tool->tool_list_config().title()).dump().size();
-    }
-
-    reserve_size += sizeof(",\"description\":") - 1 +
-                    nlohmann::json(tool->tool_list_config().description()).dump().size() +
-                    sizeof(",\"inputSchema\":") - 1;
-
-    if (!tool->tool_list_config().input_schema().empty()) {
-      reserve_size += tool->tool_list_config().input_schema().size();
-    } else {
-      reserve_size += sizeof("{\"type\":\"object\"}") - 1;
-    }
-    reserve_size += sizeof("}") - 1 + sizeof(",") - 1;
-  }
-
-  std::string response_data;
-  response_data.reserve(reserve_size);
-  absl::StrAppend(&response_data, "{\"jsonrpc\":\"2.0\",\"id\":", request_id_json,
-                  ",\"result\":{\"tools\":[");
+  response_fragments.emplace_back("{\"jsonrpc\":\"2.0\",\"id\":");
+  response_fragments.emplace_back(request_id_json),
+      response_fragments.emplace_back(",\"result\":{\"tools\":[");
 
   bool first_tool = true;
   for (const auto* tool : tools) {
     if (!first_tool) {
-      absl::StrAppend(&response_data, ",");
+      response_fragments.emplace_back(",");
     }
     first_tool = false;
 
-    absl::StrAppend(&response_data, "{\"name\":", nlohmann::json(tool->name()).dump());
+    response_fragments.emplace_back("{\"name\":");
+    response_fragments.emplace_back(*owned_response_fragments.emplace_back(
+        std::make_unique<std::string>(nlohmann::json(tool->name()).dump())));
 
     if (!tool->tool_list_config().title().empty()) {
-      absl::StrAppend(&response_data,
-                      ",\"title\":", nlohmann::json(tool->tool_list_config().title()).dump());
+      response_fragments.emplace_back(",\"title\":");
+      response_fragments.emplace_back(*owned_response_fragments.emplace_back(
+          std::make_unique<std::string>(nlohmann::json(tool->tool_list_config().title()).dump())));
     }
 
-    absl::StrAppend(&response_data, ",\"description\":",
-                    nlohmann::json(tool->tool_list_config().description()).dump(),
-                    ",\"inputSchema\":");
+    if (!tool->tool_list_config().description().empty()) {
+      response_fragments.emplace_back(",\"description\":");
+      response_fragments.emplace_back(
+          *owned_response_fragments.emplace_back(std::make_unique<std::string>(
+              nlohmann::json(tool->tool_list_config().description()).dump())));
+    }
+    response_fragments.emplace_back(",\"inputSchema\":");
 
     // WARNING: assumes input_schema is trusted to be a valid JSON fragment. Does not validate.
     if (!tool->tool_list_config().input_schema().empty()) {
-      absl::StrAppend(&response_data, tool->tool_list_config().input_schema());
+      response_fragments.emplace_back(tool->tool_list_config().input_schema());
     } else {
-      absl::StrAppend(&response_data, "{\"type\":\"object\"}");
+      response_fragments.emplace_back("{\"type\":\"object\"}");
     }
 
-    absl::StrAppend(&response_data, "}");
+    response_fragments.emplace_back("}");
   }
 
-  absl::StrAppend(&response_data, "]}}");
+  response_fragments.emplace_back("]}}");
+
+  std::string response_data;
+  size_t reserve_size = 0;
+  for (const auto& fragment : response_fragments) {
+    reserve_size += fragment.size();
+  }
+  response_data.reserve(reserve_size);
+  for (const auto& fragment : response_fragments) {
+    absl::StrAppend(&response_data, fragment);
+  }
 
   decoder_callbacks_->sendLocalReply(
       Http::Code::OK, response_data,
@@ -857,8 +824,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
   std::string method = json_rpc[McpConstants::METHOD_FIELD];
   if (!validateRequestMcpVersion(method, request_headers, config_->fallbackProtocolVersion())) {
     sendErrorResponse(
-        Http::Code::BadRequest, BridgeStatus::RequestUnsupportedProtocolVersion,
-        generateErrorJsonResponse(-32602, "Unsupported protocol version").dump(), nullptr, method,
+        Http::Code::OK, BridgeStatus::RequestUnsupportedMcpVersion,
+        generateErrorJsonResponse(-32602, "Unsupported MCP version").dump(), nullptr, method,
         json_rpc.contains(McpConstants::PARAMS_FIELD) ? json_rpc[McpConstants::PARAMS_FIELD]
                                                       : json::object());
     return;
@@ -909,7 +876,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         // be addressed later when the JSON parser is updated.
         mcp_operation_ = McpOperation::Unspecified;
         request_body_str_ = json_rpc.dump();
-        status_ = BridgeStatus::RequestPassthrough;
+        status_ = BridgeStatus::InternalToolsListPassthrough;
         setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                        ? json_rpc[McpConstants::PARAMS_FIELD]
                                        : json::object());
@@ -937,7 +904,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
       return;
     }
     sendErrorResponse(
-        Http::Code::BadRequest, BridgeStatus::RequestInitializeNotValid,
+        Http::Code::OK, BridgeStatus::RequestInitializeNotValid,
         generateErrorJsonResponse(-32602, "Missing valid protocolVersion in initialize "
                                           "request")
             .dump(),
@@ -965,8 +932,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
     mapMcpToolToApiBackend(json_rpc, per_route_config);
   } else {
     sendErrorResponse(
-        Http::Code::BadRequest, BridgeStatus::RequestMethodNotSupported,
-        generateErrorJsonResponse(-32601, absl::StrCat("Method ", method, " is not supported"))
+        Http::Code::OK, BridgeStatus::RequestMcpMethodNotSupported,
+        generateErrorJsonResponse(-32601, absl::StrCat("MCP method ", method, " is not supported"))
             .dump(),
         nullptr, method,
         json_rpc.contains(McpConstants::PARAMS_FIELD) ? json_rpc[McpConstants::PARAMS_FIELD]
@@ -996,7 +963,7 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
       response_body_str_ = ret.dump();
       setResponseMetadata(getResponseCode(response_headers) >=
                                   static_cast<int>(Http::Code::BadRequest)
-                              ? BridgeStatus::ResponseBackendError
+                              ? BridgeStatus::ResponseHttpStatusError
                               : BridgeStatus::ResponseFailedToParseJsonRpc,
                           getResponseCode(response_headers));
       break;
@@ -1021,14 +988,16 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
           translateJsonRestResponseToJsonRpc("Backend response returns an invalid UTF-8 payload.",
                                              *session_id_, true)
               .dump();
-      setResponseMetadata(BridgeStatus::ResponseInvalidUtf8, getResponseCode(response_headers));
+      setResponseMetadata(BridgeStatus::ResponseToolsCallInvalidUtf8,
+                          getResponseCode(response_headers));
     } else {
       bool is_error = getResponseCode(response_headers) >= static_cast<int>(Http::Code::BadRequest);
       response_body_str_ = translateJsonRestResponseToJsonRpc(
                                absl::string_view(json_ptr, total_size), *session_id_, is_error)
                                .dump();
       if (is_error) {
-        setResponseMetadata(BridgeStatus::ResponseBackendError, getResponseCode(response_headers));
+        setResponseMetadata(BridgeStatus::ResponseHttpStatusError,
+                            getResponseCode(response_headers));
       } else {
         setResponseMetadata(BridgeStatus::Ok, getResponseCode(response_headers));
       }
@@ -1062,6 +1031,10 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
       // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
       // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
       // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+      // Note on 400 Bad Request: While the MCP authorization spec also includes HTTP 400 for
+      // certain authorization errors, we assume authorization checks (e.g., OAuth token
+      // validation) occur in filters before MCP transcoding, so any 400 error from the REST
+      // backend is assumed to be an API error and is transformed into a standard JSON-RPC error.
       if (status_code != static_cast<int>(Http::Code::Unauthorized) &&
           status_code != static_cast<int>(Http::Code::Forbidden)) {
         response_headers->setStatus(enumToInt(Http::Code::OK));
@@ -1088,7 +1061,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
     ENVOY_STREAM_LOG(error,
                      "The tool call request is missing 'params' field or it's not an object.",
                      *decoder_callbacks_);
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestToolParamsNotFound,
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestToolsCallToolNameMissing,
                       generateErrorJsonResponse(-32602, "Invalid params").dump(), nullptr,
                       McpConstants::Methods::TOOLS_CALL, json::object());
     return;
@@ -1099,7 +1072,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   if (name_it == params.end() || !name_it->is_string()) {
     ENVOY_STREAM_LOG(error, "Failed to get the name of the tool call request.",
                      *decoder_callbacks_);
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestToolNameNotFound,
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestToolsCallToolNameMissing,
                       generateErrorJsonResponse(-32602, "Tool name not found").dump(), nullptr,
                       McpConstants::Methods::TOOLS_CALL, params);
     return;
@@ -1113,7 +1086,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   if (!http_rule.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to get http rule for method: {}", *decoder_callbacks_,
                      tool_name);
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestUnknownTool,
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestToolsCallToolNameUnknown,
                       generateErrorJsonResponse(-32602, "Unknown tool").dump(), nullptr,
                       McpConstants::Methods::TOOLS_CALL, params);
     return;
@@ -1129,7 +1102,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   if (arguments_it != params.end() && !arguments_it->is_object()) {
     ENVOY_STREAM_LOG(error, "The arguments of the tool call request must be an object.",
                      *decoder_callbacks_);
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestToolArgumentsInvalid,
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestToolsCallArgumentsMalformed,
                       generateErrorJsonResponse(-32602, "Tool arguments must be an object").dump(),
                       nullptr, McpConstants::Methods::TOOLS_CALL, params);
     return;
@@ -1138,13 +1111,14 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(
   const nlohmann::json empty_arguments = nlohmann::json::object();
   const nlohmann::json& arguments = arguments_it != params.end() ? *arguments_it : empty_arguments;
 
-  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(*http_rule, arguments);
+  BridgeStatus bridge_status = BridgeStatus::Ok;
+  absl::StatusOr<HttpRequest> http_request = buildHttpRequest(*http_rule, arguments, bridge_status);
   if (!http_request.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to build HTTP request for method: {} with status: {}",
                      *decoder_callbacks_, tool_name, http_request.status());
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestToolTranscodingFailure,
-                      generateErrorJsonResponse(-32602, "Invalid tool arguments").dump(), nullptr,
-                      McpConstants::Methods::TOOLS_CALL, params);
+    sendErrorResponse(Http::Code::OK, bridge_status,
+                      generateErrorJsonResponse(-32602, http_request.status().message()).dump(),
+                      nullptr, McpConstants::Methods::TOOLS_CALL, params);
     return;
   }
 
@@ -1337,19 +1311,19 @@ absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann:
     session_id_ = *session_id;
   }
   if (!json_rpc.contains(McpConstants::METHOD_FIELD)) {
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestMethodNotFound,
-                      generateErrorJsonResponse(-32601, "Missing method field").dump());
-    return absl::InvalidArgumentError("Missing method field");
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestMcpMethodMalformed,
+                      generateErrorJsonResponse(-32600, "Missing MCP method field").dump());
+    return absl::InvalidArgumentError("Missing MCP method field");
   } else if (!json_rpc[McpConstants::METHOD_FIELD].is_string()) {
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestMethodNotString,
-                      generateErrorJsonResponse(-32601, "Method field is not a string").dump());
-    return absl::InvalidArgumentError("Method field is not a string");
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestMcpMethodMalformed,
+                      generateErrorJsonResponse(-32600, "MCP method field is not a string").dump());
+    return absl::InvalidArgumentError("MCP method field is not a string");
   } else if (json_rpc[McpConstants::METHOD_FIELD] ==
              McpConstants::Methods::NOTIFICATION_INITIALIZED) {
     // The notifications/initialized request is not required to have an ID
     // field.
   } else if (!session_id.ok()) {
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestIdNotFound,
+    sendErrorResponse(Http::Code::OK, BridgeStatus::RequestIdNotFound,
                       generateErrorJsonResponse(-32600, "Missing ID field").dump(), nullptr,
                       json_rpc[McpConstants::METHOD_FIELD].get<std::string>(),
                       json_rpc.contains(McpConstants::PARAMS_FIELD)
