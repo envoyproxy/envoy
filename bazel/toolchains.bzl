@@ -1,5 +1,6 @@
 load("@envoy_repo//:compiler.bzl", "LLVM_LIB_DIR", "LLVM_PATH", "LLVM_VERSION_LOCAL", "USE_LIBSTDCPP", "USE_LOCAL_SYSROOT")
 load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
+load("@rules_shell//shell:repositories.bzl", "rules_shell_dependencies", "rules_shell_toolchains")
 load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
 _LLVM_VERSION_HERMETIC = "18.1.8"
@@ -78,3 +79,6 @@ def envoy_toolchains():
         },
         toolchain_roots = {"": LLVM_PATH} if LLVM_PATH else {},
     )
+
+    rules_shell_dependencies()
+    rules_shell_toolchains()
