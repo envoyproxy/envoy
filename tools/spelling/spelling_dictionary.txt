@@ -727,6 +727,7 @@ canonicalization
 canonicalize
 canonicalized
 canonicalizer
+canonicalizes
 canonicalizing
 cardinality
 casted
