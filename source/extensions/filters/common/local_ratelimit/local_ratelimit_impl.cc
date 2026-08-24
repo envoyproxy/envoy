@@ -111,7 +111,9 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider,
     uint32_t lru_size)
     : time_source_(dispatcher.timeSource()), share_provider_(std::move(shared_provider)),
-      always_consume_default_token_bucket_(always_consume_default_token_bucket) {
+      always_consume_default_token_bucket_(always_consume_default_token_bucket),
+      shadow_mode_no_short_circuit_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.local_ratelimit_shadow_mode_no_short_circuit")) {
   // Ignore the default token bucket if fill_interval is 0 because 0 fill_interval means nothing
   // and has undefined behavior.
   if (fill_interval.count() > 0) {
@@ -221,7 +223,9 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
       match_result.token_bucket->refill(match_result.request_descriptor.get().hits_addend_.value());
     } else if (!match_result.token_bucket->consume(
                    share_factor, match_result.request_descriptor.get().hits_addend_.value_or(1))) {
-      if (match_result.token_bucket->shadowMode()) {
+      if (shadow_mode_no_short_circuit_ && match_result.token_bucket->shadowMode()) {
+        // A shadow mode descriptor never denies the request by itself, so keep evaluating the
+        // remaining descriptors and the default token bucket.
         if (!first_failed_shadow_result.has_value()) {
           first_failed_shadow_result = match_result;
         }
@@ -254,7 +258,7 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
     }
   }
 
-  // All enforced rate limits passed. If any shadow-mode descriptor failed consume(), return that
+  // All enforced rate limits passed. If any shadow mode descriptor failed consume(), return that
   // result.
   if (first_failed_shadow_result.has_value()) {
     return {false, std::shared_ptr<TokenBucketContext>(first_failed_shadow_result->token_bucket),
