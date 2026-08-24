@@ -189,7 +189,8 @@ TEST(UtilityTest, TestExpirationWithUnixTimeWithExpiredCert) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  EXPECT_EQ(1787339644, Utility::getExpirationUnixTime(cert.get()).count());
+  auto cert_expiry = TestUtility::parseTime(TEST_SAN_DNS_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  EXPECT_EQ(absl::ToUnixSeconds(cert_expiry), Utility::getExpirationUnixTime(cert.get()).count());
 }
 
 TEST(UtilityTest, TestExpirationWithUnixTimeWithNotExpiredCert) {
@@ -199,7 +200,8 @@ TEST(UtilityTest, TestExpirationWithUnixTimeWithNotExpiredCert) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  EXPECT_EQ(1787339644, Utility::getExpirationUnixTime(cert.get()).count());
+  auto cert_expiry = TestUtility::parseTime(TEST_SAN_DNS_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  EXPECT_EQ(absl::ToUnixSeconds(cert_expiry), Utility::getExpirationUnixTime(cert.get()).count());
 }
 
 TEST(UtilityTest, TestDaysUntilExpiration) {
