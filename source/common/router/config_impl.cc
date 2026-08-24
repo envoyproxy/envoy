@@ -599,13 +599,15 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
     auto parser_or_error =
-        HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
+        HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove(),
+                                vhost_->globalRouteConfig().commandParsers());
     SET_AND_RETURN_IF_NOT_OK(parser_or_error.status(), creation_status);
     request_headers_parser_ = std::move(parser_or_error.value());
   }
   if (!route.response_headers_to_add().empty() || !route.response_headers_to_remove().empty()) {
-    auto parser_or_error = HeaderParser::configure(route.response_headers_to_add(),
-                                                   route.response_headers_to_remove());
+    auto parser_or_error =
+        HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove(),
+                                vhost_->globalRouteConfig().commandParsers());
     SET_AND_RETURN_IF_NOT_OK(parser_or_error.status(), creation_status);
     response_headers_parser_ = std::move(parser_or_error.value());
   }
@@ -635,7 +637,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   if (route.route().has_weighted_clusters()) {
     cluster_specifier_plugin_ = std::make_shared<WeightedClusterSpecifierPlugin>(
         route.route().weighted_clusters(), metadata_match_criteria_.get(), route_name_,
-        factory_context, init_manager, creation_status);
+        factory_context, init_manager, vhost_->globalRouteConfig().commandParsers(),
+        creation_status);
     RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   } else if (route.route().has_inline_cluster_specifier_plugin()) {
     auto plugin_or_error = getClusterSpecifierPluginByTheProto(
@@ -1631,14 +1634,16 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
       !virtual_host.request_headers_to_remove().empty()) {
     request_headers_parser_ =
         THROW_OR_RETURN_VALUE(HeaderParser::configure(virtual_host.request_headers_to_add(),
-                                                      virtual_host.request_headers_to_remove()),
+                                                      virtual_host.request_headers_to_remove(),
+                                                      global_route_config_->commandParsers()),
                               Router::HeaderParserPtr);
   }
   if (!virtual_host.response_headers_to_add().empty() ||
       !virtual_host.response_headers_to_remove().empty()) {
     response_headers_parser_ =
         THROW_OR_RETURN_VALUE(HeaderParser::configure(virtual_host.response_headers_to_add(),
-                                                      virtual_host.response_headers_to_remove()),
+                                                      virtual_host.response_headers_to_remove(),
+                                                      global_route_config_->commandParsers()),
                               Router::HeaderParserPtr);
   }
 
@@ -2154,17 +2159,26 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
     internal_only_headers_.push_back(Http::LowerCaseString(header));
   }
 
+  if (!config.formatters().empty()) {
+    Server::GenericFactoryContextImpl generic_context(factory_context,
+                                                      factory_context.messageValidationVisitor());
+    auto parsers_or_error = Formatter::SubstitutionFormatStringUtils::parseFormatters(
+        config.formatters(), generic_context);
+    SET_AND_RETURN_IF_NOT_OK(parsers_or_error.status(), creation_status);
+    command_parsers_ = std::move(*parsers_or_error);
+  }
+
   if (!config.request_headers_to_add().empty() || !config.request_headers_to_remove().empty()) {
-    request_headers_parser_ =
-        THROW_OR_RETURN_VALUE(HeaderParser::configure(config.request_headers_to_add(),
-                                                      config.request_headers_to_remove()),
-                              Router::HeaderParserPtr);
+    request_headers_parser_ = THROW_OR_RETURN_VALUE(
+        HeaderParser::configure(config.request_headers_to_add(), config.request_headers_to_remove(),
+                                command_parsers_),
+        Router::HeaderParserPtr);
   }
   if (!config.response_headers_to_add().empty() || !config.response_headers_to_remove().empty()) {
-    response_headers_parser_ =
-        THROW_OR_RETURN_VALUE(HeaderParser::configure(config.response_headers_to_add(),
-                                                      config.response_headers_to_remove()),
-                              Router::HeaderParserPtr);
+    response_headers_parser_ = THROW_OR_RETURN_VALUE(
+        HeaderParser::configure(config.response_headers_to_add(),
+                                config.response_headers_to_remove(), command_parsers_),
+        Router::HeaderParserPtr);
   }
 
   if (config.has_metadata()) {

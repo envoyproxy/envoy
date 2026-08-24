@@ -421,6 +421,18 @@ message HeaderValue {
   // unknown header values are replaced with the empty string instead of ``-``.
   // Header value is encoded as string. This does not work for non-utf8 characters.
   // Only one of ``value`` or ``raw_value`` can be set.
+  //
+  // .. note::
+  //
+  //   Only the built-in :ref:`command operators <config_access_log_command_operators>` are
+  //   available by default. Extension formatters (for example ``%FILE_CONTENT()%`` or
+  //   ``%REQ_WITHOUT_QUERY()%``) are *not* enabled here automatically; using one that has not been
+  //   enabled is rejected at configuration load with ``Not supported field in StreamInfo:
+  //   <COMMAND>``. To use an extension formatter in a header value, the surrounding configuration
+  //   must expose a ``formatters`` field and the extension must be listed there. For header
+  //   mutations on routes, virtual hosts and weighted clusters this is the
+  //   :ref:`RouteConfiguration.formatters
+  //   <envoy_v3_api_field_config.route.v3.RouteConfiguration.formatters>` field.
   string value = 2 [
     (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false},
     (udpa.annotations.field_migrate).oneof_promotion = "value_type"

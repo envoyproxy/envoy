@@ -58,6 +58,7 @@ envoy_cc_test_library(
         "//source/common/stream_info:filter_state_lib",
         "//source/common/stream_info:upstream_address_lib",
         "//source/extensions/formatter/cel:config",
+        "//test/common/formatter:command_extension_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/init:init_mocks",
