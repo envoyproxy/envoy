@@ -17,6 +17,7 @@ package(default_visibility = [
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/network/dns_resolver/hickory:__pkg__",
+    "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/tracers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
@@ -164,6 +165,16 @@ test_program(name = "formatter_missing_provider_destroy")
 test_program(name = "formatter_missing_format")
 
 test_program(name = "formatter_config_new_fail")
+
+test_program(name = "cluster_specifier_no_op")
+
+test_program(name = "cluster_specifier_missing_config_new")
+
+test_program(name = "cluster_specifier_missing_config_destroy")
+
+test_program(name = "cluster_specifier_missing_select")
+
+test_program(name = "cluster_specifier_config_new_fail")
 
 test_program(name = "cluster_no_op")
 
