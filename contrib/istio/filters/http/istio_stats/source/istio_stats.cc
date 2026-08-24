@@ -1316,13 +1316,12 @@ private:
 } // namespace
 
 absl::StatusOr<Http::FilterFactoryCb>
-IstioStatsFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const stats::PluginConfig& proto_config, const std::string&,
-    Server::Configuration::FactoryContext& factory_context) {
-  factory_context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
-      CustomStatNamespace);
-  ConfigSharedPtr config = std::make_shared<Config>(
-      proto_config, factory_context.serverFactoryContext(), factory_context.scope());
+IstioStatsFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
+    const stats::PluginConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  context.api().customStatNamespaces().registerStatNamespace(CustomStatNamespace);
+  ConfigSharedPtr config =
+      std::make_shared<Config>(proto_config, context, extra_context.scopeOr(context));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) {
     auto filter = std::make_shared<IstioStatsFilter>(config);
     callbacks.addStreamFilter(filter);
