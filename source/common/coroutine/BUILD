@@ -99,20 +99,39 @@ envoy_cc_library(
     srcs = ["async_queue.cc"],
     hdrs = ["async_queue.h"],
     deps = [
+        ":any_of_lib",
         ":async_event_lib",
         ":leaf_awaitable_lib",
         ":status_macros_lib",
         ":task_lib",
         "//source/common/common:assert_lib",
         "@abseil-cpp//absl/cleanup",
+        "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
     ],
 )
 
 envoy_cc_library(
+    name = "any_of_lib",
+    srcs = ["any_of.cc"],
+    hdrs = ["any_of.h"],
+    deps = [
+        ":context_lib",
+        ":launch_lib",
+        ":leaf_awaitable_lib",
+        ":task_lib",
+        "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:variant",
+    ],
+)
+
+envoy_cc_library(
     name = "coroutine_lib",
     deps = [
+        ":any_of_lib",
         ":async_event_lib",
         ":async_queue_lib",
         ":context_lib",

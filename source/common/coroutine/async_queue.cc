@@ -38,18 +38,18 @@ bool SharedCapacity::canAcquire(uint64_t size) const {
   return hasCapacity(size);
 }
 
-bool SharedCapacity::tryAcquire(uint64_t size) {
+std::optional<CapacityReservation> SharedCapacity::tryAcquire(uint64_t size) {
   if (waiters_.empty() && canAcquire(size)) {
     current_size_ += size;
-    return true;
+    return CapacityReservation(shared_from_this(), size);
   }
-  return false;
+  return std::nullopt;
 }
 
-Task<absl::Status> SharedCapacity::acquire(uint64_t size) {
+Task<absl::StatusOr<CapacityReservation>> SharedCapacity::acquire(uint64_t size) {
   if (waiters_.empty() && canAcquire(size)) {
     current_size_ += size;
-    co_return absl::OkStatus();
+    co_return CapacityReservation(shared_from_this(), size);
   }
 
   auto alive = alive_;
@@ -79,7 +79,7 @@ Task<absl::Status> SharedCapacity::acquire(uint64_t size) {
   current_size_ += size;
 
   capacity_event_.notifyOne();
-  co_return absl::OkStatus();
+  co_return CapacityReservation(shared_from_this(), size);
 }
 
 void SharedCapacity::release(uint64_t size) {
