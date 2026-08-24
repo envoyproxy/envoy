@@ -285,6 +285,22 @@ function build_openssl() {
     bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
 }
 
+# Run a bazel query, staying quiet on success but surfacing stderr and the exit
+# code on failure, so a broken query fails the job instead of silently selecting
+# no tests. Query results go to stdout.
+function run_bazel_query() {
+    local err out rc=0
+    err="$(mktemp)"
+    out="$(bazel query "${BAZEL_QUERY_OPTIONS[@]}" "$1" 2>"$err")" || rc=$?
+    if [[ $rc -ne 0 ]]; then
+        echo "ERROR: bazel query failed (exit ${rc}): $1" >&2
+        cat "$err" >&2
+    fi
+    rm -f "$err"
+    printf '%s' "$out"
+    return "$rc"
+}
+
 function build_openssl_presubmit() {
     # Lightweight OpenSSL pre-submit (PRs): build the binary to catch link
     # errors, then run only the tests affected by the PR (via Bazel rdeps). The
@@ -337,9 +353,8 @@ function build_openssl_presubmit() {
     # contains their //source/... deps, so it is a sufficient rdeps universe.
     local tier1_tests=""
     if [[ ${#changed_labels[@]} -gt 0 ]]; then
-        tier1_tests="$(bazel query "${BAZEL_QUERY_OPTIONS[@]}" \
-            "kind(test, rdeps(//test/... + //compat/openssl/test/..., set(${changed_labels[*]})))" \
-            2>/dev/null || true)"
+        tier1_tests="$(run_bazel_query \
+            "kind(test, rdeps(//test/... + //compat/openssl/test/..., set(${changed_labels[*]})))")"
     fi
 
     # Tier 2 (fallback for global/build-config changes): a full //test/... run is
@@ -348,13 +363,17 @@ function build_openssl_presubmit() {
     local tier2_tests=""
     if [[ "$global_config_changed" == "true" ]]; then
         echo "Global/build-config change detected; adding OpenSSL crypto-surface tests."
-        tier2_tests="$(bazel query "${BAZEL_QUERY_OPTIONS[@]}" \
-            "kind(test, rdeps(//test/..., //source/common/tls/... + //source/extensions/transport_sockets/tls/... + //compat/openssl/...))" \
-            2>/dev/null || true)"
+        tier2_tests="$(run_bazel_query \
+            "kind(test, rdeps(//test/... + //compat/openssl/test/..., //source/common/tls/... + //source/extensions/transport_sockets/tls/... + //compat/openssl/...))")"
     fi
 
+    # Combine both tiers, dropping blanks and duplicates. A read loop (rather
+    # than mapfile) keeps this portable to bash without mapfile, e.g. macOS.
     local -a test_targets=()
-    mapfile -t test_targets < <(printf '%s\n%s\n' "$tier1_tests" "$tier2_tests" | grep -v '^$' | sort -u)
+    local target
+    while IFS= read -r target; do
+        [[ -n "$target" ]] && test_targets+=("$target")
+    done < <(printf '%s\n%s\n' "$tier1_tests" "$tier2_tests" | sort -u)
 
     if [[ ${#test_targets[@]} -eq 0 ]]; then
         echo "No affected test targets found, skipping tests."
