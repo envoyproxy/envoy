@@ -409,7 +409,10 @@ get: "/v1"
     current = &((*current)["a"]);
   }
 
-  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
 }
 
 TEST(HttpRequestBuilderTest, ConstructQueryParamsArrayNestingDepthLimit) {
@@ -426,7 +429,10 @@ get: "/v1"
     current = &((*current)[0]);
   }
 
-  EXPECT_THAT(buildHttpRequest(http_rule, arguments), StatusIs(absl::StatusCode::kInvalidArgument));
+  BridgeStatus status = BridgeStatus::Ok;
+  EXPECT_THAT(buildHttpRequest(http_rule, arguments, status),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(status, BridgeStatus::RequestToolsCallMissingRequiredArg);
 }
 
 } // namespace
