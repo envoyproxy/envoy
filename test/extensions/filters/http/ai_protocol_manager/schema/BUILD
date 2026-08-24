@@ -23,4 +23,3 @@ envoy_extension_cc_test(
         "@nlohmann_json//:json",
     ],
 )
-

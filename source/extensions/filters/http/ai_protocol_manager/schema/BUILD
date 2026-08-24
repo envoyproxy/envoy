@@ -16,4 +16,3 @@ envoy_cc_library(
         "//source/extensions/filters/http/ai_protocol_manager:schema_lib",
     ],
 )
-
