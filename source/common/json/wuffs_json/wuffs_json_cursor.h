@@ -53,8 +53,8 @@ namespace Wuffs {
 // Container byte ranges: onContainerOpen/onContainerClose deliver token_start/
 // token_end forming a half-open [token_start, token_end) over raw body bytes.
 //
-// Path tracking: call matchesPatternPath(segments, depth) from a callback,
-// passing that callback's depth (container callbacks: depth-1).
+// Path tracking: call matchesPatternPath(segments) from a scalar callback, or
+// matchesContainerPatternPath(segments) from onContainerOpen.
 //
 class WuffsJsonCursor {
 public:
@@ -158,17 +158,13 @@ public:
     // Called after depth has been incremented for a { or [ open. `key` is the
     // parent dict key or "" for array/root. token_start is the offset of { or [.
     //
-    // matchesPatternPath: use depth-1 — `depth` is this container's contents
-    // level, not yet labeled. Compare `key`/is_dict yourself.
-    // TODO(tyxia): add matchesContainerPatternPath convenience wrapper.
+    // Use matchesContainerPatternPath() here to test this container's own path.
     virtual void onContainerOpen(absl::string_view key, bool is_dict, int depth,
                                  size_t token_start) = 0;
 
     // Called with the container's depth before decrement and the offset past } or ].
-    //
-    // matchesPatternPath: this container's level is depth-1; matching at
-    // `depth` describes the last item inside it. No `key` here — record the
-    // match in onContainerOpen and consume it.
+    // Fires after the decrement, so neither match helper still describes this
+    // container — record the match in onContainerOpen and consume it here.
     virtual void onContainerClose(int depth, size_t token_end) = 0;
   };
 
@@ -198,14 +194,17 @@ public:
     bool is_array_element{false};
   };
 
-  // True iff the root-to-here chain at `depth` matches `segments` exactly.
-  // Labels compare whole and are never serialized, so a document key holding
-  // '.', '[' or ']' cannot masquerade as nested structure.
-  //
-  // For `depth`, pass the value the calling Handler callback received (the
-  // container callbacks anchor one level up, at depth-1).
-  // Callable only from inside a callback; a wrong `depth` silently returns false.
-  bool matchesPatternPath(absl::Span<const PatternSegment> segments, int depth) const;
+  // True iff the cursor sits exactly on the path named by `segments` — the
+  // pattern's length is the level it addresses, so shorter names an ancestor and
+  // longer a level not yet reached, and neither matches. Labels compare whole and
+  // are never serialized, so a key holding '.', '[' or ']' cannot fake nesting.
+  // Call from a scalar callback.
+  bool matchesPatternPath(absl::Span<const PatternSegment> segments) const;
+
+  // onContainerOpen counterpart: true iff the container that just opened is itself
+  // `segments`. A container is labeled one level above its contents, so this
+  // anchors one level up. Record at open, consume at close.
+  bool matchesContainerPatternPath(absl::Span<const PatternSegment> segments) const;
 
   // Monotonically increasing offset of the next source byte to be consumed.
   // Aligns with token_start / token_end values in callbacks.
@@ -263,6 +262,9 @@ private:
   bool string_chunk_active_{false}; // onStringChunk hasn't returned false yet
   std::string key_buffer_;
   size_t key_token_start_{0};
+
+  // Shared walk. Callers must first check segments.size() against their level.
+  bool matchesChain(absl::Span<const PatternSegment> segments) const;
 
   absl::Status handleStructureToken(uint64_t token_detail, size_t token_start);
   absl::Status handleStringToken(absl::string_view raw, uint64_t token_detail, bool continued,

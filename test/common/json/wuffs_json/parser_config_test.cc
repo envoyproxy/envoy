@@ -293,8 +293,8 @@ public:
 
   void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
 
-  bool openStringCapture(absl::string_view, int depth, size_t) override {
-    capturing_ = cursor_->matchesPatternPath(pattern_, depth);
+  bool openStringCapture(absl::string_view, int, size_t) override {
+    capturing_ = cursor_->matchesPatternPath(pattern_);
     return capturing_;
   }
   bool onStringChunk(absl::string_view, int, absl::string_view chunk) override {
@@ -307,23 +307,22 @@ public:
       capturing_ = false;
     }
   }
-  absl::Status onNumber(absl::string_view, absl::string_view raw, int depth, size_t,
-                        size_t) override {
-    if (cursor_->matchesPatternPath(pattern_, depth)) {
+  absl::Status onNumber(absl::string_view, absl::string_view raw, int, size_t, size_t) override {
+    if (cursor_->matchesPatternPath(pattern_)) {
       captured_.append(raw.data(), raw.size());
       captured_ += ';';
     }
     return absl::OkStatus();
   }
-  absl::Status onBoolean(absl::string_view, bool value, int depth, size_t, size_t) override {
-    if (cursor_->matchesPatternPath(pattern_, depth)) {
+  absl::Status onBoolean(absl::string_view, bool value, int, size_t, size_t) override {
+    if (cursor_->matchesPatternPath(pattern_)) {
       captured_ += value ? "true" : "false";
       captured_ += ';';
     }
     return absl::OkStatus();
   }
-  void onNull(absl::string_view, int depth, size_t, size_t) override {
-    if (cursor_->matchesPatternPath(pattern_, depth)) {
+  void onNull(absl::string_view, int, size_t, size_t) override {
+    if (cursor_->matchesPatternPath(pattern_)) {
       captured_ += "null;";
     }
   }
@@ -539,69 +538,72 @@ TEST(StructuralMatchTest, KindMismatchRejected) {
   }
 }
 
-// Probes matchesPatternPath's degenerate arguments from inside a callback:
-// depth 0, depth >= kMaxTrackedDepth, segment count != depth, and a depth above
-// the cursor's level all return false rather than matching or reading out of
-// bounds.
-//
-// The last is reachable, not hypothetical: per-depth state survives a pop, so
-// levels above the cursor still hold a closed container's labels. Against
-// {"a":{"b":1},"c":"x"}, key_stack_[2] reads "b" while the cursor sits at "c".
+// The pattern's length is the level it addresses, so every degenerate case is a
+// length-vs-depth mismatch: empty, shorter than the cursor (an ancestor), longer,
+// or past kMaxTrackedDepth must all return false rather than match or read out of
+// bounds. "Longer" is reachable, not hypothetical — per-depth state survives a
+// pop, so against {"a":{"b":1},"c":"x"} key_stack_[2] still reads "b" at "c".
 class MatchProbeHandler : public MockHandler {
 public:
   void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
 
-  bool openStringCapture(absl::string_view, int depth, size_t) override {
-    const std::vector<WuffsJsonCursor::PatternSegment> one = {{"c", false}};
-    matched_correct_ = cursor_->matchesPatternPath(one, depth);
-    matched_depth_zero_ = cursor_->matchesPatternPath(one, 0);
-    matched_size_mismatch_ = cursor_->matchesPatternPath(one, 2);
+  bool openStringCapture(absl::string_view, int, size_t) override {
+    // Cursor stands on "x" at depth 1.
+    const std::vector<WuffsJsonCursor::PatternSegment> c = {{"c"}};
+    matched_correct_ = cursor_->matchesPatternPath(c);
+    matched_empty_ = cursor_->matchesPatternPath({});
+    // Reaches below the cursor, where key_stack_[2] still reads the closed {"b":1}.
+    const std::vector<WuffsJsonCursor::PatternSegment> c_b = {{"c"}, {"b"}};
+    matched_below_cursor_ = cursor_->matchesPatternPath(c_b);
     const std::vector<WuffsJsonCursor::PatternSegment> deep(WuffsJsonCursor::kMaxTrackedDepth,
                                                             {"a", false});
-    matched_over_bound_ = cursor_->matchesPatternPath(deep, WuffsJsonCursor::kMaxTrackedDepth);
-    // Case 2: ["c","b"] names a path that only existed inside the closed {"b":1}.
-    const std::vector<WuffsJsonCursor::PatternSegment> c_b = {{"c"}, {"b"}};
-    matched_closed_sibling_ = cursor_->matchesPatternPath(c_b, 2);
+    matched_over_bound_ = cursor_->matchesPatternPath(deep);
     return false;
   }
 
+  absl::Status onNumber(absl::string_view, absl::string_view, int depth, size_t, size_t) override {
+    // Cursor stands on 1 at depth 2; ["a"] addresses level 1, an ancestor.
+    if (depth == 2) {
+      const std::vector<WuffsJsonCursor::PatternSegment> a = {{"a"}};
+      matched_ancestor_ = cursor_->matchesPatternPath(a);
+    }
+    return absl::OkStatus();
+  }
+
   void onContainerClose(int depth, size_t) override {
-    // Case 1: `depth` here is the popped container's level, already one above
-    // the cursor. ["a","b"] described the chain until the pop.
+    // Fires after the decrement, so this chain is already behind the cursor.
     if (depth == 2) {
       const std::vector<WuffsJsonCursor::PatternSegment> a_b = {{"a"}, {"b"}};
-      matched_after_pop_ = cursor_->matchesPatternPath(a_b, depth);
+      matched_after_pop_ = cursor_->matchesPatternPath(a_b);
     }
   }
 
   const WuffsJsonCursor* cursor_{nullptr};
   bool matched_correct_{false};
-  bool matched_depth_zero_{true};
-  bool matched_size_mismatch_{true};
+  bool matched_empty_{true};
+  bool matched_ancestor_{true};
+  bool matched_below_cursor_{true};
   bool matched_over_bound_{true};
-  bool matched_closed_sibling_{true};
   bool matched_after_pop_{true};
 };
 
-TEST(StructuralMatchTest, WrongDepthArgumentNeverMatches) {
+TEST(StructuralMatchTest, PatternLengthMustEqualCursorDepth) {
   MatchProbeHandler h;
   WuffsJsonCursor cursor(h);
   h.setCursor(&cursor);
   ASSERT_TRUE(cursor.feed(R"({"a":{"b":1},"c":"x"})", /*closed=*/true).ok());
   EXPECT_TRUE(h.matched_correct_); // sanity: the well-formed call matches
-  EXPECT_FALSE(h.matched_depth_zero_);
-  EXPECT_FALSE(h.matched_size_mismatch_);
+  EXPECT_FALSE(h.matched_empty_);
+  EXPECT_FALSE(h.matched_ancestor_);
+  EXPECT_FALSE(h.matched_below_cursor_);
   EXPECT_FALSE(h.matched_over_bound_);
-  EXPECT_FALSE(h.matched_closed_sibling_);
   EXPECT_FALSE(h.matched_after_pop_);
 }
 
-// Executable form of the container depth-1 recipe documented on the cursor:
-// when a container opens, the chain at `depth` is not yet populated, so a
-// container spec of N segments is matched with the full pattern at depth-1
-// (== N), and the decision is recorded for close to consume. Captures each
-// matching container's [token_start, token_end) byte range — the production
-// shape for messages[] element passthrough.
+// Executable form of the container recipe: matchesContainerPatternPath() names the
+// container that just opened, and the decision is recorded at open for close to
+// consume (close fires after the decrement). Captures each matching container's
+// [token_start, token_end) — the production shape for messages[] passthrough.
 class ContainerRangeHandler : public MockHandler {
 public:
   explicit ContainerRangeHandler(const ExtractFieldSpec& spec, const ParserConfig& config = {})
@@ -610,8 +612,7 @@ public:
   void setCursor(const WuffsJsonCursor* cursor) { cursor_ = cursor; }
 
   void onContainerOpen(absl::string_view, bool, int depth, size_t token_start) override {
-    if (open_depth_ == -1 && depth - 1 == static_cast<int>(pattern_.size()) &&
-        cursor_->matchesPatternPath(pattern_, depth - 1)) {
+    if (open_depth_ == -1 && cursor_->matchesContainerPatternPath(pattern_)) {
       open_depth_ = depth;
       range_start_ = token_start;
     }

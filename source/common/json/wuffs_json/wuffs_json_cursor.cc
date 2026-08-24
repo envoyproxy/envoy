@@ -388,35 +388,45 @@ absl::Status WuffsJsonCursor::handleNumberOrLiteralToken(int64_t token_category,
   return absl::OkStatus();
 }
 
-bool WuffsJsonCursor::matchesPatternPath(absl::Span<const PatternSegment> segments,
-                                         int depth) const {
-  // Compares: segment count must equal depth, and each level must agree
-  // in kind (object vs array) and, for objects, in whole-label equality.
-  //
-  // depth > depth_ is rejected: per-depth state is not cleared on pop, so levels
-  // above the cursor still hold the labels of an already-closed container. Reading
-  // them would match a path the cursor is not on — at {"a":{"b":1},"c":2}'s "c",
-  // key_stack_[2] is still "b", so ["c","b"] at depth 2 would falsely match.
-  if (depth <= 0 || depth > depth_ || depth >= kMaxTrackedDepth ||
-      static_cast<int>(segments.size()) != depth) {
-    return false;
-  }
-  for (int d = 1; d <= depth; ++d) {
-    const PatternSegment& seg = segments[d - 1];
+// Compares levels 1..segments.size() of the current chain against `segments`:
+// every level must agree in kind, and dict levels in whole-label equality.
+//
+// Callers check the pattern length against their own level first, which is what
+// keeps every index below kMaxTrackedDepth — handleStructureToken caps depth_ at
+// kMaxTrackedDepth-1 at push time.
+bool WuffsJsonCursor::matchesChain(absl::Span<const PatternSegment> segments) const {
+  for (size_t i = 0; i < segments.size(); ++i) {
+    const int d = static_cast<int>(i) + 1;
+    const PatternSegment& seg = segments[i];
     if (is_dict_[d]) {
       if (seg.is_array_element) {
         return false;
       }
       // is_dict_[d] means key_stack_[d] names the item at depth d: the leaf key
-      // when d == depth, else the key that opened the container at depth d+1.
+      // at the last level, else the key that opened the container at depth d+1.
       if (key_stack_[d] != seg.key) {
         return false;
       }
-    } else if (!seg.is_array_element) {
+      continue;
+    }
+    // Array level: only the [] wildcard can match.
+    if (!seg.is_array_element) {
       return false;
     }
   }
   return true;
+}
+
+bool WuffsJsonCursor::matchesPatternPath(absl::Span<const PatternSegment> segments) const {
+  // A pattern describes this value only if it names every level down to it.
+  return !segments.empty() && static_cast<int>(segments.size()) == depth_ && matchesChain(segments);
+}
+
+bool WuffsJsonCursor::matchesContainerPatternPath(absl::Span<const PatternSegment> segments) const {
+  // onContainerOpen fires after the increment, so the container that just opened
+  // is named by the chain one level above its contents.
+  return !segments.empty() && static_cast<int>(segments.size()) == depth_ - 1 &&
+         matchesChain(segments);
 }
 
 } // namespace Wuffs

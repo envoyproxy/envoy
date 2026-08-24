@@ -47,10 +47,12 @@ absl::Status appendSegment(std::vector<Segment>& segments, Segment segment, int 
 
 class ExtractFieldSpecParser {
 public:
-  ExtractFieldSpecParser(absl::string_view path, int max_depth)
-      : path_(path), max_depth_(max_depth) {}
+  explicit ExtractFieldSpecParser(int max_depth) : max_depth_(max_depth) {}
 
-  absl::StatusOr<std::vector<Segment>> parse() {
+  // `path` is borrowed for the duration of this call only — never retained past
+  // the return, so the caller's buffer does not have to outlive the parser.
+  absl::StatusOr<std::vector<Segment>> parse(absl::string_view path) {
+    path_ = path;
     std::vector<Segment> segments;
     for (size_t i = 0; i < path_.size(); ++i) {
       if (auto status = consume(i, segments); !status.ok()) {
@@ -157,8 +159,9 @@ private:
                          max_depth_);
   }
 
-  absl::string_view path_;
   const int max_depth_;
+  // Set at entry to parse() and valid only for that call; see the note there.
+  absl::string_view path_;
   bool in_array_{false};
   bool has_key_{false};
   size_t segment_start_{0};
@@ -167,15 +170,15 @@ private:
 } // namespace
 
 absl::StatusOr<ExtractFieldSpec> parseExtractFieldSpec(absl::string_view path, int max_depth) {
-  if (auto status = validatePathSyntax(path); !status.ok()) {
+  if (absl::Status status = validatePathSyntax(path); !status.ok()) {
     return status;
   }
-  auto segments = ExtractFieldSpecParser(path, max_depth).parse();
+  absl::StatusOr<std::vector<Segment>> segments = ExtractFieldSpecParser(max_depth).parse(path);
   if (!segments.ok()) {
     return segments.status();
   }
   ExtractFieldSpec out;
-  out.segments = std::move(*segments);
+  out.segments = *std::move(segments);
   return out;
 }
 
