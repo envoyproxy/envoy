@@ -66,7 +66,7 @@ TEST(TestWasmConfig, VmLevelCapabilityRestriction) {
 
 // The deprecated plugin level capability restrictions are moved into the VM configuration, leaving
 // the VM level field as the only place the restrictions can be read from.
-TEST(TestWasmConfig, DeprecatedPluginLevelCapabilityRestriction) {
+TEST(TestWasmConfig, DEPRECATED_FEATURE_TEST(DeprecatedPluginLevelCapabilityRestriction)) {
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   plugin_config.mutable_capability_restriction_config()->mutable_allowed_capabilities()->insert(
       {"proxy_log", envoy::extensions::wasm::v3::SanitizationConfig()});
@@ -80,7 +80,7 @@ TEST(TestWasmConfig, DeprecatedPluginLevelCapabilityRestriction) {
 }
 
 // The VM level capability restrictions win when both are set.
-TEST(TestWasmConfig, VmLevelCapabilityRestrictionWins) {
+TEST(TestWasmConfig, DEPRECATED_FEATURE_TEST(VmLevelCapabilityRestrictionWins)) {
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   plugin_config.mutable_capability_restriction_config()->mutable_allowed_capabilities()->insert(
       {"proxy_log", envoy::extensions::wasm::v3::SanitizationConfig()});
@@ -199,15 +199,19 @@ TEST_F(PluginKeyTest, ConfigDifferencesProduceDistinctKeys) {
   }
   {
     auto other = config;
-    other.mutable_capability_restriction_config()->mutable_allowed_capabilities()->insert(
-        {"proxy_log", envoy::extensions::wasm::v3::SanitizationConfig()});
-    EXPECT_NE(base_key, key(other));
-  }
-  {
-    auto other = config;
     other.mutable_reload_config()->mutable_backoff()->mutable_base_interval()->set_seconds(30);
     EXPECT_NE(base_key, key(other));
   }
+}
+
+// Same as above for the deprecated plugin level capability restrictions, which are part of the
+// plugin configuration and so of the plugin identity.
+TEST_F(PluginKeyTest, DEPRECATED_FEATURE_TEST(DeprecatedCapabilityRestrictionProducesDistinctKey)) {
+  const auto config = baseConfig();
+  auto other = config;
+  other.mutable_capability_restriction_config()->mutable_allowed_capabilities()->insert(
+      {"proxy_log", envoy::extensions::wasm::v3::SanitizationConfig()});
+  EXPECT_NE(key(config), key(other));
 }
 
 // The VM configuration is not part of the plugin key: VM identity is covered by the VM key, which

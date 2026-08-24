@@ -779,14 +779,45 @@ TEST_P(WasmCommonTest, VmCacheVmConfigChange) {
         ->insert({"proxy_log", envoy::extensions::wasm::v3::SanitizationConfig()});
     EXPECT_NE(create(config), base_handle);
   }
-  // The deprecated plugin level field is normalized onto the VM configuration, so it must be
-  // covered by the VM key as well.
-  {
-    auto config = plugin_config;
-    config.mutable_capability_restriction_config()->mutable_allowed_capabilities()->insert(
-        {"proxy_log", envoy::extensions::wasm::v3::SanitizationConfig()});
-    EXPECT_NE(create(config), base_handle);
+  proxy_wasm::clearWasmCachesForTesting();
+}
+
+// The deprecated plugin level capability restrictions are normalized onto the VM configuration, so
+// they must be covered by the VM key just like the VM level ones. As above, only distinctness from
+// the unrestricted VM is asserted.
+TEST_P(WasmCommonTest, DEPRECATED_FEATURE_TEST(VmCacheDeprecatedCapabilityRestriction)) {
+  // NullVm has no separate VM configuration to vary.
+  if (std::get<0>(GetParam()) == "null") {
+    return;
   }
+  NiceMock<Init::MockManager> init_manager;
+
+  const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm"));
+  EXPECT_FALSE(code.empty());
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto* base_vm_config = plugin_config.mutable_vm_config();
+  base_vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  base_vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
+
+  auto create = [&](const envoy::extensions::wasm::v3::PluginConfig& config) {
+    auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(config, local_info_);
+    WasmHandleSharedPtr wasm_handle;
+    createWasm(plugin, scope_, cluster_manager_, init_manager, *dispatcher_, *api_,
+               lifecycle_notifier_, remote_data_provider_,
+               [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
+    return wasm_handle;
+  };
+
+  // Held for the whole test: the base Wasm cache keeps only a weak reference to it.
+  auto base_handle = create(plugin_config);
+  EXPECT_NE(base_handle, nullptr);
+
+  auto config = plugin_config;
+  config.mutable_capability_restriction_config()->mutable_allowed_capabilities()->insert(
+      {"proxy_log", envoy::extensions::wasm::v3::SanitizationConfig()});
+  EXPECT_NE(create(config), base_handle);
 
   proxy_wasm::clearWasmCachesForTesting();
 }

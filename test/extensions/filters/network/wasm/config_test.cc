@@ -325,7 +325,8 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
 
 // The deprecated plugin level capability_restriction_config is still honored, by populating the VM
 // level one.
-TEST_P(WasmNetworkFilterConfigTest, FilterConfigDeprecatedPluginLevelCapabilityRestriction) {
+TEST_P(WasmNetworkFilterConfigTest,
+       DEPRECATED_FEATURE_TEST(FilterConfigDeprecatedPluginLevelCapabilityRestriction)) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
