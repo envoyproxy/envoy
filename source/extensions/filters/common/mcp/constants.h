@@ -54,6 +54,7 @@ constexpr absl::string_view DEFAULT_SERVER_VERSION = "1.0.0";
 constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
 constexpr absl::string_view IS_EXCEEDING_LIMIT = "is_exceeding_limit";
 constexpr absl::string_view STATUS = "status";
+constexpr absl::string_view PASSTHROUGH_REASON = "passthrough_reason";
 
 namespace StatusValues {
 constexpr absl::string_view OK = "mcp_ok";

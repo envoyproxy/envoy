@@ -188,6 +188,7 @@ private:
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
   Filters::Common::Mcp::Status status_{Filters::Common::Mcp::Status::Ok};
+  std::optional<Filters::Common::Mcp::Status> passthrough_reason_;
 };
 
 } // namespace Mcp

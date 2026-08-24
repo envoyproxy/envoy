@@ -260,7 +260,7 @@ TEST_F(McpFilterTest, NoopModePassesThroughNonMcp) {
 
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
@@ -299,7 +299,7 @@ TEST_F(McpFilterTest, NoopModePerRouteOverride) {
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"accept", "text/html"}};
 
   // Global REJECT_NO_MCP would reject this, but the NOOP override lets it through.
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
@@ -356,8 +356,36 @@ TEST_F(McpFilterTest, DynamicMetadataContainsIsMcpRequest) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
-// Test that malformed JSON is always rejected regardless of traffic mode
+// Test that malformed JSON is allowed in PASS_THROUGH mode
 TEST_F(McpFilterTest, PartialNoJsonData) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  Buffer::OwnedImpl buffer("partial data");
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value, "mcp_ok"))),
+                  Contains(Pair("passthrough_reason",
+                                Property(&Protobuf::Value::string_value, "mcp_not_jsonrpc"))),
+                  Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
+      });
+
+  // Malformed JSON — allowed in PASS_THROUGH mode.
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test that malformed JSON is rejected in REJECT_NO_MCP mode
+TEST_F(McpFilterTest, PartialNoJsonDataRejectMode) {
+  setupRejectMode();
+
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
@@ -378,13 +406,40 @@ TEST_F(McpFilterTest, PartialNoJsonData) {
                   Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
       });
 
-  // Malformed JSON — always rejected even in PASS_THROUGH mode.
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
 // Test that incomplete JSON (which is valid so far but incomplete at end_stream)
-// triggers a parse error.
+// is allowed in PASS_THROUGH mode.
 TEST_F(McpFilterTest, IncompleteJsonParseError) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Send incomplete JSON body
+  Buffer::OwnedImpl buffer("{\"jsonrpc\": \"2.0\"");
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value, "mcp_ok"))),
+                  Contains(Pair("passthrough_reason",
+                                Property(&Protobuf::Value::string_value, "mcp_parse_error"))),
+                  Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, false)))));
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test that incomplete JSON triggers a parse error and rejection in REJECT_NO_MCP mode.
+TEST_F(McpFilterTest, IncompleteJsonParseErrorRejectMode) {
+  setupRejectMode();
+
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
@@ -628,8 +683,9 @@ TEST_F(McpFilterTest, RejectModeNonJsonRpcPopulatesFilterState) {
   EXPECT_EQ(filter_state_obj->status(), Filters::Common::Mcp::Status::NotJsonRpc);
 }
 
-// Test that truncated JSON with end_stream is rejected even in PASS_THROUGH mode.
-// Truncation here is caused by the client (not by size limit), so data is bad.
+// Test that truncated JSON with end_stream is allowed in PASS_THROUGH mode.
+// Truncation here is caused by the client (not by size limit), so data is bad, but we pass it
+// through.
 TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughMode) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
@@ -648,18 +704,14 @@ TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughMode) {
   std::string json = R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test")";
   Buffer::OwnedImpl buffer(json);
 
-  // Client-sent truncated data — rejected even in PASS_THROUGH mode.
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest,
-                             "reached end_stream or configured body size, don't get enough data.",
-                             _, _, _));
+  // Client-sent truncated data — allowed in PASS_THROUGH mode.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
 
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 // Test that malformed JSON with length exactly equal to max_request_body_size and end_stream=true
-// is rejected in PASS_THROUGH mode, because the client terminated the stream and no further data
-// exists.
+// is allowed in PASS_THROUGH mode.
 TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughModeExactlyAtLimit) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
@@ -682,15 +734,10 @@ TEST_F(McpFilterTest, PartialJsonEndStreamPassThroughModeExactlyAtLimit) {
 
   Buffer::OwnedImpl buffer(json);
 
-  // Even in PASS_THROUGH mode, it must be rejected because the total body length matches
-  // the limit, end_stream is true, and the JSON is genuinely malformed (not truncated by the
-  // limit).
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest,
-                             "reached end_stream or configured body size, don't get enough data.",
-                             _, _, _));
+  // Even in PASS_THROUGH mode, it must be allowed.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
 
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 // Test that if a request in PASS_THROUGH mode exceeds the size limit before extracting any MCP
@@ -722,7 +769,7 @@ TEST_F(McpFilterTest, BodyLimitPassThroughWithoutMetadata) {
   Buffer::OwnedImpl buffer(json);
 
   // In PASS_THROUGH mode, the request is allowed through.
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
 
   Protobuf::Struct captured_metadata;
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
@@ -731,13 +778,15 @@ TEST_F(McpFilterTest, BodyLimitPassThroughWithoutMetadata) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
   // Verify that dynamic metadata still contains is_exceeding_limit, is_mcp_request, and status
-  EXPECT_THAT(captured_metadata.fields(),
-              AllOf(Contains(Pair(std::string(IS_EXCEEDING_LIMIT),
-                                  Property(&Protobuf::Value::bool_value, true))),
-                    Contains(Pair(std::string(IS_MCP_REQUEST),
-                                  Property(&Protobuf::Value::bool_value, false))),
-                    Contains(Pair(std::string(STATUS),
-                                  Property(&Protobuf::Value::string_value, "mcp_ok")))));
+  EXPECT_THAT(
+      captured_metadata.fields(),
+      AllOf(Contains(Pair(std::string(IS_EXCEEDING_LIMIT),
+                          Property(&Protobuf::Value::bool_value, true))),
+            Contains(
+                Pair(std::string(IS_MCP_REQUEST), Property(&Protobuf::Value::bool_value, false))),
+            Contains(Pair(std::string(STATUS), Property(&Protobuf::Value::string_value, "mcp_ok"))),
+            Contains(Pair("passthrough_reason",
+                          Property(&Protobuf::Value::string_value, "mcp_body_too_large")))));
 
   // Verify that FilterStateObject still exists and is populated with the exceeding limit state and
   // status
@@ -751,9 +800,46 @@ TEST_F(McpFilterTest, BodyLimitPassThroughWithoutMetadata) {
 }
 
 // Test that if reject_duplicate_keys is explicitly set to true in the config,
-// the filter rejects requests containing duplicate JSON keys.
+// the filter still allows requests containing duplicate JSON keys in PASS_THROUGH mode.
 TEST_F(McpFilterTest, DuplicateKeyRejectionEnabledConfig) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_reject_duplicate_keys()->set_value(true);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  // Send JSON body containing duplicate keys
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool1"}, "params": {"name": "tool2"}})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Expect request to be allowed in PASS_THROUGH mode
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_THAT(
+            metadata.fields(),
+            AllOf(Contains(Pair("status", Property(&Protobuf::Value::string_value, "mcp_ok"))),
+                  Contains(Pair("passthrough_reason",
+                                Property(&Protobuf::Value::string_value, "mcp_duplicate_keys"))),
+                  Contains(Pair("is_mcp_request", Property(&Protobuf::Value::bool_value, true)))));
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  EXPECT_EQ(0u, config_->stats().duplicate_keys_rejected_.value());
+}
+
+// Test that duplicate keys are rejected in REJECT_NO_MCP mode if reject_duplicate_keys is true.
+TEST_F(McpFilterTest, DuplicateKeyRejectionEnabledConfigRejectMode) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   proto_config.mutable_reject_duplicate_keys()->set_value(true);
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
@@ -809,7 +895,7 @@ TEST_F(McpFilterTest, DuplicateKeyAllowedByDefault) {
   Buffer::OwnedImpl buffer(json);
 
   // Expect request to be allowed through (no rejection calls)
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -817,8 +903,31 @@ TEST_F(McpFilterTest, DuplicateKeyAllowedByDefault) {
 }
 
 // Test that a complete MCP JSON object followed by trailing garbage in the same data chunk
-// is correctly rejected with BadRequest by the filter.
+// is allowed in PASS_THROUGH mode.
 TEST_F(McpFilterTest, TrailingGarbageRejectedInFilter) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "calculator"}, "id": 1} trailing garbage)";
+  Buffer::OwnedImpl buffer(json);
+
+  // In PASS_THROUGH mode, it must be allowed.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+  EXPECT_EQ(1u, config_->stats().invalid_json_.value());
+}
+
+// Test that a complete MCP JSON object followed by trailing garbage in the same data chunk
+// is correctly rejected with BadRequest in REJECT_NO_MCP mode.
+TEST_F(McpFilterTest, TrailingGarbageRejectedInFilterRejectMode) {
+  setupRejectMode();
+
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
@@ -896,7 +1005,7 @@ TEST_F(McpFilterTest, PartialParsingSucceedsWithOptionalFieldConfig) {
   std::string json = prefix + padding + R"("}})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(
@@ -947,7 +1056,7 @@ TEST_F(McpFilterTest, OptionalMetaFieldExtractedWithPartialParsing) {
   std::string json = json_with_meta + padding + R"("}})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(
@@ -1008,7 +1117,7 @@ TEST_F(McpFilterTest, ChunkByChunkParsingWithOptionalFields) {
   std::string chunk2 = R"("_meta": {"trace_id": "abc123"}}})";
   Buffer::OwnedImpl buffer2(chunk2);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(
@@ -1156,7 +1265,7 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
   Buffer::OwnedImpl buffer(json);
 
   // In PASS_THROUGH mode, request is allowed through (no rejection).
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   Protobuf::Struct captured_metadata;
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce(testing::SaveArg<1>(&captured_metadata));
@@ -1211,7 +1320,7 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughModeMultiChunk) {
   ASSERT_EQ(chunk2.size(), 20);
   Buffer::OwnedImpl buffer2(chunk2);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   Protobuf::Struct captured_metadata;
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce(testing::SaveArg<1>(&captured_metadata));
@@ -1410,7 +1519,7 @@ TEST_F(McpFilterTest, NonMcpJsonCompletesInPassThroughMode) {
   std::string json = R"({"foo": "bar", "nested": {"deep": 123}, "baz": true})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
 }
 
@@ -1427,7 +1536,7 @@ TEST_F(McpFilterTest, NonMcpJsonMultiChunkCompletion) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer1, false));
 
   Buffer::OwnedImpl buffer2(R"("baz": 123})");
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer2, false));
 }
@@ -1578,9 +1687,10 @@ TEST_F(McpFilterTest, PerRouteRejectDuplicateKeys) {
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
-  // Per-route config overrides reject duplicate keys = true
+  // Per-route config overrides reject duplicate keys = true and traffic mode = REJECT_NO_MCP
   envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
   override_config.set_reject_duplicate_keys(true);
+  override_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   auto route_config = std::make_shared<McpOverrideConfig>(override_config);
 
   EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())

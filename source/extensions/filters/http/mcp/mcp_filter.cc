@@ -372,8 +372,13 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
 
       if (!status.ok()) {
         config_->stats().invalid_json_.inc();
-        sendErrorReply("not a valid JSON", Filters::Common::Mcp::Status::NotJsonRpc);
-        return Http::FilterDataStatus::StopIterationNoBuffer;
+        if (shouldRejectRequest()) {
+          sendErrorReply("not a valid JSON", Filters::Common::Mcp::Status::NotJsonRpc);
+          return Http::FilterDataStatus::StopIterationNoBuffer;
+        } else {
+          passthrough_reason_ = Filters::Common::Mcp::Status::NotJsonRpc;
+          return completeParsing();
+        }
       }
 
       if (parser_->isParsingComplete()) {
@@ -398,9 +403,14 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     }
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
-      if (truncated_by_limit && !shouldRejectRequest()) {
-        // PASS_THROUGH mode: size limit caused truncation, allow through.
-        ENVOY_LOG(debug, "size limit hit in PASS_THROUGH mode; proceeding with partial parse");
+      if (!shouldRejectRequest()) {
+        if (truncated_by_limit) {
+          ENVOY_LOG(debug, "size limit hit in PASS_THROUGH mode; proceeding with partial parse");
+          passthrough_reason_ = Filters::Common::Mcp::Status::BodyTooLarge;
+        } else {
+          ENVOY_LOG(debug, "parse error in PASS_THROUGH mode; proceeding");
+          passthrough_reason_ = Filters::Common::Mcp::Status::ParseError;
+        }
         return completeParsing();
       }
       Filters::Common::Mcp::Status status = Filters::Common::Mcp::Status::ParseError;
@@ -450,11 +460,15 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   ENVOY_LOG(debug, "parsing complete: is_mcp={}, bytes_parsed={}", is_mcp_request_, bytes_parsed_);
 
-  // Check for duplicate keys — reject if configured.
+  // Check for duplicate keys — reject if configured and we are in reject mode.
   if (parser_->hasDuplicateKeys() && rejectDuplicateKeys()) {
-    config_->stats().duplicate_keys_rejected_.inc();
-    sendErrorReply("duplicate JSON keys detected", Filters::Common::Mcp::Status::DuplicateKeys);
-    return Http::FilterDataStatus::StopIterationNoBuffer;
+    if (shouldRejectRequest()) {
+      config_->stats().duplicate_keys_rejected_.inc();
+      sendErrorReply("duplicate JSON keys detected", Filters::Common::Mcp::Status::DuplicateKeys);
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    } else if (!passthrough_reason_.has_value()) {
+      passthrough_reason_ = Filters::Common::Mcp::Status::DuplicateKeys;
+    }
   }
 
   if (!is_mcp_request_ && shouldRejectRequest()) {
@@ -497,7 +511,9 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   }
 
   const bool has_metadata = !metadata.fields().empty();
-  const bool should_store_metadata = has_metadata || is_exceeding_limit_;
+  const bool should_store_metadata = has_metadata || is_exceeding_limit_ ||
+                                     status_ != Filters::Common::Mcp::Status::Ok ||
+                                     passthrough_reason_.has_value();
 
   if (should_store_metadata) {
     if (shouldStoreToFilterState()) {
@@ -531,6 +547,10 @@ void McpFilter::setDynamicMetadataStatus(Protobuf::Struct metadata) {
   if (is_exceeding_limit_) {
     (*metadata.mutable_fields())[Filters::Common::Mcp::McpConstants::IS_EXCEEDING_LIMIT]
         .set_bool_value(true);
+  }
+  if (passthrough_reason_.has_value()) {
+    (*metadata.mutable_fields())[Filters::Common::Mcp::McpConstants::PASSTHROUGH_REASON]
+        .set_string_value(std::string(statusToString(passthrough_reason_.value())));
   }
   decoder_callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), metadata);
   ENVOY_STREAM_LOG(debug, "MCP filter set dynamic metadata: {}", *decoder_callbacks_,
