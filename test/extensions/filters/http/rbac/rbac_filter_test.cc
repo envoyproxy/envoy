@@ -1581,12 +1581,11 @@ TEST_F(RoleBasedAccessControlFilterTest, EnforcedEngineOnlyAllowsAccessMetadataT
   // engine and the enforced engine returned Continue
   EXPECT_THAT(
       req_info_.dynamicMetadata().filter_metadata(),
-      Contains(Pair(
-          "envoy.filters.http.rbac",
-          HasStructFields(UnorderedElementsAre(
-              IsStructString("rules_stat_prefix_enforced_engine_result", "allowed"),
-              IsStructString("rules_stat_prefix_enforced_effective_policy_id",
-                             "enforced_only_policy")))));
+      Contains(Pair("envoy.filters.http.rbac",
+                    HasStructFields(UnorderedElementsAre(
+                        IsStructString("rules_stat_prefix_enforced_engine_result", "allowed"),
+                        IsStructString("rules_stat_prefix_enforced_effective_policy_id",
+                                       "enforced_only_policy"))))));
 }
 
 } // namespace
