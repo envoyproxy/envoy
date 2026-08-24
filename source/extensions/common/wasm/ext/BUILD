@@ -1,5 +1,5 @@
-load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -18,8 +18,8 @@ envoy_cc_library(
         "envoy_proxy_wasm_api.h",
     ],
     deps = [
-        "@proxy_wasm_cpp_sdk//:api_lib",
-        "@proxy_wasm_cpp_sdk//:common_lib",
+        "@proxy-wasm-cpp-sdk//:api_lib",
+        "@proxy-wasm-cpp-sdk//:common_lib",
     ],
     alwayslink = 1,
 )
@@ -53,7 +53,7 @@ cc_library(
         ":set_envoy_filter_state_cc_proto",
         ":sign_cc_proto",
         ":verify_signature_cc_proto",
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
+        "@proxy-wasm-cpp-sdk//:proxy_wasm_intrinsics",
     ],
     alwayslink = 1,
 )
@@ -93,7 +93,7 @@ proto_library(
     name = "node_subset_proto",
     srcs = ["node_subset.proto"],
     deps = [
-        "@com_google_protobuf//:struct_proto",
+        "@protobuf//:struct_proto",
     ],
 )
 
@@ -102,7 +102,7 @@ cc_proto_library(
     name = "node_subset_cc_proto",
     deps = [
         ":node_subset_proto",
-        # "@com_google_protobuf//:protoc_lib",
+        # "@protobuf//:protoc_lib",
     ],
 )
 

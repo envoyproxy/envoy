@@ -77,7 +77,7 @@ public:
   MOCK_METHOD(std::optional<SystemTime>, expirationPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, sessionId, (), (const));
   MOCK_METHOD(uint16_t, ciphersuiteId, (), (const));
-  MOCK_METHOD(std::string, ciphersuiteString, (), (const));
+  MOCK_METHOD(absl::string_view, ciphersuiteString, (), (const));
   MOCK_METHOD(uint16_t, tlsGroupId, (), (const));
   MOCK_METHOD(absl::string_view, tlsGroupString, (), (const));
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));

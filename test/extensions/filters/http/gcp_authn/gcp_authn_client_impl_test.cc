@@ -1,3 +1,4 @@
+#include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_client_impl.h"
@@ -26,7 +27,8 @@ using ::testing::_;
 using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Not;
-using testing::Return;
+using ::testing::Return;
+using ::testing::ReturnRef;
 using Upstream::MockThreadLocalCluster;
 
 constexpr char DefaultConfig[] = R"EOF(
@@ -56,6 +58,16 @@ constexpr absl::string_view GoodTokenStr =
     "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
 const uint64_t ExpTime = 2001001001;
 
+class FakeTimeSource : public TimeSource {
+public:
+  FakeTimeSource() { system_time_ = std::chrono::system_clock::from_time_t(1000000); }
+  SystemTime systemTime() override { return system_time_; }
+  MonotonicTime monotonicTime() override { return monotonic_time_; }
+
+  SystemTime system_time_;
+  MonotonicTime monotonic_time_;
+};
+
 class GcpAuthnClientImplTest : public testing::Test {
 public:
   GcpAuthnClientImplTest() {
@@ -66,6 +78,8 @@ public:
   void setupMockObjects() {
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
         .WillRepeatedly(Return(&thread_local_cluster_));
+    ON_CALL(context_.server_factory_context_, timeSource())
+        .WillByDefault(ReturnRef(fake_time_source_));
     EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _))
         .WillRepeatedly(Invoke([&](Envoy::Http::RequestMessagePtr& message,
                                    Envoy::Http::AsyncClient::Callbacks& callback,
@@ -83,6 +97,7 @@ public:
   }
 
   NiceMock<MockFactoryContext> context_;
+  FakeTimeSource fake_time_source_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   NiceMock<Envoy::Http::MockAsyncClientRequest> client_request_{
       &thread_local_cluster_.async_client_};
