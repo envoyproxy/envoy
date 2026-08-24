@@ -81,31 +81,31 @@ TEST_F(TtlManagerTest, ScopedUpdate) {
 }
 
 TEST_F(TtlManagerTest, OverdueTtl) {
-  uint32_t calls = 0;
+  std::vector<std::string> last_expired;
+  auto cb = [&](const auto& expired) {
+    last_expired = expired;
+    // Simulate time passing during callback past "second"'s expiry (5ms).
+    test_time_.advanceTimeWait(std::chrono::milliseconds(9));
+  };
   auto ttl_timer = new testing::NiceMock<Event::MockTimer>(&dispatcher_);
-  TtlManager ttl(
-      [&](const auto&) {
-        calls++;
-        test_time_.advanceTimeWait(std::chrono::milliseconds(9));
-      },
-      dispatcher_, dispatcher_.timeSource());
+  TtlManager ttl(cb, dispatcher_, dispatcher_.timeSource());
 
+  EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(1), _));
   ttl.add(std::chrono::milliseconds(1), "first");
   ttl.add(std::chrono::milliseconds(5), "second");
 
-  // Advance time to 1ms to trigger the first TTL. During the callback, time advances by 9ms
-  // past "second"'s expiry (5ms). The timer should be re-enabled with 0ms instead of negative,
-  // and "second" would be executed on the next TTL timer tick.
+  // Advance time to 1ms to trigger the first TTL.
   test_time_.advanceTimeWait(std::chrono::milliseconds(1));
+  // The callback advances time to 10ms (past "second"'s expiry of 5ms).
+  // The overdue timer must be scheduled with 0ms instead of a negative duration.
   EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(0), _));
   ttl_timer->invokeCallback();
-  EXPECT_EQ(1, calls);
+  EXPECT_EQ(last_expired, std::vector<std::string>({"first"}));
 
+  // Now trigger the 0ms timer callback for the overdue "second" entry.
+  EXPECT_CALL(*ttl_timer, disableTimer());
   ttl_timer->invokeCallback();
-  EXPECT_EQ(2, calls);
-
-  // Now there are no TTLs left, so the timer should be disabled.
-  EXPECT_FALSE(ttl_timer->enabled());
+  EXPECT_EQ(last_expired, std::vector<std::string>({"second"}));
 }
 
 } // namespace
