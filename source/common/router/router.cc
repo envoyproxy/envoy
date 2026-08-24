@@ -1160,7 +1160,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     if (!retry_buffer_) {
       retry_buffer_ = std::make_unique<Buffer::OwnedImpl>();
     }
-    retry_buffer_->add(data);
+    retry_buffer_->move(data);
   } else {
     if (!upstream_requests_.empty()) {
       upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
