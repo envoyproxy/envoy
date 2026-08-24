@@ -87,7 +87,7 @@ absl::Status constructQueryParams(std::vector<QueryParam>& query_params, const H
   if (arguments.is_object()) {
     for (auto it = arguments.begin(); it != arguments.end(); ++it) {
       absl::Status status =
-          constructQueryParams(query_params, body_rule, it.value(), templates,
+          constructQueryParams(query_params, http_rule, it.value(), templates,
                                path.empty() ? it.key() : path + "." + it.key(), depth + 1);
       if (!status.ok()) {
         return status;
@@ -98,7 +98,7 @@ absl::Status constructQueryParams(std::vector<QueryParam>& query_params, const H
   if (arguments.is_array()) {
     for (auto& array_item : arguments) {
       absl::Status status =
-          constructQueryParams(query_params, body_rule, array_item, templates, path, depth + 1);
+          constructQueryParams(query_params, http_rule, array_item, templates, path, depth + 1);
       if (!status.ok()) {
         return status;
       }
@@ -342,7 +342,7 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
   if (http_rule.body() != "*") {
     std::string base_path;
     if (auto status =
-            constructQueryParams(query_params, http_rule.body(), arguments, templates, base_path);
+            constructQueryParams(query_params, http_rule, arguments, templates, base_path);
         !status.ok()) {
       bridge_status = BridgeStatus::RequestToolsCallMissingRequiredArg;
       return status;
@@ -361,10 +361,17 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
 
   for (const auto& binding : http_rule.bindings()) {
     if (binding.type() == HttpRule::ParameterBinding::HEADER) {
-      RETURN_IF_NOT_OK(populateHeaderParam(binding, arguments, headers_params));
+      if (auto status = populateHeaderParam(binding, arguments, headers_params); !status.ok()) {
+        bridge_status = BridgeStatus::RequestToolsCallArgumentsMalformed;
+        return status;
+      }
     } else if (binding.type() == HttpRule::ParameterBinding::COOKIE) {
-      RETURN_IF_NOT_OK(populateCookieParam(binding, arguments, cookies_params));
+      if (auto status = populateCookieParam(binding, arguments, cookies_params); !status.ok()) {
+        bridge_status = BridgeStatus::RequestToolsCallArgumentsMalformed;
+        return status;
+      }
     } else {
+      bridge_status = BridgeStatus::InternalToolsCallInvalidHttpRule;
       return absl::InvalidArgumentError(
           absl::StrCat("Unsupported parameter binding type: ", binding.type()));
     }
