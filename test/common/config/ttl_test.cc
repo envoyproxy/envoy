@@ -100,6 +100,12 @@ TEST_F(TtlManagerTest, OverdueTtl) {
   EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(0), _));
   ttl_timer->invokeCallback();
   EXPECT_EQ(1, calls);
+
+  ttl_timer->invokeCallback();
+  EXPECT_EQ(2, calls);
+
+  // Now there are no TTLs left, so the timer should be disabled.
+  EXPECT_FALSE(ttl_timer->enabled());
 }
 
 } // namespace
