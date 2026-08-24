@@ -104,6 +104,7 @@ RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_sanitize_payload_headers_filter_wide);
 RUNTIME_GUARD(envoy_reloadable_features_limit_json_parser_nesting_depth);
 RUNTIME_GUARD(envoy_reloadable_features_listener_filter_reentrant_continue_guard);
+RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_local_cluster_preserve_one_request);
 RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_shadow_mode_no_short_circuit);
 RUNTIME_GUARD(envoy_reloadable_features_map_http_stream_reset_to_tcp_rst);
 RUNTIME_GUARD(envoy_reloadable_features_match_headers_individually);
@@ -185,9 +186,6 @@ RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
-// TODO: Flip to true after operators can migrate non-zero local rate-limit buckets used as total
-// blocks to max_tokens=0.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_local_cluster_minimum_one_token);
 // When true (and the stats config carries no custom tags), the stats store uses the explicit-tags
 // scope logic that propagates scope-level tags onto every stat. Evaluated once at startup.
 // TODO: flip to true after sufficient testing.
