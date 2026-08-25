@@ -231,9 +231,9 @@ TEST_F(SemaphoreTest, ReservationLifecycle) {
     ASSERT_TRUE(opt.has_value());
     outliving_res = std::move(*opt);
     EXPECT_EQ(outliving_res.permits(), 4);
-    // scoped_sem is destroyed here.
+    // `scoped_sem` is destroyed here.
   }
-  EXPECT_FALSE(outliving_res.hasPermits()); // sem is destroyed
+  EXPECT_FALSE(outliving_res.hasPermits()); // `sem` is destroyed
   outliving_res.release();                  // Dropping after destruction is safe
   EXPECT_EQ(outliving_res.permits(), 0);
 

@@ -39,26 +39,35 @@ template <typename T> struct DefaultItemSize {
  * Concurrency & Ownership Model:
  * - Designed for multi-producer, single-consumer or single-producer, single-consumer patterns,
  *   where "producer" and "consumer" refer to independent coroutines pinned to the same
- *   executor/dispatcher thread.
- * - The queue is move-only and owned exclusively by the single consumer coroutine (popper).
- * - Producer coroutines access the queue via lightweight `PushAccessor` instances (holding a
- *   weak pointer), guaranteeing deterministic queue teardown when the consumer coroutine finishes.
+ *   executor/dispatcher thread, calling `push()` and `pop()` respectively.
+ * - The queue is move-only and owned exclusively by the single consumer coroutine.
+ * - Producer coroutines access the queue via lightweight `PushAccessor` instances, guaranteeing
+ *   deterministic queue teardown when the consumer coroutine finishes.
  *
- * Direct Resumption & Push-Pop Rendezvous:
- * - Direct Resumption: If a consumer coroutine is awaiting pop(), push() hands off the data
- *   synchronously inline without buffering or consuming Semaphore capacity.
- * - Rendezvous: If a producer coroutine is suspended awaiting Semaphore capacity, an incoming
- *   pop() steals the item directly from queue_ without waiting for capacity. When capacity is
- *   eventually granted to the producer, RAII immediately returns the permits to the Semaphore.
+ * Resumption model on push and pop:
+ * - `push()` might synchronously resume an awaiting pop() without buffering or consuming
+ *   Semaphore capacity. The call stack can be as deep as the chain of queues that are connected
+ *   by pop-push operations.
+ * - `pop()` drain an item from the head of the queue if there is any. It doesn't synchronously
+ *   resume any pending `push()`. Pending `pending()` are awaken from a clean call stack in FIFO
+ *   order.
+ *
+ * This design is to avoid unbounded stack, and simplify reentrance logic. By design, `push()`
+ * and `pop()` of the same queue should be from different coroutines otherwise it might block a
+ * queue indefinitely. This is helpful to push data down the chain as quickly as possible.
  *
  * Reentrancy & Memory Safety:
- * - Synchronous reentrancy occurs at two well-defined points: direct data handoff in
- *   `tryHandoff()` and EOF notification in `close()`.
+ * - Synchronous reentrancy occurs at two points: direct data handoff in `tryHandoff()` and EOF
+ *   notification in `close()`.
  * - In the single consumer coroutine model, call stack depth is strictly bounded at O(1).
  * - In-line queue destruction by a resumed consumer coroutine is safe: pop_waiters_ is updated
  *   prior to resumption, and no `this` members are touched after the callback returns.
  * - Any in-flight producer coroutines suspended on Semaphore acquisition observe `*alive_ == false`
  *   or `closed_ == true` upon waking up and terminate cleanly with FailedPreconditionError.
+ *
+ * Memory usage:
+ * - The queue's memory usage is bound to O(N + M), where N is the bound, and M is the number of
+ *   pending `push()`.
  */
 template <typename T, typename SizeFunc = DefaultItemSize<T>> class AsyncQueue {
 public:
@@ -246,45 +255,6 @@ private:
   };
 
 public:
-  class PopAwaitable : public LeafAwaitable<absl::StatusOr<std::optional<T>>> {
-  public:
-    explicit PopAwaitable(std::shared_ptr<Core> core) : core_(std::move(core)) {}
-
-  protected:
-    std::optional<absl::StatusOr<std::optional<T>>> tryImmediate() override {
-      std::optional<T> item = core_->tryPop();
-      if (item.has_value()) {
-        return item;
-      }
-      if (core_->closed()) {
-        // Return immediate EOF without suspending. Note that returning
-        // std::optional<T>(std::nullopt) wraps an empty inner optional (EOF) inside a present outer
-        // optional, whereas returning std::nullopt would produce an empty outer optional that
-        // instructs LeafAwaitable to suspend.
-        return std::optional<T>(std::nullopt);
-      }
-      // Queue is open but empty: return an empty outer optional to suspend and wait for a producer.
-      return std::nullopt;
-    }
-
-    void onStart() override {
-      waiter_ = std::make_shared<typename Core::PopWaiter>();
-      waiter_->cb = [this](absl::StatusOr<std::optional<T>> res) {
-        this->complete(std::move(res));
-      };
-      core_->pop_waiters_.push_back(waiter_);
-    }
-
-    void onCancel() override {
-      ASSERT(waiter_ != nullptr);
-      waiter_->cb = nullptr;
-    }
-
-  private:
-    std::shared_ptr<Core> core_;
-    std::shared_ptr<typename Core::PopWaiter> waiter_;
-  };
-
   /**
    * PushAccessor provides non-owning access to an AsyncQueue.
    * Producers can push to the queue without holding ownership, allowing the consumer (the popper)
@@ -297,7 +267,7 @@ public:
 
     Task<absl::Status> push(T item) {
       auto core = core_.lock();
-      if (!core || core->closed()) {
+      if (!core) {
         co_return absl::FailedPreconditionError("queue is closed");
       }
       auto push_task = core->push(std::move(item));
@@ -307,7 +277,7 @@ public:
 
     template <typename U = T> bool tryPush(U&& item) {
       auto core = core_.lock();
-      if (!core || core->closed()) {
+      if (!core) {
         return false;
       }
       Core* core_ptr = core.get();
@@ -354,10 +324,6 @@ public:
   explicit AsyncQueue(CapacityPtr capacity = nullptr, SizeFunc size_func = SizeFunc())
       : core_(std::make_shared<Core>(std::move(capacity), std::move(size_func))) {}
 
-  explicit AsyncQueue(std::optional<uint64_t> max_size, SizeFunc size_func = SizeFunc())
-      : AsyncQueue(max_size.has_value() ? std::make_shared<Capacity>(*max_size) : nullptr,
-                   std::move(size_func)) {}
-
   explicit AsyncQueue(uint64_t max_size, SizeFunc size_func = SizeFunc())
       : AsyncQueue(std::make_shared<Capacity>(max_size), std::move(size_func)) {}
 
@@ -367,31 +333,100 @@ public:
     }
   }
 
-  // Move-only semantics: owned exclusively by the consumer (popper).
-  AsyncQueue(AsyncQueue&& other) noexcept = default;
-  AsyncQueue& operator=(AsyncQueue&& other) noexcept = default;
+  // Move-only semantics: steals core_, leaving other.core_ == nullptr.
+  AsyncQueue(AsyncQueue&& other) noexcept : core_(std::move(other.core_)) {}
+  AsyncQueue& operator=(AsyncQueue&& other) noexcept {
+    if (this != &other) {
+      if (core_) {
+        core_->close();
+      }
+      core_ = std::move(other.core_);
+    }
+    return *this;
+  }
   AsyncQueue(const AsyncQueue&) = delete;
   AsyncQueue& operator=(const AsyncQueue&) = delete;
 
   PushAccessor pushAccessor() const { return PushAccessor(core_); }
 
-  uint64_t itemCount() const { return core_->itemCount(); }
-  uint64_t currentSize() const { return core_->currentSize(); }
-  std::optional<uint64_t> maxSize() const { return core_->maxSize(); }
-  bool closed() const { return core_->closed(); }
-  bool empty() const { return core_->empty(); }
-  CapacityPtr capacity() const { return core_->capacity(); }
+  uint64_t itemCount() const { return core_ ? core_->itemCount() : 0; }
+  uint64_t currentSize() const { return core_ ? core_->currentSize() : 0; }
+  std::optional<uint64_t> maxSize() const { return core_ ? core_->maxSize() : std::nullopt; }
+  bool closed() const { return !core_ || core_->closed(); }
+  bool empty() const { return !core_ || core_->empty(); }
+  CapacityPtr capacity() const { return core_ ? core_->capacity() : nullptr; }
 
-  Task<absl::Status> push(T item) { return core_->push(std::move(item)); }
+  Task<absl::Status> push(T item) {
+    if (!core_) {
+      co_return absl::FailedPreconditionError("queue is closed");
+    }
+    co_return co_await core_->push(std::move(item));
+  }
 
-  template <typename U = T> bool tryPush(U&& item) { return core_->tryPush(std::forward<U>(item)); }
+  template <typename U = T> bool tryPush(U&& item) {
+    if (!core_) {
+      return false;
+    }
+    return core_->tryPush(std::forward<U>(item));
+  }
 
-  PopAwaitable pop() { return PopAwaitable(core_); }
-  std::optional<T> tryPop() { return core_->tryPop(); }
+  Task<absl::StatusOr<std::optional<T>>> pop() {
+    if (!core_) {
+      co_return std::optional<T>(std::nullopt);
+    }
+    co_return co_await PopAwaitable(core_);
+  }
 
-  void close() { core_->close(); }
+  std::optional<T> tryPop() { return core_ ? core_->tryPop() : std::nullopt; }
+
+  void close() {
+    if (core_) {
+      core_->close();
+    }
+  }
 
 private:
+  class PopAwaitable : public LeafAwaitable<absl::StatusOr<std::optional<T>>> {
+  public:
+    explicit PopAwaitable(std::shared_ptr<Core> core) : core_(std::move(core)) {
+      ASSERT(core_ != nullptr);
+    }
+
+  protected:
+    std::optional<absl::StatusOr<std::optional<T>>> tryImmediate() override {
+      std::optional<T> item = core_->tryPop();
+      if (item.has_value()) {
+        return item;
+      }
+      if (core_->closed()) {
+        // Return immediate EOF without suspending. Note that returning
+        // std::optional<T>(std::nullopt) wraps an empty inner optional (EOF) inside a present outer
+        // optional, whereas returning std::nullopt would produce an empty outer optional that
+        // instructs LeafAwaitable to suspend.
+        return std::optional<T>(std::nullopt);
+      }
+      // Queue is open but empty: return an empty outer optional to suspend and wait for a producer.
+      return std::nullopt;
+    }
+
+    void onStart() override {
+      waiter_ = std::make_shared<typename Core::PopWaiter>();
+      waiter_->cb = [this](absl::StatusOr<std::optional<T>> res) {
+        this->complete(std::move(res));
+      };
+      core_->pop_waiters_.push_back(waiter_);
+    }
+
+    void onCancel() override {
+      ASSERT(waiter_ != nullptr);
+      waiter_->cb = nullptr;
+    }
+
+  private:
+    std::shared_ptr<Core> core_;
+    std::shared_ptr<typename Core::PopWaiter> waiter_;
+  };
+
   std::shared_ptr<Core> core_;
 };
 

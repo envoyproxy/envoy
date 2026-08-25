@@ -859,34 +859,128 @@ TEST_F(AsyncQueueTest, CapacityReleaseZero) {
 }
 
 // ============================================================================
-// 6. Ownership, Move Semantics, and PushAccessor
+// 6. Ownership, PushAccessor, Move Semantics, and Destruction Safety
 // ============================================================================
 
-TEST_F(AsyncQueueTest, AsyncQueueMoveSemantics) {
+TEST_F(AsyncQueueTest, MovedFromQueueIsInert) {
+  AsyncQueue<std::string> q_src(10);
+  AsyncQueue<std::string> queue = std::move(q_src); // q_src is now moved-from, core_ == nullptr
+
+  EXPECT_TRUE(q_src.empty());
+  EXPECT_TRUE(q_src.closed());
+  EXPECT_EQ(q_src.itemCount(), 0);
+  EXPECT_EQ(q_src.currentSize(), 0);
+  EXPECT_EQ(q_src.maxSize(), std::nullopt);
+  EXPECT_EQ(q_src.capacity(), nullptr);
+
+  // tryPush fails on moved-from queue
+  EXPECT_FALSE(q_src.tryPush("hello"));
+
+  // tryPop returns nullopt on moved-from queue
+  EXPECT_FALSE(q_src.tryPop().has_value());
+
+  // pop() returns immediate EOF on moved-from queue
+  bool eof_seen = false;
+  launchPop(q_src, nullptr, &eof_seen);
+  drain();
+  EXPECT_TRUE(eof_seen);
+
+  // push() returns FailedPreconditionError on moved-from queue
+  absl::Status push_status;
+  auto push_task = [&q_src, &push_status]() -> Task<absl::Status> {
+    push_status = co_await q_src.push("hello");
+    co_return push_status;
+  };
+  handles_.push_back(launch(push_task(), executor_, [](absl::Status) {}));
+  drain();
+  EXPECT_THAT(push_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+
+  // close() is a safe no-op on moved-from queue
+  q_src.close();
+  EXPECT_TRUE(q_src.closed());
+
+  // pushAccessor returns closed accessor
+  auto pusher = q_src.pushAccessor();
+  EXPECT_TRUE(pusher.closed());
+  EXPECT_FALSE(pusher.tryPush("hello"));
+}
+
+TEST_F(AsyncQueueTest, MoveConstructionTransfersCoreAndLeavesSourceInert) {
   AsyncQueue<std::string> q1(2);
-  EXPECT_TRUE(q1.tryPush("msg1"));
+  EXPECT_TRUE(q1.tryPush("item1"));
+  auto p1 = q1.pushAccessor();
 
-  // Move construct q2 from q1
+  // Move-construct q2 from q1
   AsyncQueue<std::string> q2 = std::move(q1);
-  EXPECT_EQ(q2.itemCount(), 1);
-  EXPECT_TRUE(q2.tryPush("msg2"));
 
-  // Pop from moved-to queue
+  // q1 is now inert
+  EXPECT_TRUE(q1.empty());
+  EXPECT_TRUE(q1.closed());
+  EXPECT_FALSE(q1.tryPush("item_fail"));
+  EXPECT_FALSE(q1.tryPop().has_value());
+
+  // q2 has the item and accepts new items
+  EXPECT_EQ(q2.itemCount(), 1);
+  EXPECT_TRUE(q2.tryPush("item2"));
+  EXPECT_EQ(q2.itemCount(), 2);
+
+  // Existing PushAccessor created on q1 pushes into q2's core
+  EXPECT_FALSE(p1.tryPush("item3")); // queue is full (capacity 2)
+
   auto pop1 = q2.tryPop();
   ASSERT_TRUE(pop1.has_value());
-  EXPECT_EQ(*pop1, "msg1");
+  EXPECT_EQ(*pop1, "item1");
 
   auto pop2 = q2.tryPop();
   ASSERT_TRUE(pop2.has_value());
-  EXPECT_EQ(*pop2, "msg2");
+  EXPECT_EQ(*pop2, "item2");
+}
 
-  // Move assignment
-  AsyncQueue<std::string> q3(2);
-  q3 = std::move(q2);
-  EXPECT_TRUE(q3.tryPush("msg3"));
-  auto pop3 = q3.tryPop();
-  ASSERT_TRUE(pop3.has_value());
-  EXPECT_EQ(*pop3, "msg3");
+TEST_F(AsyncQueueTest, MoveAssignmentClosesPreviousCoreAndAdoptsNew) {
+  AsyncQueue<int> q1(2);
+  EXPECT_TRUE(q1.tryPush(42));
+
+  AsyncQueue<int> q2(2);
+  EXPECT_TRUE(q2.tryPush(99));
+
+  bool old_q2_eof = false;
+  launchPop(q2, nullptr, &old_q2_eof);
+  // Pop item 99 from q2, so popper is now suspended on q2 waiting for next item
+  auto pop_old = q2.tryPop();
+  ASSERT_TRUE(pop_old.has_value());
+  EXPECT_EQ(*pop_old, 99);
+  drain();
+  EXPECT_FALSE(old_q2_eof);
+
+  // Move-assign q1 into q2: this closes old q2's core and unblocks old_q2_eof!
+  q2 = std::move(q1);
+  drain();
+  EXPECT_TRUE(old_q2_eof);
+
+  // q1 is now inert
+  EXPECT_TRUE(q1.closed());
+  EXPECT_TRUE(q1.empty());
+
+  // q2 now contains 42 from q1
+  auto pop_new = q2.tryPop();
+  ASSERT_TRUE(pop_new.has_value());
+  EXPECT_EQ(*pop_new, 42);
+}
+
+TEST_F(AsyncQueueTest, SelfMoveAssignmentIsSafe) {
+  AsyncQueue<int> queue(2);
+  EXPECT_TRUE(queue.tryPush(10));
+
+  // Self-move assignment
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wself-move"
+  queue = std::move(queue);
+#pragma clang diagnostic pop
+
+  EXPECT_EQ(queue.itemCount(), 1);
+  auto pop = queue.tryPop();
+  ASSERT_TRUE(pop.has_value());
+  EXPECT_EQ(*pop, 10);
 }
 
 TEST_F(AsyncQueueTest, PushAccessorBasicPushAndPop) {
