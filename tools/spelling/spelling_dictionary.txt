@@ -1459,6 +1459,7 @@ sim
 sinked
 sint
 sizeof
+skippable
 smatch
 snapshotted
 sockaddr
