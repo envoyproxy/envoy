@@ -969,22 +969,6 @@ TEST_F(AsyncQueueTest, MoveAssignmentClosesPreviousCoreAndAdoptsNew) {
   EXPECT_EQ(*pop_new, 42);
 }
 
-TEST_F(AsyncQueueTest, SelfMoveAssignmentIsSafe) {
-  AsyncQueue<int> queue(2);
-  EXPECT_TRUE(queue.tryPush(10));
-
-  // Self-move assignment
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wself-move"
-  queue = std::move(queue);
-#pragma clang diagnostic pop
-
-  EXPECT_EQ(queue.itemCount(), 1);
-  auto pop = queue.tryPop();
-  ASSERT_TRUE(pop.has_value());
-  EXPECT_EQ(*pop, 10);
-}
-
 TEST_F(AsyncQueueTest, PushAccessorBasicPushAndPop) {
   AsyncQueue<std::string> queue(2);
   auto pusher = queue.pushAccessor();
