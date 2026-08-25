@@ -388,12 +388,12 @@ message ProcessingResponse {
   // ext_proc server wants to terminate the stream with an OK status, it
   // must perform this drain before doing so.
   //
-  // Note that the data plane may have sent a message with
+  // Note that the data plane may have either sent a body chunk with
   // :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.StreamedBodyResponse.end_of_stream>`
-  // set to true before it received the drain request from the ext_proc
-  // server. In this case, the data plane will ignore the drain request,
-  // and the ext_proc will consider the drain complete when it sees the
-  // end-of-stream message.
+  // set to true or may have sent trailers before it received the drain
+  // request from the ext_proc server. In these cases, the data plane will
+  // ignore the drain request, and the ext_proc will consider the drain
+  // complete when it sees the end-of-stream or trailers.
   bool request_drain_requests = 15;
 
   // [#not-implemented-hide:]
@@ -431,12 +431,12 @@ message ProcessingResponse {
   // ext_proc server wants to terminate the stream with an OK status, it
   // must perform this drain before doing so.
   //
-  // Note that the data plane may have sent a message with
+  // Note that the data plane may have either sent a body chunk with
   // :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.StreamedBodyResponse.end_of_stream>`
-  // set to true before it received the drain request from the ext_proc
-  // server. In this case, the data plane will ignore the drain request,
-  // and the ext_proc will consider the drain complete when it sees the
-  // end-of-stream message.
+  // set to true or may have sent trailers before it received the drain
+  // request from the ext_proc server. In these cases, the data plane will
+  // ignore the drain request, and the ext_proc will consider the drain
+  // complete when it sees the end-of-stream or trailers.
   bool request_drain_responses = 16;
 
   // When the ext_proc server receives a request message and needs more time to process it, it
