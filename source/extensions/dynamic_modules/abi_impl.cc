@@ -2836,6 +2836,24 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_cluster_specifier_get_d
   return false;
 }
 
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, double*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_number: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_bool: not "
+               "implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) uint64_t envoy_dynamic_module_callback_cluster_specifier_get_random_value(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_random_value: not implemented "
@@ -2895,6 +2913,14 @@ __attribute__((weak)) void envoy_dynamic_module_callback_cluster_specifier_set_p
   IS_ENVOY_BUG(
       "envoy_dynamic_module_callback_cluster_specifier_set_priority: not implemented in this "
       "context");
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_response_code(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr, uint32_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_response_"
+               "code: not implemented in this context");
+  return false;
 }
 
 __attribute__((weak)) void

@@ -1798,6 +1798,12 @@ WEAK_STUB(ClusterSpecifierGetAttributeString,
 WEAK_STUB(ClusterSpecifierGetDynamicMetadata,
           envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata(
               nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(ClusterSpecifierGetDynamicMetadataBool,
+          envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_bool(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(ClusterSpecifierGetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
 WEAK_STUB(ClusterSpecifierGetRandomValue,
           envoy_dynamic_module_callback_cluster_specifier_get_random_value(nullptr))
 WEAK_STUB(ClusterSpecifierGetRequestHeaderValue,
@@ -1811,6 +1817,9 @@ WEAK_STUB(ClusterSpecifierGetRouteName,
           envoy_dynamic_module_callback_cluster_specifier_get_route_name(nullptr, nullptr))
 WEAK_STUB(ClusterSpecifierSetClusterName,
           envoy_dynamic_module_callback_cluster_specifier_set_cluster_name(nullptr, {nullptr, 0}))
+WEAK_STUB(ClusterSpecifierSetClusterNotFoundResponseCode,
+          envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_response_code(
+              nullptr, 503))
 WEAK_STUB(ClusterSpecifierSetIdleTimeout,
           envoy_dynamic_module_callback_cluster_specifier_set_idle_timeout(nullptr, 0))
 WEAK_STUB(ClusterSpecifierSetPriority,

@@ -89,6 +89,22 @@ bool envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata(
   return ContextAccessor::getDynamicMetadata(context->stream_info, filter_name, path, result);
 }
 
+bool envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, double* result) {
+  auto* context = clusterSpecifierContext(context_envoy_ptr);
+  return ContextAccessor::getDynamicMetadataNumber(context->stream_info, filter_name, path, result);
+}
+
+bool envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, bool* result) {
+  auto* context = clusterSpecifierContext(context_envoy_ptr);
+  return ContextAccessor::getDynamicMetadataBool(context->stream_info, filter_name, path, result);
+}
+
 bool envoy_dynamic_module_callback_cluster_specifier_get_route_name(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
@@ -140,6 +156,24 @@ void envoy_dynamic_module_callback_cluster_specifier_set_priority(
   context->selection.priority = priority == envoy_dynamic_module_type_resource_priority_High
                                     ? Upstream::ResourcePriority::High
                                     : Upstream::ResourcePriority::Default;
+}
+
+bool envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_response_code(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    uint32_t status_code) {
+  auto* context = clusterSpecifierContext(context_envoy_ptr);
+  // The code is only used if the selected cluster turns out to be missing, so an invalid one would
+  // otherwise surface as a malformed response far from this call. Reject it here instead.
+  if (status_code < 200 || status_code >= 600) {
+    ENVOY_LOG_EVERY_POW_2_TO_LOGGER(
+        Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), warn,
+        "dynamic module set the out of range cluster not found response code {}, so the response "
+        "code of the matched route stays in effect",
+        status_code);
+    return false;
+  }
+  context->selection.cluster_not_found_response_code = static_cast<Http::Code>(status_code);
+  return true;
 }
 
 bool envoy_dynamic_module_callback_cluster_specifier_set_route_action_override(

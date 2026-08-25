@@ -7,8 +7,10 @@
 #include <vector>
 
 #include "envoy/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
+#include "envoy/http/codes.h"
 #include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/statusor.h"
@@ -72,6 +74,14 @@ public:
    */
   const RouteActionOverride* routeActionOverride(absl::string_view name) const;
 
+  /**
+   * Validates the statically named mirror clusters of every route action override. The route level
+   * check only walks the mirror policies of the matched route, which never include these.
+   * @param cluster_manager the cluster manager to look the clusters up in.
+   * @return an error naming the first override that mirrors to an unknown cluster.
+   */
+  absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const;
+
   // The corresponding in-module cluster specifier configuration.
   envoy_dynamic_module_type_cluster_specifier_config_module_ptr in_module_config_{nullptr};
 
@@ -124,6 +134,7 @@ struct ClusterSpecifierSelection {
   std::optional<std::chrono::milliseconds> idle_timeout;
   std::optional<uint64_t> request_body_buffer_limit;
   std::optional<Upstream::ResourcePriority> priority;
+  std::optional<Http::Code> cluster_not_found_response_code;
   // Points into the override map of the cluster specifier configuration, which is immutable after
   // construction.
   const RouteActionOverride* route_action_override{nullptr};
@@ -164,6 +175,11 @@ public:
   Upstream::ResourcePriority priority() const override {
     return selection_.priority.has_value() ? *selection_.priority
                                            : DelegatingRouteEntry::priority();
+  }
+  Http::Code clusterNotFoundResponseCode() const override {
+    return selection_.cluster_not_found_response_code.has_value()
+               ? *selection_.cluster_not_found_response_code
+               : DelegatingRouteEntry::clusterNotFoundResponseCode();
   }
   const Envoy::Router::RetryPolicyConstSharedPtr& retryPolicy() const override {
     const RouteActionOverride* entry = selection_.route_action_override;
@@ -215,6 +231,9 @@ public:
       : config_(std::move(config)) {}
 
   // Router::ClusterSpecifierPlugin
+  absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const override {
+    return config_->validateClusters(cluster_manager);
+  }
   Envoy::Router::RouteConstSharedPtr route(Envoy::Router::RouteEntryAndRouteConstSharedPtr parent,
                                            const Http::RequestHeaderMap& headers,
                                            const StreamInfo::StreamInfo& stream_info,

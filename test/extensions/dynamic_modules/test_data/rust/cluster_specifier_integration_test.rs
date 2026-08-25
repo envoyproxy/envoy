@@ -16,6 +16,7 @@
 //!   `x-idle-timeout-ms` the stream idle timeout to set, in milliseconds.
 //!   `x-buffer-limit`    the request body buffer limit to set, in bytes.
 //!   `x-priority`        `high` or `default`, the upstream resource priority to set.
+//!   `x-not-found-code`  the status code to reply with when the selected cluster does not exist.
 //!   `x-echo`            the name of a read accessor whose value replaces the cluster name, so that
 //!                       a test can assert on what the module read across the ABI boundary.
 //!   `x-retry-cluster`   the cluster to route to once the first upstream attempt has been made, so
@@ -107,6 +108,12 @@ fn read_echoed_value(ctx: &ClusterSpecifierContext, name: &[u8]) -> String {
     b"dynamic-metadata" => {
       buffer_to_string_or_absent(ctx.get_dynamic_metadata("envoy.test", "shard"))
     },
+    b"dynamic-metadata-number" => ctx
+      .get_dynamic_metadata_number("envoy.test", "weight")
+      .map_or_else(|| ABSENT.to_owned(), |value| value.to_string()),
+    b"dynamic-metadata-bool" => ctx
+      .get_dynamic_metadata_bool("envoy.test", "enabled")
+      .map_or_else(|| ABSENT.to_owned(), |value| value.to_string()),
     b"route-name" => buffer_to_string_or_absent(ctx.route_name()),
     b"random-value" => ctx.random_value().to_string(),
     _ => ABSENT.to_owned(),
@@ -151,6 +158,10 @@ impl ClusterSpecifierConfig for TestClusterSpecifierConfig {
     }
     if let Some(limit) = read_u64_header(ctx, "x-buffer-limit") {
       ctx.set_request_body_buffer_limit(limit);
+    }
+    if let Some(code) = read_u64_header(ctx, "x-not-found-code") {
+      // Tests also pass out of range codes, so a rejection is expected here.
+      let _ = ctx.set_cluster_not_found_response_code(u32::try_from(code).unwrap_or(u32::MAX));
     }
     let priority = ctx
       .get_request_header("x-priority")
