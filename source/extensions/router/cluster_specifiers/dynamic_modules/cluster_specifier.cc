@@ -61,9 +61,9 @@ buildRouteActionOverride(const RouteActionOverrideProto& proto_override,
 DynamicModuleClusterSpecifierConfig::DynamicModuleClusterSpecifierConfig(
     absl::string_view specifier_name, absl::string_view specifier_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-    RouteActionOverrideMap route_action_overrides)
+    RouteActionOverrideMap route_action_overrides, Upstream::ClusterManager& cluster_manager)
     : specifier_name_(specifier_name), specifier_config_(specifier_config),
-      dynamic_module_(std::move(dynamic_module)),
+      dynamic_module_(std::move(dynamic_module)), cluster_manager_(cluster_manager),
       route_action_overrides_(std::move(route_action_overrides)) {}
 
 DynamicModuleClusterSpecifierConfig::~DynamicModuleClusterSpecifierConfig() {
@@ -133,7 +133,7 @@ newDynamicModuleClusterSpecifierConfig(const DynamicModuleClusterSpecifierProto&
 
   auto config = std::make_shared<DynamicModuleClusterSpecifierConfig>(
       proto_config.specifier_name(), specifier_config, std::move(dynamic_module),
-      std::move(route_action_overrides));
+      std::move(route_action_overrides), context.clusterManager());
   config->on_config_destroy_ = on_config_destroy.value();
   config->on_select_ = on_select.value();
 

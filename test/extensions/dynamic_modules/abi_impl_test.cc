@@ -1806,6 +1806,9 @@ WEAK_STUB(ClusterSpecifierGetDynamicMetadataNumber,
               nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
 WEAK_STUB(ClusterSpecifierGetRandomValue,
           envoy_dynamic_module_callback_cluster_specifier_get_random_value(nullptr))
+WEAK_STUB(ClusterSpecifierGetClusterHostCount,
+          envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+              nullptr, {nullptr, 0}, 0, nullptr, nullptr, nullptr))
 WEAK_STUB(ClusterSpecifierGetRequestHeaderValue,
           envoy_dynamic_module_callback_cluster_specifier_get_request_header_value(
               nullptr, {nullptr, 0}, nullptr, 0, nullptr))

@@ -6,7 +6,7 @@
 //! [`crate::NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION`] and lets a single module dispatch by
 //! `specifier_name`.
 
-use crate::{abi, EnvoyBuffer};
+use crate::{abi, ClusterHostCount, EnvoyBuffer};
 use std::ffi::c_void;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
@@ -294,6 +294,40 @@ impl ClusterSpecifierContext {
   /// used to split traffic by percentage without re-deriving a hash.
   pub fn random_value(&self) -> u64 {
     unsafe { abi::envoy_dynamic_module_callback_cluster_specifier_get_random_value(self.envoy_ptr) }
+  }
+
+  /// Get host counts for a cluster by name at the given priority level.
+  ///
+  /// Returns `None` when the cluster is not routable from the current worker at the moment, which
+  /// can happen even when the cluster is configured but not yet warmed or propagated. Healthy and
+  /// degraded host counts are eventually consistent.
+  pub fn get_cluster_host_count(
+    &self,
+    cluster_name: &str,
+    priority: u32,
+  ) -> Option<ClusterHostCount> {
+    let mut total: usize = 0;
+    let mut healthy: usize = 0;
+    let mut degraded: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(cluster_name),
+        priority,
+        &mut total as *mut _,
+        &mut healthy as *mut _,
+        &mut degraded as *mut _,
+      )
+    };
+    if success {
+      Some(ClusterHostCount {
+        total,
+        healthy,
+        degraded,
+      })
+    } else {
+      None
+    }
   }
 
   /// Set the upstream cluster for the request.

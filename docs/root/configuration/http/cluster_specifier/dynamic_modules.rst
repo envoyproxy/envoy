@@ -42,6 +42,9 @@ a different point:
   attempt, so only the first selection applies to them.
 * The cluster not found response code is read only when the selected cluster does not exist, which
   ends the request, so the selection that named the missing cluster is the one that applies.
+* ``get_cluster_host_count`` reports whether a cluster is routable from the current worker and
+  returns host counts at a priority level. It uses ``getThreadLocalCluster()``, so it can return
+  false even when the cluster is configured but not yet warmed on the worker.
 
 Configuration
 -------------
