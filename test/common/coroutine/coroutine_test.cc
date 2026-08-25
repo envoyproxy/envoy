@@ -615,17 +615,6 @@ Task<absl::StatusOr<std::unique_ptr<int>>> awaitMoveOnly(int val) {
   ASSIGN_OR_CO_RETURN(auto ptr, co_await returnsMoveOnly(val));
   co_return ptr;
 }
-
-class MoveableLeaf : public LeafAwaitable<absl::Status> {
-public:
-  MoveableLeaf() = default;
-  MoveableLeaf(MoveableLeaf&&) noexcept = default;
-  MoveableLeaf& operator=(MoveableLeaf&&) noexcept = default;
-
-protected:
-  void onStart() override {}
-  void onCancel() override {}
-};
 } // namespace
 
 TEST(TaskTest, MoveOnlyReturnType) {
@@ -667,13 +656,6 @@ TEST(LeafAwaitableTest, MultipleCompleteCallsAreIdempotent) {
   controller.completeWith(absl::OkStatus());
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(result->ok());
-}
-
-TEST(LeafAwaitableTest, MoveOperations) {
-  MoveableLeaf leaf1;
-  MoveableLeaf leaf2(std::move(leaf1));
-  MoveableLeaf leaf3;
-  leaf3 = std::move(leaf2);
 }
 
 TEST(TaskTest, FinalAwaiterAndTaskAwaiterCoverage) {

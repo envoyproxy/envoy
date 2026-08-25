@@ -846,12 +846,14 @@ TEST_F(AsyncQueueTest, CapacityDestructionAbortsAcquireWaiters) {
 
 TEST_F(AsyncQueueTest, CapacityReleaseZero) {
   auto cap = std::make_shared<Capacity>(10);
+  auto zero_res = cap->tryAcquire(0);
+  ASSERT_TRUE(zero_res.has_value());
+  EXPECT_EQ(cap->currentPermits(), 0);
+  zero_res->release();
+  EXPECT_EQ(cap->currentPermits(), 0);
+
   auto res = cap->tryAcquire(5);
   EXPECT_TRUE(res.has_value());
-  EXPECT_EQ(cap->currentPermits(), 5);
-
-  // Release 0 is a no-op
-  cap->release(0);
   EXPECT_EQ(cap->currentPermits(), 5);
 
   res->release();

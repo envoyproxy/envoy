@@ -127,9 +127,7 @@ Semaphore::SemaphoreAwaitable Semaphore::acquire(uint64_t permits) {
 }
 
 void Semaphore::release(uint64_t permits) {
-  if (permits == 0) {
-    return;
-  }
+  ASSERT(permits > 0);
   ASSERT(current_permits_ >= permits);
   current_permits_ -= permits;
   scheduleProcessWaiters();

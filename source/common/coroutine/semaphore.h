@@ -90,12 +90,12 @@ public:
 
   std::optional<SemaphoreReservation> tryAcquire(uint64_t permits = 1);
   SemaphoreAwaitable acquire(uint64_t permits = 1);
-  void release(uint64_t permits = 1);
 
 private:
   friend class SemaphoreReservation;
   friend class SemaphoreAwaitable;
 
+  void release(uint64_t permits);
   bool hasPermits(uint64_t additional_permits) const;
   bool canAcquire(uint64_t permits) const;
   void popCancelledWaiters();

@@ -45,10 +45,10 @@ template <typename T> class LeafAwaitable {
 
 public:
   LeafAwaitable() = default;
-  LeafAwaitable(LeafAwaitable&&) noexcept = default;
-  LeafAwaitable& operator=(LeafAwaitable&&) noexcept = default;
   LeafAwaitable(const LeafAwaitable&) = delete;
   LeafAwaitable& operator=(const LeafAwaitable&) = delete;
+  LeafAwaitable(LeafAwaitable&&) = delete;
+  LeafAwaitable& operator=(LeafAwaitable&&) = delete;
   virtual ~LeafAwaitable() = default;
 
   // Fail-fast: if the scope is already cancelled, or if an immediate non-blocking attempt

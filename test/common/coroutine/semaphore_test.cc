@@ -267,15 +267,21 @@ TEST_F(SemaphoreTest, UnboundedAsyncAcquire) {
 TEST_F(SemaphoreTest, PermitBoundaryConditions) {
   auto sem = std::make_shared<Semaphore>(10);
 
-  // Zero-permit releases are no-ops
-  sem->release(0);
+  // Zero-permit acquire and release are no-ops
+  auto zero_res1 = sem->tryAcquire(0);
+  ASSERT_TRUE(zero_res1.has_value());
+  EXPECT_FALSE(zero_res1->hasPermits());
+  zero_res1->release();
   EXPECT_EQ(sem->currentPermits(), 0);
 
   auto res = sem->tryAcquire(5);
   ASSERT_TRUE(res.has_value());
   EXPECT_EQ(sem->currentPermits(), 5);
 
-  sem->release(0);
+  auto zero_res2 = sem->tryAcquire(0);
+  ASSERT_TRUE(zero_res2.has_value());
+  EXPECT_FALSE(zero_res2->hasPermits());
+  zero_res2->release();
   EXPECT_EQ(sem->currentPermits(), 5);
 
   // When partially in use, oversized/overflow acquire requests are rejected
@@ -283,6 +289,28 @@ TEST_F(SemaphoreTest, PermitBoundaryConditions) {
   EXPECT_FALSE(sem->tryAcquire(huge_permits).has_value());
 
   res->release();
+  EXPECT_EQ(sem->currentPermits(), 0);
+}
+
+TEST_F(SemaphoreTest, ReleaseWhenAllWaitersCancelled) {
+  auto sem = std::make_shared<Semaphore>(1);
+  auto hold = sem->tryAcquire(1);
+  ASSERT_TRUE(hold.has_value());
+
+  auto acquireTask = [](Semaphore& s) -> Task<absl::Status> {
+    auto res = co_await s.acquire(1);
+    co_return absl::OkStatus();
+  };
+
+  auto handle = launch(acquireTask(*sem), executor_, [](absl::Status) {});
+  drain();
+
+  // Cancel the pending waiter
+  handle.cancel();
+
+  // Release capacity: scheduleProcessWaiters pops the cancelled waiter and sees empty list
+  hold->release();
+  drain();
   EXPECT_EQ(sem->currentPermits(), 0);
 }
 
