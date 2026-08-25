@@ -69,8 +69,8 @@ jobs:
       source: |
         export NO_BUILD_SETUP=1
       trusted: ${{ inputs.trusted }}
-      upload-name: release.signed
-      upload-path: container/envoy/release.signed.tar.zst
+      uploads: |
+        release.signed: container/envoy/release.signed.tar.zst
       steps-pre: |
         - run: |
             mkdir distribution/custom
@@ -142,12 +142,12 @@ jobs:
     needs:
     - release
     steps:
-    - uses: envoyproxy/toolshed/actions/appauth@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/appauth@ee731502ff969e02e361f8c74e9a0a21cbae9e37  # actions-v0.4.24
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/dispatch@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/dispatch@ee731502ff969e02e361f8c74e9a0a21cbae9e37  # actions-v0.4.24
       with:
         ref: main
         repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}

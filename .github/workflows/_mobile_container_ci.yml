@@ -120,9 +120,7 @@ on:
       trusted:
         type: boolean
         default: false
-      upload-name:
-        type: string
-      upload-path:
+      uploads:
         type: string
       warning-match:
         type: string
@@ -173,6 +171,5 @@ jobs:
       target: ${{ inputs.target }}
       timeout-minutes: ${{ inputs.timeout-minutes }}
       trusted: ${{ fromJSON(inputs.request).request.trusted }}
-      upload-name: ${{ inputs.upload-name }}
-      upload-path: ${{ inputs.upload-path }}
+      uploads: ${{ inputs.uploads }}
       warning-match: ${{ inputs.warning-match }}
