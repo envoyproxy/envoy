@@ -84,17 +84,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "async_event_lib",
-    srcs = ["async_event.cc"],
-    hdrs = ["async_event.h"],
-    deps = [
-        ":leaf_awaitable_lib",
-        "@abseil-cpp//absl/functional:any_invocable",
-        "@abseil-cpp//absl/status",
-    ],
-)
-
-envoy_cc_library(
     name = "semaphore_lib",
     srcs = ["semaphore.cc"],
     hdrs = ["semaphore.h"],
@@ -128,7 +117,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "coroutine_lib",
     deps = [
-        ":async_event_lib",
         ":async_queue_lib",
         ":context_lib",
         ":dispatcher_executor_lib",
