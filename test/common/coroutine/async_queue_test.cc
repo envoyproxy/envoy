@@ -310,7 +310,7 @@ TEST_F(AsyncQueueTest, CloseSignalsEOF) {
   EXPECT_TRUE(eof_seen);
 }
 
-TEST_F(AsyncQueueTest, CloseAbortsPushWaiters) {
+TEST_F(AsyncQueueTest, SuspendedPusherFailsWhenQueueIsClosed) {
   AsyncQueue<int> queue(1);
   EXPECT_TRUE(queue.tryPush(1));
 

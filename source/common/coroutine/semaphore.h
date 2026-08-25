@@ -53,6 +53,13 @@ private:
  * It preserves strict FIFO arrival ordering for permit acquisition. Waiters that cannot be
  * immediately satisfied are queued. When permits are released, processing resumes pending
  * waiters in strict FIFO order in the next event loop iteration.
+ *
+ * Anti-starvation for oversized requests:
+ * When the semaphore is completely idle (`currentPermits() == 0`), a single oversized
+ * acquisition (`permits > maxPermits()`) is allowed to acquire and proceed. This ensures that
+ * items larger than the nominal capacity limit are not permanently starved or deadlocked.
+ * While an oversized reservation is active, subsequent acquisitions are blocked until it is
+ * released.
  */
 class Semaphore : public std::enable_shared_from_this<Semaphore> {
 public:
@@ -88,7 +95,18 @@ public:
   std::optional<uint64_t> maxPermits() const { return max_permits_; }
   uint64_t currentPermits() const { return current_permits_; }
 
+  /**
+   * Attempts to synchronously acquire `permits` without suspending.
+   * If the semaphore has sufficient capacity (or is completely idle for a single oversized
+   * acquisition), returns a SemaphoreReservation. Otherwise returns std::nullopt.
+   */
   std::optional<SemaphoreReservation> tryAcquire(uint64_t permits = 1);
+
+  /**
+   * Asynchronously acquires `permits` following strict FIFO ordering.
+   * If capacity is not immediately available, suspends the coroutine until sufficient permits
+   * are released. Supports a single oversized acquisition when the semaphore is fully drained.
+   */
   SemaphoreAwaitable acquire(uint64_t permits = 1);
 
 private:
