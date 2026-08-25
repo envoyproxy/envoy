@@ -20,8 +20,8 @@ public:
     users.insert({"user2", {"user2", "EJ9LPFDXsN9ynSmbxvjp75Bmlx8="}}); // user2:test2
     config_ = std::make_unique<FilterConfig>(std::move(users), "x-username", "",
                                              /*allow_missing=*/false,
-                                             /*emit_dynamic_metadata=*/false, "stats",
-                                             *stats_.rootScope());
+                                             /*emit_dynamic_metadata=*/false, /*realm=*/"",
+                                             "stats", *stats_.rootScope());
     filter_ = std::make_shared<BasicAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     ON_CALL(decoder_filter_callbacks_, filterConfigName)
@@ -61,7 +61,8 @@ TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
   users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
   FilterConfigConstSharedPtr config =
       std::make_unique<FilterConfig>(std::move(users), "x-username", "", /*allow_missing=*/false,
-                                     /*emit_dynamic_metadata=*/true, "stats", *stats_.rootScope());
+                                     /*emit_dynamic_metadata=*/true, /*realm=*/"", "stats",
+                                     *stats_.rootScope());
   std::shared_ptr<BasicAuthFilter> filter = std::make_shared<BasicAuthFilter>(config);
   filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
 
@@ -261,7 +262,7 @@ TEST_F(FilterTest, BasicAuthPerRouteDefaultSettings) {
   EXPECT_CALL(decoder_filter_callbacks_, requestHeaders())
       .WillOnce(testing::Return(makeOptRef(empty_request_headers)));
   UserMap empty_users;
-  FilterConfigPerRoute basic_auth_per_route(std::move(empty_users));
+  FilterConfigPerRoute basic_auth_per_route(std::move(empty_users), "");
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(testing::Return(&basic_auth_per_route));
@@ -291,7 +292,7 @@ TEST_F(FilterTest, BasicAuthPerRouteDefaultSettings) {
 TEST_F(FilterTest, BasicAuthPerRouteEnabled) {
   UserMap users_for_route;
   users_for_route.insert({"admin", {"admin", "0DPiKuNIrrVmD8IUCuw1hQxNqZc="}}); // admin:admin
-  FilterConfigPerRoute basic_auth_per_route(std::move(users_for_route));
+  FilterConfigPerRoute basic_auth_per_route(std::move(users_for_route), "");
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(testing::Return(&basic_auth_per_route));
@@ -320,7 +321,7 @@ TEST_F(FilterTest, OverrideAuthorizationHeaderProvided) {
 
   FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
       std::move(users), "x-username", "x-authorization-override", /*allow_missing=*/false,
-      /*emit_dynamic_metadata=*/false, "stats", *stats_.rootScope());
+      /*emit_dynamic_metadata=*/false, /*realm=*/"", "stats", *stats_.rootScope());
   std::shared_ptr<BasicAuthFilter> filter = std::make_shared<BasicAuthFilter>(config);
   filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
 
@@ -335,6 +336,162 @@ TEST_F(FilterTest, OverrideAuthorizationHeaderProvided) {
   EXPECT_EQ("user1", request_headers_user1.get_("x-username"));
 }
 
+TEST_F(FilterTest, FixedRealmUsedInWWWAuthenticate) {
+  UserMap users;
+  users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}});
+  FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
+      std::move(users), "", "", /*allow_missing=*/false, /*emit_dynamic_metadata=*/false,
+      /*realm=*/"myapp", "stats", *stats_.rootScope());
+  std::shared_ptr<BasicAuthFilter> filter = std::make_shared<BasicAuthFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  // Bad credentials to trigger onDenied.
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic dXNlcjE6d3Jvbmc="}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/some/deep/path");
+  EXPECT_CALL(decoder_filter_callbacks_, requestHeaders()).Times(0);
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([&](Http::Code code, absl::string_view,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           const std::optional<Grpc::Status::GrpcStatus>,
+                           absl::string_view) {
+        EXPECT_EQ(Http::Code::Unauthorized, code);
+        Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+        modify_headers(response_headers);
+        EXPECT_EQ(
+            "Basic realm=\"myapp\"",
+            response_headers.get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter->decodeHeaders(request_headers, true));
+}
+
+TEST_F(FilterTest, EmptyRealmFallsBackToUri) {
+  // realm="" (default) → WWW-Authenticate uses the full request URI.
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic dXNlcjE6d3Jvbmc="}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+  EXPECT_CALL(decoder_filter_callbacks_, requestHeaders())
+      .WillOnce(testing::Return(makeOptRef(request_headers)));
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([&](Http::Code, absl::string_view,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+        modify_headers(response_headers);
+        EXPECT_EQ(
+            "Basic realm=\"http://host/\"",
+            response_headers.get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(FilterTest, RealmWithSpecialCharsIsEscaped) {
+  // A realm containing `"` and `\` must be escaped in the WWW-Authenticate quoted-string.
+  UserMap users;
+  users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}});
+  FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
+      std::move(users), "", "", /*allow_missing=*/false, /*emit_dynamic_metadata=*/false,
+      /*realm=*/R"(Corp\"SSO")", "stats", *stats_.rootScope());
+  std::shared_ptr<BasicAuthFilter> filter = std::make_shared<BasicAuthFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic dXNlcjE6d3Jvbmc="}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+  EXPECT_CALL(decoder_filter_callbacks_, requestHeaders()).Times(0);
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([&](Http::Code, absl::string_view,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+        modify_headers(response_headers);
+        // `\` → `\\`, `"` → `\"` inside the quoted-string
+        EXPECT_EQ(
+            R"(Basic realm="Corp\\\"SSO\"")",
+            response_headers.get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
+}
+
+TEST_F(FilterTest, BasicAuthPerRouteRealmOverridesFilterLevel) {
+  // Per-route realm takes precedence over the filter-level realm.
+  UserMap users;
+  users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}});
+  FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
+      std::move(users), "", "", /*allow_missing=*/false, /*emit_dynamic_metadata=*/false,
+      /*realm=*/"filter-realm", "stats", *stats_.rootScope());
+  std::shared_ptr<BasicAuthFilter> filter = std::make_shared<BasicAuthFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  UserMap route_users;
+  route_users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}});
+  FilterConfigPerRoute per_route(std::move(route_users), "route-realm");
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(testing::Return(&per_route));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic dXNlcjE6d3Jvbmc="}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+  EXPECT_CALL(decoder_filter_callbacks_, requestHeaders()).Times(0);
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([&](Http::Code code, absl::string_view,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        EXPECT_EQ(Http::Code::Unauthorized, code);
+        Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+        modify_headers(response_headers);
+        EXPECT_EQ(
+            "Basic realm=\"route-realm\"",
+            response_headers.get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
+}
+
+TEST_F(FilterTest, BasicAuthPerRouteEmptyRealmFallsBackToFilterLevel) {
+  // Per-route realm="" → falls back to filter-level realm.
+  UserMap users;
+  users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}});
+  FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
+      std::move(users), "", "", /*allow_missing=*/false, /*emit_dynamic_metadata=*/false,
+      /*realm=*/"filter-realm", "stats", *stats_.rootScope());
+  std::shared_ptr<BasicAuthFilter> filter = std::make_shared<BasicAuthFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  UserMap route_users;
+  route_users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}});
+  FilterConfigPerRoute per_route(std::move(route_users), ""); // no per-route realm
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(testing::Return(&per_route));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic dXNlcjE6d3Jvbmc="}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+  EXPECT_CALL(decoder_filter_callbacks_, requestHeaders()).Times(0);
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([&](Http::Code, absl::string_view,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+        modify_headers(response_headers);
+        EXPECT_EQ(
+            "Basic realm=\"filter-realm\"",
+            response_headers.get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
+}
+
 // Tests for allow_missing=true behavior.
 
 class AllowMissingFilterTest : public testing::Test {
@@ -344,7 +501,7 @@ public:
     users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
     config_ = std::make_unique<FilterConfig>(std::move(users), "x-username", "",
                                              /*allow_missing=*/true,
-                                             /*emit_dynamic_metadata=*/true, "stats",
+                                             /*emit_dynamic_metadata=*/true, /*realm=*/"", "stats",
                                              *stats_.rootScope());
     filter_ = std::make_shared<BasicAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);

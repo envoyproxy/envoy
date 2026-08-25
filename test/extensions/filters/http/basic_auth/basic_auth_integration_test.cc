@@ -28,6 +28,17 @@ typed_config:
   forward_username_header: x-username
 )EOF";
 
+const std::string BasicAuthFilterConfigWithRealm =
+    R"EOF(
+name: envoy.filters.http.basic_auth
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuth
+  users:
+    inline_string: |-
+      user1:{SHA}tESsBmE/yNY3lb6a0L6vVQEZNqw=
+  realm: myapp
+)EOF";
+
 // admin, admin
 const std::string AdminUsers =
     R"EOF(
@@ -40,6 +51,11 @@ class BasicAuthIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initializeFilter() {
     config_helper_.prependFilter(BasicAuthFilterConfig);
+    initialize();
+  }
+
+  void initializeFilterWithRealm() {
+    config_helper_.prependFilter(BasicAuthFilterConfigWithRealm);
     initialize();
   }
 
@@ -260,6 +276,27 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteEnabledInvalidCred
   EXPECT_EQ("User authentication failed. Invalid username/password combination.", response->body());
   EXPECT_EQ(
       "Basic realm=\"http://host/\"",
+      response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
+}
+
+// Verify that the proto-level realm field is wired through config.
+TEST_P(BasicAuthIntegrationTestAllProtocols, FixedRealmInWWWAuthenticate) {
+  initializeFilterWithRealm();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/some/deep/path"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("401", response->headers().getStatusValue());
+  EXPECT_EQ("User authentication failed. Missing username and password.", response->body());
+  EXPECT_EQ(
+      "Basic realm=\"myapp\"",
       response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
 }
 
