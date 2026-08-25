@@ -135,6 +135,21 @@ McpParserConfig::getFieldsForMethod(const std::string& method) const {
   return (it != method_fields_.end()) ? it->second : empty;
 }
 
+std::string McpParserConfig::getNameAttributePath(const std::string& method) const {
+  using namespace Methods;
+  using namespace Paths;
+
+  if (method == TOOLS_CALL || method == PROMPTS_GET) {
+    return std::string(PARAMS_NAME);
+  }
+
+  if (method == TASKS_GET || method == TASKS_UPDATE || method == TASKS_CANCEL) {
+    return std::string(PARAMS_TASK_ID);
+  }
+
+  return "";
+}
+
 const McpParserConfig::FieldRequirements&
 McpParserConfig::getFieldRequirementsForMethod(const std::string& method) const {
   auto it = method_requirements_.find(method);

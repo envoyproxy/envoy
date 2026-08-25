@@ -349,6 +349,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
       is_mcp_request_ = true;
 
       if (!needsBody()) {
+        populateMetadataFromHeaders();
         return Http::FilterHeadersStatus::Continue;
       }
 
@@ -557,6 +558,50 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     }
   }
   return Http::FilterDataStatus::Continue;
+}
+
+void McpFilter::populateMetadataFromHeaders() {
+  Protobuf::Struct metadata;
+
+  if (!header_method_.empty()) {
+    (*metadata.mutable_fields())["method"].set_string_value(header_method_);
+  }
+
+  if (!header_name_.empty()) {
+    const std::string name_path = parserConfig().getNameAttributePath(header_method_);
+    if (!name_path.empty()) {
+      (*metadata.mutable_fields())[name_path].set_string_value(header_name_);
+    }
+  }
+
+  const std::string& group_metadata_key = parserConfig().groupMetadataKey();
+  if (!group_metadata_key.empty() && !header_method_.empty()) {
+    (*metadata.mutable_fields())[group_metadata_key].set_string_value(
+        parserConfig().getMethodGroup(header_method_));
+  }
+
+  if (shouldStoreToDynamicMetadata()) {
+    setDynamicMetadataStatus(std::move(metadata));
+  }
+}
+
+bool McpFilter::headerAttributesMatchBody() const {
+  if (parser_->getMethod() != header_method_) {
+    return false;
+  }
+
+  if (header_name_.empty()) {
+    return true;
+  }
+
+  const std::string name_path = parserConfig().getNameAttributePath(header_method_);
+  if (name_path.empty()) {
+    return true;
+  }
+
+  const Protobuf::Value* body_name = parser_->getNestedValue(name_path);
+  return body_name != nullptr && body_name->kind_case() == Protobuf::Value::kStringValue &&
+         body_name->string_value() == header_name_;
 }
 
 void McpFilter::setDynamicMetadataStatus(Protobuf::Struct metadata) {

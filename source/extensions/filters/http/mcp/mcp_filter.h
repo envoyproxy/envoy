@@ -171,17 +171,19 @@ private:
   // we assume the route does not change during the request, so it is resolved only once.
   envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode();
   uint32_t getMaxRequestBodySize() const;
-  bool needsBody() const;
   bool clearRouteCache() const;
   const ParserConfig& parserConfig() const;
   bool shouldStoreToDynamicMetadata() const;
   bool shouldStoreToFilterState() const;
   bool rejectDuplicateKeys() const;
+  bool needsBody() const;
+  bool headerAttributesMatchBody() const;
   const McpOverrideConfig* routeOverride() const;
 
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
   Http::FilterDataStatus completeParsing();
   void setDynamicMetadataStatus(Protobuf::Struct metadata);
+  void populateMetadataFromHeaders();
 
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
