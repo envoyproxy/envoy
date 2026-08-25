@@ -38,7 +38,7 @@ Semaphore::SemaphoreAwaitable::SemaphoreAwaitable(Semaphore& sem, uint64_t permi
 std::optional<absl::StatusOr<SemaphoreReservation>> Semaphore::SemaphoreAwaitable::tryImmediate() {
   std::optional<SemaphoreReservation> res = sem_.tryAcquire(permits_);
   if (res.has_value()) {
-    return std::move(res);
+    return res;
   }
   return std::nullopt;
 }
