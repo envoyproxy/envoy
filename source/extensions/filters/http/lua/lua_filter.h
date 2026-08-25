@@ -535,7 +535,7 @@ private:
   const bool disabled_;
   const std::string name_;
   PerLuaCodeSetupPtr per_lua_code_setup_ptr_;
-  const bool has_filter_context_;
+  const bool has_filter_context_ = false;
   const Protobuf::Struct filter_context_;
 };
 
