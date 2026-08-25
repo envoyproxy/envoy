@@ -6,7 +6,7 @@
 
 #include "source/common/singleton/const_singleton.h"
 
-#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 
 namespace Envoy {
 namespace Extensions {

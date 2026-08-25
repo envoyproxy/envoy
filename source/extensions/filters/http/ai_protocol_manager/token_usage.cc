@@ -9,6 +9,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
+// One of the three per-value ApiProtocol maps; the proto <-> internal pair
+// lives in filter.h (protocolFromProto/protocolToProto). Kept as separate
+// exhaustive switches so a new enum value fails the build at each.
 absl::string_view apiProtocolName(ApiProtocol protocol) {
   switch (protocol) {
   case ApiProtocol::OpenAiChatCompletions:

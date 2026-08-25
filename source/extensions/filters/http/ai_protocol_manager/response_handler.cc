@@ -6,6 +6,7 @@
 #include "source/common/http/sse/sse_parser.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/strip.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,10 +52,10 @@ bool skippableEventType(absl::string_view event_type) {
   if (event_type == "ping" || absl::StartsWith(event_type, "content_block")) {
     return true;
   }
-  // OpenAI Responses lifecycle events: usage rides only the terminal ones.
+  // OpenAI Responses lifecycle events: usage rides only the terminal ones
+  // (one shared name list; see isOpenAiResponsesTerminalEventType).
   if (absl::StartsWith(event_type, "response.")) {
-    return !(event_type == "response.completed" || event_type == "response.failed" ||
-             event_type == "response.incomplete");
+    return !isOpenAiResponsesTerminalEventType(event_type);
   }
   return false;
 }

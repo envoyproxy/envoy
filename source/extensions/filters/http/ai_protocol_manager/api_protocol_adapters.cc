@@ -1,12 +1,12 @@
 #include <utility>
 
-#include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema/openai_chat_completions.h"
 
 #include "absl/strings/match.h"
+#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -114,9 +114,7 @@ public:
     // Terminal lifecycle events; also the usage carriers, so callers
     // extractUsage() first.
     const auto type = readString(json, JsonKeys::get().Type);
-    return type.has_value() &&
-           (type.value() == "response.completed" || type.value() == "response.failed" ||
-            type.value() == "response.incomplete");
+    return type.has_value() && isOpenAiResponsesTerminalEventType(type.value());
   }
 };
 
@@ -133,7 +131,7 @@ public:
     ExtractionResult result;
     bool& malformed = result.malformed;
     TokenUsage& usage = result.usage;
-    usage.api_protocol = ApiProtocol::AnthropicMessages;
+    usage.api_protocol = protocol();
 
     const nlohmann::json* message = readObject(json, JsonKeys::get().Message, malformed);
     const nlohmann::json& node = message != nullptr ? *message : json;
@@ -195,7 +193,7 @@ public:
     ExtractionResult result;
     bool& malformed = result.malformed;
     TokenUsage& usage = result.usage;
-    usage.api_protocol = ApiProtocol::GeminiGenerateContent;
+    usage.api_protocol = protocol();
 
     if (auto model = readString(json, JsonKeys::get().ModelVersion); model.has_value()) {
       usage.model = std::move(model).value();
@@ -254,6 +252,11 @@ const ApiProtocolAdapter& AdapterRegistry::get(ApiProtocol protocol) {
 }
 
 void finalizeUsage(TokenUsage& usage) { usage.finalize(AdapterRegistry::get(usage.api_protocol)); }
+
+bool isOpenAiResponsesTerminalEventType(absl::string_view event_type) {
+  return event_type == "response.completed" || event_type == "response.failed" ||
+         event_type == "response.incomplete";
+}
 
 // Detection stays centralized rather than delegated per adapter: the marker
 // checks are ordered from most to least structurally distinctive across

@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include "nlohmann/json.hpp"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

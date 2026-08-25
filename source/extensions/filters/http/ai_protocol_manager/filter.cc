@@ -16,6 +16,7 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -58,28 +59,12 @@ bool contentEncodingIsIdentity(const Http::ResponseHeaderMap& headers) {
   return true;
 }
 
-envoy::type::ai::v3::ApiProtocol typedApiProtocol(ApiProtocol protocol) {
-  switch (protocol) {
-  case ApiProtocol::OpenAiChatCompletions:
-    return envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS;
-  case ApiProtocol::OpenAiResponses:
-    return envoy::type::ai::v3::OPENAI_RESPONSES;
-  case ApiProtocol::AnthropicMessages:
-    return envoy::type::ai::v3::ANTHROPIC_MESSAGES;
-  case ApiProtocol::GeminiGenerateContent:
-    return envoy::type::ai::v3::GEMINI_GENERATE_CONTENT;
-  case ApiProtocol::Unspecified:
-    break;
-  }
-  return envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED;
-}
-
 // Converts the finalized accumulator once into the authoritative typed
 // record (envoy.data.ai.v3.TokenUsage). A record with no counts at all is
 // status-only and publishes as FAILED.
 envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degraded) {
   envoy::data::ai::v3::TokenUsage typed;
-  typed.set_api_protocol(typedApiProtocol(usage.api_protocol));
+  typed.set_api_protocol(protocolToProto(usage.api_protocol));
   if (!usage.model.empty()) {
     typed.set_model(usage.model);
   }

@@ -74,6 +74,12 @@ public:
 // the one-liner every caller wants; see TokenUsage::finalize().
 void finalizeUsage(TokenUsage& usage);
 
+// Whether an SSE `event:` name is an OpenAI Responses terminal lifecycle
+// event (the usage carriers). Shared by the adapter's isTerminalEvent() and
+// the SSE handler's pre-parse classification so the event-name list has one
+// owner.
+bool isOpenAiResponsesTerminalEventType(absl::string_view event_type);
+
 } // namespace AiProtocolManager
 } // namespace HttpFilters
 } // namespace Extensions

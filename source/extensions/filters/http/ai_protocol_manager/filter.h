@@ -27,9 +27,13 @@ namespace AiProtocolManager {
 using PerRouteProto =
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute;
 
-// Maps the shared wire-API enum (envoy.type.ai.v3.ApiProtocol) onto the
-// internal extractor enum. Unrecognized values -- possible only across a
-// version skew, since configs are validated defined_only -- auto-detect.
+// The inverse pair mapping the shared wire-API enum (envoy.type.ai.v3
+// .ApiProtocol) to and from the internal mirror. Kept side by side as two
+// exhaustive switches -- a shared runtime table would trade away the
+// compiler's missing-case checking when either enum grows.
+
+// Unrecognized values -- possible only across a version skew, since configs
+// are validated defined_only -- auto-detect.
 inline ApiProtocol protocolFromProto(envoy::type::ai::v3::ApiProtocol protocol) {
   switch (protocol) {
   case envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS:
@@ -43,6 +47,22 @@ inline ApiProtocol protocolFromProto(envoy::type::ai::v3::ApiProtocol protocol) 
   default:
     return ApiProtocol::Unspecified;
   }
+}
+
+inline envoy::type::ai::v3::ApiProtocol protocolToProto(ApiProtocol protocol) {
+  switch (protocol) {
+  case ApiProtocol::OpenAiChatCompletions:
+    return envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS;
+  case ApiProtocol::OpenAiResponses:
+    return envoy::type::ai::v3::OPENAI_RESPONSES;
+  case ApiProtocol::AnthropicMessages:
+    return envoy::type::ai::v3::ANTHROPIC_MESSAGES;
+  case ApiProtocol::GeminiGenerateContent:
+    return envoy::type::ai::v3::GEMINI_GENERATE_CONTENT;
+  case ApiProtocol::Unspecified:
+    break;
+  }
+  return envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED;
 }
 
 // Filter-level configuration, shared by every stream on the chain: which
