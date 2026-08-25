@@ -125,6 +125,7 @@ envoy_cc_test_library(
     srcs = ["utility.cc"],
     hdrs = [
         "enum_test_utils.h",
+        "struct_matchers.h",
         "utility.h",
     ],
     deps = [
@@ -324,6 +325,13 @@ envoy_cc_test(
     deps = [
         ":status_utility_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "struct_matchers_test",
+    srcs = ["struct_matchers_test.cc"],
+    rbe_pool = "6gig",
+    deps = [":utility_lib"],
 )
 
 envoy_cc_test(

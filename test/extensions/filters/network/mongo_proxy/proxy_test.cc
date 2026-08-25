@@ -20,6 +20,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -27,6 +28,7 @@
 using testing::_;
 using testing::AtLeast;
 using testing::Contains;
+using testing::ElementsAre;
 using testing::Invoke;
 using testing::Key;
 using testing::Matcher;
@@ -34,6 +36,7 @@ using testing::NiceMock;
 using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -224,8 +227,8 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
 
   auto& metadata =
       stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().MongoProxy);
-  EXPECT_THAT(metadata.fields(), Contains(Key("db.test")));
-  EXPECT_EQ("query", metadata.fields().at("db.test").list_value().values(0).string_value());
+  EXPECT_THAT(metadata.fields(), UnorderedElementsAre(IsStructList(
+                                     "db.test", ElementsAre(IsStructValueString("query")))));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     InsertMessagePtr message(new InsertMessageImpl(0, 0));
@@ -235,8 +238,8 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
   }));
   filter_->onData(fake_data_, false);
 
-  EXPECT_THAT(metadata.fields(), Contains(Key("db.test")));
-  EXPECT_EQ("insert", metadata.fields().at("db.test").list_value().values(0).string_value());
+  EXPECT_THAT(metadata.fields(), UnorderedElementsAre(IsStructList(
+                                     "db.test", ElementsAre(IsStructValueString("insert")))));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message1(new QueryMessageImpl(0, 0));
@@ -252,10 +255,10 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
   }));
   filter_->onData(fake_data_, false);
 
-  EXPECT_THAT(metadata.fields(), Contains(Key("db1.test1")));
-  EXPECT_EQ("query", metadata.fields().at("db1.test1").list_value().values(0).string_value());
-  EXPECT_THAT(metadata.fields(), Contains(Key("db2.test2")));
-  EXPECT_EQ("insert", metadata.fields().at("db2.test2").list_value().values(0).string_value());
+  EXPECT_THAT(
+      metadata.fields(),
+      UnorderedElementsAre(IsStructList("db1.test1", ElementsAre(IsStructValueString("query"))),
+                           IsStructList("db2.test2", ElementsAre(IsStructValueString("insert")))));
 }
 
 TEST_F(MongoProxyFilterTest, DynamicMetadataDisabled) {
