@@ -12,6 +12,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf_parser.h"
+#include "source/extensions/filters/http/ai_protocol_manager/stats.h"
 
 #include "absl/strings/string_view.h"
 
@@ -19,28 +20,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
-
-/**
- * All stats for the AI Protocol Manager filter. @see stats_macros.h
- */
-#define ALL_AI_PROTOCOL_MANAGER_STATS(COUNTER)                                                     \
-  COUNTER(token_usage_found)                                                                       \
-  COUNTER(token_usage_partial)                                                                     \
-  COUNTER(token_usage_failed)                                                                      \
-  COUNTER(token_usage_missing)                                                                     \
-  COUNTER(token_usage_total_mismatch)                                                              \
-  COUNTER(token_usage_duplicate)                                                                   \
-  COUNTER(response_parse_error)                                                                    \
-  COUNTER(response_body_too_large)                                                                 \
-  COUNTER(malformed_usage_field)                                                                   \
-  COUNTER(sse_event_too_large)                                                                     \
-  COUNTER(sse_incomplete_event)                                                                    \
-  COUNTER(sse_event_budget_exhausted)                                                              \
-  COUNTER(unsupported_content_encoding)
-
-struct AiProtocolManagerStats {
-  ALL_AI_PROTOCOL_MANAGER_STATS(GENERATE_COUNTER_STRUCT)
-};
 
 // Observe-only accumulator over a response body: the filter tees encode-path
 // frames in, and no failure inside the handler can affect the stream. Results

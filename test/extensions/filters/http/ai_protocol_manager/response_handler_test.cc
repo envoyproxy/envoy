@@ -3,6 +3,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/response_handler.h"
+#include "source/extensions/filters/http/ai_protocol_manager/stats.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"

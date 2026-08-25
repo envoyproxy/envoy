@@ -39,7 +39,14 @@ public:
   // (oversized strings appear as external-reference nodes and read as
   // absent). Absent fields stay unset; the caller accumulates via
   // TokenUsage::merge() and canonicalizes once in TokenUsage::finalize().
-  virtual ExtractionResult extractUsage(const nlohmann::json& json) const PURE;
+  // Non-virtual: the shared prologue stamps the result with the adapter's own
+  // protocol, and the dialect fills in its counts via extractUsageInto().
+  ExtractionResult extractUsage(const nlohmann::json& json) const {
+    ExtractionResult result;
+    result.usage.api_protocol = protocol();
+    extractUsageInto(json, result.usage, result.malformed);
+    return result;
+  }
 
   // Rewrite the accumulated native counts onto the canonical inclusive
   // contract (e.g. Anthropic sums its disjoint cache buckets into input;
@@ -53,6 +60,12 @@ public:
   // Callers must extractUsage() first: terminal Responses events also carry
   // the usage. Chat Completions' non-JSON `[DONE]` is handled before parsing.
   virtual bool isTerminalEvent(const nlohmann::json& json) const PURE;
+
+protected:
+  // The dialect's usage reads, onto a result already stamped with protocol().
+  // A known field with an unusable value reads as absent and sets `malformed`.
+  virtual void extractUsageInto(const nlohmann::json& json, TokenUsage& usage,
+                                bool& malformed) const PURE;
 };
 
 // The registry mapping each ApiProtocol to its adapter, plus shape detection.

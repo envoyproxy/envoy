@@ -117,10 +117,17 @@ envoy_cc_library(
         ":json_readers_lib",
         ":schema_lib",
         ":token_usage_lib",
-        "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/extensions/filters/http/ai_protocol_manager/schema:openai_chat_completions_lib",
         "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
+    name = "stats_lib",
+    hdrs = ["stats.h"],
+    deps = [
+        "//envoy/stats:stats_macros",
     ],
 )
 
@@ -131,6 +138,7 @@ envoy_cc_library(
     deps = [
         ":api_protocol_adapters_lib",
         ":json_with_ext_buf_parser_lib",
+        ":stats_lib",
         ":token_usage_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/common:pure_lib",
@@ -167,6 +175,7 @@ envoy_cc_library(
         ":json_with_ext_buf_parser_lib",
         ":response_handler_lib",
         ":schema_lib",
+        ":stats_lib",
         "//envoy/http:codes_interface",
         "//envoy/router:router_interface",
         "//envoy/stats:stats_interface",

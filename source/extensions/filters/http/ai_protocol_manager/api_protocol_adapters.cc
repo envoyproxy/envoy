@@ -22,9 +22,11 @@ class NullAdapter : public ApiProtocolAdapter {
 public:
   ApiProtocol protocol() const override { return ApiProtocol::Unspecified; }
   const PayloadSchema* schema() const override { return nullptr; }
-  ExtractionResult extractUsage(const nlohmann::json&) const override { return {}; }
   void canonicalizeUsage(TokenUsage&, bool&) const override {}
   bool isTerminalEvent(const nlohmann::json&) const override { return false; }
+
+protected:
+  void extractUsageInto(const nlohmann::json&, TokenUsage&, bool&) const override {}
 };
 
 // OpenAI: Chat Completions and Responses API. The two dialects share one
@@ -33,12 +35,12 @@ public:
 // API streaming lifecycle events nest the payload under `response`.
 class OpenAiAdapterBase : public ApiProtocolAdapter {
 public:
-  ExtractionResult extractUsage(const nlohmann::json& json) const override {
-    ExtractionResult result;
-    bool& malformed = result.malformed;
-    TokenUsage& usage = result.usage;
-    usage.api_protocol = protocol();
+  // OpenAI's native counts are already inclusive.
+  void canonicalizeUsage(TokenUsage&, bool&) const override {}
 
+protected:
+  void extractUsageInto(const nlohmann::json& json, TokenUsage& usage,
+                        bool& malformed) const override {
     const nlohmann::json* response = readObject(json, JsonKeys::get().Response, malformed);
     const nlohmann::json& node = response != nullptr ? *response : json;
 
@@ -49,7 +51,7 @@ public:
     const nlohmann::json* usage_node =
         readObject(node, JsonKeys::get().Usage, malformed, NullPolicy::AllowNullAsAbsent);
     if (usage_node == nullptr) {
-      return result;
+      return;
     }
 
     usage.input_tokens = readCount(*usage_node, JsonKeys::get().PromptTokens, malformed);
@@ -86,11 +88,7 @@ public:
       usage.reasoning_tokens =
           readCount(*output_details, JsonKeys::get().ReasoningTokens, malformed);
     }
-    return result;
   }
-
-  // OpenAI's native counts are already inclusive.
-  void canonicalizeUsage(TokenUsage&, bool&) const override {}
 };
 
 class OpenAiChatCompletionsAdapter : public OpenAiAdapterBase {
@@ -127,12 +125,23 @@ public:
   ApiProtocol protocol() const override { return ApiProtocol::AnthropicMessages; }
   const PayloadSchema* schema() const override { return nullptr; }
 
-  ExtractionResult extractUsage(const nlohmann::json& json) const override {
-    ExtractionResult result;
-    bool& malformed = result.malformed;
-    TokenUsage& usage = result.usage;
-    usage.api_protocol = protocol();
+  void canonicalizeUsage(TokenUsage& usage, bool& overflow) const override {
+    // Native input excludes the two disjoint cache buckets.
+    if (usage.input_tokens.has_value()) {
+      usage.input_tokens =
+          addCounts(addCounts(usage.input_tokens, usage.cached_input_tokens, overflow),
+                    usage.cache_creation_input_tokens, overflow);
+    }
+  }
 
+  bool isTerminalEvent(const nlohmann::json& json) const override {
+    const auto type = readString(json, JsonKeys::get().Type);
+    return type.has_value() && type.value() == "message_stop";
+  }
+
+protected:
+  void extractUsageInto(const nlohmann::json& json, TokenUsage& usage,
+                        bool& malformed) const override {
     const nlohmann::json* message = readObject(json, JsonKeys::get().Message, malformed);
     const nlohmann::json& node = message != nullptr ? *message : json;
 
@@ -142,7 +151,7 @@ public:
 
     const nlohmann::json* usage_node = readObject(node, JsonKeys::get().Usage, malformed);
     if (usage_node == nullptr) {
-      return result;
+      return;
     }
 
     // Native counts only: the disjoint input/cache buckets are summed once,
@@ -162,21 +171,6 @@ public:
         details != nullptr) {
       usage.reasoning_tokens = readCount(*details, JsonKeys::get().ThinkingTokens, malformed);
     }
-    return result;
-  }
-
-  void canonicalizeUsage(TokenUsage& usage, bool& overflow) const override {
-    // Native input excludes the two disjoint cache buckets.
-    if (usage.input_tokens.has_value()) {
-      usage.input_tokens =
-          addCounts(addCounts(usage.input_tokens, usage.cached_input_tokens, overflow),
-                    usage.cache_creation_input_tokens, overflow);
-    }
-  }
-
-  bool isTerminalEvent(const nlohmann::json& json) const override {
-    const auto type = readString(json, JsonKeys::get().Type);
-    return type.has_value() && type.value() == "message_stop";
   }
 };
 
@@ -188,34 +182,6 @@ class GeminiGenerateContentAdapter : public ApiProtocolAdapter {
 public:
   ApiProtocol protocol() const override { return ApiProtocol::GeminiGenerateContent; }
   const PayloadSchema* schema() const override { return nullptr; }
-
-  ExtractionResult extractUsage(const nlohmann::json& json) const override {
-    ExtractionResult result;
-    bool& malformed = result.malformed;
-    TokenUsage& usage = result.usage;
-    usage.api_protocol = protocol();
-
-    if (auto model = readString(json, JsonKeys::get().ModelVersion); model.has_value()) {
-      usage.model = std::move(model).value();
-    }
-
-    const nlohmann::json* usage_node = readObject(json, JsonKeys::get().UsageMetadata, malformed);
-    if (usage_node == nullptr) {
-      return result;
-    }
-
-    // Native counts only; the tool-use and thoughts adjuncts are summed in at
-    // canonicalizeUsage(), after the last cumulative snapshot merged.
-    usage.input_tokens = readCount(*usage_node, JsonKeys::get().PromptTokenCount, malformed);
-    usage.output_tokens = readCount(*usage_node, JsonKeys::get().CandidatesTokenCount, malformed);
-    usage.total_tokens = readCount(*usage_node, JsonKeys::get().TotalTokenCount, malformed);
-    usage.cached_input_tokens =
-        readCount(*usage_node, JsonKeys::get().CachedContentTokenCount, malformed);
-    usage.tool_use_input_tokens =
-        readCount(*usage_node, JsonKeys::get().ToolUsePromptTokenCount, malformed);
-    usage.reasoning_tokens = readCount(*usage_node, JsonKeys::get().ThoughtsTokenCount, malformed);
-    return result;
-  }
 
   void canonicalizeUsage(TokenUsage& usage, bool& overflow) const override {
     // Native prompt/candidates counts exclude tool-use and thoughts.
@@ -229,6 +195,30 @@ public:
 
   // No in-band terminator; extraction finalizes at end of stream.
   bool isTerminalEvent(const nlohmann::json&) const override { return false; }
+
+protected:
+  void extractUsageInto(const nlohmann::json& json, TokenUsage& usage,
+                        bool& malformed) const override {
+    if (auto model = readString(json, JsonKeys::get().ModelVersion); model.has_value()) {
+      usage.model = std::move(model).value();
+    }
+
+    const nlohmann::json* usage_node = readObject(json, JsonKeys::get().UsageMetadata, malformed);
+    if (usage_node == nullptr) {
+      return;
+    }
+
+    // Native counts only; the tool-use and thoughts adjuncts are summed in at
+    // canonicalizeUsage(), after the last cumulative snapshot merged.
+    usage.input_tokens = readCount(*usage_node, JsonKeys::get().PromptTokenCount, malformed);
+    usage.output_tokens = readCount(*usage_node, JsonKeys::get().CandidatesTokenCount, malformed);
+    usage.total_tokens = readCount(*usage_node, JsonKeys::get().TotalTokenCount, malformed);
+    usage.cached_input_tokens =
+        readCount(*usage_node, JsonKeys::get().CachedContentTokenCount, malformed);
+    usage.tool_use_input_tokens =
+        readCount(*usage_node, JsonKeys::get().ToolUsePromptTokenCount, malformed);
+    usage.reasoning_tokens = readCount(*usage_node, JsonKeys::get().ThoughtsTokenCount, malformed);
+  }
 };
 
 } // namespace

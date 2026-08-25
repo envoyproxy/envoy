@@ -59,6 +59,14 @@ bool skippableEventType(absl::string_view event_type) {
   }
   return false;
 }
+
+// The classification gate both extraction sites share: an event may carry
+// usage unless its `event:` name says otherwise. Runs on the raw event bytes,
+// before any data payload is assembled or parsed.
+bool eventMayCarryUsage(absl::string_view event) {
+  const auto event_type = sseEventTypeView(event);
+  return !event_type.has_value() || !skippableEventType(event_type.value());
+}
 } // namespace
 
 bool ResponseHandler::processDocument(const nlohmann::json& json) {
@@ -211,8 +219,7 @@ void SseResponseHandler::consumeEvent() {
 void SseResponseHandler::handleCompleteEvent(absl::string_view region) {
   // Classify before materializing: named non-usage events are dropped before
   // their data payload is assembled or parsed.
-  if (const auto event_type = sseEventTypeView(region);
-      event_type.has_value() && skippableEventType(event_type.value())) {
+  if (!eventMayCarryUsage(region)) {
     return;
   }
   // The region ends exactly at a blank-line boundary, so end_stream=true
@@ -250,8 +257,7 @@ void SseResponseHandler::onEndStream() {
       }
       const absl::string_view event =
           view.substr(result.event_start, result.event_end - result.event_start);
-      if (const auto event_type = sseEventTypeView(event);
-          !event_type.has_value() || !skippableEventType(event_type.value())) {
+      if (eventMayCarryUsage(event)) {
         processSseEvent(event);
       }
       view = view.substr(result.next_start);

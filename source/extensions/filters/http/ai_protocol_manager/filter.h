@@ -15,6 +15,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf_parser.h"
 #include "source/extensions/filters/http/ai_protocol_manager/response_handler.h"
+#include "source/extensions/filters/http/ai_protocol_manager/stats.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/status/status.h"
