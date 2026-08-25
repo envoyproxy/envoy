@@ -368,11 +368,11 @@ message ProcessingResponse {
   //    with the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.HttpBody.drain_complete>`
   //    field set to true.
-  // 4. The ext_proc server echos back all subsequent request body chunks
-  //    until it sees the body chunk with the
+  // 4. The ext_proc server continues processing all subsequent request body
+  //    chunks until it sees the body chunk with the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.HttpBody.drain_complete>`
-  //    field set to true.  When echoing back that last body chunk, the
-  //    ext_proc server will set the
+  //    field set to true.  When sending back its response to that last body
+  //    chunk, the ext_proc server will set the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.StreamedBodyResponse.drain_complete>`
   //    field to true to let the data plane know that it has finished draining.
   // 5. When the data plane sees the response with the
@@ -387,6 +387,13 @@ message ProcessingResponse {
   // Note that if the data plane is sending request body data and the
   // ext_proc server wants to terminate the stream with an OK status, it
   // must perform this drain before doing so.
+  //
+  // Note that the data plane may have sent a message with
+  // :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.StreamedBodyResponse.end_of_stream>`
+  // set to true before it received the drain request from the ext_proc
+  // server. In this case, the data plane will ignore the drain request,
+  // and the ext_proc will consider the drain complete when it sees the
+  // end-of-stream message.
   bool request_drain_requests = 15;
 
   // [#not-implemented-hide:]
@@ -404,11 +411,11 @@ message ProcessingResponse {
   //    with the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.HttpBody.drain_complete>`
   //    field set to true.
-  // 4. The ext_proc server echos back all subsequent response body chunks
-  //    until it sees the body chunk with the
+  // 4. The ext_proc server continues processing all subsequent response body
+  //    chunks until it sees the body chunk with the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.HttpBody.drain_complete>`
-  //    field set to true.  When echoing back that last body chunk, the
-  //    ext_proc server will set the
+  //    field set to true.  When sending back its response to that last body
+  //    chunk, the ext_proc server will set the
   //    :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.StreamedBodyResponse.drain_complete>`
   //    field to true to let the data plane know that it has finished draining.
   // 5. When the data plane sees the response with the
@@ -423,6 +430,13 @@ message ProcessingResponse {
   // Note that if the data plane is sending response body data and the
   // ext_proc server wants to terminate the stream with an OK status, it
   // must perform this drain before doing so.
+  //
+  // Note that the data plane may have sent a message with
+  // :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.StreamedBodyResponse.end_of_stream>`
+  // set to true before it received the drain request from the ext_proc
+  // server. In this case, the data plane will ignore the drain request,
+  // and the ext_proc will consider the drain complete when it sees the
+  // end-of-stream message.
   bool request_drain_responses = 16;
 
   // When the ext_proc server receives a request message and needs more time to process it, it
@@ -716,6 +730,11 @@ message StreamedBodyResponse {
   // :ref:`drain_complete <envoy_v3_api_field_service.ext_proc.v3.HttpBody.drain_complete>`
   // field, it will populate this field to indicate that it has finished
   // sending data back to the data plane.
+  //
+  // If the data plane receives a message with this field set to true
+  // before it has sent a drain-complete message to the ext_proc server,
+  // the data plane will treat that as if the ext_proc stream has failed
+  // with a non-OK status.
   bool drain_complete = 5;
 }
 
