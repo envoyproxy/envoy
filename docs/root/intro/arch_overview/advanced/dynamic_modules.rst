@@ -38,6 +38,7 @@ Currently, dynamic modules are supported at the following extension points:
 * As an :ref:`upstream HTTP TCP bridge <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config>`.
 * As a :ref:`tracer <envoy_v3_api_msg_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer>`.
 * As a :ref:`health checker <envoy_v3_api_msg_extensions.health_checkers.dynamic_modules.v3.DynamicModuleHealthCheck>`.
+* As a :ref:`cluster specifier <envoy_v3_api_msg_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier>`.
 
 There are a few design goals for the dynamic modules:
 
