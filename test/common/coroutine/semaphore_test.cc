@@ -260,12 +260,14 @@ TEST_F(SemaphoreTest, UnboundedAsyncAcquire) {
   auto hold = sem->tryAcquire(100);
   ASSERT_TRUE(hold.has_value());
 
-  bool acquired = false;
-  launchTaskOk([&]() -> Task<absl::Status> {
-    ASSIGN_OR_CO_RETURN(auto res, co_await sem->acquire(50));
-    acquired = true;
+  auto acquireTask = [](SemaphorePtr s, bool* acquired) -> Task<absl::Status> {
+    ASSIGN_OR_CO_RETURN(auto res, co_await s->acquire(50));
+    *acquired = true;
     co_return absl::OkStatus();
-  }());
+  };
+
+  bool acquired = false;
+  launchTaskOk(acquireTask(sem, &acquired));
   drain();
   EXPECT_TRUE(acquired);
 }
@@ -301,14 +303,16 @@ TEST_F(SemaphoreTest, DestructionWhileProcessWaitersScheduled) {
   auto hold = sem->tryAcquire(10);
   ASSERT_TRUE(hold.has_value());
 
-  bool waiter_failed = false;
-  launchTaskOk([&]() -> Task<absl::Status> {
-    auto res = co_await sem->acquire(5);
+  auto acquireTask = [](Semaphore& s, bool* failed) -> Task<absl::Status> {
+    auto res = co_await s.acquire(5);
     if (!res.ok()) {
-      waiter_failed = true;
+      *failed = true;
     }
     co_return absl::OkStatus();
-  }());
+  };
+
+  bool waiter_failed = false;
+  launchTaskOk(acquireTask(*sem, &waiter_failed));
   drain(); // Waiter is now queued in waiters_
 
   // Release permits: this schedules runScheduledProcessWaiters on executor_
@@ -325,19 +329,13 @@ TEST_F(SemaphoreTest, AllWaitersCancelledBeforeScheduleOrProcess) {
   auto hold = sem->tryAcquire(10);
   ASSERT_TRUE(hold.has_value());
 
-  DetachedHandle h1 = launch(
-      [&]() -> Task<absl::Status> {
-        auto res = co_await sem->acquire(5);
-        co_return absl::OkStatus();
-      }(),
-      executor_, [](absl::Status) {});
+  auto acquireTask = [](SemaphorePtr s) -> Task<absl::Status> {
+    auto res = co_await s->acquire(5);
+    co_return absl::OkStatus();
+  };
 
-  DetachedHandle h2 = launch(
-      [&]() -> Task<absl::Status> {
-        auto res = co_await sem->acquire(5);
-        co_return absl::OkStatus();
-      }(),
-      executor_, [](absl::Status) {});
+  DetachedHandle h1 = launch(acquireTask(sem), executor_, [](absl::Status) {});
+  DetachedHandle h2 = launch(acquireTask(sem), executor_, [](absl::Status) {});
 
   drain(); // Waiters queued
 
@@ -356,18 +354,19 @@ TEST_F(SemaphoreTest, TrailingCancelledWaiterDuringProcessWaiters) {
   auto hold = sem->tryAcquire(10);
   ASSERT_TRUE(hold.has_value());
 
-  SemaphoreReservation w1_res;
-  launchTaskOk([&]() -> Task<absl::Status> {
-    ASSIGN_OR_CO_RETURN(w1_res, co_await sem->acquire(5));
+  auto acquireTask = [](SemaphorePtr s, SemaphoreReservation* out_res) -> Task<absl::Status> {
+    ASSIGN_OR_CO_RETURN(*out_res, co_await s->acquire(5));
     co_return absl::OkStatus();
-  }());
+  };
+  auto dummyTask = [](SemaphorePtr s) -> Task<absl::Status> {
+    auto res = co_await s->acquire(5);
+    co_return absl::OkStatus();
+  };
 
-  DetachedHandle h2 = launch(
-      [&]() -> Task<absl::Status> {
-        auto res = co_await sem->acquire(5);
-        co_return absl::OkStatus();
-      }(),
-      executor_, [](absl::Status) {});
+  SemaphoreReservation w1_res;
+  launchTaskOk(acquireTask(sem, &w1_res));
+
+  DetachedHandle h2 = launch(dummyTask(sem), executor_, [](absl::Status) {});
 
   drain(); // w1 and w2 queued
 
