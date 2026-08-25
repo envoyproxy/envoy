@@ -2861,6 +2861,14 @@ __attribute__((weak)) uint64_t envoy_dynamic_module_callback_cluster_specifier_g
   return 0;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, uint32_t, size_t*, size_t*, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count: not "
+               "implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) bool envoy_dynamic_module_callback_cluster_specifier_get_request_header_value(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*, size_t,

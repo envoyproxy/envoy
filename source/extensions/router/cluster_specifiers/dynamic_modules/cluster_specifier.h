@@ -63,7 +63,8 @@ public:
   DynamicModuleClusterSpecifierConfig(absl::string_view specifier_name,
                                       absl::string_view specifier_config,
                                       Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-                                      RouteActionOverrideMap route_action_overrides);
+                                      RouteActionOverrideMap route_action_overrides,
+                                      Upstream::ClusterManager& cluster_manager);
 
   ~DynamicModuleClusterSpecifierConfig();
 
@@ -81,6 +82,11 @@ public:
    * @return an error naming the first override that mirrors to an unknown cluster.
    */
   absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const;
+
+  /**
+   * @return the cluster manager used to look up clusters during selection.
+   */
+  Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
 
   // The corresponding in-module cluster specifier configuration.
   envoy_dynamic_module_type_cluster_specifier_config_module_ptr in_module_config_{nullptr};
@@ -100,6 +106,7 @@ private:
   const std::string specifier_name_;
   const std::string specifier_config_;
   const Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
+  Upstream::ClusterManager& cluster_manager_;
   // Const after construction so that the pointers routeActionOverride() hands out stay valid.
   const RouteActionOverrideMap route_action_overrides_;
 };

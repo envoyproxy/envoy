@@ -5,6 +5,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/router/cluster_specifiers/dynamic_modules/config.h"
 
@@ -12,6 +13,8 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
@@ -822,6 +825,81 @@ route_action_overrides:
   EXPECT_EQ(matched_route_criteria, entry->metadataMatchCriteria());
   // The retry policy still comes from the override, so the entry itself was selected.
   EXPECT_EQ(7, entry->retryPolicy()->numRetries());
+}
+
+class DynamicModuleClusterSpecifierHostCountAbiTest : public testing::Test {
+public:
+  DynamicModuleClusterSpecifierHostCountAbiTest() {
+    TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+                               TestEnvironment::substitute(
+                                   "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
+                               1);
+    EXPECT_CALL(context_, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager_));
+  }
+
+  DynamicModuleClusterSpecifierConfigSharedPtr makeConfig() {
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+        Extensions::DynamicModules::testSharedObjectPath("cluster_specifier_no_op", "c"),
+        /*do_not_close=*/true);
+    EXPECT_TRUE(dynamic_module.ok());
+    auto config_or_error = newDynamicModuleClusterSpecifierConfig(
+        protoConfig("cluster_specifier_no_op", "test_cluster_specifier"),
+        std::move(dynamic_module.value()), context_);
+    EXPECT_TRUE(config_or_error.ok());
+    return config_or_error.value();
+  }
+
+  ClusterSpecifierContext makeContext(DynamicModuleClusterSpecifierConfigSharedPtr config) {
+    return ClusterSpecifierContext{*config, headers_, stream_info_, route_name_, /*random=*/0, {}};
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Upstream::MockClusterManager cluster_manager_;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  Http::TestRequestHeaderMapImpl headers_;
+  const std::string route_name_{"named-route"};
+};
+
+TEST_F(DynamicModuleClusterSpecifierHostCountAbiTest, UnknownClusterReturnsFalse) {
+  auto config = makeConfig();
+  auto context = makeContext(config);
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view("absent")))
+      .WillOnce(testing::Return(nullptr));
+  size_t total = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+      static_cast<void*>(&context), {"absent", 6}, 0, &total, nullptr, nullptr));
+}
+
+TEST_F(DynamicModuleClusterSpecifierHostCountAbiTest, HostCountsReturnedForKnownCluster) {
+  auto config = makeConfig();
+  auto context = makeContext(config);
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view("present")))
+      .WillOnce(testing::Return(&thread_local_cluster_));
+  auto* mock_host_set = thread_local_cluster_.cluster_.priority_set_.getMockHostSet(0);
+  mock_host_set->hosts_.resize(4);
+  mock_host_set->healthy_hosts_.resize(2);
+  mock_host_set->degraded_hosts_.resize(1);
+
+  size_t total = 0;
+  size_t healthy = 0;
+  size_t degraded = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+      static_cast<void*>(&context), {"present", 7}, 0, &total, &healthy, &degraded));
+  EXPECT_EQ(4, total);
+  EXPECT_EQ(2, healthy);
+  EXPECT_EQ(1, degraded);
+}
+
+TEST_F(DynamicModuleClusterSpecifierReadTest, ClusterHostCountReadable) {
+  setUpPlugin();
+  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(absl::string_view("cluster_0")))
+      .WillOnce(testing::Return(nullptr));
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"},
+                                         {"env", "prod"},
+                                         {"x-echo", "cluster-host-count"},
+                                         {"x-query-cluster", "cluster_0"}};
+  EXPECT_EQ("absent", echoedValue(headers, "cluster-host-count"));
 }
 
 } // namespace

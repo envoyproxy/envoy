@@ -121,6 +121,36 @@ uint64_t envoy_dynamic_module_callback_cluster_specifier_get_random_value(
   return clusterSpecifierContext(context_envoy_ptr)->random_value;
 }
 
+bool envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name, uint32_t priority, size_t* total_count,
+    size_t* healthy_count, size_t* degraded_count) {
+  auto* context = clusterSpecifierContext(context_envoy_ptr);
+  auto* tl_cluster = context->config.clusterManager().getThreadLocalCluster(
+      absl::string_view(cluster_name.ptr, cluster_name.length));
+  if (tl_cluster == nullptr) {
+    return false;
+  }
+  const auto& priority_set = tl_cluster->prioritySet();
+  if (priority >= priority_set.hostSetsPerPriority().size()) {
+    return false;
+  }
+  const auto& host_set = priority_set.hostSetsPerPriority()[priority];
+  if (host_set == nullptr) {
+    return false;
+  }
+  if (total_count != nullptr) {
+    *total_count = host_set->hosts().size();
+  }
+  if (healthy_count != nullptr) {
+    *healthy_count = host_set->healthyHosts().size();
+  }
+  if (degraded_count != nullptr) {
+    *degraded_count = host_set->degradedHosts().size();
+  }
+  return true;
+}
+
 void envoy_dynamic_module_callback_cluster_specifier_set_cluster_name(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer cluster_name) {

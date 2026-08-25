@@ -14945,12 +14945,37 @@ bool envoy_dynamic_module_callback_cluster_specifier_get_route_name(
 uint64_t envoy_dynamic_module_callback_cluster_specifier_get_random_value(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr);
 
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count retrieves the host counts
+ * for a cluster by name. This lets a module check whether a cluster is routable from the current
+ * worker before naming it with set_cluster_name.
+ *
+ * The lookup uses getThreadLocalCluster(), so false is returned when the cluster is not routable
+ * from this worker at the moment, which can happen even when the cluster is configured but not yet
+ * warmed or propagated. Healthy and degraded host counts are eventually consistent.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param cluster_name is the name of the cluster to query owned by the module.
+ * @param priority is the priority level to query (0 for default priority).
+ * @param total_count is the pointer to store the total number of hosts. Can be null if not needed.
+ * @param healthy_count is the pointer to store the number of healthy hosts. Can be null if not
+ * needed.
+ * @param degraded_count is the pointer to store the number of degraded hosts. Can be null if not
+ * needed.
+ * @return true if the counts were retrieved successfully, false otherwise (e.g., cluster not
+ * routable from this worker).
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name, uint32_t priority, size_t* total_count,
+    size_t* healthy_count, size_t* degraded_count);
+
 // ------------------- Cluster Specifier Callbacks - Selection -----------------
 
 /**
  * envoy_dynamic_module_callback_cluster_specifier_set_cluster_name sets the upstream cluster for
  * the request. When the cluster does not exist, the request is failed with the cluster-not-found
- * response code of the matched route.
+ * response code of the matched route. Use get_cluster_host_count to check `routability` first.
  *
  * @param context_envoy_ptr is the pointer to the cluster selection context.
  * @param cluster_name is the name of the cluster to route to. Envoy copies the buffer. An empty
