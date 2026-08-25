@@ -97,9 +97,8 @@ private:
       ASSERT(pop_waiters_.empty(),
              "under single consumer assumption, popper cannot be waiting upon destruction");
       if (in_handoff_ > 0) {
-        ASSERT(queue_.empty() && pending_pushers_ == 0,
-               "no queued items or pending pushers can exist when queue is destroyed during "
-               "direct handoff");
+        ASSERT(queue_.empty(),
+               "no queued items can exist when queue is destroyed during direct handoff");
       }
       *alive_ = false;
       close();
@@ -174,14 +173,11 @@ private:
       // 3. Acquire capacity from Capacity. Any pop() arriving while suspended will steal from
       // queue_.
       auto alive = alive_;
-      ++pending_pushers_;
       auto cap_res = co_await capacity_->acquire(size);
       if (!*alive) {
         queued_item->item.reset();
         co_return absl::FailedPreconditionError("queue is closed");
       }
-
-      --pending_pushers_;
 
       // If a pop() stole the item during rendezvous, we are done!
       if (!queued_item->item.has_value()) {
@@ -246,7 +242,6 @@ private:
     CapacityPtr capacity_;
     SizeFunc size_func_;
     uint64_t current_size_{0};
-    uint64_t pending_pushers_{0};
     uint64_t in_handoff_{0};
     std::list<std::shared_ptr<QueuedItem>> queue_;
     std::list<std::shared_ptr<PopWaiter>> pop_waiters_;
