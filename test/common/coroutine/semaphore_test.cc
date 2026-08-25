@@ -206,52 +206,44 @@ TEST_F(SemaphoreTest, DestructionFailsWaiters) {
   EXPECT_TRUE(waiter_failed);
 }
 
-TEST_F(SemaphoreTest, ReservationOutlivesSemaphoreSafely) {
-  SemaphoreReservation res;
-  {
-    auto sem = std::make_shared<Semaphore>(10);
-    auto opt = sem->tryAcquire(4);
-    ASSERT_TRUE(opt.has_value());
-    res = std::move(*opt);
-    EXPECT_EQ(res.permits(), 4);
-    // Semaphore destroyed here.
-  }
-  // Reservation dropped after semaphore destruction must not crash or leak.
-  res.release();
-  EXPECT_EQ(res.permits(), 0);
-}
-
-TEST_F(SemaphoreTest, ReservationHasPermits) {
-  auto sem = std::make_shared<Semaphore>(10);
+TEST_F(SemaphoreTest, ReservationLifecycle) {
+  // Empty reservation
   SemaphoreReservation empty_res;
   EXPECT_FALSE(empty_res.hasPermits());
 
-  auto res = sem->tryAcquire(5);
-  ASSERT_TRUE(res.has_value());
-  EXPECT_TRUE(res->hasPermits());
-  EXPECT_EQ(res->permits(), 5);
-
-  res->release();
-  EXPECT_FALSE(res->hasPermits());
-
-  // Test when semaphore is destroyed
-  auto res2 = sem->tryAcquire(3);
-  ASSERT_TRUE(res2.has_value());
-  EXPECT_TRUE(res2->hasPermits());
-  sem.reset();
-  EXPECT_FALSE(res2->hasPermits());
-}
-
-TEST_F(SemaphoreTest, ReservationMoveAssignmentOverwritesActiveReservation) {
+  // Active reservation acquires permits and hasPermits() is true
   auto sem = std::make_shared<Semaphore>(10);
-  auto res1 = sem->tryAcquire(4);
-  auto res2 = sem->tryAcquire(3);
+  auto res1 = sem->tryAcquire(5);
   ASSERT_TRUE(res1.has_value());
-  ASSERT_TRUE(res2.has_value());
-  EXPECT_EQ(sem->currentPermits(), 7);
+  EXPECT_TRUE(res1->hasPermits());
+  EXPECT_EQ(res1->permits(), 5);
 
-  // Overwriting active reservation res1 triggers ENVOY_BUG
-  EXPECT_ENVOY_BUG(*res1 = std::move(*res2),
+  // Explicit release clears permits
+  res1->release();
+  EXPECT_FALSE(res1->hasPermits());
+  EXPECT_EQ(sem->currentPermits(), 0);
+
+  // Reservation outliving semaphore releases safely without crash or leak
+  SemaphoreReservation outliving_res;
+  {
+    auto scoped_sem = std::make_shared<Semaphore>(10);
+    auto opt = scoped_sem->tryAcquire(4);
+    ASSERT_TRUE(opt.has_value());
+    outliving_res = std::move(*opt);
+    EXPECT_EQ(outliving_res.permits(), 4);
+    // scoped_sem is destroyed here.
+  }
+  EXPECT_FALSE(outliving_res.hasPermits()); // sem is destroyed
+  outliving_res.release();                  // Dropping after destruction is safe
+  EXPECT_EQ(outliving_res.permits(), 0);
+
+  // Move-assignment over an active reservation triggers ENVOY_BUG
+  auto r1 = sem->tryAcquire(4);
+  auto r2 = sem->tryAcquire(3);
+  ASSERT_TRUE(r1.has_value());
+  ASSERT_TRUE(r2.has_value());
+  EXPECT_EQ(sem->currentPermits(), 7);
+  EXPECT_ENVOY_BUG(*r1 = std::move(*r2),
                    "SemaphoreReservation should not overwrite an active reservation");
 }
 
@@ -272,27 +264,23 @@ TEST_F(SemaphoreTest, UnboundedAsyncAcquire) {
   EXPECT_TRUE(acquired);
 }
 
-TEST_F(SemaphoreTest, IntegerOverflowPermits) {
+TEST_F(SemaphoreTest, PermitBoundaryConditions) {
   auto sem = std::make_shared<Semaphore>(10);
-  auto hold = sem->tryAcquire(5);
-  ASSERT_TRUE(hold.has_value());
 
-  // Requesting huge permits causing integer overflow in current_permits + additional_permits
-  uint64_t huge_permits = std::numeric_limits<uint64_t>::max();
-  EXPECT_FALSE(sem->tryAcquire(huge_permits).has_value());
-}
-
-TEST_F(SemaphoreTest, ReleaseZeroPermitsIsNoOp) {
-  auto sem = std::make_shared<Semaphore>(10);
-  sem->release(0); // no-op
+  // Zero-permit releases are no-ops
+  sem->release(0);
   EXPECT_EQ(sem->currentPermits(), 0);
 
   auto res = sem->tryAcquire(5);
   ASSERT_TRUE(res.has_value());
   EXPECT_EQ(sem->currentPermits(), 5);
 
-  sem->release(0); // no-op when permits held
+  sem->release(0);
   EXPECT_EQ(sem->currentPermits(), 5);
+
+  // When partially in use, oversized/overflow acquire requests are rejected
+  uint64_t huge_permits = std::numeric_limits<uint64_t>::max();
+  EXPECT_FALSE(sem->tryAcquire(huge_permits).has_value());
 
   res->release();
   EXPECT_EQ(sem->currentPermits(), 0);
@@ -324,57 +312,31 @@ TEST_F(SemaphoreTest, DestructionWhileProcessWaitersScheduled) {
   EXPECT_TRUE(waiter_failed);
 }
 
-TEST_F(SemaphoreTest, AllWaitersCancelledBeforeScheduleOrProcess) {
+TEST_F(SemaphoreTest, CancellationDuringScheduledProcessing) {
   auto sem = std::make_shared<Semaphore>(10);
   auto hold = sem->tryAcquire(10);
   ASSERT_TRUE(hold.has_value());
 
-  auto acquireTask = [](SemaphorePtr s) -> Task<absl::Status> {
-    auto res = co_await s->acquire(5);
-    co_return absl::OkStatus();
-  };
-
-  DetachedHandle h1 = launch(acquireTask(sem), executor_, [](absl::Status) {});
-  DetachedHandle h2 = launch(acquireTask(sem), executor_, [](absl::Status) {});
-
-  drain(); // Waiters queued
-
-  // Cancel both waiters
-  h1.cancel();
-  h2.cancel();
-
-  // Releasing hold will trigger scheduleProcessWaiters which pops cancelled waiters and sees empty
-  hold->release();
-  drain();
-  EXPECT_EQ(sem->currentPermits(), 0);
-}
-
-TEST_F(SemaphoreTest, TrailingCancelledWaiterDuringProcessWaiters) {
-  auto sem = std::make_shared<Semaphore>(10);
-  auto hold = sem->tryAcquire(10);
-  ASSERT_TRUE(hold.has_value());
-
-  auto acquireTask = [](SemaphorePtr s, SemaphoreReservation* out_res) -> Task<absl::Status> {
-    ASSIGN_OR_CO_RETURN(*out_res, co_await s->acquire(5));
-    co_return absl::OkStatus();
-  };
-  auto dummyTask = [](SemaphorePtr s) -> Task<absl::Status> {
-    auto res = co_await s->acquire(5);
+  auto acquireTask = [](SemaphorePtr s,
+                        SemaphoreReservation* out_res = nullptr) -> Task<absl::Status> {
+    ASSIGN_OR_CO_RETURN(auto res, co_await s->acquire(5));
+    if (out_res != nullptr) {
+      *out_res = std::move(res);
+    }
     co_return absl::OkStatus();
   };
 
   SemaphoreReservation w1_res;
   launchTaskOk(acquireTask(sem, &w1_res));
+  DetachedHandle h2 = launch(acquireTask(sem), executor_, [](absl::Status) {});
+  DetachedHandle h3 = launch(acquireTask(sem), executor_, [](absl::Status) {});
+  drain(); // 3 waiters queued
 
-  DetachedHandle h2 = launch(dummyTask(sem), executor_, [](absl::Status) {});
-
-  drain(); // w1 and w2 queued
-
-  // Cancel w2 (trailing waiter)
+  // Cancel trailing waiters h2 and h3
   h2.cancel();
+  h3.cancel();
 
-  // Release hold: processWaiters will satisfy w1 in iteration 1, then pop cancelled w2 and
-  // break on empty
+  // Release hold: processWaiters satisfies w1 and prunes cancelled waiters h2 and h3
   hold->release();
   drain();
   EXPECT_TRUE(w1_res.hasPermits());

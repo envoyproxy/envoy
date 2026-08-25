@@ -977,25 +977,35 @@ TEST_F(AsyncQueueTest, PushAccessorSuspendedPushDoesNotPreventCoreDestruction) {
   EXPECT_THAT(push_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
 }
 
-TEST_F(AsyncQueueTest, PushAccessorTryPushDirectHandoffConsumerDestroysQueue) {
-  auto queue = std::make_unique<AsyncQueue<int>>(10);
-  auto pusher = queue->pushAccessor();
-
-  auto consumer_task = [](std::unique_ptr<AsyncQueue<int>>& q) -> Task<absl::Status> {
+TEST_F(AsyncQueueTest, DirectHandoffConsumerDestroysQueue) {
+  auto consumer_task = [](std::unique_ptr<AsyncQueue<int>>& q, int expected) -> Task<absl::Status> {
     auto res = co_await q->pop();
     EXPECT_TRUE(res.ok());
-    EXPECT_EQ(*res.value(), 42);
+    EXPECT_EQ(*res.value(), expected);
     // Destroy the owner queue inside the callback
     q.reset();
     co_return absl::OkStatus();
   };
-  launchTaskOk(consumer_task(queue));
 
-  drain();
-  // tryPush triggers direct handoff to waiting consumer which destroys queue
-  EXPECT_TRUE(pusher.tryPush(42));
-  EXPECT_EQ(queue, nullptr);
-  EXPECT_TRUE(pusher.closed());
+  // Case 1: PushAccessor::tryPush triggers direct handoff and consumer destroys queue
+  {
+    auto queue = std::make_unique<AsyncQueue<int>>(10);
+    auto pusher = queue->pushAccessor();
+    launchTaskOk(consumer_task(queue, 42));
+    drain();
+    EXPECT_TRUE(pusher.tryPush(42));
+    EXPECT_EQ(queue, nullptr);
+    EXPECT_TRUE(pusher.closed());
+  }
+
+  // Case 2: AsyncQueue::tryPush triggers direct handoff and consumer destroys queue
+  {
+    auto queue = std::make_unique<AsyncQueue<int>>(10);
+    launchTaskOk(consumer_task(queue, 99));
+    drain();
+    EXPECT_TRUE(queue->tryPush(99));
+    EXPECT_EQ(queue, nullptr);
+  }
 }
 
 TEST_F(AsyncQueueTest, MultiplePushersSinglePopper) {
@@ -1130,25 +1140,6 @@ TEST_F(AsyncQueueTest, TryPushFailurePreservesCallerItem) {
   ASSERT_TRUE(popped.has_value());
   ASSERT_NE(*popped, nullptr);
   EXPECT_EQ(**popped, 123);
-}
-
-TEST_F(AsyncQueueTest, QueueDestroyedDuringDirectHandoffDoesNotUAF) {
-  auto queue = std::make_unique<AsyncQueue<int>>(10);
-
-  auto consumer_task = [](std::unique_ptr<AsyncQueue<int>>& q) -> Task<absl::Status> {
-    auto res = co_await q->pop();
-    EXPECT_TRUE(res.ok());
-    EXPECT_EQ(*res.value(), 42);
-    // Destroy the queue synchronously inside the consumer callback
-    q.reset();
-    co_return absl::OkStatus();
-  };
-  launchTaskOk(consumer_task(queue));
-
-  drain();
-  // tryPush triggers direct handoff to waiting consumer which destroys queue
-  EXPECT_TRUE(queue->tryPush(42));
-  EXPECT_EQ(queue, nullptr);
 }
 
 TEST_F(AsyncQueueTest, QueueDestroyedWithStolenItemAndPendingPusher) {
