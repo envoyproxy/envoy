@@ -88,11 +88,9 @@ private:
       ASSERT(pop_waiters_.empty(),
              "under single consumer assumption, popper cannot be waiting upon destruction");
       if (in_handoff_ > 0) {
-        // If the queue is destroyed synchronously inside tryHandoff() (e.g. by a resumed
-        // popper), there must be zero pending pushers because tryHandoff() only executes when the
-        // queue was completely empty with no pushers awaiting capacity.
-        ASSERT(pending_pushers_ == 0,
-               "no pending pushers can exist when queue is destroyed during direct handoff");
+        ASSERT(queue_.empty() && pending_pushers_ == 0,
+               "no queued items or pending pushers can exist when queue is destroyed during "
+               "direct handoff");
       }
       *alive_ = false;
       close();
@@ -117,24 +115,9 @@ private:
 
     bool closed() const { return closed_; }
 
-    bool empty() const {
-      for (const auto& entry : queue_) {
-        if (entry->item.has_value() && entry->reservation.has_value()) {
-          return false;
-        }
-      }
-      return true;
-    }
+    bool empty() const { return queue_.empty(); }
 
-    uint64_t itemCount() const {
-      uint64_t count = 0;
-      for (const auto& entry : queue_) {
-        if (entry->item.has_value() && entry->reservation.has_value()) {
-          ++count;
-        }
-      }
-      return count;
-    }
+    uint64_t itemCount() const { return queue_.size(); }
 
     uint64_t currentSize() const { return current_size_; }
     std::optional<uint64_t> maxSize() const { return capacity_->maxPermits(); }
@@ -151,11 +134,12 @@ private:
 
         auto cb = std::move(waiter->cb);
         if (cb) {
-          // Track active direct handoff operations with an integer counter so that nested reentrant
-          // handoff operations (e.g. in multi-consumer cascades) properly nest and decrement.
+          auto alive = alive_;
           ++in_handoff_;
-          cb(std::optional<T>(std::forward<U>(item)));
-          --in_handoff_;
+          cb(std::optional<T>(std::move(item)));
+          if (*alive) {
+            --in_handoff_;
+          }
         }
         return true;
       }
@@ -172,8 +156,9 @@ private:
         co_return absl::OkStatus();
       }
 
-      // 2. Put item in queue_ as a pending entry.
+      // 2. Put item in queue_ as a pending entry and account for its size.
       const uint64_t size = size_func_(item);
+      current_size_ += size;
       auto queued_item = std::make_shared<QueuedItem>(std::move(item));
       auto it = queue_.insert(queue_.end(), queued_item);
 
@@ -197,15 +182,17 @@ private:
 
       if (!cap_res.ok() || closed_) {
         queue_.erase(it);
-        queued_item->item.reset();
+        if (queued_item->item.has_value()) {
+          current_size_ -= size;
+          queued_item->item.reset();
+        }
         if (!cap_res.ok()) {
           co_return cap_res.status();
         }
         co_return absl::FailedPreconditionError("queue is closed");
       }
 
-      // No pop() arrived while waiting: attach the acquired reservation.
-      current_size_ += size;
+      // Attach the acquired reservation.
       queued_item->reservation = std::move(cap_res.value());
       co_return absl::OkStatus();
     }
@@ -233,26 +220,18 @@ private:
     }
 
     std::optional<T> tryPop() {
-      while (!queue_.empty()) {
-        auto queued_item = std::move(queue_.front());
-        queue_.pop_front();
-
-        if (!queued_item->item.has_value()) {
-          // Item was cancelled or already stolen, skip.
-          continue;
-        }
-
-        auto item = std::move(*queued_item->item);
-        queued_item->item.reset();
-
-        if (queued_item->reservation.has_value()) {
-          current_size_ -= queued_item->reservation->permits();
-          queued_item->reservation.reset();
-        }
-
-        return std::optional<T>(std::move(item));
+      if (queue_.empty()) {
+        return std::nullopt;
       }
-      return std::nullopt;
+      auto queued_item = std::move(queue_.front());
+      queue_.pop_front();
+
+      auto item = std::move(*queued_item->item);
+      queued_item->item.reset();
+      current_size_ -= size_func_(item);
+      queued_item->reservation.reset();
+
+      return std::optional<T>(std::move(item));
     }
 
     CapacityPtr capacity_;
@@ -321,7 +300,9 @@ public:
       if (!core || core->closed()) {
         co_return absl::FailedPreconditionError("queue is closed");
       }
-      co_return co_await core->push(std::move(item));
+      auto push_task = core->push(std::move(item));
+      core.reset();
+      co_return co_await std::move(push_task);
     }
 
     template <typename U = T> bool tryPush(U&& item) {
@@ -329,7 +310,9 @@ public:
       if (!core || core->closed()) {
         return false;
       }
-      return core->tryPush(std::forward<U>(item));
+      Core* core_ptr = core.get();
+      core.reset();
+      return core_ptr->tryPush(std::forward<U>(item));
     }
 
     void close() {

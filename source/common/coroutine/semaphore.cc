@@ -87,9 +87,7 @@ Semaphore::~Semaphore() {
 }
 
 bool Semaphore::hasPermits(uint64_t additional_permits) const {
-  if (!max_permits_.has_value()) {
-    return true;
-  }
+  ASSERT(max_permits_.has_value());
   if (current_permits_ > *max_permits_) {
     return false;
   }
@@ -133,11 +131,7 @@ void Semaphore::release(uint64_t permits) {
     return;
   }
   ASSERT(current_permits_ >= permits);
-  if (current_permits_ < permits) {
-    current_permits_ = 0;
-  } else {
-    current_permits_ -= permits;
-  }
+  current_permits_ -= permits;
   scheduleProcessWaiters();
 }
 
@@ -174,9 +168,7 @@ void Semaphore::scheduleProcessWaiters() {
       break;
     }
   }
-  if (!exec) {
-    return;
-  }
+  ASSERT(exec != nullptr);
 
   process_handle_ = launch(
       runScheduledProcessWaiters(weak_from_this(), alive_), std::move(exec), [](absl::Status) {},

@@ -176,8 +176,8 @@ TEST_F(AsyncQueueTest, BoundedQueueBlocksPusherWhenFull) {
   launchTaskOk(push_task());
   drain();
 
-  // Pushes 1 and 2 completed; 3 is waiting in push_waiters_
-  EXPECT_EQ(queue.itemCount(), 2);
+  // Pushes 1 and 2 completed; 3 is waiting in queue_ pending capacity
+  EXPECT_EQ(queue.itemCount(), 3);
   EXPECT_EQ(pushed.size(), 3);
 
   // Pop one item, which frees space and unblocks push of 3
@@ -186,8 +186,9 @@ TEST_F(AsyncQueueTest, BoundedQueueBlocksPusherWhenFull) {
   drain();
   EXPECT_EQ(pop1, 1);
 
-  // Now push of 3 has completed, and push of 4 suspended because queue is back to capacity (2,3)
-  EXPECT_EQ(queue.itemCount(), 2);
+  // Now push of 3 has completed, and push of 4 suspended in queue_ (items: 2, 3 committed + 4
+  // pending)
+  EXPECT_EQ(queue.itemCount(), 3);
   EXPECT_EQ(pushed.size(), 4);
 
   // Pop remaining items
@@ -209,13 +210,15 @@ TEST_F(AsyncQueueTest, AbstractCapacityUnitBytes) {
 
   // 60 bytes
   launchPush(queue, TestByteItem{std::string(60, 'a')}, &push1_done);
-  // 50 bytes -> 60 + 50 = 110 > 100 bytes, suspends!
+  // 50 bytes -> 60 + 50 = 110 > 100 bytes, suspends in queue_
   launchPush(queue, TestByteItem{std::string(50, 'b')}, &push2_done);
   drain();
 
   EXPECT_TRUE(push1_done);
   EXPECT_FALSE(push2_done);
-  EXPECT_EQ(queue.currentSize(), 60);
+  // Both items (60 committed + 50 pending) are in queue_ and accounted in currentSize and itemCount
+  EXPECT_EQ(queue.currentSize(), 110);
+  EXPECT_EQ(queue.itemCount(), 2);
 
   // Pop first item (60 bytes)
   std::optional<TestByteItem> popped;
@@ -940,6 +943,60 @@ TEST_F(AsyncQueueTest, PushAccessorDestructionSafety) {
   EXPECT_THAT(push_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
 }
 
+TEST_F(AsyncQueueTest, PushAccessorSuspendedPushDoesNotPreventCoreDestruction) {
+  auto cap = std::make_shared<Capacity>(1);
+  auto queue = std::make_unique<AsyncQueue<int>>(cap);
+  auto pusher = queue->pushAccessor();
+
+  // Hold capacity
+  auto hold = cap->tryAcquire(1);
+  ASSERT_TRUE(hold.has_value());
+
+  absl::Status push_status;
+  auto push_task = [&pusher, &push_status]() -> Task<absl::Status> {
+    push_status = co_await pusher.push(42);
+    co_return push_status;
+  };
+  handles_.push_back(launch(push_task(), executor_, [](absl::Status) {}));
+  drain();
+
+  // Pusher is suspended waiting for capacity
+  EXPECT_FALSE(pusher.closed());
+
+  // Destroy the owner queue while pusher is suspended on capacity
+  queue.reset();
+
+  // The underlying Core must be immediately destroyed (weak_ptr expired)
+  EXPECT_TRUE(pusher.closed());
+
+  // Release capacity so pusher can resume
+  hold->release();
+  drain();
+
+  // Pusher wakes up, observes Core is destroyed, and returns FailedPreconditionError
+  EXPECT_THAT(push_status, HasStatusCode(absl::StatusCode::kFailedPrecondition));
+}
+
+TEST_F(AsyncQueueTest, PushAccessorTryPushDirectHandoffConsumerDestroysQueue) {
+  auto queue = std::make_unique<AsyncQueue<int>>(10);
+  auto pusher = queue->pushAccessor();
+
+  launchTaskOk([&]() -> Task<absl::Status> {
+    auto res = co_await queue->pop();
+    EXPECT_TRUE(res.ok());
+    EXPECT_EQ(*res.value(), 42);
+    // Destroy the owner queue inside the callback
+    queue.reset();
+    co_return absl::OkStatus();
+  }());
+
+  drain();
+  // tryPush triggers direct handoff to waiting consumer which destroys queue
+  EXPECT_TRUE(pusher.tryPush(42));
+  EXPECT_EQ(queue, nullptr);
+  EXPECT_TRUE(pusher.closed());
+}
+
 TEST_F(AsyncQueueTest, MultiplePushersSinglePopper) {
   // Multiple producers, one consumer (the owner queue)
   AsyncQueue<std::string> queue(10);
@@ -1005,7 +1062,7 @@ TEST_F(AsyncQueueTest, DirectResumptionSynchronousExecution) {
 TEST_F(AsyncQueueTest, PushPopRendezvousWhenBlockedOnCapacity) {
   // Shared capacity limit = 1 item
   auto shared_cap = std::make_shared<Capacity>(1);
-  AsyncQueue<std::string> queue(shared_cap);
+  AsyncQueue<std::unique_ptr<int>> queue(shared_cap);
 
   // Fill capacity directly
   auto init_res = shared_cap->tryAcquire(1);
@@ -1014,18 +1071,25 @@ TEST_F(AsyncQueueTest, PushPopRendezvousWhenBlockedOnCapacity) {
 
   // Push into queue: capacity is full, so pusher suspends
   bool push_done = false;
-  launchPush(queue, "rendezvous_item", &push_done);
+  launchPush(queue, std::make_unique<int>(99), &push_done);
   drain();
   EXPECT_FALSE(push_done);
-  EXPECT_EQ(queue.itemCount(), 0); // Not yet committed with capacity
+  EXPECT_EQ(queue.itemCount(), 1);
+  EXPECT_EQ(queue.currentSize(), 1);
+  EXPECT_FALSE(queue.empty());
 
   // Pop arrives while pusher is blocked on capacity:
   // pop() steals the item directly via rendezvous!
-  std::optional<std::string> popped;
+  std::optional<std::unique_ptr<int>> popped;
   launchPop(queue, popped);
   drain();
 
-  EXPECT_EQ(popped, "rendezvous_item");
+  ASSERT_TRUE(popped.has_value());
+  ASSERT_NE(*popped, nullptr);
+  EXPECT_EQ(**popped, 99);
+  EXPECT_EQ(queue.itemCount(), 0);
+  EXPECT_EQ(queue.currentSize(), 0);
+  EXPECT_TRUE(queue.empty());
 
   // Releasing capacity unblocks the suspended pusher, which observes the item was
   // already delivered and completes cleanly with OkStatus without re-buffering.
@@ -1065,6 +1129,59 @@ TEST_F(AsyncQueueTest, TryPushFailurePreservesCallerItem) {
   ASSERT_TRUE(popped.has_value());
   ASSERT_NE(*popped, nullptr);
   EXPECT_EQ(**popped, 123);
+}
+
+TEST_F(AsyncQueueTest, QueueDestroyedDuringDirectHandoffDoesNotUAF) {
+  auto queue = std::make_unique<AsyncQueue<int>>(10);
+
+  launchTaskOk([&]() -> Task<absl::Status> {
+    auto res = co_await queue->pop();
+    EXPECT_TRUE(res.ok());
+    EXPECT_EQ(*res.value(), 42);
+    // Destroy the queue synchronously inside the consumer callback
+    queue.reset();
+    co_return absl::OkStatus();
+  }());
+
+  drain();
+  // tryPush triggers direct handoff to waiting consumer which destroys queue
+  EXPECT_TRUE(queue->tryPush(42));
+  EXPECT_EQ(queue, nullptr);
+}
+
+TEST_F(AsyncQueueTest, QueueDestroyedWithStolenItemAndPendingPusher) {
+  auto cap = std::make_shared<Capacity>(1);
+  auto queue = std::make_unique<AsyncQueue<std::unique_ptr<int>>>(cap);
+
+  auto hold = cap->tryAcquire(1);
+  ASSERT_TRUE(hold.has_value());
+
+  bool push_done = false;
+  handles_.push_back(
+      launch(pushTask(*queue, std::make_unique<int>(42), &push_done), executor_,
+             [](absl::Status status) { EXPECT_TRUE(absl::IsFailedPrecondition(status)); }));
+  drain();
+
+  // Item is in queue_ pending capacity
+  EXPECT_EQ(queue->itemCount(), 1);
+
+  // Consumer steals item via rendezvous
+  std::optional<std::unique_ptr<int>> popped;
+  launchPop(*queue, popped);
+  drain();
+
+  ASSERT_TRUE(popped.has_value());
+  ASSERT_NE(*popped, nullptr);
+  EXPECT_EQ(**popped, 42);
+
+  // Destroy queue while pusher is still suspended on capacity!
+  queue.reset();
+
+  // Now release capacity: pusher wakes up, sees !*alive, and completes cleanly
+  hold->release();
+  drain();
+
+  EXPECT_FALSE(push_done); // Completed with FailedPreconditionError, push_done not set
 }
 
 } // namespace
