@@ -41,7 +41,7 @@ private:
  * Shared read-only half of the header map wrappers.
  *
  * Not a BaseLuaObject itself: each concrete wrapper derives from BaseLuaObject with its own type,
- * because Lua metatables are registered per C++ type (see registerType() and the typeid() key in
+ * because a Lua metatable is registered per C++ type (see registerType() and the typeid() key in
  * DECLARE_LUA_FUNCTION). That is exactly what makes ReadOnlyHeaderMapWrapper read-only -- the
  * mutating methods are absent from its metatable rather than present and refusing.
  */
