@@ -49,6 +49,7 @@ envoy_extension_cc_test(
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/clusters/composite:cluster",
+        "//source/extensions/filters/http/set_metadata:config",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
