@@ -33,9 +33,9 @@ public:
 
   void drain() { executor_->drain(); }
 
-  void launchTaskOk(Task<absl::Status> task) {
+  void launchTaskOk(Task<absl::Status> task, StartMode mode = StartMode::Scheduled) {
     handles_.push_back(
-        launch(std::move(task), executor_, [](absl::Status status) { EXPECT_OK(status); }));
+        launch(std::move(task), executor_, [](absl::Status status) { EXPECT_OK(status); }, mode));
   }
 
   template <typename T, typename SizeFunc, typename U = T>
@@ -90,8 +90,9 @@ public:
   }
 
   template <typename T, typename SizeFunc, typename U = T>
-  void launchPush(AsyncQueue<T, SizeFunc>& queue, U item, bool* done = nullptr) {
-    launchTaskOk(pushTask(queue, std::move(item), done));
+  void launchPush(AsyncQueue<T, SizeFunc>& queue, U item, bool* done = nullptr,
+                  StartMode mode = StartMode::Scheduled) {
+    launchTaskOk(pushTask(queue, std::move(item), done), mode);
   }
 
   template <typename T, typename SizeFunc, typename U = T, typename TrackType>
@@ -1035,6 +1036,82 @@ TEST_F(AsyncQueueTest, PushPopRendezvousWhenBlockedOnCapacity) {
   EXPECT_TRUE(push_done);
   EXPECT_EQ(shared_cap->currentPermits(), 0);
   EXPECT_TRUE(queue.empty());
+}
+
+TEST_F(AsyncQueueTest, TryPushWithExistingItemsPreservesFIFO) {
+  AsyncQueue<int> queue(10);
+
+  // Push items into queue via tryPush
+  EXPECT_TRUE(queue.tryPush(1));
+  EXPECT_EQ(queue.itemCount(), 1);
+  EXPECT_TRUE(queue.tryPush(2));
+  EXPECT_EQ(queue.itemCount(), 2);
+  EXPECT_TRUE(queue.tryPush(3));
+  EXPECT_EQ(queue.itemCount(), 3);
+
+  // Pop all items in order
+  EXPECT_EQ(queue.tryPop(), 1);
+  EXPECT_EQ(queue.tryPop(), 2);
+  EXPECT_EQ(queue.tryPop(), 3);
+  EXPECT_TRUE(queue.empty());
+}
+
+TEST_F(AsyncQueueTest, TryPushFailurePreservesCallerItem) {
+  // Queue with capacity limit of 1, filled by holding capacity
+  AsyncQueue<std::unique_ptr<int>> queue(1);
+  auto hold = queue.capacity()->tryAcquire(1);
+  ASSERT_TRUE(hold.has_value());
+
+  auto item = std::make_unique<int>(123);
+  EXPECT_FALSE(queue.tryPush(std::move(item)));
+  // item must NOT be dropped on the floor
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(*item, 123);
+
+  // Closed queue: tryPush will fail and preserve caller's item
+  AsyncQueue<std::unique_ptr<int>> closed_queue(10);
+  closed_queue.close();
+  EXPECT_FALSE(closed_queue.tryPush(std::move(item)));
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(*item, 123);
+
+  // When capacity is released, tryPush succeeds and moves item
+  hold->release();
+  EXPECT_TRUE(queue.tryPush(std::move(item)));
+  EXPECT_EQ(item, nullptr);
+
+  auto popped = queue.tryPop();
+  ASSERT_TRUE(popped.has_value());
+  ASSERT_NE(*popped, nullptr);
+  EXPECT_EQ(**popped, 123);
+}
+
+TEST_F(AsyncQueueTest, PusherCancelledWhileBlockedOnCapacityCleansUpQueue) {
+  auto shared_cap = std::make_shared<Capacity>(1);
+  AsyncQueue<std::string> queue(shared_cap);
+
+  // Hold capacity
+  auto hold = shared_cap->tryAcquire(1);
+  ASSERT_TRUE(hold.has_value());
+
+  // Launch pusher that blocks on capacity
+  bool push_done = false;
+  DetachedHandle handle = launch(
+      pushTask(queue, std::string("aborted_item"), &push_done), executor_,
+      [](absl::Status status) { EXPECT_TRUE(absl::IsCancelled(status)); }, StartMode::Inline);
+
+  EXPECT_FALSE(push_done);
+  EXPECT_EQ(queue.itemCount(), 0);
+
+  // Cancel the pusher!
+  handle.cancel();
+  EXPECT_FALSE(push_done);
+
+  // Queue must be completely empty with no dangling items or corrupted current_size
+  EXPECT_TRUE(queue.empty());
+  EXPECT_EQ(queue.currentSize(), 0);
+  EXPECT_EQ(queue.itemCount(), 0);
+  EXPECT_FALSE(queue.tryPop().has_value());
 }
 
 } // namespace
