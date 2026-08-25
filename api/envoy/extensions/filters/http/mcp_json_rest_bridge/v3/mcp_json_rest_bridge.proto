@@ -225,7 +225,7 @@ message ToolsListSpecificConfig {
   string title = 1;
 
   // Human-readable description of functionality.
-  string description = 2 [(validate.rules).string = {min_len: 1}];
+  string description = 2;
 
   // A JSON Schema describing expected parameters, as a serialized JSON string, in the JSON Schema
   // 2020-12 dialect. This should be raw JSON, including the "properties" and "required" keys, but

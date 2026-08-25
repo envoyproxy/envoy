@@ -94,6 +94,8 @@ message HeaderToProxyFilterConfig {
 }
 message ModifyBufferFilterConfig {
 }
+message AddDataAndContinueFilterConfig {
+}
 message ProcessContextFilterConfig {
 }
 message RuntimeFeatureTestFilterConfig {

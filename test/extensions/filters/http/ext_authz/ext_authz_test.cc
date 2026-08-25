@@ -49,6 +49,11 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+using testing::Contains;
+using testing::Key;
+using testing::Pair;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -2366,10 +2371,10 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingWithContextExtensions) {
 
   // Verify merged context extensions
   const auto& merged_extensions = merged_config.contextExtensions();
-  EXPECT_EQ(merged_extensions.size(), 3);
-  EXPECT_EQ(merged_extensions.at("base_key"), "base_value");
-  EXPECT_EQ(merged_extensions.at("specific_key"), "specific_value");
-  EXPECT_EQ(merged_extensions.at("shared_key"), "specific_shared_value"); // More specific wins
+  EXPECT_THAT(
+      merged_extensions,
+      UnorderedElementsAre(Pair("base_key", "base_value"), Pair("specific_key", "specific_value"),
+                           Pair("shared_key", "specific_shared_value"))); // More specific wins
 }
 
 // Test per-route configuration merging with gRPC service override
@@ -2404,9 +2409,8 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingWithGrpcServiceOverride)
 
   // Verify context extensions are merged
   const auto& merged_extensions = merged_config.contextExtensions();
-  EXPECT_EQ(merged_extensions.size(), 2);
-  EXPECT_EQ(merged_extensions.at("base_key"), "base_value");
-  EXPECT_EQ(merged_extensions.at("specific_key"), "specific_value");
+  EXPECT_THAT(merged_extensions, UnorderedElementsAre(Pair("base_key", "base_value"),
+                                                      Pair("specific_key", "specific_value")));
 }
 
 // Test per-route configuration merging with request body settings
@@ -2510,11 +2514,10 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingMultipleLevels) {
 
   // Verify final merged context extensions
   const auto& merged_extensions = final_merged.contextExtensions();
-  EXPECT_EQ(merged_extensions.size(), 4);
-  EXPECT_EQ(merged_extensions.at("vh_key"), "vh_value");
-  EXPECT_EQ(merged_extensions.at("route_key"), "route_value");
-  EXPECT_EQ(merged_extensions.at("wc_key"), "wc_value");
-  EXPECT_EQ(merged_extensions.at("shared_key"), "wc_shared_value"); // Most specific wins
+  EXPECT_THAT(merged_extensions,
+              UnorderedElementsAre(Pair("vh_key", "vh_value"), Pair("route_key", "route_value"),
+                                   Pair("wc_key", "wc_value"),
+                                   Pair("shared_key", "wc_shared_value"))); // Most specific wins
 
   // Verify gRPC service override is NOT inherited from less specific levels.
   EXPECT_FALSE(final_merged.grpcService().has_value());
@@ -2547,11 +2550,11 @@ TEST_P(HttpFilterTestParam, PerRouteContextExtensionsPrecedence) {
 
   // Verify context extensions are properly merged.
   const auto& merged_extensions = merged_config.contextExtensions();
-  EXPECT_EQ(merged_extensions.size(), 3);
-  EXPECT_EQ(merged_extensions.at("check_key"), "check_value");
-  EXPECT_EQ(merged_extensions.at("specific_check_key"), "specific_check_value");
-  EXPECT_EQ(merged_extensions.at("shared_key"),
-            "specific_check_shared_value"); // More specific wins
+  EXPECT_THAT(merged_extensions,
+              UnorderedElementsAre(
+                  Pair("check_key", "check_value"),
+                  Pair("specific_check_key", "specific_check_value"),
+                  Pair("shared_key", "specific_check_shared_value"))); // More specific wins
 }
 
 // Test per-route Google gRPC service configuration.
@@ -2616,7 +2619,7 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingWithEmptyConfigurations)
 
   // Verify merged configuration has empty context extensions.
   const auto& merged_extensions = merged_config.contextExtensions();
-  EXPECT_EQ(merged_extensions.size(), 0);
+  EXPECT_THAT(merged_extensions, UnorderedElementsAre());
 
   // Verify no gRPC service override
   EXPECT_FALSE(merged_config.grpcService().has_value());
@@ -2652,7 +2655,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcServiceMergingWithBaseConfiguration) {
 
   // Verify that context extensions are properly merged.
   const auto& merged_settings = merged_config.checkSettings();
-  EXPECT_TRUE(merged_settings.context_extensions().contains("route"));
+  EXPECT_THAT(merged_settings.context_extensions(), Contains(Key("route")));
   EXPECT_EQ(merged_settings.context_extensions().at("route"), "override");
 }
 

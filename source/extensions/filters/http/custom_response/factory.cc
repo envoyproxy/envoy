@@ -18,13 +18,6 @@ absl::StatusOr<::Envoy::Http::FilterFactoryCb> CustomResponseFilterFactory::crea
 }
 
 absl::StatusOr<::Envoy::Http::FilterFactoryCb>
-CustomResponseFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
-    const std::string& stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(config, stats_prefix, context.serverFactoryContext());
-}
-
-absl::StatusOr<::Envoy::Http::FilterFactoryCb>
 CustomResponseFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
     Envoy::Server::Configuration::ServerFactoryContext& context,

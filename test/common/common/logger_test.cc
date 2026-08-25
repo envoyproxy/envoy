@@ -250,7 +250,7 @@ TEST_P(LoggerCustomFlagsTest, LogMessageWithEnvoyVersion) {
   // and follow the slash-separated format produced by envoyVersionString().
   const std::string& version = envoyVersionString();
   EXPECT_FALSE(version.empty());
-  EXPECT_NE(version.find('/'), std::string::npos);
+  EXPECT_THAT(version, HasSubstr("/"));
 
   // %N emits the Envoy version string from envoyVersionString().
   expectLogMessage("%N %v", "hello", absl::StrCat(version, " hello"));

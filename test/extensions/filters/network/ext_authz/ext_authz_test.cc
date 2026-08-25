@@ -30,6 +30,9 @@ using testing::NiceMock;
 using testing::ReturnRef;
 using testing::WithArgs;
 
+using testing::Contains;
+using testing::Key;
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -430,8 +433,8 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
                                            const Protobuf::Struct& returned_dynamic_metadata) {
-        EXPECT_TRUE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));
-        EXPECT_TRUE(dynamic_metadata.fields().contains("ext_authz_duration"));
+        EXPECT_THAT(returned_dynamic_metadata.fields(), Contains(Key("ext_authz_duration")));
+        EXPECT_THAT(dynamic_metadata.fields(), Contains(Key("ext_authz_duration")));
         EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
 
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, dynamic_metadata));

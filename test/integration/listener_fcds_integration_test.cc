@@ -226,6 +226,7 @@ public:
     filter_chain.set_name(name);
     auto* filter = filter_chain.add_filters();
     filter->set_name("envoy.filters.network.does_not_exist");
+    filter->mutable_typed_config()->set_type_url("type.googleapis.com/does_not_exist");
     return filter_chain;
   }
 

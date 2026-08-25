@@ -1028,6 +1028,13 @@ public:
     CONSTRUCT_ON_FIRST_USE(ClusterTypedMetadata, DefaultMetadata::get());
   }
 
+  OptRef<const PendingRqQueuePolicy> pendingRqQueuePolicy() const override {
+    if (pending_rq_queue_policy_ == nullptr) {
+      return std::nullopt;
+    }
+    return *pending_rq_queue_policy_;
+  }
+
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
   bool connectionPoolPerDownstreamConnection() const override {
     return connection_pool_per_downstream_connection_;
@@ -1162,6 +1169,7 @@ private:
   const std::unique_ptr<const envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   const std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
   const std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
+  std::unique_ptr<const PendingRqQueuePolicy> pending_rq_queue_policy_;
   LoadBalancerConfigPtr load_balancer_config_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>

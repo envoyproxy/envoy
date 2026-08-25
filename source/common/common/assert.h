@@ -2,6 +2,8 @@
 
 #include <functional>
 
+#include "envoy/common/logger.h"
+
 #include "source/common/common/logger.h"
 
 #include "absl/debugging/stacktrace.h"

@@ -263,3 +263,37 @@ index ff2dcae..7cf8b3f 100644
      tags = ["manual"],
  )
  
+diff --git a/src/proto/grpc/gcp/BUILD b/src/proto/grpc/gcp/BUILD
+index 7e432b6..f704d5f 100644
+--- a/src/proto/grpc/gcp/BUILD
++++ b/src/proto/grpc/gcp/BUILD
+@@ -12,7 +12,9 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
++load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+ load("//bazel:grpc_build_system.bzl", "grpc_internal_proto_library")
++load("//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+ 
+ # TODO(rishesh): Enable parse_headers when internal build system limitations are resolved.
+ package(features = [
+@@ -31,3 +33,19 @@
+     ],
+     visibility = ["//visibility:public"],
+ )
++
++cc_proto_library(
++    name = "alts_handshaker_cc_proto",
++    deps = [":alts_handshaker_proto"],
++)
++
++cc_grpc_library(
++    name = "alts_handshaker_cc_grpc",
++    srcs = [":alts_handshaker_proto"],
++    deps = [
++        ":alts_handshaker_cc_proto",
++        "//:grpc++_public_hdrs",
++    ],
++    grpc_only = True,
++    visibility = ["//visibility:public"],
++)

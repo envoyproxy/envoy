@@ -368,6 +368,7 @@ Current supported substitution commands include:
       ClientHello was received.
     * ``DS_HS_END``: The time point of the downstream TLS handshake end.
     * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
+    * ``DS_RX_HDR_END``: The time point of the downstream request header receiving end.
     * ``DS_RX_END``: The time point of the downstream request receiving end.
     * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
     * ``US_CX_END``: The time point of the upstream TCP connect end.

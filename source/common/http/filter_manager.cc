@@ -212,9 +212,9 @@ void ActiveStreamFilterBase::commonHandleBufferData(Buffer::Instance& provided_d
   }
 }
 
-bool ActiveStreamFilterBase::commonHandleAfterDataCallback(FilterDataStatus status,
-                                                           Buffer::Instance& provided_data,
-                                                           bool& buffer_was_streaming) {
+bool ActiveStreamFilterBase::commonHandleAfterDataCallback(
+    FilterDataStatus status, Buffer::Instance& provided_data, bool& buffer_was_streaming,
+    bool provided_data_nonempty_before_callback) {
 
   if (status == FilterDataStatus::Continue) {
     if (iteration_state_ == IterationState::StopSingleIteration) {
@@ -223,6 +223,24 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(FilterDataStatus stat
       return false;
     } else {
       ASSERT(headers_continued_);
+      // A filter that is already iterating may drain the current frame into the filter-manager
+      // buffer via addDecoded/EncodedData() and then return Continue (e.g. a wasm filter resuming
+      // after buffering a body chunk while paused on headers). The signature of that drain is: the
+      // filter called addData during this callback (`filter_added_data_in_data_callback_`) and the
+      // frame went from non-empty to empty because its content was moved into bufferedData(). In
+      // that case forward the buffered frame down the chain so it is not silently lost. The
+      // non-empty-before + empty-after + flag checks keep this narrow: filters that add a
+      // *separate* buffer (e.g. the StopAll test filter, including on a zero-length end_stream
+      // frame) or that empty the frame without calling addData (e.g. a compressor buffering
+      // internally) do not match and are handled by the existing path. See
+      // https://github.com/envoyproxy/envoy/issues/46841.
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.filter_manager_forward_added_data_on_continue") &&
+          parent_.state_.filter_added_data_in_data_callback_ &&
+          provided_data_nonempty_before_callback && provided_data.length() == 0 && bufferedData() &&
+          bufferedData().get() != &provided_data && bufferedData()->length() > 0) {
+        provided_data.move(*bufferedData());
+      }
     }
   } else {
     iteration_state_ = IterationState::StopSingleIteration;
@@ -766,6 +784,8 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     recordLatestDataFilter(entry, state_.latest_data_decoding_filter_, decoder_filters_);
 
     state_.filter_call_state_ |= FilterCallState::DecodeData;
+    state_.filter_added_data_in_data_callback_ = false;
+    const bool data_nonempty_before_callback = data.length() > 0;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.requestTrailers();
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
@@ -800,7 +820,8 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     // below.
     terminal_filter_decoded_end_stream = end_stream && std::next(entry) == decoder_filters_.end();
 
-    if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_) &&
+    if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_,
+                                                 data_nonempty_before_callback) &&
         std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
@@ -837,6 +858,11 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
       ((state_.filter_call_state_ & FilterCallState::DecodeTrailers) && !filter.canIterate())) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.decoder_filters_streaming_ = streaming;
+    // Record that a filter drained data into the buffer during its own decodeData() callback so
+    // commonHandleAfterDataCallback() can forward it if the current frame was emptied. See #46841.
+    if (state_.filter_call_state_ & FilterCallState::DecodeData) {
+      state_.filter_added_data_in_data_callback_ = true;
+    }
     // If no call is happening or we are in the decode headers/data callback, buffer the data.
     // Inline processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
@@ -1506,6 +1532,11 @@ void FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::In
       ((state_.filter_call_state_ & FilterCallState::EncodeTrailers) && !filter.canIterate())) {
     // Make sure if this triggers watermarks, the correct action is taken.
     state_.encoder_filters_streaming_ = streaming;
+    // Record that a filter drained data into the buffer during its own encodeData() callback so
+    // commonHandleAfterDataCallback() can forward it if the current frame was emptied. See #46841.
+    if (state_.filter_call_state_ & FilterCallState::EncodeData) {
+      state_.filter_added_data_in_data_callback_ = true;
+    }
     // If no call is happening or we are in the decode headers/data callback, buffer the data.
     // Inline processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
@@ -1554,6 +1585,8 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
     recordLatestDataFilter(entry, state_.latest_data_encoding_filter_, encoder_filters_);
 
+    state_.filter_added_data_in_data_callback_ = false;
+    const bool data_nonempty_before_callback = data.length() > 0;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.responseTrailers();
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
     if (state_.encoder_filter_chain_aborted_) {
@@ -1576,7 +1609,8 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
       trailers_added_entry = entry;
     }
 
-    if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.encoder_filters_streaming_)) {
+    if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.encoder_filters_streaming_,
+                                                 data_nonempty_before_callback)) {
       return;
     }
   }

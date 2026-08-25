@@ -160,6 +160,12 @@ public:
     span_.set_parent_span_id(absl::HexStringToBytes(parent_span_id_hex));
   }
 
+  /**
+   * Records whether the span's parent context was propagated from a remote parent. Used to
+   * populate the is_remote bits of the exported span's flags field.
+   */
+  void setParentContextIsRemote(bool is_remote) { parent_context_is_remote_ = is_remote; }
+
   absl::string_view tracestate() const { return span_.trace_state(); }
 
   /**
@@ -186,6 +192,7 @@ private:
   Envoy::TimeSource& time_source_;
   bool sampled_;
   bool use_local_decision_{false};
+  bool parent_context_is_remote_{false};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

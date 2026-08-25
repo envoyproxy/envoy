@@ -12,6 +12,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -691,12 +695,11 @@ TEST_F(NetworkExtProcFilterTest, UntypedMetadataForwarding) {
 
             // Verify it has the test-namespace but not other-namespace
             const auto& metadata = request.metadata().filter_metadata();
-            EXPECT_TRUE(metadata.contains("test-namespace"));
-            EXPECT_FALSE(metadata.contains("other-namespace"));
+            EXPECT_THAT(metadata, UnorderedElementsAre(Key("test-namespace")));
 
             // Verify the key-value pairs within test-namespace
             const auto& test_ns = metadata.at("test-namespace");
-            EXPECT_TRUE(test_ns.fields().contains("key1"));
+            EXPECT_THAT(test_ns.fields(), Contains(Key("key1")));
             EXPECT_EQ(test_ns.fields().at("key1").string_value(), "value1");
           }));
 
@@ -745,8 +748,7 @@ TEST_F(NetworkExtProcFilterTest, TypedMetadataForwarding) {
 
             // Verify it has the typed-namespace but not other-namespace
             const auto& typed_metadata = request.metadata().typed_filter_metadata();
-            EXPECT_TRUE(typed_metadata.contains("typed-namespace"));
-            EXPECT_FALSE(typed_metadata.contains("other-namespace"));
+            EXPECT_THAT(typed_metadata, UnorderedElementsAre(Key("typed-namespace")));
 
             // Verify the typed value matches what we set
             const auto& actual_typed_value = typed_metadata.at("typed-namespace");
@@ -794,14 +796,14 @@ TEST_F(NetworkExtProcFilterTest, BothTypedAndUntypedMetadataForwarding) {
 
             // Verify untyped metadata
             const auto& filter_metadata = request.metadata().filter_metadata();
-            EXPECT_TRUE(filter_metadata.contains("untyped-ns"));
+            EXPECT_THAT(filter_metadata, Contains(Key("untyped-ns")));
             const auto& untyped_ns = filter_metadata.at("untyped-ns");
-            EXPECT_TRUE(untyped_ns.fields().contains("key1"));
+            EXPECT_THAT(untyped_ns.fields(), Contains(Key("key1")));
             EXPECT_EQ(untyped_ns.fields().at("key1").string_value(), "value1");
 
             // Verify typed metadata
             const auto& typed_metadata = request.metadata().typed_filter_metadata();
-            EXPECT_TRUE(typed_metadata.contains("typed-ns"));
+            EXPECT_THAT(typed_metadata, Contains(Key("typed-ns")));
             const auto& actual_typed_value = typed_metadata.at("typed-ns");
             EXPECT_EQ(actual_typed_value.type_url(), typed_value.type_url());
             EXPECT_EQ(actual_typed_value.value(), typed_value.value());

@@ -156,7 +156,7 @@ Http::FilterHeadersStatus ApiKeyAuthFilter::decodeHeaders(Http::RequestHeaderMap
 
   const auto credential = credentials->find(key_result);
   if (credential == credentials->end()) {
-    return onDenied(Http::Code::Unauthorized, "Client authentication failed.", "unkonwn_api_key");
+    return onDenied(Http::Code::Unauthorized, "Client authentication failed.", "unknown_api_key");
   }
 
   // If route config is not null then check if the client is allowed or not based on the route
