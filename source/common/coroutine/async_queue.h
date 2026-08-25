@@ -52,7 +52,7 @@ template <typename T> struct DefaultItemSize {
  *   resume any pending `push()`. Pending `pending()` are awaken from a clean call stack in FIFO
  *   order.
  *
- * This design is to avoid unbounded stack, and simplify reentrance logic. By design, `push()`
+ * This design is to avoid unbounded stack, and simplify reentrancy handling. By design, `push()`
  * and `pop()` of the same queue should be from different coroutines otherwise it might block a
  * queue indefinitely. This is helpful to push data down the chain as quickly as possible.
  *
