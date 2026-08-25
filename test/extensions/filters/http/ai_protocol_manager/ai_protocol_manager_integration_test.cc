@@ -105,6 +105,7 @@ void AiProtocolManagerIntegrationTest::runHeaderAndBody() {
     EXPECT_EQ("200", response->headers().getStatusValue());
 
     cleanupUpstreamAndDownstream();
+    test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", testing::Eq(0));
   }
 }
 
@@ -193,6 +194,7 @@ void AiProtocolManagerIntegrationTest::runHeaderAndBodyAndTrailers() {
     EXPECT_EQ("200", response->headers().getStatusValue());
 
     cleanupUpstreamAndDownstream();
+    test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", testing::Eq(0));
   }
 }
 
@@ -293,6 +295,7 @@ void AiProtocolManagerIntegrationTest::runPassThroughWhenNotInspecting() {
     EXPECT_EQ("200", response->headers().getStatusValue());
 
     cleanupUpstreamAndDownstream();
+    test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", testing::Eq(0));
   }
 }
 
