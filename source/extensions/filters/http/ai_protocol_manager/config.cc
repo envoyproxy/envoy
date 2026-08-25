@@ -11,10 +11,10 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 
 absl::StatusOr<Http::FilterFactoryCb>
-AiProtocolManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
+AiProtocolManagerFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager&
         proto_config,
-    const std::string&, DualInfo, Server::Configuration::ServerFactoryContext&) {
+    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
   // One factory is shared by every stream on the chain. The in-memory
   // implementation is stateless, so a single shared instance is safe.
   auto buffer_factory = std::make_shared<InMemoryExternalBufferFactory>();

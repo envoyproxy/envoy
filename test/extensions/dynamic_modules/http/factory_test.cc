@@ -17,6 +17,17 @@ using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Not;
 
+// Creates a per-route config through the same entry point that the route configuration uses.
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+createPerRouteConfig(Envoy::Server::Configuration::DynamicModuleConfigFactory& factory,
+                     const Protobuf::Message& proto_config,
+                     Envoy::Server::Configuration::ServerFactoryContext& context,
+                     ProtobufMessage::ValidationVisitor& validator) {
+  const std::string empty_stats_prefix;
+  Envoy::Server::Configuration::ExtraFactoryContext extra_context{validator, empty_stats_prefix};
+  return factory.createHttpFilterRouteConfig(proto_config, context, extra_context);
+}
+
 TEST(DynamicModuleConfigFactory, Overrides) {
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   EXPECT_EQ(factory.name(), "envoy.extensions.filters.http.dynamic_modules");
@@ -98,8 +109,8 @@ filter_config:
       .WillByDefault(testing::Return(1));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
-  auto result = factory.createRouteSpecificFilterConfig(
-      proto_config, context.server_factory_context_, context.messageValidationVisitor());
+  auto result = createPerRouteConfig(factory, proto_config, context.server_factory_context_,
+                                     context.messageValidationVisitor());
 }
 
 // The per-route path honors the ``module.local.filename`` data source. With only ``local.filename``
@@ -129,8 +140,8 @@ filter_config:
       .WillByDefault(testing::Return(1));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
-  auto result = factory.createRouteSpecificFilterConfig(
-      proto_config, context.server_factory_context_, context.messageValidationVisitor());
+  auto result = createPerRouteConfig(factory, proto_config, context.server_factory_context_,
+                                     context.messageValidationVisitor());
   EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr(
                           "envoy_dynamic_module_on_http_filter_per_route_config_new")));
 }
@@ -165,8 +176,8 @@ filter_config:
       .WillByDefault(testing::Return(1));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
-  auto result = factory.createRouteSpecificFilterConfig(
-      proto_config, context.server_factory_context_, context.messageValidationVisitor());
+  auto result = createPerRouteConfig(factory, proto_config, context.server_factory_context_,
+                                     context.messageValidationVisitor());
 }
 
 TEST(DynamicModuleConfigFactory, DEPRECATED_FEATURE_TEST(LoadOKPerRouteWithLegacyName)) {
@@ -196,8 +207,8 @@ filter_config:
       .WillByDefault(testing::Return(1));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
-  auto result = factory.createRouteSpecificFilterConfig(
-      proto_config, context.server_factory_context_, context.messageValidationVisitor());
+  auto result = createPerRouteConfig(factory, proto_config, context.server_factory_context_,
+                                     context.messageValidationVisitor());
 }
 
 TEST(DynamicModuleConfigFactory, LoadOKNoOptionalABI) {
@@ -514,8 +525,8 @@ filter_config:
     TestUtility::loadFromYamlAndValidate(yaml, proto_config);
     NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-    auto result = factory.createRouteSpecificFilterConfig(
-        proto_config, context, ProtobufMessage::getNullValidationVisitor());
+    auto result = createPerRouteConfig(factory, proto_config, context,
+                                       ProtobufMessage::getNullValidationVisitor());
     EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
                                   testing::HasSubstr("Failed to load dynamic module:")));
     EXPECT_EQ(1U, failureCounter(context.scope(), "per_route_config_error", "foo"));
@@ -547,8 +558,8 @@ filter_config:
     NiceMock<Server::Configuration::MockServerFactoryContext> context;
     ON_CALL(context.options_, concurrency()).WillByDefault(testing::Return(1));
 
-    auto result = factory.createRouteSpecificFilterConfig(
-        proto_config, context, ProtobufMessage::getNullValidationVisitor());
+    auto result = createPerRouteConfig(factory, proto_config, context,
+                                       ProtobufMessage::getNullValidationVisitor());
     EXPECT_THAT(result,
                 HasStatus(absl::StatusCode::kInvalidArgument, testing::HasSubstr(expected_error)));
     // A fresh context is used per iteration, so the per-route failure counter is exactly one.
@@ -595,8 +606,8 @@ TEST(DynamicModuleConfigFactory, MalformedFilterConfig) {
     envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute proto_config;
     set_malformed(proto_config);
 
-    auto result = factory.createRouteSpecificFilterConfig(
-        proto_config, context, ProtobufMessage::getNullValidationVisitor());
+    auto result = createPerRouteConfig(factory, proto_config, context,
+                                       ProtobufMessage::getNullValidationVisitor());
     EXPECT_THAT(result, Not(IsOk()));
     EXPECT_EQ(1U, failureCounter(context.scope(), "per_route_config_error", "foo"));
   }

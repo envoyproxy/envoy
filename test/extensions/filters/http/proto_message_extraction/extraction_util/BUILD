@@ -25,12 +25,12 @@ envoy_cc_test(
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
-        "@com_google_protobuf//:protobuf",
         "@ocp-diag-core//ocpdiag/core/testing:parse_text_proto",
         "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
         "@proto-converter//:all",
         "@proto-field-extraction//:all_libs",
         "@proto-field-extraction//proto_field_extraction/test_utils:utils",
         "@proto-processing//proto_processing_lib/proto_scrubber:field_mask_path_checker",
+        "@protobuf",
     ],
 )

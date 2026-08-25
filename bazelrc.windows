@@ -1,0 +1,51 @@
+#############################################################################
+# Build flags for Windows build
+#############################################################################
+
+
+build:windows --extra_execution_platforms=//bazel/platforms:x64_windows-clang-cl
+build:windows --extra_toolchains=@local_config_cc//:cc-toolchain-x64_windows-clang-cl
+build:windows --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_autoconf_toolchain
+build:windows --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_automake_toolchain
+build:windows --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_cmake_toolchain
+build:windows --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_m4_toolchain
+build:windows --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_make_toolchain
+build:windows --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_meson_toolchain
+build:windows --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_ninja_toolchain
+build:windows --extra_toolchains=@rules_foreign_cc//toolchains:preinstalled_pkgconfig_toolchain
+build:windows --action_env=TMPDIR
+build:windows --action_env=PATH
+build:windows --action_env=BAZEL_LINKLIBS=
+build:windows --action_env=BAZEL_LINKOPTS=
+build:windows --action_env=CMAKE_POLICY_VERSION_MINIMUM=3.5
+build:windows --noincompatible_strict_action_env
+build:windows --enable_runfiles=yes
+build:windows --features=compiler_param_file
+build:windows --features=fully_static_link
+build:windows --features=static_link_msvcrt
+build:windows --dynamic_mode=off
+build:windows --define signal_trace=disabled
+build:windows --define hot_restart=disabled
+build:windows --define tcmalloc=disabled
+build:windows --define wasm=disabled
+build:windows --define manual_stamp=manual_stamp
+build:windows --cxxopt=/std:c++20
+build:windows --host_cxxopt=/std:c++20
+build:windows --copt=-Wno-inconsistent-missing-override
+build:windows --copt=-Wno-microsoft-cast
+build:windows --copt=-Wno-error=implicit-function-declaration
+build:windows --copt=-Wno-unknown-argument
+build:windows --copt=-Wno-nullability-completeness
+build:windows --copt=-Wno-unused-command-line-argument
+build:windows --copt=-Wno-macro-redefined
+build:windows --copt=-Wno-builtin-macro-redefined
+build:windows --cxxopt=/FIstring
+build:windows --per_file_copt=source/extensions/http/ext_proc/.*@-Wno-nontrivial-memcall
+build:windows --per_file_copt=source/extensions/filters/common/expr/.*@-Wno-nontrivial-memcall
+build:windows --per_file_copt=source/extensions/filters/http/ext_proc/.*@-Wno-nontrivial-memcall
+build:windows --per_file_copt=source/extensions/tracers/opentelemetry/samplers/cel/.*@-Wno-nontrivial-memcall
+build:windows --per_file_copt=external/com_google_cel_cpp/.*@/DWIN32_LEAN_AND_MEAN
+build:windows --per_file_copt=external/com_google_cel_cpp/.*@/DNOUSER
+build:windows --per_file_copt=external/com_google_cel_cpp/.*@/DNOGDI
+build:windows --verbose_failures
+build:windows --curses=no

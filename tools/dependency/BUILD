@@ -36,7 +36,7 @@ json_merge(
     srcs = ["//bazel:all_repository_locations"],
     filter = """
     .[0]
-    | del(.confluentinc_librdkafka)
+    | del(.librdkafka)
     """,
     visibility = ["//visibility:public"],
 )

@@ -17,7 +17,7 @@ native_binary(
         "//bazel:darwin_arm64": "@prebuilt_protoc.osx_aarch_64//:bin/protoc",
         "//bazel:darwin_x86_64": "@prebuilt_protoc.osx_x86_64//:bin/protoc",
         "//bazel:windows_x86_64": "@prebuilt_protoc.win64//:bin/protoc.exe",
-        "//conditions:default": "@com_google_protobuf//:protoc",
+        "//conditions:default": "@protobuf//:protoc",
     }),
     out = "protoc",
     visibility = ["//visibility:public"],

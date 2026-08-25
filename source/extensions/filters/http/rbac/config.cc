@@ -12,28 +12,14 @@ namespace HttpFilters {
 namespace RBACFilter {
 
 absl::StatusOr<Http::FilterFactoryCb>
-RoleBasedAccessControlFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-
-  auto config = std::make_shared<RoleBasedAccessControlFilterConfig>(
-      proto_config, stats_prefix, context.scope(), context.serverFactoryContext(),
-      context.messageValidationVisitor());
-
-  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<RoleBasedAccessControlFilter>(config));
-  };
-}
-
-absl::StatusOr<Http::FilterFactoryCb>
 RoleBasedAccessControlFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
 
   auto config = std::make_shared<RoleBasedAccessControlFilterConfig>(
-      proto_config, extra_context.stats_prefix, context.scope(), context,
-      context.messageValidationVisitor());
+      proto_config, extra_context.stats_prefix, extra_context.scopeOr(context), context,
+      extra_context.visitor);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<RoleBasedAccessControlFilter>(config));

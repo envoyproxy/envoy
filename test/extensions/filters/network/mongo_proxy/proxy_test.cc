@@ -26,7 +26,9 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::Contains;
 using testing::Invoke;
+using testing::Key;
 using testing::Matcher;
 using testing::NiceMock;
 using testing::Property;
@@ -222,7 +224,7 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
 
   auto& metadata =
       stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().MongoProxy);
-  EXPECT_TRUE(metadata.fields().find("db.test") != metadata.fields().end());
+  EXPECT_THAT(metadata.fields(), Contains(Key("db.test")));
   EXPECT_EQ("query", metadata.fields().at("db.test").list_value().values(0).string_value());
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -233,7 +235,7 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
   }));
   filter_->onData(fake_data_, false);
 
-  EXPECT_TRUE(metadata.fields().find("db.test") != metadata.fields().end());
+  EXPECT_THAT(metadata.fields(), Contains(Key("db.test")));
   EXPECT_EQ("insert", metadata.fields().at("db.test").list_value().values(0).string_value());
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -250,9 +252,9 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
   }));
   filter_->onData(fake_data_, false);
 
-  EXPECT_TRUE(metadata.fields().find("db1.test1") != metadata.fields().end());
+  EXPECT_THAT(metadata.fields(), Contains(Key("db1.test1")));
   EXPECT_EQ("query", metadata.fields().at("db1.test1").list_value().values(0).string_value());
-  EXPECT_TRUE(metadata.fields().find("db2.test2") != metadata.fields().end());
+  EXPECT_THAT(metadata.fields(), Contains(Key("db2.test2")));
   EXPECT_EQ("insert", metadata.fields().at("db2.test2").list_value().values(0).string_value());
 }
 

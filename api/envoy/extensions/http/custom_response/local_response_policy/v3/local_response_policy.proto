@@ -24,6 +24,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // Custom response policy to serve a locally stored response to the
 // downstream.
+// [#next-free-field: 7]
 message LocalResponsePolicy {
   // Optional new local reply body text. It will be used
   // in the ``%LOCAL_REPLY_BODY%`` command operator in the ``body_format``.
@@ -43,4 +44,19 @@ message LocalResponsePolicy {
   // remote body, before it is sent to a downstream client.
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 4
       [(validate.rules).repeated = {max_items: 1000}];
+
+  // Controls what is written to ``stream_info.response_code_details`` when this
+  // policy sends its local reply.
+  //
+  // If unset, details are cleared (empty string), matching legacy behavior.
+  // Use ``preserve_response_code_details`` to keep the existing value (e.g.
+  // ``csrf_origin_mismatch``), or ``response_code_details`` to set an explicit
+  // replacement.
+  oneof response_code_details_action {
+    // If set, keep the existing ``response_code_details`` already present on StreamInfo.
+    bool preserve_response_code_details = 5 [(validate.rules).bool = {const: true}];
+
+    // Replace ``response_code_details`` with this value.
+    string response_code_details = 6 [(validate.rules).string = {min_len: 1}];
+  }
 }

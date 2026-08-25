@@ -139,8 +139,8 @@ EXTERNAL_DEPS_MAP = {
     # Abseil
     "abseil_strings": "@abseil-cpp//absl/strings",
     # gRPC transcoding
-    "grpc_transcoding": "@grpc_httpjson_transcoding//src:transcoding",
-    "path_matcher": "@grpc_httpjson_transcoding//src:path_matcher",
+    "grpc_transcoding": "@grpc-httpjson-transcoding//src:transcoding",
+    "path_matcher": "@grpc-httpjson-transcoding//src:path_matcher",
     # Google APIs
     "api_httpbody_protos": "@googleapis//google/api:httpbody_cc_proto",
     "http_api_protos": "@googleapis//google/api:annotations_cc_proto",
