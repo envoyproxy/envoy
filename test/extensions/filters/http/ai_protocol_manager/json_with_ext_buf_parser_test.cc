@@ -372,6 +372,20 @@ TEST_F(JsonWithExtBufParserTest, MixedInlineAndOffloadedValues) {
   EXPECT_LT(system_ref.offset, user_ref.offset);
 }
 
+// Gemini streamed root arrays reach candidates[].content.parts[].functionCall
+// .args (depth 9+, and `args` is an arbitrary object): well within the raised
+// nesting bound.
+TEST_F(JsonWithExtBufParserTest, GeminiFunctionCallDepthParses) {
+  JsonWithExtBufParser parser({});
+  const std::string body =
+      R"([{"candidates":[{"content":{"parts":[{"functionCall":{"name":"f",)"
+      R"("args":{"location":{"city":"sf"}}}}]}}],)"
+      R"("usageMetadata":{"promptTokenCount":6,"candidatesTokenCount":9,"totalTokenCount":15}}])";
+  ASSERT_TRUE(parser.feed(body, /*end_stream=*/true).ok());
+  const auto doc = parser.takeDocument();
+  EXPECT_EQ(doc.json()[0]["usageMetadata"]["totalTokenCount"], 15);
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters
