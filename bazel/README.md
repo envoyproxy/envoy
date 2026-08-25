@@ -656,14 +656,18 @@ The extensions enabled by default can be disabled by adding the following parame
 `envoy.wasm.runtime.v8` extension, add `--//source/extensions/wasm_runtime/v8:enabled=false`.
 Note not all extensions can be disabled.
 
-To enable a specific WebAssembly (Wasm) engine, you'll need to pass `--define wasm=[wasm_engine]`, e.g. `--define wasm=wasmtime` to enable the [wasmtime](https://wasmtime.dev/) engine. Supported engines are:
+To select a specific WebAssembly (Wasm) runtime, pass `--//bazel:wasm_runtime=[runtime]`, e.g.
+`--//bazel:wasm_runtime=wasmtime` to enable the [wasmtime](https://wasmtime.dev/) engine.
+If you're building from a custom build repository, prefix the flag with `@envoy`:
+`--@envoy//bazel:wasm_runtime=wasmtime`. Accepted values are:
 
-* `v8` (the default included engine)
+* `v8` (default)
 * `wamr`
 * `wasmtime`
+* `disabled` (disable Wasm entirely)
 
-If you're building from a custom build repository, the parameters need to prefixed with `@envoy`, for example
-`--@envoy//source/extensions/filters/http/kill_request:enabled`.
+Invalid values are rejected at parse time. Note: the former `--define wasm=<engine>` mechanism is
+no longer supported and will be silently ignored if passed.
 
 You may persist those options in `user.bazelrc` in Envoy repo or your `.bazelrc`.
 

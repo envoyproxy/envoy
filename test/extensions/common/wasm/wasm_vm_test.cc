@@ -88,7 +88,7 @@ protected:
 TEST_F(BaseVmTest, UnspecifiedRuntime) {
   auto wasm_vm = createWasmVm("");
   absl::string_view first_wasm_engine_name = getFirstAvailableWasmEngineName();
-  // Envoy is built with "--define wasm=disabled", so no Wasm engine is available
+  // Envoy is built with "--//bazel:wasm_runtime=disabled", so no Wasm engine is available
   if (first_wasm_engine_name.empty()) {
     EXPECT_TRUE(wasm_vm.get() == nullptr);
   } else {
