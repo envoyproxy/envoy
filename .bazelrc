@@ -364,7 +364,7 @@ build:fuzz-coverage --test_tag_filters=-nocoverage,-quiche
 # Existing fuzz tests don't need a full WASM runtime and in generally we don't really want to
 # fuzz dependencies anyways. On the other hand, disabling WASM reduces the build time and
 # resources required to build and run the tests.
-build:fuzz-coverage --define=wasm=disabled
+build:fuzz-coverage --@proxy-wasm-cpp-host//bazel:engine=disabled
 build:fuzz-coverage --config=fuzz-coverage-config
 build:fuzz-coverage-config --@envoy//tools/coverage:config=@envoy//test:fuzz_coverage_config
 
