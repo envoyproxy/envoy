@@ -1,6 +1,6 @@
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
-load("@com_google_protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
 load("@envoy//bazel:proto_toolchain.bzl", "get_proto_compiler", "use_proto_toolchain")
+load("@protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
 
 # Borrowed from https://github.com/grpc/grpc-java/blob/v1.24.1/java_grpc_library.bzl#L61
 def _path_ignoring_repository(f):

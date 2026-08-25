@@ -109,9 +109,9 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   // Some other attribute
   data_.add("attribute"); // 9 bytes
   data_.add(buf_, 1);
-  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreData);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
   data_.add("blah"); // 4 bytes
-  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreData);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
   data_.add(buf_, 1);
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
   ASSERT_THAT(data_.length(), 0);

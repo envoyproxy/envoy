@@ -18,7 +18,7 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         requirement("frozendict"),
-        "@com_google_protobuf//:protobuf_python",
+        "@protobuf//:protobuf_python",
     ],
 )
 
@@ -31,7 +31,7 @@ py_library(
 label_flag(
     name = "default_type_db_target",
     # While this is not completely empty but type_db_gen generates nothing on this target.
-    build_setting_default = "@com_google_protobuf//:empty_proto",
+    build_setting_default = "@protobuf//:empty_proto",
     visibility = ["//visibility:public"],
 )
 

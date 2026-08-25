@@ -1,3 +1,5 @@
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -10,6 +12,7 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+load("//test/common/router:corpus.bzl", "corpus_from_test_binary")
 
 licenses(["notice"])  # Apache 2
 
@@ -57,6 +60,7 @@ envoy_cc_test_library(
         "//source/extensions/formatter/cel:config",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
+        "//test/mocks/init:init_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:retry_priority_mocks",
@@ -85,34 +89,31 @@ sh_binary(
     srcs = ["corpus_from_config_impl.sh"],
 )
 
-genrule(
-    name = "corpus_from_config_impl",
+corpus_from_test_binary(
+    name = "corpus_from_config_impl_dir",
     testonly = 1,
-    srcs = [
-        # This is deliberately in srcs, since we run into host/target confusion
-        # otherwise in oss-fuzz builds.
-        ":config_impl_test_static",
-    ],
-    outs = ["corpus_from_config_impl.tar.gz"],
-    cmd = """
-    export GENRULE_OUTPUT_DIR=$$(mktemp -d)
-    $(location corpus_from_config_impl_sh) \
-      $(location //test/common/router:config_impl_test_static)
-    # normalize the output as the test build side effect is not deterministic.
-    sed -i 's/[[:space:]]*$$//' $$GENRULE_OUTPUT_DIR/*
-    sed -i 's|^goo\\.gle/debug[a-z]*|goo.gle/debugproto|' $$GENRULE_OUTPUT_DIR/*
-    # Dedupe the resulting corpus files.
-    # Files are saved in the root of the tarball (have their dirs stripped)
-    md5sum $$GENRULE_OUTPUT_DIR/* \
-      | sort -k1,1 -u \
-      | cut -d' ' -f3- \
-      | tar -czf $@ --transform='s|.*/||' -T -
-    """,
     exec_properties = select({
         "//bazel:engflow_rbe_x86_64": {"Pool": "6gig"},
         "//conditions:default": {},
     }),
-    tools = [":corpus_from_config_impl_sh"],
+    script = ":corpus_from_config_impl_sh",
+    # test_binary uses cfg = "target" (not "exec") to preserve host/target
+    # distinction needed for oss-fuzz builds.
+    test_binary = ":config_impl_test_static",
+)
+
+pkg_files(
+    name = "corpus_from_config_impl_files",
+    testonly = 1,
+    srcs = [":corpus_from_config_impl_dir"],
+    strip_prefix = "corpus_from_config_impl_dir",
+)
+
+pkg_tar(
+    name = "corpus_from_config_impl",
+    testonly = 1,
+    srcs = [":corpus_from_config_impl_files"],
+    extension = "tar.gz",
 )
 
 envoy_cc_test(
@@ -212,6 +213,7 @@ envoy_cc_test(
     srcs = ["static_route_provider_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/init:manager_lib",
         "//source/common/router:route_provider_manager_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/http:http_mocks",
@@ -261,6 +263,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
