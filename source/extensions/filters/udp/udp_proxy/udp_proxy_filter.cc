@@ -368,6 +368,8 @@ void UdpProxyFilter::ActiveSession::onSessionComplete() {
         .dec();
   }
 
+  hot_restart_session_handle_.reset();
+
   disableAccessLogFlushTimer();
 
   for (auto& active_read_filter : read_filters_) {
