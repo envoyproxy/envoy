@@ -7,6 +7,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/hash_policy.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
@@ -45,11 +46,17 @@ buildRouteActionOverride(const RouteActionOverrideProto& proto_override,
     RETURN_IF_NOT_OK_REF(policy_or_error.status());
     entry.shadow_policies.push_back(std::move(policy_or_error.value()));
   }
+  if (!proto_override.hash_policy().empty()) {
+    auto policy_or_error =
+        Http::HashPolicyImpl::create(proto_override.hash_policy(), context.regexEngine());
+    RETURN_IF_NOT_OK_REF(policy_or_error.status());
+    entry.hash_policy = std::move(policy_or_error.value());
+  }
   // Validate what was built rather than what was configured. A metadata_match without an envoy.lb
   // entry contributes nothing, so a populated looking configuration can still build an override
   // that replaces no property, which set_route_action_override would then accept as a decision.
   if (entry.retry_policy == nullptr && entry.metadata_match_criteria == nullptr &&
-      entry.shadow_policies.empty()) {
+      entry.shadow_policies.empty() && entry.hash_policy == nullptr) {
     return absl::InvalidArgumentError(
         "Route action override must replace at least one route action property");
   }

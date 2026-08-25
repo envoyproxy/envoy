@@ -8,6 +8,7 @@
 
 #include "envoy/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/http/codes.h"
+#include "envoy/http/hash_policy.h"
 #include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -44,6 +45,7 @@ struct RouteActionOverride {
   Envoy::Router::RetryPolicyConstSharedPtr retry_policy;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria;
   std::vector<Envoy::Router::ShadowPolicyPtr> shadow_policies;
+  std::unique_ptr<Http::HashPolicy> hash_policy;
 };
 
 using RouteActionOverrideMap = absl::flat_hash_map<std::string, RouteActionOverride>;
@@ -197,6 +199,11 @@ public:
     return entry != nullptr && !entry->shadow_policies.empty()
                ? entry->shadow_policies
                : DelegatingRouteEntry::shadowPolicies();
+  }
+  const Http::HashPolicy* hashPolicy() const override {
+    const RouteActionOverride* entry = selection_.route_action_override;
+    return entry != nullptr && entry->hash_policy != nullptr ? entry->hash_policy.get()
+                                                             : DelegatingRouteEntry::hashPolicy();
   }
   void refreshRouteCluster(const Http::RequestHeaderMap& headers,
                            const StreamInfo::StreamInfo& stream_info) const override;

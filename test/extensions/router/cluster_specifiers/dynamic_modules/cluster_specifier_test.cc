@@ -740,9 +740,31 @@ route_action_overrides:
   mirror_only:
     request_mirror_policies:
     - cluster: mirror-cluster
+  hash_only:
+    hash_policy:
+    - header:
+        header_name: x-hash
 )EOF");
   }
 };
+
+TEST_F(DynamicModuleRouteActionOverrideTest, HashPolicyOverrideReplacesRouteHashPolicy) {
+  setUpPluginWithOverrides();
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/"}, {"env", "prod"}, {"x-override", "hash_only"}, {"x-hash", "tenant-a"}};
+  const auto* entry = resolveRouteEntry(headers);
+  ASSERT_NE(nullptr, entry->hashPolicy());
+  Http::HashPolicy::AddCookieCallback add_cookie_nop;
+  EXPECT_TRUE(entry->hashPolicy()->generateHash(headers, stream_info_, add_cookie_nop).has_value());
+}
+
+TEST_F(DynamicModuleRouteActionOverrideTest, HashPolicyOverrideDelegatesWhenNotSelected) {
+  setUpPluginWithOverrides();
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "prod"}};
+  const auto* matched_hash_policy = parent_->route_entry_.hashPolicy();
+  EXPECT_CALL(parent_->route_entry_, hashPolicy()).WillOnce(Return(matched_hash_policy));
+  EXPECT_EQ(matched_hash_policy, resolveRouteEntry(headers)->hashPolicy());
+}
 
 TEST_F(DynamicModuleRouteActionOverrideTest, OverrideReplacesRouteActionProperties) {
   setUpPluginWithOverrides();

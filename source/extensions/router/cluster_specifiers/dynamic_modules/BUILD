@@ -28,6 +28,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:statusor_lib",
         "//source/common/config:well_known_names",
+        "//source/common/http:hash_policy_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/router:delegating_route_lib",
