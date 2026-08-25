@@ -607,7 +607,8 @@ rules:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigImpl filter_conf(proto_config, "", context, creation_status);
+  FilterConfigImpl filter_conf(proto_config, "", context.server_factory_context_, context.scope(),
+                               makeOptRef<Init::Manager>(context.init_manager_), creation_status);
   ASSERT_TRUE(creation_status.ok());
 
   Http::TestRequestHeaderMapImpl headers{
