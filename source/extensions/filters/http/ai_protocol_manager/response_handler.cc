@@ -90,6 +90,11 @@ bool ResponseHandler::processDocument(const nlohmann::json& json) {
     stats_.malformed_usage_field_.inc();
     degraded_ = true;
   }
+  if (result.stream_error) {
+    // An in-band stream error: the dialect's terminal usage update will
+    // never arrive, so the counts so far are not authoritative.
+    degraded_ = true;
+  }
   return adapter.isTerminalEvent(json);
 }
 
@@ -179,7 +184,7 @@ void SseResponseHandler::processSlice(absl::string_view view) {
       // The cap is enforced *before* copying: one oversized frame must not
       // become an over-cap side allocation.
       if (view.size() > allowance) {
-        enterDiscardMode();
+        enterDiscardMode(pendingEventSkippable(view));
       } else {
         retainBytes(view);
       }
@@ -187,11 +192,15 @@ void SseResponseHandler::processSlice(absl::string_view view) {
     }
     if (boundary.value() > allowance) {
       // A complete over-cap event is skipped without ever being buffered,
-      // linearized, or parsed.
+      // linearized, or parsed. A skippable named event (keepalive, content
+      // delta) could never have carried usage, so its loss does not degrade
+      // the record.
       ENVOY_LOG(debug, "ai_protocol_manager: SSE event exceeds max_event_size ({} > {}), skipped",
                 buffer_.length() + boundary.value(), max_event_size_);
       stats_.sse_event_too_large_.inc();
-      degraded_ = true;
+      if (!pendingEventSkippable(view.substr(0, boundary.value()))) {
+        degraded_ = true;
+      }
       buffer_.drain(buffer_.length());
       // scanView() already left the line state at LineStart.
     } else if (buffer_.length() == 0) {
@@ -230,17 +239,35 @@ void SseResponseHandler::handleCompleteEvent(absl::string_view region) {
   }
 }
 
-void SseResponseHandler::enterDiscardMode() {
+void SseResponseHandler::enterDiscardMode(bool skippable) {
   // The pending event exceeded the cap before terminating: drop its bytes,
-  // keep only the scanner's line state. Counted once per oversized event.
+  // keep only the scanner's line state. Counted once per oversized event; a
+  // skippable named event could never have carried usage, so its loss does
+  // not degrade the record.
   ENVOY_LOG(debug,
             "ai_protocol_manager: pending SSE data exceeds max_event_size ({}), "
             "discarding this event",
             max_event_size_);
   stats_.sse_event_too_large_.inc();
-  degraded_ = true;
+  if (!skippable) {
+    degraded_ = true;
+  }
   discarding_ = true;
   buffer_.drain(buffer_.length());
+}
+
+bool SseResponseHandler::pendingEventSkippable(absl::string_view tail) {
+  // The event's opening lines are within the retained prefix, or within
+  // `tail` when nothing is retained yet. linearize() runs only on this rare
+  // oversize transition and is bounded by max_event_size_; the caller drains
+  // the buffer right after.
+  absl::string_view region = tail;
+  if (buffer_.length() > 0) {
+    region = absl::string_view(static_cast<const char*>(buffer_.linearize(buffer_.length())),
+                               buffer_.length());
+  }
+  const std::optional<absl::string_view> event_type = sseEventTypeView(region);
+  return event_type.has_value() && skippableEventType(event_type.value());
 }
 
 void SseResponseHandler::onEndStream() {
@@ -319,6 +346,17 @@ JsonResponseHandler::JsonResponseHandler(ApiProtocol format, uint32_t max_inspec
     : ResponseHandler(format, stats), max_inspected_body_size_(max_inspected_body_size),
       parser_(std::make_unique<JsonWithExtBufParser>(JsonWithExtBufParser::Config{})) {}
 
+void JsonResponseHandler::abandonOverLimit() {
+  ENVOY_LOG(debug,
+            "ai_protocol_manager: response body exceeds max_inspected_body_size ({}), "
+            "skipping token extraction",
+            max_inspected_body_size_);
+  stats_.response_body_too_large_.inc();
+  degraded_ = true;
+  over_limit_ = true;
+  parser_.reset();
+}
+
 void JsonResponseHandler::onData(const Buffer::Instance& data) {
   if (over_limit_ || parse_failed_ || parsing_complete_) {
     return;
@@ -327,14 +365,7 @@ void JsonResponseHandler::onData(const Buffer::Instance& data) {
   // oversized string values become 16-byte external references rather than
   // materialized bytes.
   if (data.length() > max_inspected_body_size_ - bytes_fed_) {
-    ENVOY_LOG(debug,
-              "ai_protocol_manager: response body exceeds max_inspected_body_size ({}), "
-              "skipping token extraction",
-              max_inspected_body_size_);
-    stats_.response_body_too_large_.inc();
-    degraded_ = true;
-    over_limit_ = true;
-    parser_.reset();
+    abandonOverLimit();
     return;
   }
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
@@ -358,6 +389,12 @@ void JsonResponseHandler::onEndStream() {
     return;
   }
   parsing_complete_ = true;
+  if (bytes_fed_ == 0) {
+    // An empty body carries no usage; the outcome matches an eligible
+    // headers-only response (missing), independent of HTTP framing.
+    parser_.reset();
+    return;
+  }
   if (const absl::Status status = parser_->feed("", /*end_stream=*/true); !status.ok()) {
     ENVOY_LOG(debug, "ai_protocol_manager: response body is not valid JSON");
     stats_.response_parse_error_.inc();

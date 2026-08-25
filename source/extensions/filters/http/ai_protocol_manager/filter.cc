@@ -43,6 +43,14 @@ bool contentTypeMatches(absl::string_view content_type, absl::string_view expect
   return absl::EqualsIgnoreCase(normalized, expected);
 }
 
+// application/json or any +json structured-syntax suffix; parameters and
+// case are ignored.
+bool isJsonContentType(absl::string_view content_type) {
+  const absl::string_view normalized = StringUtil::trim(StringUtil::cropRight(content_type, ";"));
+  return absl::EqualsIgnoreCase(normalized, "application/json") ||
+         absl::EndsWithIgnoreCase(normalized, "+json");
+}
+
 // Extraction requires an unencoded body: every entry and comma-separated
 // coding of the (repeatable) Content-Encoding header must be `identity`.
 bool contentEncodingIsIdentity(const Http::ResponseHeaderMap& headers) {
@@ -140,7 +148,7 @@ void AiProtocolManagerFilter::onDestroy() {
   }
 }
 
-Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHeaderMap&,
+Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                                  bool end_stream) {
   // Request-side processing is off entirely; per-route declarations still
   // matter to the encode path, which resolves them itself.
@@ -168,17 +176,16 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     }
   }
 
-  // A declared AI endpoint is parsed strictly. Any other route is parsed only if
-  // the filter opted into parsing unconfigured routes, and never fails the
-  // request.
-  // TODO(penguingao): parse_unconfigured_routes takes the buffering path below for every bodied
-  // request on every route, which deadlocks full-duplex requests (e.g. gRPC client/bidi
-  // streaming): headers are held until the request's end_stream, which the client may not send
-  // until it sees a response the upstream cannot produce. Gate the best-effort path on
-  // content-type (only application/json and *+json; never gRPC or upgrades), and on a
-  // best-effort parse failure release the held headers and buffered body immediately and pass
-  // the remainder through unbuffered, rather than buffering to end-of-stream.
-  if (!isAiEndpoint() && !config_->parseUnconfiguredRoutes()) {
+  // A declared AI endpoint is parsed strictly. Any other route is parsed only
+  // if the filter opted into parsing unconfigured routes -- and only for JSON
+  // payloads: full-duplex protocols (gRPC streaming, upgrades) must not have
+  // their headers held to end of request, since the client may not finish the
+  // request until it sees a response the held upstream cannot produce.
+  // TODO(penguingao): on a best-effort parse failure, release the held headers
+  // and buffered body immediately and pass the remainder through unbuffered,
+  // rather than buffering to end-of-stream.
+  if (!isAiEndpoint() &&
+      (!config_->parseUnconfiguredRoutes() || !isJsonContentType(headers.getContentTypeValue()))) {
     // Nothing will look at this payload, so stay out of the way: offloading it
     // would cost a store round-trip and withhold the headers meanwhile, for
     // nothing. Decided once here; decode_manager_ being null carries it.
@@ -388,22 +395,6 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // A JSON body already known (from content-length) to exceed the cap skips
-  // extraction up front; the onData() cap stays authoritative for absent or
-  // wrong lengths.
-  if (is_json) {
-    uint64_t content_length = 0;
-    if (absl::SimpleAtoi(headers.getContentLengthValue(), &content_length) &&
-        content_length > config_->maxJsonBodySize()) {
-      ENVOY_LOG(debug,
-                "ai_protocol_manager: content-length {} exceeds max_json_body_size ({}), "
-                "skipping token extraction",
-                content_length, config_->maxJsonBodySize());
-      config_->stats().response_body_too_large_.inc();
-      return Http::FilterHeadersStatus::Continue;
-    }
-  }
-
   // The wire API to extract against, in precedence order: the route's declared
   // response API, the route's declared request API, the configured fallback;
   // Unspecified auto-detects from the response shape.
@@ -422,8 +413,19 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
                                                              config_->maxParsedSseEvents(),
                                                              config_->stats(), account);
   } else {
-    response_handler_ = std::make_unique<JsonResponseHandler>(protocol, config_->maxJsonBodySize(),
-                                                              config_->stats(), account);
+    auto handler = std::make_unique<JsonResponseHandler>(protocol, config_->maxJsonBodySize(),
+                                                         config_->stats(), account);
+    // A body already known (from content-length) to exceed the cap abandons
+    // extraction up front, through the same transition the incremental cap
+    // takes -- identical bodies produce the identical outcome regardless of
+    // whether the length was advertised. onData() stays authoritative for
+    // absent or wrong lengths.
+    uint64_t content_length = 0;
+    if (absl::SimpleAtoi(headers.getContentLengthValue(), &content_length) &&
+        content_length > config_->maxJsonBodySize()) {
+      handler->abandonOverLimit();
+    }
+    response_handler_ = std::move(handler);
   }
   return Http::FilterHeadersStatus::Continue;
 }

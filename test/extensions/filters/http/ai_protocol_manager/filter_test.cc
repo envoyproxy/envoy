@@ -115,7 +115,9 @@ public:
   }
 
   static Http::TestRequestHeaderMapImpl requestHeaders() {
-    return Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/chat/completions"}};
+    // Best-effort parsing gates on a JSON content type.
+    return Http::TestRequestHeaderMapImpl{
+        {":method", "POST"}, {":path", "/chat/completions"}, {"content-type", "application/json"}};
   }
 
   // The manager the filter owns requires onDestroy() before destruction (see
@@ -549,21 +551,62 @@ TEST_F(AiProtocolManagerFilterResponseTest, PartialUsageReportsExtractionStatus)
   EXPECT_EQ(counterValue("sse_event_too_large"), 1);
 }
 
-// A JSON response whose content-length already exceeds the inspection cap
-// never constructs a handler: nothing is buffered only to be discarded.
-TEST_F(AiProtocolManagerFilterResponseTest, ContentLengthOverCapSkipsExtraction) {
+// A JSON response whose content-length already exceeds the inspection cap is
+// abandoned up front -- nothing is buffered or parsed -- and publishes the
+// same status-only FAILED record the incrementally-discovered case does,
+// carrying the configured wire API rather than UNSPECIFIED.
+TEST_F(AiProtocolManagerFilterResponseTest, ContentLengthOverCapFailsExtraction) {
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
   auto* token_usage = proto_config.mutable_response_handling()->mutable_token_usage();
   token_usage->set_include_unconfigured_routes(true);
+  token_usage->set_default_api_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   token_usage->mutable_limits()->mutable_max_json_body_size()->set_value(64);
   setupWithProto(proto_config);
   Http::TestResponseHeaderMapImpl headers{
       {":status", "200"}, {"content-type", "application/json"}, {"content-length", "100"}};
   EXPECT_EQ(filter_->encodeHeaders(headers, false), Http::FilterHeadersStatus::Continue);
   sendData(std::string(100, 'x'), true); // Passes through untouched, uninspected.
-  EXPECT_TRUE(typed_metadata_writes_.empty());
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
+  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   EXPECT_EQ(counterValue("response_body_too_large"), 1);
   EXPECT_EQ(counterValue("response_parse_error"), 0); // Never buffered or parsed.
+  EXPECT_EQ(counterValue("token_usage_failed"), 1);
+}
+
+// An empty JSON body delivered as a terminal DATA frame counts missing,
+// exactly like the same nothing delivered as a headers-only response: the
+// outcome does not depend on HTTP framing.
+TEST_F(AiProtocolManagerFilterResponseTest, EmptyJsonBodyCountsMissing) {
+  setup();
+  sendHeaders("application/json");
+  sendData("", /*end_stream=*/true);
+  EXPECT_TRUE(typed_metadata_writes_.empty());
+  EXPECT_EQ(counterValue("token_usage_missing"), 1);
+  EXPECT_EQ(counterValue("token_usage_failed"), 0);
+  EXPECT_EQ(counterValue("response_parse_error"), 0);
+}
+
+// An Anthropic in-band `error` event after usage has accumulated: the
+// terminal usage update never arrives, so the record publishes as PARTIAL,
+// never COMPLETE.
+TEST_F(AiProtocolManagerFilterResponseTest, AnthropicStreamErrorMarksPartial) {
+  setup();
+  sendHeaders("text/event-stream");
+  sendData("event: message_start\n"
+           "data: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-opus-5\","
+           "\"usage\":{\"input_tokens\":2679,\"output_tokens\":3}}}\n\n",
+           false);
+  sendData("event: error\n"
+           "data: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\"}}\n\n",
+           true);
+
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::PARTIAL);
+  EXPECT_EQ(typed->input_tokens().value(), 2679);
+  EXPECT_EQ(counterValue("token_usage_partial"), 1);
 }
 
 // Complete extraction failure still publishes a status-only record: per-stream

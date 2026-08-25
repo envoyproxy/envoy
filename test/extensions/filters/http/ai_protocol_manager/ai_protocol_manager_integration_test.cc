@@ -44,10 +44,12 @@ typed_config:
     // The authority must match the upstream test cert (*.lyft.com): with HTTP/3
     // upstreams the cluster uses TLS with auto_sni, so :authority becomes the SNI
     // validated against the served certificate.
+    // Best-effort parsing gates on a JSON content type.
     return Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                           {":path", "/test/long/url"},
                                           {":scheme", "http"},
-                                          {":authority", "sni.lyft.com"}};
+                                          {":authority", "sni.lyft.com"},
+                                          {"content-type", "application/json"}};
   }
 
   // Shared scenario bodies; each is driven with the filter in either chain.

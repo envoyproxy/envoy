@@ -19,11 +19,13 @@ namespace AiProtocolManager {
 // known field reads as absent and flags `malformed`) are part of the shared
 // extraction contract, not any one dialect.
 
-// Counts are published into a protobuf `number_value` (an IEEE double) in the
-// Struct projection; only values a double represents exactly survive that
-// round trip. Anything above this bound, or non-finite, negative, or
-// fractional, is rejected rather than coerced. The bound also keeps summed
-// counts far from uint64_t overflow.
+// Sanity bound on provider-reported counts: values must survive an exact
+// round trip through IEEE-double representations (JSON re-serialization,
+// access-log pipelines) that downstream consumers commonly apply to the
+// typed record, and summed counts must stay far from uint64_t overflow.
+// Anything above this bound, or non-finite, negative, or fractional, is
+// rejected rather than coerced -- real token counts sit many orders of
+// magnitude below it.
 constexpr uint64_t MaxSafeCount = (uint64_t(1) << 53) - 1;
 
 // Response strings are upstream-controlled; the cap keeps one response from

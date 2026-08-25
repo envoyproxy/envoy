@@ -26,7 +26,7 @@ public:
   bool isTerminalEvent(const nlohmann::json&) const override { return false; }
 
 protected:
-  void extractUsageInto(const nlohmann::json&, TokenUsage&, bool&) const override {}
+  void extractUsageInto(const nlohmann::json&, ExtractionResult&) const override {}
 };
 
 // OpenAI: Chat Completions and Responses API. The two dialects share one
@@ -39,8 +39,9 @@ public:
   void canonicalizeUsage(TokenUsage&, bool&) const override {}
 
 protected:
-  void extractUsageInto(const nlohmann::json& json, TokenUsage& usage,
-                        bool& malformed) const override {
+  void extractUsageInto(const nlohmann::json& json, ExtractionResult& result) const override {
+    bool& malformed = result.malformed;
+    TokenUsage& usage = result.usage;
     const nlohmann::json* response = readObject(json, JsonKeys::get().Response, malformed);
     const nlohmann::json& node = response != nullptr ? *response : json;
 
@@ -140,8 +141,17 @@ public:
   }
 
 protected:
-  void extractUsageInto(const nlohmann::json& json, TokenUsage& usage,
-                        bool& malformed) const override {
+  void extractUsageInto(const nlohmann::json& json, ExtractionResult& result) const override {
+    bool& malformed = result.malformed;
+    TokenUsage& usage = result.usage;
+    // Anthropic documents `event: error` after a 200 has streamed: the
+    // terminal usage update never arrives, so the accumulation so far must
+    // not publish as complete.
+    if (const auto type = readString(json, JsonKeys::get().Type);
+        type.has_value() && type.value() == "error") {
+      result.stream_error = true;
+      return;
+    }
     const nlohmann::json* message = readObject(json, JsonKeys::get().Message, malformed);
     const nlohmann::json& node = message != nullptr ? *message : json;
 
@@ -197,8 +207,9 @@ public:
   bool isTerminalEvent(const nlohmann::json&) const override { return false; }
 
 protected:
-  void extractUsageInto(const nlohmann::json& json, TokenUsage& usage,
-                        bool& malformed) const override {
+  void extractUsageInto(const nlohmann::json& json, ExtractionResult& result) const override {
+    bool& malformed = result.malformed;
+    TokenUsage& usage = result.usage;
     if (auto model = readString(json, JsonKeys::get().ModelVersion); model.has_value()) {
       usage.model = std::move(model).value();
     }

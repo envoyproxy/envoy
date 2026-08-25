@@ -21,8 +21,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // Canonical LLM token usage extracted from a provider response by the
 // :ref:`AI Protocol Manager filter <config_http_filters_ai_protocol_manager>`,
-// published as typed dynamic metadata (with an equivalent untyped ``Struct``
-// projection) under one namespace at a clean end of stream.
+// published as typed dynamic metadata under one namespace at a clean end of
+// stream.
 //
 // Counts are normalized onto one *inclusive* contract regardless of wire API:
 // ``input_tokens`` covers all input consumed (uncached input, cached reads,

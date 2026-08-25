@@ -31,7 +31,13 @@ namespace AiProtocolManager {
 class ResponseHandler {
 public:
   ResponseHandler(ApiProtocol format, AiProtocolManagerStats& stats)
-      : format_(format), stats_(stats) {}
+      : format_(format), stats_(stats) {
+    // Seed the resolved protocol so even a stream whose first input fails
+    // (oversized, unparseable) publishes the configured wire API rather than
+    // API_PROTOCOL_UNSPECIFIED. Detection overwrites via merge() when the
+    // protocol was not configured.
+    usage_.api_protocol = format;
+  }
   virtual ~ResponseHandler() = default;
 
   // Observe one response body frame (a copy; the original continues down the
@@ -122,9 +128,14 @@ private:
   // A complete raw event region: classified by its `event:` field before any
   // materialization, parsed only if it survives classification and budget.
   void handleCompleteEvent(absl::string_view region);
-  void enterDiscardMode();
+  void enterDiscardMode(bool skippable);
   void processSseEvent(absl::string_view event);
   void retainBytes(absl::string_view bytes);
+  // Classifies the oversized pending event by the `event:` name observed so
+  // far -- authoritative for the retained prefix (and for `tail` when nothing
+  // is retained), exactly the same name-trust the under-cap path applies. An
+  // event without a recognizable skippable name degrades as before.
+  bool pendingEventSkippable(absl::string_view tail);
 
   const uint32_t max_event_size_ = 0;
   // Remaining parse budget (max_parsed_events); exhaustion makes the handler
@@ -154,6 +165,12 @@ public:
 
   void onData(const Buffer::Instance& data) override;
   void onEndStream() override;
+
+  // Abandons extraction for a body already known to exceed the cap (e.g. from
+  // content-length), through the same transition the incrementally-discovered
+  // case takes -- so both publish the same status-only FAILED record at a
+  // clean end of stream.
+  void abandonOverLimit();
 
 private:
   const uint32_t max_inspected_body_size_;

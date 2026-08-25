@@ -817,6 +817,77 @@ TEST_F(ResponseHandlerTest, JsonUnknownShapeYieldsNothing) {
   EXPECT_EQ(stats_.response_parse_error_.value(), 0);
 }
 
+// The resolved protocol is seeded into the accumulator, so a stream whose
+// only input fails still reports the configured wire API.
+TEST_F(ResponseHandlerTest, SeededProtocolSurvivesEarlyFailure) {
+  SseResponseHandler handler(ApiProtocol::AnthropicMessages, /*max_event_size=*/64,
+                             TestMaxParsedEvents, stats_);
+  feed(handler, "data: " + std::string(500, 'x') + "\n\n", 4096);
+  EXPECT_TRUE(handler.degraded());
+  EXPECT_EQ(handler.usage().api_protocol, ApiProtocol::AnthropicMessages);
+}
+
+// An oversized event whose `event:` name marks it skippable (a content delta)
+// could never have carried usage: it is dropped without degrading the record,
+// and the terminal usage still publishes as authoritative.
+TEST_F(ResponseHandlerTest, OversizedSkippableEventDoesNotDegrade) {
+  SseResponseHandler handler(ApiProtocol::AnthropicMessages, /*max_event_size=*/256,
+                             TestMaxParsedEvents, stats_);
+  const std::string start = "event: message_start\n"
+                            "data: {\"type\":\"message_start\",\"message\":{"
+                            "\"usage\":{\"input_tokens\":9,\"output_tokens\":1}}}\n\n";
+  feed(handler, start, start.size(), /*end_stream=*/false);
+  // Split across frames so the discard path (not the in-frame fast path)
+  // classifies it; the name sits in the retained prefix.
+  const std::string big_head = "event: content_block_delta\ndata: " + std::string(200, 'x');
+  feed(handler, big_head, big_head.size(), /*end_stream=*/false);
+  const std::string big_tail = std::string(400, 'y') + "\n\n";
+  feed(handler, big_tail, big_tail.size(), /*end_stream=*/false);
+  feed(handler,
+       "event: message_delta\n"
+       "data: {\"type\":\"message_delta\",\"delta\":{},"
+       "\"usage\":{\"output_tokens\":7}}\n\n",
+       4096);
+  EXPECT_FALSE(handler.degraded());
+  EXPECT_EQ(handler.usage().output_tokens, 7);
+  EXPECT_EQ(stats_.sse_event_too_large_.value(), 1);
+}
+
+// An oversized event with no classifiable name (an unnamed Chat Completions
+// chunk) still degrades: it could have carried the usage.
+TEST_F(ResponseHandlerTest, OversizedUnnamedEventStillDegrades) {
+  SseResponseHandler handler(ApiProtocol::OpenAiChatCompletions, /*max_event_size=*/64,
+                             TestMaxParsedEvents, stats_);
+  const std::string head = "data: " + std::string(50, 'x');
+  feed(handler, head, head.size(), /*end_stream=*/false);
+  feed(handler, std::string(100, 'y') + "\n\n", 4096);
+  EXPECT_TRUE(handler.degraded());
+}
+
+// An empty JSON body reads as no usage (missing), not as a parse failure.
+TEST_F(ResponseHandlerTest, EmptyBodyIsMissingNotFailed) {
+  JsonResponseHandler handler(ApiProtocol::Unspecified, /*max_inspected_body_size=*/1024, stats_);
+  handler.onEndStream();
+  EXPECT_FALSE(handler.degraded());
+  EXPECT_FALSE(handler.usage().hasAny());
+  EXPECT_EQ(stats_.response_parse_error_.value(), 0);
+}
+
+// abandonOverLimit() takes the same transition as the incremental cap, so a
+// content-length-known oversized body produces the identical degraded state.
+TEST_F(ResponseHandlerTest, AbandonOverLimitMatchesIncrementalCap) {
+  JsonResponseHandler handler(ApiProtocol::GeminiGenerateContent,
+                              /*max_inspected_body_size=*/64, stats_);
+  handler.abandonOverLimit();
+  Buffer::OwnedImpl late("{\"usageMetadata\":{\"promptTokenCount\":1}}");
+  handler.onData(late); // Inert after abandonment.
+  handler.onEndStream();
+  EXPECT_TRUE(handler.degraded());
+  EXPECT_FALSE(handler.usage().hasAny());
+  EXPECT_EQ(handler.usage().api_protocol, ApiProtocol::GeminiGenerateContent);
+  EXPECT_EQ(stats_.response_body_too_large_.value(), 1);
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

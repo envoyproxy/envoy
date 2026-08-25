@@ -99,6 +99,10 @@ private:
 struct ExtractionResult {
   TokenUsage usage;
   bool malformed{false};
+  // The dialect signaled an in-band stream error (e.g. Anthropic's
+  // ``event: error`` after a 200 has streamed): the terminal usage update
+  // never arrives, so the accumulation must not publish as complete.
+  bool stream_error{false};
 };
 
 } // namespace AiProtocolManager

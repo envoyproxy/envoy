@@ -76,11 +76,11 @@ message ResponseHandling {
 // Eligible 2xx SSE and JSON responses are observed as they stream through;
 // the filter never stops iteration or modifies the response, and no
 // extraction failure can affect it. The result is published at a clean end
-// of stream under one namespace in both metadata forms: the authoritative
-// typed record (:ref:`envoy.data.ai.v3.TokenUsage
-// <envoy_v3_api_msg_data.ai.v3.TokenUsage>`) and an equivalent untyped
-// ``Struct`` projection for consumers that only read untyped metadata
-// (access-log formatters, CEL).
+// of stream under one namespace as typed dynamic metadata: the authoritative
+// record is :ref:`envoy.data.ai.v3.TokenUsage
+// <envoy_v3_api_msg_data.ai.v3.TokenUsage>`, consumable through typed
+// metadata readers such as ext_proc typed forwarding. No untyped ``Struct``
+// mirror is emitted.
 message TokenUsageExtraction {
   // Also inspect responses on routes without per-route configuration.
   //
@@ -103,7 +103,7 @@ message TokenUsageExtraction {
   // for the full precedence.
   type.ai.v3.ApiProtocol default_api_protocol = 2 [(validate.rules).enum = {defined_only: true}];
 
-  // Namespace for the emitted typed and untyped dynamic metadata.
+  // Namespace for the emitted typed dynamic metadata.
   // Defaults to ``envoy.ai.token_usage``.
   string metadata_namespace = 3;
 

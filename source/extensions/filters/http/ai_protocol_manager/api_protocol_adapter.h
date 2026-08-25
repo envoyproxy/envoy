@@ -44,7 +44,7 @@ public:
   ExtractionResult extractUsage(const nlohmann::json& json) const {
     ExtractionResult result;
     result.usage.api_protocol = protocol();
-    extractUsageInto(json, result.usage, result.malformed);
+    extractUsageInto(json, result);
     return result;
   }
 
@@ -62,10 +62,11 @@ public:
   virtual bool isTerminalEvent(const nlohmann::json& json) const PURE;
 
 protected:
-  // The dialect's usage reads, onto a result already stamped with protocol().
-  // A known field with an unusable value reads as absent and sets `malformed`.
-  virtual void extractUsageInto(const nlohmann::json& json, TokenUsage& usage,
-                                bool& malformed) const PURE;
+  // The dialect's usage reads, onto a result whose usage is already stamped
+  // with protocol(). A known field with an unusable value reads as absent and
+  // sets `result.malformed`; an in-band stream error sets
+  // `result.stream_error`.
+  virtual void extractUsageInto(const nlohmann::json& json, ExtractionResult& result) const PURE;
 };
 
 // The registry mapping each ApiProtocol to its adapter, plus shape detection.
