@@ -162,26 +162,6 @@ public:
 
 class Filter;
 
-// Generates only the static thunk for a Lua function (userdata at stack slot 1). The concrete
-// handle wrapper types use this to forward calls to implementations inherited from
-// StreamHandleWrapperBase without needing to repeat the int Name(lua_State*) signature.
-#define FORWARD_LUA_FUNCTION(Class, Name)                                                          \
-  static int static_##Name(lua_State* state) {                                                     \
-    Class* object = ::Envoy::Extensions::Filters::Common::Lua::alignAndCast<Class>(                \
-        luaL_checkudata(state, 1, typeid(Class).name()));                                          \
-    object->checkDead(state);                                                                      \
-    return object->Name(state);                                                                    \
-  }
-
-// Same as FORWARD_LUA_FUNCTION but for closures where userdata is in upvalue slot 1.
-#define FORWARD_LUA_CLOSURE(Class, Name)                                                           \
-  static int static_##Name(lua_State* state) {                                                     \
-    Class* object = ::Envoy::Extensions::Filters::Common::Lua::alignAndCast<Class>(                \
-        luaL_checkudata(state, lua_upvalueindex(1), typeid(Class).name()));                        \
-    object->checkDead(state);                                                                      \
-    return object->Name(state);                                                                    \
-  }
-
 /**
  * Base class for request and response stream handle wrappers. Contains all state and Lua function
  * implementations shared between the two paths. Not a BaseLuaObject itself — the concrete
@@ -446,7 +426,10 @@ protected:
   FilterCallbacks& callbacks_;
   Http::HeaderMap* trailers_{};
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> downstream_request_headers_wrapper_;
+  // Read-only by type: ReadOnlyHeaderMapWrapper has no mutating methods in its metatable,
+  // so a script that tries to write these headers fails on a missing method rather than on
+  // a refusal at call time.
+  Filters::Common::Lua::LuaDeathRef<ReadOnlyHeaderMapWrapper> downstream_request_headers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;

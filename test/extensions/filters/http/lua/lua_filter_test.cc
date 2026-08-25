@@ -1026,8 +1026,53 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseNil) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
-// downstreamRequestHeaders() is read-only: mutations should raise a Lua error.
-TEST_F(LuaHttpFilterTest, RequestHeadersInResponseReadOnly) {
+// downstreamRequestHeaders() returns a read-only wrapper, and read-only here means the mutating
+// methods are absent from the type rather than present and refusing. Asserted by introspection,
+// because absence is the actual claim: a wrapper that carried these and rejected them would still
+// report them as present to a script that looks, and would only tell the truth by failing a live
+// request.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseHasNoMutators) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local req_headers = response_handle:downstreamRequestHeaders()
+      local absent = 0
+      for _, name in ipairs({"add", "remove", "replace", "setHttp1ReasonPhrase"}) do
+        if req_headers[name] == nil then
+          absent = absent + 1
+        end
+      end
+      response_handle:headers():add("x-absent", absent)
+      -- The mutable response headers keep all four, so this is the wrapper's doing and not a
+      -- change to how methods are registered.
+      local present = 0
+      for _, name in ipairs({"add", "remove", "replace", "setHttp1ReasonPhrase"}) do
+        if response_handle:headers()[name] ~= nil then
+          present = present + 1
+        end
+      end
+      response_handle:headers():add("x-present", present)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  EXPECT_EQ("4", response_headers.get_("x-absent"));
+  EXPECT_EQ("4", response_headers.get_("x-present"));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// And calling one anyway fails the way a misspelled method does, rather than with a message that
+// would suggest writing request headers is possible at some other point in the stream.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseMutationRaises) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
       local req_headers = response_handle:downstreamRequestHeaders()
@@ -1044,10 +1089,47 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseReadOnly) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(encoder_callbacks_, requestHeaders())
       .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
-  EXPECT_LOG_CONTAINS("error", "header map can no longer be modified", {
+  EXPECT_LOG_CONTAINS("error", "attempt to call", {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   });
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+// The read methods are all present on the read-only wrapper, sharing one implementation with the
+// mutable one. Asserted together with the absence above so a change that dropped a reader by
+// accident cannot pass as "still read-only".
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseReadMethods) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local req_headers = response_handle:downstreamRequestHeaders()
+      response_handle:headers():add("x-got", req_headers:get("x-dup"))
+      response_handle:headers():add("x-at-index", req_headers:getAtIndex("x-dup", 1))
+      response_handle:headers():add("x-num", req_headers:getNumValues("x-dup"))
+      local seen = 0
+      for key, value in pairs(req_headers) do
+        seen = seen + 1
+      end
+      response_handle:headers():add("x-pairs", seen)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestRequestHeaderMapImpl downstream_headers{{":path", "/"}, {"x-dup", "a"}, {"x-dup", "b"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{downstream_headers}));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  EXPECT_EQ("a,b", response_headers.get_("x-got"));
+  EXPECT_EQ("b", response_headers.get_("x-at-index"));
+  EXPECT_EQ("2", response_headers.get_("x-num"));
+  EXPECT_EQ("3", response_headers.get_("x-pairs"));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
 // downstreamRequestHeaders() is not in the request handle API at all, so Lua raises a nil-method

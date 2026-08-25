@@ -15,34 +15,91 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
-class HeaderMapWrapper;
+class HeaderMapWrapperBase;
 
 /**
  * Iterator over a header map.
  */
 class HeaderMapIterator : public Filters::Common::Lua::BaseLuaObject<HeaderMapIterator> {
 public:
-  HeaderMapIterator(HeaderMapWrapper& parent);
+  HeaderMapIterator(HeaderMapWrapperBase& parent);
 
   static ExportedFunctions exportedFunctions() { return {}; }
 
   DECLARE_LUA_CLOSURE(HeaderMapIterator, luaPairsIterator);
 
 private:
-  HeaderMapWrapper& parent_;
+  // The base, not either concrete wrapper: iteration reads headers and clears the parent's
+  // iterator slot, both of which live in the base, so one iterator type serves the read-write
+  // and read-only wrappers alike.
+  HeaderMapWrapperBase& parent_;
   std::vector<const Http::HeaderEntry*> entries_;
   uint64_t current_{};
 };
 
 /**
- * Lua wrapper for a header map. Methods that will modify the map will call a check function
- * to see if modification is allowed.
+ * Shared read-only half of the header map wrappers.
+ *
+ * Not a BaseLuaObject itself: each concrete wrapper derives from BaseLuaObject with its own type,
+ * because Lua metatables are registered per C++ type (see registerType() and the typeid() key in
+ * DECLARE_LUA_FUNCTION). That is exactly what makes ReadOnlyHeaderMapWrapper read-only -- the
+ * mutating methods are absent from its metatable rather than present and refusing.
  */
-class HeaderMapWrapper : public Filters::Common::Lua::BaseLuaObject<HeaderMapWrapper> {
+class HeaderMapWrapperBase {
+public:
+  HeaderMapWrapperBase(Http::HeaderMap& headers) : headers_(headers) {}
+  virtual ~HeaderMapWrapperBase() = default;
+
+protected:
+  /**
+   * Get a header value from the map.
+   * @param 1 (string): header name.
+   * @return string value if found or nil.
+   */
+  int luaGet(lua_State* state);
+
+  /**
+   * Get a header value from the map.
+   * @param 1 (string): header name.
+   * @param 2 (int): index of the value for the given header which needs to be retrieved.
+   * @return string value if found or nil.
+   */
+  int luaGetAtIndex(lua_State* state);
+
+  /**
+   * Get the header value size from the map.
+   * @param 1 (string): header name.
+   * @return int value size if found or 0.
+   */
+  int luaGetNumValues(lua_State* state);
+
+  /**
+   * Implementation of the __pairs metamethod so a headers wrapper can be iterated over using
+   * pairs().
+   */
+  int luaPairs(lua_State* state);
+
+  Http::HeaderMap& headers_;
+  Filters::Common::Lua::LuaDeathRef<HeaderMapIterator> iterator_;
+
+  friend class HeaderMapIterator;
+};
+
+/**
+ * Lua wrapper for a mutable header map. The mutating methods call a check function to see if
+ * modification is allowed at this point in the stream; when it is not, they raise.
+ *
+ * For a map that is never writable, use ReadOnlyHeaderMapWrapper below rather than passing a
+ * callback that always returns false: a caller should not be told "not right now" about something
+ * that is never possible.
+ */
+class HeaderMapWrapper : public HeaderMapWrapperBase,
+                         public Filters::Common::Lua::BaseLuaObject<HeaderMapWrapper> {
 public:
   using CheckModifiableCb = std::function<bool()>;
 
-  HeaderMapWrapper(Http::HeaderMap& headers, CheckModifiableCb cb) : headers_(headers), cb_(cb) {}
+  HeaderMapWrapper(Http::HeaderMap& headers, CheckModifiableCb cb)
+      : HeaderMapWrapperBase(headers), cb_(cb) {}
 
   static ExportedFunctions exportedFunctions() {
     return {{"add", static_luaAdd},
@@ -63,34 +120,6 @@ private:
    * @return nothing.
    */
   DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaAdd);
-
-  /**
-   * Get a header value from the map.
-   * @param 1 (string): header name.
-   * @return string value if found or nil.
-   */
-  DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaGet);
-
-  /**
-   * Get a header value from the map.
-   * @param 1 (string): header name.
-   * @param 2 (int): index of the value for the given header which needs to be retrieved.
-   * @return string value if found or nil.
-   */
-  DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaGetAtIndex);
-
-  /**
-   * Get the header value size from the map.
-   * @param 1 (string): header name.
-   * @return int value size if found or 0.
-   */
-  DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaGetNumValues);
-
-  /**
-   * Implementation of the __pairs metamethod so a headers wrapper can be iterated over using
-   * pairs().
-   */
-  DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaPairs);
 
   /**
    * Remove a header from the map.
@@ -114,6 +143,13 @@ private:
    */
   DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaSetHttp1ReasonPhrase);
 
+  // Read methods are implemented in HeaderMapWrapperBase; these only generate the thunks that
+  // bind them to this type's metatable.
+  FORWARD_LUA_FUNCTION(HeaderMapWrapper, luaGet)
+  FORWARD_LUA_FUNCTION(HeaderMapWrapper, luaGetAtIndex)
+  FORWARD_LUA_FUNCTION(HeaderMapWrapper, luaGetNumValues)
+  FORWARD_LUA_FUNCTION(HeaderMapWrapper, luaPairs)
+
   void checkModifiable(lua_State* state);
 
   // Envoy::Lua::BaseLuaObject
@@ -122,11 +158,44 @@ private:
     iterator_.reset();
   }
 
-  Http::HeaderMap& headers_;
   CheckModifiableCb cb_;
-  Filters::Common::Lua::LuaDeathRef<HeaderMapIterator> iterator_;
+};
 
-  friend class HeaderMapIterator;
+/**
+ * Lua wrapper for a header map that can only be read.
+ *
+ * The mutating methods are not in this type's metatable at all, so `h:replace(...)` fails as a
+ * call of a nil value rather than as a policy error at call time. That distinction is the point:
+ * a wrapper that carries `add`/`remove`/`replace` and refuses them still reports them as present
+ * to anything that inspects it, and only reveals the truth by failing a request in production.
+ *
+ * Used for the downstream request headers exposed on the response path, which cannot be modified
+ * usefully -- they have already been sent upstream.
+ */
+class ReadOnlyHeaderMapWrapper
+    : public HeaderMapWrapperBase,
+      public Filters::Common::Lua::BaseLuaObject<ReadOnlyHeaderMapWrapper> {
+public:
+  ReadOnlyHeaderMapWrapper(Http::HeaderMap& headers) : HeaderMapWrapperBase(headers) {}
+
+  static ExportedFunctions exportedFunctions() {
+    return {{"get", static_luaGet},
+            {"getAtIndex", static_luaGetAtIndex},
+            {"getNumValues", static_luaGetNumValues},
+            {"__pairs", static_luaPairs}};
+  }
+
+private:
+  FORWARD_LUA_FUNCTION(ReadOnlyHeaderMapWrapper, luaGet)
+  FORWARD_LUA_FUNCTION(ReadOnlyHeaderMapWrapper, luaGetAtIndex)
+  FORWARD_LUA_FUNCTION(ReadOnlyHeaderMapWrapper, luaGetNumValues)
+  FORWARD_LUA_FUNCTION(ReadOnlyHeaderMapWrapper, luaPairs)
+
+  // Envoy::Lua::BaseLuaObject
+  void onMarkDead() override {
+    // Iterators do not survive yields.
+    iterator_.reset();
+  }
 };
 
 class DynamicMetadataMapWrapper;

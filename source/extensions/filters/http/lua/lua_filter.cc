@@ -213,6 +213,7 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<Filters::Common::Lua::SslConnectionWrapper>();
   lua_state_.registerType<Filters::Common::Lua::ParsedX509NameWrapper>();
   lua_state_.registerType<HeaderMapWrapper>();
+  lua_state_.registerType<ReadOnlyHeaderMapWrapper>();
   lua_state_.registerType<HeaderMapIterator>();
   lua_state_.registerType<StreamInfoWrapper>();
   lua_state_.registerType<DynamicMetadataMapWrapper>();
@@ -586,10 +587,11 @@ int StreamHandleWrapperBase::luaDownstreamRequestHeaders(lua_State* state) {
     return 0;
   }
 
-  // The "can modify" callback returns false to make this wrapper read-only at the Lua level.
-  // Mutating request headers after they have been forwarded upstream has no effect.
+  // Read-only because the request headers have already gone upstream, so a write here could not
+  // affect the request. ReadOnlyHeaderMapWrapper enforces that by not exposing the mutators at
+  // all, rather than exposing them and refusing.
   downstream_request_headers_wrapper_.reset(
-      HeaderMapWrapper::create(state, request_headers.value().get(), [] { return false; }), true);
+      ReadOnlyHeaderMapWrapper::create(state, request_headers.value().get()), true);
   return 1;
 }
 

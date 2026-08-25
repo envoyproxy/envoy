@@ -17,7 +17,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
-HeaderMapIterator::HeaderMapIterator(HeaderMapWrapper& parent) : parent_(parent) {
+HeaderMapIterator::HeaderMapIterator(HeaderMapWrapperBase& parent) : parent_(parent) {
   entries_.reserve(parent_.headers_.size());
   parent_.headers_.iterate(
       [this](const Envoy::Http::HeaderEntry& header) -> Envoy::Http::HeaderMap::Iterate {
@@ -49,7 +49,7 @@ int HeaderMapWrapper::luaAdd(lua_State* state) {
   return 0;
 }
 
-int HeaderMapWrapper::luaGet(lua_State* state) {
+int HeaderMapWrapperBase::luaGet(lua_State* state) {
   absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   const Envoy::Http::HeaderUtility::GetAllOfHeaderAsStringResult value =
       Envoy::Http::HeaderUtility::getAllOfHeaderAsString(headers_,
@@ -62,7 +62,7 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
   }
 }
 
-int HeaderMapWrapper::luaGetAtIndex(lua_State* state) {
+int HeaderMapWrapperBase::luaGetAtIndex(lua_State* state) {
   absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   const int index = luaL_checknumber(state, 3);
   const Envoy::Http::HeaderMap::GetResult header_value =
@@ -75,7 +75,7 @@ int HeaderMapWrapper::luaGetAtIndex(lua_State* state) {
   return 0;
 }
 
-int HeaderMapWrapper::luaGetNumValues(lua_State* state) {
+int HeaderMapWrapperBase::luaGetNumValues(lua_State* state) {
   absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   const Envoy::Http::HeaderMap::GetResult header_value =
       headers_.get(Envoy::Http::LowerCaseString(key));
@@ -83,7 +83,7 @@ int HeaderMapWrapper::luaGetNumValues(lua_State* state) {
   return 1;
 }
 
-int HeaderMapWrapper::luaPairs(lua_State* state) {
+int HeaderMapWrapperBase::luaPairs(lua_State* state) {
   if (iterator_.get() != nullptr) {
     luaL_error(state, "cannot create a second iterator before completing the first");
   }
@@ -126,7 +126,11 @@ void HeaderMapWrapper::checkModifiable(lua_State* state) {
   }
 
   if (!cb_()) {
-    luaL_error(state, "header map can no longer be modified");
+    // Names the cause. The previous wording, "header map can no longer be modified", said only
+    // that the window had closed and not what closed it, which reads as a timing mystery rather
+    // than as "this map was already handed on".
+    luaL_error(state, "headers cannot be modified after they have been continued to the next "
+                      "filter");
   }
 }
 

@@ -760,8 +760,13 @@ The response handle passed to ``envoy_on_response`` supports all of the same met
 
 Returns the original downstream request headers during response processing. This method is only
 available on the response handle passed to ``envoy_on_response``; it is not present on the request
-handle. The returned handle is **read-only**; any attempt to modify it will result in a script
-error.
+handle.
+
+The returned handle is **read-only**: it supports ``get()``, ``getAtIndex()``, ``getNumValues()``
+and iteration with ``pairs()``, and the mutating methods (``add()``, ``remove()``, ``replace()``,
+``setHttp1ReasonPhrase()``) are not defined on it at all. Calling one fails the way calling any
+undefined method does. The request headers have already been sent upstream by this point, so
+modifying them could not affect the request.
 
 Returns ``nil`` if request headers are not available. This occurs when the response is generated
 before the downstream request headers have been fully received — for example, when Envoy produces

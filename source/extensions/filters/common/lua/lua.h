@@ -58,6 +58,31 @@ namespace Lua {
 #define DECLARE_LUA_FUNCTION(Class, Name) DECLARE_LUA_FUNCTION_EX(Class, Name, 1)
 
 /**
+ * Generate only the static thunk for a Lua function whose implementation is inherited from a
+ * shared base, with userdata in stack slot 1. Use this where several registered Lua types expose
+ * the same implementation: each type needs its own thunk, because the metatable and the
+ * luaL_checkudata key are per type, but the method body is written once in the base.
+ */
+#define FORWARD_LUA_FUNCTION(Class, Name)                                                          \
+  static int static_##Name(lua_State* state) {                                                     \
+    Class* object = ::Envoy::Extensions::Filters::Common::Lua::alignAndCast<Class>(                \
+        luaL_checkudata(state, 1, typeid(Class).name()));                                          \
+    object->checkDead(state);                                                                      \
+    return object->Name(state);                                                                    \
+  }
+
+/**
+ * Same as FORWARD_LUA_FUNCTION but for closures, where userdata is in upvalue slot 1.
+ */
+#define FORWARD_LUA_CLOSURE(Class, Name)                                                           \
+  static int static_##Name(lua_State* state) {                                                     \
+    Class* object = ::Envoy::Extensions::Filters::Common::Lua::alignAndCast<Class>(                \
+        luaL_checkudata(state, lua_upvalueindex(1), typeid(Class).name()));                        \
+    object->checkDead(state);                                                                      \
+    return object->Name(state);                                                                    \
+  }
+
+/**
  * Declare a Lua function in which userdata is in upvalue slot 1. See DECLARE_LUA_FUNCTION_EX()
  */
 #define DECLARE_LUA_CLOSURE(Class, Name) DECLARE_LUA_FUNCTION_EX(Class, Name, lua_upvalueindex(1))
