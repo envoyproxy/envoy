@@ -1037,6 +1037,36 @@ TEST_F(AsyncQueueTest, PushPopRendezvousWhenBlockedOnCapacity) {
   EXPECT_TRUE(queue.empty());
 }
 
+TEST_F(AsyncQueueTest, TryPushFailurePreservesCallerItem) {
+  // Queue with capacity limit of 1, filled by holding capacity
+  AsyncQueue<std::unique_ptr<int>> queue(1);
+  auto hold = queue.capacity()->tryAcquire(1);
+  ASSERT_TRUE(hold.has_value());
+
+  auto item = std::make_unique<int>(123);
+  EXPECT_FALSE(queue.tryPush(std::move(item)));
+  // item must NOT be dropped on the floor
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(*item, 123);
+
+  // Closed queue: tryPush will fail and preserve caller's item
+  AsyncQueue<std::unique_ptr<int>> closed_queue(10);
+  closed_queue.close();
+  EXPECT_FALSE(closed_queue.tryPush(std::move(item)));
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(*item, 123);
+
+  // When capacity is released, tryPush succeeds and moves item
+  hold->release();
+  EXPECT_TRUE(queue.tryPush(std::move(item)));
+  EXPECT_EQ(item, nullptr);
+
+  auto popped = queue.tryPop();
+  ASSERT_TRUE(popped.has_value());
+  ASSERT_NE(*popped, nullptr);
+  EXPECT_EQ(**popped, 123);
+}
+
 } // namespace
 } // namespace Coroutine
 } // namespace Envoy

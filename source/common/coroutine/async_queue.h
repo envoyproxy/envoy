@@ -140,7 +140,7 @@ private:
     std::optional<uint64_t> maxSize() const { return capacity_->maxPermits(); }
     CapacityPtr capacity() const { return capacity_; }
 
-    bool tryHandoff(T& item) {
+    template <typename U = T> bool tryHandoff(U&& item) {
       while (!pop_waiters_.empty()) {
         if (!pop_waiters_.front()->cb) {
           pop_waiters_.pop_front();
@@ -154,7 +154,7 @@ private:
           // Track active direct handoff operations with an integer counter so that nested reentrant
           // handoff operations (e.g. in multi-consumer cascades) properly nest and decrement.
           ++in_handoff_;
-          cb(std::optional<T>(std::move(item)));
+          cb(std::optional<T>(std::forward<U>(item)));
           --in_handoff_;
         }
         return true;
@@ -210,12 +210,12 @@ private:
       co_return absl::OkStatus();
     }
 
-    bool tryPush(T item) {
+    template <typename U = T> bool tryPush(U&& item) {
       if (closed_) {
         return false;
       }
 
-      if (tryHandoff(item)) {
+      if (tryHandoff(std::forward<U>(item))) {
         return true;
       }
 
@@ -226,7 +226,7 @@ private:
       }
 
       current_size_ += size;
-      auto queued_item = std::make_shared<QueuedItem>(std::move(item));
+      auto queued_item = std::make_shared<QueuedItem>(std::forward<U>(item));
       queued_item->reservation = std::move(*res_opt);
       queue_.push_back(std::move(queued_item));
       return true;
@@ -324,12 +324,12 @@ public:
       co_return co_await core->push(std::move(item));
     }
 
-    bool tryPush(T item) {
+    template <typename U = T> bool tryPush(U&& item) {
       auto core = core_.lock();
       if (!core || core->closed()) {
         return false;
       }
-      return core->tryPush(std::move(item));
+      return core->tryPush(std::forward<U>(item));
     }
 
     void close() {
@@ -400,7 +400,8 @@ public:
   CapacityPtr capacity() const { return core_->capacity(); }
 
   Task<absl::Status> push(T item) { return core_->push(std::move(item)); }
-  bool tryPush(T item) { return core_->tryPush(std::move(item)); }
+
+  template <typename U = T> bool tryPush(U&& item) { return core_->tryPush(std::forward<U>(item)); }
 
   PopAwaitable pop() { return PopAwaitable(core_); }
   std::optional<T> tryPop() { return core_->tryPop(); }
