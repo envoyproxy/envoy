@@ -19,10 +19,12 @@ envoy_package()
 envoy_cc_test(
     name = "ja4_fingerprint_test",
     srcs = ["ja4_fingerprint_test.cc"],
+    external_deps = ["ssl"],
     rbe_pool = "6gig",
     deps = [
         ":tls_utility_lib",
         "//source/common/common:hex_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/extensions/filters/listener/tls_inspector:ja4_fingerprint_lib",
     ],
 )
@@ -50,6 +52,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "tls_inspector_ja4_test",
     srcs = ["tls_inspector_ja4_test.cc"],
+    external_deps = ["ssl"],
     rbe_pool = "6gig",
     deps = [
         ":tls_utility_lib",
@@ -58,6 +61,7 @@ envoy_cc_test(
         "//source/common/network:listener_filter_buffer_lib",
         "//source/common/ssl:ssl_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
+        "//source/extensions/filters/listener/tls_inspector:ja4_fingerprint_lib",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/api:api_mocks",
