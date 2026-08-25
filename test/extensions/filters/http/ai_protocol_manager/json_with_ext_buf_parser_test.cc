@@ -401,7 +401,6 @@ TEST_F(JsonWithExtBufParserTest, NodeBudgetBoundsAmplification) {
   EXPECT_FALSE(status.ok());
   EXPECT_THAT(status.message(), testing::HasSubstr("node budget"));
 }
-
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

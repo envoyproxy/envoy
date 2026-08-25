@@ -221,12 +221,12 @@ public:
   }
 
   static absl::StatusOr<std::unique_ptr<FilterConfig>>
-  create(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+  create(Stats::StatName stat_prefix, Server::Configuration::GenericFactoryContext& context,
          ShadowWriterPtr&& shadow_writer,
          const envoy::extensions::filters::http::router::v3::Router& config);
 
 protected:
-  FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+  FilterConfig(Stats::StatName stat_prefix, Server::Configuration::GenericFactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config,
                absl::Status& creation_status);
