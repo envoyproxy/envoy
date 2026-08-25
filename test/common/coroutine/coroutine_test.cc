@@ -687,6 +687,86 @@ TEST(TaskTest, FinalAwaiterAndTaskAwaiterCoverage) {
   EXPECT_FALSE(awaiter.await_ready());
 }
 
+class ImmediateLeaf : public LeafAwaitable<absl::StatusOr<int>> {
+public:
+  ImmediateLeaf(std::optional<int> immediate_val, bool cancel_during_immediate = false)
+      : immediate_val_(immediate_val), cancel_during_immediate_(cancel_during_immediate) {}
+
+  bool started_ = false;
+
+protected:
+  std::optional<absl::StatusOr<int>> tryImmediate() override {
+    if (cancel_during_immediate_) {
+      context().cancellation()->cancel();
+    }
+    if (immediate_val_.has_value()) {
+      return *immediate_val_;
+    }
+    return std::nullopt;
+  }
+
+  void onStart() override {
+    started_ = true;
+    complete(999);
+  }
+  void onCancel() override {}
+
+private:
+  std::optional<int> immediate_val_;
+  bool cancel_during_immediate_ = false;
+};
+
+TEST(LeafAwaitableTest, TryImmediateSuccessAvoidsSuspension) {
+  auto exec = std::make_shared<ManualExecutor>();
+  bool ran = false;
+  std::optional<absl::StatusOr<int>> result;
+
+  auto coro = [&]() -> Task<absl::Status> {
+    ImmediateLeaf leaf(42);
+    ASSIGN_OR_CO_RETURN(int val, co_await leaf);
+    EXPECT_FALSE(leaf.started_);
+    result = val;
+    ran = true;
+    co_return absl::OkStatus();
+  };
+
+  DetachedHandle handle = launch(coro(), exec, [](absl::Status) {}, StartMode::Inline);
+  EXPECT_TRUE(ran);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_OK(*result);
+  EXPECT_EQ(result->value(), 42);
+}
+
+TEST(LeafAwaitableTest, CancellationDuringTryImmediatePreservesResultAndSubsequentAwaitAborts) {
+  auto exec = std::make_shared<ManualExecutor>();
+  bool after_first_await_reached = false;
+  bool after_second_await_reached = false;
+  std::optional<int> received_val;
+  std::optional<absl::Status> final_status;
+
+  auto coro = [&]() -> Task<absl::Status> {
+    ImmediateLeaf leaf1(42, /*cancel_during_immediate=*/true);
+    ASSIGN_OR_CO_RETURN(int val, co_await leaf1);
+    received_val = val;
+    after_first_await_reached = true;
+
+    // Second awaitable must fail-fast due to the cancellation triggered during leaf1
+    ImmediateLeaf leaf2(100);
+    ASSIGN_OR_CO_RETURN(int val2, co_await leaf2);
+    (void)val2;
+    after_second_await_reached = true;
+    co_return absl::OkStatus();
+  };
+
+  DetachedHandle handle = launch(
+      coro(), exec, [&final_status](absl::Status s) { final_status = s; }, StartMode::Inline);
+  EXPECT_TRUE(after_first_await_reached);
+  EXPECT_EQ(received_val, 42);
+  EXPECT_FALSE(after_second_await_reached);
+  ASSERT_TRUE(final_status.has_value());
+  EXPECT_TRUE(absl::IsCancelled(*final_status));
+}
+
 } // namespace
 } // namespace Coroutine
 } // namespace Envoy

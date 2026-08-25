@@ -11,9 +11,9 @@
 #include <utility>
 
 #include "source/common/common/assert.h"
-#include "source/common/coroutine/any_of.h"
-#include "source/common/coroutine/async_event.h"
+#include "source/common/coroutine/launch.h"
 #include "source/common/coroutine/leaf_awaitable.h"
+#include "source/common/coroutine/semaphore.h"
 #include "source/common/coroutine/status_macros.h"
 #include "source/common/coroutine/task.h"
 
@@ -25,106 +25,40 @@
 namespace Envoy {
 namespace Coroutine {
 
-class SharedCapacity;
-
-/**
- * CapacityReservation is an RAII guard holding a reservation against SharedCapacity.
- * When destroyed or explicitly released, it automatically decrements the reserved capacity.
- */
-class CapacityReservation {
-public:
-  CapacityReservation() = default;
-  CapacityReservation(std::shared_ptr<SharedCapacity> cap, uint64_t size);
-  ~CapacityReservation();
-
-  CapacityReservation(const CapacityReservation&) = delete;
-  CapacityReservation& operator=(const CapacityReservation&) = delete;
-
-  CapacityReservation(CapacityReservation&& other) noexcept;
-  CapacityReservation& operator=(CapacityReservation&& other) noexcept;
-
-  uint64_t size() const { return size_; }
-  bool hasCapacity() const { return cap_ != nullptr && size_ > 0; }
-  void release();
-
-private:
-  std::shared_ptr<SharedCapacity> cap_;
-  uint64_t size_{0};
-};
+using Capacity = Semaphore;
+using CapacityReservation = SemaphoreReservation;
+using CapacityPtr = SemaphorePtr;
 
 template <typename T> struct DefaultItemSize {
   uint64_t operator()(const T&) const { return 1; }
 };
 
 /**
- * SharedCapacity manages a shared capacity limit across one or more AsyncQueue instances,
- * acting as an asynchronous weighted semaphore built on AsyncEvent.
+ * AsyncQueue is an asynchronous, bounded or unbounded FIFO queue for Envoy coroutines.
  *
- * Preserves strict FIFO arrival ordering for capacity acquisition.
- */
-class SharedCapacity : public std::enable_shared_from_this<SharedCapacity> {
-public:
-  explicit SharedCapacity(std::optional<uint64_t> max_size = std::nullopt);
-  ~SharedCapacity();
-
-  SharedCapacity(const SharedCapacity&) = delete;
-  SharedCapacity& operator=(const SharedCapacity&) = delete;
-  SharedCapacity(SharedCapacity&&) = delete;
-  SharedCapacity& operator=(SharedCapacity&&) = delete;
-
-  std::optional<uint64_t> maxSize() const { return max_size_; }
-  uint64_t currentSize() const { return current_size_; }
-
-  std::optional<CapacityReservation> tryAcquire(uint64_t size);
-  Task<absl::StatusOr<CapacityReservation>> acquire(uint64_t size);
-  void release(uint64_t size);
-
-private:
-  bool hasCapacity(uint64_t additional_size) const;
-  bool canAcquire(uint64_t size) const;
-
-  const std::optional<uint64_t> max_size_;
-  uint64_t current_size_{0};
-  std::list<uint64_t> waiters_;
-  AsyncEvent capacity_event_;
-  std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
-};
-
-inline CapacityReservation::CapacityReservation(std::shared_ptr<SharedCapacity> cap, uint64_t size)
-    : cap_(std::move(cap)), size_(size) {}
-
-inline CapacityReservation::~CapacityReservation() { release(); }
-
-inline CapacityReservation::CapacityReservation(CapacityReservation&& other) noexcept
-    : cap_(std::move(other.cap_)), size_(std::exchange(other.size_, 0)) {}
-
-inline CapacityReservation& CapacityReservation::operator=(CapacityReservation&& other) noexcept {
-  if (this != &other) {
-    release();
-    cap_ = std::move(other.cap_);
-    size_ = std::exchange(other.size_, 0);
-  }
-  return *this;
-}
-
-inline void CapacityReservation::release() {
-  if (cap_ != nullptr && size_ > 0) {
-    auto cap = std::move(cap_);
-    const uint64_t size = std::exchange(size_, 0);
-    cap->release(size);
-  } else {
-    cap_.reset();
-    size_ = 0;
-  }
-}
-
-using SharedCapacityPtr = std::shared_ptr<SharedCapacity>;
-
-/**
- * AsyncQueue is a FIFO queue designed for Envoy coroutines.
+ * Concurrency & Ownership Model:
+ * - Designed for multi-producer, single-consumer or single-producer, single-consumer patterns,
+ *   where "producer" and "consumer" refer to independent coroutines pinned to the same
+ *   executor/dispatcher thread.
+ * - The queue is move-only and owned exclusively by the single consumer coroutine (popper).
+ * - Producer coroutines access the queue via lightweight `PushAccessor` instances (holding a
+ *   weak pointer), guaranteeing deterministic queue teardown when the consumer coroutine finishes.
  *
- * It models push() and pop() as coroutines, coordinating with SharedCapacity for producer
- * capacity backpressure and AsyncEvent for consumer emptiness notifications.
+ * Direct Resumption & Push-Pop Rendezvous:
+ * - Direct Resumption: If a consumer coroutine is awaiting pop(), push() hands off the data
+ *   synchronously inline without buffering or consuming Semaphore capacity.
+ * - Rendezvous: If a producer coroutine is suspended awaiting Semaphore capacity, an incoming
+ *   pop() steals the item directly from queue_ without waiting for capacity. When capacity is
+ *   eventually granted to the producer, RAII immediately returns the permits to the Semaphore.
+ *
+ * Reentrancy & Memory Safety:
+ * - Synchronous reentrancy occurs at two well-defined points: direct data handoff in
+ *   `tryHandoff()` and EOF notification in `close()`.
+ * - In the single consumer coroutine model, call stack depth is strictly bounded at O(1).
+ * - In-line queue destruction by a resumed consumer coroutine is safe: pop_waiters_ is updated
+ *   prior to resumption, and no `this` members are touched after the callback returns.
+ * - Any in-flight producer coroutines suspended on Semaphore acquisition observe `*alive_ == false`
+ *   or `closed_ == true` upon waking up and terminate cleanly with FailedPreconditionError.
  */
 template <typename T, typename SizeFunc = DefaultItemSize<T>> class AsyncQueue {
 public:
@@ -132,237 +66,349 @@ public:
       std::is_invocable_r_v<uint64_t, SizeFunc, const T&>,
       "SizeFunc must be callable with 'const T&' and return a type convertible to uint64_t");
 
-  explicit AsyncQueue(SharedCapacityPtr capacity = nullptr, SizeFunc size_func = SizeFunc())
-      : capacity_(capacity != nullptr ? std::move(capacity)
-                                      : std::make_shared<SharedCapacity>(std::nullopt)),
-        size_func_(std::move(size_func)) {}
+private:
+  struct Core : public std::enable_shared_from_this<Core> {
+    struct QueuedItem {
+      explicit QueuedItem(T item_val) : item(std::move(item_val)) {}
 
-  explicit AsyncQueue(std::optional<uint64_t> max_size, SizeFunc size_func = SizeFunc())
-      : AsyncQueue(max_size.has_value() ? std::make_shared<SharedCapacity>(*max_size) : nullptr,
-                   std::move(size_func)) {}
+      std::optional<T> item;
+      std::optional<CapacityReservation> reservation;
+    };
 
-  explicit AsyncQueue(uint64_t max_size, SizeFunc size_func = SizeFunc())
-      : AsyncQueue(std::make_shared<SharedCapacity>(max_size), std::move(size_func)) {}
+    struct PopWaiter {
+      absl::AnyInvocable<void(absl::StatusOr<std::optional<T>>)> cb;
+    };
 
-  ~AsyncQueue() {
-    *alive_ = false;
-    close();
-    queue_.clear();
-    current_size_ = 0;
-  }
+    Core(CapacityPtr capacity, SizeFunc size_func)
+        : capacity_(capacity != nullptr ? std::move(capacity)
+                                        : std::make_shared<Capacity>(std::nullopt)),
+          size_func_(std::move(size_func)) {}
 
-  AsyncQueue(const AsyncQueue&) = delete;
-  AsyncQueue& operator=(const AsyncQueue&) = delete;
-  AsyncQueue(AsyncQueue&&) = delete;
-  AsyncQueue& operator=(AsyncQueue&&) = delete;
-
-  uint64_t itemCount() const { return queue_.size(); }
-  uint64_t currentSize() const { return current_size_; }
-  std::optional<uint64_t> maxSize() const { return capacity_->maxSize(); }
-  bool isClosed() const { return closed_; }
-  bool closed() const { return closed_; }
-  bool empty() const { return queue_.empty(); }
-  SharedCapacityPtr capacity() const { return capacity_; }
-
-  /**
-   * Non-blocking attempt to push an item. Returns true on success, false if capacity full or
-   * closed.
-   */
-  bool tryPush(T item) {
-    if (closed_) {
-      return false;
+    ~Core() {
+      ASSERT(pop_waiters_.empty(),
+             "under single consumer assumption, popper cannot be waiting upon destruction");
+      if (in_handoff_ > 0) {
+        // If the queue is destroyed synchronously inside tryHandoff() (e.g. by a resumed
+        // popper), there must be zero pending pushers because tryHandoff() only executes when the
+        // queue was completely empty with no pushers awaiting capacity.
+        ASSERT(pending_pushers_ == 0,
+               "no pending pushers can exist when queue is destroyed during direct handoff");
+      }
+      *alive_ = false;
+      close();
+      queue_.clear();
+      current_size_ = 0;
     }
-    if (items_event_.hasWaiters()) {
-      queue_.push_back(QueuedItem{std::move(item), CapacityReservation{}});
-      items_event_.notifyOne();
+
+    void close() {
+      if (closed_) {
+        return;
+      }
+      closed_ = true;
+      std::list<std::shared_ptr<PopWaiter>> waiters;
+      waiters.swap(pop_waiters_);
+      for (auto& w : waiters) {
+        if (w->cb) {
+          auto cb = std::move(w->cb);
+          cb(std::optional<T>(std::nullopt));
+        }
+      }
+    }
+
+    bool closed() const { return closed_; }
+
+    bool empty() const {
+      for (const auto& entry : queue_) {
+        if (entry->item.has_value() && entry->reservation.has_value()) {
+          return false;
+        }
+      }
       return true;
     }
-    uint64_t size = size_func_(item);
-    auto res_opt = capacity_->tryAcquire(size);
-    if (!res_opt.has_value()) {
+
+    uint64_t itemCount() const {
+      uint64_t count = 0;
+      for (const auto& entry : queue_) {
+        if (entry->item.has_value() && entry->reservation.has_value()) {
+          ++count;
+        }
+      }
+      return count;
+    }
+
+    uint64_t currentSize() const { return current_size_; }
+    std::optional<uint64_t> maxSize() const { return capacity_->maxPermits(); }
+    CapacityPtr capacity() const { return capacity_; }
+
+    bool tryHandoff(T& item) {
+      while (!pop_waiters_.empty()) {
+        if (!pop_waiters_.front()->cb) {
+          pop_waiters_.pop_front();
+          continue;
+        }
+        auto waiter = std::move(pop_waiters_.front());
+        pop_waiters_.pop_front();
+
+        auto cb = std::move(waiter->cb);
+        if (cb) {
+          // Track active direct handoff operations with an integer counter so that nested reentrant
+          // handoff operations (e.g. in multi-consumer cascades) properly nest and decrement.
+          ++in_handoff_;
+          cb(std::optional<T>(std::move(item)));
+          --in_handoff_;
+        }
+        return true;
+      }
       return false;
     }
-    current_size_ += size;
-    queue_.push_back(QueuedItem{std::move(item), std::move(*res_opt)});
-    items_event_.notifyOne();
-    return true;
-  }
 
-  /**
-   * Asynchronously pushes an item into the queue, suspending until capacity is available in
-   * SharedCapacity or directly handing off to a popper via any_of.
-   * Returns OkStatus on admission/handoff, or FailedPrecondition if closed.
-   */
-  Task<absl::Status> push(T item) {
-    if (closed_) {
-      co_return absl::FailedPreconditionError("queue is closed");
-    }
-
-    if (items_event_.hasWaiters()) {
-      queue_.push_back(QueuedItem{std::move(item), CapacityReservation{}});
-      items_event_.notifyOne();
-      co_return absl::OkStatus();
-    }
-
-    uint64_t size = size_func_(item);
-    auto res_opt = capacity_->tryAcquire(size);
-    if (res_opt.has_value()) {
-      current_size_ += size;
-      queue_.push_back(QueuedItem{std::move(item), std::move(*res_opt)});
-      items_event_.notifyOne();
-      co_return absl::OkStatus();
-    }
-
-    auto alive = alive_;
-    auto cap = capacity_;
-
-    auto res = co_await any_of(cap->acquire(size), waitForPopper(&item));
-    CO_RETURN_IF_ERROR(res.status());
-
-    if (res.value().index() == 0) {
-      auto reservation = std::move(absl::get<0>(res.value()));
-      if (!*alive || closed_) {
+    Task<absl::Status> push(T item) {
+      if (closed_) {
         co_return absl::FailedPreconditionError("queue is closed");
       }
 
+      // 1. Direct handoff to a waiting popper if available.
+      if (tryHandoff(item)) {
+        co_return absl::OkStatus();
+      }
+
+      // 2. Put item in queue_ as a pending entry.
+      const uint64_t size = size_func_(item);
+      auto queued_item = std::make_shared<QueuedItem>(std::move(item));
+      auto it = queue_.insert(queue_.end(), queued_item);
+
+      // 3. Acquire capacity from Capacity. Any pop() arriving while suspended will steal from
+      // queue_.
+      auto alive = alive_;
+      ++pending_pushers_;
+      auto cap_res = co_await capacity_->acquire(size);
+      if (!*alive) {
+        queued_item->item.reset();
+        co_return absl::FailedPreconditionError("queue is closed");
+      }
+
+      --pending_pushers_;
+
+      // If a pop() stole the item during rendezvous, we are done!
+      if (!queued_item->item.has_value()) {
+        // cap_res is destroyed by RAII, returning permits back to capacity_.
+        co_return absl::OkStatus();
+      }
+
+      if (!cap_res.ok() || closed_) {
+        queue_.erase(it);
+        queued_item->item.reset();
+        if (!cap_res.ok()) {
+          co_return cap_res.status();
+        }
+        co_return absl::FailedPreconditionError("queue is closed");
+      }
+
+      // No pop() arrived while waiting: attach the acquired reservation.
       current_size_ += size;
-      queue_.push_back(QueuedItem{std::move(item), std::move(reservation)});
-      items_event_.notifyOne();
+      queued_item->reservation = std::move(cap_res.value());
       co_return absl::OkStatus();
     }
 
-    co_return absl::OkStatus();
-  }
-
-  /**
-   * Non-blocking attempt to pop an item. Returns the item if present or available from a waiting
-   * pusher, std::nullopt otherwise.
-   */
-  std::optional<T> tryPop() {
-    if (!queue_.empty()) {
-      QueuedItem item = std::move(queue_.front());
-      queue_.pop_front();
-      current_size_ -= item.reservation.size();
-      return std::move(item.item);
-    }
-
-    while (!pusher_waiters_.empty()) {
-      auto waiter = std::move(pusher_waiters_.front());
-      pusher_waiters_.pop_front();
-      if (*waiter.active && waiter.cb) {
-        *waiter.active = false;
-        T item = std::move(*waiter.item_ptr);
-        waiter.cb(absl::OkStatus());
-        return std::move(item);
-      }
-    }
-
-    return std::nullopt;
-  }
-
-  /**
-   * Asynchronously pops an item from the queue, suspending until an item is available, directly
-   * handed off from a waiting pusher, or the queue is closed. Returns the item on success, or
-   * std::nullopt on EOF (closed and drained).
-   */
-  Task<absl::StatusOr<std::optional<T>>> pop() {
-    auto alive = alive_;
-    while (true) {
-      if (!queue_.empty()) {
-        QueuedItem item = std::move(queue_.front());
-        queue_.pop_front();
-        current_size_ -= item.reservation.size();
-        co_return std::optional<T>(std::move(item.item));
-      }
-
-      while (!pusher_waiters_.empty()) {
-        auto waiter = std::move(pusher_waiters_.front());
-        pusher_waiters_.pop_front();
-        if (*waiter.active && waiter.cb) {
-          *waiter.active = false;
-          T item = std::move(*waiter.item_ptr);
-          waiter.cb(absl::OkStatus());
-          co_return std::optional<T>(std::move(item));
-        }
-      }
-
+    bool tryPush(T item) {
       if (closed_) {
-        co_return std::optional<T>(std::nullopt); // EOF
+        return false;
       }
 
-      CO_RETURN_IF_ERROR(co_await items_event_.wait());
-      if (!*alive) {
-        co_return std::optional<T>(std::nullopt);
+      if (tryHandoff(item)) {
+        return true;
       }
-    }
-  }
 
-  /**
-   * Closes the queue for future pushes.
-   * Queued items remain available for popping; once drained, pop() returns std::nullopt.
-   */
-  void close() {
-    if (closed_) {
-      return;
-    }
-    closed_ = true;
-    items_event_.notifyAll();
-
-    std::list<PusherWaiter> pusher_batch;
-    pusher_batch.swap(pusher_waiters_);
-    while (!pusher_batch.empty()) {
-      auto waiter = std::move(pusher_batch.front());
-      pusher_batch.pop_front();
-      if (*waiter.active && waiter.cb) {
-        *waiter.active = false;
-        waiter.cb(absl::FailedPreconditionError("queue is closed"));
+      const uint64_t size = size_func_(item);
+      auto res_opt = capacity_->tryAcquire(size);
+      if (!res_opt.has_value()) {
+        return false;
       }
-    }
-  }
 
-private:
-  struct QueuedItem {
-    T item;
-    CapacityReservation reservation;
+      current_size_ += size;
+      auto queued_item = std::make_shared<QueuedItem>(std::move(item));
+      queued_item->reservation = std::move(*res_opt);
+      queue_.push_back(std::move(queued_item));
+      return true;
+    }
+
+    std::optional<T> tryPop() {
+      while (!queue_.empty()) {
+        auto queued_item = std::move(queue_.front());
+        queue_.pop_front();
+
+        if (!queued_item->item.has_value()) {
+          // Item was cancelled or already stolen, skip.
+          continue;
+        }
+
+        auto item = std::move(*queued_item->item);
+        queued_item->item.reset();
+
+        if (queued_item->reservation.has_value()) {
+          current_size_ -= queued_item->reservation->permits();
+          queued_item->reservation.reset();
+        }
+
+        return std::optional<T>(std::move(item));
+      }
+      return std::nullopt;
+    }
+
+    CapacityPtr capacity_;
+    SizeFunc size_func_;
+    uint64_t current_size_{0};
+    uint64_t pending_pushers_{0};
+    uint64_t in_handoff_{0};
+    std::list<std::shared_ptr<QueuedItem>> queue_;
+    std::list<std::shared_ptr<PopWaiter>> pop_waiters_;
+    bool closed_{false};
+    std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
   };
 
-  struct PusherWaiter {
-    absl::AnyInvocable<void(absl::Status)> cb;
-    T* item_ptr;
-    std::shared_ptr<bool> active;
-  };
-
-  class PopperRendezvousAwaitable : public LeafAwaitable<absl::Status> {
+public:
+  class PopAwaitable : public LeafAwaitable<absl::StatusOr<std::optional<T>>> {
   public:
-    PopperRendezvousAwaitable(AsyncQueue& queue, T* item_ptr)
-        : queue_(queue), item_ptr_(item_ptr) {}
+    explicit PopAwaitable(std::shared_ptr<Core> core) : core_(std::move(core)) {}
 
   protected:
-    void onStart() override {
-      auto cb = [this](absl::Status status) { this->complete(status); };
-      queue_.pusher_waiters_.push_back(PusherWaiter{std::move(cb), item_ptr_, active_});
+    std::optional<absl::StatusOr<std::optional<T>>> tryImmediate() override {
+      std::optional<T> item = core_->tryPop();
+      if (item.has_value()) {
+        return item;
+      }
+      if (core_->closed()) {
+        // Return immediate EOF without suspending. Note that returning
+        // std::optional<T>(std::nullopt) wraps an empty inner optional (EOF) inside a present outer
+        // optional, whereas returning std::nullopt would produce an empty outer optional that
+        // instructs LeafAwaitable to suspend.
+        return std::optional<T>(std::nullopt);
+      }
+      // Queue is open but empty: return an empty outer optional to suspend and wait for a producer.
+      return std::nullopt;
     }
 
-    void onCancel() override { *active_ = false; }
+    void onStart() override {
+      waiter_ = std::make_shared<typename Core::PopWaiter>();
+      waiter_->cb = [this](absl::StatusOr<std::optional<T>> res) {
+        this->complete(std::move(res));
+      };
+      core_->pop_waiters_.push_back(waiter_);
+    }
+
+    void onCancel() override {
+      ASSERT(waiter_ != nullptr);
+      waiter_->cb = nullptr;
+    }
 
   private:
-    AsyncQueue& queue_;
-    T* item_ptr_;
-    std::shared_ptr<bool> active_{std::make_shared<bool>(true)};
+    std::shared_ptr<Core> core_;
+    std::shared_ptr<typename Core::PopWaiter> waiter_;
   };
 
-  PopperRendezvousAwaitable waitForPopper(T* item_ptr) {
-    return PopperRendezvousAwaitable(*this, item_ptr);
+  /**
+   * PushAccessor provides non-owning access to an AsyncQueue.
+   * Producers can push to the queue without holding ownership, allowing the consumer (the popper)
+   * to be the sole owner of the queue lifetime.
+   */
+  class PushAccessor {
+  public:
+    PushAccessor() = default;
+    explicit PushAccessor(std::weak_ptr<Core> core) : core_(std::move(core)) {}
+
+    Task<absl::Status> push(T item) {
+      auto core = core_.lock();
+      if (!core || core->closed()) {
+        co_return absl::FailedPreconditionError("queue is closed");
+      }
+      co_return co_await core->push(std::move(item));
+    }
+
+    bool tryPush(T item) {
+      auto core = core_.lock();
+      if (!core || core->closed()) {
+        return false;
+      }
+      return core->tryPush(std::move(item));
+    }
+
+    void close() {
+      auto core = core_.lock();
+      if (core) {
+        core->close();
+      }
+    }
+
+    bool closed() const {
+      auto core = core_.lock();
+      return !core || core->closed();
+    }
+
+    bool empty() const {
+      auto core = core_.lock();
+      return !core || core->empty();
+    }
+
+    uint64_t currentSize() const {
+      auto core = core_.lock();
+      return core ? core->currentSize() : 0;
+    }
+
+    uint64_t itemCount() const {
+      auto core = core_.lock();
+      return core ? core->itemCount() : 0;
+    }
+
+    CapacityPtr capacity() const {
+      auto core = core_.lock();
+      return core ? core->capacity() : nullptr;
+    }
+
+  private:
+    std::weak_ptr<Core> core_;
+  };
+
+  explicit AsyncQueue(CapacityPtr capacity = nullptr, SizeFunc size_func = SizeFunc())
+      : core_(std::make_shared<Core>(std::move(capacity), std::move(size_func))) {}
+
+  explicit AsyncQueue(std::optional<uint64_t> max_size, SizeFunc size_func = SizeFunc())
+      : AsyncQueue(max_size.has_value() ? std::make_shared<Capacity>(*max_size) : nullptr,
+                   std::move(size_func)) {}
+
+  explicit AsyncQueue(uint64_t max_size, SizeFunc size_func = SizeFunc())
+      : AsyncQueue(std::make_shared<Capacity>(max_size), std::move(size_func)) {}
+
+  ~AsyncQueue() {
+    if (core_) {
+      core_->close();
+    }
   }
 
-  SharedCapacityPtr capacity_;
-  SizeFunc size_func_;
-  uint64_t current_size_{0};
-  std::deque<QueuedItem> queue_;
-  std::list<PusherWaiter> pusher_waiters_;
-  bool closed_{false};
-  AsyncEvent items_event_;
-  std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
+  // Move-only semantics: owned exclusively by the consumer (popper).
+  AsyncQueue(AsyncQueue&& other) noexcept = default;
+  AsyncQueue& operator=(AsyncQueue&& other) noexcept = default;
+  AsyncQueue(const AsyncQueue&) = delete;
+  AsyncQueue& operator=(const AsyncQueue&) = delete;
+
+  PushAccessor pushAccessor() const { return PushAccessor(core_); }
+
+  uint64_t itemCount() const { return core_->itemCount(); }
+  uint64_t currentSize() const { return core_->currentSize(); }
+  std::optional<uint64_t> maxSize() const { return core_->maxSize(); }
+  bool closed() const { return core_->closed(); }
+  bool empty() const { return core_->empty(); }
+  CapacityPtr capacity() const { return core_->capacity(); }
+
+  Task<absl::Status> push(T item) { return core_->push(std::move(item)); }
+  bool tryPush(T item) { return core_->tryPush(std::move(item)); }
+
+  PopAwaitable pop() { return PopAwaitable(core_); }
+  std::optional<T> tryPop() { return core_->tryPop(); }
+
+  void close() { core_->close(); }
+
+private:
+  std::shared_ptr<Core> core_;
 };
 
 } // namespace Coroutine

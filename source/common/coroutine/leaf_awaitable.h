@@ -51,8 +51,15 @@ public:
   LeafAwaitable& operator=(const LeafAwaitable&) = delete;
   virtual ~LeafAwaitable() = default;
 
-  // Fail-fast: if the scope is already cancelled, don't even start/suspend.
-  bool await_ready() const { return context_->cancellation()->cancelled(); }
+  // Fail-fast: if the scope is already cancelled, or if an immediate non-blocking attempt
+  // produces a result, don't even start/suspend.
+  bool await_ready() {
+    if (context_->cancellation()->cancelled()) {
+      return true;
+    }
+    result_ = tryImmediate();
+    return result_.has_value();
+  }
 
   bool await_suspend(std::coroutine_handle<> continuation) {
     continuation_ = continuation;
@@ -75,8 +82,13 @@ public:
   // [[nodiscard]]: the result carries success/failure/cancellation, so a
   // `co_await leaf;` that drops it is almost always a bug.
   [[nodiscard]] T await_resume() {
-    // On the fail-fast path (await_ready true) await_suspend never ran, so
-    // result_ is empty and we resume with the aborted value.
+    // If result_ contains a value (e.g. from tryImmediate()), return that result rather than
+    // abortedValue() even if cancellation occurred. This ensures any non-blocking side effects
+    // (such as popped items or acquired capacity) remain visible to the caller so that they can
+    // be processed, stored, or undone as needed. The caller coroutine will either return all the
+    // way up or encounter a subsequent awaitable that is cancelled without executing further side
+    // effects.
+    // If result_ is empty (the fail-fast pre-cancelled path), return abortedValue().
     return result_ ? std::move(*result_) : abortedValue();
   }
 
@@ -88,6 +100,13 @@ protected:
   // Derived implements these:
   virtual void onStart() PURE;  // launch the op; arrange to call complete(value).
   virtual void onCancel() PURE; // cancel the pending op (honor its cancel contract).
+
+  // Optional non-blocking / immediate attempt: derived classes can perform an immediate
+  // operation (such as a non-blocking check, tryAcquire, or tryPop). If the operation completes
+  // immediately, returning a value avoids suspension overhead and resumes the coroutine directly.
+  // Returning std::nullopt indicates that the operation must suspend and arrange asynchronous
+  // completion via onStart().
+  virtual std::optional<T> tryImmediate() { return std::nullopt; }
 
   // Called by derived when the real event fires.
   void complete(T value) {
