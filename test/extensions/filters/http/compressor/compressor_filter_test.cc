@@ -72,7 +72,8 @@ public:
     auto compressor_factory = std::make_unique<TestCompressorFactory>("test");
     compressor_factory_ = compressor_factory.get();
     config_ = std::make_shared<CompressorFilterConfig>(compressor, "test.", *stats_.rootScope(),
-                                                       runtime_, std::move(compressor_factory), server_factory_context_);
+                                                       runtime_, std::move(compressor_factory),
+                                                       server_factory_context_);
     filter_ = std::make_unique<CompressorFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -1826,14 +1827,16 @@ protected:
     auto compressor_factory1 = std::make_unique<TestCompressorFactory>("test1");
     compressor_factory1->setExpectedCompressCalls(0);
     auto config1 = std::make_shared<CompressorFilterConfig>(
-        compressor, "test1.", *stats1_.rootScope(), runtime_, std::move(compressor_factory1), server_factory_context_);
+        compressor, "test1.", *stats1_.rootScope(), runtime_, std::move(compressor_factory1),
+        server_factory_context_);
     filter1_ = std::make_unique<CompressorFilter>(config1);
 
     TestUtility::loadFromJson(json2, compressor);
     auto compressor_factory2 = std::make_unique<TestCompressorFactory>("test2");
     compressor_factory2->setExpectedCompressCalls(0);
     auto config2 = std::make_shared<CompressorFilterConfig>(
-        compressor, "test2.", *stats2_.rootScope(), runtime_, std::move(compressor_factory2), server_factory_context_);
+        compressor, "test2.", *stats2_.rootScope(), runtime_, std::move(compressor_factory2),
+        server_factory_context_);
     filter2_ = std::make_unique<CompressorFilter>(config2);
   }
 
@@ -2276,7 +2279,8 @@ protected:
                               compressor);
     auto compressor_factory1 = std::make_unique<TestCompressorFactory>("test1");
     auto config1 = std::make_shared<CompressorFilterConfig>(
-        compressor, "test1.", *stats1_.rootScope(), runtime_, std::move(compressor_factory1), server_factory_context_);
+        compressor, "test1.", *stats1_.rootScope(), runtime_, std::move(compressor_factory1),
+        server_factory_context_);
     filter1_ = std::make_unique<CompressorFilter>(config1);
 
     TestUtility::loadFromJson(fmt::format(R"EOF(
@@ -2294,7 +2298,8 @@ protected:
                               compressor);
     auto compressor_factory2 = std::make_unique<TestCompressorFactory>("test2");
     auto config2 = std::make_shared<CompressorFilterConfig>(
-        compressor, "test2.", *stats2_.rootScope(), runtime_, std::move(compressor_factory2), server_factory_context_);
+        compressor, "test2.", *stats2_.rootScope(), runtime_, std::move(compressor_factory2),
+        server_factory_context_);
     filter2_ = std::make_unique<CompressorFilter>(config2);
   }
 
@@ -2593,9 +2598,7 @@ TEST_F(CompressorFilterTest, ContentTypeMatcherExactMatch) {
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
 
   Http::TestResponseHeaderMapImpl headers{
-      {":status", "200"},
-      {"content-length", "256"},
-      {"content-type", "application/custom"}};
+      {":status", "200"}, {"content-length", "256"}, {"content-type", "application/custom"}};
 
   response_stats_prefix_ = "response.";
 
@@ -2626,9 +2629,7 @@ TEST_F(CompressorFilterTest, ContentTypeMatcherExactMismatch) {
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
 
   Http::TestResponseHeaderMapImpl headers{
-      {":status", "200"},
-      {"content-length", "256"},
-      {"content-type", "application/test"}};
+      {":status", "200"}, {"content-length", "256"}, {"content-type", "application/test"}};
 
   response_stats_prefix_ = "response.";
 
@@ -2660,9 +2661,7 @@ TEST_F(CompressorFilterTest, ContentTypeMatcherOverridesDefaultContentTypes) {
 
   // Use content type which belongs to the default list
   Http::TestResponseHeaderMapImpl headers{
-      {":status", "200"},
-      {"content-length", "256"},
-      {"content-type", "application/json"}};
+      {":status", "200"}, {"content-length", "256"}, {"content-type", "application/json"}};
 
   response_stats_prefix_ = "response.";
 
@@ -2693,9 +2692,7 @@ TEST_F(CompressorFilterTest, ContentTypeMatcherPrefixMatch) {
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
 
   Http::TestResponseHeaderMapImpl headers{
-      {":status", "200"},
-      {"content-length", "256"},
-      {"content-type", "application/custom"}};
+      {":status", "200"}, {"content-length", "256"}, {"content-type", "application/custom"}};
 
   response_stats_prefix_ = "response.";
 
@@ -2725,10 +2722,9 @@ TEST_F(CompressorFilterTest, ContentTypeMatcherIgnoresParameters) {
 
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
 
-  Http::TestResponseHeaderMapImpl headers{
-      {":status", "200"},
-      {"content-length", "256"},
-      {"content-type", "application/custom; charset=utf-8"}};
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-length", "256"},
+                                          {"content-type", "application/custom; charset=utf-8"}};
 
   response_stats_prefix_ = "response.";
 
@@ -2761,10 +2757,9 @@ TEST_F(CompressorFilterTest, ContentTypeMatcherRegexMatchesAnyContentType) {
 
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test"}});
 
-  Http::TestResponseHeaderMapImpl headers{
-      {":status", "200"},
-      {"content-length", "256"},
-      {"content-type", "application/not-in-default-list"}};
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                          {"content-length", "256"},
+                                          {"content-type", "application/not-in-default-list"}};
 
   response_stats_prefix_ = "response.";
 

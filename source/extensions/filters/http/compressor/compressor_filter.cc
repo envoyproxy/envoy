@@ -100,7 +100,8 @@ CompressorFilterConfig::DirectionConfig::DirectionConfig(
     Server::Configuration::CommonFactoryContext& context)
     : compression_enabled_(proto_config.enabled(), runtime),
       min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
-      content_type_values_(contentTypeSet(proto_config.content_type(), !proto_config.content_type_matcher().empty())),
+      content_type_values_(contentTypeSet(proto_config.content_type(),
+                                          !proto_config.content_type_matcher().empty())),
       content_type_matchers_(contentTypeMatcherList(proto_config.content_type_matcher(), context)),
       stats_{generateStats(stats_prefix, scope)} {}
 
@@ -558,7 +559,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
     // If "gzip" is not excluded from the decision process then it will take precedence over
     // "deflate" and the resulting response won't be compressed at all.
     if (!content_type_value.empty() &&
-      !filter_config->responseDirectionConfig().isContentTypeAllowed(content_type_value)) {
+        !filter_config->responseDirectionConfig().isContentTypeAllowed(content_type_value)) {
       continue;
     }
 
@@ -731,18 +732,16 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
 
 bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
     const Http::RequestOrResponseHeaderMap& headers) const {
-  
+
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type == nullptr) {
     return true;
   }
 
-  return isContentTypeAllowed(
-      normalizeContentTypeValue(content_type->value().getStringView()));
+  return isContentTypeAllowed(normalizeContentTypeValue(content_type->value().getStringView()));
 }
 
-bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
-    absl::string_view value) const {
+bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(absl::string_view value) const {
 
   // If both configuration lists are empty, go for default behavior.
   if (content_type_values_.empty() && content_type_matchers_.empty()) {

@@ -8,8 +8,8 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "source/common/common/matchers.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -95,10 +95,10 @@ public:
     static uint32_t contentLengthUint(Protobuf::uint32 length);
 
     static StringUtil::CaseUnorderedSet
-    contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types, bool has_matchers);  
-    static std::vector<Matchers::StringMatcherPtr>
-    contentTypeMatcherList(const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& matchers,
-                           Server::Configuration::CommonFactoryContext& context);
+    contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types, bool has_matchers);
+    static std::vector<Matchers::StringMatcherPtr> contentTypeMatcherList(
+        const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& matchers,
+        Server::Configuration::CommonFactoryContext& context);
 
     const uint32_t min_content_length_;
     const StringUtil::CaseUnorderedSet content_type_values_;
