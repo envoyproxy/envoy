@@ -241,11 +241,13 @@ private:
   bool wuffs_done_{false};
 
   // Exclusive upper bound for per-depth state tracking: depths 1 through
-  // kMaxTrackedDepth-1 (currently 1–8) have full key/dup/path tracking.
-  // Value covers the deepest known OpenAI/Anthropic schema paths:
-  //   tools[i].function.parameters.properties.<arg>.type  (depth 7)
-  //   messages[i].content[j].content[k].text              (depth 7)
-  // plus one buffer level for schemas with one extra level of nesting.
+  // kMaxTrackedDepth-1 (currently 1–16) have full key/dup/path tracking.
+  // Value covers the deepest known provider schema paths:
+  //   tools[i].function.parameters.properties.<arg>.type      (depth 7)
+  //   messages[i].content[j].content[k].text                  (depth 7)
+  //   [i].candidates[j].content.parts[k].functionCall.args.*  (depth 9+,
+  //     Gemini streamed root arrays; `args` is an arbitrary object)
+  // plus headroom for nested tool arguments.
   //
   // Nesting beyond kMaxTrackedDepth-1 is rejected with InvalidArgumentError.
   // Key/dup/path tracking accuracy is bounded by kMaxTrackedDepth-1 because
@@ -256,7 +258,7 @@ private:
   // losing tracking accuracy. This removes the hard compile-time cap at the
   // cost of per-push heap allocation; evaluate against the request-path perf
   // budget before doing so.
-  static constexpr int kMaxTrackedDepth = 9;
+  static constexpr int kMaxTrackedDepth = 17;
   // Cap key length at 256 bytes: well above any legitimate schema field name
   // (longest observed ~25B, e.g. "input_audio_transcription") while bounding
   // per-key allocation and guarding against DoS via unbounded key lengths.
