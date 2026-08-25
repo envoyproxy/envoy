@@ -9,17 +9,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace SseToMetadata {
 
-absl::StatusOr<Http::FilterFactoryCb> SseToMetadataConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  // This filter only uses the server factory context, so delegate to the server-context variant.
-  return createHttpFilterFactoryFromProtoTyped(proto_config, stats_prefix,
-                                               context.serverFactoryContext());
-}
-
 absl::StatusOr<Http::FilterFactoryCb> SseToMetadataConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
 
   // Create shared config (which instantiates the parser from TypedExtensionConfig)
   // Note: content_parser is validated as required by proto validation rules

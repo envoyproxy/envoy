@@ -202,7 +202,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, MissingMethod) {
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
-          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Missing method field"}})json"));
+          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Missing MCP method field"}})json"));
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, MethodFieldNotString) {
@@ -235,7 +235,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, MethodFieldNotString) {
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
-          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Method field is not a string"}})json"));
+          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"MCP method field is not a string"}})json"));
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallInvalidParams) {
@@ -382,7 +382,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, UnsupportedMcpProtocolVersionHeader) {
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
-          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"Unsupported protocol version"}})json"));
+          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"Unsupported MCP version"}})json"));
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, MissingIdField) {
@@ -447,7 +447,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, UnsupportedMethod) {
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
-          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method tools/update is not supported"}})json"));
+          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"MCP method tools/update is not supported"}})json"));
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, InitializeMissingProtocolVersion) {
@@ -573,7 +573,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InvalidArguments) {
   EXPECT_EQ(
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
-          R"json({"jsonrpc":"2.0","id":321,"error":{"code":-32602,"message":"Invalid tool arguments"}})json"));
+          R"json({"jsonrpc":"2.0","id":321,"error":{"code":-32602,"message":"Could not find value for path: parent"}})json"));
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, ToolsCallWithErrorResponse) {

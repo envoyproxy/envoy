@@ -18,6 +18,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -94,19 +96,19 @@ TEST_F(ClientAssertionTest, CreateRS256Assertion) {
 
   // Decode and verify header.
   const std::string header_json = Base64Url::decode(parts[0]);
-  EXPECT_NE(std::string::npos, header_json.find("\"alg\":\"RS256\""));
-  EXPECT_NE(std::string::npos, header_json.find("\"typ\":\"JWT\""));
+  EXPECT_THAT(header_json, HasSubstr("\"alg\":\"RS256\""));
+  EXPECT_THAT(header_json, HasSubstr("\"typ\":\"JWT\""));
 
   // Decode and verify payload claims.
   const std::string payload_json = Base64Url::decode(parts[1]);
-  EXPECT_NE(std::string::npos, payload_json.find("\"iss\":\"my-client-id\""));
-  EXPECT_NE(std::string::npos, payload_json.find("\"sub\":\"my-client-id\""));
-  EXPECT_NE(std::string::npos, payload_json.find("\"aud\":\"https://auth.example.com/token\""));
-  EXPECT_NE(std::string::npos, payload_json.find("\"jti\":\"test-jti-uuid\""));
+  EXPECT_THAT(payload_json, HasSubstr("\"iss\":\"my-client-id\""));
+  EXPECT_THAT(payload_json, HasSubstr("\"sub\":\"my-client-id\""));
+  EXPECT_THAT(payload_json, HasSubstr("\"aud\":\"https://auth.example.com/token\""));
+  EXPECT_THAT(payload_json, HasSubstr("\"jti\":\"test-jti-uuid\""));
   // iat = 1000, exp = 1060, nbf = 1000
-  EXPECT_NE(std::string::npos, payload_json.find("\"iat\":1000"));
-  EXPECT_NE(std::string::npos, payload_json.find("\"exp\":1060"));
-  EXPECT_NE(std::string::npos, payload_json.find("\"nbf\":1000"));
+  EXPECT_THAT(payload_json, HasSubstr("\"iat\":1000"));
+  EXPECT_THAT(payload_json, HasSubstr("\"exp\":1060"));
+  EXPECT_THAT(payload_json, HasSubstr("\"nbf\":1000"));
 
   // Signature should not be empty.
   EXPECT_FALSE(parts[2].empty());
@@ -124,11 +126,11 @@ TEST_F(ClientAssertionTest, CreateRS384Assertion) {
   ASSERT_EQ(3, parts.size());
 
   const std::string decoded_header = Base64Url::decode(parts[0]);
-  EXPECT_NE(std::string::npos, decoded_header.find("\"alg\":\"RS384\""));
+  EXPECT_THAT(decoded_header, HasSubstr("\"alg\":\"RS384\""));
 
   const std::string payload_json = Base64Url::decode(parts[1]);
   // iat = 1000, exp = 1000 + 120 = 1120
-  EXPECT_NE(std::string::npos, payload_json.find("\"exp\":1120"));
+  EXPECT_THAT(payload_json, HasSubstr("\"exp\":1120"));
 }
 
 TEST_F(ClientAssertionTest, CreateRS512Assertion) {
@@ -143,7 +145,7 @@ TEST_F(ClientAssertionTest, CreateRS512Assertion) {
   ASSERT_EQ(3, parts.size());
 
   const std::string decoded_header = Base64Url::decode(parts[0]);
-  EXPECT_NE(std::string::npos, decoded_header.find("\"alg\":\"RS512\""));
+  EXPECT_THAT(decoded_header, HasSubstr("\"alg\":\"RS512\""));
 }
 
 TEST_F(ClientAssertionTest, UnsupportedAlgorithm) {
@@ -188,8 +190,8 @@ TEST_F(ClientAssertionTest, CustomLifetime) {
 
   const std::string payload_json = Base64Url::decode(parts[1]);
   // iat = 1000, exp = 1000 + 300 = 1300
-  EXPECT_NE(std::string::npos, payload_json.find("\"iat\":1000"));
-  EXPECT_NE(std::string::npos, payload_json.find("\"exp\":1300"));
+  EXPECT_THAT(payload_json, HasSubstr("\"iat\":1000"));
+  EXPECT_THAT(payload_json, HasSubstr("\"exp\":1300"));
 }
 
 TEST_F(ClientAssertionTest, EmptyPrivateKey) {
@@ -246,8 +248,8 @@ TEST_F(ClientAssertionTest, TwoAssertionsHaveDifferentJti) {
   std::vector<std::string> parts2 = absl::StrSplit(result2.value(), '.');
   const std::string payload1 = Base64Url::decode(parts1[1]);
   const std::string payload2 = Base64Url::decode(parts2[1]);
-  EXPECT_NE(std::string::npos, payload1.find("\"jti\":\"uuid-1\""));
-  EXPECT_NE(std::string::npos, payload2.find("\"jti\":\"uuid-2\""));
+  EXPECT_THAT(payload1, HasSubstr("\"jti\":\"uuid-1\""));
+  EXPECT_THAT(payload2, HasSubstr("\"jti\":\"uuid-2\""));
 }
 
 TEST_F(ClientAssertionTest, CreateES256Assertion) {
@@ -266,15 +268,15 @@ TEST_F(ClientAssertionTest, CreateES256Assertion) {
 
   // Decode and verify header.
   const std::string header_json = Base64Url::decode(parts[0]);
-  EXPECT_NE(std::string::npos, header_json.find("\"alg\":\"ES256\""));
-  EXPECT_NE(std::string::npos, header_json.find("\"typ\":\"JWT\""));
+  EXPECT_THAT(header_json, HasSubstr("\"alg\":\"ES256\""));
+  EXPECT_THAT(header_json, HasSubstr("\"typ\":\"JWT\""));
 
   // Decode and verify payload claims.
   const std::string payload_json = Base64Url::decode(parts[1]);
-  EXPECT_NE(std::string::npos, payload_json.find("\"iss\":\"my-client-id\""));
-  EXPECT_NE(std::string::npos, payload_json.find("\"sub\":\"my-client-id\""));
-  EXPECT_NE(std::string::npos, payload_json.find("\"aud\":\"https://auth.example.com/token\""));
-  EXPECT_NE(std::string::npos, payload_json.find("\"nbf\":1000"));
+  EXPECT_THAT(payload_json, HasSubstr("\"iss\":\"my-client-id\""));
+  EXPECT_THAT(payload_json, HasSubstr("\"sub\":\"my-client-id\""));
+  EXPECT_THAT(payload_json, HasSubstr("\"aud\":\"https://auth.example.com/token\""));
+  EXPECT_THAT(payload_json, HasSubstr("\"nbf\":1000"));
 
   // ES256 (P-256) raw r||s signature should be exactly 64 bytes (32 bytes r + 32 bytes s).
   const std::string raw_sig = Base64Url::decode(parts[2]);

@@ -317,6 +317,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:session_idle_list_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@quiche//:quic_server_http_spdy_session_lib",
     ]) + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
@@ -669,6 +670,7 @@ envoy_cc_library(
         "//envoy/network:udp_packet_writer_handler_interface",
         "//source/common/network:io_socket_error_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/runtime:runtime_lib",
         "@quiche//:quic_platform",
     ]) + select({

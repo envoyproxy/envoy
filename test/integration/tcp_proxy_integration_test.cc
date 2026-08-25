@@ -709,6 +709,25 @@ TEST_P(TcpProxyIntegrationTest, UpstreamRstPropagation) {
   auto log_result = waitForAccessLog(access_log_path);
   EXPECT_THAT(log_result, Eq("RemoteReset"));
 }
+
+// Verifies that downstream RST is propagated to upstream as RST (default behavior).
+TEST_P(TcpProxyIntegrationTest, DownstreamRstPropagation) {
+  enableHalfClose(false);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  // Downstream sends RST.
+  tcp_client->close(Network::ConnectionCloseType::AbortReset);
+
+  // Upstream should receive RST.
+  ASSERT_TRUE(fake_upstream_connection->waitForRstDisconnect());
+}
 #endif
 
 // Verifies that access log value for `UPSTREAM_LOCAL_CLOSE_REASON` matches
@@ -2277,7 +2296,7 @@ TEST_P(TcpProxyIntegrationTest, ClusterBufferHighWatermarkTimeoutClosesUpstream)
   // Disable reads from the upstream to simulate a slow upstream.
   ASSERT_TRUE(fake_upstream_connection->readDisable(true));
 
-  std::string payload(256 * 1024, 'a');
+  std::string payload(2048 * 1024, 'a');
   ASSERT_TRUE(tcp_client->write(payload, false));
 
   timeSystem().advanceTimeWait(std::chrono::milliseconds(500));

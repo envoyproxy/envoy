@@ -35,6 +35,20 @@ exports_files([
     "exported_symbols_apple.txt",
 ])
 
+# TODO(phlax): Cleanup once bzlmod migration is complete
+bool_flag(
+    name = "enable_bzlmod",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "bzlmod_mode",
+    flag_values = {
+        ":enable_bzlmod": "True",
+    },
+    visibility = ["//visibility:public"],
+)
+
 sh_library(
     name = "volatile_env",
     srcs = ["volatile_env.sh"],
@@ -685,12 +699,18 @@ config_setting(
 
 config_setting(
     name = "darwin_x86_64",
-    values = {"cpu": "darwin_x86_64"},
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
     name = "darwin_arm64",
-    values = {"cpu": "darwin_arm64"},
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
@@ -934,38 +954,7 @@ alias(
 )
 
 json_data(
-    name = "repository_locations_version_info",
-    data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
-)
-
-json_merge(
-    name = "repository_locations",
-    srcs = [":repository_locations_version_info"],
-    filter = """
-    .[0] as $versions
-    | .[1] as $metadata
-    | $versions
-    | keys
-    | reduce .[] as $k ({};
-        . + {($k): (
-          ($versions[$k] + ($metadata[$k] // {}))
-          | .version as $ver
-          | if .license_url and $ver then
-              .license_url |= (
-                gsub("{version}"; $ver)
-                | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
-                | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
-              )
-            else . end
-        )}
-      )
-    """,
-    visibility = ["//visibility:public"],
-    yaml_srcs = [":deps.yaml"],
-)
-
-json_data(
-    name = "all_repository_locations_version_info",
+    name = "legacy_all_repository_locations_version_info",
     data = merge_dicts(
         load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
         load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
@@ -973,8 +962,8 @@ json_data(
 )
 
 json_merge(
-    name = "all_repository_locations",
-    srcs = [":all_repository_locations_version_info"],
+    name = "legacy_all_repository_locations",
+    srcs = [":legacy_all_repository_locations_version_info"],
     filter = """
     .[0] as $versions
     | .[1] as $metadata1
@@ -1028,7 +1017,7 @@ updater(
 updater(
     name = "api-update",
     data = ["//tools/dependency:check"],
-    dependencies = "@envoy_api//bazel:repository_locations",
+    dependencies = "@envoy_api//bazel:legacy_repository_locations",
     post_script = ":version_update_post.sh",
     pydict = True,
     tags = ["skip_on_windows"],
@@ -1098,4 +1087,14 @@ config_setting(
     flag_values = {
         ":libstdc++": "True",
     },
+)
+
+alias(
+    name = "cpp_runfiles",
+    actual = "@bazel_tools//tools/cpp/runfiles",
+)
+
+alias(
+    name = "all_repository_locations",
+    actual = ":legacy_all_repository_locations",
 )

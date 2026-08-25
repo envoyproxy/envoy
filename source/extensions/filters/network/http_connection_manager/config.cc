@@ -604,7 +604,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRouteConfig:
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), context_.serverFactoryContext(),
+        // The inline route configuration inherits the init manager of this HTTP connection
+        // manager, so that any resource it owns can be warmed up together with the listener.
+        config.route_config(), context_.serverFactoryContext(), context_.initManager(),
         context_.messageValidationVisitor());
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::

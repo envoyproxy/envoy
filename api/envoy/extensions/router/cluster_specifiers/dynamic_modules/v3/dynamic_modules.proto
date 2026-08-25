@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package envoy.extensions.router.cluster_specifiers.dynamic_modules.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.router.cluster_specifiers.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/router/cluster_specifiers/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Cluster Specifier]
+//
+// Dynamic modules cluster specifier :ref:`configuration reference documentation
+// <config_http_cluster_specifier_dynamic_modules>`.
+// [#extension: envoy.router.cluster_specifier_plugin.dynamic_modules]
+
+// Route action properties that a dynamic module may select for a request in place of the properties
+// of the matched route. These properties are themselves built from other extensions, such as retry
+// host predicates and retry priorities, so they must be declared here in advance rather than chosen
+// freely by the module on each request.
+//
+// Each entry is built and validated when the cluster specifier is configured, so an invalid entry
+// is rejected at configuration load rather than on the request path. At least one property must be
+// specified.
+message RouteActionOverride {
+  // Retry policy replacing the retry policy of the matched route. If not specified, the retry
+  // policy of the matched route is used, so an entry cannot be used to remove a retry policy that
+  // the matched route configures.
+  config.route.v3.RetryPolicy retry_policy = 1;
+
+  // Metadata match criteria replacing the criteria of the matched route, used by subset load
+  // balancing. Only the ``envoy.lb`` entry of :ref:`filter_metadata
+  // <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` is used, matching the behavior of
+  // :ref:`RouteAction.metadata_match
+  // <envoy_v3_api_field_config.route.v3.RouteAction.metadata_match>`. If not specified, or if there
+  // is no ``envoy.lb`` entry, the criteria of the matched route are used, so an entry cannot be used
+  // to remove the criteria that the matched route configures.
+  config.core.v3.Metadata metadata_match = 2;
+
+  // Request mirroring policies replacing the request mirroring policies of the matched route. If
+  // not specified, the request mirroring policies of the matched route are used, so an entry cannot
+  // be used to turn off mirroring that the matched route configures.
+  repeated config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 3;
+}
+
+// Configuration for the Dynamic Modules Cluster Specifier. This cluster specifier allows loading
+// shared object files via ``dlopen`` to select the upstream cluster for a request, and to replace
+// the timeout, idle timeout, priority, request body buffer limit, retry policy, metadata match
+// criteria and request mirroring policies of the matched route.
+//
+// A module can be loaded by multiple cluster specifiers. It is loaded only once and shared across
+// multiple cluster specifier instances. The module is invoked while the route is being
+// resolved, so the selection is visible to the router without clearing the route cache. It is
+// invoked again whenever a filter refreshes the route cluster, or a retry re-selects it when
+// :ref:`refresh_cluster_on_retry
+// <envoy_v3_api_field_config.route.v3.RetryPolicy.refresh_cluster_on_retry>` is set, so the module
+// must be able to produce a decision from the request headers and the stream info alone.
+message DynamicModuleClusterSpecifier {
+  // Specifies the shared-object level configuration. This field is required.
+  //
+  // .. note::
+  //   This extension loads the module while the cluster specifier is configured, so it cannot wait
+  //   for an asynchronous fetch. A remote :ref:`module
+  //   <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>` is therefore
+  //   accepted only when the module is already cached on disk, and is otherwise rejected. Setting
+  //   :ref:`nack_on_cache_miss
+  //   <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.nack_on_cache_miss>` to
+  //   ``true`` makes the rejection start a background fetch so that a later update succeeds. Prefer
+  //   ``name`` or a local data source.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name for this cluster specifier configuration. If not specified, defaults to an empty
+  // string.
+  //
+  // This can be used to distinguish between different cluster specifier implementations inside a
+  // dynamic module. When Envoy receives this configuration, it passes the ``specifier_name`` to the
+  // dynamic module's cluster specifier config init function together with the ``specifier_config``.
+  // That way a module can decide which in-module implementation to use based on the name at load
+  // time.
+  string specifier_name = 2;
+
+  // The configuration for the cluster specifier chosen by ``specifier_name``. If not specified, an
+  // empty configuration is passed to the module.
+  //
+  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly without
+  // the wrapper.
+  //
+  // .. code-block:: yaml
+  //
+  //  # Passing a JSON struct configuration
+  //  specifier_config:
+  //    "@type": "type.googleapis.com/google.protobuf.Struct"
+  //    value:
+  //      cluster_name_prefix: shard-
+  //
+  //  # Passing a simple string configuration
+  //  specifier_config:
+  //    "@type": "type.googleapis.com/google.protobuf.StringValue"
+  //    value: "shard-"
+  //
+  google.protobuf.Any specifier_config = 3;
+
+  // Route action overrides that the module may select by name for a request. If not specified, the
+  // module can only select the cluster, the timeout, the idle timeout, the priority and the request
+  // body buffer limit.
+  map<string, RouteActionOverride> route_action_overrides = 4
+      [(validate.rules).map = {keys {string {min_len: 1}}}];
+}
