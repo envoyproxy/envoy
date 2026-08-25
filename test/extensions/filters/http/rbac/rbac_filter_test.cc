@@ -373,7 +373,6 @@ TEST_F(RoleBasedAccessControlFilterTest, AllowedDynamicMetadataStats) {
   setMetadata();
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
 
   EXPECT_THAT(req_info_.dynamicMetadata().filter_metadata(),
               Contains(Pair(
@@ -390,7 +389,6 @@ TEST_F(RoleBasedAccessControlFilterTest, DeniedDynamicMetadataStats) {
   setMetadata();
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
 
   EXPECT_THAT(req_info_.dynamicMetadata().filter_metadata(),
               Contains(Pair(
@@ -423,7 +421,6 @@ TEST_F(RoleBasedAccessControlFilterTest, ShadowOnlyDynamicMetadataStats) {
 
   // Defaults to allow when there's no engine to enforce.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
 
   EXPECT_THAT(
       req_info_.dynamicMetadata().filter_metadata(),
@@ -459,7 +456,6 @@ TEST_F(RoleBasedAccessControlFilterTest, EnforcedOnlyDynamicMetadataStats) {
 
   // Defaults to allow when there's no engine to enforce.
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
 
   EXPECT_THAT(
       req_info_.dynamicMetadata().filter_metadata(),
@@ -483,7 +479,6 @@ TEST_F(RoleBasedAccessControlFilterTest, NoEnginesNoDynamicMetadataStats) {
 
   // Defaults to allow when there's no engine to enforce.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
 
   ASSERT_FALSE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
 }

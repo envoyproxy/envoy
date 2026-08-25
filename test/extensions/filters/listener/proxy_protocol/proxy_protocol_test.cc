@@ -1687,10 +1687,14 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEncodeAsBase64) {
   EXPECT_THAT(
       server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
       UnorderedElementsAre(
-          Pair(ProxyProtocol, HasStructFields(UnorderedElementsAre(
-                                  IsStructString("PP2 type authority", "Zv5vLmNvwQ=="),
-                                  IsStructString("PP2 vpc id", "AXZwYy0wwDV0ZXN0MmZhNmM2M2j5Nw=="),
-                                  IsStructString("PP2 tlv1", "!"))))));
+          Pair(ProxyProtocol,
+               HasStructFields(UnorderedElementsAre(
+                   // The raw TLV values (including the non utf8 characters) are encoded as base64.
+                   IsStructString("PP2 type authority", "Zv5vLmNvwQ=="),
+                   IsStructString("PP2 vpc id", "AXZwYy0wwDV0ZXN0MmZhNmM2M2j5Nw=="),
+                   // The default encoding sanitizes the value to a valid UTF-8 string: the non utf8
+                   // byte 0xff is replaced with the `!` character.
+                   IsStructString("PP2 tlv1", "!"))))));
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
