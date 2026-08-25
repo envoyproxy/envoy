@@ -13,14 +13,15 @@ namespace Language {
 /**
  * Config registration for the language detection filter (i18n). @see NamedHttpFilterConfigFactory.
  */
-class LanguageFilterFactory : public Common::ExceptionFreeFactoryBase<
+class LanguageFilterFactory : public Common::UnifiedFactoryBase<
                                   envoy::extensions::filters::http::language::v3alpha::Language> {
 public:
-  LanguageFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.language") {}
+  LanguageFilterFactory() : UnifiedFactoryBase("envoy.filters.http.language") {}
 
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::language::v3alpha::Language& proto_config,
-      const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 DECLARE_FACTORY(LanguageFilterFactory);
