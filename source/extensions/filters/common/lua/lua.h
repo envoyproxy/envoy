@@ -38,7 +38,7 @@ namespace Lua {
  * optionally checks for object death (see BaseLuaObject below), and then invokes a normal object
  * method. Generates only the thunk, not the method declaration, so it can also serve a method
  * inherited from a shared base -- each registered type still needs its own thunk, because the
- * metatable and the luaL_checkudata key are per type, even when the body is written once.
+ * metatable and the `luaL_checkudata` key are per type, even when the body is written once.
  * @param Class supplies the owning class name.
  * @param Name supplies the function name.
  * @param Index supplies the stack index where "this" (Lua/C userdata) is found.
