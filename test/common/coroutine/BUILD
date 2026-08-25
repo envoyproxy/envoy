@@ -40,29 +40,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "any_of_test",
-    srcs = ["any_of_test.cc"],
-    rbe_pool = "6gig",
-    deps = [
-        ":manual_executor_lib",
-        "//source/common/coroutine:any_of_lib",
-        "//source/common/coroutine:context_lib",
-        "//source/common/coroutine:dispatcher_executor_lib",
-        "//source/common/coroutine:launch_lib",
-        "//source/common/coroutine:leaf_awaitable_lib",
-        "//source/common/coroutine:status_macros_lib",
-        "//source/common/coroutine:task_lib",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:status_utility_lib",
-        "//test/test_common:utility_lib",
-        "@abseil-cpp//absl/cleanup",
-        "@abseil-cpp//absl/status",
-        "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/types:variant",
-    ],
-)
-
 # DispatcherExecutor + TimerAwaitable, exercised against a simulated-time
 # dispatcher.
 envoy_cc_test(

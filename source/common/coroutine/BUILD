@@ -115,25 +115,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "any_of_lib",
-    srcs = ["any_of.cc"],
-    hdrs = ["any_of.h"],
-    deps = [
-        ":context_lib",
-        ":launch_lib",
-        ":leaf_awaitable_lib",
-        ":task_lib",
-        "//source/common/common:assert_lib",
-        "@abseil-cpp//absl/status",
-        "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/types:variant",
-    ],
-)
-
-envoy_cc_library(
     name = "coroutine_lib",
     deps = [
-        ":any_of_lib",
         ":async_queue_lib",
         ":context_lib",
         ":dispatcher_executor_lib",
