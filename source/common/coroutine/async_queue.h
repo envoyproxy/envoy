@@ -34,16 +34,31 @@ template <typename T> struct DefaultItemSize {
 };
 
 /**
- * AsyncQueue is an asynchronous queue designed for Envoy coroutines.
+ * AsyncQueue is an asynchronous, bounded or unbounded FIFO queue for Envoy coroutines.
  *
- * Direct Resumption:
- * If a consumer is suspended on pop(), push() directly and synchronously wakes up the consumer
- * and hands off the data. The data skips the queue and consumes no capacity from Capacity.
+ * Concurrency & Ownership Model:
+ * - Designed for multi-producer, single-consumer or single-producer, single-consumer patterns,
+ *   where "producer" and "consumer" refer to independent coroutines pinned to the same
+ *   executor/dispatcher thread.
+ * - The queue is move-only and owned exclusively by the single consumer coroutine (popper).
+ * - Producer coroutines access the queue via lightweight `PushAccessor` instances (holding a
+ *   weak pointer), guaranteeing deterministic queue teardown when the consumer coroutine finishes.
  *
- * Move-Only Ownership:
- * The queue is move-only and owned by the consumer (the popper). Producers access the queue
- * without shared ownership via PushAccessor (holding a weak_ptr), ensuring safe teardown and
- * immediate reclamation of queued memory when the consumer finishes and destroys the queue.
+ * Direct Resumption & Push-Pop Rendezvous:
+ * - Direct Resumption: If a consumer coroutine is awaiting pop(), push() hands off the data
+ *   synchronously inline without buffering or consuming Semaphore capacity.
+ * - Rendezvous: If a producer coroutine is suspended awaiting Semaphore capacity, an incoming
+ *   pop() steals the item directly from queue_ without waiting for capacity. When capacity is
+ *   eventually granted to the producer, RAII immediately returns the permits to the Semaphore.
+ *
+ * Reentrancy & Memory Safety:
+ * - Synchronous reentrancy occurs at two well-defined points: direct data handoff in
+ *   `tryHandoff()` and EOF notification in `close()`.
+ * - In the single consumer coroutine model, call stack depth is strictly bounded at O(1).
+ * - In-line queue destruction by a resumed consumer coroutine is safe: pop_waiters_ is updated
+ *   prior to resumption, and no `this` members are touched after the callback returns.
+ * - Any in-flight producer coroutines suspended on Semaphore acquisition observe `*alive_ == false`
+ *   or `closed_ == true` upon waking up and terminate cleanly with FailedPreconditionError.
  */
 template <typename T, typename SizeFunc = DefaultItemSize<T>> class AsyncQueue {
 public:
@@ -72,6 +87,13 @@ private:
     ~Core() {
       ASSERT(pop_waiters_.empty(),
              "under single consumer assumption, popper cannot be waiting upon destruction");
+      if (in_handoff_ > 0) {
+        // If the queue is destroyed synchronously inside tryHandoff() (e.g. by a resumed
+        // popper), there must be zero pending pushers because tryHandoff() only executes when the
+        // queue was completely empty with no pushers awaiting capacity.
+        ASSERT(pending_pushers_ == 0,
+               "no pending pushers can exist when queue is destroyed during direct handoff");
+      }
       *alive_ = false;
       close();
       queue_.clear();
@@ -129,7 +151,11 @@ private:
 
         auto cb = std::move(waiter->cb);
         if (cb) {
+          // Track active direct handoff operations with an integer counter so that nested reentrant
+          // handoff operations (e.g. in multi-consumer cascades) properly nest and decrement.
+          ++in_handoff_;
           cb(std::optional<T>(std::move(item)));
+          --in_handoff_;
         }
         return true;
       }
@@ -154,7 +180,14 @@ private:
       // 3. Acquire capacity from Capacity. Any pop() arriving while suspended will steal from
       // queue_.
       auto alive = alive_;
+      ++pending_pushers_;
       auto cap_res = co_await capacity_->acquire(size);
+      if (!*alive) {
+        queued_item->item.reset();
+        co_return absl::FailedPreconditionError("queue is closed");
+      }
+
+      --pending_pushers_;
 
       // If a pop() stole the item during rendezvous, we are done!
       if (!queued_item->item.has_value()) {
@@ -162,9 +195,9 @@ private:
         co_return absl::OkStatus();
       }
 
-      if (cap_res.status().code() != absl::StatusCode::kOk || !*alive || closed_) {
-        queued_item->item.reset();
+      if (!cap_res.ok() || closed_) {
         queue_.erase(it);
+        queued_item->item.reset();
         if (!cap_res.ok()) {
           co_return cap_res.status();
         }
@@ -225,6 +258,8 @@ private:
     CapacityPtr capacity_;
     SizeFunc size_func_;
     uint64_t current_size_{0};
+    uint64_t pending_pushers_{0};
+    uint64_t in_handoff_{0};
     std::list<std::shared_ptr<QueuedItem>> queue_;
     std::list<std::shared_ptr<PopWaiter>> pop_waiters_;
     bool closed_{false};
