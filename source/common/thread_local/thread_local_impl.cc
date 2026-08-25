@@ -121,9 +121,9 @@ void InstanceImpl::SlotImpl::set(InitializeCb cb) {
   }
 
   // Handle main thread.
-  if (parent_.main_thread_dispatcher_ != nullptr) {
-    setThreadLocal(index_, cb(*parent_.main_thread_dispatcher_));
-  }
+  ASSERT(parent_.main_thread_dispatcher_ != nullptr,
+         "main thread dispatcher must be registered before initializing thread local slots");
+  setThreadLocal(index_, cb(*parent_.main_thread_dispatcher_));
 }
 
 void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_thread) {
