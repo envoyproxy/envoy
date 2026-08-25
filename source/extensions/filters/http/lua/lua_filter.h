@@ -170,6 +170,10 @@ class Filter;
  */
 class StreamHandleWrapperBase : public Http::AsyncClient::Callbacks,
                                 public Filters::Common::Lua::LuaLoggable {
+  // NOTE: BaseLuaObject also derives from LuaLoggable, so a concrete leaf reaches it by two
+  // equal-length paths. That is harmless while only this class logs -- ENVOY_LOG and scriptLog()
+  // resolve within whichever scope names them. Logging from a leaf instead needs an explicit
+  // base, since the unqualified name is ambiguous there.
 public:
   /**
    * The state machine for a stream handler. In the current implementation everything the filter
@@ -244,14 +248,6 @@ protected:
    * @return a handle to the headers.
    */
   int luaHeaders(lua_State* state);
-
-  /**
-   * @return a read-only handle to the downstream request headers, or nil if not available.
-   * Only callable from envoy_on_response via ResponseStreamHandleWrapper.
-   * Note: the underlying C++ type is non-const, but mutation is blocked at the Lua wrapper level
-   * because modifying request headers after they have been forwarded upstream has no effect.
-   */
-  int luaDownstreamRequestHeaders(lua_State* state);
 
   /**
    * @return a handle to the full body or nil if there is no body. This call will cause the script
@@ -425,11 +421,9 @@ protected:
   Filter& filter_;
   FilterCallbacks& callbacks_;
   Http::HeaderMap* trailers_{};
+  // None of these wrappers survive a yield; onMarkDead() resets them all. The script can
+  // request them again across yields if needed.
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
-  // Read-only by type: ReadOnlyHeaderMapWrapper has no mutating methods in its metatable,
-  // so a script that tries to write these headers fails on a missing method rather than on
-  // a refusal at call time.
-  Filters::Common::Lua::LuaDeathRef<ReadOnlyHeaderMapWrapper> downstream_request_headers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
@@ -455,13 +449,72 @@ protected:
 };
 
 /**
- * Lua handle passed to envoy_on_request. Exposes the request path API.
+ * CRTP glue between StreamHandleWrapperBase and a concrete leaf handle type.
+ *
+ * The base holds the state and every Lua method body but is deliberately not a BaseLuaObject,
+ * because a Lua metatable is registered per C++ type. This layer supplies, once, everything a
+ * leaf needs that has to be spelled in terms of the leaf's own type: the per-type static thunks,
+ * and the overrides that reach BaseLuaObject<T>. A leaf only declares which of those thunks it
+ * exports, which is what lets the two paths offer different APIs over one implementation.
  */
-class RequestStreamHandleWrapper
-    : public StreamHandleWrapperBase,
-      public Filters::Common::Lua::BaseLuaObject<RequestStreamHandleWrapper> {
+template <class T>
+class StreamHandleLeaf : public StreamHandleWrapperBase,
+                         public Filters::Common::Lua::BaseLuaObject<T> {
 public:
   using StreamHandleWrapperBase::StreamHandleWrapperBase;
+
+  lua_CFunction bodyIteratorFn() const override { return static_luaBodyIterator; }
+  void markLive() override { Filters::Common::Lua::BaseLuaObject<T>::markLive(); }
+  void markDead() override { Filters::Common::Lua::BaseLuaObject<T>::markDead(); }
+
+protected:
+  // Filters::Common::Lua::BaseLuaObject
+  // Resets every LuaDeathRef declared in StreamHandleWrapperBase, for the reason given there.
+  void onMarkDead() override {
+    headers_wrapper_.reset();
+    body_wrapper_.reset();
+    trailers_wrapper_.reset();
+    metadata_wrapper_.reset();
+    filter_context_wrapper_.reset();
+    stream_info_wrapper_.reset();
+    connection_wrapper_.reset();
+    public_key_wrapper_.reset();
+    connection_stream_info_wrapper_.reset();
+    virtual_host_wrapper_.reset();
+    route_wrapper_.reset();
+    stats_scope_wrapper_.reset();
+  }
+
+  FORWARD_LUA_FUNCTION(T, luaHeaders)
+  FORWARD_LUA_FUNCTION(T, luaBody)
+  FORWARD_LUA_FUNCTION(T, luaBodyChunks)
+  FORWARD_LUA_FUNCTION(T, luaTrailers)
+  FORWARD_LUA_FUNCTION(T, luaMetadata)
+  FORWARD_LUA_FUNCTION(T, luaHttpCall)
+  FORWARD_LUA_FUNCTION(T, luaRespond)
+  FORWARD_LUA_FUNCTION(T, luaStreamInfo)
+  FORWARD_LUA_FUNCTION(T, luaConnection)
+  FORWARD_LUA_FUNCTION(T, luaImportPublicKey)
+  FORWARD_LUA_FUNCTION(T, luaVerifySignature)
+  FORWARD_LUA_FUNCTION(T, luaBase64Escape)
+  FORWARD_LUA_FUNCTION(T, luaTimestamp)
+  FORWARD_LUA_FUNCTION(T, luaTimestampString)
+  FORWARD_LUA_FUNCTION(T, luaConnectionStreamInfo)
+  FORWARD_LUA_FUNCTION(T, luaSetUpstreamOverrideHost)
+  FORWARD_LUA_FUNCTION(T, luaClearRouteCache)
+  FORWARD_LUA_FUNCTION(T, luaFilterContext)
+  FORWARD_LUA_FUNCTION(T, luaVirtualHost)
+  FORWARD_LUA_FUNCTION(T, luaRoute)
+  FORWARD_LUA_FUNCTION(T, luaStats)
+  FORWARD_LUA_CLOSURE(T, luaBodyIterator)
+};
+
+/**
+ * Lua handle passed to envoy_on_request. Exposes the request path API.
+ */
+class RequestStreamHandleWrapper : public StreamHandleLeaf<RequestStreamHandleWrapper> {
+public:
+  using StreamHandleLeaf<RequestStreamHandleWrapper>::StreamHandleLeaf;
 
   static ExportedFunctions exportedFunctions() {
     return {{"headers", static_luaHeaders},
@@ -486,70 +539,16 @@ public:
             {"route", static_luaRoute},
             {"stats", static_luaStats}};
   }
-
-  lua_CFunction bodyIteratorFn() const override { return static_luaBodyIterator; }
-  void markLive() override {
-    Filters::Common::Lua::BaseLuaObject<RequestStreamHandleWrapper>::markLive();
-  }
-  void markDead() override {
-    Filters::Common::Lua::BaseLuaObject<RequestStreamHandleWrapper>::markDead();
-  }
-
-private:
-  // Filters::Common::Lua::BaseLuaObject
-  // NOTE: This must be kept in sync with ResponseStreamHandleWrapper::onMarkDead() below.
-  // Both reset every LuaDeathRef field declared in StreamHandleWrapperBase. If a new wrapper
-  // field is added to the base, it must be reset in both subclass onMarkDead() overrides.
-  void onMarkDead() override {
-    headers_wrapper_.reset();
-    downstream_request_headers_wrapper_.reset();
-    body_wrapper_.reset();
-    trailers_wrapper_.reset();
-    metadata_wrapper_.reset();
-    filter_context_wrapper_.reset();
-    stream_info_wrapper_.reset();
-    connection_wrapper_.reset();
-    public_key_wrapper_.reset();
-    connection_stream_info_wrapper_.reset();
-    virtual_host_wrapper_.reset();
-    route_wrapper_.reset();
-    stats_scope_wrapper_.reset();
-  }
-
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaHeaders)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaBody)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaBodyChunks)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaTrailers)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaMetadata)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaHttpCall)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaRespond)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaStreamInfo)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaConnection)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaImportPublicKey)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaVerifySignature)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaBase64Escape)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaTimestamp)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaTimestampString)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaConnectionStreamInfo)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaSetUpstreamOverrideHost)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaClearRouteCache)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaFilterContext)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaVirtualHost)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaRoute)
-  FORWARD_LUA_FUNCTION(RequestStreamHandleWrapper, luaStats)
-  FORWARD_LUA_CLOSURE(RequestStreamHandleWrapper, luaBodyIterator)
 };
 
 /**
- * Lua handle passed to envoy_on_response. Exposes the response path API, which is a superset
- * of the request handle API: all the same methods are available, plus downstreamRequestHeaders().
- * respond() is intentionally omitted — it is not supported on the response path.
+ * Lua handle passed to envoy_on_response. Exposes the same set of methods as the request handle.
+ * The two tables are identical today; they are separate types so that either path can gain or
+ * drop a method without disturbing the other.
  */
-class ResponseStreamHandleWrapper
-    : public StreamHandleWrapperBase,
-      public Filters::Common::Lua::BaseLuaObject<ResponseStreamHandleWrapper> {
+class ResponseStreamHandleWrapper : public StreamHandleLeaf<ResponseStreamHandleWrapper> {
 public:
-  using StreamHandleWrapperBase::StreamHandleWrapperBase;
+  using StreamHandleLeaf<ResponseStreamHandleWrapper>::StreamHandleLeaf;
 
   static ExportedFunctions exportedFunctions() {
     return {{"headers", static_luaHeaders},
@@ -575,57 +574,27 @@ public:
             {"stats", static_luaStats}};
   }
 
-  lua_CFunction bodyIteratorFn() const override { return static_luaBodyIterator; }
-  void markLive() override {
-    Filters::Common::Lua::BaseLuaObject<ResponseStreamHandleWrapper>::markLive();
-  }
-  void markDead() override {
-    Filters::Common::Lua::BaseLuaObject<ResponseStreamHandleWrapper>::markDead();
-  }
-
 private:
-  // Filters::Common::Lua::BaseLuaObject
-  // NOTE: This must be kept in sync with RequestStreamHandleWrapper::onMarkDead() above.
-  // Both reset every LuaDeathRef field declared in StreamHandleWrapperBase. If a new wrapper
-  // field is added to the base, it must be reset in both subclass onMarkDead() overrides.
+  /**
+   * @return a read-only handle to the downstream request headers, or nil if not available.
+   * Reachable only from envoy_on_response: it is declared here rather than on the shared base,
+   * so the request handle has no such method at all.
+   * Note: the underlying C++ type is non-const, but mutation is blocked at the Lua wrapper level
+   * because modifying request headers after they have been forwarded upstream has no effect.
+   */
+  int luaDownstreamRequestHeaders(lua_State* state);
+
   void onMarkDead() override {
-    headers_wrapper_.reset();
+    StreamHandleLeaf<ResponseStreamHandleWrapper>::onMarkDead();
     downstream_request_headers_wrapper_.reset();
-    body_wrapper_.reset();
-    trailers_wrapper_.reset();
-    metadata_wrapper_.reset();
-    filter_context_wrapper_.reset();
-    stream_info_wrapper_.reset();
-    connection_wrapper_.reset();
-    public_key_wrapper_.reset();
-    connection_stream_info_wrapper_.reset();
-    virtual_host_wrapper_.reset();
-    route_wrapper_.reset();
-    stats_scope_wrapper_.reset();
   }
 
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaHeaders)
+  // Read-only by type: ReadOnlyHeaderMapWrapper has no mutating methods in its metatable,
+  // so a script that tries to write these headers fails on a missing method rather than on
+  // a refusal at call time.
+  Filters::Common::Lua::LuaDeathRef<ReadOnlyHeaderMapWrapper> downstream_request_headers_wrapper_;
+
   FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaDownstreamRequestHeaders)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaBody)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaBodyChunks)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaTrailers)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaMetadata)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaHttpCall)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaStreamInfo)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaConnection)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaImportPublicKey)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaVerifySignature)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaBase64Escape)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaTimestamp)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaTimestampString)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaConnectionStreamInfo)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaSetUpstreamOverrideHost)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaClearRouteCache)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaFilterContext)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaVirtualHost)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaRoute)
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaStats)
-  FORWARD_LUA_CLOSURE(ResponseStreamHandleWrapper, luaBodyIterator)
 };
 
 /**
@@ -724,7 +693,8 @@ public:
                                           bool end_stream) override {
     PerLuaCodeSetup* setup = getPerLuaCodeSetup();
     const int function_ref = setup ? setup->requestFunctionRef() : LUA_REFNIL;
-    return doRequestHeaders(headers, end_stream, function_ref, setup);
+    return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_, function_ref,
+                     setup, headers, end_stream);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
@@ -744,7 +714,8 @@ public:
                                           bool end_stream) override {
     PerLuaCodeSetup* setup = getPerLuaCodeSetup();
     const int function_ref = setup ? setup->responseFunctionRef() : LUA_REFNIL;
-    return doResponseHeaders(headers, end_stream, function_ref, setup);
+    return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
+                     function_ref, setup, headers, end_stream);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
@@ -800,10 +771,9 @@ private:
       return callbacks_->filterConfigName();
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
-    // downstreamRequestHeaders() is only meaningful on the response path. The method exists on
-    // FilterCallbacks so StreamHandleWrapperBase can call it uniformly, but
-    // RequestStreamHandleWrapper does not expose it in exportedFunctions(), so Lua scripts cannot
-    // reach this code path.
+    // Only meaningful on the response path. The method exists on FilterCallbacks so the
+    // response handle can reach it uniformly; the request handle exports no Lua method that
+    // reaches this code path.
     Http::RequestHeaderMapOptRef downstreamRequestHeaders() override { return {}; }
 
     Filter& parent_;
@@ -879,18 +849,20 @@ private:
                                         : per_route_config_->filterContext();
   }
 
-  Http::FilterHeadersStatus doRequestHeaders(Http::RequestOrResponseHeaderMap& headers,
-                                             bool end_stream, int function_ref,
-                                             PerLuaCodeSetup* setup);
-  Http::FilterHeadersStatus doResponseHeaders(Http::RequestOrResponseHeaderMap& headers,
-                                              bool end_stream, int function_ref,
-                                              PerLuaCodeSetup* setup);
+  template <typename Wrapper>
+  Http::FilterHeadersStatus doHeaders(Filters::Common::Lua::LuaDeathRef<Wrapper>& handle,
+                                      Filters::Common::Lua::CoroutinePtr& coroutine,
+                                      FilterCallbacks& callbacks, int function_ref,
+                                      PerLuaCodeSetup* setup,
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream);
 
-  template <typename HandleRef>
-  Http::FilterDataStatus doData(HandleRef& handle, Buffer::Instance& data, bool end_stream);
+  template <typename Wrapper>
+  Http::FilterDataStatus doData(Filters::Common::Lua::LuaDeathRef<Wrapper>& handle,
+                                Buffer::Instance& data, bool end_stream);
 
-  template <typename HandleRef>
-  Http::FilterTrailersStatus doTrailers(HandleRef& handle, Http::HeaderMap& trailers);
+  template <typename Wrapper>
+  Http::FilterTrailersStatus doTrailers(Filters::Common::Lua::LuaDeathRef<Wrapper>& handle,
+                                        Http::HeaderMap& trailers);
 
   FilterConfigConstSharedPtr config_;
   const FilterConfigPerRoute* per_route_config_{};

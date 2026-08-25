@@ -37,10 +37,12 @@ const OptionHandlers& optionHandlers() {
       {
           {"asynchronous",
            [](lua_State* state, StreamHandleWrapperBase::HttpCallOptions& options) {
+             // Handle the case when the table has: {["asynchronous"] = <boolean>} entry.
              options.is_async_request_ = lua_toboolean(state, -1);
            }},
           {"timeout_ms",
            [](lua_State* state, StreamHandleWrapperBase::HttpCallOptions& options) {
+             // Handle the case when the table has: {["timeout_ms"] = <int>} entry.
              const int timeout_ms = luaL_checkint(state, -1);
              if (timeout_ms < 0) {
                luaL_error(state, "http call timeout must be >= 0");
@@ -55,10 +57,13 @@ const OptionHandlers& optionHandlers() {
            }},
           {"return_duplicate_headers",
            [](lua_State* state, StreamHandleWrapperBase::HttpCallOptions& options) {
+             // Handle the case when the table has: {["return_duplicate_headers"] = <boolean>}
+             // entry.
              options.return_duplicate_headers_ = lua_toboolean(state, -1);
            }},
           {"send_xff",
            [](lua_State* state, StreamHandleWrapperBase::HttpCallOptions& options) {
+             // Handle the case when the table has: {["send_xff"] = <boolean>} entry.
              options.request_options_.setSendXff(lua_toboolean(state, -1));
            }},
       });
@@ -574,7 +579,7 @@ int StreamHandleWrapperBase::luaHeaders(lua_State* state) {
   return 1;
 }
 
-int StreamHandleWrapperBase::luaDownstreamRequestHeaders(lua_State* state) {
+int ResponseStreamHandleWrapper::luaDownstreamRequestHeaders(lua_State* state) {
   ASSERT(state_ == State::Running);
 
   if (downstream_request_headers_wrapper_.get() != nullptr) {
@@ -957,56 +962,31 @@ void Filter::onDestroy() {
   }
 }
 
-Http::FilterHeadersStatus Filter::doRequestHeaders(Http::RequestOrResponseHeaderMap& headers,
-                                                   bool end_stream, int function_ref,
-                                                   PerLuaCodeSetup* setup) {
+template <typename Wrapper>
+Http::FilterHeadersStatus
+Filter::doHeaders(Filters::Common::Lua::LuaDeathRef<Wrapper>& handle,
+                  Filters::Common::Lua::CoroutinePtr& coroutine, FilterCallbacks& callbacks,
+                  int function_ref, PerLuaCodeSetup* setup,
+                  Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
   if (function_ref == LUA_REFNIL) {
     return Http::FilterHeadersStatus::Continue;
   }
   ASSERT(setup);
-  request_coroutine_ = setup->createCoroutine();
+  coroutine = setup->createCoroutine();
 
-  request_stream_wrapper_.reset(RequestStreamHandleWrapper::create(
-                                    request_coroutine_->luaState(), *request_coroutine_, headers,
-                                    end_stream, *this, decoder_callbacks_, time_source_),
-                                true);
-
-  stats_.executions_.inc();
-  Http::FilterHeadersStatus status = request_stream_wrapper_.get()->start(function_ref);
-  // Copy the status out before scriptError(), which may reset (destroy) the wrapper.
-  const absl::Status coroutine_status = request_stream_wrapper_.get()->coroutineStatus();
-  if (coroutine_status.ok()) {
-    request_stream_wrapper_.markDead();
-  } else {
-    scriptError(coroutine_status);
-  }
-
-  return status;
-}
-
-Http::FilterHeadersStatus Filter::doResponseHeaders(Http::RequestOrResponseHeaderMap& headers,
-                                                    bool end_stream, int function_ref,
-                                                    PerLuaCodeSetup* setup) {
-  if (function_ref == LUA_REFNIL) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-  ASSERT(setup);
-  response_coroutine_ = setup->createCoroutine();
-
-  response_stream_wrapper_.reset(ResponseStreamHandleWrapper::create(
-                                     response_coroutine_->luaState(), *response_coroutine_, headers,
-                                     end_stream, *this, encoder_callbacks_, time_source_),
-                                 true);
+  handle.reset(Wrapper::create(coroutine->luaState(), *coroutine, headers, end_stream, *this,
+                               callbacks, time_source_),
+               true);
 
   // The counter will increment twice if the supplied script has both request and response
   // handles. This is intentionally kept so as to provide consistency with the way the 'errors'
   // counter is incremented.
   stats_.executions_.inc();
-  Http::FilterHeadersStatus status = response_stream_wrapper_.get()->start(function_ref);
+  Http::FilterHeadersStatus status = handle.get()->start(function_ref);
   // Copy the status out before scriptError(), which may reset (destroy) the wrapper.
-  const absl::Status coroutine_status = response_stream_wrapper_.get()->coroutineStatus();
+  const absl::Status coroutine_status = handle.get()->coroutineStatus();
   if (coroutine_status.ok()) {
-    response_stream_wrapper_.markDead();
+    handle.markDead();
   } else {
     scriptError(coroutine_status);
   }
@@ -1014,8 +994,9 @@ Http::FilterHeadersStatus Filter::doResponseHeaders(Http::RequestOrResponseHeade
   return status;
 }
 
-template <typename HandleRef>
-Http::FilterDataStatus Filter::doData(HandleRef& handle, Buffer::Instance& data, bool end_stream) {
+template <typename Wrapper>
+Http::FilterDataStatus Filter::doData(Filters::Common::Lua::LuaDeathRef<Wrapper>& handle,
+                                      Buffer::Instance& data, bool end_stream) {
   Http::FilterDataStatus status = Http::FilterDataStatus::Continue;
   if (handle.get() != nullptr) {
     handle.markLive();
@@ -1032,8 +1013,9 @@ Http::FilterDataStatus Filter::doData(HandleRef& handle, Buffer::Instance& data,
   return status;
 }
 
-template <typename HandleRef>
-Http::FilterTrailersStatus Filter::doTrailers(HandleRef& handle, Http::HeaderMap& trailers) {
+template <typename Wrapper>
+Http::FilterTrailersStatus Filter::doTrailers(Filters::Common::Lua::LuaDeathRef<Wrapper>& handle,
+                                              Http::HeaderMap& trailers) {
   Http::FilterTrailersStatus status = Http::FilterTrailersStatus::Continue;
   if (handle.get() != nullptr) {
     handle.markLive();
@@ -1051,18 +1033,22 @@ Http::FilterTrailersStatus Filter::doTrailers(HandleRef& handle, Http::HeaderMap
 }
 
 // Explicit instantiations to avoid linker errors (templates defined in .cc).
-template Http::FilterDataStatus
-Filter::doData<Filter::RequestStreamHandleRef>(Filter::RequestStreamHandleRef&, Buffer::Instance&,
-                                               bool);
-template Http::FilterDataStatus
-Filter::doData<Filter::ResponseStreamHandleRef>(Filter::ResponseStreamHandleRef&, Buffer::Instance&,
-                                                bool);
-template Http::FilterTrailersStatus
-Filter::doTrailers<Filter::RequestStreamHandleRef>(Filter::RequestStreamHandleRef&,
-                                                   Http::HeaderMap&);
-template Http::FilterTrailersStatus
-Filter::doTrailers<Filter::ResponseStreamHandleRef>(Filter::ResponseStreamHandleRef&,
-                                                    Http::HeaderMap&);
+template Http::FilterHeadersStatus Filter::doHeaders<RequestStreamHandleWrapper>(
+    Filters::Common::Lua::LuaDeathRef<RequestStreamHandleWrapper>&,
+    Filters::Common::Lua::CoroutinePtr&, FilterCallbacks&, int, PerLuaCodeSetup*,
+    Http::RequestOrResponseHeaderMap&, bool);
+template Http::FilterHeadersStatus Filter::doHeaders<ResponseStreamHandleWrapper>(
+    Filters::Common::Lua::LuaDeathRef<ResponseStreamHandleWrapper>&,
+    Filters::Common::Lua::CoroutinePtr&, FilterCallbacks&, int, PerLuaCodeSetup*,
+    Http::RequestOrResponseHeaderMap&, bool);
+template Http::FilterDataStatus Filter::doData<RequestStreamHandleWrapper>(
+    Filters::Common::Lua::LuaDeathRef<RequestStreamHandleWrapper>&, Buffer::Instance&, bool);
+template Http::FilterDataStatus Filter::doData<ResponseStreamHandleWrapper>(
+    Filters::Common::Lua::LuaDeathRef<ResponseStreamHandleWrapper>&, Buffer::Instance&, bool);
+template Http::FilterTrailersStatus Filter::doTrailers<RequestStreamHandleWrapper>(
+    Filters::Common::Lua::LuaDeathRef<RequestStreamHandleWrapper>&, Http::HeaderMap&);
+template Http::FilterTrailersStatus Filter::doTrailers<ResponseStreamHandleWrapper>(
+    Filters::Common::Lua::LuaDeathRef<ResponseStreamHandleWrapper>&, Http::HeaderMap&);
 
 void Filter::scriptError(const absl::Status& status) {
   stats_.errors_.inc();
