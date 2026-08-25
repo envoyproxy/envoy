@@ -123,8 +123,8 @@ ThriftMetadataToProtobufValue Rule::getValueExtractorFromField(
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata& proto_config,
     Stats::Scope& scope, absl::Status& creation_status)
-    : rqstats_{ALL_THRIFT_TO_METADATA_FILTER_STATS(
-          POOL_COUNTER_PREFIX(scope, "thrift_to_metadata.rq"))},
+    : rqstats_{
+          ALL_THRIFT_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, "thrift_to_metadata.rq"))},
       respstats_{ALL_THRIFT_TO_METADATA_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "thrift_to_metadata.resp"))},
       rq_trie_root_(std::make_shared<PayloadExtractor::Trie>()),

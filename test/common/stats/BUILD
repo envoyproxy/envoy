@@ -350,6 +350,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/stats:tag_producer_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],

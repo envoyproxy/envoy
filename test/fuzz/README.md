@@ -8,7 +8,7 @@ page](https://github.com/google/oss-fuzz/blob/master/docs/ideal_integration.md).
 
 Tests should be unit test-like, fast and not require writable access to the filesystem (beyond
 temporary files), network (including loopback) or multiple processes. See the [ClusterFuzz
-environment](https://github.com/google/oss-fuzz/blob/master/docs/fuzzer_environment.md) for further
+environment](https://github.com/google/oss-fuzz/blob/master/docs/further-reading/fuzzer_environment.md) for further
 details.
 
 ## Corpus
@@ -170,7 +170,7 @@ This generates a coverage report after running the fuzz targets for one minute a
 
 Otherwise, you can generate reports from the
 ClusterFuzz corpus following the general ClusterFuzz [instructions for profiling
-setup](https://github.com/google/oss-fuzz/blob/master/docs/code_coverage.md).
+setup](https://google.github.io/oss-fuzz/advanced-topics/code-coverage/).
 
 To filter out unrelated artifacts (e.g. Bazel cache, libfuzzer src), the following profile command
 can be used:

@@ -38,6 +38,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/matching/input_matchers/dynamic_modules:matcher_lib",
         "//test/extensions/dynamic_modules:util",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

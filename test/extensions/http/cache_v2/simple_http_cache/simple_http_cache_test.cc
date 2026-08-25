@@ -41,7 +41,7 @@ TEST(Registration, GetFactory) {
   envoy::extensions::filters::http::cache_v2::v3::CacheV2Config config;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   std::ignore = config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
-  auto cache = factory->getCache(config, factory_context);
+  auto cache = factory->getCache(config, factory_context.server_factory_context_);
   ASSERT_OK(cache);
   EXPECT_EQ((*cache)->cacheInfo().name_, "envoy.extensions.http.cache_v2.simple");
 }

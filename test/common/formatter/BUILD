@@ -53,6 +53,7 @@ envoy_cc_test(
     deps = [
         ":command_extension_lib",
         "//source/common/common:utility_lib",
+        "//source/common/formatter:coalesce_formatter_lib",
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
@@ -72,6 +73,7 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/status",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

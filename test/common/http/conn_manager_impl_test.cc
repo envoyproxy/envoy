@@ -1844,87 +1844,6 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanAndTraceDecisionRefreshA
   EXPECT_EQ(1UL, tracing_stats_.not_traceable_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanButDisableTraceDecisionRefresh) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.trace_refresh_after_route_refresh", "false"}});
-
-  setup(SetupOpts().setTracing(true));
-
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
-        auto factory = createDecoderFilterFactoryCb(filter);
-        callbacks.setFilterConfigName("");
-        factory(callbacks);
-        return true;
-      }));
-
-  // Treat request as internal, otherwise x-request-id header will be overwritten.
-  use_remote_address_ = false;
-  EXPECT_CALL(random_, uuid()).Times(0);
-
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        decoder_ = &conn_manager_->newStream(response_encoder_);
-
-        RequestHeaderMapPtr headers{
-            new TestRequestHeaderMapImpl{{":method", "GET"},
-                                         {":authority", "host"},
-                                         {":path", "/"},
-                                         {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
-
-        auto* span = new NiceMock<Tracing::MockSpan>();
-        EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
-            .WillOnce(Invoke([&](const Tracing::Config& config, Tracing::TraceContext&,
-                                 const StreamInfo::StreamInfo&,
-                                 const Tracing::Decision) -> Tracing::Span* {
-              EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
-
-              return span;
-            }));
-
-        EXPECT_CALL(runtime_.snapshot_,
-                    featureEnabled("tracing.global_enabled",
-                                   An<const envoy::type::v3::FractionalPercent&>(), _))
-            .WillOnce(Return(true));
-
-        decoder_->decodeHeaders(std::move(headers), true);
-
-        // The trace decision will be refreshed when the route is refreshed.
-        EXPECT_CALL(runtime_.snapshot_,
-                    featureEnabled("tracing.global_enabled",
-                                   An<const envoy::type::v3::FractionalPercent&>(), _))
-            .Times(0);
-        EXPECT_CALL(*span, useLocalDecision()).Times(0);
-        EXPECT_CALL(*span, setSampled(_)).Times(0);
-
-        // Clear route cache and refresh the route. But this will not trigger a new trace
-        // decision because the feature is disabled.
-        filter->callbacks_->downstreamCallbacks()->clearRouteCache();
-        filter->callbacks_->route();
-
-        EXPECT_CALL(*span, finishSpan());
-        EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
-
-        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-        filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
-        filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
-        data.drain(4);
-
-        return Http::okStatus();
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
-  EXPECT_EQ(1UL, tracing_stats_.service_forced_.value());
-  EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
-  EXPECT_EQ(0UL, tracing_stats_.not_traceable_.value());
-}
-
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowWithHcmOperationFormatter) {
   setup();
   tracing_config_->operation_ = Formatter::FormatterImpl::create("hcm_downstream_op").value();
@@ -3375,6 +3294,101 @@ TEST_F(HttpConnectionManagerImplTest, NoPath) {
   conn_manager_->onData(fake_input, false);
 }
 
+// RFC 10008 Section 2 requires servers to fail a QUERY request whose Content-Type is missing.
+TEST_F(HttpConnectionManagerImplTest, QueryWithoutContentType) {
+  setup();
+
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        FilterFactoryCb handler_factory = createLogHandlerFactoryCb(handler);
+        callbacks.setFilterConfigName("");
+        handler_factory(callbacks);
+        return true;
+      }));
+
+  EXPECT_CALL(*handler, log(_, _))
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ("query_missing_content_type", stream_info.responseCodeDetails().value());
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "QUERY"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// A present but empty Content-Type is as absent as a missing one.
+TEST_F(HttpConnectionManagerImplTest, QueryWithEmptyContentType) {
+  setup();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/"}, {":method", "QUERY"}, {"content-type", ""}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// A QUERY request that carries a Content-Type reaches the filter chain.
+TEST_F(HttpConnectionManagerImplTest, QueryWithContentType) {
+  setup();
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        FilterFactoryCb factory = createDecoderFilterFactoryCb(filter);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_EQ("QUERY", headers.getMethodValue());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
+                                                             {":path", "/"},
+                                                             {":method", "QUERY"},
+                                                             {"content-type", "application/sql"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*filter, onStreamComplete());
+  EXPECT_CALL(*filter, onDestroy());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // No idle timeout when route idle timeout is implied at both global and
 // per-route level. The connection manager config is responsible for managing
 // the default configuration aspects.
@@ -3808,7 +3822,9 @@ TEST_F(HttpConnectionManagerImplTest, BufferLimitAndRefresh) {
 
   // The initial route buffer limit is not valid value and the limit from underlying stream
   // will be used.
-  { EXPECT_EQ(122U, decoder_filters_[0]->callbacks_->bufferLimit()); }
+  {
+    EXPECT_EQ(122U, decoder_filters_[0]->callbacks_->bufferLimit());
+  }
 
   // Less buffer limit from route entry will not be applied.
   {

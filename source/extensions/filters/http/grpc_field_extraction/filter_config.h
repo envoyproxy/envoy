@@ -31,17 +31,18 @@ namespace GrpcFieldExtraction {
 // constructed only once and shared among filters for better performance.
 class FilterConfig : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
-  explicit FilterConfig(
+  FilterConfig(
       const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
           proto_config,
-      std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api);
+      std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api,
+      absl::Status& creation_status);
 
   const Extractor* findExtractor(absl::string_view proto_path) const;
 
 private:
-  void initDescriptorPool(Api::Api& api);
+  absl::Status initDescriptorPool(Api::Api& api);
 
-  void initExtractors(ExtractorFactory& extractor_factory);
+  absl::Status initExtractors(ExtractorFactory& extractor_factory);
 
   const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig
       proto_config_;

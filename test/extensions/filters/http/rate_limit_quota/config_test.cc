@@ -9,6 +9,7 @@
 
 #include "test/extensions/filters/http/rate_limit_quota/client_test_utils.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -19,6 +20,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 namespace {
+
+using StatusHelpers::HasStatus;
 
 TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
   std::string filter_config_yaml = R"EOF(
@@ -62,8 +65,10 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
 
   RateLimitQuotaFilterFactory factory;
   std::string stats_prefix = "test";
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProtoTyped(
-      filter_config, stats_prefix, mock_stream_client->context_);
+  auto cb_or = factory.createFilterFactoryFromProtoTyped(filter_config, stats_prefix,
+                                                         mock_stream_client->context_);
+  ASSERT_TRUE(cb_or.ok()) << cb_or.status();
+  Http::FilterFactoryCb cb = std::move(cb_or).value();
   cb(filter_callback);
 
   GlobalTlsStores::clear();
@@ -107,8 +112,10 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidMatcher) {
 
   RateLimitQuotaFilterFactory factory;
   std::string stats_prefix = "test";
-  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProtoTyped(filter_config, stats_prefix,
-                                                                    mock_stream_client->context_),
+  EXPECT_THROW_WITH_REGEX(factory
+                              .createFilterFactoryFromProtoTyped(filter_config, stats_prefix,
+                                                                 mock_stream_client->context_)
+                              .value(),
                           EnvoyException,
                           "Didn't find a registered implementation.*'input_not_found'");
 }
@@ -150,9 +157,9 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidGrpcClient) 
 
   RateLimitQuotaFilterFactory factory;
   std::string stats_prefix = "test";
-  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProtoTyped(filter_config, stats_prefix,
-                                                                    mock_stream_client->context_),
-                          EnvoyException, "Mock client creation failure");
+  auto cb_or = factory.createFilterFactoryFromProtoTyped(filter_config, stats_prefix,
+                                                         mock_stream_client->context_);
+  EXPECT_THAT(cb_or, HasStatus(absl::StatusCode::kInternal, "Mock client creation failure"));
 }
 
 } // namespace

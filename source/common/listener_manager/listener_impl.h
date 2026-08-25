@@ -20,8 +20,12 @@
 #include "source/common/common/logger.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/common/listener_manager/fcds_api.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/common/listener_manager/listener_info_impl.h"
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/quic_packet_writer_interface.h"
+#endif
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/factory_context_impl.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -204,6 +208,7 @@ private:
  */
 class ListenerImpl final : public Network::ListenerConfig,
                            public Network::FilterChainFactory,
+                           public FcdsClientCallbacks,
                            Logger::Loggable<Logger::Id::config> {
 public:
   /**
@@ -250,10 +255,7 @@ public:
    * Helper functions to determine whether a listener is blocked for update or remove.
    */
   bool blockLdsUpdate(uint64_t new_hash) {
-    // Receiving LDS update with FCDS config will cause full listener update. Therefore,
-    // we should not block the update if FCDS is configured, regardless of the hash.
-    return (!configInternal().has_fcds_config() && new_hash == maybe_stale_hash_) ||
-           !added_via_api_;
+    return (new_hash == maybe_stale_hash_) || !added_via_api_;
   }
   bool blockRemove() { return !added_via_api_; }
 
@@ -341,6 +343,9 @@ public:
     return listener_factory_context_->listener_factory_context_base_->listener_info_;
   }
 
+  // FilterChainUpdateCallbacks
+  void drainFilterChain(Network::DrainableFilterChainSharedPtr draining) override;
+
   void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
     if (options == nullptr) {
       options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
@@ -374,6 +379,13 @@ private:
     // Network::UdpListenerConfig
     Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
     Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
+#ifdef ENVOY_ENABLE_QUIC
+    Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override {
+      return quic_writer_factory_.get();
+    }
+#else
+    Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override { return nullptr; }
+#endif
     Network::UdpListenerWorkerRouter&
     listenerWorkerRouter(const Network::Address::Instance& address) override {
       auto iter = listener_worker_routers_.find(address.asString());
@@ -385,6 +397,9 @@ private:
     const envoy::config::listener::v3::UdpListenerConfig config_;
     Network::ActiveUdpListenerFactoryPtr listener_factory_;
     Network::UdpPacketWriterFactoryPtr writer_factory_;
+#ifdef ENVOY_ENABLE_QUIC
+    Quic::QuicPacketWriterFactoryPtr quic_writer_factory_;
+#endif
     absl::flat_hash_map<std::string, Network::UdpListenerWorkerRouterPtr> listener_worker_routers_;
   };
 
@@ -446,6 +461,8 @@ private:
   const envoy::config::listener::v3::Listener& configInternal() const {
     return config_maybe_partial_filter_chains_;
   }
+  std::shared_ptr<FcdsSharedFilterChainManager>
+  maybeCreateFilterChainManager(const envoy::config::listener::v3::Listener& config);
 
   ListenerManagerImpl& parent_;
   std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
@@ -511,6 +528,7 @@ private:
   // Important: local_init_watcher_ must be the last field in the class to avoid unexpected
   // watcher callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
+
   std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
       transport_factory_context_;
 

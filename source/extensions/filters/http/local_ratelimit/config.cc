@@ -12,24 +12,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace LocalRateLimitFilter {
 
-Http::FilterFactoryCb LocalRateLimitFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
-
-  FilterConfigSharedPtr filter_config =
-      std::make_shared<FilterConfig>(proto_config, context.serverFactoryContext(), context.scope());
-  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Filter>(filter_config));
-  };
-}
-
 absl::StatusOr<Http::FilterFactoryCb>
 LocalRateLimitFilterConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
 
-  FilterConfigSharedPtr filter_config =
-      std::make_shared<FilterConfig>(proto_config, context, context.scope());
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigSharedPtr filter_config = std::make_shared<FilterConfig>(
+      proto_config, context, extra_context.scopeOr(context), creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(filter_config));
   };
@@ -39,7 +31,12 @@ absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 LocalRateLimitFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const FilterConfig>(proto_config, context, context.scope(), true);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config =
+      std::make_shared<const FilterConfig>(proto_config, context, context.scope(), creation_status,
+                                           /*per_route=*/true);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return filter_config;
 }
 
 /**

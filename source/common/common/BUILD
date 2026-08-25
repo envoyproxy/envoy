@@ -23,6 +23,7 @@ envoy_cc_library(
     hdrs = ["assert.h"],
     deps = [
         ":minimal_logger_lib",
+        "//envoy/common:logger",
         "@abseil-cpp//absl/base",
         "@abseil-cpp//absl/debugging:stacktrace",
         "@abseil-cpp//absl/debugging:symbolize",
@@ -94,6 +95,15 @@ envoy_cc_library(
 envoy_cc_library(
     name = "c_smart_ptr_lib",
     hdrs = ["c_smart_ptr.h"],
+)
+
+envoy_cc_library(
+    name = "callbacks_handler_lib",
+    hdrs = ["callbacks_handler.h"],
+    deps = [
+        ":assert_lib",
+        "//envoy/common:optref_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -172,7 +182,10 @@ envoy_cc_library(
     name = "hex_lib",
     srcs = ["hex.cc"],
     hdrs = ["hex.h"],
-    deps = [":utility_lib"],
+    deps = [
+        ":utility_lib",
+        "@abseil-cpp//absl/types:span",
+    ],
 )
 
 envoy_cc_library(
@@ -230,6 +243,7 @@ envoy_cc_library(
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
+        "//envoy/common:logger",
         "//source/common/protobuf",
         # Depend on the header-only interface, not the implementation lib, so that every commit to
         # main does not invalidate the build cache of minimal_logger_lib (and everything that

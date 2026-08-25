@@ -49,6 +49,8 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
+
+#include "quiche/quic/core/crypto/crypto_protocol.h"
 #endif
 
 using testing::Eq;
@@ -69,6 +71,81 @@ TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
 
   testTrailers(10, 20, true, true);
+}
+
+// A QUERY request (RFC 10008) is routed upstream with its method and mandatory content intact,
+// for every combination of downstream and upstream protocol.
+TEST_P(ProtocolIntegrationTest, QueryMethod) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "QUERY"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-type", "application/sql"}},
+      128);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("QUERY", upstream_request_->headers().getMethodValue());
+  EXPECT_EQ("application/sql", upstream_request_->headers().getContentTypeValue());
+  EXPECT_EQ(128U, upstream_request_->bodyLength());
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(64, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(64U, response->body().size());
+}
+
+// With the runtime guard disabled, a downstream QUERY request is rejected by the HTTP/1 codec as
+// it was before RFC 10008 support was added. Only an HTTP/1 downstream is covered: the runtime
+// override applies to the whole test process, so for an HTTP/2 or HTTP/3 downstream the request
+// would be forwarded to the HTTP/1 fake upstream and rejected by its server codec instead. Envoy's
+// own upstream HTTP/1 codec parses responses and never validates request methods.
+TEST_P(DownstreamProtocolIntegrationTest, QueryMethodRuntimeGuardDisabled) {
+  if (GetParam().downstream_protocol != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "The QUERY method runtime guard is only consulted by the HTTP/1 codec";
+  }
+
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_allow_query_method", "false");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "QUERY"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-type", "application/sql"}},
+      128);
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_protocol_error")->value());
+}
+
+// RFC 10008 Section 2 requires servers to fail a QUERY request whose Content-Type is missing. The
+// check lives in the connection manager rather than a codec, so it applies to every downstream
+// protocol.
+TEST_P(DownstreamProtocolIntegrationTest, QueryMethodMissingContentType) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "QUERY"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
@@ -155,6 +232,44 @@ TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHandshakeFail
   // Also verify connection failure was recorded (proving connection attempt was made)
   EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_connect_fail")->value(), 1);
 }
+
+#if defined(__linux__)
+// Regression test: when the upstream connection cannot be created because binding to the
+// configured network namespace fails at connection time (the namespace file cannot be opened),
+// the request fails gracefully with a 503 instead of crashing on a null connection.
+TEST_P(ProtocolIntegrationTest, UpstreamConnectionCreationFailure) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    // QUIC upstream connections are created through a different code path which does not support
+    // binding to a network namespace, so the connection-time failure exercised here does not
+    // apply.
+    return;
+  }
+
+  // This test intentionally fails to create the upstream connection, so bypass the check that
+  // the test used upstream connections.
+  testing_upstream_intentionally_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* source_address = cluster->mutable_upstream_bind_config()->mutable_source_address();
+    source_address->set_address(Network::Test::getLoopbackAddressString(version_));
+    source_address->set_port_value(0);
+    // The namespace file does not exist, so entering it at connection time fails and the
+    // dispatcher returns a null connection. Note validate_network_namespaces is intentionally not
+    // set, so the configuration is accepted and the failure happens at connection time.
+    source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+  });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  codec_client_->close();
+}
+#endif
 
 TEST_P(ProtocolIntegrationTest, LogicalDns) {
   OsSysCallsWithMockedDns mock_os_sys_calls;
@@ -6279,6 +6394,11 @@ TEST_P(ProtocolIntegrationTest, UpstreamRstStreamNoErrorWithBufferedTrailers) {
 
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    // For HTTP/3, the STOP_SENDING(NO_ERROR) arrives after the response and may or may not be
+    // processed before/after the stream is finished. Use waitForAnyTermination() to avoid flakes.
+    ASSERT_TRUE(response->waitForAnyTermination());
+    codec_client_->close();
   } else {
     ASSERT_TRUE(response->waitForReset());
     EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());

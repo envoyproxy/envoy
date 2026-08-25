@@ -65,12 +65,13 @@ public:
         });
   }
 
-  RouteConfigProviderPtr createStaticRouteConfigProvider(
-      const RouteConfiguration& route_config,
-      Server::Configuration::ServerFactoryContext& factory_context) override {
-    return manager_.addStaticProvider([&factory_context, &route_config, this]() {
-      return std::make_unique<StaticRouteConfigProviderImpl>(route_config, config_traits_,
-                                                             factory_context, manager_);
+  RouteConfigProviderPtr
+  createStaticRouteConfigProvider(const RouteConfiguration& route_config,
+                                  Server::Configuration::ServerFactoryContext& factory_context,
+                                  Init::Manager& init_manager) override {
+    return manager_.addStaticProvider([&factory_context, &init_manager, &route_config, this]() {
+      return std::make_unique<StaticRouteConfigProviderImpl>(
+          route_config, config_traits_, factory_context, init_manager, manager_);
     });
   }
 

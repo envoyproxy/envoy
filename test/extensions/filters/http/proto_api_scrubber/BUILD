@@ -42,6 +42,7 @@ envoy_cc_test(
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/extensions/common/matcher:matcher_lib",
+        "//source/extensions/filters/http/proto_api_scrubber:config",
         "//source/extensions/filters/http/proto_api_scrubber:filter_config",
         "//source/extensions/matching/http/cel_input:cel_input_lib",
         "//source/extensions/matching/input_matchers/cel_matcher:config",
@@ -85,6 +86,7 @@ envoy_cc_test(
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/strings",

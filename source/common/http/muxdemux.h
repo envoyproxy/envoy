@@ -98,7 +98,7 @@ private:
 
   absl::Status addStream(const AsyncClient::StreamOptions& options, absl::string_view cluster_name,
                          std::weak_ptr<AsyncClient::StreamCallbacks> callbacks,
-                         Server::Configuration::FactoryContext& factory_context);
+                         Server::Configuration::ServerFactoryContext& factory_context);
   void maybeSwitchToIdle();
 
   uint32_t active_streams_{0};
@@ -116,7 +116,7 @@ public:
     std::optional<AsyncClient::StreamOptions> options;
   };
 
-  static std::shared_ptr<MuxDemux> create(Server::Configuration::FactoryContext& context) {
+  static std::shared_ptr<MuxDemux> create(Server::Configuration::ServerFactoryContext& context) {
     return std::shared_ptr<MuxDemux>(new MuxDemux(context));
   }
 
@@ -138,11 +138,11 @@ public:
 
 private:
   friend class MultiStream;
-  MuxDemux(Server::Configuration::FactoryContext& context);
+  MuxDemux(Server::Configuration::ServerFactoryContext& context);
 
   void switchToIdle() { is_idle_ = true; }
 
-  Server::Configuration::FactoryContext& factory_context_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
   bool is_idle_{true};
 };
 

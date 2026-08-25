@@ -4,12 +4,16 @@
 #include "source/common/crypto/utility.h"
 #include "source/common/crypto/utility_impl.h"
 
+#include "test/test_common/status_utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Common {
 namespace Crypto {
 namespace {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 TEST(UtilityTest, TestSha256Digest) {
   const Buffer::OwnedImpl buffer("test data");
@@ -201,8 +205,7 @@ TEST(UtilityTest, TestVerifySignature) {
       auto sig = Hex::decode(signature);
 
       auto result = UtilitySingleton::get().verifySignature(hash_func, *crypto, sig, text);
-      ASSERT_TRUE(result.ok()) << "Verification failed for " << description << " with " << hash_func
-                               << ": " << result.message();
+      ASSERT_OK(result) << "Verification failed for " << description << " with " << hash_func;
     }
   }
 
@@ -217,29 +220,25 @@ TEST(UtilityTest, TestVerifySignature) {
 
   // Test error cases using DER public key
   auto result = UtilitySingleton::get().verifySignature("unknown", *der_crypto, sig, text);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ("unknown is not supported.", result.message());
+  EXPECT_THAT(result, HasStatusMessage("unknown is not supported."));
 
   // Test with an empty crypto object
   auto empty_crypto = std::make_unique<PKeyObject>();
   result = UtilitySingleton::get().verifySignature("sha256", *empty_crypto, sig, text);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ("Failed to initialize digest verify.", result.message());
+  EXPECT_THAT(result, HasStatusMessage("Failed to initialize digest verify."));
 
   // Test with incorrect data
   auto bad_data = "baddata";
   std::vector<uint8_t> bad_text(bad_data, bad_data + strlen(bad_data));
   result = UtilitySingleton::get().verifySignature("sha256", *der_crypto, sig, bad_text);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ("Failed to verify digest. Error code: 0", result.message());
+  EXPECT_THAT(result, HasStatusMessage("Failed to verify digest. Error code: 0"));
 
   // Test with incorrect signature
   auto good_data = "hello";
   std::vector<uint8_t> good_text(good_data, good_data + strlen(good_data));
   result = UtilitySingleton::get().verifySignature("sha256", *der_crypto, Hex::decode("000000"),
                                                    good_text);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ("Failed to verify digest. Error code: 0", result.message());
+  EXPECT_THAT(result, HasStatusMessage("Failed to verify digest. Error code: 0"));
 }
 
 TEST(UtilityTest, TestImportPrivateKey) {
@@ -364,13 +363,12 @@ TEST(UtilityTest, TestSign) {
 
   for (const auto& hash_func : hash_functions) {
     auto result = UtilitySingleton::get().sign(hash_func, *crypto, text);
-    ASSERT_TRUE(result.ok()) << "Signing failed with " << hash_func << ": " << result.status();
+    ASSERT_OK(result) << "Signing failed with " << hash_func;
     EXPECT_FALSE(result->empty());
 
     // Test format equivalence: PEM private key should produce identical signature
     auto pem_result = UtilitySingleton::get().sign(hash_func, *pem_private_crypto, text);
-    ASSERT_TRUE(pem_result.ok()) << "PEM signing failed with " << hash_func << ": "
-                                 << pem_result.status();
+    ASSERT_OK(pem_result) << "PEM signing failed with " << hash_func;
     EXPECT_FALSE(pem_result->empty()) << "PEM signature empty with " << hash_func;
 
     // Verify signatures are identical (validates format equivalence)
@@ -393,7 +391,7 @@ TEST(UtilityTest, TestSign) {
 
     auto verify_result =
         UtilitySingleton::get().verifySignature(hash_func, *public_crypto, *result, text);
-    ASSERT_TRUE(verify_result.ok());
+    ASSERT_OK(verify_result);
 
     // Also verify with PEM format of the same public key (demonstrates format interoperability)
     std::string pem_public_key =
@@ -413,26 +411,23 @@ TEST(UtilityTest, TestSign) {
 
     auto pem_verify_result =
         UtilitySingleton::get().verifySignature(hash_func, *pem_public_crypto, *result, text);
-    ASSERT_TRUE(pem_verify_result.ok())
-        << "PEM verification failed with " << hash_func << ": " << pem_verify_result.message();
+    ASSERT_OK(pem_verify_result) << "PEM verification failed with " << hash_func;
   }
 
   // Test with unknown hash function
   auto result = UtilitySingleton::get().sign("unknown", *crypto, text);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ("unknown is not supported.", result.status().message());
+  EXPECT_THAT(result, HasStatusMessage("unknown is not supported."));
 
   // Test with empty crypto object
   auto empty_crypto = std::make_unique<PKeyObject>();
   result = UtilitySingleton::get().sign("sha256", *empty_crypto, text);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ("Invalid key type: private key required for signing operation.",
-            result.status().message());
+  EXPECT_THAT(result,
+              HasStatusMessage("Invalid key type: private key required for signing operation."));
 
   // Test with empty text
   std::vector<uint8_t> empty_text;
   result = UtilitySingleton::get().sign("sha256", *crypto, empty_text);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_FALSE(result->empty());
 }
 
@@ -480,7 +475,7 @@ TEST(UtilityTest, TestHashFunctionSupport) {
   std::vector<std::string> supported_hashes = {"sha1", "sha224", "sha256", "sha384", "sha512"};
   for (const auto& hash : supported_hashes) {
     auto result = UtilitySingleton::get().sign(hash, *crypto, text);
-    ASSERT_TRUE(result.ok()) << "Signing failed with " << hash << ": " << result.status();
+    ASSERT_OK(result) << "Signing failed with " << hash;
     EXPECT_FALSE(result->empty()) << "Signature empty with " << hash;
   }
 
@@ -488,8 +483,7 @@ TEST(UtilityTest, TestHashFunctionSupport) {
   std::vector<std::string> case_variants = {"SHA1", "SHA256", "Sha384"};
   for (const auto& hash : case_variants) {
     auto result = UtilitySingleton::get().sign(hash, *crypto, text);
-    ASSERT_TRUE(result.ok()) << "Case insensitive signing failed with " << hash << ": "
-                             << result.status();
+    ASSERT_OK(result) << "Case insensitive signing failed with " << hash;
     EXPECT_FALSE(result->empty()) << "Case insensitive signature empty with " << hash;
   }
 
@@ -497,25 +491,24 @@ TEST(UtilityTest, TestHashFunctionSupport) {
   std::vector<std::string> unsupported_hashes = {"md5", "sha3", "unknown", ""};
   for (const auto& hash : unsupported_hashes) {
     auto result = UtilitySingleton::get().sign(hash, *crypto, text);
-    EXPECT_FALSE(result.ok()) << "Unsupported hash should fail: " << hash;
-    EXPECT_EQ(hash + " is not supported.", result.status().message())
-        << "Wrong error message for " << hash;
+    EXPECT_THAT(result, HasStatusMessage(hash + " is not supported."))
+        << "Unsupported hash should fail: " << hash;
   }
 
   // Test additional edge cases for hash function support
   // Test with very long hash function names
   std::string long_hash_name(1000, 'a');
   auto result = UtilitySingleton::get().sign(long_hash_name, *crypto, text);
-  EXPECT_FALSE(result.ok()) << "Very long hash name should not be supported";
-  EXPECT_EQ(long_hash_name + " is not supported.", result.status().message());
+  EXPECT_THAT(result, HasStatusMessage(long_hash_name + " is not supported."))
+      << "Very long hash name should not be supported";
 
   // Test with hash names containing special characters
   std::vector<std::string> special_hashes = {"sha-256", "sha_256", "sha.256", "sha256!",
                                              "sha256@#$"};
   for (const auto& hash : special_hashes) {
     auto result = UtilitySingleton::get().sign(hash, *crypto, text);
-    EXPECT_FALSE(result.ok()) << "Hash with special characters should not be supported: " << hash;
-    EXPECT_EQ(hash + " is not supported.", result.status().message());
+    EXPECT_THAT(result, HasStatusMessage(hash + " is not supported."))
+        << "Hash with special characters should not be supported: " << hash;
   }
 }
 

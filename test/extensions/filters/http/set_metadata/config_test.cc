@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/set_metadata/set_metadata_filter.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -75,9 +76,11 @@ metadata:
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SetMetadataConfig factory;
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
 
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
+      factory.createHttpFilterFactoryFromProto(proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);
@@ -104,7 +107,7 @@ metadata:
   auto& validation_visitor = ProtobufMessage::getNullValidationVisitor();
   const auto result =
       factory.createRouteSpecificFilterConfig(proto_config, context, validation_visitor);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 } // namespace SetMetadataFilter

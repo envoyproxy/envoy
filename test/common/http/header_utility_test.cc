@@ -10,6 +10,7 @@
 
 #include "test/mocks/http/header_validator.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -1238,6 +1239,15 @@ TEST(HeaderIsValidTest, IsConnect) {
   EXPECT_FALSE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{}));
 }
 
+TEST(HeaderIsValidTest, IsQuery) {
+  EXPECT_TRUE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "QUERY"}}));
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "GET"}}));
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "POST"}}));
+  // Methods are case-sensitive.
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "query"}}));
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{}));
+}
+
 TEST(HeaderIsValidTest, IsConnectUdpRequest) {
   EXPECT_TRUE(HeaderUtility::isConnectUdpRequest(
       Http::TestRequestHeaderMapImpl{{"upgrade", "connect-udp"}}));
@@ -1498,7 +1508,7 @@ TEST(ValidateHeaders, ForbiddenCharacters) {
     Http::HeaderString invalid_key(absl::string_view("x-MiXeD-CaSe"));
     headers.addViaMove(std::move(invalid_key),
                        Http::HeaderString(absl::string_view("hello world")));
-    EXPECT_TRUE(HeaderUtility::checkValidRequestHeaders(headers).ok());
+    EXPECT_OK(HeaderUtility::checkValidRequestHeaders(headers));
   }
 
   {

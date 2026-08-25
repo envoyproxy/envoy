@@ -85,6 +85,7 @@ envoy_cc_test_binary(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
+        "//bazel:cpp_runfiles",
         "//source/common/event:dispatcher_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//test/extensions/common/wasm:wasm_runtime",
@@ -163,7 +164,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:wasm_lib",
-        "@proxy_wasm_cpp_host//:base_lib",
+        "@proxy-wasm-cpp-host//:base_lib",
     ],
 )
 

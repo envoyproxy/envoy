@@ -8,6 +8,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -128,7 +129,7 @@ TEST_F(HttpConnectionManagerConfigTest, AllDependenciesSatisfiedOk) {
       hcm_config, context_, date_provider_, route_config_provider_manager_,
       &scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_,
       creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 }
 
 // PantryFilter provides a potato, which is not required by any other filter.
@@ -144,7 +145,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnusedProvidencyOk) {
       hcm_config, context_, date_provider_, route_config_provider_manager_,
       &scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_,
       creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 }
 
 // ChefFilter requires a potato, but no filter provides it.
@@ -221,7 +222,7 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeDependencyOK) {
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 }
 
 // Dependencies provided in the HCM config filter chain do not satisfy

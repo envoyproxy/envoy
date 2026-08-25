@@ -3,6 +3,7 @@
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 
 namespace Envoy {
 namespace Network {
@@ -85,7 +86,7 @@ public:
     }
 
     auto csv_or_error = DnsResolverImpl::maybeBuildResolversCsv({resolver_address_});
-    EXPECT_TRUE(csv_or_error.ok());
+    EXPECT_OK(csv_or_error);
     return std::make_shared<DnsResolverImpl>(config, *dispatcher_, csv_or_error.value(),
                                              *stats_store_.rootScope());
   }

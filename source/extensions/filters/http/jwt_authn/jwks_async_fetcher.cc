@@ -35,11 +35,14 @@ std::chrono::milliseconds getFailedRefetchDuration(const JwksAsyncFetch& async_f
 
 JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
                                    Router::RetryPolicyConstSharedPtr retry_policy,
-                                   Server::Configuration::FactoryContext& context,
+                                   Server::Configuration::ServerFactoryContext& context,
+                                   OptRef<Init::Manager> init_manager,
                                    CreateJwksFetcherCb create_fetcher_fn,
-                                   JwtAuthnFilterStats& stats, JwksDoneFetched done_fn)
+                                   Stats::Counter& fetch_success, Stats::Counter& fetch_failed,
+                                   JwksDoneFetched done_fn)
     : remote_jwks_(remote_jwks), retry_policy_(std::move(retry_policy)), context_(context),
-      create_fetcher_fn_(create_fetcher_fn), stats_(stats), done_fn_(done_fn),
+      create_fetcher_fn_(create_fetcher_fn), fetch_success_(fetch_success),
+      fetch_failed_(fetch_failed), done_fn_(done_fn),
       debug_name_(absl::StrCat("Jwks async fetching url=", remote_jwks_.http_uri().uri())) {
   // if async_fetch is not enabled, do nothing.
   if (!remote_jwks_.has_async_fetch()) {
@@ -58,18 +61,18 @@ JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
   }
   failed_refetch_duration_ = getFailedRefetchDuration(remote_jwks.async_fetch());
 
-  refetch_timer_ = context_.serverFactoryContext().mainThreadDispatcher().createTimer(
-      [this]() -> void { fetch(); });
+  refetch_timer_ = context_.mainThreadDispatcher().createTimer([this]() -> void { fetch(); });
 
-  // For fast_listener, just trigger a fetch, not register with init_manager.
-  if (remote_jwks_.async_fetch().fast_listener()) {
+  // If no init manager is provided or fast_listener is enabled, fetch immediately and do not block
+  // the listener.
+  if (remote_jwks_.async_fetch().fast_listener() || !init_manager.has_value()) {
     fetch();
     return;
   }
 
   // Register to init_manager, force the listener to wait for the fetching.
   init_target_ = std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void { fetch(); });
-  context_.initManager().add(*init_target_);
+  init_manager->add(*init_target_);
 }
 
 std::chrono::seconds JwksAsyncFetcher::getCacheDuration(const RemoteJwks& remote_jwks) {
@@ -85,8 +88,7 @@ void JwksAsyncFetcher::fetch() {
   }
 
   ENVOY_LOG(debug, "{}: started", debug_name_);
-  fetcher_ = create_fetcher_fn_(context_.serverFactoryContext().clusterManager(), retry_policy_,
-                                remote_jwks_);
+  fetcher_ = create_fetcher_fn_(context_.clusterManager(), retry_policy_, remote_jwks_);
   fetcher_->fetch(Tracing::NullSpan::instance(), *this);
 }
 
@@ -101,7 +103,7 @@ void JwksAsyncFetcher::onJwksSuccess(Envoy::JwtVerify::JwksPtr&& jwks) {
   done_fn_(std::move(jwks));
   handleFetchDone();
   refetch_timer_->enableTimer(good_refetch_duration_);
-  stats_.jwks_fetch_success_.inc();
+  fetch_success_.inc();
 
   // Note: not to free fetcher_ within onJwksSuccess or onJwksError function.
   // They are passed to fetcher_->fetch() and are called by fetcher_ after fetch is done.
@@ -117,7 +119,7 @@ void JwksAsyncFetcher::onJwksError(Failure) {
   ENVOY_LOG(warn, "{}: failed", debug_name_);
   handleFetchDone();
   refetch_timer_->enableTimer(failed_refetch_duration_);
-  stats_.jwks_fetch_failed_.inc();
+  fetch_failed_.inc();
 
   // Note: not to free fetcher_ in this function. Please see comment at onJwksSuccess.
 }

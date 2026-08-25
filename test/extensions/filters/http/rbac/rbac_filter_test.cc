@@ -17,14 +17,17 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 
+#include "gmock/gmock.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
-
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
+
+using testing::Contains;
+using testing::Key;
 
 namespace Envoy {
 namespace Extensions {
@@ -1603,7 +1606,8 @@ TEST_F(RoleBasedAccessControlFilterTest, EnforcedEngineOnlyAllowsAccessMetadataT
 
   // Verify that dynamic metadata is set correctly even though there's no shadow
   // engine and the enforced engine returned Continue
-  EXPECT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+  EXPECT_THAT(req_info_.dynamicMetadata().filter_metadata(),
+              Contains(Key("envoy.filters.http.rbac")));
 
   // Verify the metadata contents
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");

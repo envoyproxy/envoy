@@ -304,15 +304,13 @@ uint64_t envoy_dynamic_module_callback_access_logger_get_upstream_connection_id(
 bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_cipher(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  // ciphersuiteString() returns std::string by value, so we use thread-local storage.
-  static thread_local std::string tls_cipher_str;
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
   const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
     return false;
   }
 
-  tls_cipher_str = upstream->upstreamSslConnection()->ciphersuiteString();
+  const absl::string_view tls_cipher_str = upstream->upstreamSslConnection()->ciphersuiteString();
   if (tls_cipher_str.empty()) {
     return false;
   }
@@ -493,15 +491,13 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san(
 bool envoy_dynamic_module_callback_access_logger_get_downstream_tls_cipher(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  // ciphersuiteString() returns std::string by value, so we use thread-local storage.
-  static thread_local std::string tls_cipher_str;
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
   const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return false;
   }
 
-  tls_cipher_str = provider.sslConnection()->ciphersuiteString();
+  const absl::string_view tls_cipher_str = provider.sslConnection()->ciphersuiteString();
   if (tls_cipher_str.empty()) {
     return false;
   }

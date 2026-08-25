@@ -27,6 +27,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "non_fatal_signal_test",
+    srcs = ["non_fatal_signal_test.cc"],
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/signal:non_fatal_signal_handler_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "fatal_action_test",
     srcs = ["fatal_action_test.cc"],
     rbe_pool = "6gig",

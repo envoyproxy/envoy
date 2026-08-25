@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "test/extensions/filters/http/ext_proc/ext_proc_integration_common.h"
 
 #include <chrono>
@@ -14,7 +17,12 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -744,15 +752,16 @@ void ExtProcIntegrationTest::testSendDyanmicMetadata() {
   processGenericMessage(
       *grpc_upstreams_[0], true, [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
         // Verify the processing request contains the untyped metadata we injected.
-        EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
+        EXPECT_THAT(req.metadata_context().filter_metadata(),
+                    Contains(Key("forwarding_ns_untyped")));
         const Protobuf::Struct& fwd_metadata =
             req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
-        EXPECT_EQ(1, fwd_metadata.fields_size());
-        EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
+        EXPECT_THAT(fwd_metadata.fields(), UnorderedElementsAre(Key("foo")));
         EXPECT_EQ("value from set_metadata", fwd_metadata.fields().at("foo").string_value());
 
         // Verify the processing request contains the typed metadata we injected.
-        EXPECT_TRUE(req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
+        EXPECT_THAT(req.metadata_context().typed_filter_metadata(),
+                    Contains(Key("forwarding_ns_typed")));
         const Protobuf::Any& fwd_typed_metadata =
             req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
         EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
@@ -769,6 +778,25 @@ void ExtProcIntegrationTest::testSendDyanmicMetadata() {
 
         return true;
       });
+}
+
+void ExtProcIntegrationTest::testSendTypedDyanmicMetadata() {
+  envoy::extensions::filters::http::set_metadata::v3::Metadata typed_md_to_stuff;
+  typed_md_to_stuff.set_metadata_namespace("typed_value from ext_proc");
+
+  Protobuf::Any typed_val;
+  EXPECT_TRUE(typed_val.PackFrom(typed_md_to_stuff));
+
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [typed_val](const ProcessingRequest&, ProcessingResponse& resp) {
+                          // Spoof the response to contain receiving typed metadata.
+                          HeadersResponse headers_resp;
+                          (*resp.mutable_request_headers()) = headers_resp;
+                          auto mut_typed_md = resp.mutable_typed_dynamic_metadata();
+                          (*mut_typed_md)["receiving_ns_typed"] = typed_val;
+
+                          return true;
+                        });
 }
 
 void ExtProcIntegrationTest::testSidestreamPushbackDownstream(uint32_t body_size,

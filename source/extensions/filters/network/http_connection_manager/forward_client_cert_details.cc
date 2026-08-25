@@ -63,6 +63,9 @@ std::vector<Http::ClientCertDetailsType> convertSetCurrentClientCertDetails(
   if (details.dns()) {
     result.push_back(Http::ClientCertDetailsType::DNS);
   }
+  if (details.issuer()) {
+    result.push_back(Http::ClientCertDetailsType::Issuer);
+  }
   return result;
 }
 

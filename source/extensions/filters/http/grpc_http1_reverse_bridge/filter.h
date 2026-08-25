@@ -51,6 +51,9 @@ private:
   // Tracking state for gRPC frame status when withholding gRPC frames from the
   // upstream and streaming responses.
   bool frame_header_added_{};
+  // Set when Content-Length from response headers is used to determine the
+  // response size for streaming (when response_size_header is not configured).
+  bool content_length_from_header_{};
   // The content length reported by the upstream.
   uint32_t response_message_length_{};
   // The actual size of the response returned by the upstream so far.

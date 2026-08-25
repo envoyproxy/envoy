@@ -2,6 +2,7 @@
 
 #include "test/benchmark/main.h"
 #include "test/extensions/load_balancing_policies/common/benchmark_base_tester.h"
+#include "test/test_common/status_utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -27,7 +28,7 @@ void benchmarkMaglevLoadBalancerChooseHost(::benchmark::State& state) {
     const uint64_t num_hosts = state.range(0);
     const uint64_t keys_to_simulate = state.range(1);
     MaglevTester tester(num_hosts);
-    ASSERT_TRUE(tester.maglev_lb_->initialize().ok());
+    ASSERT_OK(tester.maglev_lb_->initialize());
     LoadBalancerPtr lb = tester.maglev_lb_->factory()->create(tester.lb_params_);
     absl::node_hash_map<std::string, uint64_t> hit_counter;
     TestLoadBalancerContext context;
@@ -63,7 +64,7 @@ void benchmarkMaglevLoadBalancerBuildTable(::benchmark::State& state) {
 
     // We are only interested in timing the initial table build.
     state.ResumeTiming();
-    ASSERT_TRUE(tester.maglev_lb_->initialize().ok());
+    ASSERT_OK(tester.maglev_lb_->initialize());
     state.PauseTiming();
     const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
     state.counters["memory"] = end_mem - start_mem;
@@ -85,7 +86,7 @@ void benchmarkMaglevLoadBalancerHostLoss(::benchmark::State& state) {
     const uint64_t keys_to_simulate = state.range(2);
 
     MaglevTester tester(num_hosts);
-    ASSERT_TRUE(tester.maglev_lb_->initialize().ok());
+    ASSERT_OK(tester.maglev_lb_->initialize());
     LoadBalancerPtr lb = tester.maglev_lb_->factory()->create(tester.lb_params_);
     std::vector<HostConstSharedPtr> hosts;
     TestLoadBalancerContext context;
@@ -95,7 +96,7 @@ void benchmarkMaglevLoadBalancerHostLoss(::benchmark::State& state) {
     }
 
     MaglevTester tester2(num_hosts - hosts_to_lose);
-    ASSERT_TRUE(tester2.maglev_lb_->initialize().ok());
+    ASSERT_OK(tester2.maglev_lb_->initialize());
     lb = tester2.maglev_lb_->factory()->create(tester2.lb_params_);
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
@@ -132,7 +133,7 @@ void benchmarkMaglevLoadBalancerWeighted(::benchmark::State& state) {
     const uint64_t keys_to_simulate = state.range(4);
 
     MaglevTester tester(num_hosts, weighted_subset_percent, before_weight);
-    ASSERT_TRUE(tester.maglev_lb_->initialize().ok());
+    ASSERT_OK(tester.maglev_lb_->initialize());
     LoadBalancerPtr lb = tester.maglev_lb_->factory()->create(tester.lb_params_);
     std::vector<HostConstSharedPtr> hosts;
     TestLoadBalancerContext context;
@@ -142,7 +143,7 @@ void benchmarkMaglevLoadBalancerWeighted(::benchmark::State& state) {
     }
 
     MaglevTester tester2(num_hosts, weighted_subset_percent, after_weight);
-    ASSERT_TRUE(tester2.maglev_lb_->initialize().ok());
+    ASSERT_OK(tester2.maglev_lb_->initialize());
     lb = tester2.maglev_lb_->factory()->create(tester2.lb_params_);
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {

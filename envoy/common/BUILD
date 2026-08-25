@@ -162,3 +162,11 @@ envoy_cc_library(
         "@abseil-cpp//absl/types:variant",
     ],
 )
+
+envoy_cc_library(
+    name = "logger",
+    hdrs = ["logger.h"],
+    deps = [
+        "@spdlog",
+    ],
+)
