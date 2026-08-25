@@ -34,28 +34,53 @@ namespace Lua {
  */
 
 /**
- * Base macro for declaring a Lua/C function. Any function declared will need to be exported via
- * the exportedFunctions() function in BaseLuaObject. See BaseLuaObject below for more
- * information. This macro declares a static "thunk" which checks the user data, optionally checks
- * for object death (again see BaseLuaObject below for more info), and then invokes a normal
- * object method. The actual object method needs to be implemented by the class.
+ * Base macro for generating the static "thunk" of a Lua/C function: it checks the user data,
+ * optionally checks for object death (see BaseLuaObject below), and then invokes a normal object
+ * method. Generates only the thunk, not the method declaration, so it can also serve a method
+ * inherited from a shared base -- each registered type still needs its own thunk, because the
+ * metatable and the luaL_checkudata key are per type, even when the body is written once.
  * @param Class supplies the owning class name.
  * @param Name supplies the function name.
  * @param Index supplies the stack index where "this" (Lua/C userdata) is found.
  */
-#define DECLARE_LUA_FUNCTION_EX(Class, Name, Index)                                                \
+#define FORWARD_LUA_FUNCTION_EX(Class, Name, Index)                                                \
   static int static_##Name(lua_State* state) {                                                     \
     Class* object = ::Envoy::Extensions::Filters::Common::Lua::alignAndCast<Class>(                \
         luaL_checkudata(state, Index, typeid(Class).name()));                                      \
     object->checkDead(state);                                                                      \
     return object->Name(state);                                                                    \
-  }                                                                                                \
+  }
+
+/**
+ * Base macro for declaring a Lua/C function. Any function declared will need to be exported via
+ * the exportedFunctions() function in BaseLuaObject. See BaseLuaObject below for more
+ * information. Generates the thunk plus the object method declaration; the actual method needs to
+ * be implemented by the class.
+ * @param Class supplies the owning class name.
+ * @param Name supplies the function name.
+ * @param Index supplies the stack index where "this" (Lua/C userdata) is found.
+ */
+#define DECLARE_LUA_FUNCTION_EX(Class, Name, Index)                                                \
+  FORWARD_LUA_FUNCTION_EX(Class, Name, Index)                                                      \
   int Name(lua_State* state);
 
 /**
  * Declare a Lua function in which userdata is in stack slot 1. See DECLARE_LUA_FUNCTION_EX()
  */
 #define DECLARE_LUA_FUNCTION(Class, Name) DECLARE_LUA_FUNCTION_EX(Class, Name, 1)
+
+/**
+ * Generate only the thunk for a Lua function whose implementation is inherited from a shared
+ * base, with userdata in stack slot 1. Use this only where that base is itself not a
+ * BaseLuaObject and several leaf types export the same body; a class that owns its own
+ * implementation wants DECLARE_LUA_FUNCTION. See FORWARD_LUA_FUNCTION_EX()
+ */
+#define FORWARD_LUA_FUNCTION(Class, Name) FORWARD_LUA_FUNCTION_EX(Class, Name, 1)
+
+/**
+ * Same as FORWARD_LUA_FUNCTION but for closures, where userdata is in upvalue slot 1.
+ */
+#define FORWARD_LUA_CLOSURE(Class, Name) FORWARD_LUA_FUNCTION_EX(Class, Name, lua_upvalueindex(1))
 
 /**
  * Declare a Lua function in which userdata is in upvalue slot 1. See DECLARE_LUA_FUNCTION_EX()
