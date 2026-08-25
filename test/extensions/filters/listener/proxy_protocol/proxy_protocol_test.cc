@@ -31,6 +31,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -1625,8 +1626,8 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
                              ElementsAre(0x66, replacement, 0x6f, 0x2e, 0x63, 0x6f, replacement)),
               IsStructString("PP2 vpc id",
                              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, replacement, 0x35,
-                                         0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61, 0x36, 0x63,
-                                         0x36, 0x33, 0x68, replacement, 0x37))))));
+                                         0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61, 0x36, 0x63, 0x36,
+                                         0x33, 0x68, replacement, 0x37)))))));
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
@@ -1737,29 +1738,24 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEmitTypedAndUntypedM
   auto typed_metadata = server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata();
   EXPECT_THAT(typed_metadata, UnorderedElementsAre(Key(ProxyProtocol)));
   envoy::data::core::v3::TlvsMetadata tlvs_metadata;
-  auto status = MessageUtil::unpackTo(typed_metadata[ProxyProtocol], tlvs_metadata);
-  EXPECT_EQ(absl::OkStatus(), status);
-  EXPECT_EQ(2, tlvs_metadata.typed_metadata().size());
+  ASSERT_OK(MessageUtil::unpackTo(typed_metadata[ProxyProtocol], tlvs_metadata));
+  ASSERT_THAT(tlvs_metadata.typed_metadata(),
+              UnorderedElementsAre(
+                  Pair("PP2 type authority", ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d)),
+                  Pair("PP2 vpc id", ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35,
+                                                 0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61, 0x36,
+                                                 0x63, 0x36, 0x33, 0x68, 0x61, 0x37))));
 
-  auto value_type_authority = (tlvs_metadata.typed_metadata()).at("PP2 type authority");
-  ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
-
-  auto value_type_vpc_id = (tlvs_metadata.typed_metadata()).at("PP2 vpc id");
-  ASSERT_THAT(value_type_vpc_id,
-              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35, 0x74, 0x65, 0x73, 0x74,
-                          0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37));
-
-  EXPECT_THAT(
-      server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
-      UnorderedElementsAre(Pair(
-          ProxyProtocol,
-          HasStructFields(UnorderedElementsAre(
-              IsStructString("PP2 type authority",
-                             ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d)),
-              IsStructString("PP2 vpc id",
-                             ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35, 0x74,
-                                         0x65, 0x73, 0x74, 0x32, 0x66, 0x61, 0x36, 0x63, 0x36,
-                                         0x33, 0x68, 0x61, 0x37))))));
+  EXPECT_THAT(server_connection_->streamInfo().dynamicMetadata().filter_metadata(),
+              UnorderedElementsAre(Pair(
+                  ProxyProtocol,
+                  HasStructFields(UnorderedElementsAre(
+                      IsStructString("PP2 type authority",
+                                     ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d)),
+                      IsStructString("PP2 vpc id",
+                                     ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35,
+                                                 0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61, 0x36,
+                                                 0x63, 0x36, 0x33, 0x68, 0x61, 0x37)))))));
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
@@ -1818,24 +1814,20 @@ TEST_P(ProxyProtocolTest,
                              ElementsAre(0x66, replacement, 0x6f, 0x2e, 0x63, 0x6f, replacement)),
               IsStructString("PP2 vpc id",
                              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, replacement, 0x35,
-                                         0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61, 0x36, 0x63,
-                                         0x36, 0x33, 0x68, replacement, 0x37))))));
+                                         0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61, 0x36, 0x63, 0x36,
+                                         0x33, 0x68, replacement, 0x37)))))));
 
   auto typed_metadata = server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata();
   EXPECT_THAT(typed_metadata, UnorderedElementsAre(Key(ProxyProtocol)));
 
   envoy::data::core::v3::TlvsMetadata tlvs_metadata;
-  auto status = MessageUtil::unpackTo(typed_metadata[ProxyProtocol], tlvs_metadata);
-  EXPECT_EQ(absl::OkStatus(), status);
-  EXPECT_EQ(2, tlvs_metadata.typed_metadata().size());
-
-  value_type_authority = (tlvs_metadata.typed_metadata()).at("PP2 type authority");
-  ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0xfe, 0x6f, 0x2e, 0x63, 0x6f, 0xc1));
-
-  value_type_vpc_id = (tlvs_metadata.typed_metadata()).at("PP2 vpc id");
-  ASSERT_THAT(value_type_vpc_id,
-              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0xc0, 0x35, 0x74, 0x65, 0x73, 0x74,
-                          0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0xf9, 0x37));
+  ASSERT_OK(MessageUtil::unpackTo(typed_metadata[ProxyProtocol], tlvs_metadata));
+  ASSERT_THAT(tlvs_metadata.typed_metadata(),
+              UnorderedElementsAre(
+                  Pair("PP2 type authority", ElementsAre(0x66, 0xfe, 0x6f, 0x2e, 0x63, 0x6f, 0xc1)),
+                  Pair("PP2 vpc id", ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0xc0, 0x35,
+                                                 0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61, 0x36,
+                                                 0x63, 0x36, 0x33, 0x68, 0xf9, 0x37))));
 
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);

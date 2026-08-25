@@ -635,8 +635,8 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverrideDynamicMetadataStats)
           HasStructFields(UnorderedElementsAre(
               IsStructString("override_rules_stat_prefix_enforced_engine_result", "allowed"),
               IsStructString("override_rules_stat_prefix_enforced_effective_policy_id", "foobar"),
-              IsStructString("override_shadow_rules_prefix_shadow_engine_result", "allowed"),
-              IsStructString("override_shadow_rules_prefix_shadow_effective_policy_id",
+              IsStructString("override_shadow_rules_stat_prefix_shadow_engine_result", "allowed"),
+              IsStructString("override_shadow_rules_stat_prefix_shadow_effective_policy_id",
                              "foobar"))))));
 }
 
