@@ -19,7 +19,7 @@ py_binary(
     deps = [
         ":types_py_proto",
         "//tools/api_proto_plugin",
-        "@com_google_protobuf//:protobuf_python",
+        "@protobuf//:protobuf_python",
         "@xds//udpa/annotations:pkg_py_proto",
     ],
 )
@@ -32,7 +32,7 @@ py_binary(
         ":api_type_db_proto_py_proto",
         ":types_py_proto",
         "//tools/api_proto_plugin:utils",
-        "@com_google_protobuf//:protobuf_python",
+        "@protobuf//:protobuf_python",
     ],
 )
 
@@ -41,7 +41,7 @@ py_binary(
     srcs = ["file_descriptor_set_text_gen.py"],
     visibility = ["//visibility:public"],
     deps = [
-        "@com_google_protobuf//:protobuf_python",
+        "@protobuf//:protobuf_python",
         "@xds//udpa/annotations:pkg_py_proto",
     ],
 )

@@ -2,6 +2,7 @@
 
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/config/datasource.h"
 #include "source/common/formatter/substitution_format_string.h"
@@ -17,6 +18,28 @@ namespace Envoy {
 namespace Extensions {
 namespace Http {
 namespace CustomResponse {
+
+namespace {
+
+using LocalResponsePolicyProto =
+    envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy;
+
+bool preserveResponseCodeDetails(const LocalResponsePolicyProto& config) {
+  return config.response_code_details_action_case() ==
+             LocalResponsePolicyProto::kPreserveResponseCodeDetails &&
+         config.preserve_response_code_details();
+}
+
+std::optional<std::string> overrideResponseCodeDetails(const LocalResponsePolicyProto& config) {
+  if (config.response_code_details_action_case() ==
+      LocalResponsePolicyProto::kResponseCodeDetails) {
+    return config.response_code_details();
+  }
+  return std::nullopt;
+}
+
+} // namespace
+
 LocalResponsePolicy::LocalResponsePolicy(
     const envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy&
         config,
@@ -32,7 +55,9 @@ LocalResponsePolicy::LocalResponsePolicy(
                        : std::optional<Envoy::Http::Code>{}},
       header_parser_(THROW_OR_RETURN_VALUE(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
-          Router::HeaderParserPtr)) {
+          Router::HeaderParserPtr)),
+      preserve_response_code_details_(preserveResponseCodeDetails(config)),
+      response_code_details_(overrideResponseCodeDetails(config)) {
 
   // TODO(wbpcode): these is a potential bug of message validation. The validation visitor
   // of server context should not be used here directly. But this is bug is not introduced
@@ -77,10 +102,19 @@ Envoy::Http::FilterHeadersStatus LocalResponsePolicy::encodeHeaders(
                  : *encoder_callbacks->streamInfo().getRequestHeaders(),
              headers, encoder_callbacks->streamInfo(), encoder_callbacks->activeSpan(), body);
 
+  // Resolve details before sendLocalReply, which overwrites response_code_details.
+  absl::string_view details;
+  if (response_code_details_.has_value()) {
+    details = *response_code_details_;
+  } else if (preserve_response_code_details_) {
+    const auto& stream_details = encoder_callbacks->streamInfo().responseCodeDetails();
+    details = stream_details.has_value() ? *stream_details : EMPTY_STRING;
+  }
+
   const auto mutate_headers = [this, encoder_callbacks](Envoy::Http::ResponseHeaderMap& headers) {
     header_parser_->evaluateHeaders(headers, encoder_callbacks->streamInfo());
   };
-  encoder_callbacks->sendLocalReply(code, body, mutate_headers, std::nullopt, "");
+  encoder_callbacks->sendLocalReply(code, body, mutate_headers, std::nullopt, details);
   return Envoy::Http::FilterHeadersStatus::StopIteration;
 }
 

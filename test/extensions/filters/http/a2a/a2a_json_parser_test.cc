@@ -3,7 +3,11 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::Key;
 
 namespace Envoy {
 namespace Extensions {
@@ -1088,11 +1092,11 @@ TEST_F(A2aJsonParserTest, ParseResponseWithResult) {
   ASSERT_OK(parser_.parse(json));
   ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
-  EXPECT_TRUE(parser_.metadata().fields().contains("jsonrpc"));
+  EXPECT_THAT(parser_.metadata().fields(), Contains(Key("jsonrpc")));
   EXPECT_EQ(parser_.metadata().fields().at("jsonrpc").string_value(), "2.0");
-  EXPECT_TRUE(parser_.metadata().fields().contains("id"));
+  EXPECT_THAT(parser_.metadata().fields(), Contains(Key("id")));
   EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "1");
-  EXPECT_TRUE(parser_.metadata().fields().contains("result"));
+  EXPECT_THAT(parser_.metadata().fields(), Contains(Key("result")));
   EXPECT_TRUE(parser_.metadata().fields().at("result").has_struct_value());
 
   const auto& result = parser_.metadata().fields().at("result").struct_value().fields();
@@ -1130,13 +1134,13 @@ TEST_F(A2aJsonParserTest, GetTaskErrorResponse) {
   ASSERT_OK(parser_.parse(json));
   ASSERT_OK(parser_.finishParse());
   EXPECT_TRUE(parser_.isValidA2aRequest());
-  EXPECT_TRUE(parser_.metadata().fields().contains("jsonrpc"));
+  EXPECT_THAT(parser_.metadata().fields(), Contains(Key("jsonrpc")));
   EXPECT_EQ(parser_.metadata().fields().at("jsonrpc").string_value(), "2.0");
-  EXPECT_TRUE(parser_.metadata().fields().contains("id"));
+  EXPECT_THAT(parser_.metadata().fields(), Contains(Key("id")));
   EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 102);
-  EXPECT_TRUE(parser_.metadata().fields().contains("result"));
+  EXPECT_THAT(parser_.metadata().fields(), Contains(Key("result")));
   EXPECT_EQ(parser_.metadata().fields().at("result").null_value(), Protobuf::NULL_VALUE);
-  EXPECT_TRUE(parser_.metadata().fields().contains("error"));
+  EXPECT_THAT(parser_.metadata().fields(), Contains(Key("error")));
   EXPECT_TRUE(parser_.metadata().fields().at("error").has_struct_value());
 
   const auto& error = parser_.metadata().fields().at("error").struct_value().fields();

@@ -459,6 +459,18 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_cluster_add_hosts(
   return false;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+    envoy_dynamic_module_type_cluster_envoy_ptr, uint32_t,
+    const envoy_dynamic_module_type_module_buffer*, const envoy_dynamic_module_type_module_buffer*,
+    const uint32_t*, const envoy_dynamic_module_type_module_buffer*,
+    const envoy_dynamic_module_type_module_buffer*, const envoy_dynamic_module_type_module_buffer*,
+    const envoy_dynamic_module_type_module_buffer*, size_t, size_t,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) size_t envoy_dynamic_module_callback_cluster_remove_hosts(
     envoy_dynamic_module_type_cluster_envoy_ptr,
     const envoy_dynamic_module_type_cluster_host_envoy_ptr*, size_t) {
@@ -2788,6 +2800,124 @@ envoy_dynamic_module_callback_access_logger_set_gauge(
   IS_ENVOY_BUG(
       "envoy_dynamic_module_callback_access_logger_set_gauge: not implemented in this context");
   return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_specifier_get_attribute_bool(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id, bool*) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_cluster_specifier_get_attribute_bool: not implemented "
+      "in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_specifier_get_attribute_int(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id, uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_attribute_int: not implemented "
+               "in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_specifier_get_attribute_string(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_attribute_string: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) uint64_t envoy_dynamic_module_callback_cluster_specifier_get_random_value(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_random_value: not implemented "
+               "in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_specifier_get_request_header_value(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*, size_t,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_request_header_value: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_request_headers: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) size_t
+envoy_dynamic_module_callback_cluster_specifier_get_request_headers_size(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_request_headers_size: not "
+               "implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_specifier_get_route_name(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_route_name: not implemented in "
+               "this context");
+  return false;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_specifier_set_cluster_name(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_set_cluster_name: not implemented "
+               "in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_specifier_set_idle_timeout(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_set_idle_timeout: not implemented "
+               "in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_specifier_set_priority(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_resource_priority) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_cluster_specifier_set_priority: not implemented in this "
+      "context");
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_cluster_specifier_set_request_body_buffer_limit(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_set_request_body_buffer_limit: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_cluster_specifier_set_route_action_override(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_set_route_action_override: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_specifier_set_timeout(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_cluster_specifier_set_timeout: not implemented in this "
+      "context");
 }
 
 __attribute__((weak)) envoy_dynamic_module_type_access_log_type

@@ -14,22 +14,17 @@ namespace Compressor {
  * Config registration for the compressor filter. @see NamedHttpFilterConfigFactory.
  */
 class CompressorFilterFactory
-    : public Common::DualFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::compressor::v3::Compressor,
           envoy::extensions::filters::http::compressor::v3::CompressorPerRoute> {
 public:
-  CompressorFilterFactory() : DualFactoryBase("envoy.filters.http.compressor") {}
+  CompressorFilterFactory() : UnifiedFactoryBase("envoy.filters.http.compressor") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-      const std::string& stats_prefix, DualInfo info,
-      Server::Configuration::ServerFactoryContext& context) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
       const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,

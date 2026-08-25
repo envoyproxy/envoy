@@ -69,12 +69,18 @@ RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_report_client_creation_error);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_return_stop_iteration);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_stream_close_optimization);
+// When a filter drains the current data frame into the filter-manager buffer via
+// addDecoded/EncodedData() and then returns Continue (e.g. a wasm filter resuming after buffering),
+// forward that buffered data down the chain instead of the now-empty frame, so the frame is not
+// lost. See https://github.com/envoyproxy/envoy/issues/46841
+RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_continue);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
 RUNTIME_GUARD(envoy_reloadable_features_happy_eyeballs_sort_non_ip_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_header_mutation_url_encode_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_health_check_after_cluster_warming);
 RUNTIME_GUARD(envoy_reloadable_features_hide_transport_failure_reason_in_response_body);
+RUNTIME_GUARD(envoy_reloadable_features_http1_allow_query_method);
 RUNTIME_GUARD(envoy_reloadable_features_http1_close_connection_on_zombie_stream_complete);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_fix_goaway_loadshed_point);
@@ -88,7 +94,9 @@ RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_ja4_alpn_hex_conversion_fix);
 RUNTIME_GUARD(envoy_reloadable_features_json_formatter_omit_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header);
+RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_sanitize_payload_headers_filter_wide);
 RUNTIME_GUARD(envoy_reloadable_features_limit_json_parser_nesting_depth);
+RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_shadow_mode_no_short_circuit);
 RUNTIME_GUARD(envoy_reloadable_features_map_http_stream_reset_to_tcp_rst);
 RUNTIME_GUARD(envoy_reloadable_features_match_headers_individually);
 RUNTIME_GUARD(envoy_reloadable_features_mcp_filter_use_new_metadata_namespace);
@@ -128,6 +136,7 @@ RUNTIME_GUARD(envoy_reloadable_features_reject_empty_trusted_ca_file);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_for_non_zero_stats);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_when_rq_active_is_non_zero);
 RUNTIME_GUARD(envoy_reloadable_features_scope_upstream_tls_session_cache_by_sni);
+RUNTIME_GUARD(envoy_reloadable_features_shadow_policy_inherit_dynamic_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_skip_partition_original_dst_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_skip_pending_overflow_count_on_active_rq);
@@ -140,6 +149,7 @@ RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_tls_inspector_enforce_client_tls_version);
 RUNTIME_GUARD(envoy_reloadable_features_udp_hot_restart_session_handoff);
+RUNTIME_GUARD(envoy_reloadable_features_udp_send_zero_length_datagrams);
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_bind_config_fix_port_exhaustion);
@@ -156,7 +166,6 @@ RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_resp
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
-RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
@@ -294,6 +303,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
 // validated in production. When disabled, QUIC retains zlib-only compression while TCP TLS has
 // no certificate compression.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
+
+// DnsFilter created resolver on the worker thread which could lead to race when sharing resolvers
+// Do not turn this on if DnsFilter is used or until the race is fixed
+FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
