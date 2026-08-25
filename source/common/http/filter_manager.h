@@ -122,7 +122,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   bool commonHandleAfter1xxHeadersCallback(Filter1xxHeadersStatus status);
   bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& end_stream);
   bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
-                                     bool& buffer_was_streaming);
+                                     bool& buffer_was_streaming,
+                                     bool provided_data_nonempty_before_callback);
   bool commonHandleAfterTrailersCallback(FilterTrailersStatus status);
 
   // Buffers provided_data.
@@ -1001,6 +1002,14 @@ protected:
     bool encoder_filters_streaming_{true};
     bool decoder_filters_streaming_{true};
     bool destroyed_{false};
+
+    // Set true when a filter calls addDecodedData()/addEncodedData() during its own
+    // decodeData()/encodeData() callback. Reset immediately before each data callback. Combined
+    // with a frame that went from non-empty to empty across the callback, this signals the filter
+    // drained the current frame into the filter-manager buffer, so commonHandleAfterDataCallback()
+    // must forward the buffered data instead of the now-empty frame. See
+    // https://github.com/envoyproxy/envoy/issues/46841.
+    bool filter_added_data_in_data_callback_{false};
 
     // Result of filter chain creation.
     CreateChainResult create_chain_result_;

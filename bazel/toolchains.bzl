@@ -2,6 +2,7 @@ load("@envoy_repo//:compiler.bzl", "LLVM_LIB_DIR", "LLVM_PATH", "LLVM_VERSION_LO
 load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
 load("@protobuf//bazel/private/oss/toolchains/prebuilt:protoc_toolchain.bzl", "prebuilt_protoc_repo")
 load("@protobuf//toolchain:platforms.bzl", "PROTOBUF_PLATFORMS")
+load("@rules_shell//shell:repositories.bzl", "rules_shell_dependencies", "rules_shell_toolchains")
 load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
 _LLVM_VERSION_HERMETIC = "22.1.8"
@@ -108,3 +109,6 @@ def envoy_toolchains():
         "@protobuf//bazel/private/oss/toolchains:java_source_toolchain",
         "@protobuf//bazel/private/oss/toolchains:javalite_source_toolchain",
     )
+
+    rules_shell_dependencies()
+    rules_shell_toolchains()
