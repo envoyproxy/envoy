@@ -15,6 +15,9 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/abi_context_accessors.h"
+
+using Envoy::Extensions::DynamicModules::ContextAccessor;
 
 namespace {
 
@@ -968,12 +971,10 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
                         "stream info is not available");
     return false;
   }
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-  stream_info->filterState()->setData(
-      key_view, std::make_unique<Envoy::Router::StringAccessorImpl>(value_view),
+  return ContextAccessor::setFilterStateBytes(
+      *stream_info, absl::string_view(key.ptr, key.length),
+      absl::string_view(value.ptr, value.length),
       Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
-  return true;
 }
 
 bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
@@ -989,29 +990,10 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
     return false;
   }
 
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-
-  auto* factory =
-      Envoy::Registry::FactoryRegistry<Envoy::StreamInfo::FilterState::ObjectFactory>::getFactory(
-          key_view);
-  if (factory == nullptr) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "no ObjectFactory registered for filter state key '{}'", key_view);
-    return false;
-  }
-
-  auto object = factory->createFromBytes(value_view);
-  if (object == nullptr) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "ObjectFactory failed to create object for filter state key '{}'",
-                        key_view);
-    return false;
-  }
-
-  stream_info->filterState()->setData(key_view, std::move(object),
-                                      Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
-  return true;
+  return ContextAccessor::setFilterStateTyped(
+      *stream_info, absl::string_view(key.ptr, key.length),
+      absl::string_view(value.ptr, value.length),
+      Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
 uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
@@ -1038,10 +1020,8 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_numbe
                         "stream info is not available");
     return false;
   }
-  absl::string_view key_view(key.ptr, key.length);
-  Envoy::Protobuf::Struct metadata_value;
-  (*metadata_value.mutable_fields())[key_view].set_number_value(value);
-  stream_info->setDynamicMetadata(std::string(ns.ptr, ns.length), metadata_value);
+  ContextAccessor::setDynamicMetadataNumber(*stream_info, absl::string_view(ns.ptr, ns.length),
+                                            absl::string_view(key.ptr, key.length), value);
   return true;
 }
 
@@ -1058,11 +1038,9 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_strin
                         "stream info is not available");
     return false;
   }
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-  Envoy::Protobuf::Struct metadata_value;
-  (*metadata_value.mutable_fields())[key_view].set_string_value(value_view);
-  stream_info->setDynamicMetadata(std::string(ns.ptr, ns.length), metadata_value);
+  ContextAccessor::setDynamicMetadataString(*stream_info, absl::string_view(ns.ptr, ns.length),
+                                            absl::string_view(key.ptr, key.length),
+                                            absl::string_view(value.ptr, value.length));
   return true;
 }
 
