@@ -225,6 +225,49 @@ impl ClusterSpecifierContext {
     }
   }
 
+  /// Get a number value from dynamic metadata.
+  ///
+  /// The arguments are the same as [`Self::get_dynamic_metadata`]. Only number values are returned.
+  pub fn get_dynamic_metadata_number(&self, filter_name: &str, path: &str) -> Option<f64> {
+    let filter_buf = crate::str_to_module_buffer(filter_name);
+    let path_buf = crate::str_to_module_buffer(path);
+    let mut result: f64 = 0.0;
+    if unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_number(
+        self.envoy_ptr,
+        filter_buf,
+        path_buf,
+        &mut result,
+      )
+    } {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  /// Get a boolean value from dynamic metadata.
+  ///
+  /// The arguments are the same as [`Self::get_dynamic_metadata`]. Only boolean values are
+  /// returned.
+  pub fn get_dynamic_metadata_bool(&self, filter_name: &str, path: &str) -> Option<bool> {
+    let filter_buf = crate::str_to_module_buffer(filter_name);
+    let path_buf = crate::str_to_module_buffer(path);
+    let mut result: bool = false;
+    if unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_bool(
+        self.envoy_ptr,
+        filter_buf,
+        path_buf,
+        &mut result,
+      )
+    } {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
   /// Get the name of the matched route.
   ///
   /// This returns `None` when the route has no name.
@@ -314,6 +357,22 @@ impl ClusterSpecifierContext {
       abi::envoy_dynamic_module_callback_cluster_specifier_set_priority(
         self.envoy_ptr,
         priority.to_abi(),
+      )
+    }
+  }
+
+  /// Set the status code Envoy replies with when the selected cluster does not exist.
+  ///
+  /// This replaces the cluster-not-found response code of the matched route, letting a module that
+  /// derives cluster names from the request distinguish a name that resolves to nothing from an
+  /// upstream that is unavailable. Returns `false` when the status code is outside the range
+  /// [200, 600), in which case the call changes nothing.
+  #[must_use]
+  pub fn set_cluster_not_found_response_code(&mut self, status_code: u32) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_response_code(
+        self.envoy_ptr,
+        status_code,
       )
     }
   }

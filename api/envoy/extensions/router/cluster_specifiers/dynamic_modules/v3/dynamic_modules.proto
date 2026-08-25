@@ -29,8 +29,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // freely by the module on each request.
 //
 // Each entry is built and validated when the cluster specifier is configured, so an invalid entry
-// is rejected at configuration load rather than on the request path. At least one property must be
-// specified.
+// is rejected at configuration load rather than on the request path. Every entry must replace at
+// least one property, so an entry that builds to no replacement is rejected as well.
 message RouteActionOverride {
   // Retry policy replacing the retry policy of the matched route. If not specified, the retry
   // policy of the matched route is used, so an entry cannot be used to remove a retry policy that
@@ -43,19 +43,22 @@ message RouteActionOverride {
   // :ref:`RouteAction.metadata_match
   // <envoy_v3_api_field_config.route.v3.RouteAction.metadata_match>`. If not specified, or if there
   // is no ``envoy.lb`` entry, the criteria of the matched route are used, so an entry cannot be used
-  // to remove the criteria that the matched route configures.
+  // to remove the criteria that the matched route configures. An entry whose only property is a
+  // ``metadata_match`` without an ``envoy.lb`` entry therefore replaces nothing and is rejected.
   config.core.v3.Metadata metadata_match = 2;
 
   // Request mirroring policies replacing the request mirroring policies of the matched route. If
   // not specified, the request mirroring policies of the matched route are used, so an entry cannot
-  // be used to turn off mirroring that the matched route configures.
+  // be used to turn off mirroring that the matched route configures. Statically named mirror
+  // clusters are checked against the cluster manager when :ref:`validate_clusters
+  // <envoy_v3_api_field_config.route.v3.RouteConfiguration.validate_clusters>` is enabled.
   repeated config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 3;
 }
 
 // Configuration for the Dynamic Modules Cluster Specifier. This cluster specifier allows loading
 // shared object files via ``dlopen`` to select the upstream cluster for a request, and to replace
-// the timeout, idle timeout, priority, request body buffer limit, retry policy, metadata match
-// criteria and request mirroring policies of the matched route.
+// the timeout, idle timeout, priority, request body buffer limit, cluster not found response code,
+// retry policy, metadata match criteria and request mirroring policies of the matched route.
 //
 // A module can be loaded by multiple cluster specifiers. It is loaded only once and shared across
 // multiple cluster specifier instances. The module is invoked while the route is being
@@ -112,8 +115,8 @@ message DynamicModuleClusterSpecifier {
   google.protobuf.Any specifier_config = 3;
 
   // Route action overrides that the module may select by name for a request. If not specified, the
-  // module can only select the cluster, the timeout, the idle timeout, the priority and the request
-  // body buffer limit.
+  // module can only select the cluster, the timeout, the idle timeout, the priority, the request
+  // body buffer limit and the cluster not found response code.
   map<string, RouteActionOverride> route_action_overrides = 4
       [(validate.rules).map = {keys {string {min_len: 1}}}];
 }

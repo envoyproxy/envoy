@@ -43,8 +43,9 @@ public:
     }
 
     config_helper_.addConfigModifier(
-        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) {
+        [mirror_override = mirror_override_](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
           const std::string specifier_yaml = R"EOF(
 dynamic_module_config:
   name: cluster_specifier_integration_test
@@ -58,8 +59,6 @@ route_action_overrides:
       filter_metadata:
         envoy.lb:
           version: canary
-    request_mirror_policies:
-    - cluster: mirror-cluster
   stable:
     metadata_match:
       filter_metadata:
@@ -73,6 +72,11 @@ route_action_overrides:
 )EOF";
           DynamicModuleClusterSpecifierProto specifier_config;
           TestUtility::loadFromYaml(specifier_yaml, specifier_config);
+          if (mirror_override) {
+            (*specifier_config.mutable_route_action_overrides())["canary"]
+                .add_request_mirror_policies()
+                ->set_cluster("mirror-cluster");
+          }
 
           auto* route_action = hcm.mutable_route_config()
                                    ->mutable_virtual_hosts(0)
@@ -138,6 +142,14 @@ filter_metadata:
         });
   }
 
+  // Declares the request mirroring policy of the canary override together with the cluster it
+  // names. A statically named mirror cluster has to exist when the route configuration is
+  // validated, so the two cannot be configured independently.
+  void configureMirrorOverride() {
+    addClusterCopy("mirror-cluster");
+    mirror_override_ = true;
+  }
+
   // Adds a copy of the upstream cluster under a second name, so that a test can tell which of two
   // clusters served a request rather than relying on the only cluster in the configuration.
   void addClusterCopy(const std::string& name) {
@@ -176,6 +188,8 @@ filter_metadata:
     const auto values = headers.get(Http::LowerCaseString(HostVersionHeader));
     return values.empty() ? "" : std::string(values[0]->value().getStringView());
   }
+
+  bool mirror_override_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterSpecifierIntegrationTest,
@@ -239,6 +253,21 @@ TEST_P(DynamicModuleClusterSpecifierIntegrationTest, UnknownClusterFailsRequest)
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
   // The request must fail because the selected cluster is missing, not for some earlier reason.
+  EXPECT_EQ(1, test_server_->counter("http.config_test.no_cluster")->value());
+}
+
+// The cluster not found response code the module selected replaces the one of the matched route, so
+// a module that derives cluster names can tell a name that resolves to nothing apart from an
+// upstream that is unavailable.
+TEST_P(DynamicModuleClusterSpecifierIntegrationTest, SelectedClusterNotFoundResponseCodeIsUsed) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      requestHeaders({{"env", "nonexistent"}, {"x-not-found-code", "404"}}));
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("http.config_test.no_cluster")->value());
 }
 
@@ -338,7 +367,7 @@ TEST_P(DynamicModuleClusterSpecifierIntegrationTest, NoOverrideFindsNoLoadBalanc
 // The request mirroring policies of the selected override reach the router, so the mirror cluster
 // receives a copy of the request.
 TEST_P(DynamicModuleClusterSpecifierIntegrationTest, OverrideMirrorsRequest) {
-  addClusterCopy("mirror-cluster");
+  configureMirrorOverride();
   setupTest();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -352,7 +381,7 @@ TEST_P(DynamicModuleClusterSpecifierIntegrationTest, OverrideMirrorsRequest) {
 // Without an override the mirroring policies of the matched route are in effect, and the matched
 // route has none.
 TEST_P(DynamicModuleClusterSpecifierIntegrationTest, NoOverrideDoesNotMirrorRequest) {
-  addClusterCopy("mirror-cluster");
+  configureMirrorOverride();
   setupTest();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

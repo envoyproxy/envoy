@@ -20,8 +20,10 @@ envoy_cc_library(
     hdrs = ["cluster_specifier.h"],
     deps = [
         "//envoy/common:exception_lib",
+        "//envoy/http:codes_interface",
         "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/server:factory_context_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:statusor_lib",

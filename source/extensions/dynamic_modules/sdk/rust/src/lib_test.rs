@@ -8783,6 +8783,7 @@ struct StubSpecifierSelection {
   idle_timeout_ms: Option<u64>,
   request_body_buffer_limit: Option<u64>,
   priority: Option<abi::envoy_dynamic_module_type_resource_priority>,
+  cluster_not_found_response_code: Option<u32>,
   route_action_override: Option<String>,
 }
 
@@ -8793,6 +8794,7 @@ static STUB_SPECIFIER_SELECTION: std::sync::Mutex<StubSpecifierSelection> =
     idle_timeout_ms: None,
     request_body_buffer_limit: None,
     priority: None,
+    cluster_not_found_response_code: None,
     route_action_override: None,
   });
 
@@ -8928,6 +8930,34 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_dynamic_me
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_number(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _path: abi::envoy_dynamic_module_type_module_buffer,
+  result: *mut f64,
+) -> bool {
+  if !STUB_SPECIFIER_STATE_PRESENT.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  unsafe { *result = 0.25 };
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_bool(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _path: abi::envoy_dynamic_module_type_module_buffer,
+  result: *mut bool,
+) -> bool {
+  if !STUB_SPECIFIER_STATE_PRESENT.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  unsafe { *result = true };
+  true
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_route_name(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
   result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
@@ -8984,6 +9014,21 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_priority(
   priority: abi::envoy_dynamic_module_type_resource_priority,
 ) {
   STUB_SPECIFIER_SELECTION.lock().unwrap().priority = Some(priority);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_response_code(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  status_code: u32,
+) -> bool {
+  if !(200..600).contains(&status_code) {
+    return false;
+  }
+  STUB_SPECIFIER_SELECTION
+    .lock()
+    .unwrap()
+    .cluster_not_found_response_code = Some(status_code);
+  true
 }
 
 #[no_mangle]
@@ -9210,6 +9255,14 @@ fn test_cluster_specifier_context_reads_request_state() {
       .as_slice()
   );
   assert_eq!(
+    Some(0.25),
+    ctx.get_dynamic_metadata_number("envoy.test", "weight")
+  );
+  assert_eq!(
+    Some(true),
+    ctx.get_dynamic_metadata_bool("envoy.test", "canary")
+  );
+  assert_eq!(
     STUB_SPECIFIER_ROUTE_NAME.as_bytes(),
     ctx.route_name().unwrap().as_slice()
   );
@@ -9238,6 +9291,12 @@ fn test_cluster_specifier_context_reads_request_state() {
     .get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::HealthCheck)
     .is_none());
   assert!(ctx.get_dynamic_metadata("envoy.test", "shard").is_none());
+  assert!(ctx
+    .get_dynamic_metadata_number("envoy.test", "weight")
+    .is_none());
+  assert!(ctx
+    .get_dynamic_metadata_bool("envoy.test", "canary")
+    .is_none());
   assert!(ctx.route_name().is_none());
   STUB_SPECIFIER_STATE_PRESENT.store(true, std::sync::atomic::Ordering::SeqCst);
 }
@@ -9254,6 +9313,7 @@ fn test_cluster_specifier_context_records_selection() {
   ctx.set_idle_timeout(std::time::Duration::from_millis(4321));
   ctx.set_request_body_buffer_limit(9999);
   ctx.set_priority(ResourcePriority::High);
+  assert!(ctx.set_cluster_not_found_response_code(404));
   assert!(ctx.set_route_action_override(STUB_SPECIFIER_OVERRIDE_NAME));
 
   {
@@ -9266,6 +9326,7 @@ fn test_cluster_specifier_context_records_selection() {
       Some(abi::envoy_dynamic_module_type_resource_priority::High),
       selection.priority
     );
+    assert_eq!(Some(404), selection.cluster_not_found_response_code);
     assert_eq!(
       Some(STUB_SPECIFIER_OVERRIDE_NAME.to_string()),
       selection.route_action_override
@@ -9275,8 +9336,10 @@ fn test_cluster_specifier_context_records_selection() {
   // Sub-millisecond precision is truncated, and the default priority maps to its own ABI value.
   ctx.set_timeout(std::time::Duration::from_micros(1500));
   ctx.set_priority(ResourcePriority::Default);
-  // An override that the configuration does not declare is reported as not found.
+  // An override that the configuration does not declare is reported as not found, and so is a
+  // status code that is not an HTTP response code.
   assert!(!ctx.set_route_action_override("unknown"));
+  assert!(!ctx.set_cluster_not_found_response_code(600));
 
   {
     let selection = STUB_SPECIFIER_SELECTION.lock().unwrap();
@@ -9285,6 +9348,7 @@ fn test_cluster_specifier_context_records_selection() {
       Some(abi::envoy_dynamic_module_type_resource_priority::Default),
       selection.priority
     );
+    assert_eq!(Some(404), selection.cluster_not_found_response_code);
     assert_eq!(
       Some(STUB_SPECIFIER_OVERRIDE_NAME.to_string()),
       selection.route_action_override
