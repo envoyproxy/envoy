@@ -52,7 +52,9 @@ namespace TcpProxy {
 namespace {
 
 using ::testing::_;
+using testing::AnyOf;
 using ::testing::DoAll;
+using testing::HasSubstr;
 using ::testing::Invoke;
 using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
@@ -2686,8 +2688,7 @@ TEST_P(TcpProxyTest, SetDynamicTLVWithStartTime) {
   const std::string timestamp_value(tlvs[0].value.begin(), tlvs[0].value.end());
   EXPECT_FALSE(timestamp_value.empty());
   // Should contain date-like characters.
-  EXPECT_TRUE(timestamp_value.find('-') != std::string::npos ||
-              timestamp_value.find(':') != std::string::npos);
+  EXPECT_THAT(timestamp_value, AnyOf(HasSubstr("-"), HasSubstr(":")));
 }
 
 // Test buffer overflow behavior - should only readDisable, not re-trigger connection.

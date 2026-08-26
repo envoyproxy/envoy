@@ -50,6 +50,7 @@ envoy_cc_library(
         ":weighted_cluster_specifier_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/init:manager_interface",
         "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/router:router_interface",
         "//envoy/runtime:runtime_interface",
@@ -113,6 +114,7 @@ envoy_cc_library(
     srcs = ["per_filter_config.cc"],
     hdrs = ["per_filter_config.h"],
     deps = [
+        "//envoy/init:manager_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/server:filter_config_interface",
         "//source/common/common:empty_string",

@@ -12,15 +12,6 @@ namespace HttpFilters {
 namespace ConnectGrpcBridge {
 
 absl::StatusOr<Http::FilterFactoryCb>
-ConnectGrpcFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig&,
-    const std::string&, Server::Configuration::FactoryContext&) {
-  return [](Http::FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addStreamFilter(std::make_shared<ConnectGrpcBridgeFilter>());
-  };
-}
-
-absl::StatusOr<Http::FilterFactoryCb>
 ConnectGrpcFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig&,
     Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {

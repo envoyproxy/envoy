@@ -6,6 +6,7 @@ def envoy_mobile_repositories():
         sha256 = "d8c9586b24ce4a5513d972668f94b62eb7d705b92405d4bc102131f294751f1d",
         strip_prefix = "bazel-common-413b433b91f26dbe39cdbc20f742ad6555dd1e27",
         urls = ["https://github.com/google/bazel-common/archive/413b433b91f26dbe39cdbc20f742ad6555dd1e27.zip"],
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     upstream_envoy_overrides()
@@ -20,6 +21,7 @@ def python_repos():
         sha256 = "a58c25c5fe063a70057fa20cb8e15f3bda19b1030305bcb533af1e45f36a4a55",
         strip_prefix = "pybind11_bazel-2.12.0",
         urls = ["https://github.com/pybind/pybind11_bazel/releases/download/v2.12.0/pybind11_bazel-2.12.0.zip"],
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     http_archive(
@@ -28,6 +30,7 @@ def python_repos():
         sha256 = "e08cb87f4773da97fa7b5f035de8763abc656d87d5773e62f6da0587d1f0ec20",
         strip_prefix = "pybind11-2.13.6",
         urls = ["https://github.com/pybind/pybind11/archive/refs/tags/v2.13.6.tar.gz"],
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
 
@@ -72,6 +75,7 @@ def swift_repos():
         sha256 = "ae3a063c985a8633cb7eb566db21656f8db8eb9a0edb8c182312c7f0db53730d",
         patch_args = ["-p1"],
         patches = ["@envoy_mobile//bazel:xctestrunner.patch"],
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
 def kotlin_repos():
@@ -80,6 +84,7 @@ def kotlin_repos():
         sha256 = "3afe5195069bd379373528899c03a3072f568d33bd96fe037bd43b1f590535e7",
         strip_prefix = "rules_jvm_external-6.6",
         url = "https://github.com/bazelbuild/rules_jvm_external/releases/download/6.6/rules_jvm_external-6.6.tar.gz",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     http_archive(
@@ -88,6 +93,7 @@ def kotlin_repos():
         urls = ["https://github.com/bazelbuild/rules_kotlin/releases/download/v1.9.6/rules_kotlin-v1.9.6.tar.gz"],
         patch_args = ["-p1"],
         patches = ["@envoy_mobile//bazel:rules_kotlin.patch"],
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     http_archive(
@@ -95,6 +101,7 @@ def kotlin_repos():
         sha256 = "91837e301379c105ff4565ca822f6a6b30531f0b2ab6e75bbaf74e64f7d6879c",
         strip_prefix = "bazel_rules_detekt-0.8.1.2",
         url = "https://github.com/buildfoundation/bazel_rules_detekt/archive/v0.8.1.2.tar.gz",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     http_archive(
@@ -102,6 +109,7 @@ def kotlin_repos():
         sha256 = "507e38c8d95c7efa4f3b1c0595a8e8f139c885cb41a76cab7e20e4e67ae87731",
         strip_prefix = "rules_proto_grpc-4.1.1",
         urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/archive/4.1.1.tar.gz"],
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     http_file(
@@ -109,6 +117,7 @@ def kotlin_repos():
         executable = 1,
         sha256 = "115d4c5cb3421eae732c42c137f5db8881ff9cc1ef180a01e638283f3ccbae44",
         urls = ["https://github.com/pinterest/ktlint/releases/download/0.37.1/ktlint"],
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     http_archive(
@@ -116,18 +125,37 @@ def kotlin_repos():
         sha256 = "cf04b4206b9d21b385e8dbee478fac619fc1344e8e46935dcec2d64939dd0525",
         urls = ["https://github.com/robolectric/robolectric-bazel/releases/download/4.16/robolectric-bazel-4.16.tar.gz"],
         strip_prefix = "robolectric-bazel-4.16",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
 def android_repos():
+    # until we shift off of workspace these 2 deps needs to be declared first
+    http_archive(
+        name = "bazel_worker_api",
+        urls = ["https://github.com/bazelbuild/bazel-worker-api/releases/download/v0.0.10/bazel-worker-api-v0.0.10.tar.gz"],
+        sha256 = "0476fe27251cd3234b69737f8bc231cfe9912becdd620e07e2d73c87bcc7e40a",
+        strip_prefix = "bazel-worker-api-0.0.10/proto",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
+    )
+    http_archive(
+        name = "bazel_worker_java",
+        urls = ["https://github.com/bazelbuild/bazel-worker-api/releases/download/v0.0.10/bazel-worker-api-v0.0.10.tar.gz"],
+        sha256 = "0476fe27251cd3234b69737f8bc231cfe9912becdd620e07e2d73c87bcc7e40a",
+        strip_prefix = "bazel-worker-api-0.0.10/java",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
+    )
+
     http_archive(
         name = "rules_android",
         urls = ["https://github.com/bazelbuild/rules_android/releases/download/v0.7.2/rules_android-v0.7.2.tar.gz"],
         sha256 = "0da7198c7c8bac7e11e08dca3c434617b8593075858716595672e9aeefbef2a7",
         strip_prefix = "rules_android-0.7.2",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
     http_archive(
         name = "rules_android_ndk",
         urls = ["https://github.com/bazelbuild/rules_android_ndk/archive/v0.1.2.tar.gz"],
         sha256 = "65aedff0cd728bee394f6fb8e65ba39c4c5efb11b29b766356922d4a74c623f5",
         strip_prefix = "rules_android_ndk-0.1.2",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )

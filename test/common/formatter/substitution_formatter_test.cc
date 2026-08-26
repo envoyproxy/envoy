@@ -34,10 +34,12 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -47,32 +49,49 @@ namespace {
 
 using ::Envoy::StatusHelpers::IsOk;
 using StatusHelpers::HasStatus;
+using StatusHelpers::HasStatusCode;
+using testing::AnyOf;
 using testing::Const;
 using testing::ContainsRegex;
 using testing::HasSubstr;
 using testing::Invoke;
 using testing::NiceMock;
-using ::testing::Not;
+using testing::Not;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::StartsWith;
+using testing::UnorderedElementsAre;
 
 // Helper class to test StreamInfoFormatter.
 class StreamInfoFormatter : public FormatterProvider {
 public:
+  // This constructor expects well formed format.
   StreamInfoFormatter(const std::string& command, const std::string& sub_command = "",
                       std::optional<size_t> max_length = std::nullopt) {
     DefaultBuiltInStreamInfoCommandParserFactory factory;
     auto parser = factory.createCommandParser();
     auto formatter_or = parser->parse(command, sub_command, max_length);
-    if (!formatter_or.ok()) {
-      throwEnvoyExceptionOrPanic(std::string(formatter_or.status().message()));
-    }
+    ASSERT(formatter_or.ok(), std::string(formatter_or.status().message()));
     formatter_ = std::move(formatter_or).value();
-    if (formatter_ == nullptr) {
-      throwEnvoyExceptionOrPanic(fmt::format("Not supported command in StreamInfo: {}", command));
+    ASSERT(formatter_ != nullptr, fmt::format("Not supported command in StreamInfo: {}", command));
+  }
+
+  explicit StreamInfoFormatter(FormatterProviderPtr formatter) : formatter_(std::move(formatter)) {}
+
+  // Factory method is for testing cases with malformed format.
+  static absl::StatusOr<StreamInfoFormatter>
+  create(const std::string& command, const std::string& sub_command = "",
+         std::optional<size_t> max_length = std::nullopt) {
+    DefaultBuiltInStreamInfoCommandParserFactory factory;
+    auto parser = factory.createCommandParser();
+    auto formatter = parser->parse(command, sub_command, max_length);
+    RETURN_IF_NOT_OK(formatter.status());
+    if (*formatter == nullptr) {
+      return absl::InvalidArgumentError(
+          fmt::format("Not supported command in StreamInfo: {}", command));
     }
+    return StreamInfoFormatter(std::move(*formatter));
   }
 
   // FormatterProvider
@@ -293,7 +312,8 @@ TEST(SubstitutionFormatterTest, inFlightDuration) {
 }
 
 TEST(SubstitutionFormatterTest, streamInfoFormatter) {
-  EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
+  EXPECT_THAT(StreamInfoFormatter::create("unknown_field"),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
 
   // Used to replace the default one in the upstream info.
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
@@ -1418,7 +1438,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
       StreamInfoFormatter format("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "24");
       auto result = format.format({}, stream_info);
       if (result.has_value()) {
-        EXPECT_TRUE(result.value().find('/') != std::string::npos);
+        EXPECT_THAT(result.value(), HasSubstr("/"));
       }
     }
   }
@@ -1430,8 +1450,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
       StreamInfoFormatter format("DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT", "16");
       auto result = format.format({}, stream_info);
       if (result.has_value()) {
-        EXPECT_TRUE(result.value().find("127.0.0.0/16") != std::string::npos ||
-                    result.value().find('/') != std::string::npos);
+        EXPECT_THAT(result.value(), AnyOf(HasSubstr("127.0.0.0/16"), HasSubstr("/")));
       }
     }
   }
@@ -1686,27 +1705,27 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        { StreamInfoFormatter upstream_format("COMMON_DURATION"); }, EnvoyException,
-        "COMMON_DURATION requires parameters");
+    EXPECT_THAT(
+        StreamInfoFormatter::create("COMMON_DURATION"),
+        HasStatus(absl::StatusCode::kInvalidArgument, "COMMON_DURATION requires parameters"));
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        { StreamInfoFormatter duration_format("COMMON_DURATION", "a"); }, EnvoyException,
-        "Invalid common duration configuration: a.");
+    EXPECT_THAT(
+        StreamInfoFormatter::create("COMMON_DURATION", "a"),
+        HasStatus(absl::StatusCode::kInvalidArgument, "Invalid common duration configuration: a."));
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        { StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:c:d"); }, EnvoyException,
-        "Invalid common duration configuration: a:b:c:d.");
+    EXPECT_THAT(StreamInfoFormatter::create("COMMON_DURATION", "a:b:c:d"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          "Invalid common duration configuration: a:b:c:d."));
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(
-        { StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:zs"); }, EnvoyException,
-        "Invalid common duration precision: zs.");
+    EXPECT_THAT(
+        StreamInfoFormatter::create("COMMON_DURATION", "a:b:zs"),
+        HasStatus(absl::StatusCode::kInvalidArgument, "Invalid common duration precision: zs."));
   }
 
   {
@@ -1903,7 +1922,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 }
 
 TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
-  EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
+  EXPECT_THAT(StreamInfoFormatter::create("unknown_field"),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -4839,16 +4859,6 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
   }
 }
 
-void verifyStructOutput(Protobuf::Struct output,
-                        absl::node_hash_map<std::string, std::string> expected_map) {
-  for (const auto& pair : expected_map) {
-    EXPECT_EQ(output.fields().at(pair.first).string_value(), pair.second);
-  }
-  for (const auto& pair : output.fields()) {
-    EXPECT_TRUE(expected_map.contains(pair.first));
-  }
-}
-
 TEST(SubstitutionFormatterTest, JsonFormatterPlainStringTest) {
   StreamInfo::MockStreamInfo stream_info;
 
@@ -5056,8 +5066,6 @@ TEST(SubstitutionFormatterTest, JsonFormatterSingleOperatorTest) {
   std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  absl::node_hash_map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1"}};
-
   Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     protocol: '%PROTOCOL%'
@@ -5065,8 +5073,8 @@ TEST(SubstitutionFormatterTest, JsonFormatterSingleOperatorTest) {
                             key_mapping);
   auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  verifyStructOutput(TestUtility::jsonToStruct(formatter->format({}, stream_info)),
-                     expected_json_map);
+  EXPECT_THAT(TestUtility::jsonToStruct(formatter->format({}, stream_info)).fields(),
+              UnorderedElementsAre(IsStructString("protocol", "HTTP/1.1")));
 }
 
 TEST(SubstitutionFormatterTest, EmptyJsonFormatterTest) {
@@ -5077,8 +5085,6 @@ TEST(SubstitutionFormatterTest, EmptyJsonFormatterTest) {
   std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  absl::node_hash_map<std::string, std::string> expected_json_map = {{"protocol", ""}};
-
   Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     protocol: ''
@@ -5086,8 +5092,8 @@ TEST(SubstitutionFormatterTest, EmptyJsonFormatterTest) {
                             key_mapping);
   auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  verifyStructOutput(TestUtility::jsonToStruct(formatter->format({}, stream_info)),
-                     expected_json_map);
+  EXPECT_THAT(TestUtility::jsonToStruct(formatter->format({}, stream_info)).fields(),
+              UnorderedElementsAre(IsStructString("protocol", "")));
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterNonExistentHeaderTest) {
@@ -5132,12 +5138,6 @@ TEST(SubstitutionFormatterTest, JsonFormatterAlternateHeaderTest) {
   Context formatter_context;
   formatter_context.setRequestHeaders(request_header).setResponseHeaders(response_header);
 
-  absl::node_hash_map<std::string, std::string> expected_json_map = {
-      {"request_present_header_or_request_absent_header", "REQUEST_PRESENT_HEADER"},
-      {"request_absent_header_or_request_present_header", "REQUEST_PRESENT_HEADER"},
-      {"response_absent_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"},
-      {"response_present_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"}};
-
   Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     request_present_header_or_request_absent_header:
@@ -5155,8 +5155,16 @@ TEST(SubstitutionFormatterTest, JsonFormatterAlternateHeaderTest) {
   std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  verifyStructOutput(TestUtility::jsonToStruct(formatter->format(formatter_context, stream_info)),
-                     expected_json_map);
+  EXPECT_THAT(
+      TestUtility::jsonToStruct(formatter->format(formatter_context, stream_info)).fields(),
+      UnorderedElementsAre(IsStructString("request_present_header_or_request_absent_header",
+                                          "REQUEST_PRESENT_HEADER"),
+                           IsStructString("request_absent_header_or_request_present_header",
+                                          "REQUEST_PRESENT_HEADER"),
+                           IsStructString("response_absent_header_or_response_absent_header",
+                                          "RESPONSE_PRESENT_HEADER"),
+                           IsStructString("response_present_header_or_response_absent_header",
+                                          "RESPONSE_PRESENT_HEADER")));
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
@@ -5435,16 +5443,6 @@ TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
   SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
   EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
 
-  absl::node_hash_map<std::string, std::string> expected_json_map = {
-      {"simple_date", "2018/03/28"},
-      {"test_time", fmt::format("{}", expected_time_in_epoch)},
-      {"test_time_local", fmt::format("{}", expected_time_in_epoch)},
-      {"bad_format", "bad_format"},
-      {"default", "2018-03-28T23:35:58.000Z"},
-      {"default_local",
-       absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time), absl::LocalTimeZone())},
-      {"all_zeroes", "000000000.0.00.000"}};
-
   Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     simple_date: '%START_TIME(%Y/%m/%d)%'
@@ -5458,8 +5456,17 @@ TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
                             key_mapping);
   auto formatter = JsonFormatterImpl::create(key_mapping, false).value();
 
-  verifyStructOutput(TestUtility::jsonToStruct(formatter->format({}, stream_info)),
-                     expected_json_map);
+  EXPECT_THAT(TestUtility::jsonToStruct(formatter->format({}, stream_info)).fields(),
+              UnorderedElementsAre(
+                  IsStructString("simple_date", "2018/03/28"),
+                  IsStructString("test_time", fmt::format("{}", expected_time_in_epoch)),
+                  IsStructString("test_time_local", fmt::format("{}", expected_time_in_epoch)),
+                  IsStructString("bad_format", "bad_format"),
+                  IsStructString("default", "2018-03-28T23:35:58.000Z"),
+                  IsStructString("default_local",
+                                 absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time),
+                                                  absl::LocalTimeZone())),
+                  IsStructString("all_zeroes", "000000000.0.00.000")));
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
@@ -5472,9 +5479,6 @@ TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
     Context formatter_context;
     formatter_context.setRequestHeaders(request_header).setResponseHeaders(response_header);
 
-    absl::node_hash_map<std::string, std::string> expected_json_map = {
-        {"multi_token_field", "HTTP/1.1 plainstring SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
-
     Protobuf::Struct key_mapping;
     TestUtility::loadFromYaml(R"EOF(
       multi_token_field: '%PROTOCOL% plainstring %REQ(some_request_header)%
@@ -5486,8 +5490,10 @@ TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
     std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-    verifyStructOutput(TestUtility::jsonToStruct(formatter->format(formatter_context, stream_info)),
-                       expected_json_map);
+    EXPECT_THAT(
+        TestUtility::jsonToStruct(formatter->format(formatter_context, stream_info)).fields(),
+        UnorderedElementsAre(IsStructString(
+            "multi_token_field", "HTTP/1.1 plainstring SOME_REQUEST_HEADER SOME_RESPONSE_HEADER")));
   }
 }
 

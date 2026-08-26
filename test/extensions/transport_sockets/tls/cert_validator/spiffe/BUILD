@@ -35,6 +35,7 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
         "//test/common/tls:ssl_test_utils",
         "//test/common/tls/cert_validator:test_common",
+        "//test/common/tls/test_data:cert_infos",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",
