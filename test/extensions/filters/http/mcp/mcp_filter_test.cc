@@ -209,6 +209,113 @@ TEST_F(McpFilterTest, HeadersAttributeSourceBuffersWhenDuplicateKeyCheckEnabled)
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
+TEST_F(McpFilterTest, VerifyRejectsMethodMismatch) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(
+      envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY);
+
+  config_ =
+      std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"},
+      {"content-type", "application/json"},
+      {"accept", "application/json"},
+      {"accept", "text/event-stream"},
+      {"mcp-method", "tools/call"},
+      {"mcp-name", "get_weather"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"prompts/get","params":{"name":"get_weather"}})");
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "MCP header attributes do not match request body",
+                             _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_->decodeData(buffer, true));
+}
+
+TEST_F(McpFilterTest, VerifyRejectsNameMismatch) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(
+      envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY);
+
+  config_ =
+      std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"},
+      {"content-type", "application/json"},
+      {"accept", "application/json"},
+      {"accept", "text/event-stream"},
+      {"mcp-method", "tasks/get"},
+      {"mcp-name", "task-123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-999"}})");
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "MCP header attributes do not match request body",
+                             _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_->decodeData(buffer, true));
+}
+
+TEST_F(McpFilterTest, VerifyAcceptsMatchingAttributes) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(
+      envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY);
+
+  config_ =
+      std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"},
+      {"content-type", "application/json"},
+      {"accept", "application/json"},
+      {"accept", "text/event-stream"},
+      {"mcp-method", "tasks/get"},
+      {"mcp-name", "task-123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})");
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.mcp", _));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue,
+            filter_->decodeData(buffer, true));
+}
+
 // Test POST request with both accept headers in single value
 TEST_F(McpFilterTest, PostWithCombinedAcceptHeader) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},

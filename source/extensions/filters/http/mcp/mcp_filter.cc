@@ -481,6 +481,36 @@ void McpFilter::sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp
                                      statusToString(status));
 }
 
+bool McpFilter::verifyHeaderAttributes() const {
+  if (config_->attributeSource() !=
+      envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY) {
+    return true;
+  }
+
+  if (!parser_) {
+    return false;
+  }
+
+  if (header_method_ != parser_->getMethod()) {
+    return false;
+  }
+
+  const std::string name_path =
+      parserConfig().getNameAttributePath(header_method_);
+
+  if (!name_path.empty()) {
+    const Protobuf::Value* body_name = parser_->getNestedValue(name_path);
+
+    if (body_name == nullptr ||
+        body_name->kind_case() != Protobuf::Value::kStringValue ||
+        body_name->string_value() != header_name_) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 Http::FilterDataStatus McpFilter::completeParsing() {
   parsing_complete_ = true;
   is_mcp_request_ = parser_->isValidMcpRequest();
@@ -497,6 +527,12 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   if (!is_mcp_request_ && shouldRejectRequest()) {
     sendErrorReply("request must be a valid JSON-RPC 2.0 message for MCP",
                    Filters::Common::Mcp::Status::NotJsonRpc);
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
+  if (!verifyHeaderAttributes()) {
+    sendErrorReply("MCP header attributes do not match request body",
+                  Filters::Common::Mcp::Status::NotJsonRpc);
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 

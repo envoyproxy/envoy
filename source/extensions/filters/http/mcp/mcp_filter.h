@@ -181,6 +181,7 @@ private:
   const McpOverrideConfig* routeOverride() const;
 
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
+  bool verifyHeaderAttributes() const;
   Http::FilterDataStatus completeParsing();
   void setDynamicMetadataStatus(Protobuf::Struct metadata);
   void populateMetadataFromHeaders();
