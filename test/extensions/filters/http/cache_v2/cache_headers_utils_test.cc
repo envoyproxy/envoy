@@ -454,6 +454,13 @@ public:
           /*now=*/currentTime() + Seconds(5),
           /*expected_age=*/Seconds(5)
         },
+        {
+          "no_date_header",
+          /*response_headers=*/{{"age", "1"}},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime() + Seconds(5),
+          /*expected_age=*/Seconds(6)
+        },
     );
     // clang-format on
   }
