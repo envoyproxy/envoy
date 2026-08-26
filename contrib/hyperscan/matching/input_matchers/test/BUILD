@@ -12,7 +12,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//contrib/hyperscan/matching/input_matchers/source:config",
         "//test/mocks/server:server_factory_context_mocks",
