@@ -481,12 +481,7 @@ void McpFilter::sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp
                                      statusToString(status));
 }
 
-bool McpFilter::verifyHeaderAttributes() const {
-  if (config_->attributeSource() !=
-      envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY) {
-    return true;
-  }
-
+bool McpFilter::headerAttributesMatch() const {
   if (!parser_) {
     return false;
   }
@@ -495,20 +490,26 @@ bool McpFilter::verifyHeaderAttributes() const {
     return false;
   }
 
-  const std::string name_path =
-      parserConfig().getNameAttributePath(header_method_);
+  const std::string name_path = parserConfig().getNameAttributePath(header_method_);
 
   if (!name_path.empty()) {
     const Protobuf::Value* body_name = parser_->getNestedValue(name_path);
 
-    if (body_name == nullptr ||
-        body_name->kind_case() != Protobuf::Value::kStringValue ||
+    if (body_name == nullptr || body_name->kind_case() != Protobuf::Value::kStringValue ||
         body_name->string_value() != header_name_) {
       return false;
     }
   }
 
   return true;
+}
+
+bool McpFilter::verifyHeaderAttributes() const {
+  if (config_->attributeSource() != envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY) {
+    return true;
+  }
+
+  return headerAttributesMatch();
 }
 
 Http::FilterDataStatus McpFilter::completeParsing() {
@@ -531,9 +532,16 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   }
 
   if (!verifyHeaderAttributes()) {
+    config_->stats().header_mismatch_.inc();
+
     sendErrorReply("MCP header attributes do not match request body",
-                  Filters::Common::Mcp::Status::NotJsonRpc);
+                   Filters::Common::Mcp::Status::NotJsonRpc);
     return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
+  if (config_->attributeSource() == envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS &&
+      !headerAttributesMatch()) {
+    config_->stats().header_mismatch_.inc();
   }
 
   Protobuf::Struct metadata = parser_->metadata();

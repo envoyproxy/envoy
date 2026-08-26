@@ -29,7 +29,8 @@ namespace Mcp {
   COUNTER(requests_rejected)                                                                       \
   COUNTER(invalid_json)                                                                            \
   COUNTER(body_too_large)                                                                          \
-  COUNTER(duplicate_keys_rejected)
+  COUNTER(duplicate_keys_rejected)                                                                 \
+  COUNTER(header_mismatch)
 
 /**
  * Struct definition for MCP filter stats. @see stats_macros.h
@@ -176,11 +177,12 @@ private:
   bool shouldStoreToDynamicMetadata() const;
   bool shouldStoreToFilterState() const;
   bool rejectDuplicateKeys() const;
-  bool needsBody() const;
   bool headerAttributesMatchBody() const;
   const McpOverrideConfig* routeOverride() const;
 
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
+  bool needsBody() const;
+  bool headerAttributesMatch() const;
   bool verifyHeaderAttributes() const;
   Http::FilterDataStatus completeParsing();
   void setDynamicMetadataStatus(Protobuf::Struct metadata);
