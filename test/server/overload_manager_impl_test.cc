@@ -33,7 +33,9 @@ using testing::ByMove;
 using testing::DoAll;
 using testing::FloatNear;
 using testing::Invoke;
+using testing::IsNull;
 using testing::NiceMock;
+using testing::NotNull;
 using testing::Pointee;
 using testing::Property;
 using testing::Return;
@@ -1143,14 +1145,13 @@ TEST_F(OverloadManagerImplTest, TwoSuffixedReduceTimeoutsActionsRouteAndScaleInd
   auto* mock_main_manager = new Event::MockScaledRangeTimerManager();
   auto* mock_idle_manager = new Event::MockScaledRangeTimerManager();
   auto* mock_max_manager = new Event::MockScaledRangeTimerManager();
-  EXPECT_CALL(*manager, createScaledRangeTimerManager)
-      .Times(3)
-      .WillRepeatedly(Invoke([mock_main_manager, mock_idle_manager, mock_max_manager](
+  EXPECT_CALL(*manager, createScaledRangeTimerManager(_, IsNull()))
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_main_manager})));
+  EXPECT_CALL(*manager, createScaledRangeTimerManager(_, NotNull()))
+      .Times(2)
+      .WillRepeatedly(Invoke([mock_idle_manager, mock_max_manager](
                                  Event::Dispatcher&,
                                  const Event::ScaledTimerTypeMapConstSharedPtr& timer_minimums) {
-        if (timer_minimums == nullptr) {
-          return Event::ScaledRangeTimerManagerPtr{mock_main_manager};
-        }
         if (timer_minimums->contains(Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout)) {
           return Event::ScaledRangeTimerManagerPtr{mock_idle_manager};
         }

@@ -217,6 +217,7 @@ public:
   }
 
   void setScaleFactor(UnitFloat scale_factor) override {
+    // Action callbacks normally update sub-managers directly; this interface method overrides all.
     main_manager_->setScaleFactor(scale_factor);
     for (const auto& timer_manager : timer_managers_) {
       timer_manager.second->setScaleFactor(scale_factor);

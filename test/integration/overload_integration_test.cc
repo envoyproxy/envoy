@@ -1069,6 +1069,8 @@ TEST_P(MultipleReduceTimeoutsActionsIntegrationTest, TimerTypesScaleIndependentl
                              Eq(0));
   timeSystem().advanceTimeWait(std::chrono::seconds(3));
   test_server_->waitForCounter("http.config_test.downstream_cx_max_duration_reached", Eq(1));
+  const uint64_t max_duration_count =
+      test_server_->counter("http.config_test.downstream_cx_max_duration_reached")->value();
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
   codec_client_->close();
 
@@ -1085,7 +1087,7 @@ TEST_P(MultipleReduceTimeoutsActionsIntegrationTest, TimerTypesScaleIndependentl
   ASSERT_TRUE(codec_client_->connected());
   timeSystem().advanceTimeWait(std::chrono::seconds(5));
   test_server_->waitForCounter("http.config_test.downstream_cx_idle_timeout", Eq(1));
-  EXPECT_EQ(1,
+  EXPECT_EQ(max_duration_count,
             test_server_->counter("http.config_test.downstream_cx_max_duration_reached")->value());
   codec_client_->close();
 }
