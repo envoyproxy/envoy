@@ -38,6 +38,7 @@ envoy_extension_cc_test_library(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         ":mock_server_lib",
