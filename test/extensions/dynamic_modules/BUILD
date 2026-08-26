@@ -33,7 +33,7 @@ envoy_cc_test(
     ],
     # This is to test dlopen with the current working directory (rundir in Bazel).
     env = {"LD_LIBRARY_PATH": "."},
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":util",
         "//source/common/buffer:buffer_lib",

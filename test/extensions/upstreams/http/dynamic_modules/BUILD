@@ -21,7 +21,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_no_op",
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_stop_and_buffer",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:address_lib",
@@ -46,7 +46,7 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/rust:upstream_http_tcp_bridge",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     shard_count = 4,
     tags = [
         "cpu:3",
