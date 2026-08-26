@@ -106,23 +106,32 @@ def get_severity(metrics):
 ##
 
 def parse_deps(deps):
+  # A dep carrying a cpe but lacking a resolvable version cannot be
+  # meaningfully matched against version-ranged CVEs - a silent skip would
+  # make false negatives look identical to "clean", so it is a hard failure.
   .
   | deps
   | with_entries(
       select(.value.cpe != null and .value.cpe != "N/A")
+      | .key as $name
       | .value
-      |= parse_cpe_tag(.cpe) as $cc
-      | {
-        release_date,
-        version: Version::parse(.version),
-        cpe: {
-            match: .cpe,
-            part: $cc.part,
-            vendor: $cc.vendor,
-            product: $cc.product,
-            version: $cc.version
+      |= (Version::parse(.version) as $version
+        | if $version == null then
+            error("Dependency '\($name)' declares a cpe but has no resolvable version, CVE matching is not possible")
+          else . end
+        | parse_cpe_tag(.cpe) as $cc
+        | {
+          release_date,
+          version: $version,
+          cpe: {
+              match: .cpe,
+              part: $cc.part,
+              vendor: $cc.vendor,
+              product: $cc.product,
+              version: $cc.version
+            }
           }
-        }
+        )
       );
 
 def iterate_cves(cves; deps; ignored):

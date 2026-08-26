@@ -199,6 +199,39 @@ def check_apparent_name_uniqueness(metadata):
     return errors
 
 
+def check_tracked_implied_disjointness(metadata):
+    """Verify tracked entries and implied_untracked_deps names are disjoint.
+
+    A dependency name is either tracked (a top-level metadata entry, possibly
+    reached only transitively and annotated with ``used_by``) or untracked
+    (listed in some entry's ``implied_untracked_deps``), never both.  The
+    metadata must not be able to express the ambiguity.
+
+    Rules:
+    - A name in any ``implied_untracked_deps`` list MUST NOT be a top-level
+      metadata key.
+    - A name in any ``used_by`` list MUST be a top-level metadata key.
+
+    Returns a list of error strings (empty when the sets are disjoint and all
+    ``used_by`` references resolve).
+    """
+    errors = []
+    for key, meta in metadata.items():
+        for untracked in meta.get("implied_untracked_deps", []):
+            if untracked in metadata:
+                errors.append(
+                    "%r is a tracked entry - remove it from %r's implied_untracked_deps"
+                    % (untracked, key)
+                )
+        for parent in meta.get("used_by", []):
+            if parent not in metadata:
+                errors.append(
+                    "%r lists %r in used_by but %r is not a top-level metadata key"
+                    % (key, parent, parent)
+                )
+    return errors
+
+
 # ---------------------------------------------------------------------------
 # Validation logic (mirrors validate.py check-by-check)
 # ---------------------------------------------------------------------------
@@ -433,6 +466,14 @@ class ValidateReachabilityTest(unittest.TestCase):
         if errors:
             raise AssertionError(
                 "apparent_name uniqueness violations:\n" + "\n".join(errors)
+            )
+
+    def test_tracked_implied_disjointness(self):
+        errors = check_tracked_implied_disjointness(self.metadata)
+        if errors:
+            raise AssertionError(
+                "tracked/implied_untracked_deps disjointness violations:\n"
+                + "\n".join(errors)
             )
 
     def test_dep_names_resolved(self):
