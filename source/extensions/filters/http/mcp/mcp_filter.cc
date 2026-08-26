@@ -663,25 +663,6 @@ void McpFilter::populateMetadataFromHeaders() {
   }
 }
 
-bool McpFilter::headerAttributesMatchBody() const {
-  if (parser_->getMethod() != header_method_) {
-    return false;
-  }
-
-  if (header_name_.empty()) {
-    return true;
-  }
-
-  const std::string name_path = parserConfig().getNameAttributePath(header_method_);
-  if (name_path.empty()) {
-    return true;
-  }
-
-  const Protobuf::Value* body_name = parser_->getNestedValue(name_path);
-  return body_name != nullptr && body_name->kind_case() == Protobuf::Value::kStringValue &&
-         body_name->string_value() == header_name_;
-}
-
 void McpFilter::setDynamicMetadataStatus(Protobuf::Struct metadata) {
   (*metadata.mutable_fields())[Filters::Common::Mcp::McpConstants::STATUS].set_string_value(
       std::string(statusToString(status_)));

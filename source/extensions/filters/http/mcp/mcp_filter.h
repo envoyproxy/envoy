@@ -177,7 +177,6 @@ private:
   bool shouldStoreToDynamicMetadata() const;
   bool shouldStoreToFilterState() const;
   bool rejectDuplicateKeys() const;
-  bool headerAttributesMatchBody() const;
   const McpOverrideConfig* routeOverride() const;
 
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
