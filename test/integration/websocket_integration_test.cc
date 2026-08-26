@@ -9,6 +9,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/websocket/handshake.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
@@ -21,6 +22,7 @@
 
 using testing::Eq;
 using testing::Ge;
+using testing::HasSubstr;
 namespace Envoy {
 namespace {
 
@@ -101,8 +103,9 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
     proxied_request_headers.setContentLength(size_t(0));
   }
 
-  // Ignore the key synthesized while downgrading a native H2 or H3 WebSocket request.
-  if (downstreamProtocol() != Http::CodecType::HTTP1 &&
+  // Ignore the key synthesized for an HTTP/1 upstream attempt.
+  if (upstreamProtocol() == Http::CodecType::HTTP1 &&
+      downstreamProtocol() != Http::CodecType::HTTP1 &&
       original_request_headers.getUpgradeValue() == Http::Headers::get().UpgradeValues.WebSocket) {
     if (original_request_headers.get(Http::Headers::get().SecWebSocketKey).empty()) {
       EXPECT_EQ(proxied_request_headers.get_(Http::Headers::get().SecWebSocketKey).size(), 24);
@@ -212,8 +215,19 @@ void WebsocketIntegrationTest::performUpgrade(
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   validateUpgradeRequestHeaders(upstream_request_->headers(), upgrade_request_headers);
 
-  // Send the upgrade response
-  upstream_request_->encodeHeaders(upgrade_response_headers, false);
+  // Send the upgrade response.
+  Http::TestResponseHeaderMapImpl upstream_response_headers(upgrade_response_headers);
+  if (upgrade_request_headers.get(Http::Headers::get().SecWebSocketKey).empty()) {
+    const auto upstream_keys =
+        upstream_request_->headers().get(Http::Headers::get().SecWebSocketKey);
+    if (!upstream_keys.empty()) {
+      ASSERT_EQ(upstream_keys.size(), 1);
+      upstream_response_headers.setCopy(
+          Http::Headers::get().SecWebSocketAccept,
+          WebSocket::computeAccept(upstream_keys[0]->value().getStringView()));
+    }
+  }
+  upstream_request_->encodeHeaders(upstream_response_headers, false);
 
   // Verify the upgrade response was received downstream.
   response_->waitForHeaders();
@@ -262,6 +276,65 @@ TEST_P(WebsocketIntegrationTest, WebSocketClientSuppliedKeyIsPreserved) {
 
   performUpgrade(upgrade_request_headers, upgradeResponseHeaders());
   sendBidirectionalData();
+
+  codec_client_->close();
+  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
+}
+
+TEST_P(WebsocketIntegrationTest, WebSocketRejectsUpstreamWithoutMatchingAccept) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(upgradeRequestHeaders());
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().SecWebSocketKey).size(), 1);
+
+  upstream_request_->encodeHeaders(upgradeResponseHeaders(), false);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_EQ("502", response_->headers().getStatusValue());
+  EXPECT_TRUE(response_->headers().get(Http::Headers::get().SecWebSocketAccept).empty());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("websocket_handshake_invalid_accept"));
+
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(0));
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+TEST_P(WebsocketIntegrationTest, WebSocketAcceptValidationCanBeDisabled) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.websocket_synthesize_key_on_h2_downgrade", "false");
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(upgradeRequestHeaders());
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().SecWebSocketKey).empty());
+
+  upstream_request_->encodeHeaders(upgradeResponseHeaders(), false);
+  response_->waitForHeaders();
+  EXPECT_EQ("101", response_->headers().getStatusValue());
 
   codec_client_->close();
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());

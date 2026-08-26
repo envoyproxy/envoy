@@ -25,6 +25,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/websocket/handshake.h"
 
 namespace Envoy {
 namespace Router {
@@ -62,8 +63,7 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
 
   ENVOY_STREAM_LOG(trace, "proxying headers", *callbacks_);
   calling_encode_headers_ = true;
-  const Http::Status status =
-      callbacks_->upstreamCallbacks()->upstream()->encodeHeaders(headers, end_stream);
+  const Http::Status status = encodeHeaders(headers, end_stream);
 
   calling_encode_headers_ = false;
   if (!status.ok() || !deferred_reset_status_.ok()) {
@@ -95,6 +95,20 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   }
   return Http::FilterHeadersStatus::Continue;
+}
+
+Http::Status UpstreamCodecFilter::encodeHeaders(const Http::RequestHeaderMap& headers,
+                                                bool end_stream) {
+  const auto generated_websocket_key = callbacks_->upstreamCallbacks()->generatedWebsocketKey();
+  if (!generated_websocket_key.has_value() ||
+      !headers.get(Http::Headers::get().SecWebSocketKey).empty()) {
+    return callbacks_->upstreamCallbacks()->upstream()->encodeHeaders(headers, end_stream);
+  }
+
+  upstream_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
+  upstream_headers_->setCopy(Http::Headers::get().SecWebSocketKey, *generated_websocket_key);
+  injected_websocket_key_ = *generated_websocket_key;
+  return callbacks_->upstreamCallbacks()->upstream()->encodeHeaders(*upstream_headers_, end_stream);
 }
 
 // This is the last stop in the filter chain: take the data and ship it to the codec.
@@ -175,7 +189,26 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
   if (filter_.callbacks_->upstreamCallbacks()->pausedForWebsocketUpgrade()) {
     const uint64_t status = Http::Utility::getResponseStatus(*headers);
     const auto protocol = filter_.callbacks_->upstreamCallbacks()->upstreamStreamInfo().protocol();
-    if (status == static_cast<uint64_t>(Http::Code::SwitchingProtocols) ||
+    const bool switching_protocols =
+        status == static_cast<uint64_t>(Http::Code::SwitchingProtocols);
+    if (filter_.injected_websocket_key_.has_value()) {
+      const absl::string_view key = *filter_.injected_websocket_key_;
+      const auto accept_headers = headers->get(Http::Headers::get().SecWebSocketAccept);
+      const bool valid_accept =
+          switching_protocols && accept_headers.size() == 1 &&
+          accept_headers[0]->value().getStringView() == WebSocket::computeAccept(key);
+      headers->remove(Http::Headers::get().SecWebSocketAccept);
+      if (switching_protocols && !valid_accept) {
+        filter_.callbacks_->streamInfo().setResponseFlag(
+            StreamInfo::CoreResponseFlag::UpstreamProtocolError);
+        filter_.callbacks_->sendLocalReply(
+            Http::Code::BadGateway, "", nullptr, std::nullopt,
+            StreamInfo::ResponseCodeDetails::get().WebsocketHandshakeInvalidAccept);
+        return;
+      }
+    }
+
+    if (switching_protocols ||
         (protocol.has_value() && protocol.value() != Envoy::Http::Protocol::Http11)) {
       // handshake is finished and continue the data processing.
       filter_.callbacks_->upstreamCallbacks()->setPausedForWebsocketUpgrade(false);
