@@ -4,7 +4,7 @@
 // in-process number here and an end-to-end throughput number there describe the same unit of
 // work. Two of them exist only to be subtracted: `kNoopBoth` prices entering and leaving the VM
 // with no script work at all, and `kHeaderNoCarry` prices the same header read and write without
-// carrying a value between the two handlers, which is what envoyproxy/envoy#4613 forces a real
+// carrying a value between the two handlers, which is what envoy#4613 forces a real
 // filter to do.
 //
 // Every arm rebuilds the per-stream state -- header maps and stream info -- on each iteration,
@@ -257,7 +257,7 @@ end
 
 // Reading a carried value back is where the two channels differ most, so each read arm has a
 // write-only twin: the difference between the pair is the read alone. Metadata is read a whole
-// filter's struct at a time -- `dynamicMetadata():get(name)` materialises every field of that
+// filter's struct at a time -- `dynamicMetadata():get(name)` materializes every field of that
 // struct as a Lua table -- so the Set16 pair shows whether one read scales with fields the
 // script never asked for.
 constexpr absl::string_view kMetadataSet1Get0 = R"EOF(
@@ -301,7 +301,7 @@ function envoy_on_request(handle)
 end
 )EOF";
 
-// Sixteen reads of one filter-state object: each one serialises the object to a std::string.
+// Sixteen reads of one filter-state object: each one serializes the object to a std::string.
 constexpr absl::string_view kFilterStateSet1Get16 = R"EOF(
 local FACTORY = "envoy.string"
 local REPEATS = 16
@@ -419,7 +419,7 @@ public:
   }
 
   // Lua-heap bytes still held after a full collection: a retention figure, not a churn figure.
-  // LUA_GCCOUNT reports live bytes, so a delta taken across a running collector reads as ~0 no
+  // `LUA_GCCOUNT` reports live bytes, so a delta taken across a running collector reads as ~0 no
   // matter how much a script allocated and freed.
   uint64_t liveLuaBytesAfterGc() {
     PerLuaCodeSetup* setup = config_->perLuaCodeSetup();
