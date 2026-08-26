@@ -90,6 +90,10 @@ py_console_script_binary(
 #
 # Single-config: the core dep set does not vary with the wasm runtime, so
 # there is nothing for a matrix to add here.
+#
+# Intentionally no excluded_patterns here: core_deps is only used to skip the
+# forward extension-category assertion, so a larger core set is only more
+# lenient and cannot introduce false validation failures.
 dependency_reachability(
     name = "dep-reachability-core",
     roots = ["//source/exe:envoy_main_common_with_core_extensions_lib"],
@@ -115,7 +119,6 @@ envoy_dependency_reachability(
     name = "dep-reachability",
     attribution_patterns = [
         "//source/extensions/...",
-        "//contrib/...",
     ],
     configs = {
         "v8": {WASM_RUNTIME_FLAG: "v8"},
