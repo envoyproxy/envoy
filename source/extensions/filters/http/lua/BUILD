@@ -43,6 +43,7 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/registry",
         "//envoy/stream_info:stream_info_interface",
+        "//source/common/config:metadata_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",

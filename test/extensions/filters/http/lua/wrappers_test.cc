@@ -599,6 +599,10 @@ TEST_F(LuaStreamInfoWrapperTest, BadTypesInTableForDynamicMetadata) {
   EXPECT_THAT(start("callMe"),
               StatusHelpers::HasStatusMessage(
                   "[string \"...\"]:3: unexpected type 'function' in dynamicMetadata"));
+  // A set that raises must not leave the filter's entry behind: the value has to be converted
+  // before anything reaches the metadata map. Nothing in luaSet() states that ordering, and this
+  // script raises partway through converting a table, so it is the case that would notice.
+  EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata().count("envoy.lb"));
 }
 
 // Modify during iteration.
