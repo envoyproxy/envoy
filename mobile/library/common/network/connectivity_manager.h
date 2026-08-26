@@ -10,6 +10,7 @@
 
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "library/common/engine_types.h"
 #include "library/common/network/envoy_mobile_quic_network_observer_registry_factory.h"

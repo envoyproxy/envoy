@@ -79,7 +79,7 @@ envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
@@ -389,7 +389,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cluster_factory_lib",
         ":default_local_address_selector_factory",
@@ -414,9 +414,11 @@ envoy_cc_library(
         "//envoy/ssl:context_interface",
         "//envoy/upstream:health_checker_interface",
         "//source/common/common:dns_utils_lib",
+        "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
+        "//source/common/conn_pool:pending_stream_lib",
         "//source/common/http/http1:codec_stats_lib",
         "//source/common/http/http2:codec_stats_lib",
         "//source/common/http:utility_lib",
@@ -428,6 +430,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/queue_policy:queue_policy_base_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/server:transport_socket_config_lib",

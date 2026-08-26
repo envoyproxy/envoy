@@ -223,7 +223,92 @@ extractions_by_method: {
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
 
+TEST_F(FilterConfigTestOk, CustomMetadataKey) {
+  parseConfigProto(R"pb(
+extractions_by_method: {
+  key: "apikeys.ApiKeys.CreateApiKey"
+  value: {
+    request_field_extractions: {
+      key: "parent"
+      value: {
+        metadata_key: "normalized_parent"
+      }
+    }
+    request_field_extractions: {
+      key: "key.name"
+      value: {
+      }
+    }
+  }
+})pb");
+  *proto_config_.mutable_descriptor_set()->mutable_filename() =
+      TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+  ASSERT_OK(makeConfig());
+  EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
+}
+
 using FilterConfigTestException = FilterConfigTestBase;
+TEST_F(FilterConfigTestException, DuplicateMetadataKeys) {
+  parseConfigProto(R"pb(
+extractions_by_method: {
+  key: "apikeys.ApiKeys.CreateApiKey"
+  value: {
+    request_field_extractions: {
+      key: "parent"
+      value: {
+        metadata_key: "name"
+      }
+    }
+    request_field_extractions: {
+      key: "key.name"
+      value: {
+        metadata_key: "name"
+      }
+    }
+  }
+}
+    )pb");
+  *proto_config_.mutable_descriptor_set()->mutable_filename() =
+      TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+
+  EXPECT_THAT(
+      makeConfig(),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          testing::HasSubstr(
+              "multiple field extractions are configured for the dynamic metadata key `name`")));
+}
+
+TEST_F(FilterConfigTestException, MetadataKeyCollidesWithFieldPath) {
+  parseConfigProto(R"pb(
+extractions_by_method: {
+  key: "apikeys.ApiKeys.CreateApiKey"
+  value: {
+    request_field_extractions: {
+      key: "parent"
+      value: {
+      }
+    }
+    request_field_extractions: {
+      key: "key.name"
+      value: {
+        metadata_key: "parent"
+      }
+    }
+  }
+}
+    )pb");
+  *proto_config_.mutable_descriptor_set()->mutable_filename() =
+      TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+
+  EXPECT_THAT(
+      makeConfig(),
+      HasStatus(
+          absl::StatusCode::kInvalidArgument,
+          testing::HasSubstr(
+              "multiple field extractions are configured for the dynamic metadata key `parent`")));
+}
+
 TEST_F(FilterConfigTestException, ErrorParsingDescriptorInline) {
   parseConfigProto();
   *proto_config_.mutable_descriptor_set()->mutable_inline_bytes() = "123";

@@ -24,6 +24,7 @@
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
@@ -37,7 +38,14 @@ namespace DynamicModules {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
+using ::testing::_;
+using ::testing::An;
+using ::testing::Contains;
+using ::testing::HasSubstr;
+using ::testing::IsSupersetOf;
 using ::testing::Not;
+using ::testing::Return;
+using ::testing::UnorderedElementsAre;
 
 // Test peer class to access private members of DynamicModuleCluster.
 // This must be outside the anonymous namespace to match the friend declaration.
@@ -80,9 +88,6 @@ public:
     lb.hosts_removed_ = removed;
   }
 };
-
-using ::testing::_;
-using ::testing::Return;
 
 namespace {
 
@@ -223,13 +228,13 @@ cluster_type:
 )EOF";
 
   auto result = createCluster(yaml);
-  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("CLUSTER_PROVIDED")));
+  ASSERT_THAT(result, HasStatusMessage(HasSubstr("CLUSTER_PROVIDED")));
 }
 
 // Test that a missing module fails gracefully.
 TEST_F(DynamicModuleClusterTest, MissingModule) {
   auto result = createCluster(makeYamlConfig("nonexistent_module"));
-  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to load dynamic module")));
+  ASSERT_THAT(result, HasStatusMessage(HasSubstr("Failed to load dynamic module")));
 
   EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
 }
@@ -237,8 +242,8 @@ TEST_F(DynamicModuleClusterTest, MissingModule) {
 // Test that on_cluster_config_new returning nullptr fails.
 TEST_F(DynamicModuleClusterTest, ConfigNewFail) {
   auto result = createCluster(makeYamlConfig("cluster_config_new_fail"));
-  ASSERT_THAT(result, HasStatusMessage(
-                          testing::HasSubstr("Failed to create in-module cluster configuration")));
+  ASSERT_THAT(result,
+              HasStatusMessage(HasSubstr("Failed to create in-module cluster configuration")));
 
   // The module loads fine but its config creation fails, counted as config_init_error.
   EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "config_init_error", "test"));
@@ -248,8 +253,7 @@ TEST_F(DynamicModuleClusterTest, ConfigNewFail) {
 // Test that on_cluster_new returning nullptr fails.
 TEST_F(DynamicModuleClusterTest, ClusterNewFail) {
   auto result = createCluster(makeYamlConfig("cluster_new_fail"));
-  ASSERT_THAT(result,
-              HasStatusMessage(testing::HasSubstr("Failed to create in-module cluster instance")));
+  ASSERT_THAT(result, HasStatusMessage(HasSubstr("Failed to create in-module cluster instance")));
 }
 
 // The cluster_config Any cannot be unpacked. This is parsed before the module is loaded, so it is
@@ -563,6 +567,10 @@ TEST_F(DynamicModuleClusterTest, AbiCallbacksHostManagement) {
                                                               nullptr, 0, 2, host_ptrs));
   EXPECT_NE(nullptr, host_ptrs[0]);
   EXPECT_NE(nullptr, host_ptrs[1]);
+  EXPECT_EQ(cluster->info()->name() + addr1,
+            static_cast<Upstream::Host*>(host_ptrs[0])->hostname());
+  EXPECT_EQ(cluster->info()->name() + addr2,
+            static_cast<Upstream::Host*>(host_ptrs[1])->hostname());
 
   // Test add_hosts with invalid address causes entire batch to fail.
   std::string bad_addr = "invalid";
@@ -587,6 +595,84 @@ TEST_F(DynamicModuleClusterTest, AbiCallbacksHostManagement) {
   EXPECT_EQ(2, envoy_dynamic_module_callback_cluster_remove_hosts(cluster.get(), host_ptrs, 2));
   // Removing again should return 0.
   EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_remove_hosts(cluster.get(), host_ptrs, 2));
+}
+
+TEST_F(DynamicModuleClusterTest, AddHostsWithHostnamesABI) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_module_buffer addresses[] = {{"127.0.0.1:10001", 15},
+                                                         {"127.0.0.1:10002", 15}};
+  envoy_dynamic_module_type_module_buffer hostnames[] = {{"api.example.com", 15}, {nullptr, 0}};
+  uint32_t weights[] = {1, 1};
+  envoy_dynamic_module_type_module_buffer empty_localities[] = {{nullptr, 0}, {nullptr, 0}};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptrs[2] = {nullptr, nullptr};
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+      cluster.get(), 0, addresses, hostnames, weights, empty_localities, empty_localities,
+      empty_localities, nullptr, 0, 2, host_ptrs));
+  ASSERT_NE(nullptr, host_ptrs[0]);
+  ASSERT_NE(nullptr, host_ptrs[1]);
+
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(2, hosts.size());
+  EXPECT_EQ("api.example.com", hosts[0]->hostname());
+  EXPECT_EQ("test_cluster127.0.0.1:10002", hosts[1]->hostname());
+}
+
+TEST_F(DynamicModuleClusterTest, AddHostsWithHostnamesDeduplicatesIncrementalSharedAddress) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_module_buffer address = {"127.0.0.1:10001", 15};
+  envoy_dynamic_module_type_module_buffer hostnames[] = {{"service-a.test", 14},
+                                                         {"service-b.test", 14}};
+  uint32_t weight = 1;
+  envoy_dynamic_module_type_module_buffer empty_locality = {nullptr, 0};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptrs[] = {nullptr, nullptr};
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+      cluster.get(), 0, &address, &hostnames[0], &weight, &empty_locality, &empty_locality,
+      &empty_locality, nullptr, 0, 1, &host_ptrs[0]));
+  ASSERT_NE(nullptr, host_ptrs[0]);
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+      cluster.get(), 0, &address, &hostnames[1], &weight, &empty_locality, &empty_locality,
+      &empty_locality, nullptr, 0, 1, &host_ptrs[1]));
+  EXPECT_EQ(nullptr, host_ptrs[1]);
+
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(1, hosts.size());
+  EXPECT_EQ("service-a.test", hosts[0]->hostname());
+  EXPECT_EQ(1, envoy_dynamic_module_callback_cluster_remove_hosts(cluster.get(), &host_ptrs[0], 1));
+}
+
+TEST_F(DynamicModuleClusterTest, AddHostsWithNullHostnamesABIUsesExistingSynthesizedHostname) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_module_buffer address = {"127.0.0.1:10001", 15};
+  uint32_t weight = 1;
+  envoy_dynamic_module_type_module_buffer empty_locality = {nullptr, 0};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+      cluster.get(), 0, &address, nullptr, &weight, &empty_locality, &empty_locality,
+      &empty_locality, nullptr, 0, 1, &host_ptr));
+  ASSERT_NE(nullptr, host_ptr);
+
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(1, hosts.size());
+  EXPECT_EQ("test_cluster127.0.0.1:10001", hosts[0]->hostname());
 }
 
 // Test the LB ABI callback implementations directly.
@@ -1055,8 +1141,7 @@ TEST_F(DynamicModuleClusterTest, LbHostInformationWithMetadataAndLocality) {
 TEST_F(DynamicModuleClusterTest, MissingClusterSymbol) {
   // The "no_op" module exports on_program_init but not cluster symbols.
   auto result = createCluster(makeYamlConfig("no_op"));
-  ASSERT_THAT(result,
-              HasStatusMessage(testing::HasSubstr("envoy_dynamic_module_on_cluster_config_new")));
+  ASSERT_THAT(result, HasStatusMessage(HasSubstr("envoy_dynamic_module_on_cluster_config_new")));
 }
 
 // Test that creating a cluster with BytesValue config type works.
@@ -1509,7 +1594,7 @@ TEST_F(DynamicModuleClusterTest, ServerInitializedCallback) {
   Server::ServerLifecycleNotifier::StageCallback captured_cb;
   EXPECT_CALL(server_context_.lifecycle_notifier_,
               registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
-                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+                               An<Server::ServerLifecycleNotifier::StageCallback>()))
       .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_cb), testing::Return(nullptr)));
 
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
@@ -1537,10 +1622,9 @@ TEST_F(DynamicModuleClusterTest, DrainStartedCallback) {
 TEST_F(DynamicModuleClusterTest, ShutdownCallbackWithCompletion) {
   // Capture the shutdown callback registered during cluster construction.
   Server::ServerLifecycleNotifier::StageCallbackWithCompletion captured_shutdown_cb;
-  EXPECT_CALL(
-      server_context_.lifecycle_notifier_,
-      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                               An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
       .WillOnce(
           testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
 
@@ -1557,10 +1641,9 @@ TEST_F(DynamicModuleClusterTest, ShutdownCallbackWithCompletion) {
 TEST_F(DynamicModuleClusterTest, ShutdownCallbackAfterClusterDestroy) {
   // Capture the shutdown callback registered during cluster construction.
   Server::ServerLifecycleNotifier::StageCallbackWithCompletion captured_shutdown_cb;
-  EXPECT_CALL(
-      server_context_.lifecycle_notifier_,
-      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                               An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
       .WillOnce(
           testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
 
@@ -1589,14 +1672,13 @@ TEST_F(DynamicModuleClusterTest, AllLifecycleCallbacksRegistered) {
 
   EXPECT_CALL(server_context_.lifecycle_notifier_,
               registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
-                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+                               An<Server::ServerLifecycleNotifier::StageCallback>()))
       .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_init_cb), testing::Return(nullptr)));
   EXPECT_CALL(server_context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
       .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_drain_cb), testing::Return(nullptr)));
-  EXPECT_CALL(
-      server_context_.lifecycle_notifier_,
-      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                               An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
       .WillOnce(
           testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
 
@@ -2790,7 +2872,7 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataNumber) {
   EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
       context_ptr, ns_buf, key_buf, 42.0));
   const auto& fields = stream_info.metadata_.filter_metadata().at(ns).fields();
-  EXPECT_EQ(42.0, fields.at(key).number_value());
+  EXPECT_THAT(fields, Contains(IsStructNumber(key, 42.0)));
 }
 
 // Test set_dynamic_metadata_string with nullptr context returns false.
@@ -2839,7 +2921,7 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataString) {
   EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
       context_ptr, ns_buf, key_buf, value_buf));
   const auto& fields = stream_info.metadata_.filter_metadata().at(ns).fields();
-  EXPECT_EQ("test_value", fields.at(key).string_value());
+  EXPECT_THAT(fields, Contains(IsStructString(key, "test_value")));
 }
 
 // =================================================================================================
@@ -3393,8 +3475,8 @@ TEST_F(DynamicModuleClusterTest, AddHostsWithLocalityAndMetadata) {
   const auto& filter_metadata = hosts[0]->metadata()->filter_metadata();
   auto it = filter_metadata.find("envoy.lb");
   ASSERT_NE(it, filter_metadata.end());
-  EXPECT_EQ("42", it->second.fields().at("shard").string_value());
-  EXPECT_EQ("my-service", it->second.fields().at("service").string_value());
+  EXPECT_THAT(it->second.fields(), UnorderedElementsAre(IsStructString("shard", "42"),
+                                                        IsStructString("service", "my-service")));
 }
 
 // Test adding hosts with locality via the ABI callback.
@@ -4137,6 +4219,32 @@ TEST_F(DynamicModuleClusterTest, AddHostsOffMainThreadFailsClosed) {
         t.join();
       },
       "envoy_dynamic_module_callback_cluster_add_hosts must be called on the main thread");
+}
+
+TEST_F(DynamicModuleClusterTest, AddHostsWithHostnamesOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_module_buffer address = {"127.0.0.1:10001", 15};
+  envoy_dynamic_module_type_module_buffer hostname = {"api.example.com", 15};
+  uint32_t weight = 1;
+  envoy_dynamic_module_type_module_buffer empty = {nullptr, 0};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_FALSE(envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+              cluster_ptr, 0, &address, &hostname, &weight, &empty, &empty, &empty, nullptr, 0, 1,
+              &host_ptr));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames must be called on the main "
+      "thread");
 }
 
 // Verifies that `cluster_remove_hosts` is fail-closed when called off the main thread.

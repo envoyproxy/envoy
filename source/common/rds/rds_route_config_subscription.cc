@@ -60,6 +60,9 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);
   local_init_manager_.add(local_init_target_);
+  // The receiver warms up the route configuration that it builds on every update and notifies this
+  // subscription once it's ready to be published.
+  config_update_info_->setObserver(*this);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -80,7 +83,12 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     ENVOY_LOG(debug, "Missing {} RouteConfiguration for {} in onConfigUpdate()", rds_type_,
               route_config_name_);
     stats_.update_empty_.inc();
-    local_init_target_.ready();
+    // Don't signal readiness if a previous update is still warming up, that update publishes and
+    // signals readiness itself. An empty resource list doesn't invalidate it: it leaves the
+    // currently published route configuration in place.
+    if (!config_update_info_->configWarming()) {
+      local_init_target_.ready();
+    }
     return absl::OkStatus();
   }
   if (resources.size() != 1) {
@@ -107,26 +115,65 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
     ENVOY_LOG(warn, "rds: route config '{}' rejected: {}", route_config_name_, msg);
     return absl::InvalidArgumentError(msg);
   }
-  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
-  std::unique_ptr<Cleanup> resume_rds;
-  if (config_update_info_->onRdsUpdate(route_config, version_info)) {
-    stats_.config_reload_.inc();
-    stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
-
-    RETURN_IF_NOT_OK(beforeProviderUpdate(noop_init_manager, resume_rds));
-
-    ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
-              config_update_info_->configHash());
-
-    if (route_config_provider_ != nullptr) {
-      RETURN_IF_NOT_OK(route_config_provider_->onConfigUpdate());
+  // The new route configuration is built and warmed up by the receiver, which calls back into
+  // onConfigWarmed() to publish it. Note that this may happen before onRdsUpdate() returns, i.e.
+  // synchronously, if there is nothing to warm up, so the publishing state is reset upfront.
+  publish_status_ = absl::OkStatus();
+  if (!config_update_info_->onRdsUpdate(route_config, version_info)) {
+    // The route configuration is unchanged, so there is nothing to warm up and nothing to publish.
+    // A previous update that is still warming up is deliberately left untouched.
+    if (!config_update_info_->configWarming()) {
+      local_init_target_.ready();
     }
-
-    RETURN_IF_NOT_OK(afterProviderUpdate());
+    // Otherwise readiness is signalled once the update that is still warming up is published.
+    return absl::OkStatus();
   }
 
-  local_init_target_.ready();
-  return absl::OkStatus();
+  // If there was nothing to warm up, onConfigWarmed() has already run and the update was published
+  // before we got here, so a failure can still be reported to the xDS layer as a rejection.
+  // Otherwise the publishing happens later and publish_status_ is still OK here.
+  return publish_status_;
+}
+
+void RdsRouteConfigSubscription::onConfigWarmed() {
+  // These must outlive local_init_target_.ready() below: resume_rds is a Cleanup that resumes the
+  // VHDS subscription, and it has always run after this subscription signalled readiness.
+  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
+  std::unique_ptr<Cleanup> resume_rds;
+
+  Cleanup after_this_update([this]() {
+    // Only signal readiness if the new route configuration actually went live, so that whatever
+    // warms up with this subscription isn't told that a route configuration is ready when it
+    // isn't.
+    //
+    // If the publishing happened synchronously, i.e. if onConfigUpdate() is still on the stack,
+    // the failure is returned to the xDS layer, which rejects the update and calls
+    // onConfigUpdateFailed(). That signals readiness, so server startup isn't blocked by a bad
+    // config. If the publishing happened asynchronously the update has already been accepted, so
+    // there is no such rejection: this subscription stays unready and whatever warms up with it,
+    // e.g. a listener, stays warming. The warning logged above is the only indication of that.
+    if (publish_status_.ok()) {
+      local_init_target_.ready();
+    } else {
+      ENVOY_LOG(warn, "rds: failed to apply the warmed up route config '{}': {}",
+                route_config_name_, publish_status_.message());
+    }
+  });
+
+  stats_.config_reload_.inc();
+  stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
+  publish_status_ = beforeProviderUpdate(noop_init_manager, resume_rds);
+  RETURN_ONLY_IF_NOT_OK_REF(publish_status_);
+
+  ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
+            config_update_info_->configHash());
+
+  if (route_config_provider_ != nullptr) {
+    publish_status_ = route_config_provider_->onConfigUpdate();
+    RETURN_ONLY_IF_NOT_OK_REF(publish_status_);
+  }
+
+  publish_status_ = afterProviderUpdate();
 }
 
 absl::Status RdsRouteConfigSubscription::onConfigUpdate(

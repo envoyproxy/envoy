@@ -68,6 +68,16 @@ public:
 
   bool grpcSidestreamFlowControl() { return grpc_side_stream_flow_control_; }
 
+  ~ProcessorStreamImpl() override {
+    if (stream_closed_ || stream_ == nullptr) {
+      return;
+    }
+    // If the stream is still open for some reasons, close it now to avoid dangling reference at
+    // the underlying gRPC stream.
+    ENVOY_LOG(debug, "ProcessorStreamImpl::~ProcessorStreamImpl: stream is still open, closing");
+    close();
+  }
+
 private:
   // Private constructor only can be invoked within this class.
   ProcessorStreamImpl(ProcessorCallbacks<ResponseType>& callbacks, absl::string_view service_method)

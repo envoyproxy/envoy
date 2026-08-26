@@ -43,7 +43,7 @@ involved and how Envoy plays a role, read the CNCF
 * [envoy-maintainers](https://groups.google.com/forum/#!forum/envoy-maintainers): Use this list
   to reach all core Envoy maintainers.
 * [Twitter](https://twitter.com/EnvoyProxy/): Follow along on Twitter!
-* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](https://communityinviter.com/apps/envoyproxy/envoy).
+* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](https://www.envoyproxy.io/slack).
   * NOTE: Response to user questions is best effort on Slack. For a "guaranteed" response please email
     envoy-users@ per the guidance in the following linked thread.
 

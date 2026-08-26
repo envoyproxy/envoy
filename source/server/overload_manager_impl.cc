@@ -533,7 +533,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       auto proactive_resource_it =
           OverloadProactiveResources::get().proactive_action_name_to_resource_.find(resource);
 
-      if (resources_.find(resource) == resources_.end() &&
+      if (!resources_.contains(resource) &&
           proactive_resource_it ==
               OverloadProactiveResources::get().proactive_action_name_to_resource_.end()) {
         creation_status = absl::InvalidArgumentError(
@@ -631,7 +631,7 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
   ASSERT(!started_);
   const auto symbol = action_symbol_table_.get(action);
 
-  if (actions_.find(symbol) == actions_.end()) {
+  if (!actions_.contains(symbol)) {
     ENVOY_LOG(debug, "No overload action is configured for {}.", action);
     return false;
   }

@@ -29,6 +29,9 @@ using ::Envoy::Formatter::SubstitutionFormatStringUtils;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Not;
 
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 // Builds a proto config that loads the named module with the given in-module formatter name.
 envoy::extensions::formatter::dynamic_modules::v3::DynamicModuleFormatter
 protoConfig(absl::string_view module_name, absl::string_view formatter_name) {
@@ -83,18 +86,29 @@ TEST_F(DynamicModuleFormatterFactoryTest, ValidConfig) {
   auto proto_config = protoConfig("formatter_no_op", "test_formatter");
   auto parser = factory_.createCommandParserFromProto(proto_config, context_);
   EXPECT_NE(nullptr, parser);
+
+  // The happy path emits no load-failure counters.
+  EXPECT_EQ(0U, failureCounter(context_.server_context_.serverScope(), "module_load_error",
+                               "test_formatter"));
 }
 
 TEST_F(DynamicModuleFormatterFactoryTest, InvalidModule) {
   auto proto_config = protoConfig("nonexistent_module", "test_formatter");
   EXPECT_THROW_WITH_REGEX(factory_.createCommandParserFromProto(proto_config, context_),
                           EnvoyException, "Failed to load.*");
+
+  EXPECT_EQ(1U, failureCounter(context_.server_context_.serverScope(), "module_load_error",
+                               "test_formatter"));
 }
 
 TEST_F(DynamicModuleFormatterFactoryTest, MissingConfigNew) {
   auto proto_config = protoConfig("formatter_missing_config_new", "test_formatter");
   EXPECT_THROW_WITH_REGEX(factory_.createCommandParserFromProto(proto_config, context_),
                           EnvoyException, "Failed to create formatter config.*config_new");
+
+  // The module itself loaded, so this is not a module load failure.
+  EXPECT_EQ(0U, failureCounter(context_.server_context_.serverScope(), "module_load_error",
+                               "test_formatter"));
 }
 
 TEST_F(DynamicModuleFormatterFactoryTest, MissingConfigDestroy) {

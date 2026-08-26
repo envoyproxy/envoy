@@ -1,29 +1,33 @@
-load("@proxy_wasm_cpp_sdk//bazel:defs.bzl", "proxy_wasm_cc_binary")
+load("@proxy-wasm-cpp-sdk//bazel:defs.bzl", "proxy_wasm_cc_binary")
 load("@rules_rust//rust:defs.bzl", "rust_binary")
 
 def _wasm_rust_transition_impl(settings, attr):
     return {
         "//command_line_option:platforms": "@rules_rust//rust/platform:wasm",
+        "@proxy-wasm-cpp-host//bazel:engine": settings["@proxy-wasm-cpp-host//bazel:engine"],
     }
 
 def _wasi_rust_transition_impl(settings, attr):
     return {
         "//command_line_option:platforms": "@rules_rust//rust/platform:wasi",
+        "@proxy-wasm-cpp-host//bazel:engine": settings["@proxy-wasm-cpp-host//bazel:engine"],
     }
 
 wasm_rust_transition = transition(
     implementation = _wasm_rust_transition_impl,
-    inputs = [],
+    inputs = ["@proxy-wasm-cpp-host//bazel:engine"],
     outputs = [
         "//command_line_option:platforms",
+        "@proxy-wasm-cpp-host//bazel:engine",
     ],
 )
 
 wasi_rust_transition = transition(
     implementation = _wasi_rust_transition_impl,
-    inputs = [],
+    inputs = ["@proxy-wasm-cpp-host//bazel:engine"],
     outputs = [
         "//command_line_option:platforms",
+        "@proxy-wasm-cpp-host//bazel:engine",
     ],
 )
 

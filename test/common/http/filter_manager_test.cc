@@ -154,6 +154,8 @@ public:
     filter_manager_->destroyFilters();
   }
 
+  void runAddDecodedDataOnContinueTest(bool forward_data);
+
   std::unique_ptr<DownstreamFilterManager> filter_manager_;
   NiceMock<MockFilterManagerCallbacks> filter_manager_callbacks_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -1072,6 +1074,115 @@ TEST_F(FilterManagerTest, AllDecodeOperationsBlockedAfterDownstreamReset) {
   filter_manager_->decodeTrailers(*trailers);
 
   filter_manager_->destroyFilters();
+}
+
+// Reproduces the request-body frame loss reported in
+// https://github.com/Kuadrant/wasm-shim/issues/388 (and Envoy #46841): a filter
+// that returns StopIteration on headers (e.g. a wasm filter with
+// allow_on_headers_stop_iteration, mapped to IterationState::StopSingleIteration)
+// buffers a body chunk, continues asynchronously, and then on the next chunk
+// drains the frame into the filter-manager buffer via addDecodedData() while
+// returning Continue. Because the filter's IterationState is already Continue at
+// that point, commonHandleAfterDataCallback() forwards the now-empty frame
+// instead of the just-buffered data, so a downstream FULL_DUPLEX_STREAMED
+// ext_proc filter never receives that chunk. Exactly one mid-stream frame is
+// lost while the message count is unchanged.
+//
+// The `forward_data` parameter toggles the
+// `filter_manager_forward_added_data_on_continue` runtime guard: when disabled
+// this documents the pre-fix data loss; when enabled it verifies the fix.
+void FilterManagerTest::runAddDecodedDataOnContinueTest(bool forward_data) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.filter_manager_forward_added_data_on_continue",
+        forward_data ? "true" : "false"}});
+
+  initialize();
+
+  // filter_1 mimics the wasm filter (stops on headers, buffers, continues after
+  // an async callout); filter_2 mimics a FULL_DUPLEX_STREAMED ext_proc filter
+  // that streams (does not re-buffer) every request body byte it receives.
+  std::shared_ptr<MockStreamDecoderFilter> filter_1(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<MockStreamDecoderFilter> filter_2(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createDecoderFilterFactoryCb(filter_1);
+        callbacks.setFilterConfigName("filter_1");
+        factory(callbacks);
+        factory = createDecoderFilterFactoryCb(filter_2);
+        callbacks.setFilterConfigName("filter_2");
+        factory(callbacks);
+        return true;
+      }));
+
+  RequestHeaderMapPtr headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+  ON_CALL(filter_manager_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(*headers)));
+
+  filter_manager_->createDownstreamFilterChain();
+  filter_manager_->requestHeadersInitialized();
+
+  // filter_2 accumulates and drains (streams) every request body byte it sees.
+  std::string filter_2_received;
+  ON_CALL(*filter_2, decodeData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+        filter_2_received += data.toString();
+        data.drain(data.length());
+        return FilterDataStatus::StopIterationNoBuffer;
+      }));
+
+  // filter_1 stops iteration on headers to await an async callout; filter_2 must
+  // not see the headers yet.
+  EXPECT_CALL(*filter_1, decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  filter_manager_->decodeHeaders(*headers, false);
+
+  // Chunk A arrives while filter_1 is paused: buffer it in the filter manager.
+  EXPECT_CALL(*filter_1, decodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  Buffer::OwnedImpl chunk_a("AAAA");
+  filter_manager_->decodeData(chunk_a, false);
+
+  // The async callout completes: filter_1 continues, which delivers the buffered
+  // chunk A (and the headers) down to filter_2.
+  EXPECT_CALL(*filter_2, decodeHeaders(_, false)).WillOnce(Return(FilterHeadersStatus::Continue));
+  filter_1->callbacks_->continueDecoding();
+  EXPECT_EQ("AAAA", filter_2_received);
+
+  // Chunk B arrives right after the continue. filter_1, still in its buffering
+  // mode, moves the frame into the filter-manager buffer via addDecodedData()
+  // and then returns Continue. This frame must still reach filter_2.
+  EXPECT_CALL(*filter_1, decodeData(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+        filter_1->callbacks_->addDecodedData(data, false);
+        return FilterDataStatus::Continue;
+      }));
+  Buffer::OwnedImpl chunk_b("BBBB");
+  filter_manager_->decodeData(chunk_b, false);
+
+  // Chunk C (end of stream): filter_1 passes it straight through.
+  EXPECT_CALL(*filter_1, decodeData(_, true)).WillOnce(Return(FilterDataStatus::Continue));
+  Buffer::OwnedImpl chunk_c("CCCC");
+  filter_manager_->decodeData(chunk_c, true);
+
+  // With the fix (guard enabled) all three frames reach filter_2. Without it,
+  // chunk B is dropped and filter_2 only sees "AAAACCCC".
+  if (forward_data) {
+    EXPECT_EQ("AAAABBBBCCCC", filter_2_received);
+  } else {
+    EXPECT_EQ("AAAACCCC", filter_2_received);
+  }
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, DecodeDataFrameLostAfterContinueWithoutGuard) {
+  runAddDecodedDataOnContinueTest(/*forward_data=*/false);
+}
+
+TEST_F(FilterManagerTest, DecodeDataFrameNotLostAfterContinueWithAddDecodedData) {
+  runAddDecodedDataOnContinueTest(/*forward_data=*/true);
 }
 
 } // namespace

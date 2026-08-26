@@ -2,6 +2,8 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/hot_restart.h"
+#include "envoy/server/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
@@ -69,7 +71,8 @@ void ReverseTunnelInitiatorExtension::emitAccessLog(
     TimeSource& time_source, const std::string& event, const std::string& node_id,
     const std::string& cluster_id, const std::string& tenant_id,
     const std::string& upstream_cluster, const std::string& host_address,
-    const std::string& connection_key, const std::string& error_message) {
+    const std::string& connection_key, const std::string& worker_id,
+    const std::string& connection_id, const std::string& error_message) {
   if (access_logs_.empty()) {
     return;
   }
@@ -88,6 +91,8 @@ void ReverseTunnelInitiatorExtension::emitAccessLog(
   fields["upstream_cluster"].set_string_value(upstream_cluster);
   fields["host_address"].set_string_value(host_address);
   fields["connection_key"].set_string_value(connection_key);
+  fields["worker_id"].set_string_value(worker_id);
+  fields["connection_id"].set_string_value(connection_id);
   fields["error"].set_string_value(error_message);
   stream_info.setDynamicMetadata("envoy.reverse_tunnel.initiator", metadata);
 
@@ -99,8 +104,12 @@ void ReverseTunnelInitiatorExtension::emitAccessLog(
 }
 
 // ReverseTunnelInitiatorExtension implementation
-void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance&) {
+void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance& server) {
   ENVOY_LOG(debug, "ReverseTunnelInitiatorExtension::onServerInitialized");
+
+  // Retain the server so the initiator can reach hotRestart() to gate dialing on the parent
+  // being told to stop accepting new connections during a hot restart.
+  server_ = &server;
 
   // Provider-backed formatters (e.g. %FILE_CONTENT%, and secret/SDS-backed formatters) resolve
   // their value through a provider whose data lives in a ThreadLocal slot. That slot is populated
@@ -126,6 +135,14 @@ void ReverseTunnelInitiatorExtension::onServerInitialized(Server::Instance&) {
     }
     handshake_headers_ = std::move(handshake_headers);
   }
+}
+
+bool ReverseTunnelInitiatorExtension::parentStopAcceptingRequested() {
+  if (server_ == nullptr) {
+    // Not yet initialized (or some unit tests): no parent to wait for, so don't defer dialing.
+    return true;
+  }
+  return server_->hotRestart().parentStopAcceptingRequested();
 }
 
 void ReverseTunnelInitiatorExtension::onWorkerThreadInitialized() {

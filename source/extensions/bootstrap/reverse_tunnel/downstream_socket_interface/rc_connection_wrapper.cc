@@ -168,6 +168,15 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
                 .count();
   headers->addCopy(initiation_time_hdr, absl::StrCat(initiation_ms));
 
+  // Advertise which initiator worker and connection opened this tunnel so the two ends can be
+  // correlated and tunnels from different workers/connections told apart.
+  const Http::LowerCaseString& worker_id_hdr =
+      ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelWorkerIdHeader();
+  const Http::LowerCaseString& connection_id_hdr =
+      ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelConnectionIdHeader();
+  headers->addCopy(worker_id_hdr, connection_->dispatcher().name());
+  headers->addCopy(connection_id_hdr, absl::StrCat(connection_->id()));
+
   using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
   const auto apply_header = [&headers](const Http::LowerCaseString& key, absl::string_view value,
                                        HeaderValueOption::HeaderAppendAction action) {

@@ -2,8 +2,10 @@
 
 #include <string>
 
+#include "envoy/common/pure.h"
 #include "envoy/config/config_provider.h"
-#include "envoy/server/filter_config.h"
+#include "envoy/init/manager.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/singleton/instance.h"
 
 #include "source/common/protobuf/protobuf.h"

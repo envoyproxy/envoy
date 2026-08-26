@@ -24,34 +24,7 @@
 namespace Envoy {
 namespace Formatter {
 
-class StreamInfoFormatterProvider : public FormatterProvider {
-public:
-  // FormatterProvider
-  std::optional<std::string> format(const Context&,
-                                    const StreamInfo::StreamInfo& stream_info) const override {
-    return format(stream_info);
-  }
-  Protobuf::Value formatValue(const Context&,
-                              const StreamInfo::StreamInfo& stream_info) const override {
-    return formatValue(stream_info);
-  }
-
-  /**
-   * Format the value with the given stream info.
-   * @param stream_info supplies the stream info.
-   * @return std::optional<std::string> optional string containing a single value extracted from
-   *         the given stream info.
-   */
-  virtual std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const PURE;
-
-  /**
-   * Format the value with the given stream info.
-   * @param stream_info supplies the stream info.
-   * @return Protobuf::Value containing a single value extracted from the given stream info.
-   */
-  virtual Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const PURE;
-};
-
+using StreamInfoFormatterProvider = FormatterProvider;
 using StreamInfoFormatterProviderPtr = std::unique_ptr<StreamInfoFormatterProvider>;
 using StreamInfoFormatterResult = absl::StatusOr<StreamInfoFormatterProviderPtr>;
 
@@ -73,11 +46,10 @@ public:
                     std::optional<size_t> max_length, GetMetadataFunction get);
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
-  std::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override;
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override;
+  std::optional<std::string> format(const Context&,
+                                    const StreamInfo::StreamInfo& stream_info) const override;
+  Protobuf::Value formatValue(const Context&,
+                              const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
   std::optional<std::string>
@@ -136,11 +108,8 @@ public:
                 bool is_upstream = false, absl::string_view field_name = {});
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
-  std::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override;
 
 private:
   FilterStateFormatter(absl::string_view key, std::optional<size_t> max_length,
@@ -167,11 +136,8 @@ public:
   create(absl::string_view sub_command);
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
-  std::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override;
 
   static const absl::flat_hash_map<absl::string_view, TimePointGetter> KnownTimePointGetters;
 
@@ -191,18 +157,25 @@ private:
 
   static constexpr absl::string_view FirstDownstreamRxByteReceived =
       "DS_RX_BEG"; // Downstream request receiving begin.
+  static constexpr absl::string_view LastDownstreamHeaderRxByteReceived =
+      "DS_RX_HDR_END"; // Downstream request headers fully received.
   static constexpr absl::string_view LastDownstreamRxByteReceived =
       "DS_RX_END"; // Downstream request receiving end.
   static constexpr absl::string_view DownstreamConnectionBegin =
-      "DS_CX_BEG"; // Downstream connection begin.
+      "DS_CX_BEG"; // Downstream connection begin. The downstream connection establishment time.
+                   // NOTE: This is different from the US_CX_BEG which is the connection
+                   // establishment begin because the downstream connection begin is the time when
+                   // the downstream connection is actually established and accepted by Envoy.
   static constexpr absl::string_view DownstreamConnectionEnd =
-      "DS_CX_END"; // Downstream connection end.
+      "DS_CX_END"; // Downstream connection end. The downstream connection close time.
+                   // NOTE: This is different from the US_CX_END which is the connection
+                   // establishment end and not the connection end.
   static constexpr absl::string_view UpstreamConnectStart =
       "US_CX_BEG"; // Upstream TCP connection establishment start.
   static constexpr absl::string_view UpstreamConnectEnd =
-      "US_CX_END"; // Upstream TCP connection establishment start.
+      "US_CX_END"; // Upstream TCP connection establishment end.
   static constexpr absl::string_view UpstreamTLSConnectEnd =
-      "US_HS_END"; // Upstream TLS connection establishment start.
+      "US_HS_END"; // Upstream TLS connection establishment end.
   static constexpr absl::string_view FirstUpstreamTxByteSent =
       "US_TX_BEG"; // Upstream request sending begin.
   static constexpr absl::string_view LastUpstreamTxByteSent =
@@ -217,6 +190,10 @@ private:
       "DS_TX_BEG"; // Downstream response sending begin.
   static constexpr absl::string_view LastDownstreamTxByteSent =
       "DS_TX_END"; // Downstream response sending end.
+  static constexpr absl::string_view DownstreamHandshakeStart =
+      "DS_HS_BEG"; // Downstream TLS handshake begin, i.e. the time the ClientHello was received.
+  static constexpr absl::string_view DownstreamHandshakeEnd =
+      "DS_HS_END"; // Downstream TLS handshake end.
 
   TimePointGetter time_point_beg_;
   TimePointGetter time_point_end_;
@@ -240,11 +217,10 @@ public:
   }
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
-  std::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const Context&, const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override;
+  void formatValueTo(ValueSink& sink, const Context&, const StreamInfo::StreamInfo&) const override;
 
 protected:
   SystemTimeFormatter(absl::string_view format, TimeFieldExtractorPtr f, bool local_time = false);
@@ -338,11 +314,8 @@ public:
   EnvironmentFormatter(absl::string_view key, std::optional<size_t> max_length);
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
-  std::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override;
 
 private:
   Protobuf::Value str_;
@@ -368,11 +341,8 @@ public:
   create(absl::string_view source, absl::string_view option);
 
   // StreamInfoFormatterProvider
-  // Don't hide the other structure of format and formatValue.
-  using StreamInfoFormatterProvider::format;
-  using StreamInfoFormatterProvider::formatValue;
-  std::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  std::optional<std::string> format(const Context&, const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override;
 
   std::optional<std::string> getHostFromHeaders(const StreamInfo::StreamInfo& stream_info) const;
   std::optional<std::string> getSNIFromStreamInfo(const StreamInfo::StreamInfo& stream_info) const;

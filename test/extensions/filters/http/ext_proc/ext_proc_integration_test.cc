@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include <algorithm>
 #include <iostream>
 
@@ -9,6 +12,7 @@
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
 #include "envoy/extensions/retry/host/previous_hosts/v3/previous_hosts.pb.h"
+#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
@@ -31,12 +35,24 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "ocpdiag/core/testing/status_matchers.h"
+
+using testing::_;
+using testing::Contains;
+using testing::Eq;
+using testing::Gt;
+using testing::HasSubstr;
+using testing::IsSupersetOf;
+using testing::MatchesRegex;
+using testing::Pair;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -79,8 +95,173 @@ using testing::Not;
 using testing::ResultOf;
 using namespace std::chrono_literals;
 
+class ExtProcSessionAffinityIntegrationTest : public ExtProcIntegrationTest {
+protected:
+  void
+  configureSessionAffinity(const envoy::config::route::v3::RouteAction::HashPolicy& hash_policy,
+                           absl::string_view metadata_key, absl::string_view metadata_value) {
+    proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+    auto* metadata = proto_config_.mutable_grpc_service()->add_initial_metadata();
+    metadata->set_key(metadata_key);
+    metadata->set_value(metadata_value);
+
+    initializeConfig({}, {{0, 2}});
+    config_helper_.addConfigModifier(
+        [hash_policy](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          envoy::config::cluster::v3::Cluster* ext_proc_cluster = nullptr;
+          for (auto& cluster : *bootstrap.mutable_static_resources()->mutable_clusters()) {
+            if (cluster.name() == "ext_proc_server_0") {
+              ext_proc_cluster = &cluster;
+              break;
+            }
+          }
+          ASSERT_NE(ext_proc_cluster, nullptr);
+          ext_proc_cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::RING_HASH);
+
+          envoy::extensions::upstreams::http::v3::HttpProtocolOptions options;
+          options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+          *options.add_hash_policy() = hash_policy;
+          auto& options_any = (*ext_proc_cluster->mutable_typed_extension_protocol_options())
+              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+          ASSERT_TRUE(options_any.PackFrom(options));
+        });
+
+    autonomous_upstream_ = true;
+    HttpIntegrationTest::initialize();
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+  }
+
+  void waitForProcessorMessage(uint64_t& upstream_index, FakeStreamPtr& processor_stream,
+                               ProcessingRequest& request) {
+    ASSERT_EQ(grpc_upstreams_.size(), 2);
+    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+    while (bound.withinBound()) {
+      for (uint64_t i = 0; i < grpc_upstreams_.size(); ++i) {
+        FakeHttpConnectionPtr& processor_connection =
+            i == 0 ? processor_connection_ : processor_connection_1_;
+        if (processor_connection == nullptr) {
+          FakeHttpConnectionPtr connection;
+          if (grpc_upstreams_[i]->waitForHttpConnection(*dispatcher_, connection, 5ms)) {
+            processor_connection = std::move(connection);
+          }
+        }
+        if (processor_connection == nullptr) {
+          continue;
+        }
+
+        FakeStreamPtr stream;
+        if (processor_connection->waitForNewStream(*dispatcher_, stream, 5ms)) {
+          ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
+          upstream_index = i;
+          processor_stream = std::move(stream);
+          return;
+        }
+      }
+    }
+    FAIL() << "Timed out waiting for an ext_proc stream";
+  }
+
+  void processAffinityRequest(
+      std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers,
+      absl::string_view metadata_key, std::optional<absl::string_view> expected_metadata_value,
+      uint64_t& upstream_index) {
+    Http::TestRequestHeaderMapImpl headers;
+    HttpTestUtility::addDefaultHeaders(headers);
+    if (modify_headers) {
+      (*modify_headers)(headers);
+    }
+    auto response = codec_client_->makeHeaderOnlyRequest(headers);
+
+    ProcessingRequest request;
+    FakeStreamPtr processor_stream;
+    waitForProcessorMessage(upstream_index, processor_stream, request);
+    ASSERT_TRUE(request.has_request_headers());
+
+    if (expected_metadata_value.has_value()) {
+      const auto metadata = processor_stream->headers().get(LowerCaseString(metadata_key));
+      ASSERT_EQ(metadata.size(), 1);
+      EXPECT_EQ(metadata[0]->value().getStringView(), expected_metadata_value.value());
+    }
+
+    processor_stream->startGrpcStream();
+    ProcessingResponse processor_response;
+    processor_response.mutable_request_headers();
+    processor_stream->sendGrpcMessage(processor_response);
+    verifyDownstreamResponse(*response, 200);
+    ASSERT_TRUE(processor_stream->waitForReset(*dispatcher_));
+  }
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing,
+                         ExtProcSessionAffinityIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(ExtProcSessionAffinityIntegrationTest, HeaderSessionAffinity) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Cluster hash policies only apply to Envoy gRPC";
+  }
+
+  envoy::config::route::v3::RouteAction::HashPolicy hash_policy;
+  hash_policy.mutable_header()->set_header_name("x-session-id");
+  configureSessionAffinity(hash_policy, "x-session-id", "%REQ(x-session-id)%");
+
+  uint64_t first_upstream;
+  processAffinityRequest(
+      [](Http::RequestHeaderMap& headers) {
+        headers.addCopy(Http::LowerCaseString("x-session-id"), "session-1");
+      },
+      "x-session-id", "session-1", first_upstream);
+
+  uint64_t second_upstream;
+  processAffinityRequest(
+      [](Http::RequestHeaderMap& headers) {
+        headers.addCopy(Http::LowerCaseString("x-session-id"), "session-1");
+      },
+      "x-session-id", "session-1", second_upstream);
+
+  EXPECT_EQ(first_upstream, second_upstream);
+}
+
+TEST_P(ExtProcSessionAffinityIntegrationTest, PassiveCookieSessionAffinity) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Cluster hash policies only apply to Envoy gRPC";
+  }
+
+  envoy::config::route::v3::RouteAction::HashPolicy hash_policy;
+  hash_policy.mutable_cookie()->set_name("session_id");
+  configureSessionAffinity(hash_policy, "cookie", "%REQ(cookie)%");
+
+  uint64_t first_upstream;
+  processAffinityRequest(
+      [](Http::RequestHeaderMap& headers) {
+        headers.addCopy(Http::LowerCaseString("cookie"), "session_id=session-1");
+      },
+      "cookie", "session_id=session-1", first_upstream);
+
+  uint64_t second_upstream;
+  processAffinityRequest(
+      [](Http::RequestHeaderMap& headers) {
+        headers.addCopy(Http::LowerCaseString("cookie"), "session_id=session-1");
+      },
+      "cookie", "session_id=session-1", second_upstream);
+
+  EXPECT_EQ(first_upstream, second_upstream);
+}
+
+TEST_P(ExtProcSessionAffinityIntegrationTest, MissingSessionAffinityKey) {
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Cluster hash policies only apply to Envoy gRPC";
+  }
+
+  envoy::config::route::v3::RouteAction::HashPolicy hash_policy;
+  hash_policy.mutable_header()->set_header_name("x-session-id");
+  configureSessionAffinity(hash_policy, "x-session-id", "%REQ(x-session-id)%");
+
+  uint64_t upstream;
+  processAffinityRequest(std::nullopt, "x-session-id", std::nullopt, upstream);
+}
+
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
 // by immediately closing the stream.
@@ -3754,7 +3935,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
 
   auto response = sendDownstreamRequest(std::nullopt);
 
-  testSendDyanmicMetadata();
+  testSendDynamicMetadata();
 
   handleUpstreamRequest();
 
@@ -3767,6 +3948,36 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
       (*response).headers().get(Http::LowerCaseString("receiving_ns_untyped.foo"));
   ASSERT_EQ(1, md_header_result.size());
   EXPECT_EQ("value from ext_proc", md_header_result[0]->value().getStringView());
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SendAndReceiveTypedDynamicMetadata) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  auto* md_opts = proto_config_.mutable_metadata_options();
+  md_opts->mutable_receiving_namespaces()->add_typed("receiving_ns_typed");
+
+  ConfigOptions config_option = {};
+  config_option.add_response_processor = true; // Use DynamicMetadataToHeadersFilter
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(std::nullopt);
+
+  testSendTypedDynamicMetadata();
+
+  handleUpstreamRequest();
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  // Verify the response received contains the headers from dynamic metadata we expect.
+  ASSERT_FALSE((*response).headers().empty());
+  auto md_header_result = (*response).headers().get(Http::LowerCaseString("receiving_ns_typed"));
+  ASSERT_EQ(1, md_header_result.size());
+  EXPECT_EQ("typed_value from ext_proc", md_header_result[0]->value().getStringView());
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -3806,11 +4017,11 @@ TEST_P(ExtProcIntegrationTest, SendClusterMetadata) {
   const auto& received_metadata = request_headers_msg.metadata_context();
 
   const auto& filter_metadata = received_metadata.filter_metadata();
-  EXPECT_EQ(filter_metadata.at("cluster_ns_untyped").fields().at("some_string").string_value(),
-            "some_value");
+  EXPECT_THAT(filter_metadata.at("cluster_ns_untyped").fields(),
+              Contains(IsStructString("some_string", "some_value")));
 
   const auto& typed_filter_metadata = received_metadata.typed_filter_metadata();
-  EXPECT_TRUE(typed_filter_metadata.contains("cluster_ns_typed"));
+  EXPECT_THAT(typed_filter_metadata, Contains(Pair("cluster_ns_typed", _)));
 
   processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
@@ -3858,20 +4069,15 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
         EXPECT_TRUE(req.has_request_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
-        EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
-        EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
-        EXPECT_EQ(proto_struct.fields().at("request.size").number_value(), 0);
-        EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false);
-        EXPECT_TRUE(proto_struct.fields().at("connection.id").has_number_value());
+        EXPECT_THAT(proto_struct.fields(),
+                    UnorderedElementsAre(
+                        IsStructString("request.path", "/"),
+                        IsStructString("request.method", "GET"),
+                        IsStructString("request.scheme", "http"), IsStructNumber("request.size", 0),
+                        IsStructBool("connection.mtls", false), IsStructNumber("connection.id", _),
+                        IsStructBool("connection.peer_certificate_valid", false)));
         // connection.peer_certificate is not present without TLS
-        EXPECT_FALSE(proto_struct.fields().contains("connection.peer_certificate"));
-        // connection.peer_certificate_valid is present and false without TLS (like connection.mtls)
-        EXPECT_EQ(proto_struct.fields().at("connection.peer_certificate_valid").bool_value(),
-                  false);
-        // Make sure we did not include the attribute which was not yet available.
-        EXPECT_EQ(proto_struct.fields().size(), 7);
-        EXPECT_FALSE(proto_struct.fields().contains("response.code"));
+        // response.code should not be present.
 
         // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
         EXPECT_TRUE(req.request_headers().attributes().empty());
@@ -3890,12 +4096,12 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
         EXPECT_TRUE(req.has_response_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_EQ(proto_struct.fields().at("response.code").number_value(), 200);
-        EXPECT_EQ(proto_struct.fields().at("response.code_details").string_value(),
-                  StreamInfo::ResponseCodeDetails::get().ViaUpstream);
-
-        // Make sure we didn't include request attributes in the response-path processing request.
-        EXPECT_FALSE(proto_struct.fields().contains("request.method"));
+        EXPECT_THAT(proto_struct.fields(),
+                    UnorderedElementsAre(
+                        IsStructNumber("response.code", 200),
+                        IsStructString("response.code_details",
+                                       StreamInfo::ResponseCodeDetails::get().ViaUpstream)));
+        // request attributes should not be present in the response-path processing request.
 
         // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
         EXPECT_TRUE(req.response_headers().attributes().empty());
@@ -3944,24 +4150,26 @@ TEST_P(ExtProcIntegrationTest, RequestAttributesInResponseOnlyProcessing) {
   upstream_request_->encodeData("body", /*end_stream=*/true);
 
   // Handle response headers message.
-  processGenericMessage(
-      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
-        // Add something to the response so the message isn't seen as spurious
-        envoy::service::ext_proc::v3::HeadersResponse headers_resp;
-        *(resp.mutable_response_headers()) = headers_resp;
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [](const ProcessingRequest& req, ProcessingResponse& resp) {
+                          // Add something to the response so the message isn't seen as spurious
+                          envoy::service::ext_proc::v3::HeadersResponse headers_resp;
+                          *(resp.mutable_response_headers()) = headers_resp;
 
-        EXPECT_TRUE(req.has_response_headers());
-        EXPECT_EQ(req.attributes().size(), 1);
-        auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
-        EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
-        EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
-        EXPECT_EQ(proto_struct.fields().at("request.size").number_value(), 0);
+                          EXPECT_TRUE(req.has_response_headers());
+                          EXPECT_EQ(req.attributes().size(), 1);
+                          auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+                          EXPECT_THAT(proto_struct.fields(),
+                                      UnorderedElementsAre(IsStructString("request.path", "/"),
+                                                           IsStructString("request.method", "GET"),
+                                                           IsStructString("request.scheme", "http"),
+                                                           IsStructNumber("request.size", 0)));
 
-        // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
-        EXPECT_TRUE(req.response_headers().attributes().empty());
-        return true;
-      });
+                          // Make sure we are not including any data in the deprecated
+                          // HttpHeaders.attributes.
+                          EXPECT_TRUE(req.response_headers().attributes().empty());
+                          return true;
+                        });
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -3989,29 +4197,28 @@ TEST_P(ExtProcIntegrationTest, RequestAttributeVirtualHostMetadataIsTextProto) {
   processGenericMessage(
       *grpc_upstreams_[0], true,
       [](const ProcessingRequest& req, ProcessingResponse& resp) -> bool {
-        // Send a valid request-headers response for this request-headers processing step.
+        // Send a valid request-headers response for this request-headers
+        // processing step.
         resp.mutable_request_headers();
 
         EXPECT_TRUE(req.has_request_headers());
-        EXPECT_EQ(req.attributes().size(), 1);
-        const auto& proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_TRUE(proto_struct.fields().contains("xds.virtual_host_metadata"));
-        const auto& metadata_textproto =
-            proto_struct.fields().at("xds.virtual_host_metadata").string_value();
+        EXPECT_THAT(req.attributes(),
+                    UnorderedElementsAre(IsStructField(
+                        "envoy.filters.http.ext_proc",
+                        UnorderedElementsAre(IsStructString("xds.virtual_host_metadata", _)))));
+        const auto& metadata_textproto = req.attributes()
+                                             .at("envoy.filters.http.ext_proc")
+                                             .fields()
+                                             .at("xds.virtual_host_metadata")
+                                             .string_value();
         envoy::config::core::v3::Metadata parsed_metadata;
         const bool parsed =
             Protobuf::TextFormat::ParseFromString(metadata_textproto, &parsed_metadata);
         EXPECT_TRUE(parsed);
-        EXPECT_TRUE(parsed_metadata.filter_metadata().contains("someKey"));
-        EXPECT_EQ(parsed_metadata.filter_metadata()
-                      .at("someKey")
-                      .fields()
-                      .at("apiIdentifier")
-                      .string_value(),
-                  "test-api");
-        EXPECT_EQ(
-            parsed_metadata.filter_metadata().at("someKey").fields().at("extHost").string_value(),
-            "test-host");
+        EXPECT_THAT(parsed_metadata.filter_metadata(),
+                    Contains(IsStructField(
+                        "someKey", UnorderedElementsAre(IsStructString("apiIdentifier", "test-api"),
+                                                        IsStructString("extHost", "test-host")))));
         return true;
       });
 
@@ -4050,10 +4257,9 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
         EXPECT_TRUE(req.has_request_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_EQ(proto_struct.fields().at("remapped.method").string_value(), "POST");
-        EXPECT_EQ(proto_struct.fields().at("foo.path").string_value(), "/");
-        // Make sure we did not include anything else
-        EXPECT_EQ(proto_struct.fields().size(), 2);
+        EXPECT_THAT(proto_struct.fields(),
+                    UnorderedElementsAre(IsStructString("remapped.method", "POST"),
+                                         IsStructString("foo.path", "/")));
         return true;
       });
 
@@ -4080,10 +4286,9 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
                           EXPECT_TRUE(req.has_response_headers());
                           EXPECT_EQ(req.attributes().size(), 1);
                           auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-                          EXPECT_EQ(proto_struct.fields().at("remapped.code").number_value(), 200);
-                          EXPECT_GT(proto_struct.fields().at("user.port").number_value(), 0);
-                          // Make sure we did not include anything else, such as request attributes
-                          EXPECT_EQ(proto_struct.fields().size(), 2);
+                          EXPECT_THAT(proto_struct.fields(),
+                                      UnorderedElementsAre(IsStructNumber("remapped.code", 200),
+                                                           IsStructNumber("user.port", Gt(0))));
                           return true;
                         });
 
@@ -4139,9 +4344,8 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilderOverrides) {
         EXPECT_TRUE(req.has_request_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_EQ(proto_struct.fields().at("remapped.method").string_value(), "POST");
-        // Make sure we did not include anything else
-        EXPECT_EQ(proto_struct.fields().size(), 1);
+        EXPECT_THAT(proto_struct.fields(),
+                    UnorderedElementsAre(IsStructString("remapped.method", "POST")));
         return true;
       });
 
@@ -5011,7 +5215,7 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
     auto field_value = json_log->getString(field_name);
     EXPECT_OK(field_value) << "Field " << field_name << " should be accessible";
     if (field_value.ok()) {
-      EXPECT_THAT(*field_value, testing::MatchesRegex("[0-9]+"))
+      EXPECT_THAT(*field_value, MatchesRegex("[0-9]+"))
           << "Field " << field_name << " should be numeric, got: " << *field_value;
     }
   };
@@ -5045,15 +5249,14 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   // Test non-existent field handling (coverage for getField fallback).
   // When a field doesn't exist, it's not included in the JSON output at all.
   auto non_existent = json_log->getString("field_non_existent");
-  EXPECT_THAT(non_existent,
-              HasStatusMessage(testing::HasSubstr("key 'field_non_existent' missing")));
+  EXPECT_THAT(non_existent, HasStatusMessage(HasSubstr("key 'field_non_existent' missing")));
 
   // Bytes are only populated for Envoy gRPC, not Google gRPC.
   auto bytes_sent = json_log->getString("field_bytes_sent");
   auto bytes_received = json_log->getString("field_bytes_received");
   if (IsEnvoyGrpc()) {
-    EXPECT_THAT(*bytes_sent, testing::Not(testing::Eq("0")));
-    EXPECT_THAT(*bytes_received, testing::Not(testing::Eq("0")));
+    EXPECT_THAT(*bytes_sent, Not(Eq("0")));
+    EXPECT_THAT(*bytes_received, Not(Eq("0")));
   } else {
     EXPECT_EQ(*bytes_sent, "0");
     EXPECT_EQ(*bytes_received, "0");
@@ -5156,10 +5359,10 @@ TEST_P(ExtProcIntegrationTest, AccessLogExtProcInCompositeFilter) {
 
   const std::string log_content = waitForAccessLog(tunnel_access_log_path_);
   EXPECT_FALSE(log_content.empty());
-  EXPECT_THAT(log_content, testing::HasSubstr("request_header_call_status"));
-  EXPECT_THAT(log_content, testing::HasSubstr("request_header_latency_us"));
-  EXPECT_THAT(log_content, testing::HasSubstr("response_header_call_status"));
-  EXPECT_THAT(log_content, testing::HasSubstr("response_header_latency_us"));
+  EXPECT_THAT(log_content, HasSubstr("request_header_call_status"));
+  EXPECT_THAT(log_content, HasSubstr("request_header_latency_us"));
+  EXPECT_THAT(log_content, HasSubstr("response_header_call_status"));
+  EXPECT_THAT(log_content, HasSubstr("response_header_latency_us"));
 }
 
 TEST_P(ExtProcIntegrationTest, ExtProcLoggingFailedOpen) {

@@ -139,7 +139,8 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
   auto config = *Router::ConfigImpl::create(route_config, *factory_context,
-                                            ProtobufMessage::getNullValidationVisitor(), false);
+                                            ProtobufMessage::getNullValidationVisitor(),
+                                            factory_context->initManager(), false);
   if (!disable_deprecation_check) {
     ProtobufMessage::StrictValidationVisitorImpl visitor;
     visitor.setRuntime(factory_context->runtime_loader_);
