@@ -160,6 +160,16 @@ void InstanceBase::drainListeners(OptRef<const Network::ExtraShutdownListenerOpt
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
                                    options.has_value() ? *options
                                                        : Network::ExtraShutdownListenerOptions{});
+  // Notify the connections of every listener that draining has begun, so connection-level drain
+  // logic can react. Server-wide drains notify from their entry
+  // point rather than from DrainManagerImpl, whose per-listener children must not fan out. The
+  // start time and strategy are captured once here so every notified connection shares a single,
+  // consistent drain timeline.
+  listener_manager_->onServerDrainStart(
+      Network::DrainDirection::All,
+      Network::ConnectionDrainEvent{api().timeSource().monotonicTime(),
+                                    InstanceBase::options().drainStrategy()});
+
   drain_manager_->startDrainSequence(Network::DrainDirection::All, [] {});
 }
 

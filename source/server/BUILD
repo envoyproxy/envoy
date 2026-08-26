@@ -493,6 +493,7 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
+        "//envoy/network:drain_decision_interface",
         "//envoy/network:exception_interface",
         "//envoy/server:configuration_interface",
         "//envoy/server:guarddog_interface",

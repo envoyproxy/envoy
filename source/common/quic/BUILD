@@ -477,6 +477,7 @@ envoy_cc_library(
         ":envoy_quic_server_crypto_stream_factory_lib",
         ":envoy_quic_server_session_lib",
         ":quic_stat_names_lib",
+        "//envoy/network:drain_decision_interface",
         "//envoy/network:listener_interface",
         "//source/common/http:session_idle_list_lib",
         "@quiche//:quic_core_server_lib",
