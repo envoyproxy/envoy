@@ -267,9 +267,9 @@ TEST_P(DynamicModulesIntegrationTest, ResponseCallbacksOnLocalReply) {
 #ifdef __APPLE__
   if (GetParam() == "go") {
     // Not this test: with a Go module loaded, ~IntegrationTestServer never returns, because the
-    // exiting server thread runs macOS pthread TSD destructors and one of them enters the Go
+    // exiting server thread runs macOS pthread key destructors and one of them enters the Go
     // runtime and does not come back. The request itself succeeds. See #46905. Scoped to Apple
-    // platforms because Go is the only SDK here whose runtime installs TSD destructors and this
+    // platforms because Go is the only SDK here whose runtime installs key destructors and this
     // has not been seen on Linux.
     GTEST_SKIP() << "Go module deadlocks server teardown on macOS, see #46905";
   }
