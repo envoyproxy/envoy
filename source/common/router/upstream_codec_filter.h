@@ -101,9 +101,14 @@ public:
   bool calling_encode_headers_ = false;
 
 private:
+  Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream);
   StreamInfo::UpstreamTiming& upstreamTiming() {
     return callbacks_->upstreamCallbacks()->upstreamStreamInfo().upstreamInfo()->upstreamTiming();
   }
+
+  // Some GenericUpstream implementations retain the header map past encodeHeaders().
+  Http::RequestHeaderMapPtr upstream_headers_;
+  std::optional<std::string> injected_websocket_key_;
 };
 
 class UpstreamCodecFilterFactory

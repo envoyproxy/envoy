@@ -8,6 +8,9 @@
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
+#include "source/common/http/headers.h"
+#include "source/common/websocket/handshake.h"
+
 #include "test/integration/filters/add_header_filter.pb.h"
 #include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/http_integration.h"
@@ -840,6 +843,17 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyExtendedConnect) {
 
   Http::TestResponseHeaderMapImpl h1_upgrade_response{
       {":status", "101"}, {"upgrade", "websocket"}, {"connection", "upgrade"}};
+
+  const auto upstream_keys = upstream_request_->headers().get(Http::Headers::get().SecWebSocketKey);
+  if (upstreamProtocol() == Http::CodecType::HTTP1 &&
+      downstreamProtocol() != Http::CodecType::HTTP1) {
+    ASSERT_EQ(upstream_keys.size(), 1);
+    h1_upgrade_response.setCopy(
+        Http::Headers::get().SecWebSocketAccept,
+        WebSocket::computeAccept(upstream_keys[0]->value().getStringView()));
+  } else {
+    EXPECT_TRUE(upstream_keys.empty());
+  }
 
   // Send response headers
   // The HTTP/1 upstream will observe the upgrade headers and needs to respond with 101

@@ -195,6 +195,7 @@ private:
   void resetPerTryIdleTimer();
   void onPerTryTimeout();
   void onPerTryIdleTimeout();
+  void maybeGenerateWebsocketKey(Http::Protocol protocol);
   void upstreamLog(AccessLog::AccessLogType access_log_type);
   void resetUpstreamLogFlushTimer();
 
@@ -217,6 +218,7 @@ private:
   // access logging is configured.
   Http::ResponseHeaderMapPtr upstream_headers_;
   Http::ResponseTrailerMapPtr upstream_trailers_;
+  std::optional<std::string> generated_websocket_key_;
   OptRef<UpstreamToDownstream> upstream_interface_;
   std::list<Http::UpstreamCallbacks*> upstream_callbacks_;
 
@@ -380,6 +382,12 @@ public:
   }
   void setPausedForWebsocketUpgrade(bool value) override {
     upstream_request_.paused_for_websocket_ = value;
+  }
+  OptRef<const std::string> generatedWebsocketKey() const override {
+    if (upstream_request_.generated_websocket_key_.has_value()) {
+      return {*upstream_request_.generated_websocket_key_};
+    }
+    return {};
   }
 
   bool pausedForGenericUpgrade() const override {

@@ -302,7 +302,7 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnect) {
   EXPECT_EQ(headers.getConnectionValue(), "upgrade");
   EXPECT_EQ(headers.getProtocolValue(), "");
   EXPECT_EQ(headers.get_("sec-websocket-version"), "13");
-  EXPECT_EQ(headers.get_("sec-websocket-key").size(), 24);
+  EXPECT_TRUE(headers.get_("sec-websocket-key").empty());
 }
 
 TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoScheme) {

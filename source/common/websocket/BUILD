@@ -19,3 +19,15 @@ envoy_cc_library(
         "//source/common/common:scalar_to_byte_vector_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "handshake_lib",
+    srcs = ["handshake.cc"],
+    hdrs = ["handshake.h"],
+    external_deps = ["ssl"],
+    deps = [
+        "//envoy/common:random_generator_interface",
+        "//source/common/common:base64_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
