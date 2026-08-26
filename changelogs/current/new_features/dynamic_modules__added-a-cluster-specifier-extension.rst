@@ -1,8 +1,8 @@
 Added a dynamic modules cluster specifier extension
 (``envoy.router.cluster_specifier_plugin.dynamic_modules``) that lets a dynamic module select the
 upstream cluster for a request and replace the timeout, idle timeout, priority, request body buffer
-limit, cluster not found response code, retry policy, metadata match criteria and request mirroring
-policies of the matched route.
+limit, cluster not found response code, hash policy, retry policy, metadata match criteria and request
+mirroring policies of the matched route.
 The selection context exposes the request headers, stream info attributes, dynamic metadata, the
 route name, the random value Envoy generated for cluster selection, and a routability query that
 reports host counts for a named cluster from the current worker, and the module is invoked
