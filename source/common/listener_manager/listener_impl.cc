@@ -494,11 +494,6 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     SET_AND_RETURN_IF_NOT_OK(buildInternalListener(config), creation_status);
   }
   if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
-    // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
-    // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
-    // listener constructor so that this listener's children entities could register their targets
-    // with their parent's initManager.
-    //
     // QUIC listeners register targets in initializeWorkerRouting(), which runs after the
     // constructor, so with the runtime flag enabled registration is deferred to
     // ListenerManagerImpl::addOrUpdateListenerInternal instead.
