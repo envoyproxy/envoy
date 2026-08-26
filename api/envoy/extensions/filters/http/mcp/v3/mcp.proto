@@ -70,7 +70,6 @@ message Mcp {
     HEADERS = 2;
   }
 
-
   message TraceContextPropagationConfig {
     option (xds.annotations.v3.message_status).work_in_progress = true;
   }
