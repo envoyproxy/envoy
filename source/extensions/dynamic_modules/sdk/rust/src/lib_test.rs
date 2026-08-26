@@ -1838,6 +1838,13 @@ pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_upstream_conn
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> bool {
+  MOCK_START_TLS_RESULT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
   _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
 ) -> bool {
@@ -2066,6 +2073,30 @@ fn test_http_get_upstream_connection_id_unavailable() {
 // =============================================================================
 // StartTLS Tests
 // =============================================================================
+
+#[test]
+fn test_start_downstream_secure_transport_success() {
+  reset_upstream_host_mock();
+  set_start_tls_result(true);
+
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert!(filter.start_downstream_secure_transport());
+}
+
+#[test]
+fn test_start_downstream_secure_transport_failure() {
+  reset_upstream_host_mock();
+  set_start_tls_result(false);
+
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert!(!filter.start_downstream_secure_transport());
+}
 
 #[test]
 fn test_start_upstream_secure_transport_success() {
