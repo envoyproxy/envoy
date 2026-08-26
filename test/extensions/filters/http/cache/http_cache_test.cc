@@ -260,6 +260,19 @@ TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
 }
 
+TEST_F(LookupRequestTest, HitWithoutDateHeader) {
+  const LookupRequest lookup_request(request_headers_, currentTime() + Seconds(40),
+                                     vary_allow_list_);
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", "public, max-age=3600"}});
+  const LookupResult lookup_response = lookup_request.makeLookupResult(
+      std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers),
+      ResponseMetadata{currentTime()}, std::nullopt);
+  // An entry stored without a Date is aged from its response_time, not from the epoch.
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+  EXPECT_THAT(*lookup_response.headers_, ContainsHeader(Http::CustomHeaders::get().Age, "40"));
+}
+
 // If request Cache-Control header is missing,
 // "Pragma:no-cache" is equivalent to "Cache-Control:no-cache".
 // https://httpwg.org/specs/rfc7234.html#header.pragma

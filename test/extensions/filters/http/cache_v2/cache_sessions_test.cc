@@ -531,6 +531,32 @@ TEST_F(CacheSessionsTest,
   pumpDispatcher();
 }
 
+TEST_F(CacheSessionsTest, HitWithoutDateHeader) {
+  auto response_headers = cacheableResponseHeaders();
+  response_headers->removeDate();
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+  ActiveLookupResultPtr result;
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result](ActiveLookupResultPtr r) { result = std::move(r); });
+  pumpDispatcher();
+  ResponseMetadata metadata;
+  metadata.response_time_ = api_->timeSource().systemTime() - std::chrono::seconds(40);
+  consumeCallback(captured_lookup_callbacks_[0])(LookupResult{
+      std::make_unique<MockCacheReader>(),
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers),
+      nullptr,
+      std::move(metadata),
+      5,
+  });
+  pumpDispatcher();
+  // An entry stored without a Date is aged from its response_time, not from the epoch.
+  EXPECT_THAT(result->status_, Eq(CacheEntryStatus::Hit));
+  MockFunction<void(Http::ResponseHeaderMapPtr, EndStream)> header_callback;
+  EXPECT_CALL(header_callback, Call(Pointee(HasHeader("age", "40")), EndStream::More));
+  result->http_source_->getHeaders(header_callback.AsStdFunction());
+}
+
 TEST_F(CacheSessionsTest, CacheHitGoesDirectlyToCachedResponses) {
   auto response_headers = cacheableResponseHeaders();
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));

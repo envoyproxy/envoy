@@ -158,6 +158,43 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   }
 }
 
+TEST_P(CacheIntegrationTest, MissInsertHitWithoutDateHeader) {
+  initializeFilter(default_config);
+
+  const Http::TestRequestHeaderMapImpl request_headers =
+      httpRequestHeader("GET", /*authority=*/"MissInsertHitWithoutDateHeader");
+  const std::string response_body(42, 'a');
+  Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(response_body);
+  response_headers.removeDate();
+  const std::string insert_date = formatter_.now(simTime());
+
+  {
+    IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
+        request_headers,
+        simulateUpstreamResponse(response_headers, makeOptRef(response_body), empty_trailers_));
+    EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
+    EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
+    EXPECT_EQ(response_decoder->body(), response_body);
+    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+  }
+
+  simTime().advanceTimeWait(Seconds(10));
+
+  {
+    IntegrationStreamDecoderPtr response_decoder =
+        sendHeaderOnlyRequestAwaitResponse(request_headers, serveFromCache());
+    EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
+    EXPECT_EQ(response_decoder->body(), response_body);
+    EXPECT_THAT(response_decoder->headers(), ContainsHeader(Http::CustomHeaders::get().Age, "10"));
+    // The connection manager only sets Date when absent, so the cache-appended value is served.
+    EXPECT_THAT(response_decoder->headers(), ContainsHeader("date", insert_date));
+    // Advance time to force a log flush.
+    simTime().advanceTimeWait(Seconds(1));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+                testing::HasSubstr("RFCF cache.response_from_cache_filter"));
+  }
+}
+
 TEST_P(CacheIntegrationTest, ExpiredValidated) {
   initializeFilter(default_config);
 
@@ -223,6 +260,60 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
         sendHeaderOnlyRequestAwaitResponse(request_headers, serveFromCache());
     EXPECT_THAT(response_decoder->headers(), ContainsHeader(Http::CustomHeaders::get().Age, "1"));
 
+    // Advance time to force a log flush.
+    simTime().advanceTimeWait(Seconds(1));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 2),
+                testing::HasSubstr("RFCF cache.response_from_cache_filter"));
+  }
+}
+
+// Neither the origin response nor its 304 carries a Date
+TEST_P(CacheIntegrationTest, ExpiredValidatedWithoutDateHeader) {
+  initializeFilter(default_config);
+
+  const Http::TestRequestHeaderMapImpl request_headers =
+      httpRequestHeader("GET", /*authority=*/"ExpiredValidatedWithoutDateHeader");
+  const std::string response_body(42, 'a');
+  Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(
+      response_body, /*cache_control=*/"max-age=10", /*extra_headers=*/{{"etag", "abc123"}});
+  response_headers.removeDate();
+
+  {
+    IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
+        request_headers,
+        simulateUpstreamResponse(response_headers, makeOptRef(response_body), empty_trailers_));
+    EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
+    EXPECT_EQ(response_decoder->body(), response_body);
+    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+  }
+
+  simTime().advanceTimeWait(Seconds(11));
+
+  {
+    const std::string validation_date = formatter_.now(simTime());
+    const Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"}};
+
+    IntegrationStreamDecoderPtr response_decoder =
+        sendHeaderOnlyRequestAwaitResponse(request_headers, [&]() {
+          waitForNextUpstreamRequest();
+          Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "abc123"}};
+          EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
+          upstream_request_->encodeHeaders(not_modified_response_headers, /*end_stream=*/true);
+        });
+
+    EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
+    EXPECT_EQ(response_decoder->body(), response_body);
+    EXPECT_THAT(response_decoder->headers(), ContainsHeader("date", validation_date));
+    EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
+  }
+
+  simTime().advanceTimeWait(Seconds(1));
+
+  // Response was validated and should have fresh age
+  {
+    IntegrationStreamDecoderPtr response_decoder =
+        sendHeaderOnlyRequestAwaitResponse(request_headers, serveFromCache());
+    EXPECT_THAT(response_decoder->headers(), ContainsHeader(Http::CustomHeaders::get().Age, "1"));
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 2),
