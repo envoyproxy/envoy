@@ -36,22 +36,31 @@ OAuth2ClientImpl::asyncGetAccessToken(const std::string& client_id, const std::s
   if (in_flight_request_ != nullptr) {
     return GetTokenResult::NotDispatchedAlreadyInFlight;
   }
-  const auto encoded_client_id = Envoy::Http::Utility::PercentEncoding::encode(client_id, ":/=&?");
-  const auto encoded_secret = Envoy::Http::Utility::PercentEncoding::encode(secret, ":/=&?");
+  // Use urlEncode(), not encode(value, ":/=&?"): the request body below is
+  // application/x-www-form-urlencoded, not a URI component, and the two encoding rulesets
+  // differ. encode() with this reserved-char set leaves '+' (and '%', and space) unescaped;
+  // per the x-www-form-urlencoded serialization spec a literal '+' is decoded by
+  // the receiving end as a space, silently corrupting any client_id/secret/scope that contains
+  // one -- which happens routinely, since identity providers commonly issue base64 client
+  // secrets. urlEncode()
+  // implements the x-www-form-urlencoded algorithm directly (percent-encodes everything except
+  // ALPHA | DIGIT | * | - | . | _, with space as %20) and is the correct encoder for this body.
+  const auto encoded_client_id = Envoy::Http::Utility::PercentEncoding::urlEncode(client_id);
+  const auto encoded_secret = Envoy::Http::Utility::PercentEncoding::urlEncode(secret);
 
   Envoy::Http::RequestMessagePtr request = createPostRequest();
   std::string body;
   if (scopes.empty()) {
     body = fmt::format(GetAccessTokenBodyFormatString, encoded_client_id, encoded_secret);
   } else {
-    const auto encoded_scopes = Envoy::Http::Utility::PercentEncoding::encode(scopes, ":/=&?");
+    const auto encoded_scopes = Envoy::Http::Utility::PercentEncoding::urlEncode(scopes);
     body = fmt::format(GetAccessTokenBodyFormatStringWithScopes, encoded_client_id, encoded_secret,
                        encoded_scopes);
   }
 
   for (const auto& [param_name, param_value] : endpoint_params) {
-    const auto encoded_name = Envoy::Http::Utility::PercentEncoding::encode(param_name, ":/=&?");
-    const auto encoded_value = Envoy::Http::Utility::PercentEncoding::encode(param_value, ":/=&?");
+    const auto encoded_name = Envoy::Http::Utility::PercentEncoding::urlEncode(param_name);
+    const auto encoded_value = Envoy::Http::Utility::PercentEncoding::urlEncode(param_value);
     body += fmt::format("&{}={}", encoded_name, encoded_value);
   }
 
