@@ -3,6 +3,8 @@
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/local_address_selectors/filter_state_override/config.h"
 
+#include "test/test_common/status_utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -26,7 +28,7 @@ TEST(ConfigTest, NullUpstreamAddress) {
   upstream_local_addresses.emplace_back(Upstream::UpstreamLocalAddress{nullptr, nullptr});
   const auto endpoint = std::make_shared<const Network::Address::Ipv4Instance>("10.10.10.10");
   const auto selector = factory.createLocalAddressSelector(upstream_local_addresses, std::nullopt);
-  ASSERT_TRUE(selector.ok());
+  ASSERT_OK(selector);
   const auto result = selector.value()->getUpstreamLocalAddress(endpoint, nullptr, {});
   EXPECT_EQ(nullptr, result.address_);
 }
@@ -75,7 +77,7 @@ void validateNamespaceOverride(std::optional<std::string> netns, bool ipv6, Args
   Network::TransportSocketOptionsConstSharedPtr options =
       netns ? optionsWithOverride(*netns) : nullptr;
   const auto selector = factory.createLocalAddressSelector(upstream_local_addresses, std::nullopt);
-  ASSERT_TRUE(selector.ok());
+  ASSERT_OK(selector);
   const auto result = selector.value()->getUpstreamLocalAddress(endpoint, nullptr,
                                                                 makeOptRefFromPtr(options.get()));
   EXPECT_NE(nullptr, result.address_);

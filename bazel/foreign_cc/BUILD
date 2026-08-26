@@ -154,7 +154,7 @@ configure_make(
     env = {
         "AR": "$(AR)",
     },
-    lib_source = "@confluentinc_librdkafka//:all",
+    lib_source = "@librdkafka//:all",
     out_static_libs = [
         "librdkafka.a",
         "librdkafka++.a",
@@ -339,8 +339,9 @@ envoy_cmake(
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
-        "EVENT__DISABLE_OPENSSL": "on",
-        "EVENT__DISABLE_MBEDTLS": "on",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "EVENT__DISABLE_OPENSSL": "ON",
+        "EVENT__DISABLE_MBEDTLS": "ON",
         "EVENT__DISABLE_REGRESS": "on",
         "EVENT__DISABLE_TESTS": "on",
         "EVENT__LIBRARY_TYPE": "STATIC",
@@ -508,16 +509,6 @@ envoy_cmake(
     lib_source = "@libmaxminddb//:all",
     out_static_libs = ["libmaxminddb.a"],
     tags = ["skip_on_windows"],
-)
-
-envoy_cc_library(
-    name = "maxmind_linux_darwin",
-    srcs = [],
-    deps = select({
-        "//bazel:linux": [":maxmind"],
-        "//bazel:darwin_any": [":maxmind"],
-        "//conditions:default": [],
-    }),
 )
 
 configure_make(

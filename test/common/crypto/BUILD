@@ -21,6 +21,7 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 

@@ -15,6 +15,7 @@ envoy_cc_test(
     deps = [
         "//source/common/filesystem:filesystem_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -41,5 +42,6 @@ envoy_cc_test(
         "//source/common/filesystem:watcher_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )

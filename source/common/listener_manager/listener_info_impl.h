@@ -14,12 +14,13 @@ using ListenerMetadataPack =
 class ListenerInfoImpl : public Network::ListenerInfo {
 public:
   explicit ListenerInfoImpl(const envoy::config::listener::v3::Listener& config)
-      : metadata_(config.metadata()), direction_(config.traffic_direction()),
+      : name_(config.name()), metadata_(config.metadata()), direction_(config.traffic_direction()),
         is_quic_(config.udp_listener_config().has_quic_options()),
         bypass_overload_manager_(config.bypass_overload_manager()) {}
   ListenerInfoImpl() = default;
 
   // Network::ListenerInfo
+  absl::string_view name() const override { return name_; }
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
@@ -27,6 +28,7 @@ public:
   bool isQuic() const override { return is_quic_; }
 
 private:
+  const std::string name_;
   const ListenerMetadataPack metadata_;
   const envoy::config::core::v3::TrafficDirection direction_{};
   const bool is_quic_{};

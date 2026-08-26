@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -184,6 +186,7 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -196,6 +199,7 @@ envoy_cc_test(
     deps = [
         ":xds_test_utility_lib",
         "//source/common/config:context_provider_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -257,6 +261,7 @@ envoy_cc_test(
         "//source/common/config:watched_directory_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -299,4 +304,37 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_test(
+    name = "singleton_subscription_adapter_test",
+    srcs = ["singleton_subscription_adapter_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/config:decoded_resource_lib",
+        "//source/common/config:singleton_subscription_adapter_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "xds_resource_decoder_benchmark",
+    srcs = ["xds_resource_decoder_benchmark.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/config:opaque_resource_decoder_lib",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/protobuf:utility_lib",
+        "@benchmark",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "xds_resource_decoder_benchmark_test",
+    benchmark_binary = "xds_resource_decoder_benchmark",
 )

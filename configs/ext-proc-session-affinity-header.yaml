@@ -1,0 +1,76 @@
+# Header-based ext_proc session affinity.
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: origin
+          http_filters:
+          # session-affinity-header-filter-start
+          - name: envoy.filters.http.ext_proc
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+              grpc_service:
+                envoy_grpc:
+                  cluster_name: ext_proc_cluster
+                initial_metadata:
+                - key: x-session-id
+                  value: "%REQ(x-session-id)%"
+          # session-affinity-header-filter-end
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+  - name: origin
+    load_assignment:
+      cluster_name: origin
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8080
+  # session-affinity-header-cluster-start
+  - name: ext_proc_cluster
+    lb_policy: RING_HASH
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        hash_policy:
+        - header:
+            header_name: x-session-id
+    load_assignment:
+      cluster_name: ext_proc_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 50051
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 50052
+# session-affinity-header-cluster-end

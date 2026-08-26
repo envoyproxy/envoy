@@ -2,6 +2,8 @@
 
 #include "source/extensions/filters/http/grpc_json_reverse_transcoder/utils.h"
 
+#include "test/test_common/status_utility.h"
+
 #include "absl/status/statusor.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
@@ -12,6 +14,9 @@ namespace HttpFilters {
 namespace GrpcJsonReverseTranscoder {
 
 namespace {
+
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 TEST(BuildQueryParamString, ReturnsQueryParamString) {
   nlohmann::json object = R"({
 "shelf": {
@@ -103,19 +108,19 @@ TEST(BuildPath, ReturnsPathWithPlaceholdersReplaced) {
   // Check just the path whole message the request body.
   absl::StatusOr<std::string> path =
       BuildPath(request, "/v1/{parent=projects/*}/shelves/{shelf.name}", "*");
-  ASSERT_TRUE(path.ok());
+  ASSERT_OK(path);
   EXPECT_EQ(path.value(), "/v1/projects/123456789/shelves/science-fiction");
 
   // Check the path with a single field as the request body.
   path = BuildPath(request, "/v1/{parent=projects/*}/shelves/{shelf.name}", "shelf");
-  ASSERT_TRUE(path.ok());
+  ASSERT_OK(path);
   EXPECT_EQ(path.value(), "/v1/projects/123456789/shelves/"
                           "science-fiction?books=book1&books=book2&description=This%20is%20a%"
                           "20test%20description&theme=Kids");
 
   // Check path without any body fields.
   path = BuildPath(request, "/v1/{parent=projects/*}/shelves/{shelf.name}", "");
-  ASSERT_TRUE(path.ok());
+  ASSERT_OK(path);
   EXPECT_EQ(path.value(), "/v1/projects/123456789/shelves/"
                           "science-fiction?books=book1&books=book2&"
                           "description=This%20is%20a%20test%20description&"
@@ -128,15 +133,15 @@ TEST(BuildPath, ReturnsPathWithPlaceholdersReplaced) {
 
   // Check the path with a single-segment path variable and a verb.
   path = BuildPath(request, "/v1/{parent}/shelves/{shelf.name}:custom_verb", "*");
-  ASSERT_TRUE(path.ok());
+  ASSERT_OK(path);
   EXPECT_EQ(path.value(), "/v1/projects%2F123456789/shelves/science-fiction:custom_verb");
 
   // Check the path with a param key not found in the request message.
   path = BuildPath(request, "/v1/{parent=projects/*}/shelves/{name}", "*");
-  ASSERT_FALSE(path.ok());
+  ASSERT_THAT(path, Not(IsOk()));
 
   path = BuildPath(request, "/v1/{parent/shelves", "*");
-  ASSERT_FALSE(path.ok());
+  ASSERT_THAT(path, Not(IsOk()));
 }
 
 TEST(NestedJson, GetNestedJsonValuesAsString) {

@@ -18,6 +18,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/utility.h"
 #include "test/test_common/stats_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -275,7 +276,7 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   EXPECT_EQ("200", request("admin", "GET", "/clusters?format=json", response));
   EXPECT_EQ("application/json", contentType(response));
-  EXPECT_TRUE(Json::Factory::loadFromString(response->body()).status().ok());
+  EXPECT_OK(Json::Factory::loadFromString(response->body()).status());
 
   EXPECT_EQ("400", request("admin", "POST", "/cpuprofiler", response));
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));

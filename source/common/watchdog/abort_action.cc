@@ -6,7 +6,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/thread/terminate_thread.h"
+#include "source/common/thread/signal_thread.h"
 
 namespace Envoy {
 namespace Watchdog {

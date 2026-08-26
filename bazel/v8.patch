@@ -125,20 +125,6 @@ diff --git a/src/common/globals.h b/src/common/globals.h
 
  //
  // JavaScript Dispatch Table
-diff --git a/src/compiler/turboshaft/wasm-shuffle-reducer.cc b/src/compiler/turboshaft/wasm-shuffle-reducer.cc
---- a/src/compiler/turboshaft/wasm-shuffle-reducer.cc
-+++ b/src/compiler/turboshaft/wasm-shuffle-reducer.cc
-@@ -461,7 +461,9 @@ void WasmShuffleAnalyzer::ProcessI8x16Shuffle(const OpIndex node) {
-
-   if (!DemandedByteLanes(&shuffle)) {
-     // Full width shuffles.
--    wasm::SimdShuffle::ShuffleArray shuffle_bytes;
-+    // TODO(jwendell): Remove <> workaround once LLVM toolchain is bumped (clang 18
-+    // doesn't support default template args on alias templates without <>).
-+    wasm::SimdShuffle::ShuffleArray<> shuffle_bytes;
-     std::copy_n(shuffle.shuffle, kSimd128Size, shuffle_bytes.begin());
-     auto canonical = wasm::SimdShuffle::TryMatchCanonical(shuffle_bytes);
-     switch (canonical) {
 diff --git a/src/wasm/c-api.cc b/src/wasm/c-api.cc
 index 78e62abb..d7edf951 100644
 --- a/src/wasm/c-api.cc

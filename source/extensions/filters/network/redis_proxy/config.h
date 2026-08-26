@@ -15,7 +15,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/container/flat_hash_map.h"

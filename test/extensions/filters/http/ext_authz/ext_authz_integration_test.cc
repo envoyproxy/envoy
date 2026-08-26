@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_authz is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
@@ -20,6 +23,7 @@
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/file_system_for_test.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -1048,7 +1052,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, PerRouteGrpcServiceConfigurationParsing) {
   absl::Status creation_status = absl::OkStatus();
   Envoy::Extensions::HttpFilters::ExtAuthz::FilterConfigPerRoute config_per_route(per_route_config,
                                                                                   creation_status);
-  ASSERT_TRUE(creation_status.ok());
+  ASSERT_OK(creation_status);
 
   // Verify the configuration was parsed correctly
   ASSERT_TRUE(config_per_route.grpcService().has_value());

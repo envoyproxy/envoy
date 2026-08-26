@@ -13,6 +13,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/stat_sink:__pkg__",
     "//test/extensions/formatter/dynamic_modules:__pkg__",
     "//test/extensions/health_checkers/dynamic_modules:__pkg__",
+    "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
@@ -71,9 +72,13 @@ test_program(name = "health_checker_integration_test")
 
 test_program(name = "upstream_http_tcp_bridge")
 
+test_program(name = "cluster_specifier_integration_test")
+
 test_program(name = "cluster_integration_test")
 
 test_program(name = "cluster_filter_state_test")
+
+test_program(name = "cluster_dynamic_metadata_test")
 
 test_program(name = "stat_sink_integration_test")
 

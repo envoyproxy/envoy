@@ -13,15 +13,23 @@ namespace HttpFilters {
 namespace JsonToMetadata {
 
 class JsonToMetadataConfig
-    : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
+    : public Extensions::HttpFilters::Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata> {
 public:
-  JsonToMetadataConfig() : ExceptionFreeFactoryBase("envoy.filters.http.json_to_metadata") {}
+  JsonToMetadataConfig() : UnifiedFactoryBase("envoy.filters.http.json_to_metadata") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata&,
-      const std::string&, Server::Configuration::FactoryContext&) override;
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+
+  // Shared factory creation used by the listener/cluster and route/vhost-level paths. Stats are
+  // scoped to the given scope.
+  static absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
+      const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
+      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
+
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& config,
