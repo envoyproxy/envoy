@@ -1,0 +1,28 @@
+date: August 26, 2026
+
+bug_fixes:
+- area: ext_proc
+  change: |
+    Fixed multiple lifetime bugs in the external processing (``ext_proc``) filter and the underlying
+    gRPC async client that could lead to use-after-free or double delivery of callbacks. The gRPC
+    :ref:`async client <envoy_v3_api_msg_config.core.v3.GrpcService>` now holds an optional reference to
+    its stream callbacks and drops it once the stream is cleaned up or the owner detaches via
+    ``waitForRemoteCloseAndDelete()``, so a stream that outlives its callbacks (for example while awaiting
+    remote close) no longer invokes callbacks on freed memory. Re-entrant resets during stream
+    initialization are guarded so remote close is not notified (and the tracing span not finished) twice
+    when the cluster is missing or stream creation fails synchronously, and half-close/cleanup no longer
+    dereference a stream that was never established. The ``ext_proc`` ``ThreadLocalStreamManager`` and
+    ``ProcessorStreamImpl`` now close any still-open streams on destruction to avoid dangling references
+    into the underlying gRPC stream.
+- area: tls
+  change: |
+    Fixed a bug where OpenSSL was using glibc's allocator instead of tcmalloc. This
+    resulted in OpenSSL operating on a completely separate heap, defeating
+    tcmalloc's performance benefits on the TLS hot path and making all OpenSSL
+    allocations invisible to tcmalloc heap profiling and memory dumps.
+- area: tls
+  change: |
+    Fixed a memory leak in the OpenSSL compatibility layer where ``SSL_get0_peer_certificates()``
+    called ``SSL_get_peer_certificate()`` without freeing the returned reference. Each call leaked
+    one ``X509`` refcount, preventing the certificate and its sub-allocations from being freed when
+    the connection closed, causing unbounded memory growth in certain deployments.
