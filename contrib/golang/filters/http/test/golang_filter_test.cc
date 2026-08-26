@@ -19,6 +19,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -36,6 +37,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Golang {
+
+using Envoy::StatusHelpers::HasStatus;
 
 class TestFilter : public Filter {
 public:
@@ -87,8 +90,8 @@ public:
     Dso::DsoManager<Dso::HttpFilterDsoImpl>::cleanUpForTest();
   }
 
-  void setup(const std::string& lib_id, const std::string& lib_path,
-             const std::string& plugin_name) {
+  absl::Status setupWithStatus(const std::string& lib_id, const std::string& lib_path,
+                               const std::string& plugin_name) {
     const auto yaml_fmt = R"EOF(
     library_id: %s
     library_path: %s
@@ -108,8 +111,14 @@ public:
 
     envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute per_route_proto_config;
     setupDso(lib_id, lib_path, plugin_name);
-    setupConfig(proto_config, per_route_proto_config, plugin_name);
+    RETURN_IF_NOT_OK(setupConfig(proto_config, per_route_proto_config, plugin_name));
     setupFilter(plugin_name);
+    return absl::OkStatus();
+  }
+
+  void setup(const std::string& lib_id, const std::string& lib_path,
+             const std::string& plugin_name) {
+    ASSERT_TRUE(setupWithStatus(lib_id, lib_path, plugin_name).ok());
   }
 
   std::string genSoPath() {
@@ -121,7 +130,7 @@ public:
     Dso::DsoManager<Dso::HttpFilterDsoImpl>::load(id, path, plugin_name);
   }
 
-  void setupConfig(
+  absl::Status setupConfig(
       envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
       envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& per_route_proto_config,
       std::string plugin_name) {
@@ -129,10 +138,11 @@ public:
     config_ = std::make_shared<FilterConfig>(
         proto_config, Dso::DsoManager<Dso::HttpFilterDsoImpl>::getDsoByPluginName(plugin_name), "",
         context_);
-    config_->newGoPluginConfig();
+    RETURN_IF_NOT_OK(config_->newGoPluginConfig());
     // Setup per route config for Golang filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
+    return absl::OkStatus();
   }
 
   void setupFilter(const std::string& plugin_name) {
@@ -195,8 +205,9 @@ TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
 // invalid config for routeconfig filter
 TEST_F(GolangHttpFilterTest, InvalidConfigForRouteConfigFilter) {
   InSequence s;
-  EXPECT_THROW_WITH_REGEX(setup(ROUTECONFIG, genSoPath(), ROUTECONFIG), EnvoyException,
-                          "golang filter failed to parse plugin config");
+  auto status = setupWithStatus(ROUTECONFIG, genSoPath(), ROUTECONFIG);
+  EXPECT_THAT(status, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("golang filter failed to parse plugin config")));
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/44320.
@@ -228,7 +239,7 @@ TEST_F(GolangHttpFilterTest, BufferedDataAfterDestroyDuringContinue) {
   TestUtility::loadFromYaml(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> mock_context;
   auto config = std::make_shared<FilterConfig>(proto_config, dso_lib, "", mock_context);
-  config->newGoPluginConfig();
+  ASSERT_TRUE(config->newGoPluginConfig().ok());
 
   Network::Address::InstanceConstSharedPtr addr(
       (*Network::Address::PipeInstance::create("/test/test.sock")).release());
@@ -282,7 +293,7 @@ TEST_F(GolangHttpFilterTest, ContinueStatusFromInsideHeaderCgoCallbackPostsToDis
   TestUtility::loadFromYaml(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> mock_context;
   auto config = std::make_shared<FilterConfig>(proto_config, dso_lib, "", mock_context);
-  config->newGoPluginConfig();
+  ASSERT_TRUE(config->newGoPluginConfig().ok());
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> mock_callbacks;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> mock_enc_callbacks;

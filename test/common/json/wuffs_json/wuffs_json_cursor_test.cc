@@ -598,17 +598,25 @@ TEST(WuffsJsonCursorTest, ByteRangeKeyValueFieldString) {
 
 // Depth limit tests
 
-// 8 levels of nesting must be accepted (boundary value for default max_depth=8).
+// 16 levels of nesting must be accepted (boundary value for the tracked
+// depth limit; Gemini streamed root arrays reach depth 9+ through
+// candidates[].content.parts[].functionCall.args).
 TEST(WuffsJsonCursorTest, MaxDepthAccepted) {
   CapturingHandler h;
-  // 8 nested objects, scalar at the innermost level.
-  EXPECT_OK(parse(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}})", h));
+  // 16 nested objects, scalar at the innermost level.
+  EXPECT_OK(parse(
+      R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}}}}}}}}})",
+      h));
 }
 
-// 9 levels of nesting must be rejected (fail-closed).
+// 17 levels of nesting must be rejected (fail-closed).
 TEST(WuffsJsonCursorTest, ExceedMaxDepthRejected) {
   CapturingHandler h;
-  EXPECT_THAT(parse(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}})", h), Not(IsOk()));
+  EXPECT_THAT(
+      parse(
+          R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}}}}}}}}}})",
+          h),
+      Not(IsOk()));
 }
 
 // Path-tracking tests

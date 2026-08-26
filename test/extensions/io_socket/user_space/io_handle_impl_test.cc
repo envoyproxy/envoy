@@ -8,12 +8,15 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "absl/container/fixed_array.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
 using testing::NiceMock;
+using testing::Pair;
 
 namespace Envoy {
 namespace Extensions {
@@ -1201,8 +1204,9 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   envoy::config::core::v3::Metadata dest_metadata;
   ASSERT_NE(nullptr, io_handle_peer_->passthroughState());
   io_handle_peer_->passthroughState()->mergeInto(dest_metadata, dest_filter_state);
-  ASSERT_EQ("val",
-            dest_metadata.filter_metadata().at("envoy.test").fields().at("key").string_value());
+  ASSERT_THAT(
+      dest_metadata.filter_metadata(),
+      Contains(Pair("envoy.test", HasStructFields(Contains(IsStructString("key", "val"))))));
   auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
   ASSERT_NE(nullptr, dest_object);
   ASSERT_EQ(object->value_, dest_object->value_);

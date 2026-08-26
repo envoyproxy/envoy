@@ -23,14 +23,3 @@ envoy_extension_cc_test(
         "@nlohmann_json//:json",
     ],
 )
-
-envoy_extension_cc_test(
-    name = "schema_registry_test",
-    srcs = ["schema_registry_test.cc"],
-    extension_names = ["envoy.filters.http.ai_protocol_manager"],
-    rbe_pool = "6gig",
-    deps = [
-        "//source/extensions/filters/http/ai_protocol_manager/schema:schema_registry_lib",
-        "//test/test_common:status_utility_lib",
-    ],
-)

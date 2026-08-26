@@ -2,12 +2,21 @@ diff --git a/bazel/pgv_proto_library.bzl b/bazel/pgv_proto_library.bzl
 index b8fb865..9a7e361 100644
 --- a/bazel/pgv_proto_library.bzl
 +++ b/bazel/pgv_proto_library.bzl
-@@ -48,7 +48,7 @@ def pgv_cc_proto_library(
+@@ -22,4 +22,6 @@ def pgv_cc_proto_library(
+         deps = [],
+         cc_deps = [],
+         copts = [],
++        re2 = None,
++        protobuf = None,
+         **kargs):
+@@ -47,8 +49,8 @@ def pgv_cc_proto_library(
+             ":" + name + "_cc_proto",
              "@com_envoyproxy_protoc_gen_validate//validate:cc_validate",
              "@com_envoyproxy_protoc_gen_validate//validate:validate_cc",
-             "@com_google_protobuf//:protobuf",
+-            "@com_google_protobuf//:protobuf",
 -            "@com_googlesource_code_re2//:re2",
-+            "@re2",
++            protobuf or "@com_google_protobuf//:protobuf",
++            re2 or "@com_googlesource_code_re2//:re2",
          ],
          copts = copts + select({
              "@com_envoyproxy_protoc_gen_validate//bazel:windows_x86_64": ["-DWIN32"],
@@ -15,7 +24,7 @@ diff --git a/bazel/protobuf.bzl b/bazel/protobuf.bzl
 index 1a41f68..4d95b0d 100644
 --- a/bazel/protobuf.bzl
 +++ b/bazel/protobuf.bzl
-@@ -107,11 +107,11 @@ cc_proto_gen_validate = rule(
+@@ -107,7 +107,7 @@ cc_proto_gen_validate = rule(
              providers = [ProtoInfo],
          ),
          "_validate_deps": attr.label_list(
@@ -24,8 +33,3 @@ index 1a41f68..4d95b0d 100644
          ),
          "_protoc": attr.label(
              cfg = "exec",
--            default = Label("@com_google_protobuf//:protoc"),
-+            default = Label("@com_google_protobuf//:protoc"),
-             executable = True,
-             allow_single_file = True,
-         ),

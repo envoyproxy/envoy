@@ -2,7 +2,8 @@ load("@base_pip3//:requirements.bzl", "requirement")
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@envoy_toolshed//dependency:reachability.bzl", "dependency_reachability")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
@@ -35,7 +36,7 @@ json_merge(
     srcs = ["//bazel:all_repository_locations"],
     filter = """
     .[0]
-    | del(.confluentinc_librdkafka)
+    | del(.librdkafka)
     """,
     visibility = ["//visibility:public"],
 )
@@ -82,27 +83,41 @@ py_console_script_binary(
     script = "dependatool",
 )
 
-py_binary(
-    name = "validate",
-    srcs = ["validate.py"],
-    args = [
-        "$(location //bazel:all_repository_locations)",
-        "$(location //source/extensions:extensions_build_config)",
-    ],
-    data = [
-        "//bazel:all_repository_locations",
-        "//source/extensions:extensions_build_config",
-    ],
-    deps = [
-        "@envoy_repo",
-        requirement("aio.api.bazel"),
+# Core-only root: used to compute the "core" dep set (deps of non-extension
+# production code).  Extension-marginal deps are computed as
+# (all-extensions reachable) minus (core reachable).
+dependency_reachability(
+    name = "dep-reachability-core",
+    roots = [
+        "//source/exe:envoy_main_common_with_core_extensions_lib",
     ],
 )
 
-py_binary(
-    name = "validate_test",
-    srcs = ["validate_test.py"],
-    deps = [":validate"],
+# All-extensions root: traverses every extension so that validate_extension_deps
+# actually observes non-core extension deps.  This is the primary reachability
+# data used by all checks.
+dependency_reachability(
+    name = "dep-reachability",
+    roots = [
+        "//source/exe:main_common_with_all_extensions_lib",
+    ],
+)
+
+py_test(
+    name = "validate_reachability_test",
+    srcs = ["validate_reachability_test.py"],
+    data = [
+        ":dep-reachability",
+        ":dep-reachability-core",
+        "//bazel:all_repository_locations",
+        "//source/extensions:extensions_build_config",
+    ],
+    env = {
+        "REACHABILITY_JSON": "$(location :dep-reachability)",
+        "CORE_REACHABILITY_JSON": "$(location :dep-reachability-core)",
+        "REPOSITORY_LOCATIONS_JSON": "$(location //bazel:all_repository_locations)",
+        "EXTENSIONS_BUILD_CONFIG_JSON": "$(location //source/extensions:extensions_build_config)",
+    },
 )
 
 json_merge(

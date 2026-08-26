@@ -113,6 +113,8 @@ void ReverseConnectionIOHandle::cleanup() {
                  "reverse_tunnel: resetting file events before closing trigger pipe; "
                  "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
                  trigger_pipe_write_fd_, trigger_pipe_read_fd_);
+  // The worker dispatcher is destroyed before this handle during server teardown.
+  worker_dispatcher_ = nullptr;
   resetFileEvents();
   SET_SOCKET_INVALID(trigger_pipe_read_fd_);
 
@@ -392,11 +394,21 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
               fd_);
   }
 
-  if (rev_conn_retry_timer_) {
+  // Avoid destroying the worker-owned timer from another thread.
+  if (rev_conn_retry_timer_ != nullptr &&
+      (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe())) {
     rev_conn_retry_timer_.reset();
   }
 
   return IoSocketHandleImpl::close();
+}
+
+void ReverseConnectionIOHandle::resetFileEvents() {
+  // Stop redials on the timer's worker before the listener closes.
+  if (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe()) {
+    rev_conn_retry_timer_.reset();
+  }
+  IoSocketHandleImpl::resetFileEvents();
 }
 
 void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
@@ -911,10 +923,17 @@ void ReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement(
     return;
   }
 
-  // Dial the replacement on the next dispatcher pass instead of waiting for the periodic tick.
-  if (rev_conn_retry_timer_ != nullptr) {
-    rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(0));
+  // A stopped listener has no retry timer.
+  if (rev_conn_retry_timer_ == nullptr) {
+    ENVOY_LOG(debug,
+              "reverse_tunnel: skipping replacement dial for {}; retry timer is gone "
+              "(listener stop)",
+              connection_key);
+    return;
   }
+
+  // Dial the replacement on the next dispatcher pass instead of waiting for the periodic tick.
+  rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(0));
 }
 
 void ReverseConnectionIOHandle::updateStateGauge(const std::string& host_address,
