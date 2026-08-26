@@ -67,6 +67,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/api:api_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:custom_stat_namespaces_lib",
         "//source/server:configuration_lib",
         "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",

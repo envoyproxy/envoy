@@ -28,6 +28,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
+using testing::Key;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -4863,11 +4867,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
 
   // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+  EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
 }
 
 // When a refresh flow succeeds, but a new refresh token isn't received from the OAuth server, the
@@ -4939,11 +4939,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenNoNewRefreshToken) 
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
 
   // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+  EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
 }
 
 TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
@@ -5029,11 +5025,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
   EXPECT_EQ(cookies.at("IdToken"), "idToken");
 
   // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+  EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
 }
 
 // Test all cookies with STRICT SameSite
@@ -5562,11 +5554,7 @@ TEST_F(OAuth2Test, CookiesDecryptedBeforeForwarding) {
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
 
   // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+  EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
 }
 
 // Verifies that requests matching the pass_through_matcher configuration are not modified by the
@@ -5823,12 +5811,12 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
     bool found_nonce = false, found_code_verifier = false;
     for (const auto& cookie : cookies) {
       if (cookie.find("OauthNonce.00000000075bcd15=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/auth/callback;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/auth/callback;"))
             << "OauthNonce should have path=/auth/callback, got: " << cookie;
         found_nonce = true;
       }
       if (cookie.find("CodeVerifier.00000000075bcd15=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/auth/callback;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/auth/callback;"))
             << "CodeVerifier should have path=/auth/callback, got: " << cookie;
         found_code_verifier = true;
       }
@@ -5890,17 +5878,17 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
     bool found_hmac = false, found_bearer = false, found_expires = false;
     for (const auto& cookie : cookies) {
       if (cookie.find("OauthHMAC=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/app;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/app;"))
             << "OauthHMAC should have path=/app, got: " << cookie;
         found_hmac = true;
       }
       if (cookie.find("BearerToken=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/app;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/app;"))
             << "BearerToken should have path=/app, got: " << cookie;
         found_bearer = true;
       }
       if (cookie.find("OauthExpires=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/app;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/app;"))
             << "OauthExpires should have path=/app, got: " << cookie;
         found_expires = true;
       }
@@ -5956,22 +5944,22 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
          found_expires_delete = false;
     for (const auto& cookie : cookies) {
       if (cookie.find("OauthHMAC=deleted") != std::string::npos) {
-        EXPECT_NE(cookie.find("path=/app"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr("path=/app"))
             << "OauthHMAC deletion should have path=/app, got: " << cookie;
         found_hmac_delete = true;
       }
       if (cookie.find("OauthExpires=deleted") != std::string::npos) {
-        EXPECT_NE(cookie.find("path=/app"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr("path=/app"))
             << "OauthExpires deletion should have path=/app, got: " << cookie;
         found_expires_delete = true;
       }
       if (cookie.find("OauthNonce.00000000075bcd15=deleted") != std::string::npos) {
-        EXPECT_NE(cookie.find("path=/auth/callback"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr("path=/auth/callback"))
             << "OauthNonce deletion should have path=/auth/callback, got: " << cookie;
         found_nonce_delete = true;
       }
       if (cookie.find("CodeVerifier.00000000075bcd15=deleted") != std::string::npos) {
-        EXPECT_NE(cookie.find("path=/auth/callback"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr("path=/auth/callback"))
             << "CodeVerifier deletion should have path=/auth/callback, got: " << cookie;
         found_code_verifier_delete = true;
       }
@@ -6074,12 +6062,7 @@ TEST_F(OAuth2Test, AllowFailedWithInvalidRefreshTokenAsyncFailure) {
 
   // Verify OAuth token and flow cookies were removed
   auto cookies = Http::Utility::parseCookies(request_headers);
-  EXPECT_TRUE(cookies.find("BearerToken") == cookies.end());
-  EXPECT_TRUE(cookies.find("OauthHMAC") == cookies.end());
-  EXPECT_TRUE(cookies.find("OauthExpires") == cookies.end());
-  EXPECT_TRUE(cookies.find("RefreshToken") == cookies.end());
-  EXPECT_TRUE(cookies.find("OauthNonce.00000000075bcd15") == cookies.end());
-  EXPECT_TRUE(cookies.find("CodeVerifier.00000000075bcd15") == cookies.end());
+  EXPECT_THAT(cookies, UnorderedElementsAre());
 
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_refreshtoken_failure").value(), 1);

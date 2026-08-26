@@ -20,6 +20,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/json_to_metadata:json_to_metadata_lib",
         "//test/common/stream_info:test_util",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

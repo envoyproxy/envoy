@@ -13,14 +13,21 @@ using testing::_;
 using testing::An;
 using testing::AnyNumber;
 using testing::AtLeast;
+using testing::Bool;
+using testing::Contains;
 using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::IsNull;
 using testing::Mock;
+using testing::Optional;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrEq;
+
+#include "test/test_common/struct_matchers.h"
 
 namespace Envoy {
 namespace Http {
@@ -2716,7 +2723,7 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
   EXPECT_CALL(*handler, log(_, _))
       .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         auto dynamic_meta = stream_info.dynamicMetadata().filter_metadata().at("metadata_key");
-        EXPECT_EQ("value", dynamic_meta.fields().at("field").string_value());
+        EXPECT_THAT(dynamic_meta.fields(), Contains(IsStructString("field", "value")));
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -3105,7 +3112,7 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
             EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
             EXPECT_EQ(stream_info.requestComplete(), std::nullopt);
             EXPECT_THAT(stream_info.getDownstreamBytesMeter()->bytesAtLastDownstreamPeriodicLog(),
-                        testing::IsNull());
+                        IsNull());
           }))
       .WillOnce(Invoke(
           [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
@@ -3126,9 +3133,8 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
           [&](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {
             EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
             EXPECT_EQ(&decoder_->streamInfo(), &stream_info);
-            EXPECT_THAT(stream_info.responseCodeDetails(),
-                        testing::Optional(testing::StrEq("details")));
-            EXPECT_THAT(stream_info.responseCode(), testing::Optional(200));
+            EXPECT_THAT(stream_info.responseCodeDetails(), Optional(StrEq("details")));
+            EXPECT_THAT(stream_info.responseCode(), Optional(200));
             EXPECT_EQ(stream_info.getDownstreamBytesMeter()
                           ->bytesAtLastDownstreamPeriodicLog()
                           ->wire_bytes_received,
@@ -3292,6 +3298,101 @@ TEST_F(HttpConnectionManagerImplTest, NoPath) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+}
+
+// RFC 10008 Section 2 requires servers to fail a QUERY request whose Content-Type is missing.
+TEST_F(HttpConnectionManagerImplTest, QueryWithoutContentType) {
+  setup();
+
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        FilterFactoryCb handler_factory = createLogHandlerFactoryCb(handler);
+        callbacks.setFilterConfigName("");
+        handler_factory(callbacks);
+        return true;
+      }));
+
+  EXPECT_CALL(*handler, log(_, _))
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ("query_missing_content_type", stream_info.responseCodeDetails().value());
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "QUERY"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// A present but empty Content-Type is as absent as a missing one.
+TEST_F(HttpConnectionManagerImplTest, QueryWithEmptyContentType) {
+  setup();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/"}, {":method", "QUERY"}, {"content-type", ""}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// A QUERY request that carries a Content-Type reaches the filter chain.
+TEST_F(HttpConnectionManagerImplTest, QueryWithContentType) {
+  setup();
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        FilterFactoryCb factory = createDecoderFilterFactoryCb(filter);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_EQ("QUERY", headers.getMethodValue());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
+                                                             {":path", "/"},
+                                                             {":method", "QUERY"},
+                                                             {"content-type", "application/sql"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*filter, onStreamComplete());
+  EXPECT_CALL(*filter, onDestroy());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 // No idle timeout when route idle timeout is implied at both global and
@@ -3790,7 +3891,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(IdleAndFlushTimeoutTestFixture, IdleAndFlushTimeoutTestFixture,
-                         testing::Combine(testing::Bool(), testing::Bool(), testing::Bool()),
+                         testing::Combine(Bool(), Bool(), Bool()),
                          [](const testing::TestParamInfo<std::tuple<bool, bool, bool>>& info) {
                            return absl::StrCat(std::get<0>(info.param) ? "GlobalFlushTimeoutSet"
                                                                        : "NoGlobalFlushTimeout",
