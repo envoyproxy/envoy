@@ -57,6 +57,7 @@ void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeade
                                                                       "te",
                                                                       "keep-alive",
                                                                       "transfer-encoding",
+                                                                      "trailer",
                                                                       "proxy-connection",
                                                                       "proxy-authenticate",
                                                                       "proxy-authorization"};
