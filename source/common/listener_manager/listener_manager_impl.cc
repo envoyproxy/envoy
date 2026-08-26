@@ -617,9 +617,7 @@ absl::Status ListenerManagerImpl::setupSocketFactoryForListener(
     RETURN_IF_NOT_OK(new_listener.cloneSocketFactoryFrom(existing_listener));
   }
 
-  RETURN_IF_NOT_OK(initializeWorkerRoutingForUdpListener(new_listener, in_place_update));
-
-  return absl::OkStatus();
+  return initializeWorkerRoutingForUdpListener(new_listener, in_place_update);
 }
 
 absl::Status ListenerManagerImpl::initializeWorkerRoutingForUdpListener(ListenerImpl& new_listener,
