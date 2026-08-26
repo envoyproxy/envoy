@@ -72,7 +72,7 @@ Coroutine::Coroutine(Pool::Thread thread, Pool& pool) : thread_(thread), pool_(p
 
 Coroutine::~Coroutine() {
   // A thread that never started is pristine, and one that finished cleanly can start a fresh
-  // body. Errored cannot be resumed at all, and Yielded would resume the body it was in the
+  // body. `Errored` cannot be resumed at all, and `Yielded` would resume the body it was in the
   // middle of.
   pool_.release(thread_, state_ == State::NotStarted || state_ == State::Finished);
 }

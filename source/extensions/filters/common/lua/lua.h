@@ -450,7 +450,7 @@ public:
   public:
     // Bounds retention. The pool only ever holds threads that are idle, so its natural size is
     // the peak number of concurrent streams on this worker; the cap stops a burst from pinning
-    // that many threads for the life of the worker. It bounds the count, not the memory: LuaJIT
+    // that many threads for the life of the worker. It bounds the count, not the memory: `LuaJIT`
     // shrinks an idle thread's stack when it traverses it, so a thread that once ran a
     // stack-hungry script does not go on holding that stack here.
     static constexpr size_t MaxSize = 256;
@@ -458,7 +458,7 @@ public:
     struct Thread {
       int ref;
       // Held alongside the reference so that reusing a thread costs no Lua C API calls at all.
-      // The reference is what keeps the thread reachable while it waits here, and LuaJIT's
+      // The reference is what keeps the thread reachable while it waits here, and the `LuaJIT`
       // collector does not move objects, so this cannot go stale.
       lua_State* state;
     };
@@ -479,7 +479,8 @@ public:
     std::vector<Thread> idle_;
   };
 
-  // Errored is terminal and distinct from Finished: such a thread cannot be resumed again at all.
+  // `Errored` is terminal and distinct from `Finished`: such a thread cannot be resumed again
+  // at all.
   enum class State { NotStarted, Yielded, Finished, Errored };
 
   // `pool` is where this coroutine's thread is returned on destruction, and must outlive this
