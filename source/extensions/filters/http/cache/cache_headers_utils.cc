@@ -207,6 +207,15 @@ SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
   return {};
 }
 
+void CacheHeadersUtils::ensureDateHeader(Http::ResponseHeaderMap& headers,
+                                         const SystemTime response_time) {
+  if (!DateUtil::timePointValid(httpTime(headers.Date()))) {
+    // Sender must use IMF-fixdate, see https://www.rfc-editor.org/rfc/rfc9110#section-5.6.7
+    static const DateFormatter formatter("%a, %d %b %Y %H:%M:%S GMT");
+    headers.setDate(formatter.fromTime(response_time));
+  }
+}
+
 Seconds CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
                                         const SystemTime response_time, const SystemTime now) {
   // Age headers calculations follow: https://httpwg.org/specs/rfc7234.html#age.calculations
