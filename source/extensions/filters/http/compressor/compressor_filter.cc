@@ -768,7 +768,7 @@ bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
 
 bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(absl::string_view value) const {
 
-  // If both configuration lists are empty, go for default behavior.
+  // Default content types are normally always populated, but return true if empty.
   if (content_type_matchers_.empty()) {
     return true;
   }
