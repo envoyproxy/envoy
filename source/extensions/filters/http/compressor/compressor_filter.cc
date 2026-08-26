@@ -100,20 +100,57 @@ CompressorFilterConfig::DirectionConfig::DirectionConfig(
     Server::Configuration::CommonFactoryContext& context)
     : compression_enabled_(proto_config.enabled(), runtime),
       min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
-      content_type_values_(contentTypeSet(proto_config.content_type(),
-                                          !proto_config.content_type_matcher().empty())),
-      content_type_matchers_(contentTypeMatcherList(proto_config.content_type_matcher(), context)),
+      content_type_matchers_(contentTypeMatcherList(proto_config.content_type(),
+                                                    proto_config.content_type_matcher(), context)),
       stats_{generateStats(stats_prefix, scope)} {}
 
 std::vector<Matchers::StringMatcherPtr>
 CompressorFilterConfig::DirectionConfig::contentTypeMatcherList(
+    const Protobuf::RepeatedPtrField<std::string>& content_types,
     const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& matchers,
     Server::Configuration::CommonFactoryContext& context) {
   std::vector<Matchers::StringMatcherPtr> list;
-  list.reserve(matchers.size());
-  for (const auto& matcher : matchers) {
-    list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
+
+  const bool has_matchers = !matchers.empty();
+  const bool has_legacy_types = !content_types.empty();
+
+  // If both are empty, use default content types as exact matchers
+  if (!has_matchers && !has_legacy_types) {
+    const auto& default_content_encodings = defaultContentEncoding();
+    list.reserve(default_content_encodings.size());
+    for (const auto& type : default_content_encodings) {
+      envoy::type::matcher::v3::StringMatcher matcher;
+      matcher.set_exact(type);
+      matcher.set_ignore_case(true); // We can force lowercasing of the default content types
+      list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
+    }
+    return list;
   }
+
+  // If both are set, log a warning and let the new content_type_matcher take precedence
+  if (has_matchers && has_legacy_types) {
+    ENVOY_LOG_MISC(warn, "Both content_type and content_type_matcher are specified. "
+                         "content_type_matcher takes precedence.");
+  }
+
+  // Populate from content_type_matcher if present
+  if (has_matchers) {
+    list.reserve(matchers.size());
+    for (const auto& matcher : matchers) {
+      list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
+    }
+  }
+  // Fall back to legacy content_type strings converted into exact matchers
+  else if (has_legacy_types) {
+    list.reserve(content_types.size());
+    for (const auto& type : content_types) {
+      envoy::type::matcher::v3::StringMatcher matcher;
+      matcher.set_exact(type);
+      matcher.set_ignore_case(true); // We can force lowercasing of the legacy content types
+      list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
+    }
+  }
+
   return list;
 }
 
@@ -130,18 +167,6 @@ CompressorFilterConfig::CompressorFilterConfig(
       content_encoding_(compressor_factory->contentEncoding()),
       compressor_factory_(std::move(compressor_factory)),
       choose_first_(proto_config.choose_first()) {}
-
-StringUtil::CaseUnorderedSet CompressorFilterConfig::DirectionConfig::contentTypeSet(
-    const Protobuf::RepeatedPtrField<std::string>& types, bool has_matchers) {
-  const auto& default_content_encodings = defaultContentEncoding();
-
-  if (types.empty() && !has_matchers) {
-    return StringUtil::CaseUnorderedSet(default_content_encodings.begin(),
-                                        default_content_encodings.end());
-  }
-
-  return StringUtil::CaseUnorderedSet(types.cbegin(), types.cend());
-}
 
 uint32_t CompressorFilterConfig::DirectionConfig::contentLengthUint(Protobuf::uint32 length) {
   return length > 0 ? length : DefaultMinimumContentLength;
@@ -744,22 +769,14 @@ bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
 bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(absl::string_view value) const {
 
   // If both configuration lists are empty, go for default behavior.
-  if (content_type_values_.empty() && content_type_matchers_.empty()) {
-    return true;
-  }
-
-  // Check explicit content_type set if populated
-  if (!content_type_values_.empty() &&
-      content_type_values_.find(value) != content_type_values_.end()) {
+  if (content_type_matchers_.empty()) {
     return true;
   }
 
   // Check content_type_matcher list if populated
-  if (!content_type_matchers_.empty()) {
-    for (const auto& matcher : content_type_matchers_) {
-      if (matcher->match(value)) {
-        return true;
-      }
+  for (const auto& matcher : content_type_matchers_) {
+    if (matcher->match(value)) {
+      return true;
     }
   }
 

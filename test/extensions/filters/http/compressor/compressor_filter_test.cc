@@ -337,8 +337,10 @@ TEST_F(CompressorFilterTest, DefaultConfigValues) {
   EXPECT_EQ(false, config_->responseDirectionConfig().disableOnEtagHeader());
   EXPECT_EQ(false, config_->responseDirectionConfig().removeAcceptEncodingHeader());
   EXPECT_EQ(false, config_->responseDirectionConfig().statusHeaderEnabled());
-  EXPECT_EQ(20, config_->responseDirectionConfig().contentTypeValues().size());
-  EXPECT_EQ(20, config_->requestDirectionConfig().contentTypeValues().size());
+  EXPECT_TRUE(config_->responseDirectionConfig().isContentTypeAllowed("text/html"));
+  EXPECT_FALSE(config_->responseDirectionConfig().isContentTypeAllowed("not-in/default-list"));
+  EXPECT_TRUE(config_->requestDirectionConfig().isContentTypeAllowed("text/html"));
+  EXPECT_FALSE(config_->requestDirectionConfig().isContentTypeAllowed("not-in/default-list"));
 }
 
 TEST_F(CompressorFilterTest, CacheIdentityDecision) {

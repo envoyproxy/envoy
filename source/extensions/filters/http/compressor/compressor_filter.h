@@ -78,7 +78,6 @@ public:
     virtual bool compressionEnabled() const PURE;
 
     const CompressorStats& stats() const { return stats_; }
-    const StringUtil::CaseUnorderedSet& contentTypeValues() const { return content_type_values_; }
     uint32_t minimumLength() const { return min_content_length_; }
     bool isMinimumContentLength(const Http::RequestOrResponseHeaderMap& headers) const;
     bool isContentTypeAllowed(const Http::RequestOrResponseHeaderMap& headers) const;
@@ -97,11 +96,11 @@ public:
     static StringUtil::CaseUnorderedSet
     contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types, bool has_matchers);
     static std::vector<Matchers::StringMatcherPtr> contentTypeMatcherList(
+        const Protobuf::RepeatedPtrField<std::string>& content_types,
         const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& matchers,
         Server::Configuration::CommonFactoryContext& context);
 
     const uint32_t min_content_length_;
-    const StringUtil::CaseUnorderedSet content_type_values_;
     const std::vector<Matchers::StringMatcherPtr> content_type_matchers_;
     const CompressorStats stats_;
   };

@@ -104,12 +104,12 @@ struct CompressionParams {
   uint64_t memory_level;
 };
 
-CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
-                                               testing::NiceMock<Runtime::MockLoader>& runtime,
-                                               const CompressionParams& params) {
+CompressorFilterConfigSharedPtr
+makeGzipConfig(Stats::IsolatedStoreImpl& stats, testing::NiceMock<Runtime::MockLoader>& runtime,
+               testing::NiceMock<Server::Configuration::MockServerFactoryContext>& context,
+               const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   const auto level =
       static_cast<Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel>(
@@ -127,12 +127,12 @@ CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
   return config;
 }
 
-CompressorFilterConfigSharedPtr makeZstdConfig(Stats::IsolatedStoreImpl& stats,
-                                               testing::NiceMock<Runtime::MockLoader>& runtime,
-                                               const CompressionParams& params) {
+CompressorFilterConfigSharedPtr
+makeZstdConfig(Stats::IsolatedStoreImpl& stats, testing::NiceMock<Runtime::MockLoader>& runtime,
+               testing::NiceMock<Server::Configuration::MockServerFactoryContext>& context,
+               const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   const auto level = params.level;
   const auto strategy = params.strategy;
@@ -144,12 +144,12 @@ CompressorFilterConfigSharedPtr makeZstdConfig(Stats::IsolatedStoreImpl& stats,
   return config;
 }
 
-CompressorFilterConfigSharedPtr makeBrotliConfig(Stats::IsolatedStoreImpl& stats,
-                                                 testing::NiceMock<Runtime::MockLoader>& runtime,
-                                                 const CompressionParams& params) {
+CompressorFilterConfigSharedPtr
+makeBrotliConfig(Stats::IsolatedStoreImpl& stats, testing::NiceMock<Runtime::MockLoader>& runtime,
+                 testing::NiceMock<Server::Configuration::MockServerFactoryContext>& context,
+                 const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   const auto quality = params.level;
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
@@ -211,18 +211,19 @@ static Result compressWith(enum CompressorLibs lib, std::vector<Buffer::OwnedImp
   auto start = std::chrono::high_resolution_clock::now();
   Stats::IsolatedStoreImpl stats;
   testing::NiceMock<Runtime::MockLoader> runtime;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   CompressorFilterConfigSharedPtr config;
   std::string compressor = "";
   std::string encoding = "";
   if (lib == CompressorLibs::Brotli) {
-    config = makeBrotliConfig(stats, runtime, params);
+    config = makeBrotliConfig(stats, runtime, context, params);
     encoding = "br";
     compressor = "brotli";
   } else if (lib == CompressorLibs::Gzip) {
-    config = makeGzipConfig(stats, runtime, params);
+    config = makeGzipConfig(stats, runtime, context, params);
     encoding = compressor = "gzip";
   } else if (lib == CompressorLibs::Zstd) {
-    config = makeZstdConfig(stats, runtime, params);
+    config = makeZstdConfig(stats, runtime, context, params);
     encoding = compressor = "zstd";
   }
 
