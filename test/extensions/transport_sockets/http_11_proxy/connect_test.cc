@@ -61,6 +61,12 @@ public:
     initializeInternal(false, true, {}, with_hostname, false, auth_value);
   }
 
+  // Initialize with proxy address metadata and a wrongly-typed
+  // envoy.http11_proxy_transport_socket.proxy_authorization value (not StringValue).
+  void initializeWithMalformedAuthMetadata() {
+    initializeInternal(false, true, {}, false, false, "", true);
+  }
+
   // Initialize the test with the proxy address provided via default proxy address.
   void initializeWithDefaultProxy(bool with_hostname = false) {
     initializeInternal(false, false, {}, with_hostname, true);
@@ -110,7 +116,8 @@ public:
 private:
   void initializeInternal(bool no_proxy_protocol, bool use_metadata_proxy_addr,
                           std::optional<uint32_t> target_port, bool with_hostname = false,
-                          bool use_default_proxy_addr = false, const std::string& auth_value = "") {
+                          bool use_default_proxy_addr = false, const std::string& auth_value = "",
+                          bool use_malformed_auth = false) {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
     Network::Address::InstanceConstSharedPtr address =
@@ -134,7 +141,14 @@ private:
         std::ignore = anypb.PackFrom(addr_proto);
         metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, anypb));
 
-        if (!auth_value.empty()) {
+        if (use_malformed_auth) {
+          // Pack Address instead of StringValue so the MessageUtil::unpackTo call fails.
+          const std::string auth_key =
+              Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH;
+          Protobuf::Any auth_anypb;
+          std::ignore = auth_anypb.PackFrom(addr_proto);
+          metadata->mutable_typed_filter_metadata()->emplace(auth_key, auth_anypb);
+        } else if (!auth_value.empty()) {
           const std::string auth_key =
               Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_AUTH;
           Protobuf::StringValue auth_proto;
@@ -839,6 +853,29 @@ TEST_P(Http11ConnectTest, NoProxyAuthHeaderWhenAuthMetadataAbsent) {
   Buffer::OwnedImpl expected_legacy_data{expected_connect_string};
 
   EXPECT_CALL(io_handle_, write(BufferString(expected_legacy_data.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoError::none());
+      }));
+
+  Buffer::OwnedImpl msg("data");
+  connect_socket_->doWrite(msg, false);
+}
+
+// Test that a wrongly-typed envoy.http11_proxy_transport_socket.proxy_authorization value
+// (not google.protobuf.StringValue) is ignored. The CONNECT request will be sent with no
+// Proxy-Authorization header.
+TEST_P(Http11ConnectTest, NoProxyAuthHeaderWhenAuthMetadataWrongType) {
+  initializeWithMalformedAuthMetadata();
+
+  const std::string address_str =
+      absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
+  const std::string expected_connect_string =
+      absl::StrCat("CONNECT ", address_str, " HTTP/1.1\r\nHost: ", address_str, "\r\n\r\n");
+  Buffer::OwnedImpl expected_connect_data{expected_connect_string};
+
+  EXPECT_CALL(io_handle_, write(BufferString(expected_connect_data.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) {
         auto length = buffer.length();
         buffer.drain(length);

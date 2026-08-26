@@ -112,10 +112,10 @@ inline void UpstreamHttp11ConnectSocket::handleHostMetadataConnect(
       if (MessageUtil::unpackTo(auth_it->second, auth_value).ok()) {
         authorization = auth_value.value();
       } else {
-        ENVOY_CONN_LOG(trace,
-                       "Failed to unpack Proxy-Authorization string from host metadata, "
-                       "proceeding with empty authorization",
-                       callbacks_->connection());
+        ENVOY_LOG(trace,
+                  "Failed to unpack Proxy-Authorization string from host metadata, "
+                  "proceeding with empty authorization for host {}",
+                  host->hostname());
       }
     }
   }
