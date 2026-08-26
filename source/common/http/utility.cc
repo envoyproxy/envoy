@@ -13,11 +13,9 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
-#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
-#include "source/common/common/random_generator.h"
 #include "source/common/common/utility.h"
 #include "source/common/grpc/status.h"
 #include "source/common/http/character_set_validation.h"
@@ -28,7 +26,6 @@
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
@@ -1235,15 +1232,6 @@ void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   headers.setUpgrade(headers.getProtocolValue());
   headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
   headers.removeProtocol();
-
-  // RFC 8441 does not use Sec-WebSocket-Key, but an HTTP/1 upstream requires it.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.websocket_synthesize_key_on_h2_downgrade") &&
-      isWebSocketUpgradeRequest(headers) && headers.get(Headers::get().SecWebSocketKey).empty()) {
-    const uint64_t nonce[2] = {Random::RandomUtility::random(), Random::RandomUtility::random()};
-    headers.setCopy(Headers::get().SecWebSocketKey,
-                    Base64::encode(reinterpret_cast<const char*>(nonce), sizeof(nonce)));
-  }
 }
 
 void Utility::transformUpgradeRequestFromH3toH1(RequestHeaderMap& headers) {

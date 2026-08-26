@@ -1,7 +1,10 @@
 #include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/status.h"
 #include "source/common/network/utility.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/router/upstream_request.h"
+#include "source/common/websocket/handshake.h"
 
 #include "test/common/http/common.h"
 #include "test/common/memory/memory_test_utility.h"
@@ -18,10 +21,30 @@ using ::testing::HasSubstr;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::ReturnRef;
+using ::testing::SaveArg;
 
 namespace Envoy {
 namespace Router {
 namespace {
+
+class RecordingGenericUpstream : public GenericUpstream {
+public:
+  void encodeData(Buffer::Instance&, bool) override {}
+  void encodeMetadata(const Http::MetadataMapVector&) override {}
+  Http::Status encodeHeaders(const Http::RequestHeaderMap& headers, bool) override {
+    headers_ = std::make_unique<Http::TestRequestHeaderMapImpl>(headers);
+    return Http::okStatus();
+  }
+  void encodeTrailers(const Http::RequestTrailerMap&) override {}
+  void enableTcpTunneling() override {}
+  void readDisable(bool) override {}
+  void resetStream() override {}
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}
+  const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
+
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> headers_;
+  StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
+};
 
 class UpstreamRequestTest : public testing::Test {
 public:
@@ -43,6 +66,35 @@ public:
     return [filter](Http::FilterChainFactoryCallbacks& callbacks) {
       callbacks.addStreamDecoderFilter(filter);
     };
+  }
+
+  void setWebsocketRequestHeaders(std::optional<absl::string_view> key = std::nullopt) {
+    downstream_request_header_map_.setMethod("GET");
+    downstream_request_header_map_.setUpgrade("websocket");
+    downstream_request_header_map_.setConnection("upgrade");
+    downstream_request_header_map_.setCopy(Http::LowerCaseString("sec-websocket-version"), "13");
+    if (key.has_value()) {
+      downstream_request_header_map_.setCopy(Http::Headers::get().SecWebSocketKey, *key);
+    } else {
+      downstream_request_header_map_.remove(Http::Headers::get().SecWebSocketKey);
+    }
+    ON_CALL(router_filter_interface_.callbacks_.stream_info_, protocol())
+        .WillByDefault(Return(Http::Protocol::Http2));
+  }
+
+  RecordingGenericUpstream& establishUpstream(Http::Protocol protocol) {
+    GenericConnectionPoolCallbacks* pool_callbacks{};
+    EXPECT_CALL(*conn_pool_, newStream(_)).WillOnce(SaveArg<0>(&pool_callbacks));
+    upstream_request_->acceptHeadersFromRouter(false);
+    EXPECT_NE(pool_callbacks, nullptr);
+
+    auto upstream = std::make_unique<RecordingGenericUpstream>();
+    auto* upstream_pointer = upstream.get();
+    pool_callbacks->onPoolReady(std::move(upstream), host_,
+                                *router_filter_interface_.client_connection_.stream_info_
+                                     .downstream_connection_info_provider_,
+                                router_filter_interface_.client_connection_.stream_info_, protocol);
+    return *upstream_pointer;
   }
 
   Router::MockGenericConnPool* conn_pool_{}; // Owned by the upstream request
@@ -182,6 +234,155 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
 
   EXPECT_CALL(router_filter_interface_.callbacks_, resetStream(_, _));
   filter->callbacks_->resetStream();
+}
+
+TEST_F(UpstreamRequestTest, GeneratesWebsocketKeyForHttp1UpstreamAttempt) {
+  setWebsocketRequestHeaders();
+  initialize();
+
+  RecordingGenericUpstream& upstream = establishUpstream(Http::Protocol::Http11);
+
+  ASSERT_NE(upstream.headers_, nullptr);
+  EXPECT_TRUE(downstream_request_header_map_.get(Http::Headers::get().SecWebSocketKey).empty());
+  EXPECT_EQ(upstream.headers_->get_(Http::Headers::get().SecWebSocketKey).size(), 24);
+}
+
+TEST_F(UpstreamRequestTest, DoesNotGenerateWebsocketKeyForHttp2OrHttp3UpstreamAttempt) {
+  setWebsocketRequestHeaders();
+
+  for (const Http::Protocol protocol : {Http::Protocol::Http2, Http::Protocol::Http3}) {
+    initialize();
+    RecordingGenericUpstream& upstream = establishUpstream(protocol);
+
+    ASSERT_NE(upstream.headers_, nullptr);
+    EXPECT_TRUE(upstream.headers_->get(Http::Headers::get().SecWebSocketKey).empty());
+    upstream_request_.reset();
+  }
+}
+
+TEST_F(UpstreamRequestTest, PreservesClientSuppliedWebsocketKeyWithoutValidation) {
+  constexpr absl::string_view ClientWebsocketKey = "dGhlIHNhbXBsZSBub25jZQ==";
+  setWebsocketRequestHeaders(ClientWebsocketKey);
+  initialize();
+  RecordingGenericUpstream& upstream = establishUpstream(Http::Protocol::Http11);
+  ASSERT_NE(upstream.headers_, nullptr);
+  EXPECT_EQ(upstream.headers_->get_(Http::Headers::get().SecWebSocketKey), ClientWebsocketKey);
+
+  EXPECT_CALL(router_filter_interface_, onUpstreamHeaders(101, _, _, false))
+      .WillOnce(Invoke([](uint64_t, Http::ResponseHeaderMapPtr&& headers, UpstreamRequest&, bool) {
+        EXPECT_EQ(headers->get_(Http::Headers::get().SecWebSocketAccept), "mismatched-accept");
+      }));
+  auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl{{":status", "101"},
+                                      {"connection", "upgrade"},
+                                      {"upgrade", "websocket"},
+                                      {"sec-websocket-accept", "mismatched-accept"}});
+  upstream_request_->upstreamToDownstream().decodeHeaders(std::move(response_headers), false);
+}
+
+TEST_F(UpstreamRequestTest, WebsocketKeyGenerationCanBeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.websocket_synthesize_key_on_h2_downgrade", "false"}});
+  setWebsocketRequestHeaders();
+  initialize();
+
+  RecordingGenericUpstream& upstream = establishUpstream(Http::Protocol::Http11);
+
+  ASSERT_NE(upstream.headers_, nullptr);
+  EXPECT_TRUE(upstream.headers_->get(Http::Headers::get().SecWebSocketKey).empty());
+}
+
+TEST_F(UpstreamRequestTest, GeneratesFreshWebsocketKeyForEachUpstreamAttempt) {
+  setWebsocketRequestHeaders();
+  EXPECT_CALL(router_filter_interface_.context_.server_factory_context_.api_.random_, random())
+      .WillOnce(Return(1))
+      .WillOnce(Return(2))
+      .WillOnce(Return(3))
+      .WillOnce(Return(4));
+
+  initialize();
+  RecordingGenericUpstream& first_upstream = establishUpstream(Http::Protocol::Http11);
+  ASSERT_NE(first_upstream.headers_, nullptr);
+  const std::string first_key = first_upstream.headers_->get_(Http::Headers::get().SecWebSocketKey);
+  upstream_request_.reset();
+
+  initialize();
+  RecordingGenericUpstream& second_upstream = establishUpstream(Http::Protocol::Http11);
+  ASSERT_NE(second_upstream.headers_, nullptr);
+  EXPECT_NE(second_upstream.headers_->get_(Http::Headers::get().SecWebSocketKey), first_key);
+}
+
+TEST_F(UpstreamRequestTest, AcceptsMatchingWebsocketAcceptForGeneratedKey) {
+  setWebsocketRequestHeaders();
+  initialize();
+  RecordingGenericUpstream& upstream = establishUpstream(Http::Protocol::Http11);
+  ASSERT_NE(upstream.headers_, nullptr);
+  const std::string key = upstream.headers_->get_(Http::Headers::get().SecWebSocketKey);
+
+  EXPECT_CALL(router_filter_interface_, onUpstreamHeaders(101, _, _, false))
+      .WillOnce(Invoke([](uint64_t, Http::ResponseHeaderMapPtr&& headers, UpstreamRequest&, bool) {
+        EXPECT_TRUE(headers->get(Http::Headers::get().SecWebSocketAccept).empty());
+      }));
+  auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl{{":status", "101"},
+                                      {"connection", "upgrade"},
+                                      {"upgrade", "websocket"},
+                                      {"sec-websocket-accept", WebSocket::computeAccept(key)}});
+  upstream_request_->upstreamToDownstream().decodeHeaders(std::move(response_headers), false);
+}
+
+TEST_F(UpstreamRequestTest, RejectsMissingWebsocketAcceptForGeneratedKey) {
+  setWebsocketRequestHeaders();
+  initialize();
+  establishUpstream(Http::Protocol::Http11);
+
+  EXPECT_CALL(router_filter_interface_.callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError));
+  EXPECT_CALL(
+      router_filter_interface_.callbacks_,
+      sendLocalReply(Http::Code::BadGateway, "", _, Eq(std::nullopt),
+                     StreamInfo::ResponseCodeDetails::get().WebsocketHandshakeUnsuccessful));
+  auto response_headers =
+      std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl{
+          {":status", "101"}, {"connection", "upgrade"}, {"upgrade", "websocket"}});
+  upstream_request_->upstreamToDownstream().decodeHeaders(std::move(response_headers), false);
+}
+
+TEST_F(UpstreamRequestTest, StripsWebsocketAcceptOnFailedHandshakeForGeneratedKey) {
+  setWebsocketRequestHeaders();
+  initialize();
+  RecordingGenericUpstream& upstream = establishUpstream(Http::Protocol::Http11);
+  ASSERT_NE(upstream.headers_, nullptr);
+  const std::string key = upstream.headers_->get_(Http::Headers::get().SecWebSocketKey);
+
+  EXPECT_CALL(router_filter_interface_, onUpstreamHeaders(426, _, _, false))
+      .WillOnce(Invoke([](uint64_t, Http::ResponseHeaderMapPtr&& headers, UpstreamRequest&, bool) {
+        EXPECT_TRUE(headers->get(Http::Headers::get().SecWebSocketAccept).empty());
+      }));
+  auto response_headers =
+      std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl{
+          {":status", "426"}, {"sec-websocket-accept", WebSocket::computeAccept(key)}});
+  upstream_request_->upstreamToDownstream().decodeHeaders(std::move(response_headers), false);
+}
+
+TEST_F(UpstreamRequestTest, RejectsIncorrectWebsocketAcceptForGeneratedKey) {
+  setWebsocketRequestHeaders();
+  initialize();
+  establishUpstream(Http::Protocol::Http11);
+
+  EXPECT_CALL(router_filter_interface_.callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError));
+  EXPECT_CALL(
+      router_filter_interface_.callbacks_,
+      sendLocalReply(Http::Code::BadGateway, "", _, Eq(std::nullopt),
+                     StreamInfo::ResponseCodeDetails::get().WebsocketHandshakeUnsuccessful));
+  auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+      Http::TestResponseHeaderMapImpl{{":status", "101"},
+                                      {"connection", "upgrade"},
+                                      {"upgrade", "websocket"},
+                                      {"sec-websocket-accept", "incorrect"}});
+  upstream_request_->upstreamToDownstream().decodeHeaders(std::move(response_headers), false);
 }
 
 TEST_F(UpstreamRequestTest, ConnectionPoolLatencyTime) {
