@@ -46,6 +46,21 @@ const Http::LowerCaseString kMcpMethod{
 const Http::LowerCaseString kMcpName{
     std::string(Filters::Common::Mcp::McpConstants::MCP_NAME_HEADER)};
 
+void setNestedStringValue(Protobuf::Struct& metadata, absl::string_view path,
+                          absl::string_view value) {
+  const std::vector<absl::string_view> segments = absl::StrSplit(path, '.');
+
+  Protobuf::Struct* current = &metadata;
+
+  for (size_t i = 0; i + 1 < segments.size(); ++i) {
+    current = (*current->mutable_fields())[std::string(segments[i])].mutable_struct_value();
+  }
+
+  if (!segments.empty()) {
+    (*current->mutable_fields())[std::string(segments.back())].set_string_value(std::string(value));
+  }
+}
+
 McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = absl::StrCat(prefix, "mcp.");
   return McpFilterStats{MCP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
@@ -349,6 +364,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
       is_mcp_request_ = true;
 
       if (!needsBody()) {
+        skip_body_parsing_ = true;
         populateMetadataFromHeaders();
         return Http::FilterHeadersStatus::Continue;
       }
@@ -376,7 +392,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
 }
 
 Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  if (!is_json_post_request_ || !is_mcp_request_) {
+  if (skip_body_parsing_ || !is_json_post_request_ || !is_mcp_request_) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -613,8 +629,9 @@ void McpFilter::populateMetadataFromHeaders() {
 
   if (!header_name_.empty()) {
     const std::string name_path = parserConfig().getNameAttributePath(header_method_);
+
     if (!name_path.empty()) {
-      (*metadata.mutable_fields())[name_path].set_string_value(header_name_);
+      setNestedStringValue(metadata, name_path, header_name_);
     }
   }
 
@@ -624,8 +641,25 @@ void McpFilter::populateMetadataFromHeaders() {
         parserConfig().getMethodGroup(header_method_));
   }
 
+  if (shouldStoreToFilterState()) {
+    auto filter_state_obj = std::make_shared<FilterStateObject>(
+        header_method_, metadata, is_mcp_request_, is_exceeding_limit_, status_);
+
+    decoder_callbacks_->streamInfo().filterState()->setData(
+        std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
+        StreamInfo::FilterState::LifeSpan::Request,
+        StreamInfo::StreamSharingMayImpactPooling::None);
+  }
+
   if (shouldStoreToDynamicMetadata()) {
     setDynamicMetadataStatus(std::move(metadata));
+  }
+
+  if (clearRouteCache()) {
+    if (auto cb = decoder_callbacks_->downstreamCallbacks(); cb.has_value()) {
+      cb->clearRouteCache();
+      ENVOY_LOG(debug, "MCP filter cleared route cache for metadata-based routing");
+    }
   }
 }
 

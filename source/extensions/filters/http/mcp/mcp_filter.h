@@ -197,6 +197,7 @@ private:
   std::unique_ptr<JsonPathParser> parser_;
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
+  bool skip_body_parsing_{false};
   std::string header_method_;
   std::string header_name_;
   Filters::Common::Mcp::Status status_{Filters::Common::Mcp::Status::Ok};

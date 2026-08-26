@@ -147,11 +147,10 @@ TEST_F(McpFilterTest, HeadersAttributeSourceUsesFastPath) {
 
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
-        EXPECT_THAT(
-            metadata.fields(),
-            AllOf(Contains(Pair("method", Property(&Protobuf::Value::string_value, "tasks/get"))),
-                  Contains(Pair("params.taskId",
-                                Property(&Protobuf::Value::string_value, "task-123")))));
+        EXPECT_EQ("tasks/get", metadata.fields().at("method").string_value());
+
+        const auto& params = metadata.fields().at("params").struct_value();
+        EXPECT_EQ("task-123", params.fields().at("taskId").string_value());
       });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -178,9 +177,10 @@ TEST_F(McpFilterTest, HeadersAttributeSourceUsesNamePath) {
 
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
-        EXPECT_THAT(
-            metadata.fields(),
-            Contains(Pair("params.name", Property(&Protobuf::Value::string_value, "get_weather"))));
+        EXPECT_EQ("tools/call", metadata.fields().at("method").string_value());
+
+        const auto& params = metadata.fields().at("params").struct_value();
+        EXPECT_EQ("get_weather", params.fields().at("name").string_value());
       });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -235,6 +235,89 @@ TEST_F(McpFilterTest, HeadersMismatchIsStatOnlyWhenBodyIsParsed) {
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
+}
+
+TEST_F(McpFilterTest, HeadersAttributeSourceStoresFilterState) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS);
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::FILTER_STATE);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(_)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  auto obj = decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+      std::string(McpFilterStateObject::FilterStateKey));
+
+  ASSERT_NE(nullptr, obj);
+}
+
+TEST_F(McpFilterTest, HeadersAttributeSourceClearsRouteCache) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS);
+  proto_config.set_clear_route_cache(true);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(_)).Times(0);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(McpFilterTest, VerifyRejectsMissingMethodHeader) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::VERIFY);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})");
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "MCP header attributes do not match request body", _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 
   EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
 }
