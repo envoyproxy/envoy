@@ -212,7 +212,13 @@ SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
 Seconds CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
                                         const SystemTime response_time, const SystemTime now) {
   // Age headers calculations follow: https://httpwg.org/specs/rfc7234.html#age.calculations
-  const SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
+  SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
+  if (!DateUtil::timePointValid(date_value)) {
+    // RFC 9110 6.6.1: a recipient that receives a response without a Date
+    // header records the time it was received. Fall back to the response
+    // time so the entry is not immediately considered stale.
+    date_value = response_time;
+  }
 
   long age_value;
   const absl::string_view age_header = response_headers.getInlineValue(CacheCustomHeaders::age());
@@ -248,12 +254,14 @@ void CacheHeadersUtils::injectValidationHeaders(
     // Valid Last-Modified header exists.
     absl::string_view last_modified = last_modified_header->value().getStringView();
     request_headers.setInline(CacheCustomHeaders::ifModifiedSince(), last_modified);
-  } else {
+  } else if (DateUtil::timePointValid(CacheHeadersUtils::httpTime(old_response_headers.Date()))) {
     // Either Last-Modified is missing or invalid, fallback to Date.
     // A correct behaviour according to:
     // https://httpwg.org/specs/rfc7232.html#header.if-modified-since
-    absl::string_view date = old_response_headers.getDateValue();
-    request_headers.setInline(CacheCustomHeaders::ifModifiedSince(), date);
+    // Don't emit an empty If-Modified-Since when neither Date nor
+    // Last-Modified is present.
+    request_headers.setInline(CacheCustomHeaders::ifModifiedSince(),
+                              old_response_headers.getDateValue());
   }
 }
 
