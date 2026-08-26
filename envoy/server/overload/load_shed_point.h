@@ -55,6 +55,10 @@ public:
   // which will eventually drain the HTTP/3 connection.
   const std::string H3ServerGoAwayOnDispatch =
       "envoy.load_shed_points.http3_server_go_away_on_dispatch";
+
+  // Envoy will close the TCP proxy downstream connection upon receiving
+  // data if under memory pressure.
+  const std::string TcpProxyOnData = "envoy.load_shed_points.tcp_proxy_on_data";
 };
 
 using LoadShedPointName = ConstSingleton<LoadShedPointNameValues>;
