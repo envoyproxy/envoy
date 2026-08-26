@@ -136,6 +136,16 @@ under the configurable :ref:`metrics_namespace
 <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>`
 (``dynamicmodulescustom`` by default), separately from the ``dynamic_modules.`` namespace above.
 
+Logging
+---------------------------
+
+When a dynamic module cannot be loaded, Envoy emits an error log on the ``dynamic_modules`` logger
+with the form ``Unable to load dynamic module <module>: <reason>``. This is logged from the module
+loader itself, so it is emitted for every extension type, including extension points that have no
+factory context and therefore cannot increment the ``module_load_error`` counter. It is also the
+only signal when a module referenced from the bootstrap configuration fails to load, because Envoy
+exits before its statistics can be scraped.
+
 Secrets
 ---------------------------
 
