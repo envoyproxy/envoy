@@ -119,7 +119,7 @@ TEST_F(LuaTest, PackagePathIsPrependedInOrder) {
   setup(SCRIPT, PackagePaths{"/first/?.lua;/second/?.lua;/second/?/init.lua", ""});
 }
 
-// cpath is prepended the same way. Loading a real C module is out of scope here, so the script
+// `cpath` is prepended the same way. Loading a real C module is out of scope here, so the script
 // checks the search path itself.
 TEST_F(LuaTest, PackageCpathIsPrepended) {
   const std::string SCRIPT{R"EOF(

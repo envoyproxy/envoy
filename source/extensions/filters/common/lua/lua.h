@@ -478,9 +478,9 @@ using InitializerList = std::vector<Initializer>;
  * empty to leave that search path untouched.
  */
 struct PackagePaths {
-  // Prepended to package.path, for modules that are Lua source.
+  // Prepended to `package.path`, for modules that are Lua source.
   std::string path;
-  // Prepended to package.cpath, for modules that are loadable C libraries.
+  // Prepended to `package.cpath`, for modules that are loadable C libraries.
   std::string cpath;
 };
 
