@@ -9,6 +9,7 @@ on:
       app-id:
       app-key:
       dockerhub-token:
+      dockerhub-write-token:
       gpg-key:
       gpg-key-password:
       ssh-key:
@@ -458,6 +459,8 @@ jobs:
         ENVOY_COMMIT: ${{ fromJSON(inputs.request).request.sha }}
         ENVOY_REPO: ${{ github.repository }}
         ENVOY_PUBLISH_DRY_RUN: ${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
+        DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+        DOCKERHUB_PASSWORD: ${{ inputs.trusted && secrets.dockerhub-write-token || '' }}
 
 ######################################################################################################################
 ##
