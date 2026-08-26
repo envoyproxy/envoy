@@ -669,7 +669,8 @@ Accepted values are:
 * `disabled` (disable Wasm entirely)
 
 Invalid values are rejected at parse time. Note: the former `--define wasm=<engine>` and
-`--define engine=<engine>` mechanisms are no longer supported and will be silently ignored if passed.
+`--define engine=<engine>` mechanisms are no longer supported; passing them is now a **build
+error**. Use `--@proxy-wasm-cpp-host//bazel:engine=<engine>` instead.
 
 You may persist those options in `user.bazelrc` in Envoy repo or your `.bazelrc`.
 

@@ -10,6 +10,7 @@ load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolcha
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(":deprecated_features.bzl", "check_removed_fips_define")
+load(":legacy_flags.bzl", "legacy_define_check")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
@@ -592,6 +593,11 @@ selects.config_setting_group(
 check_removed_fips_define(
     name = "check_removed_fips_define",
     build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+legacy_define_check(
+    name = "legacy_define_check",
     visibility = ["//visibility:public"],
 )
 

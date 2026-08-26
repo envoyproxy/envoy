@@ -161,6 +161,7 @@ envoy_cc_library(
 # provides a library target for Envoy server builds with the versioning information set up correctly.
 envoy_cc_library(
     name = "envoy_main_common_lib",
+    data = ["//bazel:legacy_define_check"],
     deps = [
         ":main_common_with_all_extensions_lib",
         # These are compiled as extensions so Envoy Mobile doesn't have to link them in.
