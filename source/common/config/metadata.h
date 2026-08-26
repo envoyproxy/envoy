@@ -14,6 +14,7 @@
 #include "source/common/shared_pool/shared_pool.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Config {
@@ -83,7 +84,7 @@ public:
    * @return Protobuf::Value&. A Value message is created if not found.
    */
   static Protobuf::Value& mutableMetadataValue(envoy::config::core::v3::Metadata& metadata,
-                                               const std::string& filter, const std::string& key);
+                                               absl::string_view filter, absl::string_view key);
 
   using LabelSet = std::vector<std::pair<std::string, Protobuf::Value>>;
 

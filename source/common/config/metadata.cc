@@ -68,7 +68,9 @@ const Protobuf::Value& Metadata::metadataValue(const envoy::config::core::v3::Me
 }
 
 Protobuf::Value& Metadata::mutableMetadataValue(envoy::config::core::v3::Metadata& metadata,
-                                                const std::string& filter, const std::string& key) {
+                                                absl::string_view filter, absl::string_view key) {
+  // Both maps are keyed by string, which protobuf looks up transparently, so a caller holding a
+  // view does not have to own the key to reach an entry that already exists.
   return (*(*metadata.mutable_filter_metadata())[filter].mutable_fields())[key];
 }
 
