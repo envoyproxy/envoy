@@ -60,6 +60,7 @@ enum class StreamSharingMayImpactPooling {
   X(UpstreamSubjectAltNames, "envoy.network.upstream_subject_alt_names")                           \
   X(NetworkNamespace, "envoy.network.network_namespace")                                           \
   X(OriginalConnectPort, "envoy.router.original_connect_port")                                     \
+  X(NetworkGeoip, "envoy.geoip")                                                                   \
   ENVOY_EXECUTION_CONTEXT_KEY_X(X)
 
 enum class FilterStateIndex : uint32_t {
