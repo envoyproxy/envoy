@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -980,7 +981,6 @@ public:
 
 TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, CounterDefineAndIncrement) {
   auto config = makeConfig();
-  EXPECT_TRUE(custom_stat_namespaces_.registered(DefaultMetricsNamespace));
   unfreezeStatCreation(*config);
   auto* config_ptr = static_cast<void*>(config.get());
 
@@ -998,11 +998,10 @@ TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, CounterDefineAndIncrement) {
   EXPECT_EQ(5, counter->value());
 }
 
-TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, CustomMetricsNamespaceRegisteredAndUsed) {
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, CustomMetricsNamespaceUsed) {
   auto proto_config = protoConfig("cluster_specifier_no_op", "test_cluster_specifier");
   proto_config.mutable_dynamic_module_config()->set_metrics_namespace("cluster_specifier_custom");
   auto config = makeConfig(proto_config);
-  EXPECT_TRUE(custom_stat_namespaces_.registered("cluster_specifier_custom"));
   unfreezeStatCreation(*config);
 
   size_t counter_id = 0;
@@ -1012,6 +1011,19 @@ TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, CustomMetricsNamespaceRegist
           static_cast<void*>(config.get()), metricBuffer("test_counter"), nullptr, 0, &counter_id));
   EXPECT_NE(nullptr,
             TestUtility::findCounter(context_.store_, "cluster_specifier_custom.test_counter"));
+}
+
+// Test that the legacy behavior registers the custom stat namespace when the runtime guard is
+// enabled.
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, RegisterStatNamespaceWithRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix", "true"}});
+
+  auto proto_config = protoConfig("cluster_specifier_no_op", "test_cluster_specifier");
+  proto_config.mutable_dynamic_module_config()->set_metrics_namespace("cluster_specifier_custom");
+  auto config = makeConfig(proto_config);
+  EXPECT_TRUE(custom_stat_namespaces_.registered("cluster_specifier_custom"));
 }
 
 TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, ScalarGaugeDefineAndOperate) {

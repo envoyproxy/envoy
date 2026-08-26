@@ -12,6 +12,7 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/retry_policy_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -145,7 +146,13 @@ newDynamicModuleClusterSpecifierConfig(const DynamicModuleClusterSpecifierProto&
       proto_config.dynamic_module_config().metrics_namespace().empty()
           ? std::string(DefaultMetricsNamespace)
           : proto_config.dynamic_module_config().metrics_namespace();
-  context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+  }
 
   auto config = std::make_shared<DynamicModuleClusterSpecifierConfig>(
       proto_config.specifier_name(), specifier_config, std::move(dynamic_module),
