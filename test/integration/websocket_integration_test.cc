@@ -26,13 +26,17 @@ namespace {
 
 Http::TestRequestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = "websocket",
                                                      uint32_t content_length = 0) {
-  return Http::TestRequestHeaderMapImpl{{":authority", "sni.lyft.com"},
-                                        {"content-length", fmt::format("{}", content_length)},
-                                        {":path", "/websocket/test"},
-                                        {":method", "GET"},
-                                        {":scheme", "http"},
-                                        {"upgrade", upgrade_type},
-                                        {"connection", "keep-alive, upgrade"}};
+  Http::TestRequestHeaderMapImpl headers{{":authority", "sni.lyft.com"},
+                                         {"content-length", fmt::format("{}", content_length)},
+                                         {":path", "/websocket/test"},
+                                         {":method", "GET"},
+                                         {":scheme", "http"},
+                                         {"upgrade", upgrade_type},
+                                         {"connection", "keep-alive, upgrade"}};
+  if (Http::Headers::get().UpgradeValues.WebSocket == upgrade_type) {
+    headers.addCopy("sec-websocket-version", "13");
+  }
+  return headers;
 }
 
 Http::TestResponseHeaderMapImpl upgradeResponseHeaders(const char* upgrade_type = "websocket") {
@@ -95,6 +99,15 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
   if (original_request_headers.ContentLength() &&
       proxied_request_headers.ContentLength() == nullptr) {
     proxied_request_headers.setContentLength(size_t(0));
+  }
+
+  // Ignore the key synthesized while downgrading a native H2 or H3 WebSocket request.
+  if (downstreamProtocol() != Http::CodecType::HTTP1 &&
+      original_request_headers.getUpgradeValue() == Http::Headers::get().UpgradeValues.WebSocket) {
+    if (original_request_headers.get(Http::Headers::get().SecWebSocketKey).empty()) {
+      EXPECT_EQ(proxied_request_headers.get_(Http::Headers::get().SecWebSocketKey).size(), 24);
+      proxied_request_headers.remove(Http::Headers::get().SecWebSocketKey);
+    }
   }
 
   commonValidate(proxied_request_headers, original_request_headers);
@@ -238,6 +251,20 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
 
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
   test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(0));
+}
+
+TEST_P(WebsocketIntegrationTest, WebSocketClientSuppliedKeyIsPreserved) {
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  auto upgrade_request_headers = upgradeRequestHeaders();
+  upgrade_request_headers.addCopy("sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ==");
+
+  performUpgrade(upgrade_request_headers, upgradeResponseHeaders());
+  sendBidirectionalData();
+
+  codec_client_->close();
+  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
 }
 
 TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {

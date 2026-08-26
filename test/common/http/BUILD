@@ -548,6 +548,7 @@ envoy_cc_test(
     deps = [
         ":header_formatter_test_lib",
         "//envoy/http:header_formatter_interface",
+        "//source/common/common:base64_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
