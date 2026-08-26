@@ -41,6 +41,7 @@ fn init() -> bool {
 fn new_cluster_specifier_config_fn(
   name: &str,
   config: &[u8],
+  _metrics: std::sync::Arc<dyn EnvoyClusterSpecifierMetrics>,
 ) -> Option<Box<dyn ClusterSpecifierConfig>> {
   match name {
     "test_cluster_specifier" => Some(Box::new(TestClusterSpecifierConfig {

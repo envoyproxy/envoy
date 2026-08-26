@@ -1835,6 +1835,31 @@ WEAK_STUB(ClusterSpecifierSetRouteActionOverride,
                                                                                     {nullptr, 0}))
 WEAK_STUB(ClusterSpecifierSetTimeout,
           envoy_dynamic_module_callback_cluster_specifier_set_timeout(nullptr, 0))
+WEAK_STUB(ClusterSpecifierConfigDefineCounter,
+          envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(ClusterSpecifierConfigIncrementCounter,
+          envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(nullptr, 0,
+                                                                                   nullptr, 0, 0))
+WEAK_STUB(ClusterSpecifierConfigDefineGauge,
+          envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(nullptr, {nullptr, 0},
+                                                                              nullptr, 0, nullptr))
+WEAK_STUB(ClusterSpecifierConfigSetGauge,
+          envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(nullptr, 0, nullptr, 0,
+                                                                           0))
+WEAK_STUB(ClusterSpecifierConfigIncrementGauge,
+          envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(nullptr, 0,
+                                                                                 nullptr, 0, 0))
+WEAK_STUB(ClusterSpecifierConfigDecrementGauge,
+          envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(nullptr, 0,
+                                                                                 nullptr, 0, 0))
+WEAK_STUB(ClusterSpecifierConfigDefineHistogram,
+          envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(ClusterSpecifierConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(nullptr, 0,
+                                                                                        nullptr, 0,
+                                                                                        0))
 
 WEAK_STUB(FormatterGetAccessLogType,
           envoy_dynamic_module_callback_formatter_get_access_log_type(nullptr))

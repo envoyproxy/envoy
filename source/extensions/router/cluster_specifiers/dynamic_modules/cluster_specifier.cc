@@ -68,9 +68,12 @@ buildRouteActionOverride(const RouteActionOverrideProto& proto_override,
 DynamicModuleClusterSpecifierConfig::DynamicModuleClusterSpecifierConfig(
     absl::string_view specifier_name, absl::string_view specifier_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-    RouteActionOverrideMap route_action_overrides, Upstream::ClusterManager& cluster_manager)
-    : specifier_name_(specifier_name), specifier_config_(specifier_config),
-      dynamic_module_(std::move(dynamic_module)), cluster_manager_(cluster_manager),
+    RouteActionOverrideMap route_action_overrides, Upstream::ClusterManager& cluster_manager,
+    Stats::Scope& stats_scope, absl::string_view metrics_namespace)
+    : stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
+      stat_name_pool_(stats_scope_->symbolTable()), specifier_name_(specifier_name),
+      specifier_config_(specifier_config), dynamic_module_(std::move(dynamic_module)),
+      cluster_manager_(cluster_manager),
       route_action_overrides_(std::move(route_action_overrides)) {}
 
 DynamicModuleClusterSpecifierConfig::~DynamicModuleClusterSpecifierConfig() {
@@ -138,9 +141,16 @@ newDynamicModuleClusterSpecifierConfig(const DynamicModuleClusterSpecifierProto&
     route_action_overrides.emplace(name, std::move(entry_or_error.value()));
   }
 
+  const std::string metrics_namespace =
+      proto_config.dynamic_module_config().metrics_namespace().empty()
+          ? std::string(DefaultMetricsNamespace)
+          : proto_config.dynamic_module_config().metrics_namespace();
+  context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+
   auto config = std::make_shared<DynamicModuleClusterSpecifierConfig>(
       proto_config.specifier_name(), specifier_config, std::move(dynamic_module),
-      std::move(route_action_overrides), context.clusterManager());
+      std::move(route_action_overrides), context.clusterManager(), context.serverScope(),
+      metrics_namespace);
   config->on_config_destroy_ = on_config_destroy.value();
   config->on_select_ = on_select.value();
 
@@ -155,6 +165,7 @@ newDynamicModuleClusterSpecifierConfig(const DynamicModuleClusterSpecifierProto&
     return absl::InvalidArgumentError(
         "Failed to initialize dynamic module cluster specifier config");
   }
+  config->stat_creation_frozen_.store(true, std::memory_order_release);
   return config;
 }
 
