@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/core/v3/protocol.pb.validate.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/common/fmt.h"
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
@@ -438,7 +439,8 @@ TEST(HttpUtility, H1H2H1Request) {
 
 // Start with H2 style websocket request headers. Transform to H1 and back.
 TEST(HttpUtility, H2H1H2Request) {
-  TestRequestHeaderMapImpl converted_headers = {{":method", "CONNECT"}, {":protocol", "websocket"}};
+  TestRequestHeaderMapImpl converted_headers = {
+      {":method", "CONNECT"}, {":protocol", "websocket"}, {"sec-websocket-version", "13"}};
   const TestRequestHeaderMapImpl original_headers(converted_headers);
 
   ASSERT_FALSE(Utility::isUpgrade(converted_headers));
@@ -452,12 +454,55 @@ TEST(HttpUtility, H2H1H2Request) {
   ASSERT_FALSE(Utility::isUpgrade(converted_headers));
   ASSERT_TRUE(Utility::isH2UpgradeRequest(converted_headers));
   converted_headers.removeContentLength();
+  // The reverse transform does not strip the synthesized key.
+  converted_headers.remove(Headers::get().SecWebSocketKey);
   ASSERT_EQ(converted_headers, original_headers);
 }
 
 TEST(HttpUtility, ConnectBytestreamSpecialCased) {
   TestRequestHeaderMapImpl headers = {{":method", "CONNECT"}, {":protocol", "bytestream"}};
   ASSERT_FALSE(Utility::isH2UpgradeRequest(headers));
+}
+
+TEST(HttpUtility, H2toH1WebSocketSynthesizesKey) {
+  TestRequestHeaderMapImpl headers = {
+      {":method", "CONNECT"}, {":protocol", "websocket"}, {"sec-websocket-version", "13"}};
+  Utility::transformUpgradeRequestFromH2toH1(headers);
+
+  EXPECT_EQ(headers.get_("sec-websocket-version"), "13");
+  const std::string key = headers.get_("sec-websocket-key");
+  EXPECT_EQ(key.size(), 24);
+  EXPECT_EQ(Base64::decode(key).size(), 16);
+}
+
+TEST(HttpUtility, H2toH1WebSocketPreservesExistingKey) {
+  TestRequestHeaderMapImpl headers = {{":method", "CONNECT"},
+                                      {":protocol", "websocket"},
+                                      {"sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ=="},
+                                      {"sec-websocket-version", "13"}};
+  Utility::transformUpgradeRequestFromH2toH1(headers);
+
+  EXPECT_EQ(headers.get_("sec-websocket-key"), "dGhlIHNhbXBsZSBub25jZQ==");
+  EXPECT_EQ(headers.get_("sec-websocket-version"), "13");
+}
+
+TEST(HttpUtility, H2toH1NonWebSocketUpgradeDoesNotSynthesizeKey) {
+  TestRequestHeaderMapImpl headers = {{":method", "CONNECT"}, {":protocol", "foo"}};
+  Utility::transformUpgradeRequestFromH2toH1(headers);
+
+  EXPECT_TRUE(headers.get_("sec-websocket-key").empty());
+}
+
+TEST(HttpUtility, H2toH1WebSocketKeySynthesisCanBeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.websocket_synthesize_key_on_h2_downgrade", "false"}});
+
+  TestRequestHeaderMapImpl headers = {
+      {":method", "CONNECT"}, {":protocol", "websocket"}, {"sec-websocket-version", "13"}};
+  Utility::transformUpgradeRequestFromH2toH1(headers);
+
+  EXPECT_TRUE(headers.get_("sec-websocket-key").empty());
 }
 
 // Start with H1 style websocket response headers. Transform to H2 and back.

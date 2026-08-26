@@ -291,7 +291,8 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRejectUnderscoreHeaders
 TEST_F(Http2HeaderValidatorTest, RequestExtendedConnect) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"},  {":method", "CONNECT"},      {":protocol", "websocket"},
-      {":path", "/foo/bar"}, {":authority", "envoy.com"}, {"x-foo", "bar"}};
+      {":path", "/foo/bar"}, {":authority", "envoy.com"}, {"sec-websocket-version", "13"},
+      {"x-foo", "bar"}};
   auto uhv = createH2ServerUhv(empty_config);
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
@@ -300,6 +301,8 @@ TEST_F(Http2HeaderValidatorTest, RequestExtendedConnect) {
   EXPECT_EQ(headers.getUpgradeValue(), "websocket");
   EXPECT_EQ(headers.getConnectionValue(), "upgrade");
   EXPECT_EQ(headers.getProtocolValue(), "");
+  EXPECT_EQ(headers.get_("sec-websocket-version"), "13");
+  EXPECT_EQ(headers.get_("sec-websocket-key").size(), 24);
 }
 
 TEST_F(Http2HeaderValidatorTest, RequestExtendedConnectNoScheme) {

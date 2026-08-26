@@ -515,6 +515,7 @@ envoy_cc_test(
     srcs = ["utility_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/common:base64_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
