@@ -71,7 +71,8 @@ public:
    *
    * @param config The exporter protobuf config.
    * @param context The TracerFactoryContext.
-   * @return absl::StatusOr<OpenTelemetryTraceExporterPtr> A trace exporter. Errors must be reported via absl::Status inside absl::StatusOr and never via thrown C++ exceptions.
+   * @return absl::StatusOr<OpenTelemetryTraceExporterPtr> A trace exporter. Errors must be reported
+   * via absl::Status inside absl::StatusOr and never via thrown C++ exceptions.
    */
   virtual absl::StatusOr<OpenTelemetryTraceExporterPtr>
   createExporter(const Protobuf::Message& config,

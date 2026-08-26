@@ -1,7 +1,6 @@
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 
 #include <string>
-#include "absl/status/statusor.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/common/optref.h"
@@ -23,6 +22,7 @@
 #include "source/extensions/tracers/opentelemetry/trace_exporter.h"
 #include "source/extensions/tracers/opentelemetry/tracer.h"
 
+#include "absl/status/statusor.h"
 #include "fmt/format.h"
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"

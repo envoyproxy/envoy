@@ -3,7 +3,6 @@
 #include "envoy/config/trace/v3/opentelemetry.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "absl/status/statusor.h"
 #include "source/extensions/tracers/opentelemetry/config.h"
 #include "source/extensions/tracers/opentelemetry/trace_exporter.h"
 
@@ -11,6 +10,7 @@
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

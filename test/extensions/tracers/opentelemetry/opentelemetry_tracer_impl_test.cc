@@ -1,6 +1,5 @@
 #include <sys/types.h>
 
-#include "absl/status/statusor.h"
 #include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
 
@@ -17,6 +16,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
