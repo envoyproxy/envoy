@@ -934,9 +934,9 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   EXPECT_TRUE(connect_callbacks.closed());
 }
 
-class PerTimerTriggersIntegrationTest : public OverloadIntegrationTest {
+class MultipleReduceTimeoutsActionsIntegrationTest : public OverloadIntegrationTest {
 protected:
-  PerTimerTriggersIntegrationTest() {
+  MultipleReduceTimeoutsActionsIntegrationTest() {
     second_factory_ = std::make_unique<FakeResourceMonitorFactory2>();
     inject_second_factory_ =
         std::make_unique<Registry::InjectFactory<Server::Configuration::ResourceMonitorFactory>>(
@@ -972,14 +972,18 @@ protected:
             typed_config:
               "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
               timer_scale_factors:
-                - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
-                  min_timeout: 5s
-                  triggers:
-                    - name: "envoy.resource_monitors.testonly.fake_resource_monitor2"
-                      scaled:
-                        scaling_threshold: 0.5
-                        saturation_threshold: 0.9
                 - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+                  min_timeout: 5s
+          - name: "envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE"
+            triggers:
+              - name: "envoy.resource_monitors.testonly.fake_resource_monitor2"
+                scaled:
+                  scaling_threshold: 0.5
+                  saturation_threshold: 0.9
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+              timer_scale_factors:
+                - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
                   min_timeout: 5s
       )EOF");
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -1041,20 +1045,16 @@ private:
       inject_second_factory_;
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, PerTimerTriggersIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(Protocols, MultipleReduceTimeoutsActionsIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// Verifies that per-timer triggers drive each timer independently of the action-level triggers.
-// Config: HTTP_DOWNSTREAM_CONNECTION_IDLE has per-timer triggers pointing at
-// fake_resource_monitor2;
-//         HTTP_DOWNSTREAM_CONNECTION_MAX uses the action-level fake_resource_monitor.
-TEST_P(PerTimerTriggersIntegrationTest, PerTimerTriggersScaleIndependently) {
+// Verifies that multiple reduce_timeouts actions drive their timer types independently.
+TEST_P(MultipleReduceTimeoutsActionsIntegrationTest, TimerTypesScaleIndependently) {
   initializeOverloadManager();
 
-  // Saturate the action-level resource. This should drive the action-level scale_percent gauge
-  // (which covers HTTP_DOWNSTREAM_CONNECTION_MAX) to 100, but leave the idle timer's per-timer
-  // gauge at 0 because fake_resource_monitor2 is still at 0.
+  // Saturating the resource for the unsuffixed action affects the maximum connection timer but not
+  // the idle connection timer owned by the suffixed action.
   updateResource(0.9);
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
                              Eq(100));
@@ -1062,15 +1062,13 @@ TEST_P(PerTimerTriggersIntegrationTest, PerTimerTriggersScaleIndependently) {
                              "CONNECTION_IDLE.scale_percent",
                              Eq(0));
 
-  // Now saturate the per-timer resource. The idle timer's gauge should reach 100 while the
-  // action-level gauge stays saturated — both are driven independently.
+  // Saturating the suffixed action's resource affects its idle connection timer independently.
   updateSecondResource(0.9);
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_"
                              "CONNECTION_IDLE.scale_percent",
                              Eq(100));
 
-  // Drop the action-level resource back to 0. The action-level gauge should clear, but the idle
-  // timer's per-timer gauge must remain at 100 because fake_resource_monitor2 is still saturated.
+  // Clearing the unsuffixed action does not clear the suffixed action.
   updateResource(0);
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
                              Eq(0));

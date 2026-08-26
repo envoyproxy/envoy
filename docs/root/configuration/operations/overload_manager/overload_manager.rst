@@ -316,51 +316,41 @@ Per-timer triggers
 """"""""""""""""""
 
 By default all timers in ``timer_scale_factors`` share the action-level triggers and their scale
-factors are driven by the maximum pressure across those triggers. To give each timer its own
-independent pressure source, add a ``triggers`` list directly inside the ``timer_scale_factors``
-entry. When per-timer triggers are present they take precedence over the action-level triggers for
-that particular timer; other timers without their own triggers continue to use the action-level
-triggers as before.
+factors are driven by the maximum pressure across those triggers. Multiple ``reduce_timeouts``
+actions can be configured when different timer types need independent triggers. Additional actions
+use the name ``envoy.overload_actions.reduce_timeouts.<TIMER_TYPE>``, where ``<TIMER_TYPE>`` is the
+timer type configured by that action. Each suffixed action must configure exactly one matching timer
+type, and a timer type cannot be configured by more than one action.
 
 .. code-block:: yaml
 
-  name: "envoy.overload_actions.reduce_timeouts"
-  # Action-level trigger: drives timers that do NOT have their own per-timer triggers.
-  # In this example HTTP_DOWNSTREAM_STREAM_IDLE uses this trigger; the other two timers
-  # override it with their own triggers and are unaffected by fixed_heap pressure.
-  triggers:
-    - name: "envoy.resource_monitors.fixed_heap"
-      scaled:
-        scaling_threshold: 0.85
-        saturation_threshold: 0.95
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
-    timer_scale_factors:
-      - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
-        min_timeout: 1s
-        # Overrides the action-level trigger: scaled by custom resource1, not fixed_heap.
-        triggers:
-          - name: "envoy.resource_monitors.custom_resource1"
-            scaled:
-              scaling_threshold: 0.7
-              saturation_threshold: 0.9
-      - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
-        min_timeout: 1s
-        # Overrides the action-level trigger: scaled by custom resource2, not fixed_heap.
-        triggers:
-          - name: "envoy.resource_monitors.custom_resource2"
-            scaled:
-              scaling_threshold: 0.6
-              saturation_threshold: 0.8
-      - timer: HTTP_DOWNSTREAM_STREAM_IDLE
-        min_timeout: 2s
-        # No per-timer triggers: falls back to the action-level fixed_heap trigger.
+  actions:
+    - name: "envoy.overload_actions.reduce_timeouts"
+      triggers:
+        - name: "envoy.resource_monitors.fixed_heap"
+          scaled:
+            scaling_threshold: 0.85
+            saturation_threshold: 0.95
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_STREAM_IDLE
+            min_timeout: 2s
+    - name: "envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE"
+      triggers:
+        - name: "envoy.resource_monitors.custom_resource"
+          scaled:
+            scaling_threshold: 0.7
+            saturation_threshold: 0.9
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+            min_timeout: 1s
 
-In this configuration ``HTTP_DOWNSTREAM_CONNECTION_IDLE`` and ``HTTP_DOWNSTREAM_CONNECTION_MAX``
-are each driven by their own dedicated resource monitors, while ``HTTP_DOWNSTREAM_STREAM_IDLE``
-falls back to the action-level ``fixed_heap`` trigger. Changes in ``fixed_heap`` pressure have no
-effect on the first two timers. The action-level ``triggers`` field is still required by the schema
-even when some or all timers carry their own triggers.
+In this configuration ``HTTP_DOWNSTREAM_STREAM_IDLE`` is driven by ``fixed_heap``, while
+``HTTP_DOWNSTREAM_CONNECTION_IDLE`` is independently driven by ``custom_resource``. The suffixed
+action also exposes its own ``active`` and ``scale_percent`` stats under its full action name.
 
 .. _config_overload_manager_limiting_connections:
 
