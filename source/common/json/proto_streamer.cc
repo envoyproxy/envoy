@@ -15,6 +15,7 @@ namespace {
 using Field = Protobuf::FieldDescriptor;
 
 // Returns the value of `field`, from element `index` if the field is repeated.
+// Pass a negative `index` to get the whole field.
 #define REFLECTION_GET(Type, field, index)                                                         \
   (index < 0 ? reflection.Get##Type(message, &field)                                               \
              : reflection.GetRepeated##Type(message, &field, index))
@@ -36,7 +37,7 @@ bool hasSpecialRepresentation(const Protobuf::Message& message) {
 
 constexpr absl::string_view RedactedText = "[redacted]";
 
-const std::string& redactedBytes() {
+const std::string& redactedBase64() {
   CONSTRUCT_ON_FIRST_USE(std::string, Base64::encode(RedactedText));
 }
 
@@ -64,7 +65,7 @@ bool isTypedStruct(const Protobuf::Descriptor& descriptor) {
   return name == "xds.type.v3.TypedStruct" || name == "udpa.type.v1.TypedStruct";
 }
 
-// Converts map key `field` to a string.
+// Render map key 'field's value as a string.
 absl::string_view mapKeyToString(const Protobuf::Message& entry, const Field& field,
                                  std::string& scratch) {
   const Protobuf::Reflection& reflection = *entry.GetReflection();
@@ -169,9 +170,12 @@ void MessageStreamer::nextElement(Frame& frame) {
     return;
   }
 
-  // Keys are left alone, redacting them would collapse the map onto one key.
+  // A repeated field's level is always BufferStreamer::Array, unless it is a map,
+  // in which case it is BufferStreamer::Map, so the static_cast is safe.
+  // The level is created in MessageStreamer::startField.
   BufferStreamer::Map& entries = static_cast<BufferStreamer::Map&>(*frame.elements_);
   const Protobuf::Message& entry = reflection.GetRepeatedMessage(frame.message_, &field, index);
+  // Keys are left alone, redacting them would collapse the map onto one key.
   entries.addKey(mapKeyToString(entry, *field.message_type()->map_key(), scratch_));
   emitValue(entry, *field.message_type()->map_value(), -1, entries, frame.field_is_sensitive_);
 }
@@ -188,6 +192,8 @@ void MessageStreamer::startField(Frame& frame) {
   }
 
   frame.map_->addKey(json_names_ ? field.json_name() : field.name());
+  // is_map implies is_repeated, so handle it first.
+  // https://protobuf.dev/programming-guides/proto3/#backwards
   if (field.is_map()) {
     frame.elements_ = frame.map_->addMap();
     return;
@@ -259,7 +265,7 @@ void MessageStreamer::emitValue(const Protobuf::Message& message, const Field& f
   }
   case Field::CPPTYPE_STRING: {
     if (is_sensitive) {
-      level.addString(field.type() == Field::TYPE_BYTES ? absl::string_view(redactedBytes())
+      level.addString(field.type() == Field::TYPE_BYTES ? absl::string_view(redactedBase64())
                                                         : RedactedText);
       return;
     }
