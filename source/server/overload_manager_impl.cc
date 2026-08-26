@@ -8,6 +8,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
 #include "source/common/config/utility.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -181,15 +182,17 @@ parseTimerMinimums(const Protobuf::Any& typed_config,
   return timer_minimums;
 }
 
-absl::StatusOr<Event::ScaledTimerType> parseTimerTypeSuffix(absl::string_view action_name) {
+const std::string& reduceTimeoutsActionPrefix() {
+  CONSTRUCT_ON_FIRST_USE(std::string, absl::StrCat(OverloadActionNames::get().ReduceTimeouts, "."));
+}
+
+absl::StatusOr<Event::ScaledTimerType> parseTimerTypeSuffix(absl::string_view suffix) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
-  const std::string prefix = absl::StrCat(OverloadActionNames::get().ReduceTimeouts, ".");
   Config::TimerType config_timer_type;
-  if (!Config::TimerType_Parse(std::string(action_name.substr(prefix.size())),
-                               &config_timer_type) ||
+  if (!Config::TimerType_Parse(std::string(suffix), &config_timer_type) ||
       config_timer_type == Config::UNSPECIFIED) {
     return absl::InvalidArgumentError(
-        fmt::format("Invalid reduce_timeouts action name {}", action_name));
+        fmt::format("Invalid reduce_timeouts timer type suffix {}", suffix));
   }
   return parseTimerType(config_timer_type);
 }
@@ -215,13 +218,16 @@ public:
 
   void setScaleFactor(UnitFloat scale_factor) override {
     main_manager_->setScaleFactor(scale_factor);
+    for (const auto& timer_manager : timer_managers_) {
+      timer_manager.second->setScaleFactor(scale_factor);
+    }
   }
 
   Event::ScaledRangeTimerManager* addTimerManager(Event::ScaledTimerType timer_type,
                                                   Event::ScaledRangeTimerManagerPtr timer_manager) {
-    Event::ScaledRangeTimerManager* manager = timer_manager.get();
-    timer_managers_.emplace(timer_type, std::move(timer_manager));
-    return manager;
+    const auto [manager, inserted] = timer_managers_.emplace(timer_type, std::move(timer_manager));
+    ASSERT(inserted);
+    return manager->second.get();
   }
 
 private:
@@ -525,8 +531,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     }
   }
 
-  const std::string reduce_timeouts_prefix =
-      absl::StrCat(OverloadActionNames::get().ReduceTimeouts, ".");
+  const absl::string_view reduce_timeouts_prefix = reduceTimeoutsActionPrefix();
   absl::flat_hash_map<Event::ScaledTimerType, std::string> timer_actions;
 
   for (const auto& action : config.actions()) {
@@ -547,7 +552,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
 
     std::optional<Event::ScaledTimerType> suffixed_timer_type;
     if (is_suffixed_reduce_timeouts) {
-      auto timer_type_or_error = parseTimerTypeSuffix(name);
+      auto timer_type_or_error = parseTimerTypeSuffix(name.substr(reduce_timeouts_prefix.size()));
       SET_AND_RETURN_IF_NOT_OK(timer_type_or_error.status(), creation_status);
       suffixed_timer_type = *timer_type_or_error;
     }
@@ -570,11 +575,17 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       auto timer_or_error = parseTimerMinimums(action.typed_config(), validation_visitor);
       SET_AND_RETURN_IF_NOT_OK(timer_or_error.status(), creation_status);
 
-      if (suffixed_timer_type.has_value() &&
-          (timer_or_error->size() != 1 || !timer_or_error->contains(*suffixed_timer_type))) {
-        creation_status = absl::InvalidArgumentError(fmt::format(
-            "Overload action {} must configure exactly the timer type named by its suffix", name));
-        return;
+      if (suffixed_timer_type.has_value()) {
+        if (timer_or_error->size() != 1) {
+          creation_status = absl::InvalidArgumentError(
+              fmt::format("Overload action {} must configure exactly one timer type", name));
+          return;
+        }
+        if (!timer_or_error->contains(*suffixed_timer_type)) {
+          creation_status = absl::InvalidArgumentError(fmt::format(
+              "Overload action {} configures a timer type that does not match its suffix", name));
+          return;
+        }
       }
 
       for (const auto& timer_minimum : *timer_or_error) {

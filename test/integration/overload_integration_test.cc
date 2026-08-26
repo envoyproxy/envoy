@@ -973,7 +973,7 @@ protected:
               "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
               timer_scale_factors:
                 - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
-                  min_timeout: 5s
+                  min_timeout: 3s
           - name: "envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE"
             triggers:
               - name: "envoy.resource_monitors.testonly.fake_resource_monitor2"
@@ -992,7 +992,9 @@ protected:
     config_helper_.addConfigModifier(
         [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 cm) -> void {
-          cm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->MergeFrom(
+          auto* options = cm.mutable_common_http_protocol_options();
+          options->mutable_idle_timeout()->MergeFrom(ProtobufUtil::TimeUtil::SecondsToDuration(20));
+          options->mutable_max_connection_duration()->MergeFrom(
               ProtobufUtil::TimeUtil::SecondsToDuration(20));
         });
     initialize();
@@ -1029,6 +1031,7 @@ private:
       return monitor;
     }
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      // FactoryRegistry requires each registered factory to have a distinct config proto type.
       return std::make_unique<Protobuf::Timestamp>();
     }
     std::string name() const override {
@@ -1053,28 +1056,38 @@ INSTANTIATE_TEST_SUITE_P(Protocols, MultipleReduceTimeoutsActionsIntegrationTest
 TEST_P(MultipleReduceTimeoutsActionsIntegrationTest, TimerTypesScaleIndependently) {
   initializeOverloadManager();
 
-  // Saturating the resource for the unsuffixed action affects the maximum connection timer but not
-  // the idle connection timer owned by the suffixed action.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  ASSERT_TRUE(codec_client_->connected());
+
+  // Saturating only the resource for the unsuffixed action reduces the maximum connection duration
+  // to 3 seconds. The idle timeout owned by the suffixed action remains at 20 seconds.
   updateResource(0.9);
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
                              Eq(100));
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_"
                              "CONNECTION_IDLE.scale_percent",
                              Eq(0));
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  test_server_->waitForCounter("http.config_test.downstream_cx_max_duration_reached", Eq(1));
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
+  codec_client_->close();
 
-  // Saturating the suffixed action's resource affects its idle connection timer independently.
-  updateSecondResource(0.9);
-  test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_"
-                             "CONNECTION_IDLE.scale_percent",
-                             Eq(100));
-
-  // Clearing the unsuffixed action does not clear the suffixed action.
+  // Saturating only the suffixed action's resource reduces the idle timeout to 5 seconds. A new
+  // connection's maximum duration remains at 20 seconds.
   updateResource(0);
+  updateSecondResource(0.9);
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
                              Eq(0));
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_"
                              "CONNECTION_IDLE.scale_percent",
                              Eq(100));
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  ASSERT_TRUE(codec_client_->connected());
+  timeSystem().advanceTimeWait(std::chrono::seconds(5));
+  test_server_->waitForCounter("http.config_test.downstream_cx_idle_timeout", Eq(1));
+  EXPECT_EQ(1,
+            test_server_->counter("http.config_test.downstream_cx_max_duration_reached")->value());
+  codec_client_->close();
 }
 
 class LoadShedPointIntegrationTest : public BaseOverloadIntegrationTest,

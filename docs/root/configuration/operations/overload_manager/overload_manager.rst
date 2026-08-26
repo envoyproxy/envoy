@@ -322,6 +322,10 @@ use the name ``envoy.overload_actions.reduce_timeouts.<TIMER_TYPE>``, where ``<T
 timer type configured by that action. Each suffixed action must configure exactly one matching timer
 type, and a timer type cannot be configured by more than one action.
 
+An invalid timer-type suffix, a suffixed action that configures multiple timer types or a timer type
+that does not match its suffix, or multiple actions that configure the same timer type cause the
+overload manager configuration to be rejected at startup.
+
 .. code-block:: yaml
 
   actions:
