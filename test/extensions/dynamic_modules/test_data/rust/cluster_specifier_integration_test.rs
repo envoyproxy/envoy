@@ -41,6 +41,7 @@ fn init() -> bool {
 fn new_cluster_specifier_config_fn(
   name: &str,
   config: &[u8],
+  _metrics: std::sync::Arc<dyn EnvoyClusterSpecifierMetrics>,
 ) -> Option<Box<dyn ClusterSpecifierConfig>> {
   match name {
     "test_cluster_specifier" => Some(Box::new(TestClusterSpecifierConfig {
@@ -116,6 +117,19 @@ fn read_echoed_value(ctx: &ClusterSpecifierContext, name: &[u8]) -> String {
       .map_or_else(|| ABSENT.to_owned(), |value| value.to_string()),
     b"route-name" => buffer_to_string_or_absent(ctx.route_name()),
     b"random-value" => ctx.random_value().to_string(),
+    b"cluster-host-count" => {
+      let cluster_name = ctx
+        .get_request_header("x-query-cluster")
+        .map(buffer_to_string)
+        .unwrap_or_default();
+      let priority = read_u64_header(ctx, "x-query-priority").unwrap_or(0) as u32;
+      ctx
+        .get_cluster_host_count(&cluster_name, priority)
+        .map_or_else(
+          || ABSENT.to_owned(),
+          |counts| format!("{}/{}/{}", counts.total, counts.healthy, counts.degraded),
+        )
+    },
     _ => ABSENT.to_owned(),
   }
 }

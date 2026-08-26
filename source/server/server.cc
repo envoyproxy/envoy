@@ -401,24 +401,12 @@ void InstanceUtil::raiseFileLimits() {
   if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.raise_file_limits")) {
     return;
   }
-  struct rlimit rlim;
-  if (const auto result = Api::OsSysCallsSingleton::get().getrlimit(RLIMIT_NOFILE, &rlim);
+  if (const auto result = Api::OsSysCallsSingleton::get().raiseFileLimits();
       result.return_value_ != 0) {
-    ENVOY_LOG(warn, "Failed to read file descriptor limit, error {}.", errorDetails(result.errno_));
-    return;
-  }
-  const auto old = rlim.rlim_cur;
-  if (old == rlim.rlim_max) {
-    return;
-  }
-  rlim.rlim_cur = rlim.rlim_max;
-  if (const auto result = Api::OsSysCallsSingleton::get().setrlimit(RLIMIT_NOFILE, &rlim);
-      result.return_value_ != 0) {
-    ENVOY_LOG(warn, "Failed to raise file descriptor limit to maximum, error {}.",
+    ENVOY_LOG(warn, "Failed to raise file descriptor limit, error {}.",
               errorDetails(result.errno_));
     return;
   }
-  ENVOY_LOG(info, "Raised file descriptor limits from {} to {}.", old, rlim.rlim_max);
 }
 
 void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_address,

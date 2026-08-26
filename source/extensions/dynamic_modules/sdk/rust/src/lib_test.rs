@@ -5045,6 +5045,105 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_config_record_histogram_
   abi::envoy_dynamic_module_type_metrics_result::Success
 }
 
+// Cluster specifier config metrics FFI stubs for testing.
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  counter_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  unsafe {
+    *counter_id_ptr = 1;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  unsafe {
+    *gauge_id_ptr = 1;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  histogram_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  unsafe {
+    *histogram_id_ptr = 1;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
@@ -8958,6 +9057,26 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_dynamic_me
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _priority: u32,
+  total_count: *mut usize,
+  healthy_count: *mut usize,
+  degraded_count: *mut usize,
+) -> bool {
+  if !STUB_SPECIFIER_STATE_PRESENT.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  unsafe {
+    *total_count = 5;
+    *healthy_count = 3;
+    *degraded_count = 1;
+  }
+  true
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_route_name(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
   result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
@@ -9057,8 +9176,9 @@ fn test_envoy_dynamic_module_on_cluster_specifier_config_new_impl() {
   }
 
   let mut new_fn: NewClusterSpecifierConfigFunction =
-    |_, _| Some(Box::new(TestClusterSpecifierConfig));
+    |_, _, _| Some(Box::new(TestClusterSpecifierConfig));
   let result = cluster_specifier::envoy_dynamic_module_on_cluster_specifier_config_new_impl(
+    std::ptr::null_mut(),
     "test_cluster_specifier",
     b"config",
     &new_fn,
@@ -9069,8 +9189,9 @@ fn test_envoy_dynamic_module_on_cluster_specifier_config_new_impl() {
   }
 
   // None should result in a null pointer (e.g. unknown specifier name).
-  new_fn = |_, _| None;
+  new_fn = |_, _, _| None;
   let result = cluster_specifier::envoy_dynamic_module_on_cluster_specifier_config_new_impl(
+    std::ptr::null_mut(),
     "test_cluster_specifier",
     b"config",
     &new_fn,
@@ -9094,8 +9215,10 @@ fn test_envoy_dynamic_module_on_cluster_specifier_config_destroy() {
     }
   }
 
-  let new_fn: NewClusterSpecifierConfigFunction = |_, _| Some(Box::new(TestClusterSpecifierConfig));
+  let new_fn: NewClusterSpecifierConfigFunction =
+    |_, _, _| Some(Box::new(TestClusterSpecifierConfig));
   let config_ptr = cluster_specifier::envoy_dynamic_module_on_cluster_specifier_config_new_impl(
+    std::ptr::null_mut(),
     "test_cluster_specifier",
     b"",
     &new_fn,
@@ -9124,11 +9247,12 @@ fn test_envoy_dynamic_module_on_cluster_specifier_select() {
     }
   }
 
-  let new_fn: NewClusterSpecifierConfigFunction = |_, config| {
+  let new_fn: NewClusterSpecifierConfigFunction = |_, config, _| {
     CONFIG_BYTES_SEEN.lock().unwrap().extend_from_slice(config);
     Some(Box::new(TestClusterSpecifierConfig { decide: true }))
   };
   let config_ptr = cluster_specifier::envoy_dynamic_module_on_cluster_specifier_config_new_impl(
+    std::ptr::null_mut(),
     "test_cluster_specifier",
     b"prefix",
     &new_fn,
@@ -9158,8 +9282,9 @@ fn test_envoy_dynamic_module_on_cluster_specifier_select() {
   // A config that reports no decision is reported as such, which makes Envoy discard everything
   // the module set.
   let new_fn: NewClusterSpecifierConfigFunction =
-    |_, _| Some(Box::new(TestClusterSpecifierConfig { decide: false }));
+    |_, _, _| Some(Box::new(TestClusterSpecifierConfig { decide: false }));
   let config_ptr = cluster_specifier::envoy_dynamic_module_on_cluster_specifier_config_new_impl(
+    std::ptr::null_mut(),
     "test_cluster_specifier",
     b"",
     &new_fn,
@@ -9267,6 +9392,10 @@ fn test_cluster_specifier_context_reads_request_state() {
     ctx.route_name().unwrap().as_slice()
   );
   assert_eq!(STUB_SPECIFIER_RANDOM_VALUE, ctx.random_value());
+  let counts = ctx.get_cluster_host_count("prod", 0).unwrap();
+  assert_eq!(5, counts.total);
+  assert_eq!(3, counts.healthy);
+  assert_eq!(1, counts.degraded);
 
   // An empty header map returns an empty vector without invoking the fill callback.
   STUB_SPECIFIER_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -9297,6 +9426,7 @@ fn test_cluster_specifier_context_reads_request_state() {
   assert!(ctx
     .get_dynamic_metadata_bool("envoy.test", "canary")
     .is_none());
+  assert!(ctx.get_cluster_host_count("prod", 0).is_none());
   assert!(ctx.route_name().is_none());
   STUB_SPECIFIER_STATE_PRESENT.store(true, std::sync::atomic::Ordering::SeqCst);
 }

@@ -63,10 +63,11 @@ envoy_cc_test_library(
     name = "config_test_lib",
     srcs = ["config_test.cc"],
     hdrs = ["config_test.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:custom_stat_namespaces_lib",
         "//source/server:configuration_lib",
         "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",
