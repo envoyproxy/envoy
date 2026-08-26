@@ -1,6 +1,7 @@
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 
 #include <string>
+#include "absl/status/statusor.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/common/optref.h"
@@ -180,8 +181,14 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
           factory_context.clusterManager(), *http_service, headers_applicator);
     } else if (custom_exporter_factory != nullptr && shared_unpacked_config != nullptr &&
                worker_factory_context != nullptr) {
-      exporter =
+      auto exporter_or_error =
           custom_exporter_factory->createExporter(*shared_unpacked_config, *worker_factory_context);
+      if (exporter_or_error.ok()) {
+        exporter = std::move(exporter_or_error.value());
+      } else {
+        ENVOY_LOG(error, "Failed to create custom exporter for OpenTelemetry tracer: {}",
+                  exporter_or_error.status());
+      }
     }
     if (exporter == nullptr) {
       ENVOY_LOG(warn, "OpenTelemetry tracer initialized without a valid exporter; "

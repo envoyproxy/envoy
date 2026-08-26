@@ -5,6 +5,7 @@
 
 #include "source/common/common/logger.h"
 
+#include "absl/status/statusor.h"
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
@@ -70,9 +71,9 @@ public:
    *
    * @param config The exporter protobuf config.
    * @param context The TracerFactoryContext.
-   * @return OpenTelemetryTraceExporterPtr A trace exporter.
+   * @return absl::StatusOr<OpenTelemetryTraceExporterPtr> A trace exporter. Errors must be reported via absl::Status inside absl::StatusOr and never via thrown C++ exceptions.
    */
-  virtual OpenTelemetryTraceExporterPtr
+  virtual absl::StatusOr<OpenTelemetryTraceExporterPtr>
   createExporter(const Protobuf::Message& config,
                  Server::Configuration::TracerFactoryContext& context) const PURE;
 

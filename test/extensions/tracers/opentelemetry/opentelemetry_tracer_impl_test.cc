@@ -1,5 +1,6 @@
 #include <sys/types.h>
 
+#include "absl/status/statusor.h"
 #include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
 
@@ -55,7 +56,7 @@ public:
 
 class DummyTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
 public:
-  OpenTelemetryTraceExporterPtr
+  absl::StatusOr<OpenTelemetryTraceExporterPtr>
   createExporter(const Protobuf::Message& config,
                  Server::Configuration::TracerFactoryContext& /*context*/) const override {
     EXPECT_NE(dynamic_cast<const Protobuf::Empty*>(&config), nullptr);
@@ -75,10 +76,10 @@ REGISTER_FACTORY(DummyTraceExporterFactory, OpenTelemetryTraceExporterFactory);
 
 class NullTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
 public:
-  OpenTelemetryTraceExporterPtr
+  absl::StatusOr<OpenTelemetryTraceExporterPtr>
   createExporter(const Protobuf::Message& /*config*/,
                  Server::Configuration::TracerFactoryContext& /*context*/) const override {
-    return nullptr;
+    return OpenTelemetryTraceExporterPtr(nullptr);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

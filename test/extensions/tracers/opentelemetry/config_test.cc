@@ -3,6 +3,7 @@
 #include "envoy/config/trace/v3/opentelemetry.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "absl/status/statusor.h"
 #include "source/extensions/tracers/opentelemetry/config.h"
 #include "source/extensions/tracers/opentelemetry/trace_exporter.h"
 
@@ -103,7 +104,7 @@ public:
 
 class DummyTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
 public:
-  OpenTelemetryTraceExporterPtr
+  absl::StatusOr<OpenTelemetryTraceExporterPtr>
   createExporter(const Protobuf::Message& config,
                  Server::Configuration::TracerFactoryContext& /*context*/) const override {
     EXPECT_NE(dynamic_cast<const Protobuf::Empty*>(&config), nullptr);
@@ -123,7 +124,7 @@ REGISTER_FACTORY(DummyTraceExporterFactory, OpenTelemetryTraceExporterFactory);
 
 class NullConfigTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
 public:
-  OpenTelemetryTraceExporterPtr
+  absl::StatusOr<OpenTelemetryTraceExporterPtr>
   createExporter(const Protobuf::Message& /*config*/,
                  Server::Configuration::TracerFactoryContext& /*context*/) const override {
     return std::make_unique<DummyTraceExporter>();
