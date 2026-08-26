@@ -34,6 +34,7 @@ envoy_extension_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/router/cluster_specifiers/dynamic_modules/v3:pkg_cc_proto",

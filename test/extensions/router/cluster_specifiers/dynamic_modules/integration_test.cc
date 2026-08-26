@@ -207,6 +207,22 @@ TEST_P(DynamicModuleClusterSpecifierIntegrationTest, SelectsCluster) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// The module defines metrics at configuration time and records them on each selection, so a
+// request that selects a cluster increments both the plain counter and the counter labeled with
+// the selected env.
+TEST_P(DynamicModuleClusterSpecifierIntegrationTest, RecordsSelectionMetrics) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(requestHeaders({{"env", "prod"}}));
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  test_server_->waitForCounter("dynamicmodulescustom.selections_total", testing::Ge(1));
+  test_server_->waitForCounter("dynamicmodulescustom.selections_by_env.env.prod", testing::Ge(1));
+}
+
 // Setting every property the module can select still routes the request.
 TEST_P(DynamicModuleClusterSpecifierIntegrationTest, SelectsClusterWithRouteActionOverride) {
   setupTest();

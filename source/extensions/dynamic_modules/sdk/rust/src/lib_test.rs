@@ -9494,3 +9494,270 @@ fn test_cluster_specifier_context_records_selection() {
   assert_eq!(Some(u64::MAX), selection.timeout_ms);
   assert_eq!(Some(u64::MAX), selection.idle_timeout_ms);
 }
+
+// =============================================================================
+// Cluster Specifier Metrics Tests
+// =============================================================================
+
+// The cluster specifier module is not glob re-exported at the crate root, so bring its metrics
+// trait into scope to call it on the generated mock.
+use crate::cluster_specifier::EnvoyClusterSpecifierMetrics;
+
+#[test]
+fn test_cluster_specifier_metrics_define_counter() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_counter()
+    .with(mockall::predicate::eq("test_counter"))
+    .returning(|_| Ok(EnvoyCounterId(1)));
+  let result = mock.define_counter("test_counter");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyCounterId(1));
+}
+
+#[test]
+fn test_cluster_specifier_metrics_define_gauge() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_gauge()
+    .with(mockall::predicate::eq("test_gauge"))
+    .returning(|_| Ok(EnvoyGaugeId(1)));
+  let result = mock.define_gauge("test_gauge");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyGaugeId(1));
+}
+
+#[test]
+fn test_cluster_specifier_metrics_define_histogram() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_histogram()
+    .with(mockall::predicate::eq("test_histogram"))
+    .returning(|_| Ok(EnvoyHistogramId(1)));
+  let result = mock.define_histogram("test_histogram");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyHistogramId(1));
+}
+
+#[test]
+fn test_cluster_specifier_metrics_increment_counter() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_increment_counter()
+    .with(
+      mockall::predicate::eq(EnvoyCounterId(1)),
+      mockall::predicate::eq(5u64),
+    )
+    .returning(|_, _| Ok(()));
+  assert!(mock.increment_counter(EnvoyCounterId(1), 5).is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_increment_counter_invalid_id() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_increment_counter()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock.increment_counter(EnvoyCounterId(999), 1).is_err());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_gauge_operations() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_set_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(42u64),
+    )
+    .returning(|_, _| Ok(()));
+  mock
+    .expect_increase_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(10u64),
+    )
+    .returning(|_, _| Ok(()));
+  mock
+    .expect_decrease_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(5u64),
+    )
+    .returning(|_, _| Ok(()));
+  assert!(mock.set_gauge(EnvoyGaugeId(1), 42).is_ok());
+  assert!(mock.increase_gauge(EnvoyGaugeId(1), 10).is_ok());
+  assert!(mock.decrease_gauge(EnvoyGaugeId(1), 5).is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_gauge_invalid_id() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_set_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_increase_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_decrease_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock.set_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(mock.increase_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(mock.decrease_gauge(EnvoyGaugeId(999), 1).is_err());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_record_histogram_value() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_record_histogram_value()
+    .with(
+      mockall::predicate::eq(EnvoyHistogramId(1)),
+      mockall::predicate::eq(42u64),
+    )
+    .returning(|_, _| Ok(()));
+  assert!(mock.record_histogram_value(EnvoyHistogramId(1), 42).is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_record_histogram_value_invalid_id() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_record_histogram_value()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock
+    .record_histogram_value(EnvoyHistogramId(999), 1)
+    .is_err());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_define_all_metric_types_and_use() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_counter()
+    .returning(|_| Ok(EnvoyCounterId(1)));
+  mock
+    .expect_define_gauge()
+    .returning(|_| Ok(EnvoyGaugeId(1)));
+  mock
+    .expect_define_histogram()
+    .returning(|_| Ok(EnvoyHistogramId(1)));
+  mock.expect_increment_counter().returning(|_, _| Ok(()));
+  mock.expect_set_gauge().returning(|_, _| Ok(()));
+  mock
+    .expect_record_histogram_value()
+    .returning(|_, _| Ok(()));
+
+  let counter_id = mock.define_counter("c").unwrap();
+  let gauge_id = mock.define_gauge("g").unwrap();
+  let histogram_id = mock.define_histogram("h").unwrap();
+  assert!(mock.increment_counter(counter_id, 1).is_ok());
+  assert!(mock.set_gauge(gauge_id, 100).is_ok());
+  assert!(mock.record_histogram_value(histogram_id, 50).is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_define_counter_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_counter_vec()
+    .returning(|_, _| Ok(EnvoyCounterVecId(1)));
+  let result = mock.define_counter_vec("test_counter", &["region", "zone"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyCounterVecId(1));
+}
+
+#[test]
+fn test_cluster_specifier_metrics_define_gauge_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_gauge_vec()
+    .returning(|_, _| Ok(EnvoyGaugeVecId(1)));
+  let result = mock.define_gauge_vec("test_gauge", &["env"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyGaugeVecId(1));
+}
+
+#[test]
+fn test_cluster_specifier_metrics_define_histogram_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_histogram_vec()
+    .returning(|_, _| Ok(EnvoyHistogramVecId(1)));
+  let result = mock.define_histogram_vec("test_histogram", &["method"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyHistogramVecId(1));
+}
+
+#[test]
+fn test_cluster_specifier_metrics_increment_counter_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_increment_counter_vec()
+    .returning(|_, _, _| Ok(()));
+  assert!(mock
+    .increment_counter_vec(EnvoyCounterVecId(1), &["us-east-1"], 1)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_set_gauge_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock.expect_set_gauge_vec().returning(|_, _, _| Ok(()));
+  assert!(mock
+    .set_gauge_vec(EnvoyGaugeVecId(1), &["prod"], 42)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_increase_gauge_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock.expect_increase_gauge_vec().returning(|_, _, _| Ok(()));
+  assert!(mock
+    .increase_gauge_vec(EnvoyGaugeVecId(1), &["prod"], 10)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_decrease_gauge_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock.expect_decrease_gauge_vec().returning(|_, _, _| Ok(()));
+  assert!(mock
+    .decrease_gauge_vec(EnvoyGaugeVecId(1), &["prod"], 5)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_record_histogram_value_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_record_histogram_value_vec()
+    .returning(|_, _, _| Ok(()));
+  assert!(mock
+    .record_histogram_value_vec(EnvoyHistogramVecId(1), &["GET"], 100)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_vec_metric_invalid_id() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_increment_counter_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_set_gauge_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_record_histogram_value_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock
+    .increment_counter_vec(EnvoyCounterVecId(999), &["v1"], 1)
+    .is_err());
+  assert!(mock
+    .set_gauge_vec(EnvoyGaugeVecId(999), &["v1"], 1)
+    .is_err());
+  assert!(mock
+    .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
+    .is_err());
+}
