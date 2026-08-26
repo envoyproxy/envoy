@@ -242,7 +242,9 @@ std::string JA4Fingerprinter::getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_cl
             if (!CBS_get_u16(&sig_alg_data, &sig_alg)) {
               break;
             }
-            sig_algs.push_back(sig_alg);
+            if (isNotGrease(sig_alg)) {
+              sig_algs.push_back(sig_alg);
+            }
           }
         }
       }
