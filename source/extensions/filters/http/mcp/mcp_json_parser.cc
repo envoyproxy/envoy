@@ -54,6 +54,20 @@ void McpParserConfig::initializeDefaults() {
                   {AttributeExtractionRule(std::string(Paths::PARAMS_PROTOCOL_VERSION)),
                    AttributeExtractionRule(std::string(Paths::PARAMS_CLIENT_INFO_NAME))});
 
+  // Discovery.
+  addMethodConfig(Methods::SERVER_DISCOVER, {});
+
+  // Subscriptions.
+  addMethodConfig(Methods::SUBSCRIPTIONS_LISTEN, {});
+
+  // Tasks.
+  addMethodConfig(Methods::TASKS_GET,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_TASK_ID))});
+  addMethodConfig(Methods::TASKS_UPDATE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_TASK_ID))});
+  addMethodConfig(Methods::TASKS_CANCEL,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_TASK_ID))});
+
   // Notifications.
   addMethodConfig(Methods::NOTIFICATION_INITIALIZED, {});
   addMethodConfig(Methods::NOTIFICATION_CANCELLED,
@@ -149,6 +163,21 @@ std::string McpParserConfig::getBuiltInMethodGroup(const std::string& method) co
   // Lifecycle methods
   if (method == INITIALIZE || method == NOTIFICATION_INITIALIZED || method == PING) {
     return std::string(LIFECYCLE);
+  }
+
+  // Discovery methods
+  if (method == SERVER_DISCOVER) {
+    return std::string(DISCOVERY);
+  }
+
+  // Subscription methods
+  if (method == SUBSCRIPTIONS_LISTEN) {
+    return std::string(SUBSCRIPTION);
+  }
+
+  // Task methods
+  if (method == TASKS_GET || method == TASKS_UPDATE || method == TASKS_CANCEL) {
+    return std::string(TASK);
   }
 
   // Tool methods
@@ -491,7 +520,7 @@ McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
     // Store in temp storage
     Protobuf::Value proto_value;
     proto_value.set_string_value(std::string(value));
-    storeField(full_path, proto_value);
+    storeField(full_path, name, proto_value);
   }
 
   return this;
@@ -509,7 +538,7 @@ McpFieldExtractor* McpFieldExtractor::RenderBool(absl::string_view name, bool va
   if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
     Protobuf::Value proto_value;
     proto_value.set_bool_value(value);
-    storeField(full_path, proto_value);
+    storeField(full_path, name, proto_value);
   }
 
   return this;
@@ -535,7 +564,7 @@ McpFieldExtractor* McpFieldExtractor::RenderInt64(absl::string_view name, int64_
   if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
     Protobuf::Value proto_value;
     proto_value.set_number_value(static_cast<double>(value));
-    storeField(full_path, proto_value);
+    storeField(full_path, name, proto_value);
   }
 
   return this;
@@ -553,7 +582,7 @@ McpFieldExtractor* McpFieldExtractor::RenderUint64(absl::string_view name, uint6
   if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
     Protobuf::Value proto_value;
     proto_value.set_number_value(static_cast<double>(value));
-    storeField(full_path, proto_value);
+    storeField(full_path, name, proto_value);
   }
 
   return this;
@@ -571,7 +600,7 @@ McpFieldExtractor* McpFieldExtractor::RenderDouble(absl::string_view name, doubl
   if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
     Protobuf::Value proto_value;
     proto_value.set_number_value(value);
-    storeField(full_path, proto_value);
+    storeField(full_path, name, proto_value);
   }
 
   return this;
@@ -593,7 +622,7 @@ McpFieldExtractor* McpFieldExtractor::RenderNull(absl::string_view name) {
   if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
     Protobuf::Value proto_value;
     proto_value.set_null_value(Protobuf::NULL_VALUE);
-    storeField(full_path, proto_value);
+    storeField(full_path, name, proto_value);
   }
 
   return this;
@@ -603,14 +632,14 @@ McpFieldExtractor* McpFieldExtractor::RenderBytes(absl::string_view name, absl::
   return RenderString(name, value);
 }
 
-void McpFieldExtractor::storeField(const std::string& path, const Protobuf::Value& value) {
+void McpFieldExtractor::storeField(const std::string& path, absl::string_view name,
+                                   const Protobuf::Value& value) {
   // Store in nested structure in temp storage
   if (!context_stack_.empty() && context_stack_.top().struct_ptr) {
     auto* current = context_stack_.top().struct_ptr;
-    size_t last_dot = path.rfind('.');
-    std::string field_name = (last_dot != std::string::npos) ? path.substr(last_dot + 1) : path;
-    if (!field_name.empty()) {
-      (*current->mutable_fields())[field_name] = value;
+
+    if (!name.empty()) {
+      (*current->mutable_fields())[std::string(name)] = value;
     }
   }
 

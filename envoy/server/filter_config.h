@@ -253,6 +253,62 @@ struct ExtraFactoryContext {
   // owns the filter configuration is warmed up, so factories may register init targets with it but
   // must never store the reference.
   OptRef<Init::Manager> init_manager = std::nullopt;
+  // Optional stats scope that the filter configuration should use to create its own stats. May be
+  // nullopt for contexts where no specific scope is available, such as route specific filter
+  // configurations. When it is nullopt, factories that need a scope should fall back to the scope
+  // of the ServerFactoryContext.
+  OptRef<Stats::Scope> scope = std::nullopt;
+  // Whether the filter is being created for an upstream filter chain rather than a downstream one.
+  // Only dual filters, that is filters that can be configured in both the downstream and the
+  // upstream filter chains, need to care about this. It is always false for contexts that can only
+  // ever be downstream, such as route specific filter configurations.
+  bool is_upstream = false;
+
+  /**
+   * @return the scope to use for stats: this context's own scope if it has one, otherwise the scope
+   *         of the given server factory context. Filters should prefer this over reading scope
+   *         directly so that they work on both the listener/cluster and the route/embedded paths.
+   */
+  template <class ContextType> Stats::Scope& scopeOr(ContextType& context) const {
+    return scope.has_value() ? scope.ref() : context.scope();
+  }
+
+  /**
+   * Create an extra factory context for a downstream (listener) filter chain.
+   *
+   * NOTE: the returned struct only holds references to the arguments, so both the context and the
+   * stat prefix must outlive the returned struct.
+   *
+   * @param context the downstream factory context.
+   * @param stats_prefix prefix for stat logging.
+   * @return ExtraFactoryContext the extra factory context.
+   */
+  static ExtraFactoryContext create(FactoryContext& context, const std::string& stats_prefix) {
+    ExtraFactoryContext extra_context{context.messageValidationVisitor(), stats_prefix};
+    extra_context.init_manager = context.initManager();
+    extra_context.scope = context.scope();
+    return extra_context;
+  }
+
+  /**
+   * Create an extra factory context for an upstream (cluster) filter chain.
+   *
+   * NOTE: the returned struct only holds references to the arguments, so both the context and the
+   * stat prefix must outlive the returned struct.
+   *
+   * @param context the upstream factory context.
+   * @param stats_prefix prefix for stat logging.
+   * @return ExtraFactoryContext the extra factory context.
+   */
+  static ExtraFactoryContext create(UpstreamFactoryContext& context,
+                                    const std::string& stats_prefix) {
+    ExtraFactoryContext extra_context{context.serverFactoryContext().messageValidationVisitor(),
+                                      stats_prefix};
+    extra_context.init_manager = context.initManager();
+    extra_context.scope = context.scope();
+    extra_context.is_upstream = true;
+    return extra_context;
+  }
 };
 
 /**
@@ -340,6 +396,13 @@ public:
                                        Server::Configuration::ServerFactoryContext&) {
     return false;
   }
+
+  /**
+   * @return bool true if this filter is a unified filter that implements
+   * createHttpFilterFactoryFromProto to replace createFilterFactoryFromProto completely. This is
+   * used to differentiate unified filters from legacy filters.
+   */
+  virtual bool isUnifiedFilter() { return false; }
 };
 
 class NamedHttpFilterConfigFactory : public virtual HttpFilterConfigFactoryBase {
@@ -420,6 +483,28 @@ public:
   virtual absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::UpstreamFactoryContext& context) PURE;
+
+  /**
+   * Create a particular http filter factory implementation. If the implementation is unable to
+   * produce a factory with the provided parameters, it should return an error status.
+   * The returned callback should always be initialized.
+   *
+   * @param config supplies the general Protobuf message to be marshaled into a filter-specific
+   * configuration.
+   * @param context supplies the filter's context.
+   * @param extra_context supplies the filter's extra context.
+   * @return Http::FilterFactoryCb the factory creation function.
+   */
+  virtual absl::StatusOr<Http::FilterFactoryCb>
+  createHttpFilterFactoryFromProto(const Protobuf::Message& config,
+                                   Server::Configuration::ServerFactoryContext& context,
+                                   ExtraFactoryContext& extra_context) {
+    UNREFERENCED_PARAMETER(config);
+    UNREFERENCED_PARAMETER(context);
+    UNREFERENCED_PARAMETER(extra_context);
+    return absl::UnimplementedError(
+        "createHttpFilterFactoryFromProto is not implemented for this filter");
+  }
 };
 
 } // namespace Configuration

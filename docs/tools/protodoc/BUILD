@@ -1,8 +1,8 @@
-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load("@docs_pip3//:requirements.bzl", "requirement")
 load("@envoy//tools/base:envoy_python.bzl", "envoy_jinja_env", "envoy_py_data")
 load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@grpc//bazel:python_rules.bzl", "py_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 
@@ -24,7 +24,7 @@ proto_library(
     name = "manifest_proto",
     srcs = ["manifest.proto"],
     deps = [
-        "@com_google_protobuf//:struct_proto",
+        "@protobuf//:struct_proto",
     ],
 )
 
@@ -52,7 +52,7 @@ py_binary(
         requirement("envoy.base.utils"),
         ":manifest_py_pb2",
         ":protodoc_manifest_untyped",
-        "@com_google_protobuf//:protobuf_python",
+        "@protobuf//:protobuf_python",
     ],
 )
 

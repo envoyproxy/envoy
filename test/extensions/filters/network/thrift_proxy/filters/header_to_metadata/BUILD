@@ -35,5 +35,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy:mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
