@@ -217,7 +217,7 @@ typed_config:
   EXPECT_EQ("400", response->headers().getStatusValue());
 
   // The upstream should NOT receive a request because the filter sends a local reply.
-  EXPECT_FALSE(upstream_request_ != nullptr);
+  EXPECT_EQ(nullptr, upstream_request_);
 }
 
 // Test that an MCP request with malformed JSON is rejected with a 400.
