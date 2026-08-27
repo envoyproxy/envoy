@@ -315,11 +315,10 @@ class RouteConfigUpdateRequester {
 public:
   virtual ~RouteConfigUpdateRequester() = default;
 
-  virtual void
-  requestRouteConfigUpdate(RouteCache& route_cache,
-                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
-                           std::optional<Router::ConfigConstSharedPtr> route_config,
-                           Event::Dispatcher& dispatcher, RequestHeaderMap& request_headers) PURE;
+  virtual void requestRouteConfigUpdate(
+      RouteCache& route_cache, Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
+      std::optional<Router::ConfigConstSharedPtr> route_config, Event::Dispatcher& dispatcher,
+      RequestHeaderMap& request_headers, Router::ScopeKeyPtr scope_key) PURE;
   virtual void
   requestVhdsUpdate(const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
                     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;

@@ -1354,8 +1354,10 @@ message ScopedRoutes {
         //
         // .. note::
         //
-        //   Filter state is not available on the on-demand scoped route discovery path, so a scope
-        //   key using this fragment will not trigger an on-demand SRDS update.
+        //   The filter state object must be set before the scope key is computed for route
+        //   selection (e.g. at connection life span, or by a filter that clears the route cache
+        //   after setting it) for a scope using this fragment to match, including on the on-demand
+        //   SRDS path.
         FilterStateExtractor filter_state = 2;
       }
     }

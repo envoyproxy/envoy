@@ -264,7 +264,7 @@ TEST(FilterStateExtractorImplTest, FilterStateExtraction) {
 TEST(FilterStateExtractorImplTest, NoStreamInfo) {
   FilterStateExtractorImpl extractor = makeFilterStateExtractor();
 
-  // The on demand scoped route update path has no stream info, so no fragment can be produced.
+  // Without stream info the filter state fragment cannot be produced.
   EXPECT_EQ(extractor.computeFragment(TestRequestHeaderMapImpl{}), nullptr);
 }
 
