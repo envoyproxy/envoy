@@ -316,9 +316,13 @@ public:
     std::weak_ptr<Core> core_;
   };
 
+  // By default, this creates an unbounded queue. If `capacity` is provided, the
+  // queue shares capacity with all other queues using the given `capacity`.
   explicit AsyncQueue(CapacityPtr capacity = nullptr, SizeFunc size_func = SizeFunc())
       : core_(std::make_shared<Core>(std::move(capacity), std::move(size_func))) {}
 
+  // A bounded queue of max_size. Typically the max_size should be set to the
+  // equivalent of "high watermark" of a watermark managed streaming buffer.
   explicit AsyncQueue(uint64_t max_size, SizeFunc size_func = SizeFunc())
       : AsyncQueue(std::make_shared<Capacity>(max_size), std::move(size_func)) {}
 
