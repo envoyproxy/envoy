@@ -12027,6 +12027,119 @@ bool envoy_dynamic_module_callback_matcher_get_header_value(
     size_t index, size_t* total_count_out);
 
 // =============================================================================
+// Matcher Data Input Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_matcher_data_input_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleStringDataInput class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_matcher_data_input_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_matcher_data_input_config_module_ptr is a pointer to an in-module
+ * matcher data input configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_matcher_data_input_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_matcher_data_input_envoy_ptr is a raw pointer to the matcher data input
+ * in Envoy. This represents the matching data available during a single get evaluation.
+ *
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the get event hook.
+ */
+typedef void* envoy_dynamic_module_type_matcher_data_input_envoy_ptr;
+
+// =============================================================================
+// Matcher Data Input Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_matcher_data_input_config_new is called when a new matcher data input
+ * configuration is created. This is called on the main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStringDataInput object.
+ * @param name is the data input config name.
+ * @param config is the configuration for the data input.
+ * @return a pointer to the in-module data input configuration. Returning nullptr indicates a
+ *         failure to initialize the module, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_matcher_data_input_config_module_ptr
+envoy_dynamic_module_on_matcher_data_input_config_new(
+    envoy_dynamic_module_type_matcher_data_input_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_matcher_data_input_config_destroy is called when the matcher data input
+ * configuration is destroyed.
+ *
+ * @param config_module_ptr is a pointer to the in-module data input configuration.
+ */
+void envoy_dynamic_module_on_matcher_data_input_config_destroy(
+    envoy_dynamic_module_type_matcher_data_input_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_matcher_data_input_get is called to extract a value used for matching.
+ * This is called on worker threads.
+ *
+ * The data_input_envoy_ptr is only valid during this callback. The module must not store this
+ * pointer or use it after the callback returns. The module reads matching data with the matcher
+ * data input callbacks (e.g. envoy_dynamic_module_callback_matcher_data_input_get_header_value) and
+ * provides the extracted value with envoy_dynamic_module_callback_matcher_data_input_set_result.
+ * When the module does not set a result, Envoy treats the input as having no value.
+ *
+ * @param config_module_ptr is the pointer to the in-module data input configuration.
+ * @param data_input_envoy_ptr is the pointer to the Envoy matcher data input (valid during this
+ *        call only).
+ */
+void envoy_dynamic_module_on_matcher_data_input_get(
+    envoy_dynamic_module_type_matcher_data_input_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_matcher_data_input_envoy_ptr data_input_envoy_ptr);
+
+// =============================================================================
+// Matcher Data Input Callbacks
+// =============================================================================
+
+/**
+ * Get a specific header value by key during a matcher data input get evaluation.
+ *
+ * Since a header can have multiple values, the index is used to get the specific value. This
+ * returns the total number of values for the given key via total_count_out, so it can be used to
+ * iterate over all values by starting from 0 and incrementing the index.
+ *
+ * @param data_input_envoy_ptr is the pointer to the matcher data input.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @param key is the key of the header to look up.
+ * @param result is the buffer where the header value will be stored.
+ * @param index is the index of the header value in the list of values for the given key.
+ * @param total_count_out is the pointer to the variable where the total number of values for the
+ *        given key will be stored. This parameter is optional and can be null.
+ * @return true if the header value is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_matcher_data_input_get_header_value(
+    envoy_dynamic_module_type_matcher_data_input_envoy_ptr data_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * Set the value extracted by the module for this get evaluation. Envoy copies the buffer, so the
+ * module may release it after this call returns. Calling this more than once overwrites the
+ * previous value. When this is not called, the input is treated as having no value.
+ *
+ * @param data_input_envoy_ptr is the pointer to the matcher data input.
+ * @param result is the value extracted by the module, owned by the module and copied by Envoy.
+ */
+void envoy_dynamic_module_callback_matcher_data_input_set_result(
+    envoy_dynamic_module_type_matcher_data_input_envoy_ptr data_input_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer result);
+
+// =============================================================================
 // ============================ Cert Validator ==================================
 // =============================================================================
 //

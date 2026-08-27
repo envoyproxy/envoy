@@ -1343,6 +1343,26 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_matcher_get_header_valu
   return false;
 }
 
+// ---------------------- Matcher data input callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations
+// are provided in the matcher data input extension abi_impl.cc when the extension is used.
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_matcher_data_input_get_header_value(
+    envoy_dynamic_module_type_matcher_data_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_envoy_buffer*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_matcher_data_input_get_header_value: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_matcher_data_input_set_result(
+    envoy_dynamic_module_type_matcher_data_input_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_matcher_data_input_set_result: "
+               "not implemented in this context");
+}
+
 // ---------------------- Network filter callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the network filter abi_impl.cc when the network filter extension is used.

@@ -24,6 +24,7 @@ pub mod http;
 pub mod listener;
 pub mod load_balancer;
 pub mod matcher;
+pub mod matcher_data_input;
 pub mod network;
 pub mod stats_sink;
 pub mod tracer;

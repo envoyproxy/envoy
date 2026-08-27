@@ -632,6 +632,12 @@ WEAK_STUB(MatcherGetHeaderValue,
           envoy_dynamic_module_callback_matcher_get_header_value(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
               nullptr, 0, nullptr))
+WEAK_STUB(MatcherDataInputGetHeaderValue,
+          envoy_dynamic_module_callback_matcher_data_input_get_header_value(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
+              nullptr, 0, nullptr))
+WEAK_STUB(MatcherDataInputSetResult,
+          envoy_dynamic_module_callback_matcher_data_input_set_result(nullptr, {nullptr, 0}))
 
 WEAK_STUB(NetworkFilterWrite,
           envoy_dynamic_module_callback_network_filter_write(nullptr, {nullptr, 0}, false))
