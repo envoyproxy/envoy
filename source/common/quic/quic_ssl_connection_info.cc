@@ -54,6 +54,9 @@ X509* QuicSslConnectionInfo::validatedPeerIssuer() const {
   return validated_cert_chain_[1].get();
 }
 
+// peerCertificateChain() lazily converts the CRYPTO_BUFFER-based chain into X509 objects and
+// stores the result in peer_cert_chain_, so calling it while the SSL object is still alive is
+// all that is needed to populate the cache.
 void QuicSslConnectionInfo::cachePeerCertificateChain() { peerCertificateChain(); }
 
 void QuicSslConnectionInfo::onCertValidated(
