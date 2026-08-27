@@ -221,6 +221,8 @@ test_program(name = "matcher_string_input_missing_config_destroy")
 
 test_program(name = "matcher_string_input_missing_get")
 
+test_program(name = "matcher_lifecycle_counter")
+
 test_program(name = "cert_validator_no_op")
 
 test_program(name = "cert_validator_fail")

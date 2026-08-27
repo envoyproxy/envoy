@@ -414,14 +414,10 @@ class DynamicModuleClusterSpecifierUpstreamIntegrationTest
 public:
   DynamicModuleClusterSpecifierUpstreamIntegrationTest() { autonomous_upstream_ = false; }
 
-  // Fails the pending upstream request and drops the connection, so that a retry arrives on a fresh
-  // connection rather than depending on how the pool reuses this one.
+  // Fails the pending upstream request by sending a 503.
   void failUpstreamRequest() {
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-    ASSERT_TRUE(fake_upstream_connection_->close());
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    fake_upstream_connection_.reset();
   }
 
   // Waits only for the upstream request headers, for the tests that leave the downstream request
@@ -453,7 +449,7 @@ TEST_P(DynamicModuleClusterSpecifierUpstreamIntegrationTest, OverrideRetriesRequ
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ(1, test_server_->counter("cluster.prod.upstream_rq_retry")->value());
+  test_server_->waitForCounter("cluster.prod.upstream_rq_retry", testing::Eq(1));
 }
 
 // A retry whose policy refreshes the cluster runs the module again, and the cluster it selects for
