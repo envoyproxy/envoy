@@ -53,12 +53,20 @@ message RouteActionOverride {
   // clusters are checked against the cluster manager when :ref:`validate_clusters
   // <envoy_v3_api_field_config.route.v3.RouteConfiguration.validate_clusters>` is enabled.
   repeated config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 3;
+
+  // Hash policy replacing the hash policy of the matched route, used when the upstream cluster
+  // employs a hashing load balancer. If not specified, the hash policy of the matched route is used,
+  // so an entry cannot be used to remove a hash policy that the matched route configures. A
+  // cluster-level hash policy and a load-balancer-level hash policy, when configured, take precedence
+  // over this route-level policy.
+  repeated config.route.v3.RouteAction.HashPolicy hash_policy = 4;
 }
 
 // Configuration for the Dynamic Modules Cluster Specifier. This cluster specifier allows loading
 // shared object files via ``dlopen`` to select the upstream cluster for a request, and to replace
 // the timeout, idle timeout, priority, request body buffer limit, cluster not found response code,
-// retry policy, metadata match criteria and request mirroring policies of the matched route.
+// hash policy, retry policy, metadata match criteria and request mirroring policies of the matched
+// route.
 //
 // A module can be loaded by multiple cluster specifiers. It is loaded only once and shared across
 // multiple cluster specifier instances. The module is invoked while the route is being

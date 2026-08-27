@@ -429,7 +429,7 @@ private:
   uint64_t total_cluster_weight_;
   AccessLog::InstanceSharedPtrVector access_logs_;
   const uint32_t max_connect_attempts_;
-  ThreadLocal::SlotPtr upstream_drain_manager_slot_;
+  ThreadLocal::SlotSharedPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
   Random::RandomGenerator& random_generator_;

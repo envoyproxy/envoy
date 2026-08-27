@@ -88,6 +88,9 @@ def api_dependencies(bzlmod = False):
             "@com_google_absl": "@abseil-cpp",
             "@com_google_protobuf": "@protobuf",
         },
+        # Avoid shadowing the C++ standard <version> header on case-insensitive file systems.
+        patch_cmds = ["rm VERSION"],
+        patch_cmds_win = ["Remove-Item VERSION"],
     )
     external_http_archive(
         name = "dev_cel",

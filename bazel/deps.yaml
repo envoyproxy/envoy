@@ -177,6 +177,7 @@ cel_spec:
   - envoy.filters.http.rbac
   - envoy.filters.http.upstream_rbac
   - envoy.filters.http.wasm
+  - envoy.filters.network.ext_proc
   - envoy.filters.network.rbac
   - envoy.filters.network.wasm
   - envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder
@@ -275,7 +276,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-08-21"
+  release_date: "2026-08-25"
   use_category:
   - build
   - controlplane
@@ -387,7 +388,6 @@ flatbuffers:
   - envoy.filters.network.wasm
   - envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder
   - envoy.stat_sinks.wasm
-  - envoy.rbac.matchers.upstream_ip_port
   - envoy.matching.inputs.cel_data_input
   - envoy.matching.matchers.cel_matcher
   - envoy.filters.network.ext_proc
@@ -879,7 +879,6 @@ proto_field_extraction:
   use_category:
   - dataplane_ext
   extensions:
-  - envoy.filters.http.grpc_json_transcoder
   - envoy.filters.http.grpc_field_extraction
   - envoy.filters.http.proto_message_extraction
   - envoy.filters.http.proto_api_scrubber
@@ -895,8 +894,6 @@ proto_processing:
   use_category:
   - dataplane_ext
   extensions:
-  - envoy.filters.http.grpc_json_transcoder
-  - envoy.filters.http.grpc_field_extraction
   - envoy.filters.http.proto_message_extraction
   - envoy.filters.http.proto_api_scrubber
   license: "Apache-2.0"

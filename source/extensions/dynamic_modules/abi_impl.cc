@@ -2861,6 +2861,14 @@ __attribute__((weak)) uint64_t envoy_dynamic_module_callback_cluster_specifier_g
   return 0;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, uint32_t, size_t*, size_t*, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count: not "
+               "implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) bool envoy_dynamic_module_callback_cluster_specifier_get_request_header_value(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*, size_t,
@@ -2944,6 +2952,81 @@ __attribute__((weak)) void envoy_dynamic_module_callback_cluster_specifier_set_t
   IS_ENVOY_BUG(
       "envoy_dynamic_module_callback_cluster_specifier_set_timeout: not implemented in this "
       "context");
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer*, size_t,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_config_define_counter: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_config_increment_counter: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer*, size_t,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_config_define_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_config_set_gauge: not implemented "
+               "in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer*, size_t,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_config_define_histogram: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value: not "
+               "implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
 }
 
 __attribute__((weak)) envoy_dynamic_module_type_access_log_type
