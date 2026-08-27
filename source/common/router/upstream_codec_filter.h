@@ -108,7 +108,7 @@ private:
     return callbacks_->upstreamCallbacks()->upstreamStreamInfo().upstreamInfo()->upstreamTiming();
   }
 
-  // Some GenericUpstream implementations retain the header map past encodeHeaders().
+  // HttpTcpBridge retains a pointer to the headers for module callbacks.
   Http::RequestHeaderMapPtr upstream_headers_;
   bool injected_generated_websocket_key_ = false;
 };
