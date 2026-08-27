@@ -1246,16 +1246,15 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     double value) {
-  auto metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, ns);
-  if (!metadata_namespace) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto stream_info = filter->streamInfo();
+  if (!stream_info) {
     // If stream info is not available, we cannot guarantee that the namespace is created.
     // TODO(wbpcode): this should never happen and we should simplify this.
     return;
   }
-  absl::string_view key_view{key.ptr, key.length};
-  Protobuf::Struct metadata_value;
-  (*metadata_value.mutable_fields())[key_view].set_number_value(value);
-  metadata_namespace->MergeFrom(metadata_value);
+  ContextAccessor::setDynamicMetadataNumber(*stream_info, absl::string_view(ns.ptr, ns.length),
+                                            absl::string_view(key.ptr, key.length), value);
 }
 
 bool envoy_dynamic_module_callback_http_get_metadata_number(
@@ -1281,17 +1280,16 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     envoy_dynamic_module_type_module_buffer value) {
-  auto metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, ns);
-  if (!metadata_namespace) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto stream_info = filter->streamInfo();
+  if (!stream_info) {
     // If stream info is not available, we cannot guarantee that the namespace is created.
     // TODO(wbpcode): this should never happen and we should simplify this.
     return;
   }
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-  Protobuf::Struct metadata_value;
-  (*metadata_value.mutable_fields())[key_view].set_string_value(value_view);
-  metadata_namespace->MergeFrom(metadata_value);
+  ContextAccessor::setDynamicMetadataString(*stream_info, absl::string_view(ns.ptr, ns.length),
+                                            absl::string_view(key.ptr, key.length),
+                                            absl::string_view(value.ptr, value.length));
 }
 
 void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
@@ -1608,11 +1606,8 @@ bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
                         "stream info is not available");
     return false;
   }
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-  stream_info->filterState()->setData(key_view,
-                                      std::make_unique<Router::StringAccessorImpl>(value_view));
-  return true;
+  return ContextAccessor::setFilterStateBytes(*stream_info, absl::string_view(key.ptr, key.length),
+                                              absl::string_view(value.ptr, value.length));
 }
 
 bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
@@ -1648,27 +1643,8 @@ bool envoy_dynamic_module_callback_http_set_filter_state_typed(
     return false;
   }
 
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-
-  auto* factory =
-      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(key_view);
-  if (factory == nullptr) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "no ObjectFactory registered for filter state key '{}'", key_view);
-    return false;
-  }
-
-  auto object = factory->createFromBytes(value_view);
-  if (object == nullptr) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "ObjectFactory failed to create object for filter state key '{}'",
-                        key_view);
-    return false;
-  }
-
-  stream_info->filterState()->setData(key_view, std::move(object));
-  return true;
+  return ContextAccessor::setFilterStateTyped(*stream_info, absl::string_view(key.ptr, key.length),
+                                              absl::string_view(value.ptr, value.length));
 }
 
 bool envoy_dynamic_module_callback_http_get_filter_state_typed(

@@ -193,11 +193,13 @@ void substitutePathTemplateVariable(std::string& url, absl::string_view element,
 
 absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
                                              const absl::flat_hash_set<std::string>& templates,
-                                             const nlohmann::json& arguments) {
+                                             const nlohmann::json& arguments,
+                                             BridgeStatus& bridge_status) {
   std::string base_url = std::string(pattern);
   for (const auto& element : templates) {
     absl::StatusOr<nlohmann::json> template_value_json = getJsonValue(arguments, element);
     if (!template_value_json.ok()) {
+      bridge_status = BridgeStatus::RequestToolsCallMissingRequiredArg;
       return template_value_json.status();
     }
     const std::string raw_value = jsonValueToString(*template_value_json);
@@ -208,6 +210,7 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
     // traversal, so treat it as a separator here too.
     for (const absl::string_view segment : absl::StrSplit(raw_value, absl::ByAnyChar("\\/"))) {
       if (segment == "." || segment == "..") {
+        bridge_status = BridgeStatus::RequestToolsCallPathTraversalRejected;
         return absl::InvalidArgumentError(absl::StrCat(
             "path template variable '", element, "' must not contain path traversal segments"));
       }
@@ -228,7 +231,7 @@ absl::StatusOr<std::string> constructBaseUrl(absl::string_view pattern,
 
 absl::StatusOr<HttpRequest> buildHttpRequest(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule& http_rule,
-    const nlohmann::json& arguments) {
+    const nlohmann::json& arguments, BridgeStatus& bridge_status) {
   std::string pattern;
   std::string method;
   // TODO(guoyilin42): Add validation to ensure exactly one HTTP method is specified.
@@ -248,7 +251,8 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
     method = "PATCH";
     pattern = http_rule.patch();
   } else {
-    return absl::InvalidArgumentError("Unsupported HTTP method in HttpRule");
+    bridge_status = BridgeStatus::InternalToolsCallInvalidHttpRule;
+    return absl::InvalidArgumentError("HttpRule is malformed");
   }
   absl::string_view url_template = pattern;
   absl::flat_hash_set<std::string> templates;
@@ -257,7 +261,7 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
   while (RE2::FindAndConsume(&url_template, *template_regex, &template_capture)) {
     templates.insert(template_capture);
   }
-  absl::StatusOr<std::string> url = constructBaseUrl(pattern, templates, arguments);
+  absl::StatusOr<std::string> url = constructBaseUrl(pattern, templates, arguments, bridge_status);
   if (!url.ok()) {
     return url.status();
   }
@@ -268,6 +272,7 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
     if (auto status =
             constructQueryParams(query_params, http_rule.body(), arguments, templates, base_path);
         !status.ok()) {
+      bridge_status = BridgeStatus::RequestToolsCallMissingRequiredArg;
       return status;
     }
   }
@@ -275,6 +280,7 @@ absl::StatusOr<HttpRequest> buildHttpRequest(
 
   absl::StatusOr<json> http_body = constructRequestBody(http_rule.body(), templates, arguments);
   if (!http_body.ok()) {
+    bridge_status = BridgeStatus::RequestToolsCallMissingRequiredArg;
     return http_body.status();
   }
 

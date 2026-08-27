@@ -477,6 +477,7 @@ envoy_cc_library(
         ":envoy_quic_server_crypto_stream_factory_lib",
         ":envoy_quic_server_session_lib",
         ":quic_stat_names_lib",
+        "//envoy/network:drain_decision_interface",
         "//envoy/network:listener_interface",
         "//source/common/http:session_idle_list_lib",
         "@quiche//:quic_core_server_lib",
@@ -670,6 +671,7 @@ envoy_cc_library(
         "//envoy/network:udp_packet_writer_handler_interface",
         "//source/common/network:io_socket_error_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/runtime:runtime_lib",
         "@quiche//:quic_platform",
     ]) + select({

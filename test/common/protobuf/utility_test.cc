@@ -27,6 +27,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -38,15 +39,17 @@
 
 using ::Envoy::StatusHelpers::IsOk;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
-using ::testing::Not;
+using testing::Not;
 using namespace std::chrono_literals;
 
 using testing::Contains;
+using testing::ContainsRegex;
+using testing::ElementsAre;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
 
-using ::testing::HasSubstr;
+using testing::HasSubstr;
 
 bool checkProtoEquality(const Protobuf::Value& proto1, std::string text_proto2) {
   Protobuf::Value proto2;
@@ -213,11 +216,10 @@ TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<Protobuf::UInt32Value> repeated;
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
   repeated.Add()->set_value(10);
-  EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n\\]"));
+  EXPECT_THAT(RepeatedPtrUtil::debugString(repeated), ContainsRegex("\\[.*[\n]*value:\\s*10\n\\]"));
   repeated.Add()->set_value(20);
   EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n,.*[\n]*value:\\s*20\n\\]"));
+              ContainsRegex("\\[.*[\n]*value:\\s*10\n,.*[\n]*value:\\s*20\n\\]"));
 }
 
 // Validated exception thrown when downcastAndValidate observes a PGV failures.
@@ -306,8 +308,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
 TEST_F(ProtobufUtilityTest, JsonConvertKnownGoodMessage) {
   Protobuf::Any source_any;
   std::ignore = source_any.PackFrom(envoy::config::bootstrap::v3::Bootstrap::default_instance());
-  EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrError(source_any, true),
-              testing::HasSubstr("@type"));
+  EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrError(source_any, true), HasSubstr("@type"));
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertOrErrorAnyWithUnknownMessageType) {
@@ -1217,20 +1218,15 @@ TEST_F(ProtobufUtilityTest, SanitizeUTF8) {
 
 TEST_F(ProtobufUtilityTest, KeyValueStruct) {
   const Protobuf::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
-  EXPECT_EQ(obj.fields_size(), 1);
-  EXPECT_EQ(obj.fields().at("test_key").kind_case(), Protobuf::Value::KindCase::kStringValue);
-  EXPECT_EQ(obj.fields().at("test_key").string_value(), "test_value");
+  EXPECT_THAT(obj.fields(), UnorderedElementsAre(IsStructString("test_key", "test_value")));
 }
 
 TEST_F(ProtobufUtilityTest, KeyValueStructMap) {
   const Protobuf::Struct obj = MessageUtil::keyValueStruct(
       {{"test_key", "test_value"}, {"test_another_key", "test_another_value"}});
-  EXPECT_EQ(obj.fields_size(), 2);
-  EXPECT_EQ(obj.fields().at("test_key").kind_case(), Protobuf::Value::KindCase::kStringValue);
-  EXPECT_EQ(obj.fields().at("test_key").string_value(), "test_value");
-  EXPECT_EQ(obj.fields().at("test_another_key").kind_case(),
-            Protobuf::Value::KindCase::kStringValue);
-  EXPECT_EQ(obj.fields().at("test_another_key").string_value(), "test_another_value");
+  EXPECT_THAT(obj.fields(),
+              UnorderedElementsAre(IsStructString("test_key", "test_value"),
+                                   IsStructString("test_another_key", "test_another_value")));
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilEqual_NullValues) {
@@ -1502,7 +1498,7 @@ TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   Protobuf::Timestamp dst;
   EXPECT_THAT(
       MessageUtil::unpackTo(source_any, dst).message(),
-      testing::ContainsRegex(
+      ContainsRegex(
           R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)"));
 }
 
@@ -1548,10 +1544,9 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   Protobuf::Timestamp dst;
   auto status = MessageUtil::unpackTo(source_any, dst);
   EXPECT_TRUE(absl::IsInternal(status));
-  EXPECT_THAT(
-      std::string(status.message()),
-      testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
-                             ".*[\n]*\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
+  EXPECT_THAT(std::string(status.message()),
+              ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
+                            ".*[\n]*\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
 }
 
 // MessageUtility::loadFromJson() throws on garbage JSON.
@@ -2286,40 +2281,36 @@ protected:
 TEST_F(StructUtilTest, StructUtilUpdateScalars) {
   {
     const auto obj = updateSimpleStruct(ValueUtil::stringValue("v0"), ValueUtil::stringValue("v1"));
-    EXPECT_EQ(obj.fields().at("key").string_value(), "v1");
+    EXPECT_THAT(obj.fields(), Contains(IsStructString("key", "v1")));
   }
 
   {
     const auto obj = updateSimpleStruct(ValueUtil::numberValue(0), ValueUtil::numberValue(1));
-    EXPECT_EQ(obj.fields().at("key").number_value(), 1);
+    EXPECT_THAT(obj.fields(), Contains(IsStructNumber("key", 1)));
   }
 
   {
     const auto obj = updateSimpleStruct(ValueUtil::boolValue(false), ValueUtil::boolValue(true));
-    EXPECT_EQ(obj.fields().at("key").bool_value(), true);
+    EXPECT_THAT(obj.fields(), Contains(IsStructBool("key", true)));
   }
 
   {
     const auto obj = updateSimpleStruct(ValueUtil::nullValue(), ValueUtil::nullValue());
-    EXPECT_EQ(obj.fields().at("key").kind_case(), Protobuf::Value::KindCase::kNullValue);
+    EXPECT_THAT(obj.fields(), Contains(IsStructNull("key", Protobuf::NULL_VALUE)));
   }
 }
 
 TEST_F(StructUtilTest, StructUtilUpdateDifferentKind) {
   {
     const auto obj = updateSimpleStruct(ValueUtil::stringValue("v0"), ValueUtil::numberValue(1));
-    auto& val = obj.fields().at("key");
-    EXPECT_EQ(val.kind_case(), Protobuf::Value::KindCase::kNumberValue);
-    EXPECT_EQ(val.number_value(), 1);
+    EXPECT_THAT(obj.fields(), Contains(IsStructNumber("key", 1)));
   }
 
   {
     const auto obj =
         updateSimpleStruct(ValueUtil::structValue(MessageUtil::keyValueStruct("subkey", "v0")),
                            ValueUtil::stringValue("v1"));
-    auto& val = obj.fields().at("key");
-    EXPECT_EQ(val.kind_case(), Protobuf::Value::KindCase::kStringValue);
-    EXPECT_EQ(val.string_value(), "v1");
+    EXPECT_THAT(obj.fields(), Contains(IsStructString("key", "v1")));
   }
 }
 
@@ -2334,11 +2325,11 @@ TEST_F(StructUtilTest, StructUtilUpdateList) {
   *with_list.add_values()->mutable_struct_value() = v2;
 
   StructUtil::update(obj, with);
-  ASSERT_THAT(obj.fields().size(), 1);
-  const auto& list_vals = list.values();
-  EXPECT_TRUE(ValueUtil::equal(list_vals[0], ValueUtil::stringValue("v0")));
-  EXPECT_TRUE(ValueUtil::equal(list_vals[1], ValueUtil::numberValue(1)));
-  EXPECT_TRUE(ValueUtil::equal(list_vals[2], ValueUtil::structValue(v2)));
+  EXPECT_THAT(
+      obj.fields(),
+      Contains(IsStructList("key", ElementsAre(IsStructValueString("v0"), IsStructValueNumber(1),
+                                               IsStructValueStruct(UnorderedElementsAre(
+                                                   IsStructString("subkey", "str")))))));
 }
 
 TEST_F(StructUtilTest, StructUtilUpdateNewKey) {
@@ -2347,9 +2338,8 @@ TEST_F(StructUtilTest, StructUtilUpdateNewKey) {
   (*with.mutable_fields())["key1"].set_number_value(1);
   StructUtil::update(obj, with);
 
-  const auto& fields = obj.fields();
-  EXPECT_TRUE(ValueUtil::equal(fields.at("key0"), ValueUtil::numberValue(1)));
-  EXPECT_TRUE(ValueUtil::equal(fields.at("key1"), ValueUtil::numberValue(1)));
+  EXPECT_THAT(obj.fields(),
+              UnorderedElementsAre(IsStructNumber("key0", 1), IsStructNumber("key1", 1)));
 }
 
 TEST_F(StructUtilTest, StructUtilUpdateRecursiveStruct) {
@@ -2360,10 +2350,9 @@ TEST_F(StructUtilTest, StructUtilUpdateRecursiveStruct) {
       MessageUtil::keyValueStruct("tag1", "1");
   StructUtil::update(obj, with);
 
-  ASSERT_EQ(obj.fields().at("tags").kind_case(), Protobuf::Value::KindCase::kStructValue);
-  const auto& tags = obj.fields().at("tags").struct_value().fields();
-  EXPECT_TRUE(ValueUtil::equal(tags.at("tag0"), ValueUtil::stringValue("1")));
-  EXPECT_TRUE(ValueUtil::equal(tags.at("tag1"), ValueUtil::stringValue("1")));
+  EXPECT_THAT(obj.fields(),
+              Contains(IsStructStruct("tags", UnorderedElementsAre(IsStructString("tag0", "1"),
+                                                                   IsStructString("tag1", "1")))));
 }
 
 TEST_F(ProtobufUtilityTest, SubsequentLoadClearsExistingProtoValues) {

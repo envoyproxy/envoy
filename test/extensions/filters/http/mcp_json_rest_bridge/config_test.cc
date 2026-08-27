@@ -51,7 +51,7 @@ TEST(McpJsonRestBridgeFilterConfigFactoryTest, CreateFilterWithServerContext) {
   cb(filter_callbacks);
 }
 
-TEST(McpJsonRestBridgeFilterConfigTest, InvalidToolListHttpRuleThrowsException) {
+TEST(McpJsonRestBridgeFilterConfigTest, InvalidToolListHttpRule) {
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
   TestUtility::loadFromYaml(R"EOF(
     tool_config:
@@ -77,6 +77,46 @@ TEST(McpJsonRestBridgeFilterConfigTest, InvalidToolListHttpRuleThrowsException) 
   EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, "stats", context),
               HasStatus(absl::StatusCode::kInvalidArgument,
                         HasSubstr("tool_list_http_rule must be a GET request with an empty body")));
+}
+
+TEST(McpJsonRestBridgeFilterConfigTest, DuplicateToolNames) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+  TestUtility::loadFromYaml(R"EOF(
+    tool_config:
+      tools:
+        - name: "my_tool"
+          http_rule: { get: "/foo" }
+        - name: "my_tool"
+          http_rule: { get: "/bar" }
+  )EOF",
+                            proto_config);
+
+  McpJsonRestBridgeFilterConfigFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(proto_config, "stats", context),
+      HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("Duplicate tool name: my_tool")));
+}
+
+TEST(McpJsonRestBridgeFilterPerRouteConfigTest, PerRouteConfigDuplicateToolNames) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      per_route_config;
+  TestUtility::loadFromYaml(R"EOF(
+    tool_config:
+      tools:
+        - name: "my_tool"
+          http_rule: { get: "/foo" }
+        - name: "my_tool"
+          http_rule: { get: "/bar" }
+  )EOF",
+                            per_route_config);
+
+  McpJsonRestBridgeFilterConfigFactory factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto config_or = factory.createRouteSpecificFilterConfig(
+      per_route_config, context, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_THAT(config_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                   HasSubstr("Duplicate tool name: my_tool")));
 }
 
 } // namespace

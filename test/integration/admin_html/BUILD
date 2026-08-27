@@ -13,7 +13,7 @@ envoy_package()
 envoy_cc_test_binary(
     name = "test_server",
     srcs = ["test_server.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
@@ -37,7 +37,7 @@ envoy_sh_test(
         "//source/server/admin/html:admin_web_files",
         "//test/integration:test_utility.sh",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
 
     # This test fails on windows trying to poll the server for the admin
     # address. Failure is:

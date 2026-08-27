@@ -7,6 +7,7 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load(":reachability.bzl", "WASM_RUNTIME_FLAG", "envoy_dependency_reachability")
 
 licenses(["notice"])  # Apache 2
 
@@ -86,21 +87,52 @@ py_console_script_binary(
 # Core-only root: used to compute the "core" dep set (deps of non-extension
 # production code).  Extension-marginal deps are computed as
 # (all-extensions reachable) minus (core reachable).
+#
+# Single-config: the core dep set does not vary with the wasm runtime, so
+# there is nothing for a matrix to add here.
+#
+# Intentionally no excluded_patterns here: core_deps is only used to skip the
+# forward extension-category assertion, so a larger core set is only more
+# lenient and cannot introduce false validation failures.
 dependency_reachability(
     name = "dep-reachability-core",
-    roots = [
-        "//source/exe:envoy_main_common_with_core_extensions_lib",
-    ],
+    roots = ["//source/exe:envoy_main_common_with_core_extensions_lib"],
 )
 
 # All-extensions root: traverses every extension so that validate_extension_deps
 # actually observes non-core extension deps.  This is the primary reachability
 # data used by all checks.
-dependency_reachability(
+#
+# The wasm runtimes are mutually exclusive within a single configuration: only
+# one of v8/wamr/wasmtime is built at a time.  Analyzing a single config would
+# therefore make it impossible for eg envoy.wasm.runtime.wamr and
+# envoy.wasm.runtime.wasmtime to both be attributed, and deps legitimately
+# listing both (proxy_wasm_cpp_host, proxy_wasm_cpp_sdk, rules_rust) would be
+# reported as carrying stale `extensions:` entries.
+#
+# Data from all analyzed configs is merged by union, so the emitted JSON is
+# config-independent and `deps.yaml` metadata does not have to be written
+# against whichever config CI happens to run.
+#
+# See :reachability.bzl for why the rule is constructed there rather than here.
+envoy_dependency_reachability(
     name = "dep-reachability",
-    roots = [
-        "//source/exe:main_common_with_all_extensions_lib",
+    attribution_patterns = [
+        "//source/extensions/...",
     ],
+    configs = {
+        "v8": {WASM_RUNTIME_FLAG: "v8"},
+        "wamr": {WASM_RUNTIME_FLAG: "wamr"},
+        "wasmtime": {WASM_RUNTIME_FLAG: "wasmtime"},
+    },
+    excluded_patterns = [
+        "base_pip3_*",
+        "bazel_tools",
+        "cu__*",
+        "envoy_rust_crate_*",
+        "envoy_api",
+    ],
+    roots = ["//source/exe:main_common_with_all_extensions_lib"],
 )
 
 py_test(

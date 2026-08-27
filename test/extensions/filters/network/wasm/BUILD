@@ -24,7 +24,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/wasm/test_data:test_cpp.wasm",
     ]),
     extension_names = ["envoy.filters.network.wasm"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",
@@ -53,7 +53,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/wasm/test_data:resume_call_rust.wasm",
     ]),
     extension_names = ["envoy.filters.network.wasm"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/network/wasm:wasm_filter_lib",
