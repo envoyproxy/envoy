@@ -32,7 +32,11 @@ namespace GcpAuthn {
 namespace {
 
 std::optional<envoy::extensions::filters::http::gcp_authn::v3::Audience>
-retrieveAudience(Upstream::ThreadLocalCluster* cluster) {
+retrieveAudience(Upstream::ThreadLocalCluster* cluster, const FilterConfigProto& config) {
+  if (config.has_audience()) {
+    return config.audience();
+  }
+
   if (cluster == nullptr) {
     return std::nullopt;
   }
@@ -116,7 +120,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
       filter_config_->context().clusterManager().getThreadLocalCluster(
           route->routeEntry()->clusterName());
 
-  auto audience_opt = retrieveAudience(cluster);
+  auto audience_opt = retrieveAudience(cluster, filter_config_->config());
   if (!audience_opt.has_value()) {
     filter_config_->stats().retrieve_audience_failed_.inc();
     state_ = State::Complete;

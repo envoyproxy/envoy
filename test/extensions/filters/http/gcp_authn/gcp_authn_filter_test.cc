@@ -1084,6 +1084,71 @@ TEST_F(GcpAuthnFilterTest, TokenMetadataKeyPrecedenceOverTokenHeader) {
   EXPECT_EQ(default_headers_.get_("Authorization"), "");
 }
 
+TEST_F(GcpAuthnFilterTest, ConfigAudienceOverridesClusterMetadata) {
+  config_.mutable_audience()->set_url("http://config_audience");
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  auto mock_client = std::make_unique<MockGcpAuthnClient>();
+  MockGcpAuthnClient* mock_client_ptr = mock_client.get();
+  setClient(std::move(mock_client));
+
+  // Set up cluster metadata with a different audience.
+  setupMockFilterMetadata(/*valid=*/true, "http://cluster_audience");
+
+  EXPECT_CALL(*mock_client_ptr,
+              fetchUnboundJwt(
+                  testing::Property(&envoy::extensions::filters::http::gcp_authn::v3::Audience::url,
+                                    "http://config_audience"),
+                  _));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+}
+
+TEST_F(GcpAuthnFilterTest, ConfigAudienceWithoutClusterMetadata) {
+  config_.mutable_audience()->set_url("http://config_audience");
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  auto mock_client = std::make_unique<MockGcpAuthnClient>();
+  MockGcpAuthnClient* mock_client_ptr = mock_client.get();
+  setClient(std::move(mock_client));
+
+  // Set up cluster metadata without audience filter metadata.
+  setupMockFilterMetadata(/*valid=*/false);
+
+  EXPECT_CALL(*mock_client_ptr,
+              fetchUnboundJwt(
+                  testing::Property(&envoy::extensions::filters::http::gcp_authn::v3::Audience::url,
+                                    "http://config_audience"),
+                  _));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+}
+
+TEST_F(GcpAuthnFilterTest, ConfigAudienceAccessToken) {
+  config_.mutable_audience()->mutable_access_token();
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  auto mock_client = std::make_unique<MockGcpAuthnClient>();
+  MockGcpAuthnClient* mock_client_ptr = mock_client.get();
+  setClient(std::move(mock_client));
+
+  // Set up cluster metadata with a URL audience.
+  setupMockFilterMetadata(/*valid=*/true, "http://cluster_audience");
+
+  EXPECT_CALL(*mock_client_ptr, fetchUnboundAccessToken(_, _));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+}
+
 } // namespace GcpAuthn
 } // namespace HttpFilters
 } // namespace Extensions
