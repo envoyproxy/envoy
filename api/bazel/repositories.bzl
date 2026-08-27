@@ -42,7 +42,8 @@ def api_dependencies(bzlmod = False):
         repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
     external_http_archive(
-        name = "com_envoyproxy_protoc_gen_validate",
+        name = "protoc-gen-validate",
+        location_name = "protoc_gen_validate",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:pgv.patch"],
         repo_mapping = {
