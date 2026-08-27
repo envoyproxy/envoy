@@ -85,7 +85,6 @@ message BasicAuth {
 
 // Extra settings that may be added to per-route configuration for
 // a virtual host or a cluster.
-// [#next-free-field: 3]
 message BasicAuthPerRoute {
   // Username-password pairs for this route.
   config.core.v3.DataSource users = 1
