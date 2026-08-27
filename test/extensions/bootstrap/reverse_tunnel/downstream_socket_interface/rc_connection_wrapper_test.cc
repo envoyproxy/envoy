@@ -44,6 +44,9 @@ std::unique_ptr<NiceMock<Network::MockClientConnection>>
 getDeletableConn(Event::Dispatcher& dispatcher) {
   auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
   EXPECT_CALL(*mock_connection, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  // shutdown() calls getSocket() before close(); the mock has no default for a reference return.
+  static Network::ConnectionSocketPtr empty_socket;
+  EXPECT_CALL(*mock_connection, getSocket()).WillRepeatedly(ReturnRef(empty_socket));
 
   return mock_connection;
 }
@@ -1698,16 +1701,15 @@ TEST_F(RCConnectionWrapperTest, ReleaseConnectionDetachesCallbacksAndReadFilter)
   EXPECT_EQ(wrapper.releaseConnection(), nullptr);
 }
 
-// shutdown() must detach the connection callbacks and read filter and hand the connection to the
-// dispatcher's deferred-delete queue instead of closing/destroying it inline. Deferring ensures the
-// connection (and the wrapper that owns the codec/read filter) outlives the active dispatch.
+// shutdown() must detach callbacks/filters, close an open connection, then hand it to the
+// dispatcher's deferred-delete queue so ConnectionImpl is not destroyed with an open socket.
 TEST_F(RCConnectionWrapperTest, ShutdownDetachesAndDefersConnectionDeletion) {
   auto mock_connection = setupMockConnection();
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
   EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
   EXPECT_CALL(*mock_connection, removeReadFilter(_));
-  EXPECT_CALL(*mock_connection, close(_)).Times(0);
+  EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
   EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(4242));
 
