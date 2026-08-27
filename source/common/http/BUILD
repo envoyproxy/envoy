@@ -595,6 +595,7 @@ envoy_cc_library(
         "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@abseil-cpp//absl/container:node_hash_set",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
