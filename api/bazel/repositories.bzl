@@ -42,11 +42,13 @@ def api_dependencies(bzlmod = False):
         repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
     external_http_archive(
-        name = "com_envoyproxy_protoc_gen_validate",
+        name = "protoc-gen-validate",
+        location_name = "protoc_gen_validate",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:pgv.patch"],
         repo_mapping = {
             "@bazel_gazelle": "@gazelle",
+            "@com_envoyproxy_protoc_gen_validate": "@protoc-gen-validate",
             "@com_google_absl": "@abseil-cpp",
             "@com_github_grpc_grpc": "@grpc",
             "@com_google_protobuf": "@protobuf",
@@ -62,6 +64,7 @@ def api_dependencies(bzlmod = False):
     external_http_archive(
         name = "xds",
         repo_mapping = {
+            "@com_envoyproxy_protoc_gen_validate": "@protoc-gen-validate",
             "@com_google_googleapis": "@googleapis",
             "@com_google_protobuf": "@protobuf",
             "@com_github_grpc_grpc": "@grpc",

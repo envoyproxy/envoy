@@ -1,10 +1,10 @@
-load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@grpc//bazel:python_rules.bzl", _py_proto_library = "py_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 load("@protobuf//bazel:java_lite_proto_library.bzl", "java_lite_proto_library")
 load("@protobuf//bazel:proto_library.bzl", "proto_library")
+load("@protoc-gen-validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_test")
 load(
     "//bazel:external_proto_deps.bzl",
@@ -39,7 +39,7 @@ _COMMON_PROTO_DEPS = [
     "@googleapis//google/api:httpbody_proto",
     "@googleapis//google/api:annotations_proto",
     "@googleapis//google/rpc:status_proto",
-    "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
+    "@protoc-gen-validate//validate:validate_proto",
 ]
 
 def _proto_mapping(dep, proto_dep_map, proto_suffix):
@@ -161,14 +161,14 @@ def api_proto_package(
         has_services = has_services,
     )
 
-    compilers = ["@io_bazel_rules_go//proto:go_proto", "@com_envoyproxy_protoc_gen_validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
+    compilers = ["@io_bazel_rules_go//proto:go_proto", "@protoc-gen-validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
     if has_services:
-        compilers = ["@io_bazel_rules_go//proto:go_proto", "@io_bazel_rules_go//proto:go_grpc_v2", "@com_envoyproxy_protoc_gen_validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
+        compilers = ["@io_bazel_rules_go//proto:go_proto", "@io_bazel_rules_go//proto:go_grpc_v2", "@protoc-gen-validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
 
     deps = (
         [_go_proto_mapping(dep) for dep in deps] +
         [
-            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
+            "@protoc-gen-validate//validate:go_default_library",
             "@org_golang_google_genproto_googleapis_api//annotations:annotations",
             "@org_golang_google_genproto_googleapis_rpc//status:status",
             "@org_golang_google_protobuf//types/known/anypb:go_default_library",

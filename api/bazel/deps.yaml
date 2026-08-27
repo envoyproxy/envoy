@@ -8,24 +8,6 @@ bazel_skylib:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/bazel-skylib/blob/{version}/LICENSE"
 
-com_envoyproxy_protoc_gen_validate:
-  project_name: "protoc-gen-validate (PGV)"
-  project_desc: "protoc plugin to generate polyglot message validators"
-  project_url: "https://github.com/bufbuild/protoc-gen-validate"
-  release_date: "2026-02-18"
-  use_category:
-  - api
-  implied_untracked_deps:
-  - com_github_iancoleman_strcase
-  - com_github_lyft_protoc_gen_star_v2
-  - com_github_spf13_afero
-  - org_golang_google_genproto
-  - org_golang_x_text
-  - org_golang_x_mod
-  - org_golang_x_sys
-  license: "Apache-2.0"
-  license_url: "https://github.com/bufbuild/protoc-gen-validate/blob/v{version}/LICENSE"
-
 com_github_chrusty_protoc_gen_jsonschema:
   project_name: "protoc-gen-jsonschema"
   project_desc: "Protobuf to JSON-Schema compiler"
@@ -93,6 +75,25 @@ prometheus_metrics_model:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/prometheus/client_model/blob/v{version}/LICENSE"
+
+protoc_gen_validate:
+  apparent_name: protoc-gen-validate
+  project_name: "protoc-gen-validate (PGV)"
+  project_desc: "protoc plugin to generate polyglot message validators"
+  project_url: "https://github.com/bufbuild/protoc-gen-validate"
+  release_date: "2026-02-18"
+  use_category:
+  - api
+  implied_untracked_deps:
+  - com_github_iancoleman_strcase
+  - com_github_lyft_protoc_gen_star_v2
+  - com_github_spf13_afero
+  - org_golang_google_genproto
+  - org_golang_x_text
+  - org_golang_x_mod
+  - org_golang_x_sys
+  license: "Apache-2.0"
+  license_url: "https://github.com/bufbuild/protoc-gen-validate/blob/v{version}/LICENSE"
 
 rules_buf:
   project_name: "Bazel rules for Buf"
