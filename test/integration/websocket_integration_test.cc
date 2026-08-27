@@ -103,7 +103,6 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
     proxied_request_headers.setContentLength(size_t(0));
   }
 
-  // Ignore the key synthesized for an HTTP/1 upstream attempt.
   if (upstreamProtocol() == Http::CodecType::HTTP1 &&
       downstreamProtocol() != Http::CodecType::HTTP1 &&
       original_request_headers.getUpgradeValue() == Http::Headers::get().UpgradeValues.WebSocket) {
@@ -215,7 +214,6 @@ void WebsocketIntegrationTest::performUpgrade(
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   validateUpgradeRequestHeaders(upstream_request_->headers(), upgrade_request_headers);
 
-  // Send the upgrade response.
   Http::TestResponseHeaderMapImpl upstream_response_headers(upgrade_response_headers);
   if (upgrade_request_headers.get(Http::Headers::get().SecWebSocketKey).empty()) {
     const auto upstream_keys =
@@ -304,12 +302,90 @@ TEST_P(WebsocketIntegrationTest, WebSocketRejectsUpstreamWithoutMatchingAccept) 
 
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_EQ("502", response_->headers().getStatusValue());
+  EXPECT_EQ(response_->headers().Connection(), nullptr);
+  EXPECT_EQ(response_->headers().Upgrade(), nullptr);
   EXPECT_TRUE(response_->headers().get(Http::Headers::get().SecWebSocketAccept).empty());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("websocket_handshake_invalid_accept"));
 
   test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
   test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(0));
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+TEST_P(WebsocketIntegrationTest, WebSocketInvalidHandshakeRetriesAnotherHost) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  config_helper_.addConfigModifier(setRouteRetryOn5xxPolicy());
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* locality = cluster->mutable_load_assignment()->mutable_endpoints(0);
+    const auto endpoint = locality->lb_endpoints(0);
+    locality->add_lb_endpoints()->MergeFrom(endpoint);
+
+    auto* outlier_detection = cluster->mutable_outlier_detection();
+    outlier_detection->mutable_consecutive_5xx()->set_value(1);
+    outlier_detection->mutable_enforcing_consecutive_5xx()->set_value(100);
+    outlier_detection->set_split_external_local_origin_errors(true);
+    outlier_detection->mutable_max_ejection_percent()->set_value(100);
+  });
+  setUpstreamCount(2);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(upgradeRequestHeaders());
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  FakeHttpConnectionPtr broken_connection;
+  const auto broken_upstream_index =
+      FakeUpstream::waitForHttpConnection(*dispatcher_, fake_upstreams_, broken_connection);
+  ASSERT_TRUE(broken_upstream_index.ok()) << broken_upstream_index.status();
+  FakeStreamPtr broken_request;
+  ASSERT_TRUE(broken_connection->waitForNewStream(*dispatcher_, broken_request));
+  ASSERT_TRUE(broken_request->waitForHeadersComplete());
+  const auto broken_keys = broken_request->headers().get(Http::Headers::get().SecWebSocketKey);
+  ASSERT_EQ(broken_keys.size(), 1);
+  const std::string broken_key(broken_keys[0]->value().getStringView());
+
+  broken_request->encodeHeaders(upgradeResponseHeaders(), false);
+  ASSERT_TRUE(broken_connection->waitForDisconnect());
+
+  FakeHttpConnectionPtr healthy_connection;
+  const auto healthy_upstream_index =
+      FakeUpstream::waitForHttpConnection(*dispatcher_, fake_upstreams_, healthy_connection);
+  ASSERT_TRUE(healthy_upstream_index.ok()) << healthy_upstream_index.status();
+  EXPECT_NE(healthy_upstream_index.value(), broken_upstream_index.value());
+  FakeStreamPtr healthy_request;
+  ASSERT_TRUE(healthy_connection->waitForNewStream(*dispatcher_, healthy_request));
+  ASSERT_TRUE(healthy_request->waitForHeadersComplete());
+  const auto healthy_keys = healthy_request->headers().get(Http::Headers::get().SecWebSocketKey);
+  ASSERT_EQ(healthy_keys.size(), 1);
+  EXPECT_NE(healthy_keys[0]->value().getStringView(), broken_key);
+
+  auto success_headers = upgradeResponseHeaders();
+  success_headers.setCopy(Http::Headers::get().SecWebSocketAccept,
+                          WebSocket::computeAccept(healthy_keys[0]->value().getStringView()));
+  healthy_request->encodeHeaders(success_headers, false);
+
+  response_->waitForHeaders();
+  EXPECT_EQ(response_->headers().getStatusValue(), "101");
+  EXPECT_TRUE(response_->headers().get(Http::Headers::get().SecWebSocketAccept).empty());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry_success", Eq(1));
+  test_server_->waitForCounter(
+      "cluster.cluster_0.outlier_detection.ejections_detected_consecutive_5xx", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.outlier_detection.ejections_enforced_total",
+                               Eq(1));
+
+  fake_upstream_connection_ = std::move(healthy_connection);
+  upstream_request_ = std::move(healthy_request);
+  sendBidirectionalData();
+  codec_client_->close();
+  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketAcceptValidationCanBeDisabled) {
