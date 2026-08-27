@@ -90,6 +90,7 @@ private:
   friend class GcpAuthnFilterTest;
 
   std::optional<std::string> getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster);
+  void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str);
 
   GcpAuthnFilterStats generateStats(const std::string& stats_prefix, Stats::Scope& scope) {
     return {ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))};

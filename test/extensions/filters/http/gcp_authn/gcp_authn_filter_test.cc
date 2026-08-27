@@ -13,6 +13,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -978,6 +979,109 @@ TEST_F(GcpAuthnFilterTest, AudiencePrecedenceUnboundAccessToken) {
         EXPECT_CALL(client, fetchUnboundJwt(_, _)).Times(0);
       },
       /*is_bound=*/false);
+}
+
+TEST_F(GcpAuthnFilterTest, SaveTokenToDynamicMetadata) {
+  config_.set_token_metadata_key("custom_token_key");
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  EXPECT_CALL(decoder_callbacks_, filterConfigName())
+      .WillRepeatedly(Return("envoy.filters.http.gcp_authn"));
+  setupMockFilterMetadata(/*valid=*/true);
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Protobuf::Struct expected_metadata;
+  (*expected_metadata.mutable_fields())["custom_token_key"].set_string_value(
+      std::string(GoodTokenStr));
+  EXPECT_CALL(decoder_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.gcp_authn", ProtoEq(expected_metadata)));
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(std::string(GoodTokenStr));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  EXPECT_EQ(default_headers_.get_("Authorization"), "");
+}
+
+TEST_F(GcpAuthnFilterTest, SaveTokenToDynamicMetadataCacheHit) {
+  config_.set_token_metadata_key("custom_token_key");
+  envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig cache_config;
+  cache_config.mutable_cache_size()->set_value(100);
+  config_.mutable_cache_config()->CopyFrom(cache_config);
+  refreshConfig();
+
+  setupMockObjects();
+  setupMockFilterMetadata(/*valid=*/true);
+  setupFilterAndCallback();
+  EXPECT_CALL(decoder_callbacks_, filterConfigName())
+      .WillRepeatedly(Return("envoy.filters.http.gcp_authn"));
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("test");
+
+  uint64_t far_future_exp =
+      DateUtil::nowToSeconds(context_.serverFactoryContext().timeSource()) + 1000;
+  auto token = std::make_unique<GcpToken>();
+  token->token = "cached_token";
+  token->expires_at = far_future_exp;
+  token->audience = audience;
+  filter_config_->tokenCache()->insert(std::move(token));
+
+  EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
+
+  Protobuf::Struct expected_metadata;
+  (*expected_metadata.mutable_fields())["custom_token_key"].set_string_value("cached_token");
+  EXPECT_CALL(decoder_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.gcp_authn", ProtoEq(expected_metadata)));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(default_headers_.get_("Authorization"), "");
+}
+
+TEST_F(GcpAuthnFilterTest, TokenMetadataKeyPrecedenceOverTokenHeader) {
+  config_.set_token_metadata_key("custom_token_key");
+  auto* token_header = config_.mutable_token_header();
+  token_header->set_name("custom-header");
+  token_header->set_value_prefix("Prefix ");
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  EXPECT_CALL(decoder_callbacks_, filterConfigName())
+      .WillRepeatedly(Return("envoy.filters.http.gcp_authn"));
+  setupMockFilterMetadata(/*valid=*/true);
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Protobuf::Struct expected_metadata;
+  (*expected_metadata.mutable_fields())["custom_token_key"].set_string_value(
+      std::string(GoodTokenStr));
+  EXPECT_CALL(decoder_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.gcp_authn", ProtoEq(expected_metadata)));
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(std::string(GoodTokenStr));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  EXPECT_EQ(default_headers_.get_("custom-header"), "");
+  EXPECT_EQ(default_headers_.get_("Authorization"), "");
 }
 
 } // namespace GcpAuthn

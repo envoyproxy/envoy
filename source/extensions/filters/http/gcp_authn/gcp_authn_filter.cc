@@ -30,16 +30,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 namespace {
-void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str,
-                       const envoy::extensions::filters::http::gcp_authn::v3::TokenHeader& header) {
-  if (header.ByteSizeLong() == 0) {
-    std::string id_token = absl::StrCat("Bearer ", token_str);
-    hdrs.setCopy(authorizationHeaderKey(), id_token);
-  } else {
-    std::string id_token = absl::StrCat(header.value_prefix(), token_str);
-    hdrs.setCopy(Http::LowerCaseString(header.name()), id_token);
-  }
-}
 
 std::optional<envoy::extensions::filters::http::gcp_authn::v3::Audience>
 retrieveAudience(Upstream::ThreadLocalCluster* cluster) {
@@ -155,7 +145,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   if (jwt_token_cache_ != nullptr) {
     auto token = jwt_token_cache_->lookUp(audience_, client_cert_fingerprint_);
     if (token.has_value()) {
-      addTokenToRequest(hdrs, token.value(), filter_config_->config().token_header());
+      addTokenToRequest(hdrs, token.value());
       state_ = State::Complete;
       return FilterHeadersStatus::Continue;
     }
@@ -192,8 +182,7 @@ void GcpAuthnFilter::onComplete(absl::StatusOr<GcpToken> token) {
       // `Authorization: Bearer ID_TOKEN` header).
       GcpToken token_val = *token;
       if (request_header_map_ != nullptr) {
-        addTokenToRequest(*request_header_map_, token_val.token,
-                          filter_config_->config().token_header());
+        addTokenToRequest(*request_header_map_, token_val.token);
       } else {
         ENVOY_LOG(debug, "No request header to be modified.");
       }
@@ -212,6 +201,25 @@ void GcpAuthnFilter::onDestroy() {
   if (state_ == State::Calling) {
     state_ = State::Complete;
     client_->cancel();
+  }
+}
+
+void GcpAuthnFilter::addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str) {
+  const FilterConfigProto proto = filter_config_->config();
+  if (!proto.token_metadata_key().empty()) {
+    Protobuf::Struct metadata;
+    (*metadata.mutable_fields())[proto.token_metadata_key()].set_string_value(token_str);
+    decoder_callbacks_->streamInfo().setDynamicMetadata(
+        std::string(decoder_callbacks_->filterConfigName()), metadata);
+    return;
+  }
+  const envoy::extensions::filters::http::gcp_authn::v3::TokenHeader& header = proto.token_header();
+  if (header.ByteSizeLong() == 0) {
+    std::string id_token = absl::StrCat("Bearer ", token_str);
+    hdrs.setCopy(authorizationHeaderKey(), id_token);
+  } else {
+    std::string id_token = absl::StrCat(header.value_prefix(), token_str);
+    hdrs.setCopy(Http::LowerCaseString(header.name()), id_token);
   }
 }
 

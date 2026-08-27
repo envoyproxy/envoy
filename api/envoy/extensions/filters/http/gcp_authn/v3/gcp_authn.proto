@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.gcp_authn]
 
 // Filter configuration.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message GcpAuthnFilterConfig {
   // The HTTP URI to fetch tokens from GCE Metadata Server(https://cloud.google.com/compute/docs/metadata/overview).
   // The URL format is "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
@@ -45,8 +45,13 @@ message GcpAuthnFilterConfig {
 
   // Request header location to extract the token. By default (i.e. if this field is not specified), the token
   // is extracted to the Authorization HTTP header, in the format "Authorization: Bearer <token>".
+  // If ``token_metadata_key`` is set, this field takes no effect.
   // Not supported by all data planes.
   TokenHeader token_header = 4;
+
+  // Optional dynamic metadata key to save the token. The metadata uses the filter config name as the namespace.
+  // Takes precedence over ``token_header``.
+  string token_metadata_key = 7;
 
   // Cluster to send traffic to the GCE metadata server. Not supported
   // by all data planes; a data plane may instead have its own mechanism
