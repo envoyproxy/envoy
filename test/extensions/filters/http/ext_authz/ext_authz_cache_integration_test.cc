@@ -1,5 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/registry/registry.h"
@@ -16,6 +18,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -27,28 +30,127 @@ struct SimpleInMemoryCacheStorage {
   absl::Mutex mutex;
   absl::flat_hash_map<std::string, Filters::Common::ExtAuthz::ResponseSharedPtr>
       map ABSL_GUARDED_BY(mutex);
+  bool hold_lookup ABSL_GUARDED_BY(mutex){false};
+  uint32_t cancel_count ABSL_GUARDED_BY(mutex){0};
+  uint32_t lookup_count ABSL_GUARDED_BY(mutex){0};
+
+  void setHoldLookup(bool hold) {
+    absl::MutexLock lock(&mutex);
+    hold_lookup = hold;
+  }
+
+  uint32_t cancelCount() {
+    absl::MutexLock lock(&mutex);
+    return cancel_count;
+  }
+
+  uint32_t lookupCount() {
+    absl::MutexLock lock(&mutex);
+    return lookup_count;
+  }
+
+  bool waitForLookup(absl::Duration timeout = absl::Seconds(5)) {
+    auto predicate = [this]() ABSL_SHARED_LOCKS_REQUIRED(mutex) {
+      mutex.AssertHeld();
+      return lookup_count > 0;
+    };
+    absl::MutexLock lock(&mutex);
+    return mutex.AwaitWithTimeout(absl::Condition(&predicate), timeout);
+  }
+
+  bool waitForCancel(absl::Duration timeout = absl::Seconds(5)) {
+    auto predicate = [this]() ABSL_SHARED_LOCKS_REQUIRED(mutex) {
+      mutex.AssertHeld();
+      return cancel_count > 0;
+    };
+    absl::MutexLock lock(&mutex);
+    return mutex.AwaitWithTimeout(absl::Condition(&predicate), timeout);
+  }
+};
+
+class SimpleLookupRequest : public AuthCacheSession::LookupRequest {
+public:
+  SimpleLookupRequest(Event::Dispatcher& dispatcher, AuthCacheSession::LookupCallback cb,
+                      Filters::Common::ExtAuthz::ResponseSharedPtr response,
+                      std::shared_ptr<SimpleInMemoryCacheStorage> storage, bool hold_lookup)
+      : cb_(std::move(cb)), response_(std::move(response)), storage_(std::move(storage)) {
+    if (!hold_lookup) {
+      timer_ = dispatcher.createTimer([this]() {
+        if (!cancelled_) {
+          cb_(std::move(response_));
+        }
+      });
+      timer_->enableTimer(std::chrono::milliseconds(0));
+    }
+  }
+
+  ~SimpleLookupRequest() override {
+    if (timer_ != nullptr) {
+      timer_->disableTimer();
+      timer_.reset();
+    }
+  }
+
+  void cancel() override {
+    cancelled_ = true;
+    if (timer_ != nullptr) {
+      timer_->disableTimer();
+      timer_.reset();
+    }
+    absl::MutexLock lock(&storage_->mutex);
+    storage_->cancel_count++;
+  }
+
+private:
+  AuthCacheSession::LookupCallback cb_;
+  Filters::Common::ExtAuthz::ResponseSharedPtr response_;
+  std::shared_ptr<SimpleInMemoryCacheStorage> storage_;
+  Event::TimerPtr timer_;
+  bool cancelled_{false};
 };
 
 class SimpleInMemoryCacheSession : public AuthCacheSession {
 public:
-  SimpleInMemoryCacheSession(std::shared_ptr<SimpleInMemoryCacheStorage> storage)
-      : storage_(storage) {}
+  SimpleInMemoryCacheSession(std::shared_ptr<SimpleInMemoryCacheStorage> storage, bool async_lookup)
+      : storage_(std::move(storage)), async_lookup_(async_lookup) {}
 
-  LookupRequest* lookup(Http::StreamDecoderFilterCallbacks&, const RequestAttributes& attributes,
-                        LookupCallback&& cb) override {
+  LookupRequest* lookup(Http::StreamDecoderFilterCallbacks& decoder_callbacks,
+                        const RequestAttributes& attributes, LookupCallback&& cb) override {
     current_key_ = std::string(attributes.headers_.getPathValue());
     if (current_key_.empty()) {
+      if (async_lookup_) {
+        bool hold = false;
+        {
+          absl::MutexLock lock(&storage_->mutex);
+          hold = storage_->hold_lookup;
+        }
+        active_request_ = std::make_unique<SimpleLookupRequest>(
+            decoder_callbacks.dispatcher(), std::move(cb), nullptr, storage_, hold);
+        return active_request_.get();
+      }
       cb(nullptr);
       return nullptr;
     }
 
-    absl::ReaderMutexLock lock(&storage_->mutex);
-    auto it = storage_->map.find(current_key_);
-    if (it != storage_->map.end()) {
-      cb(it->second);
-      return nullptr;
+    Filters::Common::ExtAuthz::ResponseSharedPtr response = nullptr;
+    bool hold = false;
+    {
+      absl::MutexLock lock(&storage_->mutex);
+      storage_->lookup_count++;
+      auto it = storage_->map.find(current_key_);
+      if (it != storage_->map.end()) {
+        response = it->second;
+      }
+      hold = storage_->hold_lookup;
     }
-    cb(nullptr);
+
+    if (async_lookup_) {
+      active_request_ = std::make_unique<SimpleLookupRequest>(
+          decoder_callbacks.dispatcher(), std::move(cb), std::move(response), storage_, hold);
+      return active_request_.get();
+    }
+
+    cb(std::move(response));
     return nullptr;
   }
 
@@ -57,39 +159,44 @@ public:
       return;
     }
 
-    absl::WriterMutexLock lock(&storage_->mutex);
+    absl::MutexLock lock(&storage_->mutex);
     storage_->map[current_key_] = std::make_shared<Filters::Common::ExtAuthz::Response>(response);
   }
 
 private:
   std::shared_ptr<SimpleInMemoryCacheStorage> storage_;
+  const bool async_lookup_;
   std::string current_key_;
+  std::unique_ptr<SimpleLookupRequest> active_request_;
 };
 
 class SimpleInMemoryCache : public AuthCache {
 public:
-  SimpleInMemoryCache() : storage_(std::make_shared<SimpleInMemoryCacheStorage>()) {}
+  SimpleInMemoryCache(bool async_lookup, std::shared_ptr<SimpleInMemoryCacheStorage> storage)
+      : storage_(std::move(storage)), async_lookup_(async_lookup) {}
 
   AuthCacheSessionPtr createSession() override {
-    return std::make_unique<SimpleInMemoryCacheSession>(storage_);
+    return std::make_unique<SimpleInMemoryCacheSession>(storage_, async_lookup_);
   }
 
   void clear() {
-    absl::WriterMutexLock lock(&storage_->mutex);
+    absl::MutexLock lock(&storage_->mutex);
     storage_->map.clear();
   }
 
 private:
   std::shared_ptr<SimpleInMemoryCacheStorage> storage_;
+  const bool async_lookup_;
 };
 
 class SimpleInMemoryCacheFactory : public AuthCacheFactory {
 public:
-  SimpleInMemoryCacheFactory() = default;
+  SimpleInMemoryCacheFactory(bool async_lookup, std::shared_ptr<SimpleInMemoryCacheStorage> storage)
+      : async_lookup_(async_lookup), storage_(std::move(storage)) {}
 
   AuthCachePtr createAuthCache(const Protobuf::Message&,
                                Server::Configuration::ServerFactoryContext&) override {
-    return std::make_unique<SimpleInMemoryCache>();
+    return std::make_unique<SimpleInMemoryCache>(async_lookup_, storage_);
   }
 
   std::string name() const override {
@@ -100,15 +207,17 @@ public:
     return std::make_unique<Protobuf::Struct>();
   }
 
-  void clear() {
-    // No-op because each cache has its own storage and is recreated with the server.
-  }
+private:
+  const bool async_lookup_;
+  std::shared_ptr<SimpleInMemoryCacheStorage> storage_;
 };
 
-class ExtAuthzCacheIntegrationTest : public HttpIntegrationTest, public testing::Test {
+class ExtAuthzCacheIntegrationTest : public HttpIntegrationTest,
+                                     public testing::TestWithParam<bool> {
 public:
   ExtAuthzCacheIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4),
+        storage_(std::make_shared<SimpleInMemoryCacheStorage>()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -117,9 +226,9 @@ public:
   }
 
   void initialize() override {
-    cache_factory_.clear();
+    cache_factory_ = std::make_unique<SimpleInMemoryCacheFactory>(GetParam(), storage_);
     inject_cache_factory_ =
-        std::make_unique<Registry::InjectFactory<AuthCacheFactory>>(cache_factory_);
+        std::make_unique<Registry::InjectFactory<AuthCacheFactory>>(*cache_factory_);
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add ext_authz cluster by merging from cluster_0 (backend)
@@ -160,14 +269,20 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
-  SimpleInMemoryCacheFactory cache_factory_;
+  std::shared_ptr<SimpleInMemoryCacheStorage> storage_;
+  std::unique_ptr<SimpleInMemoryCacheFactory> cache_factory_;
   std::unique_ptr<Registry::InjectFactory<AuthCacheFactory>> inject_cache_factory_;
 
   FakeHttpConnectionPtr fake_ext_authz_connection_;
   FakeStreamPtr ext_authz_request_;
 };
 
-TEST_F(ExtAuthzCacheIntegrationTest, CacheMissThenHit) {
+INSTANTIATE_TEST_SUITE_P(CacheLookupMode, ExtAuthzCacheIntegrationTest, testing::Bool(),
+                         [](const ::testing::TestParamInfo<bool>& params) {
+                           return params.param ? "AsyncLookup" : "SyncLookup";
+                         });
+
+TEST_P(ExtAuthzCacheIntegrationTest, CacheMissThenHit) {
   initialize();
 
   // --- Request 1: Cache Miss ---
@@ -248,6 +363,36 @@ TEST_F(ExtAuthzCacheIntegrationTest, CacheMissThenHit) {
   // Verify cluster stats: only incremented on cache miss, not on cache hit.
   uint64_t cluster_ok_counter = test_server_->counter("cluster.cluster_0.ext_authz.ok")->value();
   EXPECT_EQ(1U, cluster_ok_counter);
+}
+
+TEST_P(ExtAuthzCacheIntegrationTest, CancelledLookup) {
+  if (!GetParam()) {
+    return; // Cancellation only applies to asynchronous cache lookups.
+  }
+
+  storage_->setHoldLookup(true);
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/cancel-me"}, {":scheme", "http"}, {":authority", "host"}};
+  auto encoder_decoder = codec_client_->startRequest(headers);
+
+  // Wait until the cache lookup has started in ext_authz filter.
+  ASSERT_TRUE(storage_->waitForLookup());
+
+  // Reset the downstream stream while cache lookup is in progress.
+  codec_client_->sendReset(encoder_decoder.first);
+
+  // Verify that the cache lookup was cancelled.
+  ASSERT_TRUE(storage_->waitForCancel());
+  EXPECT_EQ(1U, storage_->cancelCount());
+
+  // Verify stats: no OK or Denied responses recorded.
+  EXPECT_EQ(0U, test_server_->counter("http.config_test.ext_authz.ok")->value());
+  EXPECT_EQ(0U, test_server_->counter("http.config_test.ext_authz.denied")->value());
+
+  codec_client_->close();
 }
 
 } // namespace ExtAuthz

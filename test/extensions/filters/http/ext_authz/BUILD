@@ -270,6 +270,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.ext_authz"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
         "//source/extensions/filters/http/ext_authz:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:registry_lib",
