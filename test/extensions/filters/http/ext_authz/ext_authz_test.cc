@@ -3993,6 +3993,11 @@ TEST_F(HttpFilterCacheTest, CacheHitOk) {
   EXPECT_EQ(
       "yes",
       request_headers_.get(Http::LowerCaseString("x-cached-header"))[0]->value().getStringView());
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.ok")
+                    .value());
 }
 
 TEST_F(HttpFilterCacheTest, CacheHitOkSync) {
@@ -4022,6 +4027,11 @@ TEST_F(HttpFilterCacheTest, CacheHitOkSync) {
   EXPECT_EQ(
       "yes",
       request_headers_.get(Http::LowerCaseString("x-cached-header"))[0]->value().getStringView());
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.ok")
+                    .value());
 }
 
 TEST_F(HttpFilterCacheTest, CacheHitDenied) {
@@ -4058,6 +4068,10 @@ TEST_F(HttpFilterCacheTest, CacheHitDenied) {
   lookup_cb(std::move(cached_response));
 
   EXPECT_EQ(1U, config_->stats().denied_.value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.denied")
+                    .value());
 }
 
 TEST_F(HttpFilterCacheTest, CacheHitDeniedSync) {
@@ -4089,6 +4103,10 @@ TEST_F(HttpFilterCacheTest, CacheHitDeniedSync) {
             filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_EQ(1U, config_->stats().denied_.value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.denied")
+                    .value());
 }
 
 TEST_F(HttpFilterCacheTest, CacheHitErrorFailOpen) {
@@ -4123,6 +4141,14 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailOpen) {
 
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.error")
+                    .value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.failure_mode_allowed")
+                    .value());
 }
 
 TEST_F(HttpFilterCacheTest, CacheHitErrorFailOpenSync) {
@@ -4150,6 +4176,14 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailOpenSync) {
 
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.error")
+                    .value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.failure_mode_allowed")
+                    .value());
 }
 
 TEST_F(HttpFilterCacheTest, CacheHitErrorFailClosed) {
@@ -4185,6 +4219,10 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailClosed) {
 
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ(0U, config_->stats().failure_mode_allowed_.value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.error")
+                    .value());
 }
 
 TEST_F(HttpFilterCacheTest, CacheHitErrorFailClosedSync) {
@@ -4215,6 +4253,10 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailClosedSync) {
 
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ(0U, config_->stats().failure_mode_allowed_.value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.error")
+                    .value());
 }
 
 TEST_F(HttpFilterCacheTest, CacheMiss) {

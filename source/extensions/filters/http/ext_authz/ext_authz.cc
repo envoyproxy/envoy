@@ -1042,7 +1042,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponseSharedPtr response) {
       }
     }
 
-    if (cluster_) {
+    if (!from_cache && cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
     }
     if (config_->shadowMode()) {
@@ -1058,7 +1058,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponseSharedPtr response) {
                      *decoder_callbacks_, enumToInt(response->status_code));
     stats_.denied_.inc();
 
-    if (cluster_) {
+    if (!from_cache && cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_denied_);
       if (config_->chargeClusterResponseStats()) {
         Http::CodeStats::ResponseStatInfo info{config_->scope(),
@@ -1138,7 +1138,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponseSharedPtr response) {
   }
 
   case CheckStatus::Error: {
-    if (cluster_) {
+    if (!from_cache && cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_error_);
     }
     stats_.error_.inc();
@@ -1169,7 +1169,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponseSharedPtr response) {
       if (config_->emitFilterStateStats() && logging_info_ != nullptr) {
         logging_info_->setFailedOpen();
       }
-      if (cluster_) {
+      if (!from_cache && cluster_) {
         config_->incCounter(cluster_->statsScope(), config_->ext_authz_failure_mode_allowed_);
       }
       if (config_->failureModeAllowHeaderAdd()) {

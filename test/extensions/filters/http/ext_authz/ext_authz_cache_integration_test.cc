@@ -245,6 +245,9 @@ TEST_F(ExtAuthzCacheIntegrationTest, CacheMissThenHit) {
   // Verify stats: 2 OKs total
   uint64_t ok_counter = test_server_->counter("http.config_test.ext_authz.ok")->value();
   EXPECT_EQ(2U, ok_counter);
+  // Verify cluster stats: only incremented on cache miss, not on cache hit.
+  uint64_t cluster_ok_counter = test_server_->counter("cluster.cluster_0.ext_authz.ok")->value();
+  EXPECT_EQ(1U, cluster_ok_counter);
 }
 
 } // namespace ExtAuthz
