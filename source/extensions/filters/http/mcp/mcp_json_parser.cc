@@ -143,6 +143,10 @@ std::string McpParserConfig::getNameAttributePath(const std::string& method) con
     return std::string(PARAMS_NAME);
   }
 
+  if (method == RESOURCES_READ) {
+    return std::string(PARAMS_URI);
+  }
+
   if (method == TASKS_GET || method == TASKS_UPDATE || method == TASKS_CANCEL) {
     return std::string(PARAMS_TASK_ID);
   }

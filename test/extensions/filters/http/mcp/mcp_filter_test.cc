@@ -186,6 +186,36 @@ TEST_F(McpFilterTest, HeadersAttributeSourceUsesNamePath) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
+TEST_F(McpFilterTest, HeadersAttributeSourceUsesResourceUriPath) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-method", "resources/read"},
+                                         {"mcp-name", "file:///tmp/foo"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(_)).Times(0);
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_EQ("resources/read", metadata.fields().at("method").string_value());
+
+        const auto& params = metadata.fields().at("params").struct_value();
+        EXPECT_EQ("file:///tmp/foo", params.fields().at("uri").string_value());
+      });
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
 TEST_F(McpFilterTest, HeadersAttributeSourceBuffersWhenDuplicateKeyCheckEnabled) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);

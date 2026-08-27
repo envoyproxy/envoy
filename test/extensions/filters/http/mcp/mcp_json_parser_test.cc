@@ -1568,6 +1568,7 @@ TEST(McpParserConfigTest, NameAttributePaths) {
 
   EXPECT_EQ(config.getNameAttributePath("tools/call"), "params.name");
   EXPECT_EQ(config.getNameAttributePath("prompts/get"), "params.name");
+  EXPECT_EQ(config.getNameAttributePath("resources/read"), "params.uri");
   EXPECT_EQ(config.getNameAttributePath("tasks/get"), "params.taskId");
   EXPECT_EQ(config.getNameAttributePath("tasks/update"), "params.taskId");
   EXPECT_EQ(config.getNameAttributePath("tasks/cancel"), "params.taskId");
