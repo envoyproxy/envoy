@@ -2270,6 +2270,8 @@ bool Filter::convertRequestHeadersForInternalRedirect(
   // Make sure that performing the redirect won't result in exceeding the configured number of
   // redirects allowed for this route.
   StreamInfo::UInt32Accessor* num_internal_redirect{};
+  const uint32_t max_internal_redirects =
+      policy.enabled() ? policy.maxInternalRedirects() : 1;
 
   if (num_internal_redirect = filter_state->getDataMutable<StreamInfo::UInt32Accessor>(
           NumInternalRedirectsFilterStateName);
@@ -2281,7 +2283,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(
                           StreamInfo::FilterState::LifeSpan::Request);
   }
 
-  if (num_internal_redirect->value() >= policy.maxInternalRedirects()) {
+  if (num_internal_redirect->value() >= max_internal_redirects) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: redirect limits exceeded.", *callbacks_);
     stats_.passthrough_internal_redirect_too_many_redirects_.inc();
     return false;
