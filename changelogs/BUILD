@@ -11,6 +11,7 @@ filegroup(
         "current/**/*.rst",
     ]) + [
         "changelogs.yaml",
+        "current/PLACEHOLDER.txt",
     ],
     visibility = ["//visibility:public"],
 )
