@@ -70,7 +70,7 @@ HostSelectionResponse OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerC
       const Network::Address::Ip* dst_ip = dst_addr.ip();
       if (dst_ip) {
         Network::Address::InstanceConstSharedPtr host_ip_port(
-            Network::Utility::copyInternetAddressAndPort(*dst_ip));
+            Network::Utility::getAddressWithPort(dst_addr, dst_ip->port()));
         // Create a host we can use immediately.
         auto info = parent_->cluster_->info();
         HostSharedPtr host(std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
@@ -289,8 +289,7 @@ void OriginalDstCluster::cleanup() {
       if (hosts->used_) {
         keep = true;
         hosts->used_ = false; // Mark to be removed during the next round.
-      } else if (Runtime::runtimeFeatureEnabled(
-                     "envoy.reloadable_features.original_dst_rely_on_idle_timeout")) {
+      } else {
         // Check that all hosts (first, as well as others that may have been added concurrently)
         // are not in use by any connection pool.
         if (hosts->host_->used()) {

@@ -24,7 +24,7 @@ envoy_cc_library(
 
 envoy_cc_binary(
     name = "envoy-static",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     stamped = True,
     visibility = ["//visibility:public"],
     deps = [

@@ -2,6 +2,7 @@
 
 #include "envoy/filesystem/filesystem.h"
 
+#include "source/common/html/utility.h"
 #include "source/server/admin/admin_html_util.h"
 #include "source/server/admin/stats_render.h"
 
@@ -29,10 +30,12 @@ public:
   void generate(Buffer::Instance& response, const std::string& name,
                 const std::string& value) override;
 
-  // This matches the superclass impl exactly, but is needed to allow gcc to compile, which
-  // warns about hidden overrides if we omit it.
   void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override {
-    StatsTextRender::generate(response, name, value);
+    if (Html::Utility::requiresSanitization(name) && sanitize_html_stats_names_) {
+      StatsTextRender::generate(response, Html::Utility::sanitize(name), value);
+    } else {
+      StatsTextRender::generate(response, name, value);
+    }
   }
 
   void generate(Buffer::Instance&, const std::string& name,
@@ -43,6 +46,7 @@ private:
   const bool active_{false};
   bool json_histograms_{false};
   bool first_histogram_{true};
+  const bool sanitize_html_stats_names_{false};
 };
 
 } // namespace Server

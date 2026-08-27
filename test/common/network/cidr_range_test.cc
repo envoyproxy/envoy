@@ -85,7 +85,9 @@ TEST(TruncateIpAddressAndLength, Various) {
 }
 
 TEST(IsInRange, Various) {
-  { EXPECT_THAT(CidrRange::create("foo").status(), Not(IsOk())); }
+  {
+    EXPECT_THAT(CidrRange::create("foo").status(), Not(IsOk()));
+  }
 
   {
     CidrRange rng = *CidrRange::create("10.255.255.255/0");
@@ -359,7 +361,9 @@ makeCidrRangeList(const std::vector<std::pair<std::string, uint32_t>>& ranges) {
 }
 
 TEST(IpListTest, Errors) {
-  { EXPECT_THAT(IpList::create(makeCidrRangeList({{"foo", 0}})).status(), Not(IsOk())); }
+  {
+    EXPECT_THAT(IpList::create(makeCidrRangeList({{"foo", 0}})).status(), Not(IsOk()));
+  }
 }
 
 TEST(IpListTest, SpecificAddressAllowed) {

@@ -118,9 +118,12 @@ TEST_F(OcspFullResponseParsingTest, MultiCertResponseTest) {
 TEST_F(OcspFullResponseParsingTest, UnsuccessfulResponseTest) {
   std::vector<uint8_t> data = {
       // SEQUENCE
-      0x30, 3,
+      0x30,
+      3,
       // OcspResponseStatus - InternalError
-      0xau, 1, 2,
+      0xau,
+      1,
+      2,
       // no response bytes
   };
   EXPECT_EQ(OcspResponseWrapperImpl::create(data, time_system_).status().message(),
@@ -130,9 +133,12 @@ TEST_F(OcspFullResponseParsingTest, UnsuccessfulResponseTest) {
 TEST_F(OcspFullResponseParsingTest, NoResponseBodyTest) {
   std::vector<uint8_t> data = {
       // SEQUENCE
-      0x30, 3,
+      0x30,
+      3,
       // OcspResponseStatus - Success
-      0xau, 1, 0,
+      0xau,
+      1,
+      0,
       // no response bytes
   };
   EXPECT_EQ(OcspResponseWrapperImpl::create(data, time_system_).status().message(),
@@ -231,9 +237,12 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseDataBadResponderIdVariantTest) {
 TEST_F(Asn1OcspUtilityTest, ParseOcspResponseBytesMissingTest) {
   std::vector<uint8_t> data = {
       // SEQUENCE
-      0x30, 3,
+      0x30,
+      3,
       // OcspResponseStatus - InternalError
-      0xau, 1, 2,
+      0xau,
+      1,
+      2,
       // no response bytes
   };
   CBS cbs;

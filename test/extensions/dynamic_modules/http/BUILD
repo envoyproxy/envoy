@@ -58,7 +58,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op_no_optional_abi",
     ],
     # factory_context_mocks needs this.
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
@@ -89,7 +89,7 @@ envoy_cc_test(
         "GODEBUG": "cgocheck=0",
     },
     # http_mocks needs this.
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
@@ -101,7 +101,11 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -112,7 +116,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     # http_mocks needs this.
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
@@ -132,6 +136,8 @@ envoy_cc_test(
         "//test/mocks/upstream:priority_set_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -153,7 +159,7 @@ envoy_cc_test(
     env = {
         "GODEBUG": "cgocheck=0",
     },
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/extensions/dynamic_modules:abi_impl",
@@ -162,6 +168,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules:util",
         "//test/extensions/dynamic_modules/test_data/rust:http_integration_test_static",
         "//test/integration:http_integration_lib",
+        "//test/test_common:logging_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

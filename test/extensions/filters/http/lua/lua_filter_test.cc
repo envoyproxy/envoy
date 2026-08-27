@@ -19,20 +19,27 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 
 using testing::_;
+using testing::AllOf;
 using testing::AtLeast;
+using testing::Contains;
 using testing::Eq;
+using testing::Field;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
+using testing::IsSupersetOf;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrEq;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -95,12 +102,15 @@ public:
       const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
       const envoy::extensions::filters::http::lua::v3::LuaPerRoute& per_route_proto_config) {
     // Setup filter config for Lua filter.
-    config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_,
-                                             *stats_store_.rootScope(), "test.",
-                                             server_factory_context_.options().concurrency());
+    absl::Status creation_status = absl::OkStatus();
+    config_ = std::make_shared<FilterConfig>(
+        proto_config, tls_, cluster_manager_, api_, *stats_store_.rootScope(), "test.",
+        server_factory_context_.options().concurrency(), creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     // Setup per route config for Lua filter.
-    per_route_config_ =
-        std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
+    per_route_config_ = std::make_shared<FilterConfigPerRoute>(
+        per_route_proto_config, server_factory_context_, creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
   }
 
   void setupFilter() {
@@ -302,10 +312,12 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua", 1),
-      Filters::Common::Lua::LuaException,
-      "script load error: [string \"...\"]:3: '=' expected near '<eof>'");
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua", 1,
+               creation_status);
+  EXPECT_THAT(creation_status, StatusHelpers::HasStatusMessage(
+                                   "script load error: [string \"...\"]:3: '=' expected near "
+                                   "'<eof>'"));
 }
 
 // Script touching headers only, request that is headers only.
@@ -2780,8 +2792,8 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
                                              .fields()
                                              .at("complex")
                                              .struct_value();
-  EXPECT_EQ("abcd", meta_complex.fields().at("x").string_value());
-  EXPECT_EQ(1234.0, meta_complex.fields().at("y").number_value());
+  EXPECT_THAT(meta_complex.fields(),
+              UnorderedElementsAre(IsStructString("x", "abcd"), IsStructNumber("y", 1234.0)));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
@@ -3644,8 +3656,10 @@ TEST_F(LuaHttpFilterTest, DestructFilterConfigPerRoute) {
   EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).Times(0);
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(0);
 
-  per_route_config_ =
-      std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
+  absl::Status creation_status = absl::OkStatus();
+  per_route_config_ = std::make_shared<FilterConfigPerRoute>(
+      per_route_proto_config, server_factory_context_, creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
   per_route_config_.reset();
 }
 
@@ -3767,9 +3781,11 @@ TEST_F(LuaHttpFilterTest, LuaVmCountGaugeDecrementOnDestroy) {
     envoy::config::core::v3::DataSource src;
     src.set_inline_string(HEADER_ONLY_SCRIPT);
     extra_proto.mutable_source_codes()->insert({"extra.lua", src});
+    absl::Status creation_status = absl::OkStatus();
     auto extra_config = std::make_shared<FilterConfig>(
         extra_proto, tls_, cluster_manager_, api_, *stats_store_.rootScope(), "test.",
-        server_factory_context_.options().concurrency());
+        server_factory_context_.options().concurrency(), creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     EXPECT_EQ(2 * per_setup_vm_count,
               stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
     // extra_config destroyed at end of scope → its PerLuaCodeSetup destructor fires.
@@ -3825,11 +3841,10 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHost) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(
-      decoder_callbacks_,
-      setUpstreamOverrideHost(testing::AllOf(
-          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
-          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, false))));
+  EXPECT_CALL(decoder_callbacks_,
+              setUpstreamOverrideHost(
+                  AllOf(Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+                        Field(&Upstream::LoadBalancerContext::OverrideHost::strict, false))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -3845,11 +3860,10 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostStrict) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(
-      decoder_callbacks_,
-      setUpstreamOverrideHost(testing::AllOf(
-          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
-          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
+  EXPECT_CALL(decoder_callbacks_,
+              setUpstreamOverrideHost(
+                  AllOf(Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+                        Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -3912,11 +3926,10 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostDifferentPaths) {
 
   {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/path1"}};
-    EXPECT_CALL(
-        decoder_callbacks_,
-        setUpstreamOverrideHost(testing::AllOf(
-            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
-            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
+    EXPECT_CALL(decoder_callbacks_,
+                setUpstreamOverrideHost(AllOf(
+                    Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+                    Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   }
 
@@ -3924,11 +3937,10 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostDifferentPaths) {
 
   {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/path2"}};
-    EXPECT_CALL(
-        decoder_callbacks_,
-        setUpstreamOverrideHost(testing::AllOf(
-            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
-            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
+    EXPECT_CALL(decoder_callbacks_,
+                setUpstreamOverrideHost(AllOf(
+                    Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+                    Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   }
 }

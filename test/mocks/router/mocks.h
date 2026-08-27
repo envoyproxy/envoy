@@ -642,6 +642,7 @@ public:
   MOCK_METHOD(uint32_t, maxDirectResponseBodySizeBytes, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
+  MOCK_METHOD(bool, ignorePathParametersInPathMatching, (), (const));
 
   std::shared_ptr<MockRoute> route_;
   std::vector<Http::LowerCaseString> internal_only_headers_;
@@ -679,7 +680,7 @@ public:
   MOCK_METHOD(RouteConfigProviderPtr, createStaticRouteConfigProvider,
               (const envoy::config::route::v3::RouteConfiguration& route_config,
                Server::Configuration::ServerFactoryContext& factory_context,
-               ProtobufMessage::ValidationVisitor& validator));
+               Init::Manager& init_manager, ProtobufMessage::ValidationVisitor& validator));
 };
 
 class MockScopedConfig : public ScopedConfig {

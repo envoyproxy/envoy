@@ -124,7 +124,10 @@ def envoy_cc_library(
         srcs = srcs,
         hdrs = hdrs,
         copts = envoy_copts(repository) + envoy_pch_copts(repository, "//source/common/common:common_pch") + copts,
-        data = [repository + "//bazel:check_removed_fips_define"],
+        data = [
+            repository + "//bazel:check_removed_fips_define",
+            repository + "//bazel:check_removed_wasm_defines",
+        ],
         linkopts = linkopts,
         visibility = visibility,
         tags = tags,

@@ -57,6 +57,10 @@ build --action_env=BAZEL_VOLATILE_DIRTY --host_action_env=BAZEL_VOLATILE_DIRTY
 
 build --test_summary=terse
 
+# rules_external_jvm triggers unwanted android toolchain setup if this is set
+# if you actually require this you should override it (see mobile/.bazelrc)
+common --repo_env=ANDROID_HOME=
+
 # TODO(keith): Remove once these 2 are the default
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
@@ -70,6 +74,10 @@ common --incompatible_allow_tags_propagation
 # Python
 common --@rules_python//python/config_settings:bootstrap_impl=script
 build --incompatible_default_to_explicit_init_py
+
+# Protobuf
+common --@protobuf//bazel/flags:prefer_prebuilt_protoc=true
+common --incompatible_enable_proto_toolchain_resolution
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -116,6 +124,7 @@ build:macos --@toolchains_llvm//toolchain/config:libunwind=false
 
 # Common flags for Clang (shared between all clang variants)
 common:clang-common --linkopt=-fuse-ld=lld
+common:clang-common --cxxopt=-Wno-nullability-completeness
 common:clang-common --@toolchains_llvm//toolchain/config:compiler-rt=false
 common:clang-common --@toolchains_llvm//toolchain/config:libunwind=false
 
@@ -201,7 +210,7 @@ build:coverage --coverage_report_generator=@envoy//tools/coverage:report_generat
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
-build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target
+build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target,-quiche
 
 ## Compile-time-options testing
 # Right now, none of the available compile-time options conflict with each other. If this
@@ -242,7 +251,7 @@ common:openssl --@envoy//bazel:crypto=@envoy//compat/openssl:crypto
 common:openssl --copt=-DENVOY_SSL_OPENSSL
 common:openssl --host_copt=-DENVOY_SSL_OPENSSL
 common:openssl --@envoy//bazel:http3=False
-common:openssl --test_tag_filters=-nofips
+common:openssl --test_tag_filters=-nofips,-quiche
 common:openssl --build_tag_filters=-nofips
 
 
@@ -264,7 +273,7 @@ build:asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 build:asan --action_env=ENVOY_UBSAN_VPTR=1
 build:asan --copt=-fsanitize=vptr,function
 build:asan --linkopt=-fsanitize=vptr,function
-build:asan --linkopt='-L/opt/llvm/lib/clang/18/lib/x86_64-unknown-linux-gnu'
+build:asan --linkopt='-L/opt/llvm/lib/clang/22/lib/x86_64-unknown-linux-gnu'
 
 # Basic ASAN/UBSAN that works for gcc or llvm
 build:asan-common --config=sanitizer
@@ -306,6 +315,7 @@ build:msan --test_tag_filters=-no_san
 build:msan --define ENVOY_CONFIG_MSAN=1
 build:msan --copt -fsanitize=memory
 build:msan --linkopt -fsanitize=memory
+build:msan --linkopt=-Wl,--allow-multiple-definition
 build:msan --copt -fsanitize-memory-track-origins=2
 build:msan --copt -DMEMORY_SANITIZER=1
 build:msan --test_env=MSAN_SYMBOLIZER_PATH
@@ -319,6 +329,7 @@ build:tsan --config=sanitizer
 build:tsan --define ENVOY_CONFIG_TSAN=1
 build:tsan --copt -fsanitize=thread
 build:tsan --linkopt -fsanitize=thread
+build:tsan --linkopt=-Wl,--allow-multiple-definition
 build:tsan --copt -DTHREAD_SANITIZER=1
 build:tsan --build_tag_filters=-no_san,-no_tsan
 build:tsan --test_tag_filters=-no_san,-no_tsan
@@ -349,11 +360,11 @@ build:asan-fuzzer --linkopt=-lc++
 
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
-build:fuzz-coverage --test_tag_filters=-nocoverage
+build:fuzz-coverage --test_tag_filters=-nocoverage,-quiche
 # Existing fuzz tests don't need a full WASM runtime and in generally we don't really want to
 # fuzz dependencies anyways. On the other hand, disabling WASM reduces the build time and
 # resources required to build and run the tests.
-build:fuzz-coverage --define=wasm=disabled
+build:fuzz-coverage --@proxy-wasm-cpp-host//bazel:engine=disabled
 build:fuzz-coverage --config=fuzz-coverage-config
 build:fuzz-coverage-config --@envoy//tools/coverage:config=@envoy//test:fuzz_coverage_config
 

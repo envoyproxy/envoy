@@ -26,11 +26,13 @@ class ReverseConnectionIOHandle;
 class DownstreamReverseConnectionIOHandle : public RpingInterceptor {
 public:
   /**
-   * Constructor that takes ownership of the socket and stores parent pointer and connection key.
+   * Constructor that takes ownership of the socket and stores parent pointer, connection key, and
+   * the initiator's per-connection identifier (retained so it can be reported at close time, when
+   * the originating connection object is already gone).
    */
   DownstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket,
                                       ReverseConnectionIOHandle* parent,
-                                      const std::string& connection_key);
+                                      const std::string& connection_key, uint64_t connection_id);
 
   ~DownstreamReverseConnectionIOHandle() override;
 
@@ -74,6 +76,8 @@ private:
   ReverseConnectionIOHandle* parent_;
   // Connection key for tracking this specific connection.
   std::string connection_key_;
+  // The initiator's per-connection identifier, reported to the parent on close.
+  uint64_t connection_id_;
 };
 
 } // namespace ReverseConnection

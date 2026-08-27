@@ -2455,6 +2455,149 @@ TEST_P(Http2FrameIntegrationTest, SetDetailsTwice) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
 }
 
+TEST_P(Http2FrameIntegrationTest, UpstreamResponseTrailersWithoutEndStream) {
+  beginSession();
+
+  // Downstream → Envoy: header-only GET (END_STREAM|END_HEADERS).
+  sendFrame(Http2Frame::makeRequest(1, "host", "/"));
+
+  // Envoy → upstream: grab the raw upstream TCP connection.
+  FakeRawConnectionPtr upstream;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+
+  // Wait until Envoy has actually written its preface + SETTINGS + request
+  // HEADERS to the upstream so the client codec stream-1 exists and is
+  // half_closed_local (we sent a header-only GET).
+  std::string observed;
+  ASSERT_TRUE(upstream->waitForData(FakeRawConnection::waitForAtLeastBytes(40), &observed));
+
+  // Craft the malicious upstream response, all in one write so the client
+  // codec processes it in a single dispatch():
+  //   1. SETTINGS (server preface)
+  //   2. SETTINGS ACK
+  //   3. HEADERS stream=1 :status=200, END_HEADERS only (no END_STREAM)
+  //   4. HEADERS stream=1 trailer "x: y", END_HEADERS only (no END_STREAM)
+  //      ← oghttp2 delivers this as RESPONSE_TRAILER without fin; Envoy's
+  //        onHeaders() sees flags & END_STREAM == 0 and fires
+  //        ASSERT(stream->remote_end_stream_).
+  //   5. HEADERS stream=1 trailer again, END_HEADERS|END_STREAM — in a
+  //      release build (ASSERT compiled out) step 4 ran decodeTrailers()
+  //      and freed the ActiveRequest; this third HEADERS dereferences the
+  //      dangling response_decoder_.
+  std::string buf;
+  absl::StrAppend(&buf, std::string(Http2Frame::makeEmptySettingsFrame()));
+  absl::StrAppend(&buf,
+                  std::string(Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack)));
+
+  // Response headers: :status 200, END_HEADERS only.
+  absl::StrAppend(&buf, std::string(Http2Frame::makeHeadersFrameWithStatus(
+                            "200", 1, Http2Frame::HeadersFlags::EndHeaders)));
+
+  // Trailers WITHOUT END_STREAM: a single regular header, END_HEADERS only.
+  {
+    Http2Frame trailers =
+        Http2Frame::makeEmptyHeadersFrame(1, Http2Frame::HeadersFlags::EndHeaders);
+    trailers.appendHeaderWithoutIndexing(Http2Frame::Header("x", "y"));
+    trailers.adjustPayloadSize();
+    absl::StrAppend(&buf, std::string(trailers));
+  }
+
+  // Third HEADERS (release-build UAF amplifier).
+  {
+    Http2Frame extra = Http2Frame::makeEmptyHeadersFrame(
+        1, static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
+               Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
+    extra.appendHeaderWithoutIndexing(Http2Frame::Header("x", "z"));
+    extra.adjustPayloadSize();
+    absl::StrAppend(&buf, std::string(extra));
+  }
+
+  ASSERT_TRUE(upstream->write(buf));
+
+  // We expect HEADERS (response headers) first.
+  Http2Frame response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+
+  // Then we expect RST_STREAM.
+  Http2Frame reset = readFrame();
+  EXPECT_EQ(Http2Frame::Type::RstStream, reset.type());
+
+  tcp_client_->close();
+
+  if (upstream->connected()) {
+    ASSERT_TRUE(upstream->close());
+  }
+}
+
+TEST_P(Http2FrameIntegrationTest, UpstreamResponseTrailersWithoutEndStream_DataFrameAmplifier) {
+  beginSession();
+
+  // Downstream → Envoy: header-only GET (END_STREAM|END_HEADERS).
+  sendFrame(Http2Frame::makeRequest(1, "host", "/"));
+
+  // Envoy → upstream: grab the raw upstream TCP connection.
+  FakeRawConnectionPtr upstream;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+
+  // Wait until Envoy has actually written its preface + SETTINGS + request
+  // HEADERS to the upstream so the client codec stream-1 exists and is
+  // half_closed_local (we sent a header-only GET).
+  std::string observed;
+  ASSERT_TRUE(upstream->waitForData(FakeRawConnection::waitForAtLeastBytes(40), &observed));
+
+  // Craft the malicious upstream response, all in one write so the client
+  // codec processes it in a single dispatch():
+  //   1. SETTINGS (server preface)
+  //   2. SETTINGS ACK
+  //   3. HEADERS stream=1 :status=200, END_HEADERS only (no END_STREAM)
+  //   4. HEADERS stream=1 trailer "x: y", END_HEADERS only (no END_STREAM)
+  //      ← oghttp2 delivers this as RESPONSE_TRAILER without fin; Envoy's
+  //        onHeaders() sees flags & END_STREAM == 0 and fires
+  //        ASSERT(stream->remote_end_stream_).
+  //   5. DATA stream=1 empty, END_STREAM — in a release build (ASSERT
+  //      compiled out) step 4 ran decodeTrailers() and freed the ActiveRequest;
+  //      this DATA frame dereferences the dangling response_decoder_.
+  std::string buf;
+  absl::StrAppend(&buf, std::string(Http2Frame::makeEmptySettingsFrame()));
+  absl::StrAppend(&buf,
+                  std::string(Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack)));
+
+  // Response headers: :status 200, END_HEADERS only.
+  absl::StrAppend(&buf, std::string(Http2Frame::makeHeadersFrameWithStatus(
+                            "200", 1, Http2Frame::HeadersFlags::EndHeaders)));
+
+  // Trailers WITHOUT END_STREAM: a single regular header, END_HEADERS only.
+  {
+    Http2Frame trailers =
+        Http2Frame::makeEmptyHeadersFrame(1, Http2Frame::HeadersFlags::EndHeaders);
+    trailers.appendHeaderWithoutIndexing(Http2Frame::Header("x", "y"));
+    trailers.adjustPayloadSize();
+    absl::StrAppend(&buf, std::string(trailers));
+  }
+
+  // Third frame (release-build UAF amplifier): empty DATA frame with END_STREAM.
+  {
+    Http2Frame extra = Http2Frame::makeEmptyDataFrame(1, Http2Frame::DataFlags::EndStream);
+    absl::StrAppend(&buf, std::string(extra));
+  }
+
+  ASSERT_TRUE(upstream->write(buf));
+
+  // We expect HEADERS (response headers) first.
+  Http2Frame response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+
+  // Then we expect RST_STREAM.
+  Http2Frame reset = readFrame();
+  EXPECT_EQ(Http2Frame::Type::RstStream, reset.type());
+
+  tcp_client_->close();
+
+  if (upstream->connected()) {
+    ASSERT_TRUE(upstream->close());
+  }
+}
+
 TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
   // Configure max concurrent streams to 2.
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -3285,6 +3428,45 @@ TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   tcp_client_->close();
 }
 
+TEST_P(Http2FrameIntegrationTest, HostExceedsHeaderMapSizeLimit) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_max_request_headers_kb()->set_value(2); });
+  beginSession();
+
+  uint32_t request_idx = 0;
+  std::string large_host(2000, 'a');
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx),
+                                         "one.example.com", "/path", {{"host", large_host}});
+  sendFrame(request);
+
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::RstStream, frame.type());
+  tcp_client_->close();
+  if (GetParam().http2_implementation == Http2Impl::Nghttp2) {
+    test_server_->waitForCounter("http2.header_list_size_too_large", testing::Ge(1));
+  }
+}
+
+TEST_P(Http2FrameIntegrationTest, HostExceedsHeaderMapCountLimit) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(4);
+      });
+  beginSession();
+
+  uint32_t request_idx = 0;
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx),
+                                         "one.example.com", "/path", {{"host", "two.example.com"}});
+  sendFrame(request);
+
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::RstStream, frame.type());
+  tcp_client_->close();
+  test_server_->waitForCounter("http2.header_overflow", testing::Ge(1));
+}
+
 // Tests that an empty metadata map from upstream is ignored.
 TEST_P(MetadataIntegrationTest, UpstreamSendingEmptyMetadata) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
@@ -3652,8 +3834,6 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
   // to receive the related error code in onStreamClose().
   // But note, the onStreamClose() for the active closing side will also be called.
   // But the error code for active closing side will always be 0 if the Oghttp2 is used.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_ignore_upstream_reason",
-                                    "true");
 
   initialize();
 
@@ -3716,114 +3896,6 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
 
       cleanupUpstreamAndDownstream();
     });
-  }
-}
-
-TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogationToDownstream) {
-  // There are four streams created in total, client stream, Envoy server stream,
-  // Envoy client stream and upstream server stream.
-  // When we close a stream actively with a specific reset reason, we expect the peer
-  // to receive the related error code in onStreamClose().
-  // But note, the onStreamClose() for the active closing side will also be called.
-  // But the error code for active closing side will always be 0 if the Oghttp2 is used.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_ignore_upstream_reason",
-                                    "false");
-
-  initialize();
-
-  {
-    size_t log_num = 0;
-    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
-      log_num = 2;
-    } else {
-      log_num = 4;
-    }
-
-    // The ProtocolError will be translated to OGHTTP2_PROTOCOL_ERROR (1).
-    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 1", log_num, {
-      codec_client_ = makeHttpConnection(lookupPort("http"));
-      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-      auto response = std::move(encoder_decoder.second);
-      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
-      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-      // This will result in the router to send a local reply. And because the downstream request
-      // is not complete yet, it will finally result in resetting of the downstream stream.
-      upstream_request_->encodeResetStream(Http::StreamResetReason::ProtocolError);
-      ASSERT_TRUE(response->waitForReset());
-      EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
-
-      cleanupUpstreamAndDownstream();
-    });
-  }
-
-  {
-    // For reason LocalReset, it will be translated to default HTTP2 stream error code.
-    // At the downstream side, because a complete local reply will be send before resetting
-    // the stream, so the stream close code observed at downstream side will be NO_ERROR (0).
-    // So, we expect 1 log entry with "closed: 2" for Oghttp2 and 2 log entries with "closed: 2"
-    // for other implementations.
-    size_t log_num = 0;
-    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
-      log_num = 1;
-    } else {
-      log_num = 2;
-    }
-
-    // The LocalReset will be translated to default code OGHTTP2_INTERNAL_ERROR (2).
-    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 2", log_num, {
-      codec_client_ = makeHttpConnection(lookupPort("http"));
-      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-      auto response = std::move(encoder_decoder.second);
-      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
-      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-      // This will result in the router to send a local reply. And because the downstream request
-      // is not complete yet, it will finally result in resetting of the stream.
-      upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
-      ASSERT_TRUE(response->waitForReset());
-      EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
-
-      cleanupUpstreamAndDownstream();
-    });
-  }
-}
-
-TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogationLegacy) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "false");
-
-  std::vector<Http::StreamResetReason> reasons = {Http::StreamResetReason::ProtocolError,
-                                                  Http::StreamResetReason::LocalReset};
-  std::vector<Http::StreamResetReason> result_reasons = {
-      Http::StreamResetReason::RemoteResetNoError, Http::StreamResetReason::RemoteResetNoError};
-
-  // There are four streams created in total, client stream, Envoy server stream,
-  // Envoy client stream and upstream server stream.
-  // When we close a stream actively with a specific reset reason, we expect the peer
-  // to receive the related error code in onStreamClose().
-  // But note, the onStreamClose() for the active closing side will also be called.
-  // But the error code for active closing side will always be 0 if the Oghttp2 is used.
-
-  initialize();
-  for (size_t i = 0; i < reasons.size(); ++i) {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-
-    // In legacy code path, both the ProtocolError and LocalReset will be translated
-    // to OGHTTP2_NO_ERROR (0). So, we expect 4 log entries with "closed: 0" for both cases.
-    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 0", 4, {
-      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-      auto response = std::move(encoder_decoder.second);
-      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
-      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-      // This will result in the router to send a local reply. And because the downstream request
-      // is not complete yet, it will finally result in resetting of the stream.
-      upstream_request_->encodeResetStream(reasons[i]);
-      ASSERT_TRUE(response->waitForReset());
-      EXPECT_EQ(result_reasons[i], response->resetReason());
-    });
-
-    cleanupUpstreamAndDownstream();
   }
 }
 

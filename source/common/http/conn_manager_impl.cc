@@ -298,15 +298,8 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
              StreamInfo::CoreResponseFlag::UpstreamConnectionTermination))) {
       stream.response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
     } else {
-      const bool reset_with_error =
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error");
       if (stream.filter_manager_.streamInfo().hasResponseFlag(
-              StreamInfo::CoreResponseFlag::UpstreamProtocolError) &&
-          !Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.reset_ignore_upstream_reason")) {
-        stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
-      } else if (reset_with_error && stream.filter_manager_.streamInfo().hasResponseFlag(
-                                         StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
+              StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
       } else {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
@@ -936,6 +929,19 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   filter_manager_.streamInfo().downstreamTiming().setDownstreamConnectionBegin(
       connection_manager_.read_callbacks_->connection().streamInfo().startTimeMonotonic());
 
+  // Copy the connection-level downstream TLS handshake time points onto the request-level stream
+  // info so they are available to COMMON_DURATION (DS_HS_BEG/DS_HS_END) access logging.
+  const auto& connection_downstream_timing =
+      connection_manager_.read_callbacks_->connection().streamInfo().downstreamTiming();
+  if (connection_downstream_timing.downstreamHandshakeStart().has_value()) {
+    filter_manager_.streamInfo().downstreamTiming().setDownstreamHandshakeStart(
+        connection_downstream_timing.downstreamHandshakeStart().value());
+  }
+  if (connection_downstream_timing.downstreamHandshakeComplete().has_value()) {
+    filter_manager_.streamInfo().downstreamTiming().setDownstreamHandshakeComplete(
+        connection_downstream_timing.downstreamHandshakeComplete().value());
+  }
+
   // TODO(chaoqin-li1123): can this be moved to the on demand filter?
   auto factory = Envoy::Config::Utility::getFactoryByName<RouteConfigUpdateRequesterFactory>(
       kRouteFactoryName);
@@ -1485,6 +1491,18 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Code::NotFound, "", nullptr, std::nullopt,
                    StreamInfo::ResponseCodeDetails::get().AbsolutePath);
+    return;
+  }
+
+  // RFC 10008 Section 2: "Servers MUST fail the request if the Content-Type request field is
+  // missing or is inconsistent with the request content." Only the missing case is enforced here;
+  // whether the media type is consistent with, supported by, or processable for the request
+  // content is a decision only the origin server can make. An empty field value is as absent as a
+  // missing one. Section 2.1 calls for "a 4xx status code such as 400".
+  if (HeaderUtility::isQuery(*request_headers_) &&
+      request_headers_->getContentTypeValue().empty()) {
+    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().QueryMissingContentType);
     return;
   }
 

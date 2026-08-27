@@ -16,6 +16,10 @@ envoy_extension_package()
 envoy_cc_library(
     name = "oauth_callback_interface",
     hdrs = ["oauth.h"],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/stream_info:stream_info_interface",
+    ],
 )
 
 envoy_proto_library(

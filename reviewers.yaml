@@ -9,6 +9,9 @@ agrawroh:
 antoniovleonti:
   first-pass: true
   slack: U06DHAS4FDF
+basundhara-c:
+  first-pass: true
+  slack: U0APVQSN0PR
 botengyao:
   maintainer: true
   opsgenie: Boteng
@@ -24,6 +27,10 @@ ggreenway:
   maintainer: true
   opsgenie: Greg
   slack: U78MBV869
+htuch:
+  maintainer: true
+  opsgenie: Harvey
+  slack: U78E7055Z
 jmarantz:
   slack: U80HPLBPG
 jwendell:
@@ -101,6 +108,4 @@ yanjunxiang-google:
   opsgenie: Yanjun
   slack: U0210Q3SUKX
 zuercher:
-  maintainer: true
-  opsgenie: Stephan
   slack: U78J72Q82

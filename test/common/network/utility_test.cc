@@ -9,6 +9,7 @@
 #endif
 
 #include <cstdint>
+#include <iterator>
 #include <list>
 #include <memory>
 #include <string>
@@ -27,9 +28,11 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
@@ -41,10 +44,86 @@ using testing::Invoke;
 using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
+
+using testing::Contains;
+using testing::Key;
 
 namespace Envoy {
 namespace Network {
 namespace {
+
+TEST(NetworkUtility, WriteEmptyDatagramConnected) {
+  StrictMock<MockIoHandle> io_handle;
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+
+  EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle, send(_, 0))
+      .WillOnce(Invoke([](const void* buffer, size_t) -> Api::IoCallUint64Result {
+        EXPECT_NE(nullptr, buffer);
+        return Api::ioCallUint64ResultNoError();
+      }));
+  EXPECT_CALL(io_handle, writev(_, _)).Times(0);
+  EXPECT_CALL(io_handle, sendmsg(_, _, _, _, _)).Times(0);
+
+  Buffer::OwnedImpl buffer;
+  const Api::IoCallUint64Result result =
+      Utility::writeToSocket(io_handle, buffer, nullptr, peer_address);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(NetworkUtility, WriteExplicitEmptySliceConnected) {
+  StrictMock<MockIoHandle> io_handle;
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+
+  EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle, send(_, 0)).WillOnce(Return(Api::ioCallUint64ResultNoError()));
+  EXPECT_CALL(io_handle, writev(_, _)).Times(0);
+  EXPECT_CALL(io_handle, sendmsg(_, _, _, _, _)).Times(0);
+
+  uint8_t empty_payload = 0;
+  Buffer::RawSlice slice{&empty_payload, 0};
+  const Api::IoCallUint64Result result =
+      Utility::writeToSocket(io_handle, &slice, 1, nullptr, peer_address);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(NetworkUtility, WriteEmptyDatagramUnconnected) {
+  StrictMock<MockIoHandle> io_handle;
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+
+  EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(false));
+  EXPECT_CALL(io_handle, send(_, _)).Times(0);
+  EXPECT_CALL(io_handle, writev(_, _)).Times(0);
+  EXPECT_CALL(io_handle, sendmsg(_, 0, 0, nullptr, testing::Ref(peer_address)))
+      .WillOnce(Return(Api::ioCallUint64ResultNoError()));
+
+  Buffer::OwnedImpl buffer;
+  const Api::IoCallUint64Result result =
+      Utility::writeToSocket(io_handle, buffer, nullptr, peer_address);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(NetworkUtility, DropEmptyDatagramWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.udp_send_zero_length_datagrams", "false"}});
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+
+  for (const bool connected : {false, true}) {
+    StrictMock<MockIoHandle> io_handle;
+    EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(connected));
+
+    Buffer::OwnedImpl buffer;
+    const Api::IoCallUint64Result result =
+        Utility::writeToSocket(io_handle, buffer, nullptr, peer_address);
+    EXPECT_TRUE(result.ok());
+    EXPECT_EQ(0, result.return_value_);
+  }
+}
 
 struct Interface {
   std::string name;
@@ -800,9 +879,9 @@ TEST(PacketLoss, LossTest) {
 
   // Send a packet.
   char buf[2048];
-  memset(buf, 0, ABSL_ARRAYSIZE(buf));
-  EXPECT_EQ(ABSL_ARRAYSIZE(buf), sendto(fd, buf, ABSL_ARRAYSIZE(buf), 0,
-                                        reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
+  memset(buf, 0, std::size(buf));
+  EXPECT_EQ(std::size(buf), sendto(fd, buf, std::size(buf), 0,
+                                   reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
 
   // Verify the packet is dropped.
   IoSocketHandleImpl handle(fd);
@@ -824,8 +903,8 @@ TEST(PacketLoss, LossTest) {
   EXPECT_EQ(0, packets_read);
 
   // Send another packet.
-  EXPECT_EQ(ABSL_ARRAYSIZE(buf), sendto(fd, buf, ABSL_ARRAYSIZE(buf), 0,
-                                        reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
+  EXPECT_EQ(std::size(buf), sendto(fd, buf, std::size(buf), 0,
+                                   reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
 
   // Make sure the drop count is now 2.
   Utility::readFromSocket(handle, *address, processor, time_source, recv_msg_method,
@@ -856,14 +935,14 @@ TEST_F(ExecInNetnsTest, Basic) {
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_syscalls);
 
   EXPECT_CALL(os_syscalls, close(_)).WillRepeatedly(Invoke([this](int fd) -> Api::SysCallIntResult {
-    EXPECT_TRUE(fake_fd_map_.contains(fd));
+    EXPECT_THAT(fake_fd_map_, Contains(Key(fd)));
     fake_fd_map_.erase(fd);
     return {0, 0};
   }));
 
   EXPECT_CALL(linux_os_syscalls, setns(_, Eq(CLONE_NEWNET)))
       .WillRepeatedly(([this](int fd, int) -> Api::SysCallIntResult {
-        EXPECT_TRUE(fake_fd_map_.contains(fd));
+        EXPECT_THAT(fake_fd_map_, Contains(Key(fd)));
         current_netns_ = fake_fd_map_[fd];
         return {0, 0};
       }));

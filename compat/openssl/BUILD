@@ -387,6 +387,7 @@ mapping_func_filegroup(
         "BIO_new_mem_buf",
         "BIO_new_socket",
         "BIO_new",
+        "BIO_number_read",
         "BIO_pending",
         "BIO_printf",
         "BIO_puts",

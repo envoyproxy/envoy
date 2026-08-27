@@ -1099,8 +1099,7 @@ public class CronetUrlRequestContextTest {
   @Feature({"Cronet"})
   @Ignore("Multiple Engines are not yet supported: "
           + "https://github.com/envoyproxy/envoy-mobile/issues/332")
-  public void
-  testInitTwoEnginesSimultaneously() throws Exception {
+  public void testInitTwoEnginesSimultaneously() throws Exception {
     // Threads will block on runBlocker to ensure simultaneous execution.
     ConditionVariable runBlocker = new ConditionVariable(false);
     RequestThread thread1 = new RequestThread(mUrl, runBlocker);
@@ -1136,8 +1135,7 @@ public class CronetUrlRequestContextTest {
   @Feature({"Cronet"})
   @Ignore("Multiple Engines are not yet supported: "
           + "https://github.com/envoyproxy/envoy-mobile/issues/332")
-  public void
-  testInitDifferentEngines() throws Exception {
+  public void testInitDifferentEngines() throws Exception {
     // Test that concurrently instantiating Cronet context's upon various
     // different versions of the same Android Context does not cause crashes
     // like crbug.com/453845

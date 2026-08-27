@@ -89,6 +89,7 @@ public:
       const std::vector<std::string>& untyped_forwarding_namespaces,
       const std::vector<std::string>& typed_forwarding_namespaces,
       const std::vector<std::string>& untyped_receiving_namespaces,
+      const std::vector<std::string>& typed_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
       const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
       bool allow_content_length_header)
@@ -97,6 +98,7 @@ public:
         untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
         typed_forwarding_namespaces_(&typed_forwarding_namespaces),
         untyped_receiving_namespaces_(&untyped_receiving_namespaces),
+        typed_receiving_namespaces_(&typed_receiving_namespaces),
         untyped_cluster_metadata_forwarding_namespaces_(
             &untyped_cluster_metadata_forwarding_namespaces),
         typed_cluster_metadata_forwarding_namespaces_(
@@ -153,6 +155,13 @@ public:
   void setUntypedReceivingMetadataNamespaces(const std::vector<std::string>& ns) {
     untyped_receiving_namespaces_ = &ns;
   };
+
+  const std::vector<std::string>& typedReceivingMetadataNamespaces() const {
+    return *typed_receiving_namespaces_;
+  };
+  void setTypedReceivingMetadataNamespaces(const std::vector<std::string>& ns) {
+    typed_receiving_namespaces_ = &ns;
+  };
   const std::vector<std::string>& untypedClusterMetadataForwardingNamespaces() const {
     return *untyped_cluster_metadata_forwarding_namespaces_;
   }
@@ -177,6 +186,9 @@ public:
   }
   bool trailersSentToServer() const { return trailers_sent_to_server_; }
   void setTrailersSentToServer(bool b) { trailers_sent_to_server_ = b; }
+
+  bool eosSentToServerWithBody() const { return eos_sent_to_server_with_body_; }
+  void setEosSentToServerWithBody(bool b) { eos_sent_to_server_with_body_ = b; }
 
   envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode bodyMode() const {
     return body_mode_;
@@ -370,6 +382,8 @@ protected:
   bool complete_body_available_ : 1 = false;
   // If true, the trailers is already sent to the server.
   bool trailers_sent_to_server_ : 1 = false;
+  // If true, the end_of_stream is already sent to the server with body.
+  bool eos_sent_to_server_with_body_ : 1 = false;
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
   bool body_replaced_ : 1 = false;
   // If true, some of the body data is received.
@@ -404,6 +418,7 @@ protected:
   const std::vector<std::string>* untyped_forwarding_namespaces_{};
   const std::vector<std::string>* typed_forwarding_namespaces_{};
   const std::vector<std::string>* untyped_receiving_namespaces_{};
+  const std::vector<std::string>* typed_receiving_namespaces_{};
   const std::vector<std::string>* untyped_cluster_metadata_forwarding_namespaces_{};
   const std::vector<std::string>* typed_cluster_metadata_forwarding_namespaces_{};
 
@@ -533,12 +548,14 @@ public:
       const std::vector<std::string>& untyped_forwarding_namespaces,
       const std::vector<std::string>& typed_forwarding_namespaces,
       const std::vector<std::string>& untyped_receiving_namespaces,
+      const std::vector<std::string>& typed_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
       const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
       bool allow_content_length_header)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::INBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
-                       untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
+                       untyped_receiving_namespaces, typed_receiving_namespaces,
+                       untyped_cluster_metadata_forwarding_namespaces,
                        typed_cluster_metadata_forwarding_namespaces, allow_content_length_header) {
     setProcessingModeInternal(mode);
   }
@@ -681,12 +698,14 @@ public:
       const std::vector<std::string>& untyped_forwarding_namespaces,
       const std::vector<std::string>& typed_forwarding_namespaces,
       const std::vector<std::string>& untyped_receiving_namespaces,
+      const std::vector<std::string>& typed_receiving_namespaces,
       const std::vector<std::string>& untyped_cluster_metadata_forwarding_namespaces,
       const std::vector<std::string>& typed_cluster_metadata_forwarding_namespaces,
       bool allow_content_length_header)
       : ProcessorState(filter, envoy::config::core::v3::TrafficDirection::OUTBOUND,
                        untyped_forwarding_namespaces, typed_forwarding_namespaces,
-                       untyped_receiving_namespaces, untyped_cluster_metadata_forwarding_namespaces,
+                       untyped_receiving_namespaces, typed_receiving_namespaces,
+                       untyped_cluster_metadata_forwarding_namespaces,
                        typed_cluster_metadata_forwarding_namespaces, allow_content_length_header) {
     setProcessingModeInternal(mode);
   }
