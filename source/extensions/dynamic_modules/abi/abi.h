@@ -4807,6 +4807,21 @@ uint64_t envoy_dynamic_module_callback_network_filter_get_upstream_connection_id
 // ---------------------- StartTLS Support Callbacks ---------------------------
 
 /**
+ * envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport is called by the
+ * module to convert the downstream connection from non-secure to secure mode (StartTLS).
+ *
+ * This signals the downstream connection to enable secure transport mode. This is done when the
+ * downstream connection's transport socket is of startTLS type. At the moment it is the only
+ * transport socket type which can be programmatically converted from non-secure to secure mode.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if the downstream transport was successfully converted to secure mode, false
+ * otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
  * envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport is called by the
  * module to convert the upstream connection from non-secure to secure mode (StartTLS).
  *

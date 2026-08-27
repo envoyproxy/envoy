@@ -768,6 +768,8 @@ WEAK_STUB(NetworkFilterHasUpstreamHost,
           envoy_dynamic_module_callback_network_filter_has_upstream_host(nullptr))
 WEAK_STUB(NetworkFilterGetUpstreamConnectionId,
           envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(nullptr))
+WEAK_STUB(NetworkFilterStartDownstreamSecureTransport,
+          envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(nullptr))
 WEAK_STUB(NetworkFilterStartUpstreamSecureTransport,
           envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(nullptr))
 WEAK_STUB(NetworkFilterReadEnabled,

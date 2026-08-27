@@ -1808,6 +1808,14 @@ envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
 }
 
 __attribute__((weak)) bool
+envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(
+    envoy_dynamic_module_type_network_filter_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
 envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
     envoy_dynamic_module_type_network_filter_envoy_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport: "
