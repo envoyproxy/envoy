@@ -88,6 +88,8 @@ public:
 
   private:
     void maybeEndDecode(bool end_stream);
+    bool hasValidGeneratedWebsocketHandshakeHeaders(const Http::ResponseHeaderMap& headers) const;
+    void rejectInvalidGeneratedWebsocketHandshake();
     bool seen_1xx_headers_{};
     bool first_body_rx_recorded_{};
     UpstreamCodecFilter& filter_;
@@ -108,7 +110,7 @@ private:
 
   // Some GenericUpstream implementations retain the header map past encodeHeaders().
   Http::RequestHeaderMapPtr upstream_headers_;
-  std::optional<std::string> injected_websocket_key_;
+  bool injected_generated_websocket_key_ = false;
 };
 
 class UpstreamCodecFilterFactory

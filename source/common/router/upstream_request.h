@@ -195,7 +195,7 @@ private:
   void resetPerTryIdleTimer();
   void onPerTryTimeout();
   void onPerTryIdleTimeout();
-  void maybeGenerateWebsocketKey(Http::Protocol protocol);
+  OptRef<const std::string> websocketKeyForUpstream();
   void upstreamLog(AccessLog::AccessLogType access_log_type);
   void resetUpstreamLogFlushTimer();
 
@@ -383,11 +383,8 @@ public:
   void setPausedForWebsocketUpgrade(bool value) override {
     upstream_request_.paused_for_websocket_ = value;
   }
-  OptRef<const std::string> generatedWebsocketKey() const override {
-    if (upstream_request_.generated_websocket_key_.has_value()) {
-      return {*upstream_request_.generated_websocket_key_};
-    }
-    return {};
+  OptRef<const std::string> websocketKeyForUpstream() override {
+    return upstream_request_.websocketKeyForUpstream();
   }
 
   bool pausedForGenericUpgrade() const override {
