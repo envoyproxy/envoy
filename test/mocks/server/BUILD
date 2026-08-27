@@ -182,6 +182,7 @@ envoy_cc_mock(
     srcs = ["worker.cc"],
     hdrs = ["worker.h"],
     deps = [
+        "//envoy/network:drain_decision_interface",
         "//envoy/server:worker_interface",
     ],
 )
