@@ -264,6 +264,14 @@ TEST_F(McpFilterTest, HeadersMismatchIsStatOnlyWhenBodyIsParsed) {
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_EQ("tasks/get", metadata.fields().at("method").string_value());
+
+        const auto& params = metadata.fields().at("params").struct_value();
+        EXPECT_EQ("task-123", params.fields().at("taskId").string_value());
+      });
+
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
   EXPECT_EQ(1u, config_->stats().header_mismatch_.value());

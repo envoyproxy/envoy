@@ -562,6 +562,22 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   Protobuf::Struct metadata = parser_->metadata();
 
+  std::string effective_method = parser_->getMethod();
+
+  if (config_->attributeSource() == envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS) {
+    effective_method = header_method_;
+
+    if (!header_method_.empty()) {
+      (*metadata.mutable_fields())["method"].set_string_value(header_method_);
+    }
+
+    const std::string name_path = parserConfig().getNameAttributePath(header_method_);
+
+    if (!header_name_.empty() && !name_path.empty()) {
+      setNestedStringValue(metadata, name_path, header_name_);
+    }
+  }
+
   // For JSON-RPC responses (no method field), set a synthetic method so the
   // router can identify and dispatch them.
   if (is_mcp_request_ && parser_->isResponse()) {
@@ -572,7 +588,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   const ParserConfig& active_parser_config = parserConfig();
   const std::string& group_metadata_key = active_parser_config.groupMetadataKey();
   if (!group_metadata_key.empty()) {
-    std::string method_group = active_parser_config.getMethodGroup(parser_->getMethod());
+    std::string method_group = active_parser_config.getMethodGroup(effective_method);
     (*metadata.mutable_fields())[group_metadata_key].set_string_value(method_group);
     ENVOY_LOG(debug, "MCP filter set method group: {}={}", group_metadata_key, method_group);
   }
@@ -599,7 +615,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   if (should_store_metadata) {
     if (shouldStoreToFilterState()) {
       auto filter_state_obj = std::make_shared<FilterStateObject>(
-          parser_->getMethod(), metadata, is_mcp_request_, is_exceeding_limit_, status_);
+          effective_method, metadata, is_mcp_request_, is_exceeding_limit_, status_);
       decoder_callbacks_->streamInfo().filterState()->setData(
           std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
           StreamInfo::FilterState::LifeSpan::Request,
