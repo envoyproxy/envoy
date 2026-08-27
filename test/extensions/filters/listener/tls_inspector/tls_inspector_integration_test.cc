@@ -26,9 +26,9 @@ namespace {
 
 class LargeBufferListenerFilter : public Network::ListenerFilter {
 public:
-  // These differences in BUFFER_SIZE are required because BoringSSL and OpenSSL
-  // produce different sized client hello messages (514 and 394 respectively).
-  static constexpr int BUFFER_SIZE = SSL_SELECT(512, 392);
+  // Set BUFFER_SIZE to 300, which is larger than tls_inspector's initial read buffer size
+  // 256 bytes but smaller than the client hello message which is at least 350 bytes.
+  static constexpr int BUFFER_SIZE = 300;
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks&) override {
     ENVOY_LOG_MISC(debug, "LargeBufferListenerFilter::onAccept");
@@ -404,9 +404,9 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanGrow) {
   EXPECT_EQ(
       TestUtility::readSampleCount(test_server_->server().dispatcher(), *bytes_processed_histogram),
       1);
-  EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+  EXPECT_GT(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
                                                         *bytes_processed_histogram)),
-            SSL_SELECT(514, 414));
+            256);
 }
 
 TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanStartBig) {
@@ -444,7 +444,6 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanStartBig) {
       1);
   auto bytes_processed = static_cast<int>(
       TestUtility::readSampleSum(test_server_->server().dispatcher(), *bytes_processed_histogram));
-  EXPECT_EQ(bytes_processed, SSL_SELECT(514, 394));
   // Double check that the test is effective by ensuring that the
   // LargeBufferListenerFilter::BUFFER_SIZE is smaller than the client hello.
   EXPECT_GT(bytes_processed, LargeBufferListenerFilter::BUFFER_SIZE);

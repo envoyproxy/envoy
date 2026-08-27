@@ -2296,7 +2296,7 @@ TEST_P(TcpProxyIntegrationTest, ClusterBufferHighWatermarkTimeoutClosesUpstream)
   // Disable reads from the upstream to simulate a slow upstream.
   ASSERT_TRUE(fake_upstream_connection->readDisable(true));
 
-  std::string payload(256 * 1024, 'a');
+  std::string payload(2048 * 1024, 'a');
   ASSERT_TRUE(tcp_client->write(payload, false));
 
   timeSystem().advanceTimeWait(std::chrono::milliseconds(500));

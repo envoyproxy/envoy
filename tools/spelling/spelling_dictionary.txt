@@ -3,6 +3,7 @@
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
 
+AI
 Allshard
 FCS
 FLUSHALL
@@ -79,6 +80,7 @@ DFP
 Dynatrace
 DOM
 DONTFRAG
+dotdot
 Gasd
 GiB
 IPTOS
@@ -726,6 +728,7 @@ canonicalization
 canonicalize
 canonicalized
 canonicalizer
+canonicalizes
 canonicalizing
 cardinality
 casted
@@ -964,6 +967,7 @@ hackery
 hacky
 handoff
 handshaker
+hardcode
 hardcoded
 hardcodes
 hardcoding
@@ -1371,6 +1375,7 @@ reperform
 repicked
 replayable
 repo
+repos
 representable
 reproducibility
 requirepass
@@ -1409,6 +1414,7 @@ rtest
 rtrim
 rtt
 ruleset
+runfile
 runfiles
 runtime
 runtimes
@@ -1454,6 +1460,7 @@ sim
 sinked
 sint
 sizeof
+skippable
 smatch
 snapshotted
 sockaddr
@@ -1680,6 +1687,7 @@ wildcard
 wildcards
 winsock
 workspace
+workspaces
 writev
 wrsq
 www
@@ -1734,6 +1742,7 @@ NXDOMAIN
 DNAT
 RSP
 EWMA
+fifo
 hotplug
 cgroup
 cgroupv1

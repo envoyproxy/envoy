@@ -178,6 +178,9 @@ struct ResponseCodeDetailValues {
   const std::string InvalidPath = "invalid_path";
   // The request was rejected due to using an absolute path on a route not supporting them.
   const std::string AbsolutePath = "absolute_path_rejected";
+  // The QUERY request was rejected because it had no Content-Type field. RFC 10008 Section 2
+  // requires servers to fail such requests.
+  const std::string QueryMissingContentType = "query_missing_content_type";
   // The request was rejected because path normalization was configured on and failed, probably due
   // to an invalid path.
   const std::string PathNormalizationFailed = "path_normalization_failed";

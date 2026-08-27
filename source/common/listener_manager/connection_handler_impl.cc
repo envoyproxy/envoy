@@ -266,22 +266,24 @@ void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag,
 }
 
 void ConnectionHandlerImpl::onFilterChainDrain(
-    uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains) {
+    uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
+    Network::ConnectionDrainEvent drain_event) {
   if (auto listener_it = listener_map_by_tag_.find(listener_tag);
       listener_it != listener_map_by_tag_.end()) {
     listener_it->second->invokeListenerMethod(
-        [&filter_chains](Network::ConnectionHandler::ActiveListener& listener) {
-          listener.onFilterChainDrainStart(filter_chains);
+        [&filter_chains, drain_event](Network::ConnectionHandler::ActiveListener& listener) {
+          listener.onFilterChainDrainStart(filter_chains, drain_event);
         });
   }
 }
 
-void ConnectionHandlerImpl::onListenerDrain(uint64_t listener_tag) {
+void ConnectionHandlerImpl::onListenerDrain(uint64_t listener_tag,
+                                            Network::ConnectionDrainEvent drain_event) {
   if (auto listener_it = listener_map_by_tag_.find(listener_tag);
       listener_it != listener_map_by_tag_.end()) {
     listener_it->second->invokeListenerMethod(
-        [](Network::ConnectionHandler::ActiveListener& listener) {
-          listener.onListenerDrainStart();
+        [drain_event](Network::ConnectionHandler::ActiveListener& listener) {
+          listener.onListenerDrainStart(drain_event);
         });
   }
 }
