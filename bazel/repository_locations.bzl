@@ -1,21 +1,5 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "35.1"
-
-# These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
-# and both must match the names from the protobuf releases (see
-# https://github.com/protocolbuffers/protobuf/releases).
-# The names change in upcoming versions.
-# The shas are calculated from the downloads on the releases page.
-PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "01bf9d08808c7f96678b63f4bd8efa559bb4f83d5a7a270d5edaf507f9d5d9cf",
-    linux_x86_64 = "6930ebf62bd4ea607b98fff052596c6ee564b9835b4ce172c75a3f53ae9d91b7",
-    linux_ppcle_64 = "92da6d454ca3c30b0acf9bd3613dde973a179855742b1ca2859f30a4555cd6e5",
-    osx_aarch_64 = "193289af0470c6a1aada357d4fba0bbf8d78bfaac8b5e42ca30af2ef75583de2",
-    osx_x86_64 = "537d73604a344ded6fc94e98e07e529d4fe3e4a0b09e59905353950fafc2a1f7",
-    win64 = "5d3ff218d7d91eea95f7569bcb5a98f3030f8996d44151279d9772edcff76082",
-)
-
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_compdb = dict(
         version = "40864791135333e1446a04553b63cbe744d358d0",
@@ -29,12 +13,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazel-contrib/bazel_features/releases/download/v{version}/bazel_features-v{version}.tar.gz"],
         strip_prefix = "bazel_features-{version}",
     ),
-    bazel_gazelle = dict(
+    gazelle = dict(
         version = "0.47.0",
         sha256 = "675114d8b433d0a9f54d81171833be96ebc4113115664b791e6f204d58e93446",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
     ),
-    build_bazel_rules_apple = dict(
+    rules_apple = dict(
         version = "3.20.1",
         sha256 = "73ad768dfe824c736d0a8a81521867b1fb7a822acda2ed265897c03de6ae6767",
         urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
@@ -46,8 +30,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.2",
-        sha256 = "3427dc6eaafa83042249125920b3fb03ebc3779bb1aff02c147faedebb6c0475",
+        version = "0.4.8",
+        sha256 = "f887fd8cc8bd2853692b00d1973da1a249396e1751883f34c688cb661874def3",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -197,7 +181,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "jemalloc-{version}",
         urls = ["https://github.com/jemalloc/jemalloc/releases/download/{version}/jemalloc-{version}.tar.bz2"],
     ),
-    com_github_grpc_grpc = dict(
+    grpc = dict(
         version = "1.83.0",
         sha256 = "90d453393a9d41215df546103b10b33b9566df79cdf6f49dc67f6c4d044d090d",
         strip_prefix = "grpc-{version}",
@@ -409,8 +393,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "googletest-{version}",
         urls = ["https://github.com/google/googletest/releases/download/v{version}/googletest-{version}.tar.gz"],
     ),
-    com_google_protobuf = dict(
-        version = PROTOBUF_VERSION,
+    protobuf = dict(
+        version = "35.1",
         # When upgrading the protobuf library, please re-run
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
@@ -553,8 +537,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "89d6d17edc0f0b79f38edf6fac9e5c8bf5f3cfd7",
-        sha256 = "d994da485d3e1821bcf20a0da5f38ee3d28bd8c0f00389a59adb7ce1196dbce7",
+        version = "01408281e0d4541113cd8c15185d70f30c773b36",
+        sha256 = "d2be8be3c47ccb8bcc96bde210ccddc87c12a2ab6b50cc795399e1bdbea50f0d",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -594,7 +578,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "kafka-{version}/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/{version}.zip"],
     ),
-    confluentinc_librdkafka = dict(
+    librdkafka = dict(
         version = "2.6.0",
         sha256 = "abe0212ecd3e7ed3c4818a4f2baf7bf916e845e902bb15ae48834ca2d36ac745",
         strip_prefix = "librdkafka-{version}",
@@ -638,7 +622,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     # After updating you may need to run:
     #
-    #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
+    #     bazel run //bazel/external/cargo:crates_vendor -- --repin
     #
     rules_rust = dict(
         version = "0.69.0",
@@ -741,13 +725,3 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # (declarations) and implementation (when WUFFS_IMPLEMENTATION is defined).
     ),
 )
-
-def _compiled_protoc_deps(locations, versions):
-    for platform, sha in versions.items():
-        locations["com_google_protobuf_protoc_%s" % platform] = dict(
-            version = PROTOBUF_VERSION,
-            sha256 = sha,
-            urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
-        )
-
-_compiled_protoc_deps(REPOSITORY_LOCATIONS_SPEC, PROTOC_VERSIONS)

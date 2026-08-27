@@ -1,3 +1,5 @@
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -10,6 +12,7 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+load("//test/common/router:corpus.bzl", "corpus_from_test_binary")
 
 licenses(["notice"])  # Apache 2
 
@@ -41,7 +44,7 @@ envoy_cc_test_library(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         ":route_fuzz_proto_cc_proto",
@@ -57,6 +60,7 @@ envoy_cc_test_library(
         "//source/extensions/formatter/cel:config",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
+        "//test/mocks/init:init_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:retry_priority_mocks",
@@ -73,7 +77,7 @@ envoy_cc_test_library(
 # envoy_cc_test_binary is generating mostly static binary regardless of config
 envoy_cc_test_binary(
     name = "config_impl_test_static",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":config_impl_test_lib",
         "//test:main",
@@ -85,34 +89,31 @@ sh_binary(
     srcs = ["corpus_from_config_impl.sh"],
 )
 
-genrule(
-    name = "corpus_from_config_impl",
+corpus_from_test_binary(
+    name = "corpus_from_config_impl_dir",
     testonly = 1,
-    srcs = [
-        # This is deliberately in srcs, since we run into host/target confusion
-        # otherwise in oss-fuzz builds.
-        ":config_impl_test_static",
-    ],
-    outs = ["corpus_from_config_impl.tar.gz"],
-    cmd = """
-    export GENRULE_OUTPUT_DIR=$$(mktemp -d)
-    $(location corpus_from_config_impl_sh) \
-      $(location //test/common/router:config_impl_test_static)
-    # normalize the output as the test build side effect is not deterministic.
-    sed -i 's/[[:space:]]*$$//' $$GENRULE_OUTPUT_DIR/*
-    sed -i 's|^goo\\.gle/debug[a-z]*|goo.gle/debugproto|' $$GENRULE_OUTPUT_DIR/*
-    # Dedupe the resulting corpus files.
-    # Files are saved in the root of the tarball (have their dirs stripped)
-    md5sum $$GENRULE_OUTPUT_DIR/* \
-      | sort -k1,1 -u \
-      | cut -d' ' -f3- \
-      | tar -czf $@ --transform='s|.*/||' -T -
-    """,
     exec_properties = select({
-        "//bazel:engflow_rbe_x86_64": {"Pool": "6gig"},
+        "//bazel:engflow_rbe_x86_64": {"Pool": "linux_x64_small"},
         "//conditions:default": {},
     }),
-    tools = [":corpus_from_config_impl_sh"],
+    script = ":corpus_from_config_impl_sh",
+    # test_binary uses cfg = "target" (not "exec") to preserve host/target
+    # distinction needed for oss-fuzz builds.
+    test_binary = ":config_impl_test_static",
+)
+
+pkg_files(
+    name = "corpus_from_config_impl_files",
+    testonly = 1,
+    srcs = [":corpus_from_config_impl_dir"],
+    strip_prefix = "corpus_from_config_impl_dir",
+)
+
+pkg_tar(
+    name = "corpus_from_config_impl",
+    testonly = 1,
+    srcs = [":corpus_from_config_impl_files"],
+    extension = "tar.gz",
 )
 
 envoy_cc_test(
@@ -121,7 +122,7 @@ envoy_cc_test(
     srcs = [
         "config_impl_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/protobuf",
         "//source/common/router:config_lib",
@@ -136,7 +137,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "config_impl_headermap_benchmark_test",
     srcs = ["config_impl_headermap_benchmark_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/router:config_lib",
@@ -160,7 +161,7 @@ envoy_cc_fuzz_test(
     name = "header_parser_fuzz_test",
     srcs = ["header_parser_fuzz_test.cc"],
     corpus = "header_parser_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":header_parser_fuzz_proto_cc_proto",
         "//source/common/http:header_map_lib",
@@ -172,7 +173,7 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "reset_header_parser_test",
     srcs = ["reset_header_parser_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:header_utility_lib",
         "//source/common/router:reset_header_parser_lib",
@@ -185,7 +186,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "rds_impl_test",
     srcs = ["rds_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/http:rds_lib",
@@ -210,8 +211,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "static_route_provider_impl_test",
     srcs = ["static_route_provider_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/init:manager_lib",
         "//source/common/router:route_provider_manager_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/http:http_mocks",
@@ -229,7 +231,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "scoped_config_impl_test",
     srcs = ["scoped_config_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:scoped_config_lib",
         "//test/mocks/router:router_mocks",
@@ -243,7 +245,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "scoped_rds_test",
     srcs = ["scoped_rds_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/config:subscription_interface",
         "//envoy/init:manager_interface",
@@ -261,6 +263,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
@@ -277,7 +280,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "vhds_test",
     srcs = ["vhds_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
@@ -297,7 +300,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "retry_state_impl_test",
     srcs = ["retry_state_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/router:reset_header_parser_lib",
@@ -335,7 +338,7 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["route_fuzz_test.cc"],
     corpus = ":route_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":route_fuzz_proto_cc_proto",
         "//source/common/router:config_lib",
@@ -354,7 +357,7 @@ envoy_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:formatter_extension_lib",
@@ -380,7 +383,7 @@ envoy_cc_test(
         "router_test.cc",
         "router_2_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 5,
     deps = [
         ":router_test_base_lib",
@@ -421,7 +424,7 @@ envoy_cc_test_library(
     name = "router_test_base_lib",
     srcs = ["router_test_base.cc"],
     hdrs = ["router_test_base.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:context_lib",
@@ -454,7 +457,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "router_upstream_log_test",
     srcs = ["router_upstream_log_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -482,7 +485,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_upstream_filter_test",
     srcs = ["router_upstream_filter_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:filter_chain_helper_lib",
@@ -521,7 +524,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "shadow_writer_impl_test",
     srcs = ["shadow_writer_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
@@ -533,7 +536,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "header_formatter_test",
     srcs = ["header_formatter_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -560,7 +563,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "string_accessor_impl_test",
     srcs = ["string_accessor_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:string_accessor_lib",
     ],
@@ -569,7 +572,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:router_lib",
         "//test/common/http:common_lib",
@@ -583,7 +586,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "delegating_route_impl_test",
     srcs = ["delegating_route_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:config_lib",
         "//source/common/router:delegating_route_lib",
@@ -604,7 +607,7 @@ envoy_proto_library(
 envoy_cc_benchmark_binary(
     name = "config_impl_speed_test",
     srcs = ["config_impl_speed_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/router:config_lib",
@@ -624,8 +627,9 @@ envoy_benchmark_test(
 envoy_cc_benchmark_binary(
     name = "header_formatter_speed_test",
     srcs = ["header_formatter_speed_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/router:router_lib",
         "//test/common/stream_info:test_util",
         "@benchmark",

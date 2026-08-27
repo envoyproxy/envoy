@@ -1,4 +1,6 @@
 #pragma once
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
 
 #include <vector>
 
@@ -200,8 +202,8 @@ protected:
 
   void testGetAndFailStream();
   void testGetAndCloseStream();
-  void testSendDyanmicMetadata();
-  void testSendTypedDyanmicMetadata();
+  void testSendDynamicMetadata();
+  void testSendTypedDynamicMetadata();
   void testSidestreamPushbackDownstream(uint32_t body_size, bool check_downstream_flow_control);
   void initializeConfigDuplexStreamed(bool both_direction = false);
 

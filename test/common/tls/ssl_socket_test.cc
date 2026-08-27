@@ -7692,7 +7692,16 @@ protected:
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     EXPECT_CALL(*read_filter_, onNewConnection());
-    EXPECT_CALL(*read_filter_, onData(_, _)).Times(testing::AnyNumber());
+    // The read buffer must be drained as it is delivered. Leaving it full keeps the server read
+    // buffer above its high watermark, which read disables the connection permanently: once
+    // read_disable_count_ is non-zero onReadReady() returns without calling doRead(), so the
+    // close below would never be observed and disconnect() would block forever.
+    EXPECT_CALL(*read_filter_, onData(_, _))
+        .Times(testing::AnyNumber())
+        .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+          data.drain(data.length());
+          return Network::FilterStatus::StopIteration;
+        }));
 
     std::string data_to_write(bytes_to_write, 'a');
     Buffer::OwnedImpl buffer_to_write(data_to_write);
@@ -7700,12 +7709,17 @@ protected:
     EXPECT_CALL(*client_write_buffer, move(_))
         .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                               Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove)));
+    // Two drains are expected: the first from the SSL write below, and the second from
+    // ConnectionImpl::closeSocket() in disconnect(). Only the first may exit the dispatcher.
+    // closeSocket() is reached synchronously from close(), so exiting on the second drain arms a
+    // loop exit while no loop is running, which then terminates disconnect()'s run before the
+    // server connection has observed the close.
     EXPECT_CALL(*client_write_buffer, drain(_))
-        .Times(2)
-        .WillRepeatedly(Invoke([&](uint64_t n) -> void {
+        .WillOnce(Invoke([&](uint64_t n) -> void {
           client_write_buffer->baseDrain(n);
           dispatcher_->exit();
-        }));
+        }))
+        .WillOnce(Invoke([&](uint64_t n) -> void { client_write_buffer->baseDrain(n); }));
     client_connection_->write(buffer_to_write, false);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_EQ(data_to_write, data_written);

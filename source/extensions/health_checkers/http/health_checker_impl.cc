@@ -272,6 +272,13 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
     Upstream::Host::CreateConnectionData conn =
         host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
                                            parent_.transportSocketMatchMetadata().get());
+    // Connection creation can fail, e.g. when binding to a configured network namespace that is
+    // no longer available. Treat this as a network failure rather than crashing on a null
+    // dereference below.
+    if (conn.connection_ == nullptr) {
+      handleFailure(envoy::data::core::v3::NETWORK);
+      return;
+    }
     client_.reset(parent_.createCodecClient(conn));
     client_->addConnectionCallbacks(connection_callback_impl_);
     client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
