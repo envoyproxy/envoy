@@ -25,6 +25,7 @@ InstanceImpl::~InstanceImpl() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(shutdown_);
   thread_local_data_.data_.clear();
+  thread_local_data_.dispatcher_ = nullptr;
 }
 
 SlotSharedPtr InstanceImpl::allocateSlot() {

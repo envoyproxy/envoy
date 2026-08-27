@@ -287,6 +287,9 @@ void ThreadLocalStoreImpl::shutdownThreading() {
   shutting_down_ = true;
   ASSERT(!tls_.has_value() || tls_->isShutdown());
 
+  tls_cache_.reset();
+  tls_.reset();
+
   // We can't call runOnAllThreads here as global threading has already been shutdown. It is okay
   // to simply clear the scopes and central cache entries here as they will be cleaned up during
   // thread local data cleanup in InstanceImpl::shutdownThread().
