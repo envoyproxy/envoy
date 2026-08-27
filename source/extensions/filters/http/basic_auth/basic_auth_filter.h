@@ -100,7 +100,8 @@ public:
                     absl::string_view password) const;
 
 private:
-  Http::FilterHeadersStatus onDenied(absl::string_view body, absl::string_view response_code_details,
+  Http::FilterHeadersStatus onDenied(absl::string_view body,
+                                     absl::string_view response_code_details,
                                      absl::string_view realm);
   void setDynamicMetadata(absl::string_view username);
 

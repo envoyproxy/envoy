@@ -23,8 +23,8 @@ public:
     users.insert({"user2", {"user2", "EJ9LPFDXsN9ynSmbxvjp75Bmlx8="}}); // user2:test2
     config_ = std::make_unique<FilterConfig>(std::move(users), "x-username", "",
                                              /*allow_missing=*/false,
-                                             /*emit_dynamic_metadata=*/false, /*realm=*/"",
-                                             "stats", *stats_.rootScope());
+                                             /*emit_dynamic_metadata=*/false, /*realm=*/"", "stats",
+                                             *stats_.rootScope());
     filter_ = std::make_shared<BasicAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     ON_CALL(decoder_filter_callbacks_, filterConfigName)
@@ -62,10 +62,9 @@ TEST_F(FilterTest, BasicAuth) {
 TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
   UserMap users;
   users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
-  FilterConfigConstSharedPtr config =
-      std::make_unique<FilterConfig>(std::move(users), "x-username", "", /*allow_missing=*/false,
-                                     /*emit_dynamic_metadata=*/true, /*realm=*/"", "stats",
-                                     *stats_.rootScope());
+  FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
+      std::move(users), "x-username", "", /*allow_missing=*/false,
+      /*emit_dynamic_metadata=*/true, /*realm=*/"", "stats", *stats_.rootScope());
   std::shared_ptr<BasicAuthFilter> filter = std::make_shared<BasicAuthFilter>(config);
   filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
 
@@ -358,8 +357,7 @@ TEST_F(FilterTest, FixedRealmUsedInWWWAuthenticate) {
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(Invoke([&](Http::Code code, absl::string_view,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus>,
-                           absl::string_view) {
+                           const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         EXPECT_EQ(Http::Code::Unauthorized, code);
         Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
         modify_headers(response_headers);
@@ -367,8 +365,7 @@ TEST_F(FilterTest, FixedRealmUsedInWWWAuthenticate) {
             "Basic realm=\"myapp\"",
             response_headers.get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
       }));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
 }
 
 TEST_F(FilterTest, EmptyRealmFallsBackToUri) {

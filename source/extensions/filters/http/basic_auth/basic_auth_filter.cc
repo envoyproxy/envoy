@@ -166,9 +166,9 @@ Http::FilterHeadersStatus BasicAuthFilter::onDenied(absl::string_view body,
                                  // requestHeaders is non-null here: onDenied is only called from
                                  // decodeHeaders.
                                  *this->decoder_callbacks_->requestHeaders(), MaximumUriLength);
-        headers.setReferenceKey(Http::Headers::get().WWWAuthenticate,
-                                absl::StrCat("Basic realm=\"", escapeForQuotedString(realm_value),
-                                             "\""));
+        headers.setReferenceKey(
+            Http::Headers::get().WWWAuthenticate,
+            absl::StrCat("Basic realm=\"", escapeForQuotedString(realm_value), "\""));
       },
       std::nullopt, response_code_details);
   return Http::FilterHeadersStatus::StopIteration;
