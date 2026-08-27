@@ -5,7 +5,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "37cdfbc6faefea94f7b37760a305c98c08981116c2bc9e821e3b423221fad8c8",
         urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz"],
     ),
-    com_envoyproxy_protoc_gen_validate = dict(
+    protoc_gen_validate = dict(
         sha256 = "20da84f8efe8f53c10cbde79d2cdd1e63365b0ae1ad9de22af56aa1a49d59330",
         version = "1.3.3",
         urls = ["https://github.com/bufbuild/protoc-gen-validate/archive/refs/tags/v{version}.zip"],
