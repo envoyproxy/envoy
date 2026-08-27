@@ -1988,7 +1988,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   }
   const Http::Code response_code_enum = static_cast<Http::Code>(response_code);
   const bool should_redirect =
-      (route_redirect_enabled &&
+      (route_redirect_enabled && (
+       route_entry_->internalRedirectPolicy().shouldRedirectForResponseCode(response_code_enum) ||
+       header_redirect_codes.contains(response_code_enum))
        route_entry_->internalRedirectPolicy().shouldRedirectForResponseCode(response_code_enum)) ||
       (!route_redirect_enabled && !header_redirect_codes.empty() &&
        header_redirect_codes.contains(response_code_enum));
