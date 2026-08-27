@@ -185,6 +185,9 @@ public:
    */
   Api::IoCallUint64Result close() override;
 
+  /** Stop reverse-connection maintenance on listener teardown. */
+  void resetFileEvents() override;
+
   /**
    * Triggers the reverse connection workflow.
    * @param dispatcher the event dispatcher.
@@ -299,8 +302,9 @@ public:
    * Handle downstream connection closure and update internal maps so that the next
    * maintenance cycle re-initiates the connection.
    * @param connection_key the unique key identifying the closed connection.
+   * @param connection_id the initiator's per-connection identifier for the closed connection.
    */
-  void onDownstreamConnectionClosed(const std::string& connection_key);
+  void onDownstreamConnectionClosed(const std::string& connection_key, uint64_t connection_id);
 
   /**
    * Drop a tunnel from tracking because it has begun draining (the downstream HCM sent a
@@ -428,11 +432,14 @@ private:
    * @param host_address the address of the remote host
    * @param cluster_name the name of the upstream cluster
    * @param connection_key the unique key identifying the connection
+   * @param connection_id the initiator's per-connection identifier, or nullopt if the connection is
+   *        no longer available (e.g. after it has been released or closed); logged as an empty
+   *        string rather than a sentinel value so it is unambiguously distinct from a real id.
    * @param error_message the error message (empty on success)
    */
   void emitAccessLog(const std::string& event, const std::string& host_address,
                      const std::string& cluster_name, const std::string& connection_key,
-                     const std::string& error_message);
+                     std::optional<uint64_t> connection_id, const std::string& error_message);
 
   /**
    * Clean up all reverse connection resources.
@@ -521,6 +528,10 @@ private:
 
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
+
+  // Set while waiting for parentStopAcceptingRequested(); cleared after scheduling the one-shot
+  // drain-propagation grace timer so fresh starts dial immediately.
+  bool deferred_for_parent_stop_accepting_{false};
 
   bool is_reverse_conn_started_{
       false}; // Whether reverse connections have been started on worker thread

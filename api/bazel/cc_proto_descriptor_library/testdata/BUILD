@@ -1,5 +1,5 @@
-load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("//bazel/cc_proto_descriptor_library:builddefs.bzl", "cc_proto_descriptor_library")
 
@@ -14,7 +14,7 @@ proto_library(
     srcs = ["test.proto"],
     visibility = ["//visibility:private"],
     deps = [
-        "@com_google_protobuf//:any_proto",
+        "@protobuf//:any_proto",
     ],
 )
 
@@ -25,7 +25,7 @@ proto_library(
     visibility = ["//visibility:private"],
     deps = [
         ":test_proto",
-        "@com_google_protobuf//:any_proto",
+        "@protobuf//:any_proto",
     ],
 )
 
@@ -37,7 +37,7 @@ proto_library(
     visibility = ["//visibility:private"],
     deps = [
         ":test_proto",
-        "@com_google_protobuf//:any_proto",
+        "@protobuf//:any_proto",
     ],
 )
 
@@ -102,8 +102,8 @@ cc_test(
         "test_extension_cc_proto",
         "test_extension_descriptors",
         "//bazel/cc_proto_descriptor_library:text_format_transcoder",
-        "@com_google_protobuf//:protobuf",
         "@googletest//:gtest_main",
+        "@protobuf",
     ],
 )
 
@@ -116,8 +116,8 @@ cc_test(
     deps = [
         "test_cc_proto",
         "//bazel/cc_proto_descriptor_library:text_format_transcoder",
-        "@com_google_protobuf//:protobuf",
         "@googletest//:gtest_main",
+        "@protobuf",
     ],
 )
 
@@ -132,7 +132,7 @@ cc_test(
         "test_descriptors",
         "//bazel/cc_proto_descriptor_library:create_dynamic_message",
         "//bazel/cc_proto_descriptor_library:text_format_transcoder",
-        "@com_google_protobuf//:protobuf",
         "@googletest//:gtest_main",
+        "@protobuf",
     ],
 )

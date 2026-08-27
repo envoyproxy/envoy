@@ -19,12 +19,15 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Contains;
 using testing::Invoke;
+using testing::IsSupersetOf;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -140,7 +143,9 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
   const int fd = 321;
   auto socket = createMockSocket(fd);
   socket_manager_->addConnectionSocket("node-c", "cluster-c", std::move(socket),
-                                       std::chrono::seconds(30), false, "tenant-c");
+                                       std::chrono::seconds(30), false, "tenant-c",
+                                       /*initiator_worker_id=*/"worker_5",
+                                       /*initiator_connection_id=*/"42");
   handed_off_socket_ = socket_manager_->getConnectionSocket("node-c");
   ASSERT_NE(handed_off_socket_, nullptr);
 
@@ -154,6 +159,8 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
   EXPECT_EQ(filterStateString(kFilterStateNodeId), "node-c");
   EXPECT_EQ(filterStateString(kFilterStateClusterId), "cluster-c");
   EXPECT_EQ(filterStateString(kFilterStateTenantId), "tenant-c");
+  EXPECT_EQ(filterStateString(kFilterStateInitiatorWorkerId), "worker_5");
+  EXPECT_EQ(filterStateString(kFilterStateInitiatorConnectionId), "42");
   EXPECT_EQ(filterStateUint64(kFilterStateFd), fd);
 
   auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
@@ -243,19 +250,20 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
   extension_->setTestOnlyAccessLogs({access_log});
 
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(
-          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
-            const auto& metadata = stream_info.dynamicMetadata().filter_metadata().at(
-                std::string(kAccessLogMetadataNamespace));
-            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
-            EXPECT_EQ(metadata.fields().at("event").string_value(),
-                      std::string(kLifecycleEventTunnelClosed));
-            EXPECT_EQ(metadata.fields().at("close_reason").string_value(),
-                      std::string(kLifecycleCloseReasonRemoteClose));
-            ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
-            EXPECT_EQ(stream_info.connectionTerminationDetails().value(),
-                      std::string(kLifecycleCloseReasonRemoteClose));
-          }));
+      .WillOnce(Invoke([&](const Formatter::Context& context,
+                           const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = stream_info.dynamicMetadata().filter_metadata().at(
+            std::string(kAccessLogMetadataNamespace));
+        EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
+        EXPECT_THAT(
+            metadata.fields(),
+            IsSupersetOf(StructMatchers(
+                IsStructString("event", std::string(kLifecycleEventTunnelClosed)),
+                IsStructString("close_reason", std::string(kLifecycleCloseReasonRemoteClose)))));
+        ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
+        EXPECT_EQ(stream_info.connectionTerminationDetails().value(),
+                  std::string(kLifecycleCloseReasonRemoteClose));
+      }));
 
   socket_manager_->markSocketDead(fd);
   filter.onEvent(Network::ConnectionEvent::RemoteClose);
@@ -289,10 +297,11 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
             const auto& metadata = stream_info.dynamicMetadata().filter_metadata().at(
                 std::string(kAccessLogMetadataNamespace));
             EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
-            EXPECT_EQ(metadata.fields().at("event").string_value(),
-                      std::string(kLifecycleEventTunnelClosed));
-            EXPECT_EQ(metadata.fields().at("close_reason").string_value(),
-                      std::string(kLifecycleCloseReasonLocalClose));
+            EXPECT_THAT(
+                metadata.fields(),
+                IsSupersetOf(StructMatchers(
+                    IsStructString("event", std::string(kLifecycleEventTunnelClosed)),
+                    IsStructString("close_reason", std::string(kLifecycleCloseReasonLocalClose)))));
             ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
             EXPECT_EQ(stream_info.connectionTerminationDetails().value(),
                       std::string(kLifecycleCloseReasonLocalClose));

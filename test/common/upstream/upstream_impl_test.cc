@@ -21,12 +21,15 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/metadata.h"
+#include "source/common/conn_pool/pending_stream.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/queue_policy/fifo_queue_policy.h"
+#include "source/common/queue_policy/queue_policy_base.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
@@ -53,12 +56,15 @@
 #include "test/mocks/upstream/typed_load_balancer_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatus;
 using testing::_;
 using testing::AnyNumber;
 using testing::ContainerEq;
@@ -67,6 +73,10 @@ using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Upstream {
@@ -1420,10 +1430,10 @@ TEST_P(StrictDnsClusterImplParamTest, CustomResolverFails) {
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
     auto cluster_or_error = createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
-    EXPECT_FALSE(cluster_or_error.ok());
-    EXPECT_EQ(cluster_or_error.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_EQ(cluster_or_error.status().message(),
-              "STRICT_DNS clusters must NOT have a custom resolver name set");
+    EXPECT_THAT(
+        cluster_or_error,
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  testing::Eq("STRICT_DNS clusters must NOT have a custom resolver name set")));
   } else {
     EXPECT_THROW_WITH_MESSAGE(
         auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
@@ -2382,6 +2392,68 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
   EXPECT_NE(connection, connection_data.connection_.get());
   EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
+}
+
+// Verifies that the happy eyeballs sort of the address list runs once when the host is
+// created, and not again on each connection attempt.
+TEST_F(HostImplTest, HappyEyeballsSortsAddressListOncePerHost) {
+  MockClusterMockPrioritySet cluster;
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
+  envoy::config::core::v3::Locality locality;
+  locality.set_region("oceania");
+  locality.set_zone("hello");
+  locality.set_sub_zone("world");
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+  AddressVector address_list = {
+      address,
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+  };
+
+  // Creating the host sorts the address list exactly once.
+  std::shared_ptr<Upstream::HostImpl> host;
+  EXPECT_LOG_CONTAINS_N_TIMES("trace", "sort address with happy_eyeballs config", 1, {
+    host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+        cluster.info_, "lyft.com", address,
+        std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
+        std::make_shared<const envoy::config::core::v3::Locality>(locality),
+        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+        envoy::config::core::v3::UNKNOWN, address_list));
+  });
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+
+  auto connection1 = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection1, setBufferLimits(0));
+  EXPECT_CALL(*connection1, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection1, connectionInfoSetter());
+  EXPECT_CALL(*connection1, streamInfo());
+  auto connection2 = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection2, setBufferLimits(0));
+  EXPECT_CALL(*connection2, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection2, connectionInfoSetter());
+  EXPECT_CALL(*connection2, streamInfo());
+  // Both connections should be created with the first address in the list.
+  EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
+      .WillOnce(Return(connection1))
+      .WillOnce(Return(connection2));
+  EXPECT_CALL(dispatcher, createTimer_(_)).Times(2);
+
+  // Creating connections reuses the sorted list and does not sort again.
+  Envoy::Upstream::Host::CreateConnectionData connection_data1;
+  Envoy::Upstream::Host::CreateConnectionData connection_data2;
+  EXPECT_LOG_CONTAINS_N_TIMES("trace", "sort address with happy_eyeballs config", 0, {
+    connection_data1 = host->createConnection(dispatcher, options, transport_socket_options);
+    connection_data2 = host->createConnection(dispatcher, options, transport_socket_options);
+  });
+  // The created connections will be wrapped in HappyEyeballsConnectionImpls.
+  EXPECT_NE(connection1, connection_data1.connection_.get());
+  EXPECT_NE(connection2, connection_data2.connection_.get());
 }
 
 TEST_F(HostImplTest, HealthFlags) {
@@ -4668,9 +4740,7 @@ TEST(PrioritySet, BatchUpdateMemberCallbackFiresOnce) {
 
   auto member_update_cb = priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) {
     member_cb_count++;
-    EXPECT_EQ(2, dirty_priorities.size());
-    EXPECT_TRUE(dirty_priorities.contains(0));
-    EXPECT_TRUE(dirty_priorities.contains(1));
+    EXPECT_THAT(dirty_priorities, UnorderedElementsAre(0, 1));
     dirty_priorities.clear();
   });
 
@@ -4811,7 +4881,7 @@ public:
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
   parse(const Protobuf::Struct& d) const override {
-    if (d.fields().find("name") != d.fields().end()) {
+    if (d.fields().contains("name")) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
     throw EnvoyException("Cannot create a Baz when metadata is empty.");
@@ -5903,7 +5973,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
       []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::Struct>(); },
       [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
         const auto& msg_struct = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(msg);
-        EXPECT_TRUE(msg_struct.fields().find("option") != msg_struct.fields().end());
+        EXPECT_THAT(msg_struct.fields(), Contains(Key("option")));
 
         return protocol_options;
       });
@@ -6877,6 +6947,104 @@ TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                             "Only one of max_requests_per_connection from Cluster or "
                             "HttpProtocolOptions can be specified");
+}
+
+using PendingStreamQueueFactory =
+    Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>;
+
+class RejectingQueuePolicyFactory : public PendingStreamQueueFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<ConnectionPool::PendingStream>>
+  createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
+                    ProtobufMessage::ValidationVisitor&) override {
+    stat_prefix_ = stat_prefix;
+    return absl::InvalidArgumentError("queue policy creation failed");
+  }
+
+  std::string name() const override { return "envoy.queue_policy.rejecting"; }
+  std::string stat_prefix_;
+};
+
+class SuccessfulQueuePolicyFactory : public PendingStreamQueueFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<ConnectionPool::PendingStream>>
+  createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
+                    ProtobufMessage::ValidationVisitor&) override {
+    stat_prefix_ = stat_prefix;
+    return std::make_unique<Extensions::QueuePolicy::FifoQueue<ConnectionPool::PendingStream>>();
+  }
+
+  std::string name() const override { return "envoy.queue_policy.successful"; }
+  std::string stat_prefix_;
+};
+
+TEST_F(ClusterInfoImplTest, InvalidQueuePolicyConfig) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.invalid
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Didn't find a registered queue policy implementation for name: "
+                            "'envoy.queue_policy.invalid'");
+}
+
+TEST_F(ClusterInfoImplTest, QueuePolicyCreationFailure) {
+  RejectingQueuePolicyFactory factory;
+  Registry::InjectFactory<PendingStreamQueueFactory> registered_factory(factory);
+
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.rejecting
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException, "queue policy creation failed");
+  EXPECT_EQ("cluster.cluster1.envoy.queue_policy.rejecting", factory.stat_prefix_);
+}
+
+TEST_F(ClusterInfoImplTest, QueuePolicyCreationSuccess) {
+  SuccessfulQueuePolicyFactory factory;
+  Registry::InjectFactory<PendingStreamQueueFactory> registered_factory(factory);
+
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.successful
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+  const auto policy = cluster->info()->pendingRqQueuePolicy();
+  ASSERT_TRUE(policy.has_value());
+  EXPECT_EQ(&factory, policy->factory_);
+  ASSERT_NE(nullptr, policy->config_);
+  EXPECT_EQ("google.protobuf.Struct", policy->config_->GetTypeName());
+  EXPECT_EQ("cluster.cluster1.envoy.queue_policy.successful", policy->stat_prefix_);
+  EXPECT_EQ(policy->stat_prefix_, factory.stat_prefix_);
 }
 
 TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {

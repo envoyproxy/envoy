@@ -154,7 +154,7 @@ configure_make(
     env = {
         "AR": "$(AR)",
     },
-    lib_source = "@confluentinc_librdkafka//:all",
+    lib_source = "@librdkafka//:all",
     out_static_libs = [
         "librdkafka.a",
         "librdkafka++.a",
@@ -509,16 +509,6 @@ envoy_cmake(
     lib_source = "@libmaxminddb//:all",
     out_static_libs = ["libmaxminddb.a"],
     tags = ["skip_on_windows"],
-)
-
-envoy_cc_library(
-    name = "maxmind_linux_darwin",
-    srcs = [],
-    deps = select({
-        "//bazel:linux": [":maxmind"],
-        "//bazel:darwin_any": [":maxmind"],
-        "//conditions:default": [],
-    }),
 )
 
 configure_make(

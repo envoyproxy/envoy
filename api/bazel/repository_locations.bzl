@@ -1,11 +1,11 @@
 # This should match the schema defined in external_deps.bzl.
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_skylib = dict(
-        version = "1.9.0",
-        sha256 = "3b5b49006181f5f8ff626ef8ddceaa95e9bb8ad294f7b5d7b11ea9f7ddaf8c59",
+        version = "1.9.2",
+        sha256 = "37cdfbc6faefea94f7b37760a305c98c08981116c2bc9e821e3b423221fad8c8",
         urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz"],
     ),
-    com_envoyproxy_protoc_gen_validate = dict(
+    protoc_gen_validate = dict(
         sha256 = "20da84f8efe8f53c10cbde79d2cdd1e63365b0ae1ad9de22af56aa1a49d59330",
         version = "1.3.3",
         urls = ["https://github.com/bufbuild/protoc-gen-validate/archive/refs/tags/v{version}.zip"],
@@ -30,7 +30,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "zipkin-api-{version}",
         urls = ["https://github.com/openzipkin/zipkin-api/archive/{version}.tar.gz"],
     ),
-    com_google_googleapis = dict(
+    googleapis = dict(
         # TODO(dio): Consider writing a Starlark macro for importing Google API proto.
         version = "fd52b5754b2b268bc3a22a10f29844f206abb327",
         sha256 = "97fc354dddfd3ea03e7bf2ad74129291ed6fad7ff39d3bd8daec738a3672eb8a",
@@ -56,8 +56,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_proto/archive/refs/tags/{version}.tar.gz"],
     ),
     opentelemetry_proto = dict(
-        version = "1.10.0",
-        sha256 = "52c85df79badc45da7e6a8735e8090b05a961b0208756187e1492a40db2d1f5f",
+        version = "1.11.0",
+        sha256 = "cefb4cf0dee432bdd0eb25af73ed4c996b16e80baea7f98285c413184c1b92ad",
         strip_prefix = "opentelemetry-proto-{version}",
         urls = ["https://github.com/open-telemetry/opentelemetry-proto/archive/v{version}.tar.gz"],
     ),
@@ -74,8 +74,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/cel-spec/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.35",
-        sha256 = "5179bc3f912d9c2dd5a6e5215e98222abe088847f021eba9f0f2e9a006deacaa",
+        version = "0.4.9",
+        sha256 = "5d8207675350daeeaedde48de9d42640afc400240f19688f741216c859faa6b8",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),

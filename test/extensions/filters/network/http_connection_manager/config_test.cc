@@ -51,6 +51,10 @@ using testing::Return;
 using testing::StrictMock;
 using testing::WhenDynamicCastTo;
 
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -537,7 +541,7 @@ tracing:
   std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
   const Tracing::CustomTagMap& custom_tag_map = config.tracingConfig()->custom_tags_;
   for (const std::string& custom_tag : custom_tags) {
-    EXPECT_NE(custom_tag_map.find(custom_tag), custom_tag_map.end());
+    EXPECT_THAT(custom_tag_map, Contains(Key(custom_tag)));
   }
 }
 
@@ -3504,6 +3508,32 @@ TEST_F(HttpConnectionManagerConfigTest, SetCurrentClientCertDetailsCertAndChain)
   EXPECT_EQ(Http::ClientCertDetailsType::Chain, config.setCurrentClientCertDetails()[1]);
 }
 
+TEST_F(HttpConnectionManagerConfigTest, SetCurrentClientCertDetailsIssuer) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  forward_client_cert_details: APPEND_FORWARD
+  set_current_client_cert_details:
+    subject: true
+    issuer: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_OK(creation_status_);
+  EXPECT_EQ(Http::ForwardClientCertType::AppendForward, config.forwardClientCert());
+  EXPECT_EQ(2, config.setCurrentClientCertDetails().size());
+  EXPECT_EQ(Http::ClientCertDetailsType::Subject, config.setCurrentClientCertDetails()[0]);
+  EXPECT_EQ(Http::ClientCertDetailsType::Issuer, config.setCurrentClientCertDetails()[1]);
+}
+
 TEST_F(HttpConnectionManagerConfigTest, ForwardClientCertMatcher) {
   // Test that forward_client_cert_matcher is properly parsed and can match on request headers.
   const std::string yaml_string = R"EOF(
@@ -4067,14 +4097,10 @@ http_filters:
   EXPECT_OK(creation_status_);
 
   const auto& https_ports = config.httpsDestinationPorts();
-  EXPECT_EQ(2, https_ports.size());
-  EXPECT_TRUE(https_ports.contains(443));
-  EXPECT_TRUE(https_ports.contains(8443));
+  EXPECT_THAT(https_ports, UnorderedElementsAre(443, 8443));
 
   const auto& http_ports = config.httpDestinationPorts();
-  EXPECT_EQ(2, http_ports.size());
-  EXPECT_TRUE(http_ports.contains(80));
-  EXPECT_TRUE(http_ports.contains(8080));
+  EXPECT_THAT(http_ports, UnorderedElementsAre(80, 8080));
 }
 
 // Test empty forward_proto_config is valid (feature disabled).

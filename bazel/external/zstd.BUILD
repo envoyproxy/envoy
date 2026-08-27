@@ -63,7 +63,10 @@ cc_library(
         "//conditions:default": [],
     }),
     includes = ["lib"],
-    linkopts = ["-pthread"],
+    linkopts = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["-pthread"],
+    }),
     linkstatic = True,
 )
 

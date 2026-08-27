@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:utility_lib",
@@ -26,6 +26,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/upstreams/http/reverse_tunnel/v3:pkg_cc_proto",
     ],

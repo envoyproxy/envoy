@@ -26,7 +26,9 @@ envoy_cc_library(
     srcs = ["reverse_tunnel_filter.cc"],
     hdrs = ["reverse_tunnel_filter.h"],
     deps = [
+        ":jwt_handshake_validator_lib",
         "//envoy/buffer:buffer_interface",
+        "//envoy/formatter:http_formatter_context_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/http:codec_interface",
         "//envoy/network:connection_interface",
@@ -34,7 +36,9 @@ envoy_cc_library(
         "//envoy/ssl:connection_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:codes_lib",
@@ -46,9 +50,7 @@ envoy_cc_library(
         "//source/common/http/http1:settings_lib",
         "//source/common/network:connection_socket_lib",
         "//source/common/protobuf",
-        "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_includes",
@@ -58,5 +60,22 @@ envoy_cc_library(
         "//source/server:null_overload_manager_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/reverse_tunnel/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "jwt_handshake_validator_lib",
+    srcs = ["jwt_handshake_validator.cc"],
+    hdrs = ["jwt_handshake_validator.h"],
+    deps = [
+        "//envoy/http:header_map_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/jwt:jwt_lib",
+        "//source/extensions/filters/common/jwks:jwks_provider_lib",
+        "@envoy_api//envoy/extensions/filters/common/jwks/v3:pkg_cc_proto",
     ],
 )

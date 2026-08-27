@@ -157,10 +157,10 @@ public:
               (const absl::string_view name, FieldType& msg_type, int16_t& field_id));
   MOCK_METHOD(FilterStatus, fieldEnd, ());
   MOCK_METHOD(FilterStatus, boolValue, (bool& value));
-  MOCK_METHOD(FilterStatus, byteValue, (uint8_t & value));
-  MOCK_METHOD(FilterStatus, int16Value, (int16_t & value));
-  MOCK_METHOD(FilterStatus, int32Value, (int32_t & value));
-  MOCK_METHOD(FilterStatus, int64Value, (int64_t & value));
+  MOCK_METHOD(FilterStatus, byteValue, (uint8_t& value));
+  MOCK_METHOD(FilterStatus, int16Value, (int16_t& value));
+  MOCK_METHOD(FilterStatus, int32Value, (int32_t& value));
+  MOCK_METHOD(FilterStatus, int64Value, (int64_t& value));
   MOCK_METHOD(FilterStatus, doubleValue, (double& value));
   MOCK_METHOD(FilterStatus, stringValue, (absl::string_view value));
   MOCK_METHOD(FilterStatus, mapBegin,
@@ -231,10 +231,10 @@ public:
               (absl::string_view name, FieldType& msg_type, int16_t& field_id));
   MOCK_METHOD(FilterStatus, fieldEnd, ());
   MOCK_METHOD(FilterStatus, boolValue, (bool& value));
-  MOCK_METHOD(FilterStatus, byteValue, (uint8_t & value));
-  MOCK_METHOD(FilterStatus, int16Value, (int16_t & value));
-  MOCK_METHOD(FilterStatus, int32Value, (int32_t & value));
-  MOCK_METHOD(FilterStatus, int64Value, (int64_t & value));
+  MOCK_METHOD(FilterStatus, byteValue, (uint8_t& value));
+  MOCK_METHOD(FilterStatus, int16Value, (int16_t& value));
+  MOCK_METHOD(FilterStatus, int32Value, (int32_t& value));
+  MOCK_METHOD(FilterStatus, int64Value, (int64_t& value));
   MOCK_METHOD(FilterStatus, doubleValue, (double& value));
   MOCK_METHOD(FilterStatus, stringValue, (absl::string_view value));
   MOCK_METHOD(FilterStatus, mapBegin,
@@ -300,10 +300,10 @@ public:
               (absl::string_view name, FieldType& msg_type, int16_t& field_id));
   MOCK_METHOD(FilterStatus, fieldEnd, ());
   MOCK_METHOD(FilterStatus, boolValue, (bool& value));
-  MOCK_METHOD(FilterStatus, byteValue, (uint8_t & value));
-  MOCK_METHOD(FilterStatus, int16Value, (int16_t & value));
-  MOCK_METHOD(FilterStatus, int32Value, (int32_t & value));
-  MOCK_METHOD(FilterStatus, int64Value, (int64_t & value));
+  MOCK_METHOD(FilterStatus, byteValue, (uint8_t& value));
+  MOCK_METHOD(FilterStatus, int16Value, (int16_t& value));
+  MOCK_METHOD(FilterStatus, int32Value, (int32_t& value));
+  MOCK_METHOD(FilterStatus, int64Value, (int64_t& value));
   MOCK_METHOD(FilterStatus, doubleValue, (double& value));
   MOCK_METHOD(FilterStatus, stringValue, (absl::string_view value));
   MOCK_METHOD(FilterStatus, mapBegin,
@@ -366,10 +366,10 @@ public:
               (absl::string_view name, FieldType& msg_type, int16_t& field_id));
   MOCK_METHOD(FilterStatus, encodeFieldEnd, ());
   MOCK_METHOD(FilterStatus, encodeBoolValue, (bool& value));
-  MOCK_METHOD(FilterStatus, encodeByteValue, (uint8_t & value));
-  MOCK_METHOD(FilterStatus, encodeInt16Value, (int16_t & value));
-  MOCK_METHOD(FilterStatus, encodeInt32Value, (int32_t & value));
-  MOCK_METHOD(FilterStatus, encodeInt64Value, (int64_t & value));
+  MOCK_METHOD(FilterStatus, encodeByteValue, (uint8_t& value));
+  MOCK_METHOD(FilterStatus, encodeInt16Value, (int16_t& value));
+  MOCK_METHOD(FilterStatus, encodeInt32Value, (int32_t& value));
+  MOCK_METHOD(FilterStatus, encodeInt64Value, (int64_t& value));
   MOCK_METHOD(FilterStatus, encodeDoubleValue, (double& value));
   MOCK_METHOD(FilterStatus, encodeStringValue, (absl::string_view value));
   MOCK_METHOD(FilterStatus, encodeMapBegin,
@@ -391,10 +391,10 @@ public:
               (absl::string_view name, FieldType& msg_type, int16_t& field_id));
   MOCK_METHOD(FilterStatus, decodeFieldEnd, ());
   MOCK_METHOD(FilterStatus, decodeBoolValue, (bool& value));
-  MOCK_METHOD(FilterStatus, decodeByteValue, (uint8_t & value));
-  MOCK_METHOD(FilterStatus, decodeInt16Value, (int16_t & value));
-  MOCK_METHOD(FilterStatus, decodeInt32Value, (int32_t & value));
-  MOCK_METHOD(FilterStatus, decodeInt64Value, (int64_t & value));
+  MOCK_METHOD(FilterStatus, decodeByteValue, (uint8_t& value));
+  MOCK_METHOD(FilterStatus, decodeInt16Value, (int16_t& value));
+  MOCK_METHOD(FilterStatus, decodeInt32Value, (int32_t& value));
+  MOCK_METHOD(FilterStatus, decodeInt64Value, (int64_t& value));
   MOCK_METHOD(FilterStatus, decodeDoubleValue, (double& value));
   MOCK_METHOD(FilterStatus, decodeStringValue, (absl::string_view value));
   MOCK_METHOD(FilterStatus, decodeMapBegin,

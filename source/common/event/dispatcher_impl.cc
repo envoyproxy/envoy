@@ -98,9 +98,14 @@ void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
       std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
 }
 
-Evwatch::ObserverHandlePtr DispatcherImpl::registerEvwatchObserver(Evwatch::ObserverPtr observer) {
+void DispatcherImpl::registerEvwatchObserver(Evwatch::Observer& observer) {
   ASSERT(isThreadSafe());
-  return base_scheduler_.registerEvwatchObserver(std::move(observer));
+  base_scheduler_.registerEvwatchObserver(observer);
+}
+
+void DispatcherImpl::unregisterEvwatchObserver(Evwatch::Observer& observer) {
+  ASSERT(isThreadSafe());
+  base_scheduler_.unregisterEvwatchObserver(observer);
 }
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope,

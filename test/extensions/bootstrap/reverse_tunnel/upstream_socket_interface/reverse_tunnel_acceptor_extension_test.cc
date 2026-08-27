@@ -27,6 +27,8 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -166,7 +168,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 2);
 
   for (const auto& [stat_name, value] : stat_map) {
-    EXPECT_TRUE(stat_name.find("worker_0") != std::string::npos);
+    EXPECT_THAT(stat_name, HasSubstr("worker_0"));
   }
 
   extension_->updateConnectionStats("node1", "cluster1", true, false);
@@ -464,9 +466,9 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, CreateEmptyConfigProto) {
   auto proto = socket_interface_->createEmptyConfigProto();
   EXPECT_NE(proto, nullptr);
 
-  auto* typed_proto =
-      dynamic_cast<envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
-                       UpstreamReverseConnectionSocketInterface*>(proto.get());
+  auto* typed_proto = Protobuf::DynamicCastMessage<
+      envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+          UpstreamReverseConnectionSocketInterface>(proto.get());
   EXPECT_NE(typed_proto, nullptr);
 }
 

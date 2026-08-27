@@ -653,6 +653,19 @@ TEST_F(CacheFilterTest, FilterResetDuringEncodeTrailersResetsDownstream) {
   EXPECT_THAT(decoder_callbacks_.details(), Eq("cache.aborted_trailers"));
 }
 
+TEST_F(CacheFilterTest, LowWatermarkWithoutHighIsEnvoyBug) {
+  auto filter = makeFilter(mock_cache_);
+  EXPECT_ENVOY_BUG(filter->onBelowWriteBufferLowWatermark(),
+                   "low watermark not preceded by high watermark should not happen");
+}
+
+TEST_F(CacheFilterTest, ConfigVaryAllowListIsAccessible) {
+  auto config =
+      std::make_shared<CacheFilterConfig>(config_, mock_cache_, context_.server_factory_context_);
+  const VaryAllowList& vary = config->varyAllowList();
+  EXPECT_FALSE(vary.allowsValue("anything"));
+}
+
 } // namespace
 } // namespace CacheV2
 } // namespace HttpFilters

@@ -69,7 +69,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, ConfigMissingSymbols) {
   proto_config.set_filter_name("test_filter");
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+      std::ignore = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
           proto_config, std::move(dynamic_module.value()), *stats_.rootScope()),
       EnvoyException,
       "Dynamic module does not support UDP listener filters: Failed to resolve symbol "
@@ -255,7 +255,7 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingConfigDestroy) {
   proto_config.mutable_filter_config()->set_value("config");
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+      std::ignore = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
           proto_config, std::move(dynamic_module.value()), *stats.rootScope()),
       EnvoyException,
       "Dynamic module does not support UDP listener filters: Failed to resolve symbol "
@@ -273,7 +273,7 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterNew) {
   proto_config.set_filter_name("test");
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+      std::ignore = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
           proto_config, std::move(dynamic_module.value()), *stats.rootScope()),
       EnvoyException,
       "Dynamic module does not support UDP listener filters: Failed to resolve symbol "
@@ -291,7 +291,7 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingOnData) {
   proto_config.set_filter_name("test");
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+      std::ignore = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
           proto_config, std::move(dynamic_module.value()), *stats.rootScope()),
       EnvoyException,
       "Dynamic module does not support UDP listener filters: Failed to resolve symbol "
@@ -309,7 +309,7 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterDestroy) {
   proto_config.set_filter_name("test");
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+      std::ignore = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
           proto_config, std::move(dynamic_module.value()), *stats.rootScope()),
       EnvoyException,
       "Dynamic module does not support UDP listener filters: Failed to resolve symbol "

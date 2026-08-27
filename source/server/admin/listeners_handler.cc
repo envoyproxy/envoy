@@ -41,10 +41,20 @@ Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
       response.add("OK\n");
       return Http::Code::OK;
     }
+
+    // The start time and strategy are captured once here so every notified connection shares a
+    // single, consistent drain timeline. A future query parameter can override the strategy for
+    // this drain without touching the server-wide default.
+    server_.listenerManager().onServerDrainStart(
+        direction, Network::ConnectionDrainEvent{server_.api().timeSource().monotonicTime(),
+                                                 server_.options().drainStrategy()});
     // This means either we aren't draining or we still have to do some work
     // (e.g. we were draining inbound only but now we're being asked to drain all)
     server_.drainManager().startDrainSequence(direction, [this, stop_listeners_type, skip_exit]() {
       if (!skip_exit) {
+        // Stop the listeners after the drain duration because for admin initiated drain, there is
+        // no another versions of the listeners to take care of the new connections. So Envoy still
+        // accepts new connections during the drain duration to reduce the errors.
         server_.listenerManager().stopListeners(stop_listeners_type, {});
       }
     });

@@ -26,16 +26,19 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::AnyNumber;
 using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrictMock;
@@ -2476,7 +2479,7 @@ retry_back_off:
 
   absl::StatusOr<std::unique_ptr<AsyncStreamImpl>> stream_or_error = Http::AsyncStreamImpl::create(
       client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy));
-  EXPECT_FALSE(stream_or_error.ok());
+  EXPECT_THAT(stream_or_error, Not(IsOk()));
 }
 
 TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithRetryPolicy) {

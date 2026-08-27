@@ -16,7 +16,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data:plugins.so",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//contrib/golang/filters/http/test/test_data/destroyconfig:destroyconfig_test_lib",
@@ -32,7 +32,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data:plugins.so",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//contrib/golang/common/dso/test:dso_mocks",
         "//contrib/golang/filters/http/source:golang_filter_lib",
@@ -46,6 +46,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -57,7 +58,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data:plugins.so",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":golang_test_filters_proto_cc_proto",
         "//contrib/golang/filters/http/source:config",
@@ -90,7 +91,7 @@ envoy_cc_fuzz_test(
     name = "golang_filter_fuzz_test",
     srcs = ["golang_filter_fuzz_test.cc"],
     corpus = "golang_filter_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":golang_filter_fuzz_proto_cc_proto",
         "//contrib/golang/common/dso/test:dso_mocks",
@@ -112,7 +113,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data:plugins.so",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],

@@ -12,6 +12,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/common/secret/secret_manager_impl.h"
+#include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/extensions/filters/http/oauth2/filter.h"
 
 #include "test/mocks/http/mocks.h"
@@ -19,12 +20,17 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::HasSubstr;
+using testing::Key;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -353,10 +359,23 @@ public:
 
     // Create filter config.
     auto secret_reader = std::make_shared<MockSecretReader>();
-    FilterConfigSharedPtr c = std::make_shared<FilterConfig>(
-        p, factory_context_.server_factory_context_, secret_reader, scope_, "test.");
+    FilterConfigSharedPtr c = makeFilterConfig(p, secret_reader).value();
 
     return c;
+  }
+
+  // Builds a FilterConfig from `p`. Config-creation errors are returned via the StatusOr; callers
+  // that expect success use `.value()`, while tests asserting on failures use EXPECT_THAT.
+  absl::StatusOr<FilterConfigSharedPtr>
+  makeFilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& p,
+                   std::shared_ptr<SecretReader> secret_reader) {
+    absl::Status creation_status = absl::OkStatus();
+    auto config = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                                 secret_reader, scope_, "test.", creation_status);
+    if (!creation_status.ok()) {
+      return creation_status;
+    }
+    return config;
   }
 
   // Builds a minimal valid config that forwards the ID token on the given header. When
@@ -396,8 +415,7 @@ public:
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
     auto secret_reader = std::make_shared<MockSecretReader>();
-    return std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                          secret_reader, scope_, "test.");
+    return makeFilterConfig(p, secret_reader).value();
   }
 
   // Test helpers exposing private OAuth2Filter methods. OAuth2Filter declares
@@ -527,8 +545,7 @@ public:
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
     auto secret_reader = std::make_shared<MockSecretReader>();
-    return std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                          secret_reader, scope_, "test.");
+    return makeFilterConfig(p, secret_reader).value();
   }
 };
 
@@ -580,7 +597,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_client, typed_secret);
   const auto decoded_resources_client = TestUtility::decodeResources({typed_secret});
 
-  EXPECT_TRUE(client_callback->onConfigUpdate(decoded_resources_client.refvec_, "").ok());
+  EXPECT_OK(client_callback->onConfigUpdate(decoded_resources_client.refvec_, ""));
   EXPECT_EQ(secret_reader.clientSecret(), "client_test");
   EXPECT_EQ(secret_reader.hmacSecret(), "");
 
@@ -593,7 +610,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_token, typed_secret);
   const auto decoded_resources_token = TestUtility::decodeResources({typed_secret});
 
-  EXPECT_TRUE(token_callback->onConfigUpdate(decoded_resources_token.refvec_, "").ok());
+  EXPECT_OK(token_callback->onConfigUpdate(decoded_resources_token.refvec_, ""));
   EXPECT_EQ(secret_reader.clientSecret(), "client_test");
   EXPECT_EQ(secret_reader.hmacSecret(), "token_test");
 
@@ -606,7 +623,7 @@ generic_secret:
   TestUtility::loadFromYaml(yaml_client_recheck, typed_secret);
   const auto decoded_resources_client_recheck = TestUtility::decodeResources({typed_secret});
 
-  EXPECT_TRUE(client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "").ok());
+  EXPECT_OK(client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, ""));
   EXPECT_EQ(secret_reader.clientSecret(), "client_test_recheck");
   EXPECT_EQ(secret_reader.hmacSecret(), "token_test");
 }
@@ -633,8 +650,7 @@ TEST_F(OAuth2Test, SecretsNotReadyReturnsServiceUnavailable) {
   credentials->mutable_hmac_secret()->set_name("hmac");
 
   MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
-  init(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
-                                      scope_, "test."));
+  init(makeFilterConfig(p, secret_reader).value());
 
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
@@ -674,8 +690,7 @@ TEST_F(OAuth2Test, TlsClientAuthDoesNotRequireClientSecret) {
   credentials->mutable_hmac_secret()->set_name("hmac");
 
   MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
-  init(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
-                                      scope_, "test."));
+  init(makeFilterConfig(p, secret_reader).value());
 
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
@@ -707,10 +722,9 @@ TEST_F(OAuth2Test, InvalidAuthorizationEndpoint) {
 
   // Attempt to create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
-  EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
-                                     scope_, "test."),
-      EnvoyException, "OAuth2 filter: invalid authorization endpoint URL 'INVALID_URL' in config.");
+  EXPECT_THAT(makeFilterConfig(p, secret_reader),
+              StatusHelpers::HasStatusMessage(
+                  "OAuth2 filter: invalid authorization endpoint URL 'INVALID_URL' in config."));
 }
 
 // Verifies that the OAuth config is created with a default value for auth_scopes field when it is
@@ -741,8 +755,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
+  test_config_ = makeFilterConfig(p, secret_reader).value();
 
   // resource is optional
   EXPECT_EQ(test_config_->encodedResourceQueryParams(), "");
@@ -835,8 +848,7 @@ TEST_F(OAuth2Test, CustomCsrfTokenExpiresIn) {
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
+  test_config_ = makeFilterConfig(p, secret_reader).value();
 
   init(test_config_);
   Http::TestRequestHeaderMapImpl request_headers{
@@ -907,8 +919,7 @@ TEST_F(OAuth2Test, CustomCodeVerifierTokenExpiresIn) {
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
+  test_config_ = makeFilterConfig(p, secret_reader).value();
 
   init(test_config_);
   Http::TestRequestHeaderMapImpl request_headers{
@@ -972,8 +983,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
+  test_config_ = makeFilterConfig(p, secret_reader).value();
   init(test_config_);
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
@@ -1035,8 +1045,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
+  test_config_ = makeFilterConfig(p, secret_reader).value();
   init(test_config_);
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
@@ -1151,8 +1160,7 @@ TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
+  test_config_ = makeFilterConfig(p, secret_reader).value();
   init(test_config_);
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1214,8 +1222,7 @@ TEST_F(OAuth2Test, RequestSignoutWithCustomPostLogoutRedirectUri) {
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
+  test_config_ = makeFilterConfig(p, secret_reader).value();
   init(test_config_);
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1276,8 +1283,7 @@ TEST_F(OAuth2Test, RequestSignoutWithFormattedPostLogoutRedirectUri) {
 
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
+  test_config_ = makeFilterConfig(p, secret_reader).value();
   init(test_config_);
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1339,8 +1345,7 @@ TEST_F(OAuth2Test, RequestSignoutWithDisabledPostLogoutRedirectUri) {
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
+  test_config_ = makeFilterConfig(p, secret_reader).value();
   init(test_config_);
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1402,15 +1407,12 @@ TEST_F(OAuth2Test, InvalidPostLogoutRedirectUriValidatedOnlyWhenUsed) {
   auto secret_reader = std::make_shared<MockSecretReader>();
 
   // End_session_endpoint is not defined: the invalid formatter is never compiled,
-  // so the config loads without throwing.
-  EXPECT_NO_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                 secret_reader, scope_, "test."));
+  // so the config loads successfully.
+  EXPECT_THAT(makeFilterConfig(p, secret_reader), StatusHelpers::IsOk());
 
   // End_session_endpoint is set: the invalid formatter is compiled and the config fails to load.
   p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
-  EXPECT_THROW(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                              secret_reader, scope_, "test."),
-               EnvoyException);
+  EXPECT_THAT(makeFilterConfig(p, secret_reader), ::testing::Not(StatusHelpers::IsOk()));
 }
 
 /**
@@ -1454,6 +1456,59 @@ TEST_F(OAuth2Test, OAuthOkPass) {
 
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
+}
+
+/**
+ * Scenario: a request carrying a stream request id is processed by the filter.
+ *
+ * Expected behavior: the OAuth2 filter's application log lines include a RequestId tag whose value
+ * matches the stream's request id (the same value as the access log %STREAM_ID% / x-request-id), so
+ * application logs can be correlated with access logs on a per-request basis.
+ */
+TEST_F(OAuth2Test, LogsRequestIdTag) {
+  const std::string request_id = "a765d063-2c3d-4b19-92d4-4486a16e7f50";
+  StreamInfo::StreamIdProviderImpl id_provider{std::string(request_id)};
+  EXPECT_CALL(decoder_callbacks_.stream_info_, getStreamIdProvider())
+      .WillRepeatedly(Return(makeOptRef<const StreamInfo::StreamIdProvider>(id_provider)));
+
+  Http::TestRequestHeaderMapImpl mock_request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  // Take the valid-HMAC-cookie path, which emits "skipping oauth flow due to valid hmac cookie".
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+
+  EXPECT_LOG_CONTAINS("debug", absl::StrCat("\"RequestId\":\"", request_id, "\""),
+                      { filter_->decodeHeaders(mock_request_headers, false); });
+}
+
+/**
+ * Scenario: the filter processes a request whose stream has no request id provider.
+ *
+ * Expected behavior: the OAuth2 filter still logs, but the log line carries no RequestId tag.
+ */
+TEST_F(OAuth2Test, NoRequestIdTagWhenProviderAbsent) {
+  // The default MockStreamInfo returns an empty StreamIdProvider, so no RequestId is emitted.
+  Http::TestRequestHeaderMapImpl mock_request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+
+  EXPECT_LOG_NOT_CONTAINS("debug", "RequestId",
+                          { filter_->decodeHeaders(mock_request_headers, false); });
 }
 
 /**
@@ -1862,8 +1917,7 @@ TEST_F(OAuth2Test, SetBearerTokenWithPrivateKeyJwt) {
   MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
   auto secret_reader = std::make_shared<PEMSecretReader>();
-  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
-      p, factory_context_.server_factory_context_, secret_reader, scope_, "test.");
+  FilterConfigSharedPtr config = makeFilterConfig(p, secret_reader).value();
   init(config);
 
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
@@ -1944,8 +1998,7 @@ TEST_F(OAuth2Test, RefreshTokenWithPrivateKeyJwt) {
   MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
   auto secret_reader = std::make_shared<PEMSecretReader>();
-  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
-      p, factory_context_.server_factory_context_, secret_reader, scope_, "test.");
+  FilterConfigSharedPtr config = makeFilterConfig(p, secret_reader).value();
   init(config);
 
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
@@ -4814,11 +4867,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
 
   // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+  EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
 }
 
 // When a refresh flow succeeds, but a new refresh token isn't received from the OAuth server, the
@@ -4890,11 +4939,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenNoNewRefreshToken) 
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
 
   // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+  EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
 }
 
 TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
@@ -4980,11 +5025,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
   EXPECT_EQ(cookies.at("IdToken"), "idToken");
 
   // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+  EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
 }
 
 // Test all cookies with STRICT SameSite
@@ -5513,11 +5554,7 @@ TEST_F(OAuth2Test, CookiesDecryptedBeforeForwarding) {
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
 
   // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+  EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
 }
 
 // Verifies that requests matching the pass_through_matcher configuration are not modified by the
@@ -5573,8 +5610,7 @@ TEST_F(OAuth2Test, RouteSpecificConfigOverridesGlobalConfig) {
   credentials->mutable_hmac_secret()->set_name("hmac");
 
   auto secret_reader = std::make_shared<MockSecretReader>();
-  auto route_config = std::make_shared<FilterConfig>(
-      route_proto, factory_context_.server_factory_context_, secret_reader, scope_, "test.");
+  auto route_config = makeFilterConfig(route_proto, secret_reader).value();
 
   ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
       .WillByDefault(Return(route_config.get()));
@@ -5676,8 +5712,7 @@ TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
   auto run_test_with_prefix = [&](absl::string_view prefix, bool expect_secure) {
     auto p = make_config(prefix);
     auto secret_reader = std::make_shared<MockSecretReader>();
-    init(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
-                                        scope_, "test."));
+    init(makeFilterConfig(p, secret_reader).value());
 
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
         .WillOnce(Invoke([&](Http::ResponseHeaderMap& passed_headers, bool) {
@@ -5776,12 +5811,12 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
     bool found_nonce = false, found_code_verifier = false;
     for (const auto& cookie : cookies) {
       if (cookie.find("OauthNonce.00000000075bcd15=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/auth/callback;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/auth/callback;"))
             << "OauthNonce should have path=/auth/callback, got: " << cookie;
         found_nonce = true;
       }
       if (cookie.find("CodeVerifier.00000000075bcd15=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/auth/callback;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/auth/callback;"))
             << "CodeVerifier should have path=/auth/callback, got: " << cookie;
         found_code_verifier = true;
       }
@@ -5843,17 +5878,17 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
     bool found_hmac = false, found_bearer = false, found_expires = false;
     for (const auto& cookie : cookies) {
       if (cookie.find("OauthHMAC=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/app;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/app;"))
             << "OauthHMAC should have path=/app, got: " << cookie;
         found_hmac = true;
       }
       if (cookie.find("BearerToken=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/app;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/app;"))
             << "BearerToken should have path=/app, got: " << cookie;
         found_bearer = true;
       }
       if (cookie.find("OauthExpires=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/app;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/app;"))
             << "OauthExpires should have path=/app, got: " << cookie;
         found_expires = true;
       }
@@ -5909,22 +5944,22 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
          found_expires_delete = false;
     for (const auto& cookie : cookies) {
       if (cookie.find("OauthHMAC=deleted") != std::string::npos) {
-        EXPECT_NE(cookie.find("path=/app"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr("path=/app"))
             << "OauthHMAC deletion should have path=/app, got: " << cookie;
         found_hmac_delete = true;
       }
       if (cookie.find("OauthExpires=deleted") != std::string::npos) {
-        EXPECT_NE(cookie.find("path=/app"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr("path=/app"))
             << "OauthExpires deletion should have path=/app, got: " << cookie;
         found_expires_delete = true;
       }
       if (cookie.find("OauthNonce.00000000075bcd15=deleted") != std::string::npos) {
-        EXPECT_NE(cookie.find("path=/auth/callback"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr("path=/auth/callback"))
             << "OauthNonce deletion should have path=/auth/callback, got: " << cookie;
         found_nonce_delete = true;
       }
       if (cookie.find("CodeVerifier.00000000075bcd15=deleted") != std::string::npos) {
-        EXPECT_NE(cookie.find("path=/auth/callback"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr("path=/auth/callback"))
             << "CodeVerifier deletion should have path=/auth/callback, got: " << cookie;
         found_code_verifier_delete = true;
       }
@@ -6027,12 +6062,7 @@ TEST_F(OAuth2Test, AllowFailedWithInvalidRefreshTokenAsyncFailure) {
 
   // Verify OAuth token and flow cookies were removed
   auto cookies = Http::Utility::parseCookies(request_headers);
-  EXPECT_TRUE(cookies.find("BearerToken") == cookies.end());
-  EXPECT_TRUE(cookies.find("OauthHMAC") == cookies.end());
-  EXPECT_TRUE(cookies.find("OauthExpires") == cookies.end());
-  EXPECT_TRUE(cookies.find("RefreshToken") == cookies.end());
-  EXPECT_TRUE(cookies.find("OauthNonce.00000000075bcd15") == cookies.end());
-  EXPECT_TRUE(cookies.find("CodeVerifier.00000000075bcd15") == cookies.end());
+  EXPECT_THAT(cookies, UnorderedElementsAre());
 
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_refreshtoken_failure").value(), 1);
@@ -6336,8 +6366,7 @@ TEST_F(OAuth2Test, AllowFailedBlockedForCallbackPath) {
   credentials->mutable_hmac_secret()->set_name("hmac");
   MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
   auto secret_reader = std::make_shared<MockSecretReader>();
-  init(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
-                                      scope_, "test."));
+  init(makeFilterConfig(p, secret_reader).value());
 
   // Make a callback request — asyncGetAccessToken is called and returns Idle (async pending).
   Http::TestRequestHeaderMapImpl request_headers{

@@ -50,8 +50,15 @@ public:
       const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
           DownstreamReverseConnectionSocketInterface& config);
 
-  void onServerInitialized(Server::Instance&) override;
+  void onServerInitialized(Server::Instance& server) override;
   void onWorkerThreadInitialized() override;
+
+  /**
+   * @return whether drainParentListeners() has sent the drain-listeners request to the hot-restart
+   * parent (if any). Returns true when there is no parent (fresh start), hot restart is disabled,
+   * or the server is not yet initialized. Safe to call from a worker thread.
+   */
+  bool parentStopAcceptingRequested();
 
   /**
    * @return reference to the stat prefix string.
@@ -152,12 +159,15 @@ public:
    * @param upstream_cluster the name of the upstream cluster
    * @param host_address the address of the remote host
    * @param connection_key the unique key identifying the connection
+   * @param worker_id the initiator worker (dispatcher name) that opened the connection
+   * @param connection_id the initiator's per-connection identifier
    * @param error_message the error message (empty on success)
    */
   void emitAccessLog(TimeSource& time_source, const std::string& event, const std::string& node_id,
                      const std::string& cluster_id, const std::string& tenant_id,
                      const std::string& upstream_cluster, const std::string& host_address,
-                     const std::string& connection_key, const std::string& error_message);
+                     const std::string& connection_key, const std::string& worker_id,
+                     const std::string& connection_id, const std::string& error_message);
 
   /**
    * Increment handshake stats for reverse tunnel connections (per-worker only).
@@ -182,6 +192,8 @@ public:
 
 private:
   Server::Configuration::ServerFactoryContext& context_;
+  // Captured in onServerInitialized() to reach hotRestart(); not owned. Null until then.
+  Server::Instance* server_{nullptr};
   const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config_;
   ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;

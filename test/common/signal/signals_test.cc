@@ -204,7 +204,9 @@ TEST(SignalsDeathTest, IllegalStackAccessDeathTest) {
 
 TEST(Signals, LegalTest) {
   // Don't do anything wrong.
-  { SignalAction actions; }
+  {
+    SignalAction actions;
+  }
   // Nothing should happen...
 }
 

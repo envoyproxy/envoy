@@ -119,6 +119,9 @@ MockSignalEvent::MockSignalEvent(MockDispatcher* dispatcher) {
 
 MockSignalEvent::~MockSignalEvent() = default;
 
+MockEvwatchObserverManager::MockEvwatchObserverManager() = default;
+MockEvwatchObserverManager::~MockEvwatchObserverManager() = default;
+
 MockFileEvent::MockFileEvent() = default;
 MockFileEvent::~MockFileEvent() = default;
 
