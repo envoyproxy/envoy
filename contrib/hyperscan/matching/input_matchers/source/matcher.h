@@ -12,10 +12,14 @@ namespace Matching {
 namespace InputMatchers {
 namespace Hyperscan {
 
+using DatabaseSharedPtr = std::shared_ptr<hs_database_t>;
+
 struct ScratchThreadLocal : public ThreadLocal::ThreadLocalObject {
-  ScratchThreadLocal(const hs_database_t* database, const hs_database_t* start_of_match_database);
+  ScratchThreadLocal(DatabaseSharedPtr database, DatabaseSharedPtr start_of_match_database);
   ~ScratchThreadLocal() override;
 
+  DatabaseSharedPtr database_;
+  DatabaseSharedPtr start_of_match_database_;
   hs_scratch_t* scratch_{};
 };
 
@@ -48,15 +52,15 @@ public:
   const std::string& pattern() const override { return EMPTY_STRING; }
 
 private:
-  hs_database_t* database_{};
-  hs_database_t* start_of_match_database_{};
+  DatabaseSharedPtr database_;
+  DatabaseSharedPtr start_of_match_database_;
   Event::Dispatcher& main_thread_dispatcher_;
   ThreadLocal::TypedSlotPtr<ScratchThreadLocal> tls_;
 
   // Compiles the Hyperscan database. It will throw on failure of insufficient memory or malformed
   // regex patterns and flags. Vector parameters should have the same size.
   void compile(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
-               const std::vector<unsigned int>& ids, hs_database_t** database);
+               const std::vector<unsigned int>& ids, DatabaseSharedPtr& database);
 
   hs_scratch_t* getScratch(ScratchThreadLocalPtr& local_scratch) const;
 };

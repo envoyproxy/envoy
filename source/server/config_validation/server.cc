@@ -59,7 +59,7 @@ ValidationInstance::ValidationInstance(
       stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
                                    random_generator_, bootstrap_, process_context)),
-      dispatcher_(api_->allocateDispatcher("main_thread")),
+      dispatcher_(api_->allocateDispatcher("main_thread")), thread_local_(*dispatcher_),
       access_log_manager_(options.fileFlushIntervalMsec(), options.fileFlushMinSizeKB(), *api_,
                           *dispatcher_, access_log_lock, store),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
@@ -130,7 +130,6 @@ void ValidationInstance::initialize(const Options& options,
   AdminFactoryContext factory_context(*this, std::make_shared<ListenerInfoImpl>());
   initial_config.initAdminAccessLog(bootstrap_, factory_context);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
-  thread_local_.registerThread(*dispatcher_, true);
 
   // Create bootstrap extensions to validate their configs and register any providers
   // or singletons needed by downstream config elements.

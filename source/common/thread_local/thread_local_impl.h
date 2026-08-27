@@ -19,12 +19,12 @@ namespace ThreadLocal {
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
-  InstanceImpl();
+  explicit InstanceImpl(Event::Dispatcher& main_dispatcher);
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
   SlotSharedPtr allocateSlot() override;
-  void registerThread(Event::Dispatcher& dispatcher, bool main_thread) override;
+  void registerThread(Event::Dispatcher& dispatcher) override;
   void shutdownGlobalThreading() override;
   void shutdownThread() override;
   Event::Dispatcher& dispatcher() override;
@@ -73,7 +73,7 @@ private:
   // A collection of indices of freed slots.
   std::vector<uint32_t> free_slot_indexes_;
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
-  Event::Dispatcher* main_thread_dispatcher_{};
+  Event::Dispatcher& main_thread_dispatcher_;
   std::atomic<bool> shutdown_{false};
 
   // Test only.

@@ -28,24 +28,24 @@ public:
   }
 
   void TearDown() override {
-    if (!thread_is_shutdown_) {
-      instance_.shutdownGlobalThreading();
-      instance_.shutdownThread();
+    if (!thread_is_shutdown_ && instance_ != nullptr) {
+      instance_->shutdownGlobalThreading();
+      instance_->shutdownThread();
     }
   }
 
   void initialize(bool create_second_thread = false) {
     api_ = Api::createApiForTest(time_system_);
     dispatcher_ = api_->allocateDispatcher("test_thread");
-    instance_.registerThread(*dispatcher_, true);
+    instance_ = std::make_unique<ThreadLocal::InstanceImpl>(*dispatcher_);
 
     if (create_second_thread) {
       second_dispatcher_ = api_->allocateDispatcher("test_second_thread");
-      instance_.registerThread(*second_dispatcher_, false);
+      instance_->registerThread(*second_dispatcher_);
     }
 
     io_uring_worker_factory_ = std::make_unique<Io::IoUringWorkerFactoryImpl>(
-        10, false, false, 8192, 1000, 131072, 16384, instance_);
+        10, false, false, 8192, 1000, 131072, 16384, *instance_);
     io_uring_worker_factory_->onWorkerThreadInitialized();
 
     // Create the thread after the io_uring worker has been initialized, otherwise the dispatcher
@@ -136,7 +136,7 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Event::GlobalTimeSystem time_system_;
-  ThreadLocal::InstanceImpl instance_;
+  ThreadLocal::InstanceImplPtr instance_;
   std::unique_ptr<Io::IoUringWorkerFactory> io_uring_worker_factory_;
   os_fd_t fd_;
   IoHandlePtr io_uring_socket_handle_;
@@ -916,8 +916,8 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, IoUringWorkerEarlyRelease) {
   createClientConnection();
 
   thread_is_shutdown_ = true;
-  instance_.shutdownGlobalThreading();
-  instance_.shutdownThread();
+  instance_->shutdownGlobalThreading();
+  instance_->shutdownThread();
 }
 
 TEST_F(IoUringSocketHandleImplIntegrationTest, MigrateServerSocketBetweenThreads) {

@@ -975,10 +975,10 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogErrorFieldAlwaysPresent
 // ThreadLocal::InstanceImpl and a real worker OS thread because ThreadLocal storage is
 // per-OS-thread, so the value must be read on the worker itself.
 TEST(ReverseTunnelInitiatorExtensionFileContentTest, FileContentResolvesOnWorkerThread) {
-  ThreadLocal::InstanceImpl tls;
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr main_dispatcher = api->allocateDispatcher("test_main_thread");
   Event::DispatcherPtr worker_dispatcher = api->allocateDispatcher("test_worker_thread");
+  ThreadLocal::InstanceImpl tls(*main_dispatcher);
 
   Stats::IsolatedStoreImpl stats_store;
   Stats::ScopeSharedPtr scope = stats_store.createScope("test.");
@@ -995,8 +995,6 @@ TEST(ReverseTunnelInitiatorExtensionFileContentTest, FileContentResolvesOnWorker
   const std::string token_path =
       TestEnvironment::writeStringToFileForTest("reverse_tunnel_token.jwt", token);
 
-  // Register the main thread first (as the server does before creating bootstrap extensions).
-  tls.registerThread(*main_dispatcher, true);
   main_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 
   envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
@@ -1016,7 +1014,7 @@ TEST(ReverseTunnelInitiatorExtensionFileContentTest, FileContentResolvesOnWorker
 
   // Register the worker thread after construction, as the ListenerManager does (workers register
   // after the bootstrap extensions are created).
-  tls.registerThread(*worker_dispatcher, false);
+  tls.registerThread(*worker_dispatcher);
 
   // Build the handshake formatters now that the worker is registered. This creates the
   // file_content provider's ThreadLocal slot and propagates its content to the worker thread.

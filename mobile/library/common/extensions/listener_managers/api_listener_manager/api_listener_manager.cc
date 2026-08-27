@@ -26,7 +26,7 @@ namespace Server {
 ApiListenerWorker::ApiListenerWorker(Instance& server)
     : server_(server), dispatcher_(server.api().allocateDispatcher("api_listener_worker")),
       provisional_dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
-  server_.threadLocal().registerThread(*dispatcher_, false);
+  server_.threadLocal().registerThread(*dispatcher_);
   provisional_dispatcher_->drain(*dispatcher_);
 }
 

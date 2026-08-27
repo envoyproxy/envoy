@@ -27,7 +27,8 @@ TEST(MainThreadVerificationTest, All) {
   EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
 #endif
   {
-    InstanceImpl tls;
+    Event::MockDispatcher main_dispatcher;
+    InstanceImpl tls(main_dispatcher);
     // Tls instance has been initialized.
     // Call to main thread verification should succeed in main thread.
     EXPECT_TRUE(Thread::MainThread::isMainThread());
@@ -55,14 +56,11 @@ public:
 
 class ThreadLocalInstanceImplTest : public testing::Test {
 public:
-  ThreadLocalInstanceImplTest() {
+  ThreadLocalInstanceImplTest() : tls_(main_dispatcher_) {
     EXPECT_CALL(main_dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
 
-    EXPECT_CALL(thread_dispatcher_, post(_));
-    tls_.registerThread(thread_dispatcher_, false);
-    // Register the main thread after the worker thread to ensure that the
-    // thread_local_data_.dispatcher_ of current test thread is set to the main thread dispatcher.
-    tls_.registerThread(main_dispatcher_, true);
+    EXPECT_CALL(thread_dispatcher_, post(_)).WillOnce(Return());
+    tls_.registerThread(thread_dispatcher_);
     EXPECT_EQ(&main_dispatcher_, &tls_.dispatcher());
   }
 
@@ -81,10 +79,9 @@ public:
     return object_ref;
   }
   int freeSlotIndexesListSize() { return tls_.free_slot_indexes_.size(); }
-  InstanceImpl tls_;
-
   NiceMock<Event::MockDispatcher> main_dispatcher_{"test_main_thread"};
   NiceMock<Event::MockDispatcher> thread_dispatcher_{"test_worker_thread"};
+  InstanceImpl tls_;
 };
 
 TEST_F(ThreadLocalInstanceImplTest, All) {
@@ -300,14 +297,12 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 
 // Validate ThreadLocal::InstanceImpl's dispatcher() behavior.
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
-  InstanceImpl tls;
-
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr main_dispatcher(api->allocateDispatcher("test_main_thread"));
   Event::DispatcherPtr thread_dispatcher(api->allocateDispatcher("test_worker_thread"));
 
-  tls.registerThread(*main_dispatcher, true);
-  tls.registerThread(*thread_dispatcher, false);
+  InstanceImpl tls(*main_dispatcher);
+  tls.registerThread(*thread_dispatcher);
 
   // Ensure that the dispatcher update in tls posted during the above registerThread happens.
   main_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
@@ -352,14 +347,12 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
 }
 
 TEST(ThreadLocalInstanceImplDispatcherTest, DestroySlotOnWorker) {
-  InstanceImpl tls;
-
   Api::ApiPtr api = Api::createApiForTest();
   Event::MockDispatcher main_dispatcher{"test_main_thread"};
   Event::DispatcherPtr thread_dispatcher(api->allocateDispatcher("test_worker_thread"));
 
-  tls.registerThread(main_dispatcher, true);
-  tls.registerThread(*thread_dispatcher, false);
+  InstanceImpl tls(main_dispatcher);
+  tls.registerThread(*thread_dispatcher);
 
   // Verify we have the expected dispatcher for the main thread.
   EXPECT_EQ(&main_dispatcher, &tls.dispatcher());

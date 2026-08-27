@@ -175,13 +175,11 @@ private:
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;
-  ThreadLocal::InstanceImpl thread_local_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
-  // ssl_context_manager_ must come before dispatcher_, since ClusterInfo
-  // references SslSocketFactory and is deleted on the main thread via the dispatcher.
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Event::DispatcherPtr dispatcher_;
+  ThreadLocal::InstanceImpl thread_local_;
   std::unique_ptr<Server::ValidationAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_;
   std::unique_ptr<Runtime::Loader> runtime_;

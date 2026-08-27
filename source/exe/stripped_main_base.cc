@@ -65,7 +65,6 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options,
   case Server::Mode::InitOnly:
   case Server::Mode::Serve:
     configureHotRestarter(random_generator);
-    tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
     break;
   case Server::Mode::Validate:
@@ -85,7 +84,7 @@ void StrippedMainBase::init(Event::TimeSystem& time_system, ListenerHooks& liste
 
     server_ = create_instance(*init_manager_, options_, time_system, listener_hooks, *restarter_,
                               *stats_store_, restarter_->accessLogLock(), component_factory_,
-                              std::move(random_generator), *tls_, platform_impl_->threadFactory(),
+                              std::move(random_generator), platform_impl_->threadFactory(),
                               platform_impl_->fileSystem(), std::move(process_context), nullptr);
     break;
   }

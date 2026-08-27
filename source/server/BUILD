@@ -443,6 +443,7 @@ envoy_cc_library(
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:tag_producer_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//source/common/tls:context_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/version:version_lib",

@@ -191,7 +191,7 @@ class ThreadSafeTest : public testing::Test {
 public:
   ThreadSafeTest()
       : api_(Api::createApiForTest()), main_dispatcher_(api_->allocateDispatcher("main")),
-        worker_dispatcher_(api_->allocateDispatcher("worker")) {}
+        worker_dispatcher_(api_->allocateDispatcher("worker")), tls_(*main_dispatcher_) {}
 
   // Use real dispatchers to verify that callback functions can be executed correctly.
   Api::ApiPtr api_;
@@ -210,9 +210,8 @@ TEST_F(ThreadSafeTest, StateDestructedBeforeWorkerRun) {
     end
   )EOF"};
 
-  tls_.registerThread(*main_dispatcher_, true);
   EXPECT_EQ(main_dispatcher_.get(), &tls_.dispatcher());
-  tls_.registerThread(*worker_dispatcher_, false);
+  tls_.registerThread(*worker_dispatcher_);
 
   // Some callback functions waiting to be executed will be added to the dispatcher of the Worker
   // thread. The callback functions in the main thread will be executed directly.

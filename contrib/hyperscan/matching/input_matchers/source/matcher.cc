@@ -8,14 +8,15 @@ namespace Hyperscan {
 
 using ::Envoy::Matcher::MatchResult;
 
-ScratchThreadLocal::ScratchThreadLocal(const hs_database_t* database,
-                                       const hs_database_t* start_of_match_database) {
-  hs_error_t err = hs_alloc_scratch(database, &scratch_);
+ScratchThreadLocal::ScratchThreadLocal(DatabaseSharedPtr database,
+                                       DatabaseSharedPtr start_of_match_database)
+    : database_(std::move(database)), start_of_match_database_(std::move(start_of_match_database)) {
+  hs_error_t err = hs_alloc_scratch(database_.get(), &scratch_);
   if (err != HS_SUCCESS) {
     IS_ENVOY_BUG(fmt::format("unable to allocate scratch space, error code {}.", err));
   }
-  if (start_of_match_database) {
-    err = hs_alloc_scratch(start_of_match_database, &scratch_);
+  if (start_of_match_database_) {
+    err = hs_alloc_scratch(start_of_match_database_.get(), &scratch_);
     if (err != HS_SUCCESS) {
       IS_ENVOY_BUG(
           fmt::format("unable to allocate start of match scratch space, error code {}.", err));
@@ -44,7 +45,7 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
   ASSERT(expressions.size() == ids.size());
 
   // Compile database.
-  compile(expressions, flags, ids, &database_);
+  compile(expressions, flags, ids, database_);
 
   // Compile start of match database which will report start of matching, works for replaceAll.
   if (report_start_of_matching) {
@@ -52,25 +53,23 @@ Matcher::Matcher(const std::vector<const char*>& expressions,
     for (unsigned int& start_of_match_flag : start_of_match_flags) {
       start_of_match_flag = start_of_match_flag | HS_FLAG_SOM_LEFTMOST;
     }
-    compile(expressions, start_of_match_flags, ids, &start_of_match_database_);
+    compile(expressions, start_of_match_flags, ids, start_of_match_database_);
   }
 
-  tls_->set([this](Event::Dispatcher&) {
-    return std::make_shared<ScratchThreadLocal>(database_, start_of_match_database_);
+  tls_->set([database = database_,
+             start_of_match_database = start_of_match_database_](Event::Dispatcher&) {
+    return std::make_shared<ScratchThreadLocal>(database, start_of_match_database);
   });
 }
 
-Matcher::~Matcher() {
-  hs_free_database(database_);
-  hs_free_database(start_of_match_database_);
-}
+Matcher::~Matcher() = default;
 
 bool Matcher::match(absl::string_view value) const {
   bool matched = false;
   ScratchThreadLocalPtr local_scratch;
   hs_scratch_t* scratch = getScratch(local_scratch);
   hs_error_t err = hs_scan(
-      database_, value.data(), value.size(), 0, scratch,
+      database_.get(), value.data(), value.size(), 0, scratch,
       [](unsigned int, unsigned long long, unsigned long long, unsigned int, void* context) -> int {
         bool* matched = static_cast<bool*>(context);
         *matched = true;
@@ -92,7 +91,7 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
   ScratchThreadLocalPtr local_scratch;
   hs_scratch_t* scratch = getScratch(local_scratch);
   hs_error_t err = hs_scan(
-      start_of_match_database_, value.data(), value.size(), 0, scratch,
+      start_of_match_database_.get(), value.data(), value.size(), 0, scratch,
       [](unsigned int, unsigned long long from, unsigned long long to, unsigned int,
          void* context) -> int {
         std::vector<Bound>* bounds = static_cast<std::vector<Bound>*>(context);
@@ -140,11 +139,11 @@ MatchResult Matcher::match(const ::Envoy::Matcher::DataInputGetResult& input) {
 
 void Matcher::compile(const std::vector<const char*>& expressions,
                       const std::vector<unsigned int>& flags, const std::vector<unsigned int>& ids,
-                      hs_database_t** database) {
+                      DatabaseSharedPtr& database) {
+  hs_database_t* db = nullptr;
   hs_compile_error_t* compile_err;
-  hs_error_t err =
-      hs_compile_multi(expressions.data(), flags.data(), ids.data(), expressions.size(),
-                       HS_MODE_BLOCK, nullptr, database, &compile_err);
+  hs_error_t err = hs_compile_multi(expressions.data(), flags.data(), ids.data(),
+                                    expressions.size(), HS_MODE_BLOCK, nullptr, &db, &compile_err);
   if (err != HS_SUCCESS) {
     std::string compile_err_message(compile_err->message);
     int compile_err_expression = compile_err->expression;
@@ -159,6 +158,7 @@ void Matcher::compile(const std::vector<const char*>& expressions,
     }
   }
   hs_free_compile_error(compile_err);
+  database = DatabaseSharedPtr(db, [](hs_database_t* p) { hs_free_database(p); });
 }
 
 hs_scratch_t* Matcher::getScratch(ScratchThreadLocalPtr& local_scratch) const {
@@ -168,11 +168,12 @@ hs_scratch_t* Matcher::getScratch(ScratchThreadLocalPtr& local_scratch) const {
   // before workers while there is chance to use these matchers in working threads. As a result,
   // we have to ask main thread to allocate thread local object again.
   if (!tls_->get().has_value()) {
-    main_thread_dispatcher_.post([this]() {
-      tls_->set([this](Event::Dispatcher&) {
-        return std::make_shared<ScratchThreadLocal>(database_, start_of_match_database_);
-      });
-    });
+    main_thread_dispatcher_.post(
+        [this, database = database_, start_of_match_database = start_of_match_database_]() {
+          tls_->set([database, start_of_match_database](Event::Dispatcher&) {
+            return std::make_shared<ScratchThreadLocal>(database, start_of_match_database);
+          });
+        });
 
     local_scratch = std::make_unique<ScratchThreadLocal>(database_, start_of_match_database_);
     return local_scratch->scratch_;

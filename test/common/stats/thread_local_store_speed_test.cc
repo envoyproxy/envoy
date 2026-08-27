@@ -60,8 +60,7 @@ public:
       Envoy::Event::Libevent::Global::initialize();
     }
     dispatcher_ = api_->allocateDispatcher("test_thread");
-    tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
-    tls_->registerThread(*dispatcher_, true);
+    tls_ = std::make_unique<ThreadLocal::InstanceImpl>(*dispatcher_);
     store_.initializeThreading(*dispatcher_, *tls_);
   }
 

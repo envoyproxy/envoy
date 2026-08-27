@@ -24,10 +24,12 @@ using ::Envoy::Matcher::DataInputGetResult;
 TEST(ThreadLocalTest, RaceScratchCreation) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
 
-  hs_database_t* database;
+  DatabaseSharedPtr database;
+  hs_database_t* db = nullptr;
   hs_compile_error_t* compile_err;
-  hs_error_t err = hs_compile("hello", 0, HS_MODE_BLOCK, nullptr, &database, &compile_err);
+  hs_error_t err = hs_compile("hello", 0, HS_MODE_BLOCK, nullptr, &db, &compile_err);
   ASSERT(err == HS_SUCCESS);
+  database = DatabaseSharedPtr(db, [](hs_database_t* p) { hs_free_database(p); });
 
   constexpr int num_threads = 100;
   std::vector<Thread::ThreadPtr> threads;
@@ -83,8 +85,6 @@ TEST(BoundTest, Compare) {
 
 class MatcherTest : public ::testing::Test {
 protected:
-  MatcherTest() { instance_.registerThread(dispatcher_, true); }
-
   void setup(const char* expression, unsigned int flag, bool report_start_of_matching) {
     std::vector<const char*> expressions{expression};
     std::vector<unsigned int> flags{flag};
@@ -99,7 +99,7 @@ protected:
   }
 
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
-  ThreadLocal::InstanceImpl instance_;
+  ThreadLocal::InstanceImpl instance_{dispatcher_};
   std::unique_ptr<Matcher> matcher_;
 };
 

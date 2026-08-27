@@ -215,14 +215,12 @@ template <class T = ThreadLocalObject> using TypedSlotPtr = std::unique_ptr<Type
 class Instance : public SlotAllocator {
 public:
   /**
-   * A thread (via its dispatcher) must be registered before set() is called on any allocated slots
-   * to receive thread local data updates.
+   * A worker thread (via its dispatcher) must be registered before set() is called on any allocated
+   * slots to receive thread local data updates. The main thread dispatcher is registered
+   * automatically during Instance construction.
    * @param dispatcher supplies the thread's dispatcher.
-   * @param main_thread supplies whether this is the main program thread or not. (The only
-   *                    difference is that callbacks fire immediately on the main thread when posted
-   *                    from the main thread).
    */
-  virtual void registerThread(Event::Dispatcher& dispatcher, bool main_thread) PURE;
+  virtual void registerThread(Event::Dispatcher& dispatcher) PURE;
 
   /**
    * This should be called by the main thread before any worker threads start to exit. This will

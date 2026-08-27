@@ -137,7 +137,6 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   Stats::TestIsolatedStoreImpl stats_store;
   Thread::MutexBasicLockable fakelock;
   TestComponentFactory component_factory;
-  ThreadLocal::InstanceImpl thread_local_instance;
   DangerousDeprecatedTestTime test_time;
   Fuzz::PerTestEnvironment test_env;
   Init::ManagerImpl init_manager{"Server"};
@@ -154,8 +153,8 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   try {
     server = std::make_unique<InstanceImpl>(
         init_manager, options, test_time.timeSystem(), hooks, restart, stats_store, fakelock,
-        std::make_unique<Random::RandomGeneratorImpl>(), thread_local_instance,
-        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+        std::make_unique<Random::RandomGeneratorImpl>(), Thread::threadFactoryForTest(),
+        Filesystem::fileSystemForTest(), nullptr);
     server->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                        component_factory);
   } catch (const EnvoyException& ex) {

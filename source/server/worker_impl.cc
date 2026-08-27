@@ -54,7 +54,7 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
       api_(api), reset_streams_counter_(
                      api_.rootScope().counterFromStatName(stat_names.reset_high_memory_stream_)) {
-  tls_.registerThread(*dispatcher_, false);
+  tls_.registerThread(*dispatcher_);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
       [this](OverloadActionState state) { stopAcceptingConnectionsCb(state); });

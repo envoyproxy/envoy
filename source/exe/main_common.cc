@@ -32,22 +32,21 @@
 namespace Envoy {
 
 StrippedMainBase::CreateInstanceFunction createFunction() {
-  return
-      [](Init::Manager& init_manager, const Server::Options& options,
-         Event::TimeSystem& time_system, ListenerHooks& hooks, Server::HotRestart& restarter,
-         Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
-         Server::ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
-         ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-         Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
-         Buffer::WatermarkFactorySharedPtr watermark_factory) {
-        auto local_address = Network::Utility::getLocalAddress(options.localAddressIpVersion());
-        auto server = std::make_unique<Server::InstanceImpl>(
-            init_manager, options, time_system, hooks, restarter, store, access_log_lock,
-            std::move(random_generator), tls, thread_factory, file_system,
-            std::move(process_context), watermark_factory);
-        server->initialize(local_address, component_factory);
-        return server;
-      };
+  return [](Init::Manager& init_manager, const Server::Options& options,
+            Event::TimeSystem& time_system, ListenerHooks& hooks, Server::HotRestart& restarter,
+            Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
+            Server::ComponentFactory& component_factory,
+            Random::RandomGeneratorPtr&& random_generator, Thread::ThreadFactory& thread_factory,
+            Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
+            Buffer::WatermarkFactorySharedPtr watermark_factory) {
+    auto local_address = Network::Utility::getLocalAddress(options.localAddressIpVersion());
+    auto server = std::make_unique<Server::InstanceImpl>(
+        init_manager, options, time_system, hooks, restarter, store, access_log_lock,
+        std::move(random_generator), thread_factory, file_system, std::move(process_context),
+        watermark_factory);
+    server->initialize(local_address, component_factory);
+    return server;
+  };
 }
 
 MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,

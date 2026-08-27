@@ -81,8 +81,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
                            HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
                            Random::RandomGeneratorPtr&& random_generator,
-                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-                           Filesystem::Instance& file_system,
+                           Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
                            std::unique_ptr<ProcessContext> process_context,
                            Buffer::WatermarkFactorySharedPtr watermark_factory)
     : init_manager_(init_manager), live_(false), options_(options),
@@ -90,13 +89,13 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
                           !options.rejectUnknownDynamicFields(),
                           options.ignoreUnknownDynamicFields(), options.skipDeprecatedLogs()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
-      original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
+      original_start_time_(start_time_), stats_store_(store),
       random_generator_(std::move(random_generator)),
       api_(new Api::Impl(
           thread_factory, store, time_system, file_system, *random_generator_, bootstrap_,
           process_context ? ProcessContextOptRef(std::ref(*process_context)) : std::nullopt,
           watermark_factory)),
-      dispatcher_(api_->allocateDispatcher("main_thread")),
+      dispatcher_(api_->allocateDispatcher("main_thread")), thread_local_(*dispatcher_),
       access_log_manager_(options.fileFlushIntervalMsec(), options.fileFlushMinSizeKB(), *api_,
                           *dispatcher_, access_log_lock, store),
       handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
@@ -469,12 +468,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
     ENVOY_LOG(info, "  {}: {}", ext.first, absl::StrJoin(ext.second->registeredNames(), ", "));
   }
-
-  // The main thread is registered for thread local updates so that code that does not care
-  // whether it runs on the main thread or on workers can still use TLS.
-  // We do this as early as possible because this has no side effect and could ensure that the
-  // TLS always contains a valid main thread dispatcher when TLS is used.
-  thread_local_.registerThread(*dispatcher_, true);
 
   // Handle configuration that needs to take place prior to the main configuration load.
   RETURN_IF_NOT_OK(InstanceUtil::loadBootstrapConfig(

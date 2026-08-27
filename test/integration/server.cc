@@ -253,16 +253,16 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Random::RandomGeneratorPtr&& random_generator, ProcessObjectOptRef process_object,
     Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_admin_server) {
   {
+    Thread::MainThread main_thread;
     Init::ManagerImpl init_manager{"Server"};
     Server::HotRestartNopImpl restarter;
-    ThreadLocal::InstanceImpl tls;
     Stats::ThreadLocalStoreImpl stat_store(*stats_allocator_);
     std::unique_ptr<ProcessContext> process_context;
     if (process_object.has_value()) {
       process_context = std::make_unique<ProcessContextImpl>(process_object->get());
     }
     Server::InstanceImpl server(init_manager, options, time_system, hooks, restarter, stat_store,
-                                access_log_lock, std::move(random_generator), tls,
+                                access_log_lock, std::move(random_generator),
                                 Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
                                 std::move(process_context), watermark_factory);
     server.initialize(local_address, component_factory);

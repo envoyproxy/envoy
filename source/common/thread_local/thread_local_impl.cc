@@ -16,7 +16,10 @@ namespace ThreadLocal {
 
 thread_local InstanceImpl::ThreadLocalData InstanceImpl::thread_local_data_;
 
-InstanceImpl::InstanceImpl() = default;
+InstanceImpl::InstanceImpl(Event::Dispatcher& main_dispatcher)
+    : main_thread_dispatcher_(main_dispatcher) {
+  thread_local_data_.dispatcher_ = &main_dispatcher;
+}
 
 InstanceImpl::~InstanceImpl() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
@@ -52,10 +55,7 @@ InstanceImpl::SlotImpl::~SlotImpl() {
     return;
   }
 
-  auto* main_thread_dispatcher = parent_.main_thread_dispatcher_;
-  // Main thread dispatcher may be nullptr if the slot is being created and destroyed during
-  // server initialization.
-  if (main_thread_dispatcher == nullptr || main_thread_dispatcher->isThreadSafe()) {
+  if (parent_.main_thread_dispatcher_.isThreadSafe()) {
     // If the slot is being destroyed on the main thread, we can remove it immediately.
     parent_.removeSlot(index_);
   } else {
@@ -67,7 +67,7 @@ InstanceImpl::SlotImpl::~SlotImpl() {
     // 2. The removal is not executed if the main dispatcher has already exited. This is fine
     //    because the removal has no side effect and will be ignored. The shutdown process will
     //    clean up all the slots anyway.
-    main_thread_dispatcher->post([i = index_, &tls = parent_] { tls.removeSlot(i); });
+    parent_.main_thread_dispatcher_.post([i = index_, &tls = parent_] { tls.removeSlot(i); });
   }
 }
 
@@ -121,23 +121,16 @@ void InstanceImpl::SlotImpl::set(InitializeCb cb) {
   }
 
   // Handle main thread.
-  ASSERT(parent_.main_thread_dispatcher_ != nullptr,
-         "main thread dispatcher must be registered before initializing thread local slots");
-  setThreadLocal(index_, cb(*parent_.main_thread_dispatcher_));
+  setThreadLocal(index_, cb(parent_.main_thread_dispatcher_));
 }
 
-void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_thread) {
+void InstanceImpl::registerThread(Event::Dispatcher& dispatcher) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(!shutdown_);
 
-  if (main_thread) {
-    main_thread_dispatcher_ = &dispatcher;
-    thread_local_data_.dispatcher_ = &dispatcher;
-  } else {
-    ASSERT(!containsReference(registered_threads_, dispatcher));
-    registered_threads_.push_back(dispatcher);
-    dispatcher.post([&dispatcher] { thread_local_data_.dispatcher_ = &dispatcher; });
-  }
+  ASSERT(!containsReference(registered_threads_, dispatcher));
+  registered_threads_.push_back(dispatcher);
+  dispatcher.post([&dispatcher] { thread_local_data_.dispatcher_ = &dispatcher; });
 }
 
 void InstanceImpl::removeSlot(uint32_t slot) {
@@ -190,7 +183,7 @@ void InstanceImpl::runOnAllThreads(std::function<void()> cb,
 
   std::shared_ptr<std::function<void()>> cb_guard(
       new std::function<void()>(cb), [this, all_threads_complete_cb](std::function<void()>* cb) {
-        main_thread_dispatcher_->post(all_threads_complete_cb);
+        main_thread_dispatcher_.post(all_threads_complete_cb);
         delete cb;
       });
 

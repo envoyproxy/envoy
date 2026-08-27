@@ -292,7 +292,6 @@ protected:
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
-    thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
     if (process_object_ != nullptr) {
       process_context_ = std::make_unique<ProcessContextImpl>(*process_object_);
     }
@@ -301,9 +300,8 @@ protected:
 
     server_ = std::make_unique<InstanceImpl>(
         *init_manager_, options_, time_system_, hooks, restart_, stats_store_, fakelock_,
-        std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
-        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
-        std::move(process_context_));
+        std::make_unique<NiceMock<Random::MockRandomGenerator>>(), Thread::threadFactoryForTest(),
+        Filesystem::fileSystemForTest(), std::move(process_context_));
     server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                         component_factory_);
     EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
@@ -316,12 +314,11 @@ protected:
         {{"health_check_timeout", fmt::format("{}", timeout).c_str()},
          {"health_check_interval", fmt::format("{}", interval).c_str()}},
         TestEnvironment::PortMap{}, version_);
-    thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
     init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
     server_ = std::make_unique<InstanceImpl>(
         *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
-        std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
-        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+        std::make_unique<NiceMock<Random::MockRandomGenerator>>(), Thread::threadFactoryForTest(),
+        Filesystem::fileSystemForTest(), nullptr);
     server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                         component_factory_);
 
@@ -346,7 +343,6 @@ protected:
       startup_handle = nullptr;
       post_init_handle = nullptr;
       server_ = nullptr;
-      thread_local_ = nullptr;
     });
 
     started.WaitForNotification();
@@ -370,7 +366,6 @@ protected:
   testing::NiceMock<MockOptions> options_;
   DefaultListenerHooks hooks_;
   testing::NiceMock<MockHotRestart> restart_;
-  ThreadLocal::InstanceImplPtr thread_local_;
   Stats::TestIsolatedStoreImpl stats_store_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;
@@ -547,12 +542,11 @@ TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
 
   options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
       "test/server/test_data/server/empty_bootstrap.yaml", {}, version_);
-  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
   server_ = std::make_unique<InstanceImpl>(
       *init_manager_, options_, time_system_, hooks_, restart_, *real_store, fakelock_,
-      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
-      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), Thread::threadFactoryForTest(),
+      Filesystem::fileSystemForTest(), nullptr);
   server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                       component_factory_);
   EXPECT_TRUE(real_store->useExplicitTags());
@@ -561,7 +555,6 @@ TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
   // and restore the process-global runtime flag so it does not leak into other tests.
   server_.reset();
   real_store.reset();
-  thread_local_.reset();
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", false);
 }
 
@@ -574,19 +567,17 @@ TEST_P(ServerInstanceImplTest, ExplicitTagsDisabledByDefault) {
 
   options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
       "test/server/test_data/server/empty_bootstrap.yaml", {}, version_);
-  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
   server_ = std::make_unique<InstanceImpl>(
       *init_manager_, options_, time_system_, hooks_, restart_, *real_store, fakelock_,
-      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
-      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), Thread::threadFactoryForTest(),
+      Filesystem::fileSystemForTest(), nullptr);
   server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                       component_factory_);
   EXPECT_FALSE(real_store->useExplicitTags());
 
   server_.reset();
   real_store.reset();
-  thread_local_.reset();
 }
 
 // Validates that server stats are flushed even when server is stuck with initialization.
@@ -713,7 +704,6 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
     // handle3 is nulled out in the callback itself, to test that works as well
     handle4 = nullptr;
     server_ = nullptr;
-    thread_local_ = nullptr;
   });
 
   started.WaitForNotification();
@@ -758,7 +748,6 @@ protected:
       initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
       server_->run();
       server_ = nullptr;
-      thread_local_ = nullptr;
     });
 
     workers_started_fired_.WaitForNotification();
@@ -845,7 +834,6 @@ TEST_P(ServerInstanceImplTest, NoLifecycleNotificationOnEarlyShutdown) {
 
     shutdown_handle = nullptr;
     server_ = nullptr;
-    thread_local_ = nullptr;
   });
 
   // Wait until the init manager starts initializing targets...
@@ -875,7 +863,6 @@ TEST_P(ServerInstanceImplTest, ShutdownBeforeWorkersStarted) {
     post_init_handle = nullptr;
     shutdown_handle = nullptr;
     server_ = nullptr;
-    thread_local_ = nullptr;
   });
 
   server_thread->join();
@@ -1054,7 +1041,6 @@ TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
     initialize("test/server/test_data/server/stats_sink_manual_flush_bootstrap.yaml", false, hooks);
     server_->run();
     server_ = nullptr;
-    thread_local_ = nullptr;
   });
 
   workers_started_fired.WaitForNotification();
@@ -1484,12 +1470,11 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 // When there are no bootstrap CLI options, either for content or path, we can load the server with
 // an empty config.
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
-  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
   server_ = std::make_unique<InstanceImpl>(
       *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
-      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
-      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), Thread::threadFactoryForTest(),
+      Filesystem::fileSystemForTest(), nullptr);
   EXPECT_THROW_WITH_MESSAGE(
       server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                           component_factory_),
@@ -1499,12 +1484,11 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
 }
 
 TEST_P(ServerInstanceImplTest, ServerContextSingleton) {
-  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
   server_ = std::make_unique<InstanceImpl>(
       *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
-      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
-      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), Thread::threadFactoryForTest(),
+      Filesystem::fileSystemForTest(), nullptr);
 
   EXPECT_EQ(&server_->serverFactoryContext(),
             Configuration::ServerFactoryContextInstance::getExisting());

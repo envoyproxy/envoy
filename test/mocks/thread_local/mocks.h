@@ -22,7 +22,7 @@ public:
 
   // Server::ThreadLocal
   MOCK_METHOD(SlotSharedPtr, allocateSlot, ());
-  MOCK_METHOD(void, registerThread, (Event::Dispatcher & dispatcher, bool main_thread));
+  MOCK_METHOD(void, registerThread, (Event::Dispatcher & dispatcher));
   void shutdownGlobalThreading() override { shutdown_ = true; }
   MOCK_METHOD(void, shutdownThread, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());

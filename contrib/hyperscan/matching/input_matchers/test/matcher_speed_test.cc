@@ -48,7 +48,7 @@ BENCHMARK(BM_CompiledGoogleReMatcher);
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_HyperscanMatcher(benchmark::State& state) {
   Event::MockDispatcher dispatcher;
-  ThreadLocal::InstanceImpl instance;
+  ThreadLocal::InstanceImpl instance(dispatcher);
   auto matcher = Extensions::Matching::InputMatchers::Hyperscan::Matcher(
       {std::string(ClusterRePattern).c_str()}, {0}, {0}, dispatcher, instance, false);
   uint32_t passes = 0;

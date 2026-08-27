@@ -39,9 +39,8 @@ public:
       Init::Manager& init_manager, const Server::Options& options, Event::TimeSystem& time_system,
       ListenerHooks& hooks, Server::HotRestart& restarter, Stats::StoreRoot& store,
       Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
-      Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
-      Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
-      std::unique_ptr<ProcessContext> process_context,
+      Random::RandomGeneratorPtr&& random_generator, Thread::ThreadFactory& thread_factory,
+      Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
       Buffer::WatermarkFactorySharedPtr watermark_factory)>;
 
   static std::string hotRestartVersion(bool hot_restart_enabled);
@@ -80,7 +79,6 @@ protected:
   Stats::SymbolTableImpl symbol_table_;
   Stats::Allocator stats_allocator_;
 
-  ThreadLocal::InstanceImplPtr tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
   Stats::ThreadLocalStoreImplPtr stats_store_;
   // logging_context_ is only used in (some) subclasses, but it must be declared here so that it's

@@ -40,6 +40,7 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/thread_local/thread_local_impl.h"
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
@@ -247,9 +248,8 @@ public:
   InstanceBase(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
                ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock,
-               Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
-               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
-               std::unique_ptr<ProcessContext> process_context,
+               Random::RandomGeneratorPtr&& random_generator, Thread::ThreadFactory& thread_factory,
+               Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
                Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
   // initialize the server. This must be called before run().
@@ -392,10 +392,10 @@ private:
   std::unique_ptr<ServerStats> server_stats_;
   std::unique_ptr<CompilationSettings::ServerCompilationSettingsStats>
       server_compilation_settings_stats_;
+  Thread::MainThread main_thread_;
   Assert::ActionRegistrationPtr assert_action_registration_;
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
   Assert::ActionRegistrationPtr envoy_notification_registration_;
-  ThreadLocal::Instance& thread_local_;
   Random::RandomGeneratorPtr random_generator_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
@@ -403,6 +403,7 @@ private:
   // references SslSocketFactory and is deleted on the main thread via the dispatcher.
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Event::DispatcherPtr dispatcher_;
+  ThreadLocal::InstanceImpl thread_local_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::shared_ptr<Admin> admin_;
   Singleton::ManagerImpl singleton_manager_;

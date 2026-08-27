@@ -21,11 +21,10 @@ RealThreadsTestHelper::RealThreadsTestHelper(uint32_t num_threads)
     }
   }
   runOnMainBlocking([this]() {
-    tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
-    tls_->registerThread(*main_dispatcher_, true);
+    tls_ = std::make_unique<ThreadLocal::InstanceImpl>(*main_dispatcher_);
     for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
       // Worker threads must be registered from the main thread, per assert in registerThread().
-      tls_->registerThread(*dispatcher, false);
+      tls_->registerThread(*dispatcher);
     }
   });
 }
