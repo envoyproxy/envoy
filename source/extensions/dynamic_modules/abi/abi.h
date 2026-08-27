@@ -12032,7 +12032,7 @@ bool envoy_dynamic_module_callback_matcher_get_header_value(
 
 /**
  * envoy_dynamic_module_type_matcher_data_input_config_envoy_ptr is a raw pointer to the
- * DynamicModuleStringDataInput class in Envoy.
+ * DynamicModuleDataInput class in Envoy.
  *
  * OWNERSHIP: Envoy owns the pointer.
  */
@@ -12062,7 +12062,7 @@ typedef void* envoy_dynamic_module_type_matcher_data_input_envoy_ptr;
  * envoy_dynamic_module_on_matcher_data_input_config_new is called when a new matcher data input
  * configuration is created. This is called on the main thread.
  *
- * @param config_envoy_ptr is the pointer to the DynamicModuleStringDataInput object.
+ * @param config_envoy_ptr is the pointer to the DynamicModuleDataInput object.
  * @param name is the data input config name.
  * @param config is the configuration for the data input.
  * @return a pointer to the in-module data input configuration. Returning nullptr indicates a

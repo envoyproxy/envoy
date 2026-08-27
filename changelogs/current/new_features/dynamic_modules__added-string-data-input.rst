@@ -5,5 +5,5 @@ string input, so map matchers such as an exact match map can dispatch on it, whi
 select one of many matches with a single evaluation and without clearing the route cache. The Rust
 SDK exposes this through the ``matcher_data_input`` module and the ``declare_matcher_data_input!``
 macro. See
-:ref:`DynamicModuleStringDataInput <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.DynamicModuleStringDataInput>`
+:ref:`DynamicModuleDataInput <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.DynamicModuleDataInput>`
 for configuration details.

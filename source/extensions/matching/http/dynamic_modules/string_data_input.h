@@ -30,7 +30,7 @@ using DataInputModuleSharedPtr = std::shared_ptr<Extensions::DynamicModules::Dyn
 // Evaluation state passed to the module during a single get. The data input pointer handed to the
 // module points at this struct, and the module reads headers and writes the result through the
 // matcher data input callbacks. Valid only during the get event hook.
-struct StringDataInputContext {
+struct DataInputContext {
   const ::Envoy::Http::RequestHeaderMap* request_headers{};
   const ::Envoy::Http::ResponseHeaderMap* response_headers{};
   const ::Envoy::Http::ResponseTrailerMap* response_trailers{};
@@ -41,11 +41,10 @@ struct StringDataInputContext {
 // Data input that delegates value extraction to a dynamic module. The module returns a string that
 // downstream map matchers dispatch on, so a module can select one of many matches with a single
 // evaluation and without clearing the route cache.
-class DynamicModuleStringDataInput
-    : public ::Envoy::Matcher::DataInput<::Envoy::Http::HttpMatchingData> {
+class DynamicModuleDataInput : public ::Envoy::Matcher::DataInput<::Envoy::Http::HttpMatchingData> {
 public:
-  DynamicModuleStringDataInput(DataInputModuleSharedPtr module, OnDataInputGetType on_get,
-                               std::shared_ptr<const void> in_module_config);
+  DynamicModuleDataInput(DataInputModuleSharedPtr module, OnDataInputGetType on_get,
+                         std::shared_ptr<const void> in_module_config);
 
   // The produced value is a string, so the default "string" data input type is inherited, which
   // lets exact, prefix, domain, and IP range map matchers dispatch on it.
@@ -54,8 +53,8 @@ public:
 
 private:
   // Prevent copy/move.
-  DynamicModuleStringDataInput(const DynamicModuleStringDataInput&) = delete;
-  DynamicModuleStringDataInput& operator=(const DynamicModuleStringDataInput&) = delete;
+  DynamicModuleDataInput(const DynamicModuleDataInput&) = delete;
+  DynamicModuleDataInput& operator=(const DynamicModuleDataInput&) = delete;
 
   DataInputModuleSharedPtr module_;
   OnDataInputGetType on_get_;
@@ -64,9 +63,11 @@ private:
   std::shared_ptr<const void> in_module_config_;
 };
 
-class DynamicModuleStringDataInputFactory
+class DynamicModuleDataInputFactory
     : public ::Envoy::Matcher::DataInputFactory<::Envoy::Http::HttpMatchingData> {
 public:
+  // The registered name keeps "string" because the sibling data input already registers
+  // "envoy.matching.inputs.dynamic_module_data_input".
   std::string name() const override {
     return "envoy.matching.inputs.dynamic_module_string_data_input";
   }
@@ -77,11 +78,11 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::matching::http::dynamic_modules::v3::DynamicModuleStringDataInput>();
+        envoy::extensions::matching::http::dynamic_modules::v3::DynamicModuleDataInput>();
   }
 };
 
-DECLARE_FACTORY(DynamicModuleStringDataInputFactory);
+DECLARE_FACTORY(DynamicModuleDataInputFactory);
 
 } // namespace DynamicModules
 } // namespace Http

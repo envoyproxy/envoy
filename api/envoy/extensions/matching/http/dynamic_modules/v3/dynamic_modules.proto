@@ -28,17 +28,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message HttpDynamicModuleMatchInput {
 }
 
-// [#extension: envoy.matching.inputs.dynamic_module_string_data_input]
-
-// Configuration for the dynamic modules string data input. This input loads a shared object file
-// via ``dlopen`` and invokes it during match evaluation to extract a string value from the HTTP
-// request and response. The extracted value can be dispatched through an exact match map, so a
-// module can select one of many matches with a single evaluation.
+// Configuration for the dynamic modules data input. This input loads a shared object file
+// via ``dlopen`` and invokes it during match evaluation to extract a value from the HTTP
+// request and response. The extracted value is a string that an exact match map can dispatch on,
+// so a module can select one of many matches with a single evaluation.
 //
 // Unlike :ref:`HttpDynamicModuleMatchInput
 // <envoy_v3_api_msg_extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput>`, the
 // module produces the value directly rather than pairing with the dynamic modules input matcher.
-message DynamicModuleStringDataInput {
+// [#extension: envoy.matching.inputs.dynamic_module_string_data_input]
+message DynamicModuleDataInput {
   // Specifies the shared-object level configuration. This field is required. Remote module sources
   // are not supported for data inputs, so the module must be available locally or by name.
   envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1

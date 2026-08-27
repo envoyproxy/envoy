@@ -7,19 +7,19 @@
 
 namespace Envoy {
 
-// Drives the string data input end to end. The module echoes the ``x-route-key`` request header,
+// Drives the data input end to end. The module echoes the ``x-route-key`` request header,
 // and an exact match map dispatches that value to a route, so the module selects the route with a
 // single evaluation and without clearing the route cache.
-class DynamicModuleStringDataInputIntegrationTest
+class DynamicModuleDataInputIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
 public:
-  DynamicModuleStringDataInputIntegrationTest()
+  DynamicModuleDataInputIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
     setUpstreamProtocol(Http::CodecType::HTTP2);
   }
 
-  void initializeWithStringDataInput() {
+  void initializeWithDataInput() {
     std::string shared_object_path =
         Extensions::DynamicModules::testSharedObjectPath("matcher_string_input_echo", "c");
     std::string shared_object_dir =
@@ -40,7 +40,7 @@ matcher:
     input:
       name: envoy.matching.inputs.dynamic_module_string_data_input
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.matching.http.dynamic_modules.v3.DynamicModuleStringDataInput
+        "@type": type.googleapis.com/envoy.extensions.matching.http.dynamic_modules.v3.DynamicModuleDataInput
         dynamic_module_config:
           name: matcher_string_input_echo
           do_not_close: true
@@ -70,13 +70,13 @@ matcher:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleStringDataInputIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleDataInputIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 // The value the module extracts selects a route through the exact match map.
-TEST_P(DynamicModuleStringDataInputIntegrationTest, MatchingRouteKey) {
-  initializeWithStringDataInput();
+TEST_P(DynamicModuleDataInputIntegrationTest, MatchingRouteKey) {
+  initializeWithDataInput();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
@@ -93,8 +93,8 @@ TEST_P(DynamicModuleStringDataInputIntegrationTest, MatchingRouteKey) {
 }
 
 // A value with no entry in the exact match map does not select a route.
-TEST_P(DynamicModuleStringDataInputIntegrationTest, NonMatchingRouteKey) {
-  initializeWithStringDataInput();
+TEST_P(DynamicModuleDataInputIntegrationTest, NonMatchingRouteKey) {
+  initializeWithDataInput();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
@@ -110,8 +110,8 @@ TEST_P(DynamicModuleStringDataInputIntegrationTest, NonMatchingRouteKey) {
 }
 
 // A request that omits the header leaves the input without a value, so no route is selected.
-TEST_P(DynamicModuleStringDataInputIntegrationTest, MissingRouteKey) {
-  initializeWithStringDataInput();
+TEST_P(DynamicModuleDataInputIntegrationTest, MissingRouteKey) {
+  initializeWithDataInput();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 

@@ -25,8 +25,8 @@ namespace {
 
 using ::testing::NiceMock;
 
-using DynamicModuleStringDataInputProto =
-    envoy::extensions::matching::http::dynamic_modules::v3::DynamicModuleStringDataInput;
+using DynamicModuleDataInputProto =
+    envoy::extensions::matching::http::dynamic_modules::v3::DynamicModuleDataInput;
 
 std::shared_ptr<Network::ConnectionInfoSetterImpl> connectionInfoProvider() {
   CONSTRUCT_ON_FIRST_USE(std::shared_ptr<Network::ConnectionInfoSetterImpl>,
@@ -41,9 +41,9 @@ StreamInfo::StreamInfoImpl createStreamInfo() {
       connectionInfoProvider(), StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
-class DynamicModuleStringDataInputTest : public testing::Test {
+class DynamicModuleDataInputTest : public testing::Test {
 public:
-  DynamicModuleStringDataInputTest() {
+  DynamicModuleDataInputTest() {
     const std::string shared_object_path =
         Extensions::DynamicModules::testSharedObjectPath("matcher_string_input_echo", "c");
     const std::string shared_object_dir =
@@ -52,8 +52,8 @@ public:
   }
 
   // Builds a proto that loads the named module and configures it to echo the given request header.
-  DynamicModuleStringDataInputProto protoConfig(absl::string_view module_name,
-                                                absl::string_view header_name) {
+  DynamicModuleDataInputProto protoConfig(absl::string_view module_name,
+                                          absl::string_view header_name) {
     const std::string yaml = fmt::format(R"EOF(
 dynamic_module_config:
   name: {}
@@ -64,7 +64,7 @@ input_config:
   value: {}
 )EOF",
                                          module_name, header_name);
-    DynamicModuleStringDataInputProto proto_config;
+    DynamicModuleDataInputProto proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
     return proto_config;
   }
@@ -85,28 +85,28 @@ input_config:
     };
   }
 
-  DynamicModuleStringDataInputFactory factory_;
+  DynamicModuleDataInputFactory factory_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
-TEST_F(DynamicModuleStringDataInputTest, FactoryName) {
+TEST_F(DynamicModuleDataInputTest, FactoryName) {
   EXPECT_EQ("envoy.matching.inputs.dynamic_module_string_data_input", factory_.name());
 }
 
-TEST_F(DynamicModuleStringDataInputTest, CreateEmptyConfigProto) {
+TEST_F(DynamicModuleDataInputTest, CreateEmptyConfigProto) {
   auto proto = factory_.createEmptyConfigProto();
   ASSERT_NE(nullptr, proto);
-  EXPECT_NE(nullptr, dynamic_cast<DynamicModuleStringDataInputProto*>(proto.get()));
+  EXPECT_NE(nullptr, dynamic_cast<DynamicModuleDataInputProto*>(proto.get()));
 }
 
-TEST_F(DynamicModuleStringDataInputTest, FactoryRegistration) {
+TEST_F(DynamicModuleDataInputTest, FactoryRegistration) {
   auto* factory = Registry::FactoryRegistry<
       ::Envoy::Matcher::DataInputFactory<::Envoy::Http::HttpMatchingData>>::
       getFactory("envoy.matching.inputs.dynamic_module_string_data_input");
   EXPECT_NE(nullptr, factory);
 }
 
-TEST_F(DynamicModuleStringDataInputTest, ValidConfig) {
+TEST_F(DynamicModuleDataInputTest, ValidConfig) {
   auto factory_cb = factory_.createDataInputFactoryCb(
       protoConfig("matcher_string_input_echo", "x-route"), validation_visitor_);
   ASSERT_NE(nullptr, factory_cb);
@@ -117,8 +117,8 @@ TEST_F(DynamicModuleStringDataInputTest, ValidConfig) {
 }
 
 // Load the module via the ``module.local.filename`` data source instead of by name.
-TEST_F(DynamicModuleStringDataInputTest, ValidConfigWithLocalFile) {
-  DynamicModuleStringDataInputProto proto_config;
+TEST_F(DynamicModuleDataInputTest, ValidConfigWithLocalFile) {
+  DynamicModuleDataInputProto proto_config;
   proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
       Extensions::DynamicModules::testSharedObjectPath("matcher_string_input_echo", "c"));
   proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
@@ -130,8 +130,8 @@ TEST_F(DynamicModuleStringDataInputTest, ValidConfigWithLocalFile) {
 }
 
 // Remote module sources are not supported for data inputs, which have no factory context.
-TEST_F(DynamicModuleStringDataInputTest, RemoteSourceRejected) {
-  DynamicModuleStringDataInputProto proto_config;
+TEST_F(DynamicModuleDataInputTest, RemoteSourceRejected) {
+  DynamicModuleDataInputProto proto_config;
   auto* remote = proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_remote();
   remote->mutable_http_uri()->set_uri("https://example.com/module.so");
   remote->mutable_http_uri()->set_cluster("cluster_1");
@@ -143,38 +143,38 @@ TEST_F(DynamicModuleStringDataInputTest, RemoteSourceRejected) {
                           EnvoyException, "Remote module sources require a factory context");
 }
 
-TEST_F(DynamicModuleStringDataInputTest, ConfigNewReturnsNull) {
+TEST_F(DynamicModuleDataInputTest, ConfigNewReturnsNull) {
   EXPECT_THROW_WITH_REGEX(
       factory_.createDataInputFactoryCb(
           protoConfig("matcher_string_input_config_new_fail", "x-route"), validation_visitor_),
       EnvoyException, "Failed to initialize dynamic module matcher data input config");
 }
 
-TEST_F(DynamicModuleStringDataInputTest, MissingConfigNew) {
+TEST_F(DynamicModuleDataInputTest, MissingConfigNew) {
   EXPECT_THROW_WITH_REGEX(
       factory_.createDataInputFactoryCb(
           protoConfig("matcher_string_input_missing_config_new", "x-route"), validation_visitor_),
       EnvoyException, "Failed to resolve symbol.*data_input_config_new");
 }
 
-TEST_F(DynamicModuleStringDataInputTest, MissingConfigDestroy) {
+TEST_F(DynamicModuleDataInputTest, MissingConfigDestroy) {
   EXPECT_THROW_WITH_REGEX(factory_.createDataInputFactoryCb(
                               protoConfig("matcher_string_input_missing_config_destroy", "x-route"),
                               validation_visitor_),
                           EnvoyException, "Failed to resolve symbol.*data_input_config_destroy");
 }
 
-TEST_F(DynamicModuleStringDataInputTest, MissingGet) {
+TEST_F(DynamicModuleDataInputTest, MissingGet) {
   EXPECT_THROW_WITH_REGEX(
       factory_.createDataInputFactoryCb(protoConfig("matcher_string_input_missing_get", "x-route"),
                                         validation_visitor_),
       EnvoyException, "Failed to resolve symbol.*data_input_get");
 }
 
-TEST_F(DynamicModuleStringDataInputTest, MalformedInputConfig) {
+TEST_F(DynamicModuleDataInputTest, MalformedInputConfig) {
   // The module loads and resolves symbols, but the input_config Any cannot be unpacked, which
   // happens before the module configuration is created.
-  DynamicModuleStringDataInputProto proto_config;
+  DynamicModuleDataInputProto proto_config;
   proto_config.mutable_dynamic_module_config()->set_name("matcher_string_input_echo");
   proto_config.mutable_dynamic_module_config()->set_do_not_close(true);
   proto_config.set_input_name("test_input");
@@ -186,7 +186,7 @@ TEST_F(DynamicModuleStringDataInputTest, MalformedInputConfig) {
                           EnvoyException, "Failed to parse data input config");
 }
 
-TEST_F(DynamicModuleStringDataInputTest, GetReturnsValueFromHeader) {
+TEST_F(DynamicModuleDataInputTest, GetReturnsValueFromHeader) {
   auto factory_cb = factory_.createDataInputFactoryCb(
       protoConfig("matcher_string_input_echo", "x-route"), validation_visitor_);
   auto data_input = factory_cb();
@@ -200,7 +200,7 @@ TEST_F(DynamicModuleStringDataInputTest, GetReturnsValueFromHeader) {
   EXPECT_EQ("cluster_0", result.stringData().value());
 }
 
-TEST_F(DynamicModuleStringDataInputTest, GetReturnsNoValueWhenHeaderAbsent) {
+TEST_F(DynamicModuleDataInputTest, GetReturnsNoValueWhenHeaderAbsent) {
   auto factory_cb = factory_.createDataInputFactoryCb(
       protoConfig("matcher_string_input_echo", "x-route"), validation_visitor_);
   auto data_input = factory_cb();
@@ -214,13 +214,13 @@ TEST_F(DynamicModuleStringDataInputTest, GetReturnsNoValueWhenHeaderAbsent) {
 }
 
 // Exercises the header lookup callback directly across every header map and edge case.
-TEST_F(DynamicModuleStringDataInputTest, GetHeaderValueCallbackCoversAllPaths) {
+TEST_F(DynamicModuleDataInputTest, GetHeaderValueCallbackCoversAllPaths) {
   ::Envoy::Http::TestRequestHeaderMapImpl request_headers{
       {"x-single", "req"}, {"x-multi", "a"}, {"x-multi", "b"}};
   ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{"x-resp", "resp"}};
   ::Envoy::Http::TestResponseTrailerMapImpl response_trailers{{"x-trailer", "trailer"}};
 
-  StringDataInputContext context;
+  DataInputContext context;
   context.request_headers = &request_headers;
   context.response_headers = &response_headers;
   context.response_trailers = &response_trailers;
@@ -278,7 +278,7 @@ TEST_F(DynamicModuleStringDataInputTest, GetHeaderValueCallbackCoversAllPaths) {
 
 // The factory callback may run more than once, and every data input instance shares one in-module
 // configuration. Releasing all of them must destroy the configuration exactly once.
-TEST_F(DynamicModuleStringDataInputTest, SharedConfigDestroyedOnceForMultipleInputs) {
+TEST_F(DynamicModuleDataInputTest, SharedConfigDestroyedOnceForMultipleInputs) {
   const auto destroy_count = configDestroyCounter();
   const int before = destroy_count();
 
@@ -298,7 +298,7 @@ TEST_F(DynamicModuleStringDataInputTest, SharedConfigDestroyedOnceForMultipleInp
 
 // A factory callback that is never invoked still owns the in-module configuration and must destroy
 // it once when released, so a rejected match tree does not leak the configuration.
-TEST_F(DynamicModuleStringDataInputTest, ConfigDestroyedWhenFactoryCallbackNeverInvoked) {
+TEST_F(DynamicModuleDataInputTest, ConfigDestroyedWhenFactoryCallbackNeverInvoked) {
   const auto destroy_count = configDestroyCounter();
   const int before = destroy_count();
 

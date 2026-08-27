@@ -16,14 +16,14 @@ namespace Matching {
 namespace Http {
 namespace DynamicModules {
 
-using DynamicModuleStringDataInputProto =
-    envoy::extensions::matching::http::dynamic_modules::v3::DynamicModuleStringDataInput;
+using DynamicModuleDataInputProto =
+    envoy::extensions::matching::http::dynamic_modules::v3::DynamicModuleDataInput;
 
 namespace {
 
 using HeadersMapOptConstRef = OptRef<const ::Envoy::Http::HeaderMap>;
 
-HeadersMapOptConstRef headerMapByType(const StringDataInputContext* context,
+HeadersMapOptConstRef headerMapByType(const DataInputContext* context,
                                       envoy_dynamic_module_type_http_header_type header_type) {
   switch (header_type) {
   case envoy_dynamic_module_type_http_header_type_RequestHeader:
@@ -39,14 +39,14 @@ HeadersMapOptConstRef headerMapByType(const StringDataInputContext* context,
 
 } // namespace
 
-DynamicModuleStringDataInput::DynamicModuleStringDataInput(
-    DataInputModuleSharedPtr module, OnDataInputGetType on_get,
-    std::shared_ptr<const void> in_module_config)
+DynamicModuleDataInput::DynamicModuleDataInput(DataInputModuleSharedPtr module,
+                                               OnDataInputGetType on_get,
+                                               std::shared_ptr<const void> in_module_config)
     : module_(std::move(module)), on_get_(on_get), in_module_config_(std::move(in_module_config)) {}
 
 ::Envoy::Matcher::DataInputGetResult
-DynamicModuleStringDataInput::get(const ::Envoy::Http::HttpMatchingData& data) const {
-  StringDataInputContext context;
+DynamicModuleDataInput::get(const ::Envoy::Http::HttpMatchingData& data) const {
+  DataInputContext context;
   context.request_headers = data.requestHeaders().ptr();
   context.response_headers = data.responseHeaders().ptr();
   context.response_trailers = data.responseTrailers().ptr();
@@ -58,13 +58,12 @@ DynamicModuleStringDataInput::get(const ::Envoy::Http::HttpMatchingData& data) c
 }
 
 ::Envoy::Matcher::DataInputFactoryCb<::Envoy::Http::HttpMatchingData>
-DynamicModuleStringDataInputFactory::createDataInputFactoryCb(
+DynamicModuleDataInputFactory::createDataInputFactoryCb(
     const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
 
-  const auto& proto_config =
-      MessageUtil::downcastAndValidate<const DynamicModuleStringDataInputProto&>(
-          config, validation_visitor);
+  const auto& proto_config = MessageUtil::downcastAndValidate<const DynamicModuleDataInputProto&>(
+      config, validation_visitor);
 
   // Data inputs have no factory context, so only the synchronous local-file and by-name module
   // sources can load here. A remote source is rejected by newDynamicModuleByConfig.
@@ -128,11 +127,11 @@ DynamicModuleStringDataInputFactory::createDataInputFactoryCb(
                             const void* config) { on_config_destroy(config); });
 
   return [shared_module, on_get = on_get.value(), shared_config] {
-    return std::make_unique<DynamicModuleStringDataInput>(shared_module, on_get, shared_config);
+    return std::make_unique<DynamicModuleDataInput>(shared_module, on_get, shared_config);
   };
 }
 
-REGISTER_FACTORY(DynamicModuleStringDataInputFactory,
+REGISTER_FACTORY(DynamicModuleDataInputFactory,
                  ::Envoy::Matcher::DataInputFactory<::Envoy::Http::HttpMatchingData>);
 
 } // namespace DynamicModules
@@ -149,7 +148,7 @@ bool envoy_dynamic_module_callback_matcher_data_input_get_header_value(
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
     size_t index, size_t* total_count_out) {
   using namespace Envoy::Extensions::Matching::Http::DynamicModules;
-  auto* context = static_cast<StringDataInputContext*>(data_input_envoy_ptr);
+  auto* context = static_cast<DataInputContext*>(data_input_envoy_ptr);
   auto map = headerMapByType(context, header_type);
   if (!map.has_value()) {
     *result = {.ptr = nullptr, .length = 0};
@@ -176,7 +175,7 @@ void envoy_dynamic_module_callback_matcher_data_input_set_result(
     envoy_dynamic_module_type_matcher_data_input_envoy_ptr data_input_envoy_ptr,
     envoy_dynamic_module_type_module_buffer result) {
   using namespace Envoy::Extensions::Matching::Http::DynamicModules;
-  auto* context = static_cast<StringDataInputContext*>(data_input_envoy_ptr);
+  auto* context = static_cast<DataInputContext*>(data_input_envoy_ptr);
   context->result.assign(result.ptr, result.length);
   context->has_result = true;
 }
