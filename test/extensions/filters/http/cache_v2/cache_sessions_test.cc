@@ -69,7 +69,8 @@ protected:
         .WillRepeatedly(Return(true));
     auto mock_http_cache = std::make_unique<MockHttpCache>();
     mock_http_cache_ = mock_http_cache.get();
-    cache_sessions_ = CacheSessions::create(mock_factory_context_, std::move(mock_http_cache));
+    cache_sessions_ = CacheSessions::create(mock_factory_context_.server_factory_context_,
+                                            std::move(mock_http_cache));
     ON_CALL(*mock_http_cache_, lookup)
         .WillByDefault([this](LookupRequest&&, HttpCache::LookupCallback&& cb) {
           captured_lookup_callbacks_.push_back(std::move(cb));
@@ -881,6 +882,42 @@ TEST_F(CacheSessionsTest, PassthroughWithUpstreamResetCallsGetHeadersCallbackWit
   // stream.
   consumeCallback(fake_upstream_get_headers_callbacks_[1])(nullptr, EndStream::Reset);
   EXPECT_THAT(headers2, IsNull());
+}
+
+TEST_F(CacheSessionsTest, UpstreamResetDuringCacheMissReportsUpstreamReset) {
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+  ActiveLookupResultPtr result;
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result](ActiveLookupResultPtr r) { result = std::move(r); });
+  pumpDispatcher();
+  consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
+  ASSERT_THAT(fake_upstreams_.size(), Eq(1));
+  ASSERT_THAT(fake_upstream_get_headers_callbacks_.size(), Eq(1));
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(nullptr, EndStream::Reset);
+  pumpDispatcher();
+  ASSERT_THAT(result, NotNull());
+  EXPECT_THAT(result->status_, Eq(CacheEntryStatus::UpstreamReset));
+}
+
+TEST_F(CacheSessionsTest, VaryHeaderInUpstreamResponseTreatedAsUncacheable) {
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+  ActiveLookupResultPtr result;
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result](ActiveLookupResultPtr r) { result = std::move(r); });
+  pumpDispatcher();
+  consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
+  ASSERT_THAT(fake_upstreams_.size(), Eq(1));
+  ASSERT_THAT(fake_upstream_get_headers_callbacks_.size(), Eq(1));
+  auto headers = cacheableResponseHeaders();
+  headers->addCopy(Http::CustomHeaders::get().Vary, "accept");
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(std::move(headers), EndStream::End);
+  pumpDispatcher();
+  ASSERT_THAT(result, NotNull());
+  EXPECT_THAT(result->status_, Eq(CacheEntryStatus::Uncacheable));
 }
 
 // TODO: UpdateHeadersSkipSpecificHeaders

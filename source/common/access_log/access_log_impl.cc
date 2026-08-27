@@ -91,7 +91,8 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
     {
       auto& factory =
           Config::Utility::getAndCheckFactory<ExtensionFilterFactory>(config.extension_filter());
-      return factory.createFilter(config.extension_filter(), context);
+      return THROW_OR_RETURN_VALUE(factory.createFilter(config.extension_filter(), context),
+                                   FilterPtr);
     }
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::FILTER_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
@@ -215,10 +216,7 @@ bool HeaderFilter::evaluate(const Formatter::Context& context,
                             const StreamInfo::StreamInfo&) const {
   const auto& headers =
       context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers);
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.match_headers_individually")) {
-    return header_data_->matchesHeaders(headers);
-  }
-  return header_data_->matchesHeadersIndividually(headers);
+  return header_data_->matches(headers);
 }
 
 ResponseFlagFilter::ResponseFlagFilter(
@@ -273,7 +271,7 @@ bool GrpcStatusFilter::evaluate(const Formatter::Context& context,
     status = optional_status.value();
   }
 
-  const bool found = statuses_.find(status) != statuses_.end();
+  const bool found = statuses_.contains(status);
   return exclude_ ? !found : found;
 }
 

@@ -2,13 +2,15 @@
 
 set -e
 
+ENVOY_SRCDIR="${TEST_SRCDIR}/${TEST_WORKSPACE}"
+
 # Router_check_tool binary path
-PATH_BIN="${TEST_SRCDIR}/envoy"/test/tools/router_check/router_check_tool
+PATH_BIN="${ENVOY_SRCDIR}"/test/tools/router_check/router_check_tool
 
 # Config json path
-PATH_CONFIG="${TEST_SRCDIR}/envoy"/test/tools/router_check/test/config
+PATH_CONFIG="${ENVOY_SRCDIR}"/test/tools/router_check/test/config
 
-TESTS=("ContentType" "ClusterHeader" "DirectResponse" "HeaderMatchedRouting" "Redirect" "Redirect2" "Redirect3" "Redirect4" "Runtime" "TestRoutes" "Weighted")
+TESTS=("ContentType" "ClusterHeader" "DirectResponse" "HeaderMatchedRouting" "Redirect" "Redirect2" "Redirect3" "Redirect4" "Runtime" "TestRoutes" "Timeout" "Weighted")
 
 # Testing expected matches
 for t in "${TESTS[@]}"
@@ -101,6 +103,15 @@ if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "expected: [has(x-ping-response):false
   exit 1
 fi
 if ! echo "${FAILURE_OUTPUT}" | grep -Fxq "expected: [has(x-pong-response):true], actual: [has(x-pong-response):false], test type: response_header_matches.present_match"; then
+  exit 1
+fi
+
+# Failure test case for timeout mismatch strings.
+# The API regex matches only single-digit versions, so /api/v10/resource selects the fallback.
+echo "testing timeout mismatch failure output"
+TIMEOUT_FAILURE_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Timeout.yaml" "-t" "${PATH_CONFIG}/TimeoutFailures.golden.proto.json" "--only-show-failures" 2>&1) ||
+  echo "${TIMEOUT_FAILURE_OUTPUT:-no-output}"
+if ! echo "${TIMEOUT_FAILURE_OUTPUT}" | grep -Fxq "expected: [120000], actual: [30000], test type: timeout"; then
   exit 1
 fi
 

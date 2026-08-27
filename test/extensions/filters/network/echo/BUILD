@@ -13,7 +13,7 @@ envoy_cc_test(
     srcs = [
         "echo_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         # Uncomment this line to run this test repeatedly in exclusive mode if not using docker-sandbox,
         # or RBE, see comments in AddRemoveListener.
@@ -24,6 +24,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/echo:config",
         "//test/integration:integration_lib",
         "//test/server:utility_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

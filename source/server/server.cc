@@ -52,6 +52,7 @@
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
+#include "source/server/cgroup_cpu_util.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/listener_manager_factory.h"
@@ -159,6 +160,16 @@ void InstanceBase::drainListeners(OptRef<const Network::ExtraShutdownListenerOpt
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
                                    options.has_value() ? *options
                                                        : Network::ExtraShutdownListenerOptions{});
+  // Notify the connections of every listener that draining has begun, so connection-level drain
+  // logic can react. Server-wide drains notify from their entry
+  // point rather than from DrainManagerImpl, whose per-listener children must not fan out. The
+  // start time and strategy are captured once here so every notified connection shares a single,
+  // consistent drain timeline.
+  listener_manager_->onServerDrainStart(
+      Network::DrainDirection::All,
+      Network::ConnectionDrainEvent{api().timeSource().monotonicTime(),
+                                    InstanceBase::options().drainStrategy()});
+
   drain_manager_->startDrainSequence(Network::DrainDirection::All, [] {});
 }
 
@@ -400,24 +411,12 @@ void InstanceUtil::raiseFileLimits() {
   if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.raise_file_limits")) {
     return;
   }
-  struct rlimit rlim;
-  if (const auto result = Api::OsSysCallsSingleton::get().getrlimit(RLIMIT_NOFILE, &rlim);
+  if (const auto result = Api::OsSysCallsSingleton::get().raiseFileLimits();
       result.return_value_ != 0) {
-    ENVOY_LOG(warn, "Failed to read file descriptor limit, error {}.", errorDetails(result.errno_));
-    return;
-  }
-  const auto old = rlim.rlim_cur;
-  if (old == rlim.rlim_max) {
-    return;
-  }
-  rlim.rlim_cur = rlim.rlim_max;
-  if (const auto result = Api::OsSysCallsSingleton::get().setrlimit(RLIMIT_NOFILE, &rlim);
-      result.return_value_ != 0) {
-    ENVOY_LOG(warn, "Failed to raise file descriptor limit to maximum, error {}.",
+    ENVOY_LOG(warn, "Failed to raise file descriptor limit, error {}.",
               errorDetails(result.errno_));
     return;
   }
-  ENVOY_LOG(info, "Raised file descriptor limits from {} to {}.", old, rlim.rlim_max);
 }
 
 void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_address,
@@ -481,6 +480,22 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   RETURN_IF_NOT_OK(InstanceUtil::loadBootstrapConfig(
       bootstrap_, options_, messageValidationContext().staticValidationVisitor(), *api_));
   bootstrap_config_update_time_ = time_source_.systemTime();
+
+  // Decide whether the stats store should use the explicit-tags logic. The explicit-tags logic
+  // use the tags specified by the caller when creating a stat and will ignore any tags extraction
+  // rules.
+  // To keep the backwards compatibility, we only enable the explicit-tags logic if the user
+  // has not specified any custom tags extraction rules and has not disabled the use of default
+  // tags.
+  {
+    const auto& stats_config = bootstrap_.stats_config();
+    const bool use_all_default_tags =
+        !stats_config.has_use_all_default_tags() || stats_config.use_all_default_tags().value();
+    if (stats_config.stats_tags().empty() && use_all_default_tags &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_stats_explicit_tags")) {
+      stats_store_.setUseExplicitTags(true);
+    }
+  }
 
   if (bootstrap_.has_application_log_config()) {
     RETURN_IF_NOT_OK(
@@ -573,6 +588,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
+  ENVOY_LOG(debug, "server concurrency set to {}", options_.concurrency());
+  // Logging is now initialized; emit the cgroup CPU detection result stashed during the
+  // OptionsImpl constructor.
+  CgroupDetectorSingleton::get().logResult();
   if (!options().hotRestartDisabled()) {
     server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
   }

@@ -8,6 +8,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
@@ -406,7 +407,20 @@ DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
 DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
                                                          uint64_t workers_pending_removal)
     : draining_listener_(std::move(draining_listener)),
+      listener_tag_(draining_listener_->listenerTag()),
       workers_pending_removal_(workers_pending_removal) {}
+
+DrainingFilterChainsManager::DrainingFilterChainsManager(
+    std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains,
+    uint64_t listener_tag, uint64_t workers_pending_removal)
+    : listener_tag_(listener_tag),
+      draining_filter_chain_shared_ptrs_(std::move(draining_filter_chains)),
+      workers_pending_removal_(workers_pending_removal) {
+  for (auto& fc : draining_filter_chain_shared_ptrs_) {
+    fc->startDraining();
+    draining_filter_chains_.push_back(fc.get());
+  }
+}
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          std::unique_ptr<ListenerComponentFactory>&& factory,
@@ -419,6 +433,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
   if (!factory_) {
     factory_ = std::make_unique<ProdListenerComponentFactory>(server);
   }
+
   if (server.admin().has_value()) {
     listeners_config_tracker_entry_ = server.admin()->getConfigTracker().add(
         "listeners", [this](const Matchers::StringMatcher& name_matcher) {
@@ -747,9 +762,13 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
 
   // Notify existing connections on this listener that draining has begun so that callbacks
   // (e.g. HTTP/2 codecs) can react before the drain timer expires and connections are
-  // forcibly closed.
+  // forcibly closed. The drain start time, duration and strategy are captured once here so that
+  // every connection shares a single, consistent drain timeline regardless of which worker it
+  // lives on or when it is notified.
+  const Network::ConnectionDrainEvent listener_drain_event{
+      server_.api().timeSource().monotonicTime(), server_.options().drainStrategy()};
   for (const auto& worker : workers_) {
-    worker->onListenerDrain(*draining_it->listener_);
+    worker->onListenerDrain(listener_tag, listener_drain_event);
   }
 
   // Start the drain sequence which completes when the listener's drain manager has completed
@@ -932,32 +951,52 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
   std::list<DrainingFilterChainsManager>::iterator draining_group =
       draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(),
                                               std::move(draining_listener), workers_.size());
-  draining_group->getDrainingListener().diffFilterChain(
+  draining_group->getDrainingListener()->diffFilterChain(
       new_listener, [&draining_group](Network::DrainableFilterChain& filter_chain) mutable {
         filter_chain.startDraining();
         draining_group->addFilterChainToDrain(filter_chain);
       });
+  drainGroup(draining_group);
+  updateWarmingActiveGauges();
+}
+
+void ListenerManagerImpl::drainGroup(
+    std::list<DrainingFilterChainsManager>::iterator draining_group) {
   auto filter_chain_size = draining_group->numDrainingFilterChains();
   stats_.total_filter_chains_draining_.add(filter_chain_size);
-  draining_group->getDrainingListener().debugLog(
-      absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
-                   draining_group->getDrainingListener().name()));
+  if (auto listener = draining_group->getDrainingListener(); listener) {
+    listener->debugLog(absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
+                                    listener->name()));
+  }
 
   // Notify existing connections in the draining filter chains that draining has begun so
   // callbacks (e.g. HTTP/2 codecs) can react before the drain timer expires and the
-  // connections are forcibly closed.
+  // connections are forcibly closed. The drain start time is captured once here so that every
+  // connection shares a single, consistent drain timeline.
+  //
+  // The strategy is forced to Immediate rather than using the configured
+  // Server::Options::drainStrategy(). This preserves the pre-existing behavior of
+  // PerFilterChainFactoryContextImpl::drainClose(), which returns true unconditionally once the
+  // filter chain is draining, and it is the correct behavior here: unlike a server drain, the
+  // configuration backing these connections is already gone, and at the end of the drain window
+  // removeFilterChains() hard-closes whatever is left. Ramping up gradually would mean a large
+  // share of connections are still running on deleted configuration when that deadline arrives,
+  // and are then closed abruptly instead of being given the whole window to finish gracefully.
+  const Network::ConnectionDrainEvent filter_chain_drain_event{
+      server_.api().timeSource().monotonicTime(), Server::DrainStrategy::Immediate};
   for (const auto& worker : workers_) {
     worker->onFilterChainDrain(draining_group->getDrainingListenerTag(),
-                               draining_group->getDrainingFilterChains());
+                               draining_group->getDrainingFilterChains(), filter_chain_drain_event);
   }
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
   draining_group->startDrainSequence(
       server_.options().drainTime(), server_.dispatcher(), [this, draining_group]() -> void {
-        draining_group->getDrainingListener().debugLog(
-            absl::StrCat("removing draining filter chains from listener ",
-                         draining_group->getDrainingListener().name()));
+        if (auto listener = draining_group->getDrainingListener(); listener) {
+          listener->debugLog(
+              absl::StrCat("removing draining filter chains from listener ", listener->name()));
+        }
         for (const auto& worker : workers_) {
           // Once the drain time has completed via the drain manager's timer, we tell the workers
           // to remove the filter chains.
@@ -969,9 +1008,10 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
                 // listener while filters might still be using its context (stats, etc.).
                 server_.dispatcher().post([this, draining_group]() -> void {
                   if (draining_group->decWorkersPendingRemoval() == 0) {
-                    draining_group->getDrainingListener().debugLog(
-                        absl::StrCat("draining filter chains from listener ",
-                                     draining_group->getDrainingListener().name(), " complete"));
+                    if (auto listener = draining_group->getDrainingListener(); listener) {
+                      listener->debugLog(absl::StrCat("draining filter chains from listener ",
+                                                      listener->name(), " complete"));
+                    }
                     stats_.total_filter_chains_draining_.sub(
                         draining_group->numDrainingFilterChains());
                     draining_filter_chains_manager_.erase(draining_group);
@@ -980,7 +1020,18 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& draining_listener,
               });
         }
       });
-  updateWarmingActiveGauges();
+}
+
+void ListenerManagerImpl::drainFilterChains(
+    ListenerImpl& listener,
+    std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains) {
+  std::list<DrainingFilterChainsManager>::iterator draining_group =
+      draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(),
+                                              std::move(draining_filter_chains),
+                                              listener.listenerTag(), workers_.size());
+  listener.debugLog(absl::StrCat("draining ", draining_group->numDrainingFilterChains(),
+                                 " dynamic filter chains in listener ", listener.name()));
+  drainGroup(draining_group);
 }
 
 uint64_t ListenerManagerImpl::numConnections() const {
@@ -1174,7 +1225,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
         // This prevents us from double incrementing if listeners are stopped twice.
         // This can happen if the admin endpoint is triggered for inbound_only and then
         // all. We perform the check in the callback to ensure it's done on the main thread
-        if (stopped_listener_tags_.find(listener_tag) == stopped_listener_tags_.end()) {
+        if (!stopped_listener_tags_.contains(listener_tag)) {
           stats_.listener_stopped_.inc();
           stopped_listener_tags_.insert(listener_tag);
           for (auto& listener : active_listeners_) {
@@ -1184,6 +1235,34 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
           }
         }
       });
+    }
+  }
+}
+
+void ListenerManagerImpl::onServerDrainStart(Network::DrainDirection direction,
+                                             Network::ConnectionDrainEvent drain_event) {
+  // Direction is honored by only notifying listeners whose traffic direction is covered by the
+  // drain, so the connection-level drain logic itself does not need to re-check direction. The
+  // event is supplied by the caller and passed through unchanged, so every connection covered by
+  // one drain shares a single, consistent timeline.
+  //
+  // Only active listeners are notified. Listeners that are themselves already draining are
+  // deliberately skipped: drainListener() has already notified all of their connections, and under
+  // the first-event-wins rule (see Network::Connection::onDrain()) those connections would drop
+  // this later event anyway, staying on the earlier timeline they are already draining on. The
+  // pre-existing pull model OR'd the listener's own drain decision with the server-wide one, which
+  // made drain-close marginally more likely for those connections; dropping the server-wide term
+  // loses a small amount of drain acceleration in that window and nothing else. Their hard
+  // deadline is unchanged, since the listener's own drain sequence still force-closes whatever
+  // remains, and under DrainStrategy::Immediate there is no difference at all.
+  for (Network::ListenerConfig& listener : listeners()) {
+    if (direction == Network::DrainDirection::InboundOnly &&
+        listener.listenerInfo()->direction() != envoy::config::core::v3::INBOUND) {
+      continue;
+    }
+    const uint64_t listener_tag = listener.listenerTag();
+    for (const auto& worker : workers_) {
+      worker->onListenerDrain(listener_tag, drain_event);
     }
   }
 }
@@ -1235,16 +1314,15 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
     auto existing_draining_filter_chain = std::find_if(
         draining_filter_chains_manager_.cbegin(), draining_filter_chains_manager_.cend(),
         [&listener](const DrainingFilterChainsManager& draining_filter_chain) {
-          return draining_filter_chain.getDrainingListener()
-                     .listenSocketFactories()[0]
-                     ->getListenSocket(0)
-                     ->isOpen() &&
-                 listener.hasCompatibleAddress(draining_filter_chain.getDrainingListener());
+          OptRef<ListenerImpl> draining_listener = draining_filter_chain.getDrainingListener();
+          return draining_listener &&
+                 draining_listener->listenSocketFactories()[0]->getListenSocket(0)->isOpen() &&
+                 listener.hasCompatibleAddress(*draining_listener);
         });
 
     if (existing_draining_filter_chain != draining_filter_chains_manager_.cend()) {
-      existing_draining_filter_chain->getDrainingListener().debugLog("clones listener socket");
-      draining_listener_ptr = &existing_draining_filter_chain->getDrainingListener();
+      existing_draining_filter_chain->getDrainingListener()->debugLog("clones listener socket");
+      draining_listener_ptr = existing_draining_filter_chain->getDrainingListener().ptr();
     }
   }
 
@@ -1314,7 +1392,10 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
       // A listener can be in-place updated multiple times, so there may
       // have multiple draining listeners with same tag.
       if (manager.getDrainingListenerTag() == listener.listenerTag()) {
-        manager.getDrainingListener().closeAllSockets();
+        if (OptRef<ListenerImpl> draining_listener = manager.getDrainingListener();
+            draining_listener) {
+          draining_listener->closeAllSockets();
+        }
       }
     }
   }

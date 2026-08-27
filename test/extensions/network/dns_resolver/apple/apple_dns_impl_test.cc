@@ -18,6 +18,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -891,7 +892,7 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResult) {
   // Error in processing will cause the connection to the DNS server to be reset.
   EXPECT_CALL(dns_service_, dnsServiceProcessResult(_)).WillOnce(Return(kDNSServiceErr_Unknown));
 
-  ASSERT_TRUE(file_ready_cb_(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_ready_cb_(Event::FileReadyType::Read));
 
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "dns.apple.processing_failure")->value());
 }

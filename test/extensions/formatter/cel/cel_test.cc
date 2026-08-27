@@ -7,6 +7,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "fmt/format.h"
@@ -16,6 +17,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace Formatter {
+
+using ::Envoy::StatusHelpers::HasStatus;
+using ::testing::HasSubstr;
 
 class CELFormatterTest : public ::testing::Test {
 public:
@@ -601,9 +605,9 @@ TEST_F(CELFormatterTest, TestUntypedInvalidExpression) {
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  EXPECT_THROW_WITH_REGEX(
-      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
-      EnvoyException, "Not able to parse expression: .*");
+  EXPECT_THAT(
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+      HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("Not able to parse expression:")));
 }
 
 TEST_F(CELFormatterTest, TestTypedInvalidExpression) {
@@ -613,9 +617,9 @@ TEST_F(CELFormatterTest, TestTypedInvalidExpression) {
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  EXPECT_THROW_WITH_REGEX(
-      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
-      EnvoyException, "Not able to parse expression: .*");
+  EXPECT_THAT(
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+      HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("Not able to parse expression:")));
 }
 
 TEST_F(CELFormatterTest, TestInvalidSemanticExpression) {

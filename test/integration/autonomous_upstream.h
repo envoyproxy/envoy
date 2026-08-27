@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "test/integration/fake_upstream.h"
 
 namespace Envoy {

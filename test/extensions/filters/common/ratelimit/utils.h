@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 #include "envoy/service/ratelimit/v3/rls.pb.h"

@@ -3,6 +3,7 @@
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
 
+AI
 Allshard
 FCS
 FLUSHALL
@@ -35,6 +36,7 @@ ARRAYSIZE
 ARN
 ASAN
 ASCII
+ASLR
 ASM
 ASN
 ASSERTed
@@ -64,6 +66,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+bzlmod
 CIO
 CBC
 cbc
@@ -77,6 +80,7 @@ DFP
 Dynatrace
 DOM
 DONTFRAG
+dotdot
 Gasd
 GiB
 IPTOS
@@ -86,6 +90,7 @@ Reserializer
 SION
 TRA
 Websockets
+reentrancy
 webtransport
 WEBTRANSPORT
 signalling
@@ -508,6 +513,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIGUSR
 SIMD
 SIO
 SSE
@@ -657,6 +663,9 @@ auths
 authz
 automata
 autoscale
+awaitable
+awaitables
+awaiter
 backend
 backends
 backgrounded
@@ -719,6 +728,7 @@ canonicalization
 canonicalize
 canonicalized
 canonicalizer
+canonicalizes
 canonicalizing
 cardinality
 casted
@@ -751,6 +761,7 @@ combinatorial
 comparator
 compat
 completable
+computable
 cond
 condvar
 conf
@@ -761,6 +772,7 @@ conns
 const
 constexpr
 constructible
+cooldown
 copyable
 coroutine
 coroutines
@@ -853,6 +865,7 @@ dup
 durations
 dynamodb
 eg
+el
 emplace
 emplaced
 emscripten
@@ -954,6 +967,7 @@ hackery
 hacky
 handoff
 handshaker
+hardcode
 hardcoded
 hardcodes
 hardcoding
@@ -970,6 +984,7 @@ healths
 healthz
 hermeticity
 highp
+hl
 hit
 hoc
 hostname
@@ -1160,6 +1175,7 @@ netmask
 netns
 NLB
 NLMSG
+nodiscard
 nonblocking
 noncopyable
 nonresponsive
@@ -1180,6 +1196,7 @@ oauth
 observability
 observations
 ocagent
+offloadable
 offsetof
 oneof
 oneway
@@ -1328,6 +1345,7 @@ redispatch
 redistributions
 reentrant
 reentrants
+reentrantly
 refactor
 refactored
 refcount
@@ -1357,6 +1375,7 @@ reperform
 repicked
 replayable
 repo
+repos
 representable
 reproducibility
 requirepass
@@ -1395,6 +1414,7 @@ rtest
 rtrim
 rtt
 ruleset
+runfile
 runfiles
 runtime
 runtimes
@@ -1419,6 +1439,7 @@ serializable
 serializer
 serv
 servercert
+setarch
 setenv
 SETNAME
 setsockopt
@@ -1439,6 +1460,7 @@ sim
 sinked
 sint
 sizeof
+skippable
 smatch
 snapshotted
 sockaddr
@@ -1495,6 +1517,7 @@ submatch
 submessages
 subnet
 subnets
+subobject
 suboptimal
 subprocess
 subsecond
@@ -1548,6 +1571,7 @@ testcase
 testcases
 testdata
 testee
+tgkill
 threadsafe
 thru
 timespan
@@ -1590,6 +1614,7 @@ udpa
 uint
 un-
 unacked
+uname
 unary
 unconfigurable
 undef
@@ -1662,6 +1687,7 @@ wildcard
 wildcards
 winsock
 workspace
+workspaces
 writev
 wrsq
 www
@@ -1675,6 +1701,9 @@ xid
 xmodem
 xxhash
 xxs
+xxxx
+xxxxxxxx
+xxxxxxxxxxxx
 xyz
 xyzwebservices
 yml
@@ -1713,6 +1742,7 @@ NXDOMAIN
 DNAT
 RSP
 EWMA
+fifo
 hotplug
 cgroup
 cgroupv1
@@ -1755,3 +1785,30 @@ datasets
 smartptr
 JA3
 JA4
+AiProtocolManager
+modelling
+delegator
+CNSA
+KEM
+MSS
+SERVFAIL
+WR
+exceptionless
+freeaddrinfo
+fstat
+getrlimit
+linkat
+mkstemp
+muxes
+pread
+pwrite
+setns
+setrlimit
+preprocessor
+RDWR
+stringification
+RMW
+acq
+interleavings
+millis
+msgs

@@ -23,6 +23,8 @@
 #include "source/server/proto_descriptors.h"
 
 #include "test/integration/utility.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
@@ -48,6 +50,17 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
                                            Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       version_(version), upstream_address_fn_(upstream_address_fn),
       config_helper_(version, bootstrap),
+      thread_local_storage_(std::make_unique<NiceMock<ThreadLocal::MockInstance>>()),
+      factory_context_storage_(
+          std::make_unique<NiceMock<Server::Configuration::MockGenericFactoryContext>>()),
+      server_factory_context_storage_(
+          std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>()),
+      thread_local_(*thread_local_storage_), factory_context_(*factory_context_storage_),
+      server_factory_context_(*server_factory_context_storage_),
+      context_manager_storage_(
+          std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+              server_factory_context_)),
+      context_manager_(*context_manager_storage_),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
   Envoy::Server::validateProtoDescriptors();
   // This is a hack, but there are situations where we disconnect fake upstream connections and
@@ -64,17 +77,21 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
             return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
                                                std::move(above_overflow));
           }));
-  ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
-  ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
-  ON_CALL(factory_context_.server_context_, sslContextManager())
+  ON_CALL(factory_context_storage_->server_context_, api()).WillByDefault(ReturnRef(*api_));
+  ON_CALL(*factory_context_storage_, statsScope())
+      .WillByDefault(ReturnRef(*stats_store_.rootScope()));
+  ON_CALL(factory_context_storage_->server_context_, sslContextManager())
       .WillByDefault(ReturnRef(context_manager_));
-  ON_CALL(factory_context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
+  ON_CALL(factory_context_storage_->server_context_, threadLocal())
+      .WillByDefault(ReturnRef(thread_local_));
 
 #ifndef ENVOY_ADMIN_FUNCTIONALITY
   config_helper_.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void { bootstrap.clear_admin(); });
 #endif
 }
+
+BaseIntegrationTest::~BaseIntegrationTest() = default;
 
 BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
@@ -867,7 +884,7 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
     return true;
   };
   find_stat_prefix("", *json);
-  ENVOY_LOG_MISC(debug, "discovered stat_prefixes {}", stat_prefixes);
+  ENVOY_LOG_MISC(debug, "discovered stat_prefixes {}", absl::StrJoin(stat_prefixes, ","));
 
   auto check_metric = [&](auto& metric) {
     // Validate that the `stat_prefix` string doesn't appear in the tag-extracted name, indicating

@@ -51,6 +51,15 @@ public:
   }
 
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
+    if (client_ == nullptr) {
+      // The client has been destroyed by the kill_after_on_data_ path. With half close
+      // enabled the downstream payload and FIN can arrive in two separate read dispatches,
+      // so ignore any dispatch after the client is gone. See
+      // https://github.com/envoyproxy/envoy/issues/43233.
+      stats_.on_data_.inc();
+      return Network::FilterStatus::StopIteration;
+    }
+
     if (require_reconnect_ && !client_->connect()) {
       ENVOY_LOG_MISC(debug, "Unable to reconnect to cluster");
       return Network::FilterStatus::StopIteration;
@@ -102,6 +111,11 @@ private:
 
       ENVOY_LOG_MISC(debug, "tcp client test filter downstream detected close type: {}.",
                      static_cast<int>(parent_.read_callbacks_->connection().detectedCloseType()));
+
+      if (parent_.client_ == nullptr) {
+        // The client has been destroyed by the kill_after_on_data_ path.
+        return;
+      }
 
       if (parent_.read_callbacks_->connection().detectedCloseType() ==
           StreamInfo::DetectedCloseType::RemoteReset) {

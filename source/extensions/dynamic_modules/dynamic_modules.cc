@@ -19,6 +19,7 @@
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
+#include "absl/types/span.h"
 #include "openssl/evp.h"
 #include "openssl/sha.h"
 
@@ -27,6 +28,19 @@ namespace Extensions {
 namespace DynamicModules {
 
 constexpr char DYNAMIC_MODULES_SEARCH_PATH[] = "ENVOY_DYNAMIC_MODULES_SEARCH_PATH";
+
+namespace {
+
+// Logged from the loader itself so that every extension type reports load failures, including the
+// ones that have no scope to increment ``dynamic_modules.module_load_error`` on. It is also the
+// only signal for a module named in the bootstrap config, since the server then exits before its
+// statistics can be scraped.
+void logModuleLoadFailure(absl::string_view module, absl::string_view reason) {
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                      "Unable to load dynamic module {}: {}", module, reason);
+}
+
+} // namespace
 
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
@@ -58,8 +72,13 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
   }
   handle = dlopen(object_file_absolute_path.c_str(), mode);
   if (handle == nullptr) {
+    // `dlerror()` returns null when no error is pending, so do not pass it along unchecked.
+    const char* dlopen_error = dlerror();
+    const absl::string_view reason =
+        dlopen_error != nullptr ? dlopen_error : "unknown dlopen error";
+    logModuleLoadFailure(object_file_absolute_path.c_str(), reason);
     return absl::InvalidArgumentError(absl::StrCat(
-        "Failed to load dynamic module: ", object_file_absolute_path.c_str(), " : ", dlerror()));
+        "Failed to load dynamic module: ", object_file_absolute_path.c_str(), " : ", reason));
   }
 
   DynamicModulePtr dynamic_module = std::make_unique<DynamicModule>(handle);
@@ -69,11 +88,14 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
           "envoy_dynamic_module_on_program_init");
 
   if (!init_function.ok()) {
+    logModuleLoadFailure(object_file_absolute_path.c_str(), init_function.status().message());
     return init_function.status();
   }
 
   const char* abi_version = (*init_function.value())();
   if (abi_version == nullptr) {
+    logModuleLoadFailure(object_file_absolute_path.c_str(),
+                         "envoy_dynamic_module_on_program_init returned null");
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to initialize dynamic module: ", object_file_absolute_path.c_str()));
   }
@@ -203,7 +225,7 @@ absl::Status verifyFileSha256(const std::filesystem::path& path,
   if (EVP_DigestFinal(ctx.get(), digest.data(), nullptr) != 1) {
     return absl::InternalError("Failed to finalize SHA256 digest");
   }
-  std::string actual_hex = Hex::encode(digest.data(), digest.size());
+  std::string actual_hex = Hex::encode(absl::Span<const uint8_t>(digest.data(), digest.size()));
   // The expected hash is operator-supplied (proto config, not user input) and the actual digest
   // is computed from a file the attacker may control; the only information leaked by an
   // early-exit comparison is "wrong remote module", which carries no secret. A constant-time
@@ -297,11 +319,13 @@ absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_
       dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_program_init)>(
           "envoy_dynamic_module_on_program_init");
   if (!init_function.ok()) {
+    logModuleLoadFailure(module_name, init_function.status().message());
     return init_function.status();
   }
 
   const char* abi_version = (*init_function.value())();
   if (abi_version == nullptr) {
+    logModuleLoadFailure(module_name, "envoy_dynamic_module_on_program_init returned null");
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to initialize static module: ", module_name));
   }

@@ -187,11 +187,19 @@ TEST_P(WasmFilterConfigTest, CreateFilterFactoryFromProtoWithServerContext) {
   WasmFilterConfig factory;
   Http::FilterFactoryCb cb;
   if (std::get<2>(GetParam())) {
-    cb = factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats",
-                                                               context_.server_factory_context_);
+    Server::Configuration::ExtraFactoryContext extra_context{
+        context_.server_factory_context_.messageValidationVisitor(), "stats"};
+    cb = factory
+             .createHttpFilterFactoryFromProto(proto_config, context_.server_factory_context_,
+                                               extra_context)
+             .value();
   } else {
-    cb = factory.createFilterFactoryFromProtoWithServerContext(
-        proto_config, "stats", upstream_factory_context_.server_factory_context_);
+    Server::Configuration::ExtraFactoryContext extra_context{
+        upstream_factory_context_.server_factory_context_.messageValidationVisitor(), "stats"};
+    cb = factory
+             .createHttpFilterFactoryFromProto(
+                 proto_config, upstream_factory_context_.server_factory_context_, extra_context)
+             .value();
   }
 
   EXPECT_CALL(init_watcher_, ready());

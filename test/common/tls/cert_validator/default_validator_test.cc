@@ -8,6 +8,7 @@
 #include "test/common/tls/ssl_test_utility.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -20,6 +21,9 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 using TestCertificateValidationContextConfigPtr =
     std::unique_ptr<TestCertificateValidationContextConfig>;
 using X509StoreContextPtr = CSmartPtr<X509_STORE_CTX, X509_STORE_CTX_free>;
@@ -440,7 +444,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameExactDNSFailure) {
 
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("api.example.com");
-  EXPECT_DEATH(std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context),
+  EXPECT_DEATH(std::ignore = std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context),
                "general_name_type != 2 || matcher.match_pattern_case() != "
                "envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact");
 #endif
@@ -653,7 +657,7 @@ TEST(DefaultCertValidatorTest, WithVerifyDepth) {
   X509_STORE_add_cert(storep, ca_cert.get());
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), storep, cert.get(), intermediates));
 
-  ASSERT_TRUE(default_validator->addClientValidationContext(ssl_ctx.get(), false).ok());
+  ASSERT_OK(default_validator->addClientValidationContext(ssl_ctx.get(), false));
   X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(store_ctx.get()),
                          SSL_CTX_get0_param(ssl_ctx.get()));
 
@@ -672,7 +676,7 @@ TEST(DefaultCertValidatorTest, WithVerifyDepth) {
   X509_STORE_add_cert(storep, ca_cert.get());
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), storep, cert.get(), intermediates));
 
-  ASSERT_TRUE(default_validator->addClientValidationContext(ssl_ctx.get(), false).ok());
+  ASSERT_OK(default_validator->addClientValidationContext(ssl_ctx.get(), false));
   X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(store_ctx.get()),
                          SSL_CTX_get0_param(ssl_ctx.get()));
 
@@ -810,7 +814,7 @@ TEST(DefaultCertValidatorTest, DefaultValidatorCaExpirationStats) {
 
   std::vector<SSL_CTX*> ssl_contexts;
   auto result = validator->initializeSslContexts(ssl_contexts, true, *store.rootScope());
-  ASSERT_TRUE(result.ok()) << result.status().message();
+  ASSERT_OK(result);
 
   std::string expected_metric_name = "ssl.certificate.test_ca_cert.expiration_unix_time_seconds";
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
@@ -936,7 +940,7 @@ TEST(DefaultCertValidatorTest, SuppressClientCaListEnabled) {
 
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
   ASSERT_NE(ssl_ctx, nullptr);
-  ASSERT_TRUE(validator->addClientValidationContext(ssl_ctx.get(), true).ok());
+  ASSERT_OK(validator->addClientValidationContext(ssl_ctx.get(), true));
 
   // When suppressed, the validator must not populate the CA list. Depending on the
   // BoringSSL version, SSL_CTX_new may leave the list as nullptr or as an empty stack;
@@ -961,7 +965,7 @@ TEST(DefaultCertValidatorTest, SuppressClientCaListDisabled) {
 
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
   ASSERT_NE(ssl_ctx, nullptr);
-  ASSERT_TRUE(validator->addClientValidationContext(ssl_ctx.get(), true).ok());
+  ASSERT_OK(validator->addClientValidationContext(ssl_ctx.get(), true));
 
   STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
   ASSERT_NE(ca_list, nullptr);
@@ -986,7 +990,7 @@ TEST(DefaultCertValidatorTest, AddClientValidationContextWithMalformedCaCert) {
 
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
   ASSERT_NE(ssl_ctx, nullptr);
-  EXPECT_FALSE(validator->addClientValidationContext(ssl_ctx.get(), true).ok());
+  EXPECT_THAT(validator->addClientValidationContext(ssl_ctx.get(), true), Not(IsOk()));
 }
 
 // Test that session ID hash differs when suppress_client_ca_list differs.
@@ -1009,14 +1013,154 @@ TEST(DefaultCertValidatorTest, SuppressClientCaListSessionIdDiffers) {
   bssl::UniquePtr<SSL_CTX> ssl_ctx_not_suppressed(SSL_CTX_new(TLS_method()));
   std::vector<SSL_CTX*> ctxs1 = {ssl_ctx_suppressed.get()};
   std::vector<SSL_CTX*> ctxs2 = {ssl_ctx_not_suppressed.get()};
-  ASSERT_TRUE(validator_suppressed.initializeSslContexts(ctxs1, true, *store.rootScope()).ok());
-  ASSERT_TRUE(validator_not_suppressed.initializeSslContexts(ctxs2, true, *store.rootScope()).ok());
+  ASSERT_OK(validator_suppressed.initializeSslContexts(ctxs1, true, *store.rootScope()));
+  ASSERT_OK(validator_not_suppressed.initializeSslContexts(ctxs2, true, *store.rootScope()));
 
   auto digest_suppressed = computeSessionIdDigest(validator_suppressed);
   auto digest_not_suppressed = computeSessionIdDigest(validator_not_suppressed);
 
   EXPECT_NE(digest_suppressed, digest_not_suppressed)
       << "Session ID digests must differ when suppress_client_ca_list differs";
+}
+
+// Certificate validation context config that reports a fixed CRL blob, used to
+// exercise CRL sharing across validators.
+class CrlValidationContextConfig : public TestCertificateValidationContextConfig {
+public:
+  explicit CrlValidationContextConfig(std::string crl) : crl_(std::move(crl)) {}
+  const std::string& certificateRevocationList() const override { return crl_; }
+
+private:
+  const std::string crl_;
+};
+
+// The CRL cache returns one shared parsed representation for identical content,
+// so a CRL referenced from many contexts is materialized in memory only once.
+TEST(CrlCacheTest, SharesIdenticalCrlContent) {
+  auto cache = std::make_shared<CrlCache>();
+  const std::string crl = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+
+  absl::StatusOr<CrlListSharedPtr> first = cache->getOrCreate(crl, "ca_cert.crl");
+  ASSERT_OK(first);
+  absl::StatusOr<CrlListSharedPtr> second = cache->getOrCreate(crl, "ca_cert.crl");
+  ASSERT_OK(second);
+
+  // Both lookups return the same CrlList and the same parsed X509_CRL.
+  EXPECT_EQ(first->get(), second->get());
+  ASSERT_FALSE((*first)->crls.empty());
+  EXPECT_EQ((*first)->crls[0].get(), (*second)->crls[0].get());
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Distinct CRL content is cached separately.
+TEST(CrlCacheTest, SeparatesDistinctCrlContent) {
+  auto cache = std::make_shared<CrlCache>();
+  const std::string crl1 = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+  const std::string crl2 = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.crl"));
+
+  absl::StatusOr<CrlListSharedPtr> first = cache->getOrCreate(crl1, "ca_cert.crl");
+  ASSERT_OK(first);
+  absl::StatusOr<CrlListSharedPtr> second = cache->getOrCreate(crl2, "intermediate_ca_cert.crl");
+  ASSERT_OK(second);
+
+  EXPECT_NE(first->get(), second->get());
+  EXPECT_EQ(cache->size(), 2);
+}
+
+// An entry is released once the last reference to it is dropped, so the cache
+// does not grow without bound as CRLs are rotated via xDS.
+TEST(CrlCacheTest, ReleasesUnreferencedEntries) {
+  auto cache = std::make_shared<CrlCache>();
+  const std::string crl = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+
+  {
+    absl::StatusOr<CrlListSharedPtr> entry = cache->getOrCreate(crl, "ca_cert.crl");
+    ASSERT_OK(entry);
+    EXPECT_EQ(cache->size(), 1);
+  }
+  // The only reference is gone, so the entry is released.
+  EXPECT_EQ(cache->size(), 0);
+
+  // Re-adding the same content succeeds and repopulates the cache.
+  absl::StatusOr<CrlListSharedPtr> reloaded = cache->getOrCreate(crl, "ca_cert.crl");
+  ASSERT_OK(reloaded);
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Invalid CRL content returns an error and is not cached.
+TEST(CrlCacheTest, ReturnsErrorForInvalidCrl) {
+  auto cache = std::make_shared<CrlCache>();
+  const std::string invalid = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/not_a_crl.crl"));
+
+  absl::StatusOr<CrlListSharedPtr> result = cache->getOrCreate(invalid, "not_a_crl.crl");
+  EXPECT_THAT(result,
+              HasStatusMessage(testing::HasSubstr("Failed to load CRL from not_a_crl.crl")));
+  EXPECT_EQ(cache->size(), 0);
+}
+
+// A returned CrlList keeps the cache alive, so a caller only needs to hold the
+// CrlList (this is what lets the validator store a single shared_ptr).
+TEST(CrlCacheTest, CrlListKeepsCacheAlive) {
+  std::weak_ptr<CrlCache> weak_cache;
+  CrlListSharedPtr crl_list;
+  {
+    auto cache = std::make_shared<CrlCache>();
+    weak_cache = cache;
+    const std::string crl = TestEnvironment::readFileToStringForTest(
+        TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+    absl::StatusOr<CrlListSharedPtr> result = cache->getOrCreate(crl, "ca_cert.crl");
+    ASSERT_OK(result);
+    crl_list = std::move(*result);
+  }
+  // The local cache reference is gone, but the CrlList still holds it alive.
+  EXPECT_FALSE(weak_cache.expired());
+  EXPECT_EQ(crl_list->cache.get(), weak_cache.lock().get());
+
+  // Dropping the CrlList releases the cache.
+  crl_list.reset();
+  EXPECT_TRUE(weak_cache.expired());
+}
+
+// Two validators created from the same factory context share a single parsed
+// CRL, which is the behavior that prevents a separate copy per TLS context.
+TEST(DefaultCertValidatorTest, SharesCrlAcrossContexts) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  const std::string crl = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+
+  auto config1 = std::make_unique<CrlValidationContextConfig>(crl);
+  auto config2 = std::make_unique<CrlValidationContextConfig>(crl);
+  DefaultCertValidator validator1(config1.get(), stats, context);
+  DefaultCertValidator validator2(config2.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx1(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL_CTX> ssl_ctx2(SSL_CTX_new(TLS_method()));
+  std::vector<SSL_CTX*> contexts1 = {ssl_ctx1.get()};
+  std::vector<SSL_CTX*> contexts2 = {ssl_ctx2.get()};
+  ASSERT_OK(validator1.initializeSslContexts(contexts1, false, *store.rootScope()));
+  ASSERT_OK(validator2.initializeSslContexts(contexts2, false, *store.rootScope()));
+
+  // Both validators reference the same parsed CRL, cached exactly once.
+  EXPECT_EQ(getCrlCache(context.singletonManager())->size(), 1);
+
+  // A validator using different CRL content adds a second cache entry.
+  const std::string other_crl =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.crl"));
+  auto config3 = std::make_unique<CrlValidationContextConfig>(other_crl);
+  DefaultCertValidator validator3(config3.get(), stats, context);
+  bssl::UniquePtr<SSL_CTX> ssl_ctx3(SSL_CTX_new(TLS_method()));
+  std::vector<SSL_CTX*> contexts3 = {ssl_ctx3.get()};
+  ASSERT_OK(validator3.initializeSslContexts(contexts3, false, *store.rootScope()));
+  EXPECT_EQ(getCrlCache(context.singletonManager())->size(), 2);
 }
 
 } // namespace Tls

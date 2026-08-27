@@ -1,7 +1,5 @@
 load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
-load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@cel-cpp//bazel:deps.bzl", "parser_deps")
 load("@com_github_chrusty_protoc_gen_jsonschema//:deps.bzl", protoc_gen_jsonschema_go_dependencies = "go_dependencies")
 load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
@@ -10,15 +8,17 @@ load("@emsdk//:toolchains.bzl", "register_emscripten_toolchains")
 load("@envoy_toolshed//compile:sanitizer_libs.bzl", "setup_sanitizer_libs")
 load("@envoy_toolshed//coverage/grcov:grcov_repository.bzl", "grcov_repository")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
+load("@gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
-load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
+load("@proxy-wasm-rust-sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
+load("@rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@rules_buf//buf:repositories.bzl", "rules_buf_toolchains")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
-load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
+load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
@@ -43,9 +43,18 @@ def envoy_dependency_imports(
         # which can be used to workaround a rules_rust bug. See:
         # - https://github.com/bazelbuild/rules_rust/issues/3521
         # - https://github.com/envoyproxy/envoy/issues/38951
-        cargo_bazel_lockfile = "@envoy//:Cargo.Bazel.lock"):
+        cargo_bazel_lockfile = "@envoy//:Cargo.Bazel.lock",
+        use_host_tools = False):
     compatibility_proxy_repo()
-    rules_foreign_cc_dependencies()
+
+    # When use_host_tools is True, skip downloading hermetic toolchains and use
+    # whatever is installed on the host. This is unsupported by the Envoy project
+    # and intended only for downstream builds in controlled environments.
+    if use_host_tools:
+        go_version = "host"
+        rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
+    else:
+        rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
     if go_version != "host":
@@ -211,6 +220,7 @@ def envoy_dependency_imports(
         importpath = "github.com/planetscale/vtprotobuf",
         sum = "h1:ujRGEVWJEoaxQ+8+HMl8YEpGaDAgohgZxJ5S+d2TTFQ=",
         version = "v0.6.1-0.20240409071808-615f978279ca",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     go_repository(
@@ -218,6 +228,7 @@ def envoy_dependency_imports(
         importpath = "github.com/envoyproxy/protoc-gen-validate",
         sum = "h1:TvGH1wof4H33rezVKWSpqKz5NXWg5VPuZ0uONDT6eb4=",
         version = "v1.3.0",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
     rules_proto_grpc_toolchains()
@@ -251,6 +262,17 @@ def envoy_download_go_sdks(go_version):
 def crates_repositories(cargo_bazel_lockfile):
     crates_repository(
         name = "envoy_rust_crate_index",
+        annotations = {
+            # rules_rust re-roots CC/CXX/LD into the execroot for build scripts, but its
+            # inherited CFLAGS/CXXFLAGS leave the toolchain's execroot-relative
+            # `-imacros external/llvm_toolchain/redacted_dates.h` path untouched. Run
+            # ring's build.rs from the execroot so the existing toolchain path resolves
+            # without changing redaction semantics or compile command lines.
+            "ring": [crate.annotation(
+                build_script_data = ["@llvm_toolchain//:redacted_dates.h"],
+                build_script_rundir = ".",
+            )],
+        },
         cargo_lockfile = "@envoy//:Cargo.lock",
         lockfile = Label(cargo_bazel_lockfile),
         manifests = ["@envoy//:Cargo.toml"],

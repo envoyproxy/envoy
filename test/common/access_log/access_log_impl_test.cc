@@ -1630,8 +1630,9 @@ class TestHeaderFilterFactory : public ExtensionFilterFactory {
 public:
   ~TestHeaderFilterFactory() override = default;
 
-  FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Server::Configuration::GenericFactoryContext& context) override {
+  absl::StatusOr<FilterPtr>
+  createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
+               Server::Configuration::GenericFactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, context.messageValidationVisitor(), *this);
     const auto& header_config =
@@ -1725,8 +1726,9 @@ class SampleExtensionFilterFactory : public ExtensionFilterFactory {
 public:
   ~SampleExtensionFilterFactory() override = default;
 
-  FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Server::Configuration::GenericFactoryContext& context) override {
+  absl::StatusOr<FilterPtr>
+  createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
+               Server::Configuration::GenericFactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, context.messageValidationVisitor(), *this);
 

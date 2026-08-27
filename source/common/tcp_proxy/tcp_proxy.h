@@ -429,7 +429,7 @@ private:
   uint64_t total_cluster_weight_;
   AccessLog::InstanceSharedPtrVector access_logs_;
   const uint32_t max_connect_attempts_;
-  ThreadLocal::SlotPtr upstream_drain_manager_slot_;
+  ThreadLocal::SlotSharedPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
   Random::RandomGenerator& random_generator_;
@@ -616,6 +616,8 @@ public:
     }
     void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
     void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
+    void addUpstreamWatermarkCallbacks(Http::UpstreamWatermarkCallbacks&) override {}
+    void removeUpstreamWatermarkCallbacks(Http::UpstreamWatermarkCallbacks&) override {}
     void setBufferLimit(uint64_t) override {}
     uint64_t bufferLimit() override { return 0; }
     bool recreateStream(const Http::ResponseHeaderMap*) override { return false; }

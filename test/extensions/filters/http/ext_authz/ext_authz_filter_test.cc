@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_authz is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include <chrono>
 #include <memory>
 #include <string>
@@ -29,29 +32,31 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using Envoy::Http::LowerCaseString;
 using testing::_;
+using testing::A;
 using testing::Contains;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Key;
-using testing::NiceMock;
 using testing::Not;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Values;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
+
+using StatusHelpers::HasStatus;
 
 TEST_F(HttpFilterTest, DisableDynamicMetadataIngestion) {
   InSequence s;
@@ -182,21 +187,21 @@ TEST_F(HttpFilterTest, MergeConfig) {
   // First config base config with one base value, and one value to be overridden.
   (*extensions)["base_key"] = "base_value";
   (*extensions)["merged_key"] = "base_value";
-  FilterConfigPerRoute base_config(settings);
+  FilterConfigPerRoute base_config = makePerRoute(settings);
 
   // Construct a config to merge, that provides one value and overrides one value.
   settings.Clear();
   auto&& specific_extensions = settings.mutable_check_settings()->mutable_context_extensions();
   (*specific_extensions)["merged_key"] = "value";
   (*specific_extensions)["key"] = "value";
-  FilterConfigPerRoute specific_config(settings);
+  FilterConfigPerRoute specific_config = makePerRoute(settings);
 
   // Perform the merge:
   base_config.merge(specific_config);
 
   settings.Clear();
   settings.set_disabled(true);
-  FilterConfigPerRoute disabled_config(settings);
+  FilterConfigPerRoute disabled_config = makePerRoute(settings);
 
   // Perform a merge with disabled config:
   base_config.merge(disabled_config);
@@ -1172,7 +1177,7 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
 
   // The check call should only be called once.
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1261,7 +1266,7 @@ TEST_F(HttpFilterTest, AuthWithRequestData) {
   prepareCheck();
 
   envoy::service::auth::v3::CheckRequest check_request;
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& check_param,
                            Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
@@ -1305,7 +1310,7 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestData) {
   prepareCheck();
 
   envoy::service::auth::v3::CheckRequest check_request;
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& check_param,
                            Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
@@ -1352,7 +1357,7 @@ TEST_F(HttpFilterTest, AuthWithNonUtf8RequestHeaders) {
   absl::string_view header_value = reinterpret_cast<const char*>(non_utf_8_bytes);
   request_headers_.addCopy(Http::LowerCaseString{header_key}, header_value);
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& check_request,
                            Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
@@ -1390,7 +1395,7 @@ TEST_F(HttpFilterTest, HeaderOnlyRequest) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1419,7 +1424,7 @@ TEST_F(HttpFilterTest, UpgradeWebsocketRequest) {
   request_headers_.addCopy(Http::Headers::get().Upgrade,
                            Http::Headers::get().UpgradeValues.WebSocket);
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1447,7 +1452,7 @@ TEST_F(HttpFilterTest, H2UpgradeRequest) {
   request_headers_.addCopy(Http::Headers::get().Protocol,
                            Http::Headers::get().ProtocolStrings.Http2String);
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1472,7 +1477,7 @@ TEST_F(HttpFilterTest, HeaderOnlyRequestWithStream) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1506,7 +1511,7 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1562,7 +1567,7 @@ TEST_F(HttpFilterTest, ClearCache) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1607,7 +1612,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1650,7 +1655,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1693,7 +1698,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1733,7 +1738,7 @@ TEST_F(HttpFilterTest, DeniedResponseWithBodyTruncation) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1774,7 +1779,7 @@ TEST_F(HttpFilterTest, DeniedResponseWithBodyNotTruncated) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1812,7 +1817,7 @@ TEST_F(HttpFilterTest, DeniedResponseWithBodyNotTruncatedWhenLimitIsZero) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1903,7 +1908,7 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1940,7 +1945,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -1986,7 +1991,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   response.headers_to_set = {{"foo", "bar"}};
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                            const StreamInfo::StreamInfo&) -> void {
@@ -2738,7 +2743,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
 
   prepareCheck();
 
-  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+  EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -2765,12 +2770,10 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
       .WillOnce(Invoke([&response](const std::string& ns,
                                    const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
-        // Check timing metadata correctness
-        EXPECT_TRUE(returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
-
+        // Check timing metadata correctness.
+        EXPECT_THAT(returned_dynamic_metadata.fields(),
+                    Contains(IsStructNumber("ext_authz_duration", 10)));
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
-        EXPECT_EQ(response.dynamic_metadata.fields().at("ext_authz_duration").number_value(),
-                  returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
       }));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
@@ -2891,10 +2894,13 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsConfigCheck) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   settings.mutable_check_settings()->CopyFrom(check_settings);
 
-  // Expect an exception while initializing the route's per filter config.
-  EXPECT_THROW_WITH_MESSAGE((FilterConfigPerRoute(settings)), EnvoyException,
-                            "Invalid configuration for check_settings. Only one of "
-                            "disable_request_body_buffering or with_request_body can be set.");
+  // Expect an error status while initializing the route's per filter config.
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfigPerRoute config(settings, creation_status);
+  EXPECT_THAT(creation_status,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "Invalid configuration for check_settings. Only one of "
+                        "disable_request_body_buffering or with_request_body can be set."));
 }
 
 // Checks that the per-route filter can override the check_settings set on the main filter.
@@ -2918,7 +2924,7 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsWorks) {
   // Initialize the route's per filter config.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   settings.mutable_check_settings()->CopyFrom(check_settings);
-  FilterConfigPerRoute auth_per_route(settings);
+  FilterConfigPerRoute auth_per_route = makePerRoute(settings);
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
@@ -3002,7 +3008,7 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsOverrideWorks) {
   // Initialize the route's per filter config.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   settings.mutable_check_settings()->CopyFrom(check_settings);
-  FilterConfigPerRoute auth_per_route(settings);
+  FilterConfigPerRoute auth_per_route = makePerRoute(settings);
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
@@ -3055,7 +3061,7 @@ TEST_F(HttpFilterTest, GrpcClientPerRouteError) {
   auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
   grpc_service->mutable_envoy_grpc()->set_cluster_name("nonexistent_cluster");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_config);
 
   // Set up route config to use the per-route configuration.
   ON_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig())
@@ -3101,7 +3107,7 @@ TEST_F(HttpFilterTest, HttpClientPerRouteOverride) {
   http_service->mutable_server_uri()->set_cluster("per_route_http_cluster");
   http_service->set_path_prefix("/api/v2/auth");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_config);
 
   // Set up route config to use the per-route configuration.
   ON_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig())
@@ -3750,8 +3756,8 @@ TEST_F(HttpFilterTest, ShadowModeDeniedWithAuthServerDynamicMetadata) {
       .WillOnce(
           Invoke([](const std::string& ns, const Protobuf::Struct& returned_dynamic_metadata) {
             EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
-            EXPECT_EQ(returned_dynamic_metadata.fields().at("custom_key").string_value(),
-                      "custom_value");
+            EXPECT_THAT(returned_dynamic_metadata.fields(),
+                        Contains(IsStructString("custom_key", "custom_value")));
           }));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
@@ -3895,7 +3901,7 @@ TEST_F(HttpFilterTest, CreatePerRouteGrpcClientWithServerContext) {
   auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
   grpc_service->mutable_envoy_grpc()->set_cluster_name("per_route_cluster");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_config);
   ON_CALL(decoder_filter_callbacks_, perFilterConfigs())
       .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_filter_config}));
 
@@ -3934,7 +3940,7 @@ TEST_F(HttpFilterTest, CreatePerRouteHttpClientWithServerContext) {
   http_service->mutable_server_uri()->set_uri("https://per-route.example.com");
   http_service->mutable_server_uri()->set_cluster("per_route_cluster");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_config);
   ON_CALL(decoder_filter_callbacks_, perFilterConfigs())
       .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_filter_config}));
 
@@ -4034,7 +4040,7 @@ TEST_F(HttpFilterTest, PerRouteGrpcClientCreationFailure) {
   auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
   grpc_service->mutable_envoy_grpc()->set_cluster_name("per_route_cluster");
 
-  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  FilterConfigPerRoute per_route_filter_config = makePerRoute(per_route_config);
   ON_CALL(decoder_filter_callbacks_, perFilterConfigs())
       .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_filter_config}));
 

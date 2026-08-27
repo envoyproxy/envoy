@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/init/manager.h"
@@ -21,6 +22,8 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/interval_value.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Network {
@@ -83,6 +86,14 @@ public:
   virtual absl::Status doFinalPreWorkerInit() PURE;
 };
 
+} // namespace Network
+
+namespace Quic {
+class QuicPacketWriterFactory;
+} // namespace Quic
+
+namespace Network {
+
 /**
  * Configuration for a UDP listener.
  */
@@ -99,6 +110,11 @@ public:
    * @return factory for writing to a UDP socket.
    */
   virtual UdpPacketWriterFactory& packetWriterFactory() PURE;
+
+  /**
+   * @return factory for creating QUIC packet writers.
+   */
+  virtual Quic::QuicPacketWriterFactory* quicPacketWriterFactory() PURE;
 
   /**
    * @param address is used to query the address specific router.
@@ -142,6 +158,11 @@ public:
   virtual ~ListenerInfo() = default;
 
   /**
+   * @return absl::string_view the name of the listener as set in configuration.
+   */
+  virtual absl::string_view name() const PURE;
+
+  /**
    * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
    * listener.
    */
@@ -163,6 +184,13 @@ public:
    * @return whether the listener is a Quic listener.
    */
   virtual bool isQuic() const PURE;
+
+  /**
+   * @return envoy::config::listener::v3::Listener::DrainType the drain type configured on this
+   * listener. DEFAULT listeners drain in response to /healthcheck/fail in addition to listener
+   * removal/modification and hot restart; MODIFY_ONLY listeners do not.
+   */
+  virtual envoy::config::listener::v3::Listener::DrainType drainType() const PURE;
 
   /**
    * @return bool whether the listener should bypass overload manager actions

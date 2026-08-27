@@ -314,6 +314,10 @@ public:
       metadata = m;
       return *this;
     }
+    StreamOptions& setMetadata(envoy::config::core::v3::Metadata&& m) {
+      metadata = std::move(m);
+      return *this;
+    }
 
     // Set FilterState on async stream allowing upstream filters to access it.
     StreamOptions& setFilterState(Envoy::StreamInfo::FilterStateSharedPtr fs) {
@@ -459,7 +463,7 @@ public:
     // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
     Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
 
-    // The amount of tiem to wait for server to half-close its stream after client
+    // The amount of time to wait for server to half-close its stream after client
     // has half-closed its stream.
     // Defaults to 1 second.
     std::chrono::milliseconds remote_close_timeout{1000};

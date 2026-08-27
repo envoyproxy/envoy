@@ -1,9 +1,11 @@
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/common/logger.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 
 namespace Envoy {
 
@@ -170,6 +172,91 @@ TEST_P(DynamicModulesIntegrationTest, PassThrough) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(10U, response->body().size());
+}
+
+TEST_P(DynamicModulesIntegrationTest, GenericSecretCallbacks) {
+  // The module subscribes by name with no config source, so the name resolves against the
+  // statically configured secrets.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("test_secret");
+    secret->mutable_generic_secret()->mutable_secret()->set_inline_string("super_secret_value");
+  });
+
+  initializeFilter("generic_secret_callbacks", "test_secret");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  // The value the module read while handling the request.
+  EXPECT_EQ(
+      "super_secret_value",
+      response->headers().get(Http::LowerCaseString("x-secret-value"))[0]->value().getStringView());
+  // The value the module read from the config context while the configuration was being loaded.
+  EXPECT_EQ("super_secret_value", response->headers()
+                                      .get(Http::LowerCaseString("x-secret-value-at-config"))[0]
+                                      ->value()
+                                      .getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, UpstreamConnectionId) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the upstream_connection_id filter is only in the rust test module";
+  }
+
+  initializeFilter("upstream_connection_id");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, LogLevel) {
+  if (GetParam() == "cpp") {
+    GTEST_SKIP() << "the log_level filter is only in the rust and go test modules";
+  }
+
+  // Pin the dynamic modules logger to a known level so the assertions are deterministic, and
+  // restore it afterwards to avoid affecting other tests.
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::warn);
+
+  initializeFilter("log_level");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  logger.set_level(original_level);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  // Warn is index 3 in the ABI log level enum.
+  EXPECT_EQ(
+      "3",
+      response->headers().get(Http::LowerCaseString("x-log-level"))[0]->value().getStringView());
+  // Info is below the configured level so it is disabled, Error is above it so it is enabled.
+  EXPECT_EQ("false", response->headers()
+                         .get(Http::LowerCaseString("x-log-info-enabled"))[0]
+                         ->value()
+                         .getStringView());
+  EXPECT_EQ("true", response->headers()
+                        .get(Http::LowerCaseString("x-log-error-enabled"))[0]
+                        ->value()
+                        .getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, HeaderCallbacks) { runHeaderCallbacksTest(false); }
@@ -423,6 +510,61 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestHeaders) {
   EXPECT_EQ(
       "some_value",
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
+}
+
+// A live, non-serializable object stored in filter state at Request lifespan is carried across
+// recreate_stream: the rebuilt filter recovers the same object and echoes its value.
+TEST_P(DynamicModulesIntegrationTest, FilterStateObjectSurvivesRecreateStream) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the filter_state_object_recreate filter is only in the rust test module";
+  }
+  initializeFilter("filter_state_object_recreate");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("0xabcd", response->headers()
+                          .get(Http::LowerCaseString("x-live-object-value"))[0]
+                          ->value()
+                          .getStringView());
+}
+
+// recreate_stream tears the filter chain down on the module's own stack. The in-module filter is
+// destroyed from the deferred deletion list, so the hook keeps using itself and calling back into
+// Envoy after the teardown. A synchronous destroy would have dropped the filter before its hook
+// resumed, so the first request would report a non-zero drop count. Each request builds a filter
+// for the original stream and one for the recreated stream, so the second request also pins down
+// that the dispatcher really runs the deferred destroy rather than dropping it.
+TEST_P(DynamicModulesIntegrationTest, ModuleUsesItselfAfterRecreateStream) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the use_self_after_teardown filter is only in the rust test module";
+  }
+  initializeFilter("use_self_after_teardown");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto sendRequestAndExpectRecreated = [this]() {
+    IntegrationStreamDecoderPtr response =
+        codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    auto recreated = response->headers().get(Http::LowerCaseString("x-recreated"));
+    ASSERT_FALSE(recreated.empty());
+    EXPECT_EQ("true", recreated[0]->value().getStringView());
+  };
+
+  constexpr absl::string_view log_line =
+      "recreated with state alive-torn-down after {} drops, header_set=true recreated=true "
+      "append=false drain=false route=false";
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"info", fmt::format(log_line, 0)},
+                                                         {"info", fmt::format(log_line, 2)}}),
+                             {
+                               sendRequestAndExpectRecreated();
+                               sendRequestAndExpectRecreated();
+                             });
 }
 
 TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestBody) {

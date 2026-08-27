@@ -22,6 +22,7 @@
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -46,6 +47,37 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
   EXPECT_LOG_CONTAINS("error",
                       "admin path \"" + path + "\" mutates state, method=GET rather than POST",
                       EXPECT_EQ(Http::Code::MethodNotAllowed, getCallback(path, header_map, data)));
+}
+
+// A graceful drain notifies the listeners that draining has begun, so that connection-level drain
+// logic (Network::Connection::onDrain()) applies to connections on -- and accepted by -- the
+// listeners covered by the drain. DrainManagerImpl deliberately does not do this itself: its
+// per-listener children must not fan out, so each server-drain entry point notifies instead.
+TEST_P(AdminInstanceTest, GracefulDrainNotifiesListeners) {
+  Buffer::OwnedImpl data;
+  Http::TestResponseHeaderMapImpl header_map;
+
+  // The event carries the server's configured strategy, so connections can reproduce the same
+  // gradual/immediate drain behavior the pull model applied.
+  ON_CALL(server_.options_, drainStrategy())
+      .WillByDefault(testing::Return(Server::DrainStrategy::Gradual));
+  Network::ConnectionDrainEvent captured;
+  EXPECT_CALL(server_.listener_manager_, onServerDrainStart(Network::DrainDirection::All, _))
+      .WillOnce(
+          testing::Invoke([&captured](Network::DrainDirection,
+                                      Network::ConnectionDrainEvent event) { captured = event; }));
+  EXPECT_EQ(Http::Code::OK, postCallback("/drain_listeners?graceful", header_map, data));
+  EXPECT_EQ(Server::DrainStrategy::Gradual, captured.strategy);
+
+  // Inbound-only drains pass the narrower direction through.
+  EXPECT_CALL(server_.listener_manager_,
+              onServerDrainStart(Network::DrainDirection::InboundOnly, _));
+  EXPECT_EQ(Http::Code::OK,
+            postCallback("/drain_listeners?graceful&inboundonly", header_map, data));
+
+  // A non-graceful drain stops the listeners outright; there is no drain window to notify about.
+  EXPECT_CALL(server_.listener_manager_, onServerDrainStart(_, _)).Times(0);
+  EXPECT_EQ(Http::Code::OK, postCallback("/drain_listeners", header_map, data));
 }
 
 TEST_P(AdminInstanceTest, Getters) {
@@ -187,6 +219,7 @@ TEST_P(AdminInstanceTest, Help) {
   /stats: print server stats
       usedonly: Only include stats that have been written by system since restart
       filter: Regular expression (Google re2) for filtering stats
+      invert_filter: Invert the filter regex
       format: Format to use; One of (html, active-html, text, json)
       type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
       histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, detailed, summary)
@@ -194,6 +227,7 @@ TEST_P(AdminInstanceTest, Help) {
       usedonly: Only include stats that have been written by system since restart
       text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)
       filter: Regular expression (Google re2) for filtering stats
+      invert_filter: Invert the filter regex
       histogram_buckets: Histogram bucket display mode; One of (cumulative, summary)
   /stats/recentlookups: Show recent stat-name lookups
   /stats/recentlookups/clear (POST): clear list of stat-name lookups and counter
@@ -341,7 +375,7 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.routeConfigProvider().config();
   peer.routeConfigProvider().configInfo();
   peer.routeConfigProvider().lastUpdated();
-  ASSERT_TRUE(peer.routeConfigProvider().onConfigUpdate().ok());
+  ASSERT_OK(peer.routeConfigProvider().onConfigUpdate());
 
   peer.scopedRouteConfigProvider().lastUpdated();
   peer.scopedRouteConfigProvider().getConfig();
@@ -358,7 +392,7 @@ TEST_P(AdminInstanceTest, Overrides) {
 
   peer.socketFactory().clone();
   peer.socketFactory().closeAllSockets();
-  ASSERT_TRUE(peer.socketFactory().doFinalPreWorkerInit().ok());
+  ASSERT_OK(peer.socketFactory().doFinalPreWorkerInit());
 
   peer.listener().name();
   peer.listener().udpListenerConfig();

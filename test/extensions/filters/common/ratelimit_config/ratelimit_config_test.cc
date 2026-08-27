@@ -19,13 +19,17 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
 using testing::NiceMock;
+using ::testing::Not;
 
 namespace Envoy {
 namespace Extensions {
@@ -114,9 +118,8 @@ TEST_F(RateLimitConfigTest, DisableKeyIsNotAllowed) {
 
     factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
     setupTest(yaml);
-    EXPECT_FALSE(creation_status_.ok());
-    EXPECT_EQ(creation_status_.message(),
-              "'stage' field and 'disable_key' field are not supported");
+    EXPECT_THAT(creation_status_,
+                HasStatusMessage("'stage' field and 'disable_key' field are not supported"));
   }
 }
 
@@ -136,8 +139,7 @@ TEST_F(RateLimitConfigTest, LimitIsNotAllowed) {
 
     factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
     setupTest(yaml);
-    EXPECT_FALSE(creation_status_.ok());
-    EXPECT_EQ(creation_status_.message(), "'limit' field is not supported");
+    EXPECT_THAT(creation_status_, HasStatusMessage("'limit' field is not supported"));
   }
 }
 
@@ -486,7 +488,7 @@ TEST_F(RateLimitConfigTest, LimitOverrideApplied) {
   )EOF";
 
   setupTest(yaml, /*no_limit=*/false);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   const std::string metadata_yaml = R"EOF(
 filter_metadata:
@@ -519,7 +521,7 @@ TEST_F(RateLimitConfigTest, StaticLimitOverrideApplied) {
   )EOF";
 
   setupTest(yaml, /*no_limit=*/false);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
   config_->populateDescriptors(headers_, stream_info_, "", descriptors);
@@ -549,7 +551,7 @@ TEST_F(RateLimitConfigTest, LimitOverrideWithHitsAddend) {
   )EOF";
 
   setupTest(yaml, /*no_limit=*/false);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   const std::string metadata_yaml = R"EOF(
 filter_metadata:
@@ -588,7 +590,7 @@ TEST_F(RateLimitConfigTest, LimitOverrideNotFound) {
   )EOF";
 
   setupTest(yaml, /*no_limit=*/false);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 
   const std::string metadata_yaml = R"EOF(
 filter_metadata:
@@ -1596,7 +1598,7 @@ actions:
   absl::Status creation_status;
   RateLimitPolicy policy(parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
 
-  EXPECT_FALSE(creation_status.ok());
+  EXPECT_THAT(creation_status, Not(IsOk()));
 }
 
 TEST_F(RateLimitPolicyTest, HeaderValueMatchValidationInvalidFormat) {
@@ -1616,7 +1618,7 @@ actions:
   absl::Status creation_status;
   RateLimitPolicy policy(parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
 
-  EXPECT_FALSE(creation_status.ok());
+  EXPECT_THAT(creation_status, Not(IsOk()));
 }
 
 TEST_F(RateLimitPolicyTest, QueryParameterValueMatchValidationInvalidFormat) {
@@ -1636,7 +1638,7 @@ actions:
   absl::Status creation_status;
   RateLimitPolicy policy(parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
 
-  EXPECT_FALSE(creation_status.ok());
+  EXPECT_THAT(creation_status, Not(IsOk()));
 }
 
 TEST_F(RateLimitPolicyTest, GenericKeyWithMultipleFormatters) {
@@ -1747,7 +1749,7 @@ hits_addend:
 
   absl::Status creation_status;
   RateLimitPolicy policy(rate_limit, factory_context_, creation_status);
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
 

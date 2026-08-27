@@ -28,6 +28,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.mcp_router"],
     deps = [
         "//source/extensions/filters/http/mcp_router:session_codec_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -45,6 +46,7 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/clusters/mcp_multicluster/v3:pkg_cc_proto",
     ],
@@ -67,7 +69,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["mcp_router_integration_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/clusters/mcp_multicluster:cluster",
         "//source/extensions/filters/http/mcp:config",

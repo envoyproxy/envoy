@@ -4,6 +4,7 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -173,7 +174,7 @@ TEST(QuicLbTest, InvalidConfig) {
   encryption_parameters.mutable_generic_secret();
   auto status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_EQ(factory_or_status.status().message(), "Missing 'encryption_key'");
 
@@ -185,7 +186,7 @@ TEST(QuicLbTest, InvalidConfig) {
   factory_context.server_factory_context_.resetSecretManager();
   status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_EQ(factory_or_status.status().message(),
             "'encryption_key' length was 3, but it must be length 16");
@@ -196,7 +197,7 @@ TEST(QuicLbTest, InvalidConfig) {
   factory_context.server_factory_context_.resetSecretManager();
   status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_EQ(factory_or_status.status().message(), "Missing 'configuration_version'");
 
@@ -209,7 +210,7 @@ TEST(QuicLbTest, InvalidConfig) {
   factory_context.server_factory_context_.resetSecretManager();
   status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_EQ(factory_or_status.status().message(),
             "'configuration_version' length was 2, but it must be length 1 byte");
@@ -222,7 +223,7 @@ TEST(QuicLbTest, InvalidConfig) {
   factory_context.server_factory_context_.resetSecretManager();
   status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_EQ(factory_or_status.status().message(),
             "'configuration_version' was 7, but must be less than 7");
@@ -234,9 +235,9 @@ TEST(QuicLbTest, InvalidConfig) {
   factory_context.server_factory_context_.resetSecretManager();
   status = factory_context.server_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
-  EXPECT_TRUE(status.ok());
+  EXPECT_OK(status);
   factory_or_status = Factory::create(cfg, factory_context);
-  EXPECT_TRUE(factory_or_status.ok());
+  EXPECT_OK(factory_or_status);
 
   // Server ID length mismatch
   cfg.set_expected_server_id_length(3);
@@ -247,7 +248,7 @@ TEST(QuicLbTest, InvalidConfig) {
   // Valid config with expected length set.
   cfg.set_expected_server_id_length(6);
   factory_or_status = Factory::create(cfg, factory_context);
-  EXPECT_TRUE(factory_or_status.ok());
+  EXPECT_OK(factory_or_status);
 
   // Invalid concurrency.
   EXPECT_CALL(factory_context.server_factory_context_.options_, concurrency())
@@ -464,7 +465,7 @@ TEST(QuicLbTest, EmptySecretCallback) {
 
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
-  EXPECT_TRUE(factory_or_status.ok());
+  EXPECT_OK(factory_or_status);
 
   auto status = update_callback();
   EXPECT_EQ(status.message(), "secret update callback called with empty secret");
