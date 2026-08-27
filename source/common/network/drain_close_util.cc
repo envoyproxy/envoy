@@ -8,6 +8,15 @@
 namespace Envoy {
 namespace Network {
 
+envoy::config::listener::v3::Listener::DrainType listenerDrainType(const Connection& connection) {
+  const OptRef<const ListenerInfo> listener_info =
+      connection.connectionInfoProvider().listenerInfo();
+  if (!listener_info.has_value()) {
+    return envoy::config::listener::v3::Listener::DEFAULT;
+  }
+  return listener_info->drainType();
+}
+
 bool shouldDrainClose(Server::Configuration::ServerFactoryContext& context,
                       envoy::config::listener::v3::Listener::DrainType drain_type,
                       std::optional<ConnectionDrainEvent> drain_event) {

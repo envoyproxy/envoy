@@ -400,5 +400,17 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.listener().tcpBacklogSize();
 }
 
+// The admin listener declares MODIFY_ONLY so that the connection-level drain decision (see
+// Network::shouldDrainClose()) agrees with the drain decision the admin connection manager is
+// constructed with, namely the global drain manager, which is also MODIFY_ONLY (see
+// ProdComponentFactory::createDrainManager). In particular /healthcheck/fail must not drain-close
+// admin connections, which would break keep-alive for admin clients that hold a connection while
+// the server is health check failed.
+TEST_P(AdminInstanceTest, ListenerDrainTypeIsModifyOnly) {
+  AdminTestingPeer peer(admin_);
+  EXPECT_EQ(envoy::config::listener::v3::Listener::MODIFY_ONLY,
+            peer.listener().listenerInfo()->drainType());
+}
+
 } // namespace Server
 } // namespace Envoy
