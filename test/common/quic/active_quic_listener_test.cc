@@ -819,5 +819,21 @@ TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreation) {
   EXPECT_EQ(quic_listener_->quicPacketWriter(), raw_writer);
 }
 
+TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreationNullWriter) {
+  MockQuicPacketWriterFactory quic_packet_writer_factory;
+
+  // Override the quicPacketWriterFactory mock to return our QUIC factory.
+  EXPECT_CALL(udp_listener_config_, quicPacketWriterFactory())
+      .WillRepeatedly(Return(&quic_packet_writer_factory));
+
+  // Expect createQuicPacketWriter to return nullptr.
+  EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _))
+      .Times(testing::AnyNumber())
+      .WillRepeatedly(testing::InvokeWithoutArgs([]() -> QuicPacketWriterPtr { return nullptr; }));
+
+  // Initialize the listener. This will trigger IS_ENVOY_BUG.
+  EXPECT_ENVOY_BUG(initialize(), "quic_packet_writer_factory failed to create quic_writer");
+}
+
 } // namespace Quic
 } // namespace Envoy

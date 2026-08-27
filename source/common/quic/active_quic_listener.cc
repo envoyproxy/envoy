@@ -116,6 +116,8 @@ ActiveQuicListener::ActiveQuicListener(
     if (quic_writer != nullptr) {
       quic_packet_writer_ = quic_writer.get();
       quic_dispatcher_->InitializeWithWriter(quic_writer.release());
+    } else {
+      IS_ENVOY_BUG("quic_packet_writer_factory failed to create quic_writer");
     }
   } else {
     // TODO(panting): This fallback is a temporary migration bridge. We must keep this
