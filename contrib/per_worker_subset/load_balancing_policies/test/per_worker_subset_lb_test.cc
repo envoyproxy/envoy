@@ -304,6 +304,90 @@ TEST_F(PerWorkerSubsetLoadBalancerTest, UsesDegradedHostsWhenNoHealthyHostsRemai
   EXPECT_EQ(stats_.counterFromString("lb_per_worker_subset_slice_fallback").value(), 0);
 }
 
+TEST_F(PerWorkerSubsetLoadBalancerTest, FallbackThresholdBoundariesSelectExpectedHealthClasses) {
+  makeHosts(4);
+  ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*hosts_[2]), coarseHealth())
+      .WillByDefault(Return(Upstream::Host::Health::Degraded));
+  ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*hosts_[3]), coarseHealth())
+      .WillByDefault(Return(Upstream::Host::Health::Unhealthy));
+
+  struct Scenario {
+    uint32_t threshold;
+    std::set<Upstream::HostConstSharedPtr> expected;
+  };
+  const std::vector<Scenario> scenarios{
+      {0, {hosts_[0], hosts_[1]}},
+      {25, {hosts_[0], hosts_[1]}},
+      {50, {hosts_[0], hosts_[1]}},
+      {51, {hosts_[0], hosts_[1], hosts_[2]}},
+      {75, {hosts_[0], hosts_[1], hosts_[2]}},
+      {76, {hosts_[0], hosts_[1], hosts_[2], hosts_[3]}},
+      {100, {hosts_[0], hosts_[1], hosts_[2], hosts_[3]}},
+  };
+
+  for (const auto& scenario : scenarios) {
+    SCOPED_TRACE(scenario.threshold);
+    PerWorkerSubsetLoadBalancer lb(
+        priority_set_, lb_stats_, *stats_.rootScope(), runtime_, random_, time_system_,
+        /*subset_size=*/0, PartitioningStrategy::EqualPartitions,
+        HostSelectionStrategy::SimpleRoundRobin, /*worker_id=*/0, total_workers_,
+        scenario.threshold, /*envoy_seed=*/0, /*slow_start_config=*/{});
+
+    std::set<Upstream::HostConstSharedPtr> seen;
+    for (size_t i = 0; i < hosts_.size() * 2; ++i) {
+      seen.insert(lb.chooseHost(nullptr).host);
+    }
+    EXPECT_EQ(seen, scenario.expected);
+  }
+}
+
+TEST_F(PerWorkerSubsetLoadBalancerTest, InnerLoadBalancersHonorFullSliceFallback) {
+  makeHosts(4);
+  host_set_.healthy_hosts_.clear();
+  for (const auto& host : hosts_) {
+    ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*host), coarseHealth())
+        .WillByDefault(Return(Upstream::Host::Health::Unhealthy));
+  }
+
+  for (const auto strategy :
+       {HostSelectionStrategy::EnvoyRoundRobin, HostSelectionStrategy::EnvoyP2C}) {
+    SCOPED_TRACE(static_cast<int>(strategy));
+    PerWorkerSubsetLoadBalancer lb(
+        priority_set_, lb_stats_, *stats_.rootScope(), runtime_, random_, time_system_,
+        /*subset_size=*/0, PartitioningStrategy::EqualPartitions, strategy,
+        /*worker_id=*/0, total_workers_,
+        /*fallback_threshold=*/50, /*envoy_seed=*/0, /*slow_start_config=*/{});
+
+    std::set<Upstream::HostConstSharedPtr> seen;
+    for (int i = 0; i < 200; ++i) {
+      const auto host = lb.chooseHost(nullptr).host;
+      ASSERT_NE(host, nullptr);
+      seen.insert(host);
+    }
+    EXPECT_EQ(seen.size(), hosts_.size());
+  }
+}
+
+TEST_F(PerWorkerSubsetLoadBalancerTest, InnerLoadBalancersPreferHealthyHostsWithoutPanic) {
+  makeHosts(4);
+  ON_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*hosts_[3]), coarseHealth())
+      .WillByDefault(Return(Upstream::Host::Health::Degraded));
+
+  for (const auto strategy :
+       {HostSelectionStrategy::EnvoyRoundRobin, HostSelectionStrategy::EnvoyP2C}) {
+    SCOPED_TRACE(static_cast<int>(strategy));
+    PerWorkerSubsetLoadBalancer lb(
+        priority_set_, lb_stats_, *stats_.rootScope(), runtime_, random_, time_system_,
+        /*subset_size=*/0, PartitioningStrategy::EqualPartitions, strategy,
+        /*worker_id=*/0, total_workers_,
+        /*fallback_threshold=*/100, /*envoy_seed=*/0, /*slow_start_config=*/{});
+
+    for (int i = 0; i < 200; ++i) {
+      EXPECT_NE(lb.chooseHost(nullptr).host, hosts_[3]);
+    }
+  }
+}
+
 // EQUAL_PARTITIONS auto-computes ``K = ceil(N/W)``. With ``N=64`` and ``W=8``,
 // ``K=8``; worker 0 and worker 1 see distinct 8-host slices.
 TEST_F(PerWorkerSubsetLoadBalancerTest, EqualPartitionsAutoComputesDisjointSubsets) {

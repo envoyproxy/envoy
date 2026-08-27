@@ -161,7 +161,9 @@ message PerWorkerSubset {
   // :ref:`common_lb_config.healthy_panic_threshold
   // <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.healthy_panic_threshold>`
   // -- this knob is scoped to the per-worker subset, not the whole
-  // cluster.
+  // cluster. It is evaluated by this policy before publishing the worker's
+  // synthetic host set; the inner stock load balancer does not apply a
+  // second panic threshold.
   google.protobuf.UInt32Value fallback_threshold = 4 [(validate.rules).uint32 = {lte: 100}];
 
   // Slow-start config forwarded to the inner stock LB when

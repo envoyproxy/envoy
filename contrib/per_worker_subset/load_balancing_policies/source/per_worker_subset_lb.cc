@@ -13,6 +13,11 @@ namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
 namespace PerWorkerSubset {
+namespace {
+
+constexpr uint32_t InnerHealthyPanicThreshold = 0;
+
+} // namespace
 
 PerWorkerSubsetLoadBalancer::PerWorkerSubsetLoadBalancer(
     const Upstream::PrioritySet& priority_set, Upstream::ClusterLbStats& stats, Stats::Scope& scope,
@@ -51,9 +56,12 @@ PerWorkerSubsetLoadBalancer::PerWorkerSubsetLoadBalancer(
     // RoundRobin proto. Stock RR's EdfLoadBalancerBase reads it on init.
     // Unset = empty proto = slow_start disabled (default behavior).
     *rr_config.mutable_slow_start_config() = slow_start_config;
+    // The outer LB is the sole owner of per-worker fallback. The inner LB
+    // receives an already-selected synthetic host view and only performs
+    // within-subset scheduling.
     inner_lb_ = std::make_unique<Upstream::RoundRobinLoadBalancer>(
         synthetic_priority_set_, /*local_priority_set=*/nullptr, stats_, runtime_, random_,
-        fallback_threshold_, rr_config, time_source_);
+        InnerHealthyPanicThreshold, rr_config, time_source_);
     break;
   }
   case HostSelectionStrategy::EnvoyP2C: {
@@ -61,7 +69,7 @@ PerWorkerSubsetLoadBalancer::PerWorkerSubsetLoadBalancer(
     *lr_config.mutable_slow_start_config() = slow_start_config;
     inner_lb_ = std::make_unique<Upstream::LeastRequestLoadBalancer>(
         synthetic_priority_set_, /*local_priority_set=*/nullptr, stats_, runtime_, random_,
-        fallback_threshold_, lr_config, time_source_);
+        InnerHealthyPanicThreshold, lr_config, time_source_);
     break;
   }
   case HostSelectionStrategy::SimpleRoundRobin:
@@ -92,7 +100,7 @@ void PerWorkerSubsetLoadBalancer::rebuildSubset(bool membership_changed) {
   per_worker_subset_stats_.lb_per_worker_subset_rebuilds_.inc();
   if (priority_set_.hostSetsPerPriority().empty()) {
     subset_ = std::make_shared<std::vector<Upstream::HostConstSharedPtr>>();
-    publishSubsetToSyntheticPrioritySet(*subset_);
+    publishSubsetToSyntheticPrioritySet(*subset_, /*full_slice_fallback=*/false);
     return;
   }
   const auto& host_set = priority_set_.hostSetsPerPriority()[0];
@@ -105,7 +113,7 @@ void PerWorkerSubsetLoadBalancer::rebuildSubset(bool membership_changed) {
       random_partition_.clear();
     }
     subset_ = std::move(new_subset);
-    publishSubsetToSyntheticPrioritySet(*subset_);
+    publishSubsetToSyntheticPrioritySet(*subset_, /*full_slice_fallback=*/false);
     return;
   }
 
@@ -118,16 +126,17 @@ void PerWorkerSubsetLoadBalancer::rebuildSubset(bool membership_changed) {
   // healthy-only subset, avoiding the synchronized connection-pool churn
   // that a cluster-wide check would produce.
   std::vector<Upstream::HostConstSharedPtr> picked;
+  bool full_slice_fallback;
   if (strategy_ == PartitioningStrategy::EqualPartitions) {
     if (membership_changed) {
       rebuildEqualPartitionAssignment(all);
     }
-    rebuildEqualPartition(picked);
+    full_slice_fallback = rebuildEqualPartition(picked);
   } else {
     if (membership_changed) {
       reconcileRandomPartition(host_set->healthyHosts(), all);
     }
-    rebuildRandomPartition(picked);
+    full_slice_fallback = rebuildRandomPartition(picked);
   }
 
   ENVOY_LOG(debug, "per_worker_subset: worker={} strategy={} intra={} K={} from N={}", worker_id_,
@@ -136,7 +145,7 @@ void PerWorkerSubsetLoadBalancer::rebuildSubset(bool membership_changed) {
 
   new_subset->swap(picked);
   subset_ = std::move(new_subset);
-  publishSubsetToSyntheticPrioritySet(*subset_);
+  publishSubsetToSyntheticPrioritySet(*subset_, full_slice_fallback);
 }
 
 void PerWorkerSubsetLoadBalancer::reconcileRandomPartition(
@@ -187,9 +196,9 @@ void PerWorkerSubsetLoadBalancer::reconcileRandomPartition(
   random_partition_ = std::move(next);
 }
 
-void PerWorkerSubsetLoadBalancer::rebuildRandomPartition(
+bool PerWorkerSubsetLoadBalancer::rebuildRandomPartition(
     std::vector<Upstream::HostConstSharedPtr>& out) {
-  filterAssignmentByHealth(random_partition_, out);
+  return filterAssignmentByHealth(random_partition_, out);
 }
 
 void PerWorkerSubsetLoadBalancer::rebuildEqualPartitionAssignment(
@@ -252,17 +261,17 @@ void PerWorkerSubsetLoadBalancer::rebuildEqualPartitionAssignment(
   }
 }
 
-void PerWorkerSubsetLoadBalancer::rebuildEqualPartition(
+bool PerWorkerSubsetLoadBalancer::rebuildEqualPartition(
     std::vector<Upstream::HostConstSharedPtr>& out) {
-  filterAssignmentByHealth(equal_partition_, out);
+  return filterAssignmentByHealth(equal_partition_, out);
 }
 
-void PerWorkerSubsetLoadBalancer::filterAssignmentByHealth(
+bool PerWorkerSubsetLoadBalancer::filterAssignmentByHealth(
     const std::vector<Upstream::HostConstSharedPtr>& assignment,
     std::vector<Upstream::HostConstSharedPtr>& out) {
   if (assignment.empty()) {
     out.clear();
-    return;
+    return false;
   }
 
   std::vector<Upstream::HostConstSharedPtr> healthy;
@@ -290,14 +299,14 @@ void PerWorkerSubsetLoadBalancer::filterAssignmentByHealth(
   };
   if (meets_threshold(healthy.size())) {
     out = std::move(healthy);
-    return;
+    return false;
   }
 
   const bool no_healthy_hosts = healthy.empty();
   healthy.insert(healthy.end(), degraded.begin(), degraded.end());
   if (meets_threshold(healthy.size())) {
     out = std::move(healthy);
-    return;
+    return false;
   }
 
   per_worker_subset_stats_.lb_per_worker_subset_slice_fallback_.inc();
@@ -305,10 +314,11 @@ void PerWorkerSubsetLoadBalancer::filterAssignmentByHealth(
     per_worker_subset_stats_.lb_per_worker_subset_slice_empty_healthy_.inc();
   }
   out = assignment;
+  return true;
 }
 
 void PerWorkerSubsetLoadBalancer::publishSubsetToSyntheticPrioritySet(
-    const std::vector<Upstream::HostConstSharedPtr>& subset) {
+    const std::vector<Upstream::HostConstSharedPtr>& subset, bool full_slice_fallback) {
   // SimpleRoundRobin reads ``subset_`` directly, no inner LB to feed.
   if (host_selection_strategy_ == HostSelectionStrategy::SimpleRoundRobin) {
     return;
@@ -359,6 +369,21 @@ void PerWorkerSubsetLoadBalancer::publishSubsetToSyntheticPrioritySet(
   // the partition step, not within-subset.
   auto hosts_per_locality = std::make_shared<Upstream::HostsPerLocalityImpl>(*hosts, false);
   auto params = Upstream::HostSetImpl::partitionHosts(hosts, hosts_per_locality);
+  if (full_slice_fallback) {
+    // Core panic is disabled on the inner LB, so make the outer fallback
+    // decision authoritative by presenting every selected host as eligible.
+    // Outside full fallback, partitionHosts() retains normal healthy/degraded
+    // preference.
+    auto eligible_hosts = std::make_shared<Upstream::HealthyHostVector>(*hosts);
+    auto empty_degraded_hosts = std::make_shared<Upstream::DegradedHostVector>();
+    auto empty_excluded_hosts = std::make_shared<Upstream::ExcludedHostVector>();
+    auto empty_hosts_per_locality =
+        std::make_shared<Upstream::HostsPerLocalityImpl>(Upstream::HostVector{}, false);
+    params = Upstream::HostSetImpl::updateHostsParams(
+        hosts, hosts_per_locality, std::move(eligible_hosts), hosts_per_locality,
+        std::move(empty_degraded_hosts), empty_hosts_per_locality, std::move(empty_excluded_hosts),
+        empty_hosts_per_locality);
+  }
   synthetic_priority_set_.updateHosts(0, std::move(params), /*locality_weights=*/nullptr,
                                       hosts_added, hosts_removed,
                                       /*weighted_priority_health=*/absl::nullopt,

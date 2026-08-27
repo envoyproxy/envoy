@@ -151,20 +151,21 @@ private:
   void reconcileRandomPartition(const Upstream::HostVector& healthy_candidates,
                                 const Upstream::HostVector& all_candidates);
   // Apply the shared health/degraded/fallback policy to the stable random
-  // assignment without resampling it.
-  void rebuildRandomPartition(std::vector<Upstream::HostConstSharedPtr>& out);
+  // assignment without resampling it. Returns true for full-slice fallback.
+  bool rebuildRandomPartition(std::vector<Upstream::HostConstSharedPtr>& out);
   // Recompute EQUAL_PARTITIONS' stable K-host assignment after a membership
   // update. This is the only path that copies and address-sorts all N hosts.
   void rebuildEqualPartitionAssignment(const Upstream::HostVector& all_candidates);
   // Filter the cached equal assignment to healthy hosts and apply the
   // per-worker fallback threshold. Health-only updates call only this O(K)
-  // path.
-  void rebuildEqualPartition(std::vector<Upstream::HostConstSharedPtr>& out);
+  // path. Returns true for full-slice fallback.
+  bool rebuildEqualPartition(std::vector<Upstream::HostConstSharedPtr>& out);
   // Apply the common healthy -> degraded -> full-assignment selection policy.
   // Healthy hosts are preferred; degraded hosts are added only when healthy
   // capacity does not meet the per-worker threshold. Unhealthy hosts are
-  // included only in the final panic-style fallback.
-  void filterAssignmentByHealth(const std::vector<Upstream::HostConstSharedPtr>& assignment,
+  // included only in the final panic-style fallback. Returns true for that
+  // full-assignment fallback.
+  bool filterAssignmentByHealth(const std::vector<Upstream::HostConstSharedPtr>& assignment,
                                 std::vector<Upstream::HostConstSharedPtr>& out);
 
   // Simple in-extension pick: ``next_index_ % K`` round-robin against the
@@ -175,9 +176,12 @@ private:
                              Upstream::LoadBalancerContext* context);
 
   // Push the latest subset into ``synthetic_priority_set_`` so the inner
-  // stock LB (if any) sees an updated host set and re-derives. No-op when
+  // stock LB (if any) sees an updated host set and re-derives. During
+  // full-slice fallback, every selected host is marked eligible so the inner
+  // LB cannot override the outer fallback decision. No-op when
   // ``host_selection_strategy_`` is ``SimpleRoundRobin``.
-  void publishSubsetToSyntheticPrioritySet(const std::vector<Upstream::HostConstSharedPtr>& subset);
+  void publishSubsetToSyntheticPrioritySet(const std::vector<Upstream::HostConstSharedPtr>& subset,
+                                           bool full_slice_fallback);
 
   const Upstream::PrioritySet& priority_set_;
   Upstream::ClusterLbStats& stats_;
