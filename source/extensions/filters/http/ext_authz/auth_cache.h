@@ -34,7 +34,7 @@ public:
     virtual void cancel() PURE;
   };
 
-  using LookupCallback = std::function<void(Filters::Common::ExtAuthz::ResponsePtr&&)>;
+  using LookupCallback = std::function<void(Filters::Common::ExtAuthz::ResponseSharedPtr)>;
 
   /**
    * Looks for a matching request/response pair in the cache.

@@ -3982,7 +3982,7 @@ TEST_F(HttpFilterCacheTest, CacheHitOk) {
 
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
 
-  auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  auto cached_response = std::make_shared<Filters::Common::ExtAuthz::Response>();
   cached_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
   cached_response->headers_to_add.push_back({"x-cached-header", "yes"});
 
@@ -4008,7 +4008,7 @@ TEST_F(HttpFilterCacheTest, CacheHitOkSync) {
       .WillOnce(
           Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
                      AuthCacheSession::LookupCallback&& cb) -> AuthCacheSession::LookupRequest* {
-            auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+            auto cached_response = std::make_shared<Filters::Common::ExtAuthz::Response>();
             cached_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
             cached_response->headers_to_add.push_back({"x-cached-header", "yes"});
             cb(std::move(cached_response));
@@ -4047,7 +4047,7 @@ TEST_F(HttpFilterCacheTest, CacheHitDenied) {
 
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
 
-  auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  auto cached_response = std::make_shared<Filters::Common::ExtAuthz::Response>();
   cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   cached_response->status_code = Http::Code::Forbidden;
   cached_response->body = "Access Denied by Cache";
@@ -4073,7 +4073,7 @@ TEST_F(HttpFilterCacheTest, CacheHitDeniedSync) {
       .WillOnce(
           Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
                      AuthCacheSession::LookupCallback&& cb) -> AuthCacheSession::LookupRequest* {
-            auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+            auto cached_response = std::make_shared<Filters::Common::ExtAuthz::Response>();
             cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Denied;
             cached_response->status_code = Http::Code::Forbidden;
             cached_response->body = "Access Denied by Cache";
@@ -4114,7 +4114,7 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailOpen) {
 
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
 
-  auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  auto cached_response = std::make_shared<Filters::Common::ExtAuthz::Response>();
   cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
@@ -4138,7 +4138,7 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailOpenSync) {
       .WillOnce(
           Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
                      AuthCacheSession::LookupCallback&& cb) -> AuthCacheSession::LookupRequest* {
-            auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+            auto cached_response = std::make_shared<Filters::Common::ExtAuthz::Response>();
             cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
             cb(std::move(cached_response));
             return nullptr;
@@ -4175,7 +4175,7 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailClosed) {
 
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
 
-  auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  auto cached_response = std::make_shared<Filters::Common::ExtAuthz::Response>();
   cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
   cached_response->status_code = Http::Code::Forbidden;
 
@@ -4200,7 +4200,7 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailClosedSync) {
       .WillOnce(
           Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes&,
                      AuthCacheSession::LookupCallback&& cb) -> AuthCacheSession::LookupRequest* {
-            auto cached_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+            auto cached_response = std::make_shared<Filters::Common::ExtAuthz::Response>();
             cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
             cached_response->status_code = Http::Code::Forbidden;
             cb(std::move(cached_response));

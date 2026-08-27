@@ -496,6 +496,8 @@ public:
   // ExtAuthz::RequestCallbacks
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
+  void onComplete(Filters::Common::ExtAuthz::ResponseSharedPtr response);
+
 private:
   // Convenience function for the following:
   // 1. If `validate_mutations` is set to true, validate header key and value.
@@ -514,7 +516,7 @@ private:
   // Validates error response headers and clears custom attributes if invalid headers are found.
   // Returns true if headers are valid or validation is disabled, false if headers are invalid.
   bool
-  validateAndClearInvalidErrorResponseAttributes(Filters::Common::ExtAuthz::ResponsePtr& response);
+  validateAndClearInvalidErrorResponseAttributes(Filters::Common::ExtAuthz::Response& response);
 
   // Helper to check if we can add more headers to the response, respecting header limits.
   // Returns true if we can add more headers, false if the limit has been reached.
@@ -540,7 +542,7 @@ private:
   void initiateCall(const Http::RequestHeaderMap& headers);
   RequestAttributes collectAttributes(const Http::RequestHeaderMap& headers);
   void callAuthzService();
-  void onCacheLookupComplete(Filters::Common::ExtAuthz::ResponsePtr&& response);
+  void onCacheLookupComplete(Filters::Common::ExtAuthz::ResponseSharedPtr response);
   void continueDecoding();
   // In shadow mode, writes the authorization decision and response attributes into
   // FilterState and increments the appropriate shadow stat counter. Takes the response

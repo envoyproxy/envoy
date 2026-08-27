@@ -414,7 +414,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
     active_lookup_ =
         cache_session_->lookup(*decoder_callbacks_, *request_attributes_,
-                               [this](Filters::Common::ExtAuthz::ResponsePtr&& response) {
+                               [this](Filters::Common::ExtAuthz::ResponseSharedPtr response) {
                                  active_lookup_ = nullptr;
                                  onCacheLookupComplete(std::move(response));
                                });
@@ -431,7 +431,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   onCacheLookupComplete(nullptr);
 }
 
-void Filter::onCacheLookupComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
+void Filter::onCacheLookupComplete(Filters::Common::ExtAuthz::ResponseSharedPtr response) {
   if (response == nullptr) {
     ENVOY_STREAM_LOG(trace, "ext_authz filter cache miss.", *decoder_callbacks_);
     ASSERT(request_attributes_.has_value());
@@ -713,6 +713,10 @@ CheckResult Filter::validateAndCheckDecoderHeaderMutation(
 }
 
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
+  onComplete(Filters::Common::ExtAuthz::ResponseSharedPtr(std::move(response)));
+}
+
+void Filter::onComplete(Filters::Common::ExtAuthz::ResponseSharedPtr response) {
   const bool from_cache = (state_ == State::CacheLookup);
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
@@ -1147,7 +1151,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     }
 
     // Validate error response headers and clear custom attributes if invalid.
-    validateAndClearInvalidErrorResponseAttributes(response);
+    validateAndClearInvalidErrorResponseAttributes(*response);
 
     // Apply max_denied_response_body_bytes limit to error response body as well.
     if (config_->maxDeniedResponseBodyBytes() > 0 &&
@@ -1272,13 +1276,13 @@ Filter::PerRouteFlags Filter::getPerRouteFlags(OptRef<const Router::Route> route
 }
 
 bool Filter::validateAndClearInvalidErrorResponseAttributes(
-    Filters::Common::ExtAuthz::ResponsePtr& response) {
+    Filters::Common::ExtAuthz::Response& response) {
   if (!config_->validateMutations()) {
     return true;
   }
 
   // Validate headers_to_set.
-  for (const auto& [key, value] : response->headers_to_set) {
+  for (const auto& [key, value] : response.headers_to_set) {
     if (!Http::HeaderUtility::headerNameIsValid(key) ||
         !Http::HeaderUtility::headerValueIsValid(value)) {
       ENVOY_STREAM_LOG(trace, "Rejected invalid error header '{}':'{}'.", *decoder_callbacks_, key,
@@ -1288,16 +1292,16 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
                        "header. Falling back to generic error response.",
                        *decoder_callbacks_);
       // Fall back to generic error by clearing all custom attributes.
-      response->headers_to_set.clear();
-      response->headers_to_append.clear();
-      response->body.clear();
-      response->status_code = zeroHttpCode(); // Clear custom status.
+      response.headers_to_set.clear();
+      response.headers_to_append.clear();
+      response.body.clear();
+      response.status_code = zeroHttpCode(); // Clear custom status.
       return false;
     }
   }
 
   // Validate headers_to_append.
-  for (const auto& [key, value] : response->headers_to_append) {
+  for (const auto& [key, value] : response.headers_to_append) {
     if (!Http::HeaderUtility::headerNameIsValid(key) ||
         !Http::HeaderUtility::headerValueIsValid(value)) {
       ENVOY_STREAM_LOG(trace, "Rejected invalid error header '{}':'{}'.", *decoder_callbacks_, key,
@@ -1307,10 +1311,10 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
                        "header. Falling back to generic error response.",
                        *decoder_callbacks_);
       // Fall back to generic error by clearing all custom attributes.
-      response->headers_to_set.clear();
-      response->headers_to_append.clear();
-      response->body.clear();
-      response->status_code = zeroHttpCode(); // Clear custom status.
+      response.headers_to_set.clear();
+      response.headers_to_append.clear();
+      response.body.clear();
+      response.status_code = zeroHttpCode(); // Clear custom status.
       return false;
     }
   }

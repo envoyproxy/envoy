@@ -25,7 +25,8 @@ namespace ExtAuthz {
 
 struct SimpleInMemoryCacheStorage {
   absl::Mutex mutex;
-  absl::flat_hash_map<std::string, Filters::Common::ExtAuthz::Response> map ABSL_GUARDED_BY(mutex);
+  absl::flat_hash_map<std::string, Filters::Common::ExtAuthz::ResponseSharedPtr>
+      map ABSL_GUARDED_BY(mutex);
 };
 
 class SimpleInMemoryCacheSession : public AuthCacheSession {
@@ -44,7 +45,7 @@ public:
     absl::ReaderMutexLock lock(&storage_->mutex);
     auto it = storage_->map.find(current_key_);
     if (it != storage_->map.end()) {
-      cb(std::make_unique<Filters::Common::ExtAuthz::Response>(it->second));
+      cb(it->second);
       return nullptr;
     }
     cb(nullptr);
@@ -57,7 +58,7 @@ public:
     }
 
     absl::WriterMutexLock lock(&storage_->mutex);
-    storage_->map[current_key_] = response;
+    storage_->map[current_key_] = std::make_shared<Filters::Common::ExtAuthz::Response>(response);
   }
 
 private:
