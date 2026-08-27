@@ -468,6 +468,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/common/websocket:handshake_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,

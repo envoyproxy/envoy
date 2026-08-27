@@ -81,9 +81,10 @@ HTTP/2+ hop, with the documented flaw that the HTTP/1.1 method is always assumed
 `RFC 6455 <https://www.rfc-editor.org/rfc/rfc6455>`_ ``Sec-WebSocket-Key``/``Sec-WebSocket-Accept``
 exchange with the ``:protocol`` pseudo-header. When converting a WebSocket extended ``CONNECT`` to
 an HTTP/1.1 upgrade, Envoy generates the ``sec-websocket-key`` required by that upstream attempt
-and validates the corresponding ``sec-websocket-accept`` response. The generated handshake headers
-are not added to the shared downstream request or response headers. A retry generates a new key.
-An existing key is preserved without additional validation so that
+and validates the upstream's ``upgrade``, ``connection``, and ``sec-websocket-accept`` response
+headers. Invalid handshakes are treated as ``502`` responses for retry and outlier detection. The
+generated handshake headers are not added to the shared downstream request or response headers. A
+retry generates a new key. An existing key is preserved without additional validation so that
 upgrade-``CONNECT``-upgrade chains continue to use the original HTTP/1.1 client's key.
 
 Non-WebSocket upgrades are allowed to use any valid HTTP method (i.e. ``POST``) and the current

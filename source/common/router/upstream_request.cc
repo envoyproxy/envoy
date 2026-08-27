@@ -658,7 +658,6 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
 
   if (protocol) {
     stream_info_.protocol(protocol.value());
-    maybeGenerateWebsocketKey(protocol.value());
   } else {
     // We only pause for CONNECT and upgrades for HTTP upstreams. If this is a non-HTTP
     // upstream (e.g. TCP for CONNECT termination or UDP for CONNECT-UDP termination), unpause.
@@ -764,20 +763,23 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   }
 }
 
-void UpstreamRequest::maybeGenerateWebsocketKey(Http::Protocol protocol) {
+OptRef<const std::string> UpstreamRequest::websocketKeyForUpstream() {
+  if (generated_websocket_key_.has_value()) {
+    return {*generated_websocket_key_};
+  }
+
   const auto downstream_protocol = parent_.callbacks()->streamInfo().protocol();
   const bool downstream_uses_extended_connect =
       downstream_protocol == Http::Protocol::Http2 || downstream_protocol == Http::Protocol::Http3;
-  if (protocol != Http::Protocol::Http11 || !downstream_uses_extended_connect ||
+  if (stream_info_.protocol() != Http::Protocol::Http11 || !downstream_uses_extended_connect ||
       !paused_for_websocket_ ||
       !Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.websocket_synthesize_key_on_h2_downgrade")) {
-    return;
+    return {};
   }
 
-  // onPoolReady() may run before upstream filters, so the codec filter decides whether to inject
-  // this key.
   generated_websocket_key_ = WebSocket::generateKey(parent_.config().random_);
+  return {*generated_websocket_key_};
 }
 
 UpstreamToDownstream& UpstreamRequest::upstreamToDownstream() { return *upstream_interface_; }

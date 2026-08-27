@@ -27,6 +27,8 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/websocket/handshake.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -99,15 +101,18 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
 
 Http::Status UpstreamCodecFilter::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                 bool end_stream) {
-  const auto generated_websocket_key = callbacks_->upstreamCallbacks()->generatedWebsocketKey();
-  if (!generated_websocket_key.has_value() ||
-      !headers.get(Http::Headers::get().SecWebSocketKey).empty()) {
+  if (!headers.get(Http::Headers::get().SecWebSocketKey).empty()) {
+    return callbacks_->upstreamCallbacks()->upstream()->encodeHeaders(headers, end_stream);
+  }
+
+  const auto generated_websocket_key = callbacks_->upstreamCallbacks()->websocketKeyForUpstream();
+  if (!generated_websocket_key.has_value()) {
     return callbacks_->upstreamCallbacks()->upstream()->encodeHeaders(headers, end_stream);
   }
 
   upstream_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
   upstream_headers_->setCopy(Http::Headers::get().SecWebSocketKey, *generated_websocket_key);
-  injected_websocket_key_ = *generated_websocket_key;
+  injected_generated_websocket_key_ = true;
   return callbacks_->upstreamCallbacks()->upstream()->encodeHeaders(*upstream_headers_, end_stream);
 }
 
@@ -191,21 +196,14 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
     const auto protocol = filter_.callbacks_->upstreamCallbacks()->upstreamStreamInfo().protocol();
     const bool switching_protocols =
         status == static_cast<uint64_t>(Http::Code::SwitchingProtocols);
-    if (filter_.injected_websocket_key_.has_value()) {
-      const absl::string_view key = *filter_.injected_websocket_key_;
-      const auto accept_headers = headers->get(Http::Headers::get().SecWebSocketAccept);
-      const bool valid_accept =
-          switching_protocols && accept_headers.size() == 1 &&
-          accept_headers[0]->value().getStringView() == WebSocket::computeAccept(key);
-      headers->remove(Http::Headers::get().SecWebSocketAccept);
-      if (switching_protocols && !valid_accept) {
-        filter_.callbacks_->streamInfo().setResponseFlag(
-            StreamInfo::CoreResponseFlag::UpstreamProtocolError);
-        filter_.callbacks_->sendLocalReply(
-            Http::Code::BadGateway, "", nullptr, std::nullopt,
-            StreamInfo::ResponseCodeDetails::get().WebsocketHandshakeInvalidAccept);
+    if (filter_.injected_generated_websocket_key_) {
+      const bool valid_handshake =
+          !switching_protocols || hasValidGeneratedWebsocketHandshakeHeaders(*headers);
+      if (!valid_handshake) {
+        rejectInvalidGeneratedWebsocketHandshake();
         return;
       }
+      headers->remove(Http::Headers::get().SecWebSocketAccept);
     }
 
     if (switching_protocols ||
@@ -270,6 +268,33 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
   maybeEndDecode(end_stream);
   filter_.callbacks_->encodeHeaders(std::move(headers), end_stream,
                                     StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+}
+
+bool UpstreamCodecFilter::CodecBridge::hasValidGeneratedWebsocketHandshakeHeaders(
+    const Http::ResponseHeaderMap& headers) const {
+  const auto generated_websocket_key =
+      filter_.callbacks_->upstreamCallbacks()->websocketKeyForUpstream();
+  ASSERT(generated_websocket_key.has_value());
+  const auto accept_headers = headers.get(Http::Headers::get().SecWebSocketAccept);
+  return Http::Utility::isUpgrade(headers) &&
+         absl::EqualsIgnoreCase(headers.getUpgradeValue(),
+                                Http::Headers::get().UpgradeValues.WebSocket) &&
+         accept_headers.size() == 1 &&
+         accept_headers[0]->value().getStringView() ==
+             WebSocket::computeAccept(*generated_websocket_key);
+}
+
+void UpstreamCodecFilter::CodecBridge::rejectInvalidGeneratedWebsocketHandshake() {
+  filter_.callbacks_->streamInfo().setResponseFlag(
+      StreamInfo::CoreResponseFlag::UpstreamProtocolError);
+  const absl::string_view response_code_details =
+      StreamInfo::ResponseCodeDetails::get().WebsocketHandshakeInvalidAccept;
+  filter_.callbacks_->upstreamCallbacks()->upstreamStreamInfo().setResponseCodeDetails(
+      response_code_details);
+  auto headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+      {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::BadGateway))}});
+  filter_.callbacks_->encodeHeaders(std::move(headers), true, response_code_details);
+  maybeEndDecode(true);
 }
 
 // This is response data arriving from the codec. Send it through the filter manager.
