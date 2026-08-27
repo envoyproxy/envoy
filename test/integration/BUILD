@@ -471,6 +471,9 @@ envoy_cc_test(
     ],
     deps = [
         ":http_protocol_integration_lib",
+        "//envoy/network:drain_decision_interface",
+        "//envoy/server:instance_interface",
+        "//envoy/server:listener_manager_interface",
         "//test/test_common:utility_lib",
     ],
 )
