@@ -127,6 +127,14 @@ protected:
     return io_handle_->conn_wrapper_to_host_map_;
   }
 
+  void addWrapperToHostMap(RCConnectionWrapper* wrapper, const std::string& host_address) {
+    io_handle_->conn_wrapper_to_host_map_[wrapper] = host_address;
+  }
+
+  void pushConnectionWrapper(std::unique_ptr<RCConnectionWrapper> wrapper) {
+    io_handle_->connection_wrappers_.push_back(std::move(wrapper));
+  }
+
   // Test Data Setup Helpers.
 
   void addHostConnectionInfo(const std::string& host_address, const std::string& cluster_name,
@@ -1616,8 +1624,8 @@ TEST_F(RCConnectionWrapperTest, DispatchForbiddenWithBodyDoesNotCloseDuringDispa
   (void)wrapper->connect("tenant", "cluster", "node");
 
   RCConnectionWrapper* wrapper_ptr = wrapper.get();
-  io_handle_->connection_wrappers_.push_back(std::move(wrapper));
-  io_handle_->conn_wrapper_to_host_map_[wrapper_ptr] = "10.0.0.1:80";
+  pushConnectionWrapper(std::move(wrapper));
+  addWrapperToHostMap(wrapper_ptr, "10.0.0.1:80");
 
   Buffer::OwnedImpl response("HTTP/1.1 403 Forbidden\r\n"
                              "Content-Type: text/plain\r\n"
@@ -1626,8 +1634,8 @@ TEST_F(RCConnectionWrapperTest, DispatchForbiddenWithBodyDoesNotCloseDuringDispa
                              "validation_failed");
   wrapper_ptr->dispatchHttp1(response);
 
-  EXPECT_TRUE(io_handle_->connection_wrappers_.empty());
-  EXPECT_TRUE(io_handle_->conn_wrapper_to_host_map_.empty());
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_TRUE(getConnWrapperToHostMap().empty());
 
   // onConnectionDone deferred-deletes the wrapper; shutdown() closes after dispatch.
   while (!dispatcher_.to_delete_.empty()) {
