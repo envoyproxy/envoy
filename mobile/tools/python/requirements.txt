@@ -366,9 +366,9 @@ pluggy==1.6.0 \
     --hash=sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3 \
     --hash=sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746
     # via pytest
-py-cpuinfo==9.0.0 \
-    --hash=sha256:3cdbbf3fac90dc6f118bfd64384f309edeadd902d7c8fb17f02ffa1fc3f49690 \
-    --hash=sha256:859625bc251f64e21f077d099d4162689c762b5d6a4c3c97553d56241c9674d5
+py-cpuinfo2==10.1.1 \
+    --hash=sha256:7861133863663f16e06eca63b12904ef100b5760415e92372dac0162799a4771 \
+    --hash=sha256:adc53396bfb206e6498d078ec2ab407f85799ecd819584ac36a8f80a2d4d762d
     # via pytest-benchmark
 pygments==2.20.0 \
     --hash=sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f \
@@ -385,9 +385,9 @@ pytest-asyncio==1.4.0 \
     --hash=sha256:933ca923a23075a87fb7070c0ec272a6848489824d887c85c812670932835aa1 \
     --hash=sha256:c6c0d2259945122819f171a32ecea2c349ead889ee28176caaf492143424be42
     # via -r requirements.in
-pytest-benchmark==5.2.3 \
-    --hash=sha256:bc839726ad20e99aaa0d11a127445457b4219bdb9e80a1afc4b51da7f96b0803 \
-    --hash=sha256:deb7317998a23c650fd4ff76e1230066a76cb45dcece0aca5607143c619e7779
+pytest-benchmark==5.3.0 \
+    --hash=sha256:358444d4e89be901ee2b6404fb043ac3d7684002ad7f3563cc153fca6339c965 \
+    --hash=sha256:920ab1dfcffa718d49aa15ba144c7e357bda59216a0dc308016cc1c7236f719d
     # via -r requirements.in
 pytokens==0.4.1 \
     --hash=sha256:0fc71786e629cef478cbf29d7ea1923299181d0699dbe7c3c0f4a583811d9fc1 \
