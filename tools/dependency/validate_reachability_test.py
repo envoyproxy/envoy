@@ -5,10 +5,6 @@ This replaces the old validate.py which used `bazel query` (slow, broken under
 bzlmod).  The data source is the pre-built ``dependency_reachability`` JSON
 produced by the ``@envoy_toolshed`` aspect.
 
-NOTE: This Python implementation is transitional.  After the bzlmod migration,
-this logic will move to jq inside ``@envoy_toolshed``, where it will be
-properly tested.  Do not invest in Python unit tests here.
-
 Two reachability roots are declared (see tools/dependency/BUILD):
 
   dep-reachability-core — rooted at envoy_main_common_with_core_extensions_lib.
@@ -39,6 +35,11 @@ Checks still covered outside this test:
     expressions. The first direction (test_only deps must not be reachable via a
     production path) is fully retained here.
 """
+
+# NOTE: This Python implementation is transitional.  After the bzlmod migration,
+# this logic will move to jq inside ``@envoy_toolshed``, where it will be
+# properly tested.
+# TODO(phlax): move this to toolshed add proper tests
 
 import json
 import os
@@ -348,10 +349,9 @@ def validate_extension_deps(deps, metadata, apparent_lookup, revmap, extensions_
     are reported so they can be removed.
     """
     # Build package-path -> [extension-name] mapping from the config.
-    # Both //source/extensions/... and //contrib/... packages are supported.
     pkg_to_ext: dict = {}
     for ext_name, target in extensions_build_config.items():
-        m = re.match(r"(//(?:source/extensions|contrib)/[^:]+):", target)
+        m = re.match(r"(//source/extensions/[^:]+):", target)
         if m:
             pkg = m.group(1)
             pkg_to_ext.setdefault(pkg, []).append(ext_name)
@@ -413,6 +413,8 @@ def validate_extension_deps(deps, metadata, apparent_lookup, revmap, extensions_
             if not meta:
                 continue
             use_category = meta.get("use_category", [])
+            # Build-only deps are tooling inputs; they are intentionally exempt
+            # from extension runtime category requirements.
             if "build" in use_category:
                 continue
             valid_category = any(
@@ -437,8 +439,8 @@ def validate_extension_deps(deps, metadata, apparent_lookup, revmap, extensions_
     # Reverse check: every extension listed in extensions: must be attributed.
     # Only check deps that are actually present in the reachability JSON (i.e.
     # reachable in the current build configuration).  Deps absent from the JSON
-    # are simply not analysed in this configuration (contrib extensions, wasm
-    # runtimes gated behind --//bazel:wasm_runtime=, etc.) — silence is correct for them.
+    # are simply not analysed in this configuration (for example contrib-only
+    # extension deps) — silence is correct for them.
     reachable_keys = {
         _resolve_dep_name(dep_data["name"], apparent_lookup, revmap)
         for dep_data in deps.values()
@@ -1017,8 +1019,8 @@ class ValidateExtensionDepsUnitTest(unittest.TestCase):
     #    reachability JSON must NOT trigger a stale-entry error.
     def test_reverse_check_skips_unanalysed_deps(self):
         """A dep absent from the reachability JSON is silenced, not flagged as stale."""
-        # "wamr" is in metadata (contrib, wasm-gated) but not in deps (not
-        # reachable in this configuration).
+        # contrib_dep is in metadata but not in deps (not reachable in this
+        # configuration).
         deps = {
             "hessian2_codec": {
                 "name": "hessian2_codec",
@@ -1039,13 +1041,13 @@ class ValidateExtensionDepsUnitTest(unittest.TestCase):
                 "extensions": ["envoy.filters.network.dubbo_proxy"],
             },
             # This dep is NOT in deps (not reachable in this config).
-            "wamr": {
+            "contrib_dep": {
                 "use_category": ["dataplane_ext"],
-                "extensions": ["envoy.wasm.runtime.wamr"],
+                "extensions": ["envoy.filters.network.kafka_broker"],
             },
         }
-        # Must not raise — wamr is not in the reachability JSON and the
-        # envoy.wasm.runtime.wamr extension is not in ext_cfg, so no stale
+        # Must not raise — contrib_dep is not in the reachability JSON and
+        # envoy.filters.network.kafka_broker is not in ext_cfg, so no stale
         # error should be reported.
         ext_cfg = {
             "envoy.filters.network.dubbo_proxy": (
@@ -1085,28 +1087,15 @@ class ValidateExtensionDepsUnitTest(unittest.TestCase):
         self.assertIn("envoy.filters.network.generic_proxy", str(ctx.exception))
 
     # 9. Bug 2: a dep carrying 'build' in use_category is skipped by the
-    #    extension check even when it is reached by an extension consumer.
+    #    extension check when it is reached by an extension consumer.
     def test_build_category_dep_skipped_in_extension_check(self):
-        """A dep with use_category 'build' is not checked for extension attribution."""
+        """A dep with use_category 'build' is skipped by the category assertion branch."""
         deps = {
             "rules_cc": {
                 "name": "rules_cc",
                 "consumers": [
                     {
-                        # Reached only via external repo build tooling.
-                        "target": "@cel-cpp//bazel:cel_cc_embed",
-                        "repo": "cel-cpp",
-                    },
-                ],
-            },
-            "hessian2_codec": {
-                "name": "hessian2_codec",
-                "consumers": [
-                    {
-                        "target": (
-                            "//source/extensions/filters/network/"
-                            "dubbo_proxy:hessian_utils_lib"
-                        ),
+                        "target": "//source/extensions/filters/network/dubbo_proxy:config",
                         "repo": "",
                     },
                 ],
@@ -1117,12 +1106,28 @@ class ValidateExtensionDepsUnitTest(unittest.TestCase):
                 "use_category": ["build", "controlplane", "dataplane_core"],
                 # No extensions: key — build tooling should be skipped entirely.
             },
-            "hessian2_codec": {
-                "use_category": ["dataplane_ext"],
-                "extensions": ["envoy.filters.network.dubbo_proxy"],
-            },
         }
         # rules_cc must not produce "not including dataplane_ext/..." error.
+        self._run(deps, metadata)
+
+    def test_external_repo_consumer_not_attributed_to_extension(self):
+        """A dep consumed only in an external repo is not extension-attributed."""
+        deps = {
+            "rules_cc": {
+                "name": "rules_cc",
+                "consumers": [
+                    {
+                        "target": "@cel-cpp//bazel:cel_cc_embed",
+                        "repo": "cel-cpp",
+                    },
+                ],
+            },
+        }
+        metadata = {
+            "rules_cc": {
+                "use_category": ["build", "controlplane", "dataplane_core"],
+            },
+        }
         self._run(deps, metadata)
 
 
