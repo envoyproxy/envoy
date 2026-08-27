@@ -360,6 +360,75 @@ TEST_F(McpFilterTest, VerifyRejectsMissingMethodHeader) {
   EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
 }
 
+TEST_F(McpFilterTest, HeadersAttributeSourceFallsBackWhenMethodHeaderMissing) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(_));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl data(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"body-task"}})");
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_EQ("tasks/get", metadata.fields().at("method").string_value());
+
+        const auto& params = metadata.fields().at("params").struct_value();
+        EXPECT_EQ("body-task", params.fields().at("taskId").string_value());
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
+  EXPECT_EQ(0u, config_->stats().header_mismatch_.value());
+}
+
+TEST_F(McpFilterTest, HeadersAttributeSourceFallsBackWhenNameHeaderMissing) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-method", "tools/call"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(_));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl data(
+      R"({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"body-tool"}})");
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_EQ("tools/call", metadata.fields().at("method").string_value());
+
+        const auto& params = metadata.fields().at("params").struct_value();
+        EXPECT_EQ("body-tool", params.fields().at("name").string_value());
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
+  EXPECT_EQ(0u, config_->stats().header_mismatch_.value());
+}
+
 TEST_F(McpFilterTest, VerifyRejectsMethodMismatch) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);

@@ -181,6 +181,7 @@ private:
 
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
   bool needsBody() const;
+  bool hasCompleteHeaderAttributes() const;
   bool headerAttributesMatch() const;
   bool verifyHeaderAttributes() const;
   Http::FilterDataStatus completeParsing();

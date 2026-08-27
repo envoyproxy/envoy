@@ -308,12 +308,26 @@ bool McpFilter::needsBody() const {
     return true;
   }
 
+  if (!hasCompleteHeaderAttributes()) {
+    return true;
+  }
+
   if (config_->propagateTraceContext().has_value() || config_->propagateBaggage().has_value() ||
       rejectDuplicateKeys()) {
     return true;
   }
 
   return false;
+}
+
+bool McpFilter::hasCompleteHeaderAttributes() const {
+  if (header_method_.empty()) {
+    return false;
+  }
+
+  const std::string name_path = parserConfig().getNameAttributePath(header_method_);
+
+  return name_path.empty() || !header_name_.empty();
 }
 
 const McpOverrideConfig* McpFilter::routeOverride() const {
@@ -556,7 +570,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   }
 
   if (config_->attributeSource() == envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS &&
-      !headerAttributesMatch()) {
+      hasCompleteHeaderAttributes() && !headerAttributesMatch()) {
     config_->stats().header_mismatch_.inc();
   }
 
@@ -565,9 +579,8 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   std::string effective_method = parser_->getMethod();
 
   if (config_->attributeSource() == envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS) {
-    effective_method = header_method_;
-
     if (!header_method_.empty()) {
+      effective_method = header_method_;
       (*metadata.mutable_fields())["method"].set_string_value(header_method_);
     }
 
