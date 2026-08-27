@@ -71,6 +71,7 @@ message GcpAuthnFilterConfig {
 
 // Audience is the URL of the receiving service that performs token authentication.
 // It will be provided to the filter through cluster's typed_filter_metadata.
+// [#next-free-field: 6]
 message Audience {
   message AccessToken {
   }
@@ -81,6 +82,21 @@ message Audience {
   }
 
   message BoundAccessToken {
+  }
+
+  // Default lifetime is 1h.
+  message IAMAccessToken {
+    // A template string for the account email or unique ID for which the credentials are requested,
+    // e.g. ``my-sa-%DYNAMIC_METADATA(my_filter:tenant_project)%@my-project.iam.gserviceaccount.com``.
+    string account = 1 [(validate.rules).string = {min_len: 1}];
+
+    // A template string for the authorization header value,
+    // e.g. ``Bearer %DYNAMIC_METADATA(gcp_authn:token)%``.
+    string authorization = 2 [(validate.rules).string = {min_len: 1}];
+
+    // Optional custom scopes for the token request.
+    // Default scope is https://www.googleapis.com/auth/cloud-platform.
+    repeated string scopes = 3;
   }
 
   // The audience URL, used for fetching unbound JWT token.
@@ -97,6 +113,11 @@ message Audience {
   // If defined, the filter will fetch bound Access Token instead of unbound.
   // It takes precedence over ``bound_jwt``, ``access_token`` and ``url``.
   BoundAccessToken bound_access_token = 4;
+
+  // If defined, the filter will fetch an access token for a service account.
+  // It takes precedence over ``bound_access_token``, ``bound_jwt``, ``access_token``, and ``url``.
+  // Requires inlined audience definition in the filter configuration.
+  IAMAccessToken iam_access_token = 5;
 }
 
 // Token Cache configuration.

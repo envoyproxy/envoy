@@ -13,6 +13,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -50,6 +51,10 @@ public:
   MOCK_METHOD(void, fetchBoundAccessToken,
               (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
                const std::string& fingerprint, Callbacks& callbacks),
+              (override));
+  MOCK_METHOD(void, fetchIamAccessToken,
+              (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+               const std::string& authorization, Callbacks& callbacks),
               (override));
   MOCK_METHOD(void, cancel, (), (override));
 };
@@ -94,8 +99,10 @@ public:
   GcpAuthnFilterTest() {
     // Initialize the default configuration.
     TestUtility::loadFromYaml(DefaultConfig, config_);
+    absl::Status status;
     filter_config_ = std::make_shared<FilterConfig>(config_, context_.server_factory_context_,
-                                                    "stats", context_.scope_);
+                                                    "stats", context_.scope_, status);
+    EXPECT_OK(status);
     fingerprinter_ = std::make_shared<NiceMock<MockCertFingerprinter>>();
   }
 
@@ -138,8 +145,10 @@ public:
   }
 
   void refreshConfig() {
+    absl::Status status;
     filter_config_ = std::make_shared<FilterConfig>(config_, context_.server_factory_context_,
-                                                    "stats", context_.scope_);
+                                                    "stats", context_.scope_, status);
+    ASSERT_OK(status);
   }
 
   void setClient(std::unique_ptr<GcpAuthnClient> client) { filter_->client_ = std::move(client); }
@@ -1144,6 +1153,193 @@ TEST_F(GcpAuthnFilterTest, ConfigAudienceAccessToken) {
   setupMockFilterMetadata(/*valid=*/true, "http://cluster_audience");
 
   EXPECT_CALL(*mock_client_ptr, fetchUnboundAccessToken(_, _));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+}
+
+TEST_F(GcpAuthnFilterTest, ResumeFilterChainIterationWithIamAccessToken) {
+  auto* iam_access_token = config_.mutable_audience()->mutable_iam_access_token();
+  iam_access_token->set_account("%DYNAMIC_METADATA(custom_filter:target_sa)%");
+  iam_access_token->set_authorization("Bearer %DYNAMIC_METADATA(custom_filter:gce_token)%");
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+
+  // Set up dynamic metadata for target SA and GCE token.
+  Protobuf::Struct custom_metadata;
+  (*custom_metadata.mutable_fields())["target_sa"].set_string_value(
+      "target-sa@proj.iam.gserviceaccount.com");
+  (*custom_metadata.mutable_fields())["gce_token"].set_string_value("mock_gce_token_123");
+  decoder_callbacks_.stream_info_.metadata_.mutable_filter_metadata()->insert(
+      {"custom_filter", custom_metadata});
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "POST");
+  EXPECT_EQ(message_->headers().Host()->value().getStringView(), "iamcredentials.googleapis.com");
+  EXPECT_EQ(
+      message_->headers().Path()->value().getStringView(),
+      "/v1/projects/-/serviceAccounts/target-sa@proj.iam.gserviceaccount.com:generateAccessToken");
+  EXPECT_EQ(message_->headers()
+                .get(Envoy::Http::CustomHeaders::get().Authorization)[0]
+                ->value()
+                .getStringView(),
+            "Bearer mock_gce_token_123");
+  EXPECT_EQ(message_->headers().ContentType()->value().getStringView(),
+            "application/json; charset=utf-8");
+  EXPECT_TRUE(TestUtility::jsonStringEqual(
+      message_->bodyAsString(),
+      "{\"lifetime\":\"3600s\",\"scope\":[\"https://www.googleapis.com/auth/cloud-platform\"]}"));
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(
+      R"({"accessToken": "mock_iam_access_token", "expireTime": "2033-05-29T17:36:41Z"})");
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  EXPECT_EQ(default_headers_.get_("Authorization"), "Bearer mock_iam_access_token");
+}
+
+TEST_F(GcpAuthnFilterTest, IamAccessTokenInvalidConfigFormatters) {
+  auto* iam_access_token = config_.mutable_audience()->mutable_iam_access_token();
+  iam_access_token->set_account("%INVALID_FORMATTER(");
+  iam_access_token->set_authorization("Bearer token");
+
+  absl::Status create_status;
+  FilterConfig filter_config(config_, context_.server_factory_context_, "stats", context_.scope_,
+                             create_status);
+  EXPECT_FALSE(create_status.ok());
+  EXPECT_THAT(create_status,
+              StatusHelpers::HasStatusMessage("Incorrect configuration: %INVALID_FORMATTER(. "
+                                              "Couldn't find valid command at position 0"));
+}
+
+TEST_F(GcpAuthnFilterTest, IamAccessTokenResolutionFailed) {
+  auto* iam_access_token = config_.mutable_audience()->mutable_iam_access_token();
+  iam_access_token->set_account("%DYNAMIC_METADATA(custom_filter:target_sa)%");
+  iam_access_token->set_authorization("Bearer %DYNAMIC_METADATA(custom_filter:gce_token)%");
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+
+  // Dynamic metadata is not populated.
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError,
+                             "Failed to resolve IAM access token account or authorization.", _, _,
+                             "iam_token_resolution_failed"));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+}
+
+TEST_F(GcpAuthnFilterTest, IamAccessTokenInClusterMetadataRejected) {
+  setupMockObjects();
+  setupFilterAndCallback();
+
+  // Cluster metadata has IAMAccessToken, but filter config has no audience.
+  cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  auto* iam_token = audience.mutable_iam_access_token();
+  iam_token->set_account("sa@proj.iam.gserviceaccount.com");
+  iam_token->set_authorization("Bearer token");
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
+  ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError,
+                             "IAM access token requires audience configured in filter config.", _,
+                             _, "iam_token_config_error"));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+}
+
+TEST_F(GcpAuthnFilterTest, IamAccessTokenCacheMissAndHit) {
+  auto* iam_access_token = config_.mutable_audience()->mutable_iam_access_token();
+  iam_access_token->set_account("%DYNAMIC_METADATA(custom_filter:target_sa)%");
+  iam_access_token->set_authorization("Bearer %DYNAMIC_METADATA(custom_filter:gce_token)%");
+  envoy::extensions::filters::http::gcp_authn::v3::TokenCacheConfig cache_config;
+  cache_config.mutable_cache_size()->set_value(100);
+  config_.mutable_cache_config()->CopyFrom(cache_config);
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+
+  Protobuf::Struct custom_metadata;
+  (*custom_metadata.mutable_fields())["target_sa"].set_string_value(
+      "target-sa@proj.iam.gserviceaccount.com");
+  (*custom_metadata.mutable_fields())["gce_token"].set_string_value("mock_gce_token_123");
+  decoder_callbacks_.stream_info_.metadata_.mutable_filter_metadata()->insert(
+      {"custom_filter", custom_metadata});
+
+  // First request: cache miss.
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(
+      R"({"accessToken": "mock_iam_access_token", "expireTime": "2033-05-29T17:36:41Z"})");
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+  EXPECT_EQ(default_headers_.get_("Authorization"), "Bearer mock_iam_access_token");
+
+  // Second request: cache hit.
+  Http::TestRequestHeaderMapImpl second_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+
+  // Rotate the authentication token, this should not impact caching.
+  (*custom_metadata.mutable_fields())["gce_token"].set_string_value("mock_gce_token_456");
+  decoder_callbacks_.stream_info_.metadata_.mutable_filter_metadata()->insert(
+      {"custom_filter", custom_metadata});
+  setupFilterAndCallback();
+  EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
+
+  EXPECT_EQ(filter_->decodeHeaders(second_headers, true), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(second_headers.get_("Authorization"), "Bearer mock_iam_access_token");
+}
+
+TEST_F(GcpAuthnFilterTest, AudiencePrecedenceIamAccessToken) {
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.set_url("http://unbound_jwt");
+  audience.mutable_access_token();
+  audience.mutable_bound_jwt()->set_url("http://bound_jwt");
+  audience.mutable_bound_access_token();
+  auto* iam = audience.mutable_iam_access_token();
+  iam->set_account("target-sa@proj.iam.gserviceaccount.com");
+  iam->set_authorization("Bearer token");
+
+  config_.mutable_audience()->CopyFrom(audience);
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  auto mock_client = std::make_unique<MockGcpAuthnClient>();
+  MockGcpAuthnClient* mock_client_ptr = mock_client.get();
+  setClient(std::move(mock_client));
+
+  EXPECT_CALL(*mock_client_ptr, fetchIamAccessToken(_, _, _));
+  EXPECT_CALL(*mock_client_ptr, fetchBoundAccessToken(_, _, _)).Times(0);
+  EXPECT_CALL(*mock_client_ptr, fetchBoundJwt(_, _, _)).Times(0);
+  EXPECT_CALL(*mock_client_ptr, fetchUnboundAccessToken(_, _)).Times(0);
+  EXPECT_CALL(*mock_client_ptr, fetchUnboundJwt(_, _)).Times(0);
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
