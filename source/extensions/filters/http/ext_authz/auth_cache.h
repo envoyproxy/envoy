@@ -68,6 +68,8 @@ public:
 
   /**
    * Creates a new cache session for a stream filter.
+   * 
+   * Implementations need to be thread-safe.
    */
   virtual AuthCacheSessionPtr createSession() PURE;
 };
