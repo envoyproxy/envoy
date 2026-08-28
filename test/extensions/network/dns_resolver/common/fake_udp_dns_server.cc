@@ -106,16 +106,18 @@ void FakeUdpDnsServer::onReadReady() {
     }
 
     queries_received_++;
-    auto response = buildResponse(buf, result.return_value_);
+    auto responses = makeResponses(buf, result.return_value_);
 
-    if (response.empty()) {
-      continue;
+    for (auto& response : responses) {
+      if (response.empty()) {
+        continue;
+      }
+
+      outgoing_.emplace_back(response, output.msg_[0].peer_address_);
+
+      // Try writing any outgoing messages to the socket.
+      tryFlushOutgoing();
     }
-
-    outgoing_.emplace_back(response, output.msg_[0].peer_address_);
-
-    // Try writing any outgoing messages to the socket.
-    tryFlushOutgoing();
   }
 }
 
@@ -131,11 +133,15 @@ void FakeUdpDnsServer::tryFlushOutgoing() {
     if (send_result.wouldBlock()) {
       return;
     }
-
     // Either the send succeeded or failed with an error we can't just retry on
     // later. Either way remove the outgoing message from the queue.
     outgoing_.pop_front();
   }
+}
+
+std::array<std::vector<std::uint8_t>, 2> FakeUdpDnsServer::makeResponses(const uint8_t* query,
+                                                                         size_t query_len) {
+  return {buildResponse(query, query_len), std::vector<std::uint8_t>{}};
 }
 
 std::vector<uint8_t> FakeUdpDnsServer::buildResponse(const uint8_t* query, size_t query_len) const {

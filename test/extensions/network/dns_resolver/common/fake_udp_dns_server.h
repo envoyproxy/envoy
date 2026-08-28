@@ -27,7 +27,7 @@ public:
   // Binds a UDP socket to loopback on a random port and starts listening for
   // queries on `dispatcher`. Use ipv6=true for [::1].
   explicit FakeUdpDnsServer(Event::Dispatcher& dispatcher, bool ipv6 = false);
-  ~FakeUdpDnsServer();
+  virtual ~FakeUdpDnsServer();
 
   // Not copyable or movable.
   FakeUdpDnsServer(const FakeUdpDnsServer&) = delete;
@@ -48,6 +48,10 @@ public:
   // Counters. Updated on, and so only safe to read from, the dispatcher's thread.
   uint64_t queriesReceived() const { return queries_received_; }
   uint64_t responsesSent() const { return responses_sent_; }
+
+protected:
+  // Builds up to 2 responses. Empty responses will be skipped.
+  virtual std::array<std::vector<uint8_t>, 2> makeResponses(const uint8_t* query, size_t query_len);
 
 private:
   // Read event handler: answers every datagram queued on the socket.
