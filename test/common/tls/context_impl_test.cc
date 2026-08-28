@@ -1648,9 +1648,8 @@ TEST_F(ServerContextConfigImplTest, TlsCertificateNonEmpty) {
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   auto server_context_config =
       *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
-  ContextManagerImpl manager(server_factory_context_);
-  Stats::IsolatedStoreImpl store;
-  EXPECT_EQ(manager.createSslServerContext(*store.rootScope(), *server_context_config, nullptr)
+  ContextManagerImpl manager(factory_context_.server_context_);
+  EXPECT_EQ(manager.createSslServerContext(*store_.rootScope(), *server_context_config, nullptr)
                 .status()
                 .message(),
             "Server TlsCertificates must have a certificate specified");
@@ -1752,12 +1751,11 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProviderFallbac
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()->add_tls_certificates();
-  Stats::IsolatedStoreImpl store;
   NiceMock<Ssl::MockContextManager> context_manager;
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  ContextManagerImpl manager(server_factory_context_);
+  ContextManagerImpl manager(factory_context_.server_context_);
   EXPECT_CALL(factory_context_.server_context_, sslContextManager())
       .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
@@ -1780,7 +1778,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   auto server_context_config =
       *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
-  EXPECT_EQ(manager.createSslServerContext(*store.rootScope(), *server_context_config, nullptr)
+  EXPECT_EQ(manager.createSslServerContext(*store_.rootScope(), *server_context_config, nullptr)
                 .status()
                 .message(),
             "Failed to get BoringSSL private key method from provider");

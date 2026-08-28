@@ -296,6 +296,9 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
+  TestIsolatedStoreImpl() = default;
+  explicit TestIsolatedStoreImpl(SymbolTable& symbol_table) : store_(symbol_table) {}
+
   // Stats::Store
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);

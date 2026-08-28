@@ -288,9 +288,10 @@ public:
     return Ssl::ClientContextSharedPtr(std::move(*context_or_error));
   }
 
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   // Declared before factory_ so the store (and its symbol table) outlives the contexts created
   // from it, which the factory retains until destruction.
-  Stats::IsolatedStoreImpl store_;
+  Stats::IsolatedStoreImpl store_{context_.server_context_.serverScope().symbolTable()};
   NiceMock<Ssl::MockClientContextConfig> real_context_config_;
   NiceMock<Ssl::MockTlsCertificateConfig> tls_cert_config_;
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs_;
@@ -302,7 +303,6 @@ public:
   const std::string test_private_key_{quic::test::kTestCertificatePrivateKeyPem};
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   // Will be owned by factory_.
   NiceMock<Ssl::MockClientContextConfig>* context_config_{

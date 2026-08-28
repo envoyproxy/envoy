@@ -99,7 +99,8 @@ public:
 
     tls_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
         server_factory_context_);
-    tls_context_ = Ssl::createClientSslTransportSocketFactory({}, *tls_context_manager_, *api_);
+    tls_context_ = Ssl::createClientSslTransportSocketFactory(
+        {}, *tls_context_manager_, *api_, &server_factory_context_.serverScope());
 
     payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 
@@ -678,7 +679,8 @@ public:
 
     tls_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
         server_factory_context_);
-    tls_context_ = Ssl::createClientSslTransportSocketFactory({}, *tls_context_manager_, *api_);
+    tls_context_ = Ssl::createClientSslTransportSocketFactory(
+        {}, *tls_context_manager_, *api_, &server_factory_context_.serverScope());
 
     payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 

@@ -61,8 +61,7 @@ public:
     }};
   }
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  ContextManagerImpl manager_{server_factory_context_};
+  ContextManagerImpl manager_{factory_context_.server_context_};
 };
 
 // Validate that empty SNI (according to C string rules) fails config validation.
@@ -85,8 +84,7 @@ TEST_F(ClientContextConfigImplTest, AutoSniSanValidationWithoutValidationContext
   tls_context.set_auto_sni_san_validation(true);
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context);
-  Stats::IsolatedStoreImpl store;
-  EXPECT_EQ(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+  EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), *client_context_config)
                 .status()
                 .message(),
             "'auto_sni_san_validation' was configured without a validation context");
@@ -103,8 +101,7 @@ TEST_F(ClientContextConfigImplTest, AutoSniSanValidationWithoutTrustedCa) {
                                          CertificateValidationContext::ACCEPT_UNTRUSTED);
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context);
-  Stats::IsolatedStoreImpl store;
-  EXPECT_EQ(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+  EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), *client_context_config)
                 .status()
                 .message(),
             "'auto_sni_san_validation' was configured without configuring a trusted CA");
@@ -120,8 +117,7 @@ TEST_F(ClientContextConfigImplTest, InvalidCertificateHash) {
       ->add_verify_certificate_hash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context);
-  Stats::IsolatedStoreImpl store;
-  EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+  EXPECT_THAT(manager_.createSslClientContext(*store_.rootScope(), *client_context_config)
                   .status()
                   .message(),
               testing::MatchesRegex("Invalid hex-encoded SHA-256 .*"));
@@ -136,8 +132,7 @@ TEST_F(ClientContextConfigImplTest, InvalidCertificateSpki) {
       // Not a base64-encoded string.
       ->add_verify_certificate_spki("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context);
-  Stats::IsolatedStoreImpl store;
-  EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+  EXPECT_THAT(manager_.createSslClientContext(*store_.rootScope(), *client_context_config)
                   .status()
                   .message(),
               testing::MatchesRegex("Invalid base64-encoded SHA-256 .*"));
@@ -155,8 +150,7 @@ TEST_F(ClientContextConfigImplTest, RSA2048Cert) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl store;
-  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  auto context_or = manager_.createSslClientContext(*store_.rootScope(), *client_context_config);
   EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
 }
@@ -173,14 +167,13 @@ TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl store;
 
   std::string error_msg(absl::StrCat(
       "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA "
       "certificates ",
       (FIPS_mode() ? "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
                    : "with 2048-bit or larger keys are supported")));
-  EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+  EXPECT_THAT(manager_.createSslClientContext(*store_.rootScope(), *client_context_config)
                   .status()
                   .message(),
               testing::MatchesRegex(error_msg));
@@ -196,14 +189,13 @@ TEST_F(ClientContextConfigImplTest, RSA1024Pkcs12) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl store;
 
   std::string error_msg(absl::StrCat(
       "Failed to load certificate chain from .*selfsigned_rsa_1024_certkey.p12, "
       "only RSA certificates ",
       (FIPS_mode() ? "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
                    : "with 2048-bit or larger keys are supported")));
-  EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+  EXPECT_THAT(manager_.createSslClientContext(*store_.rootScope(), *client_context_config)
                   .status()
                   .message(),
               testing::MatchesRegex(error_msg));
@@ -221,9 +213,7 @@ TEST_F(ClientContextConfigImplTest, RSA3072Cert) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  ContextManagerImpl manager(server_factory_context_);
-  Stats::IsolatedStoreImpl store;
-  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  auto context_or = manager_.createSslClientContext(*store_.rootScope(), *client_context_config);
   EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
 }
@@ -240,8 +230,7 @@ TEST_F(ClientContextConfigImplTest, RSA4096Cert) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl store;
-  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  auto context_or = manager_.createSslClientContext(*store_.rootScope(), *client_context_config);
   EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
 }
@@ -258,8 +247,7 @@ TEST_F(ClientContextConfigImplTest, P256EcdsaCert) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl store;
-  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  auto context_or = manager_.createSslClientContext(*store_.rootScope(), *client_context_config);
   EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
 }
@@ -276,8 +264,7 @@ TEST_F(ClientContextConfigImplTest, P384EcdsaCert) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl store;
-  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  auto context_or = manager_.createSslClientContext(*store_.rootScope(), *client_context_config);
   EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
 }
@@ -292,7 +279,6 @@ TEST_F(ClientContextConfigImplTest, P384EcdsaPkcs12) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl store;
 }
 
 TEST_F(ClientContextConfigImplTest, P521EcdsaCert) {
@@ -306,8 +292,7 @@ TEST_F(ClientContextConfigImplTest, P521EcdsaCert) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl store;
-  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  auto context_or = manager_.createSslClientContext(*store_.rootScope(), *client_context_config);
   EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
 }
@@ -324,10 +309,9 @@ TEST_F(ClientContextConfigImplTest, UnsupportedCurveEcdsaCert) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl store;
   // Envoy has logic to reject P-224, but newer versions of BoringSSL reject it in `SSL_CTX`
   // before Envoy's logic runs. This test expectation is written to accept both paths.
-  EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+  EXPECT_THAT(manager_.createSslClientContext(*store_.rootScope(), *client_context_config)
                   .status()
                   .message(),
               testing::ContainsRegex(
@@ -552,8 +536,7 @@ TEST_F(ClientContextConfigImplTest, PasswordWrongPkcs12) {
   EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(secret_config));
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
-  Stats::IsolatedStoreImpl store;
-  EXPECT_EQ(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+  EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), *client_context_config)
                 .status()
                 .message(),
             absl::StrCat("Failed to load pkcs12 from ", pkcs12_path));
@@ -581,8 +564,7 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedPkcs12) {
   EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(secret_config));
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
-  Stats::IsolatedStoreImpl store;
-  EXPECT_EQ(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+  EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), *client_context_config)
                 .status()
                 .message(),
             absl::StrCat("Failed to load pkcs12 from ", pkcs12_path));
@@ -613,9 +595,8 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedTlsCertificates) {
   EXPECT_OK(factory_context_.server_context_.secretManager().addStaticSecret(secret_config));
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
-  Stats::IsolatedStoreImpl store;
   EXPECT_THAT(
-      manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+      manager_.createSslClientContext(*store_.rootScope(), *client_context_config)
           .status()
           .message(),
       testing::ContainsRegex(absl::StrCat("Failed to load private key from ", private_key_path)));
