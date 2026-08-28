@@ -130,7 +130,7 @@ class FakeResourceMonitorFactory : public Server::Configuration::ResourceMonitor
 public:
   FakeResourceMonitorFactory(const std::string& name) : name_(name) {}
 
-  Server::ResourceMonitorPtr
+  absl::StatusOr<Server::ResourceMonitorPtr>
   createResourceMonitor(const Protobuf::Message&,
                         Server::Configuration::ResourceMonitorFactoryContext& context) override {
     auto monitor = std::make_unique<FakeResourceMonitor>(context.mainThreadDispatcher());
