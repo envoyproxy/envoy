@@ -118,7 +118,7 @@ void InstanceImpl::SlotImpl::set(InitializeCb cb) {
   initialize_cb_ = cb;
 
   for (Event::Dispatcher& dispatcher : parent_.registered_threads_) {
-    // See the header file comments for still_alive_guard_ for why we capture index_.
+    // Capture index_ by value so we don't access this->index_ if the slot is destroyed.
     dispatcher.post(wrapCallback(
         [index = index_, cb, &dispatcher]() -> void { setThreadLocal(index, cb(dispatcher)); }));
   }
@@ -143,12 +143,10 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
     for (auto& weak_slot : slots_) {
       if (auto slot = weak_slot.lock()) {
         if (slot->initialize_cb_ != nullptr) {
-          dispatcher.post(
-              [weak_slot, cb = slot->initialize_cb_, index = slot->index_, &dispatcher]() -> void {
-                if (auto slot = weak_slot.lock()) {
-                  setThreadLocal(index, cb(dispatcher));
-                }
-              });
+          dispatcher.post(slot->wrapCallback(
+              [index = slot->index_, cb = slot->initialize_cb_, &dispatcher]() -> void {
+                setThreadLocal(index, cb(dispatcher));
+              }));
         }
       }
     }

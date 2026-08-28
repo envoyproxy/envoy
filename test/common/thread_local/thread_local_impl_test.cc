@@ -456,7 +456,7 @@ TEST_F(ThreadLocalInstanceImplTest, RegisterThreadReplaySlotDeletedBeforeRunning
   slot.reset();
 
   // Run the queued callbacks. The slot initialize callback should not run because
-  // still_alive_guard_ is expired.
+  // the slot was destroyed (weak pointer expired).
   while (!holder.empty()) {
     holder.front()();
     holder.pop_front();
