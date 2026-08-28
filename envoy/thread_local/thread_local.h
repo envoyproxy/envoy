@@ -87,7 +87,7 @@ protected:
   virtual bool isShutdown() const PURE;
 };
 
-using SlotPtr = std::unique_ptr<Slot>;
+using SlotSharedPtr = std::shared_ptr<Slot>;
 
 /**
  * Interface used to allocate thread local slots.
@@ -97,9 +97,9 @@ public:
   virtual ~SlotAllocator() = default;
 
   /**
-   * @return SlotPtr a dedicated slot for use in further calls to get(), set(), etc.
+   * @return SlotSharedPtr a dedicated slot for use in further calls to get(), set(), etc.
    */
-  virtual SlotPtr allocateSlot() PURE;
+  virtual SlotSharedPtr allocateSlot() PURE;
 };
 
 // Provides a typesafe API for slots. The slot data must be derived from
@@ -204,7 +204,7 @@ private:
     return [cb](ThreadLocalObjectSharedPtr obj) { cb(getOpt(obj)); };
   }
 
-  const SlotPtr slot_;
+  const SlotSharedPtr slot_;
 };
 
 template <class T = ThreadLocalObject> using TypedSlotPtr = std::unique_ptr<TypedSlot<T>>;

@@ -221,12 +221,12 @@ public:
   }
 
   static absl::StatusOr<std::unique_ptr<FilterConfig>>
-  create(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+  create(Stats::StatName stat_prefix, Server::Configuration::GenericFactoryContext& context,
          ShadowWriterPtr&& shadow_writer,
          const envoy::extensions::filters::http::router::v3::Router& config);
 
 protected:
-  FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+  FilterConfig(Stats::StatName stat_prefix, Server::Configuration::GenericFactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config,
                absl::Status& creation_status);
@@ -587,6 +587,9 @@ private:
                                                     const Http::HeaderMap& headers) const;
   void applyShadowPolicyHeaders(const ShadowPolicy& shadow_policy,
                                 Http::RequestHeaderMap& headers) const;
+  // Collects the downstream request's dynamic ``envoy.lb`` metadata (request over connection) for
+  // forwarding to shadow streams, mirroring ``metadataMatchCriteria()``. Empty if none is present.
+  envoy::config::core::v3::Metadata shadowDynamicMetadata() const;
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request,
                        TimeoutRetry is_timeout_retry);
   uint32_t numRequestsAwaitingHeaders();

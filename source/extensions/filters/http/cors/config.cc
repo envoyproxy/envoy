@@ -17,22 +17,12 @@ namespace Cors {
 using CorsPolicyImpl =
     Router::CorsPolicyImplBase<envoy::extensions::filters::http::cors::v3::CorsPolicy>;
 
-absl::StatusOr<Http::FilterFactoryCb> CorsFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::cors::v3::Cors&, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
-  CorsFilterConfigSharedPtr config =
-      std::make_shared<CorsFilterConfig>(stats_prefix, context.scope());
-  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<CorsFilter>(config));
-  };
-}
-
 absl::StatusOr<Http::FilterFactoryCb> CorsFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cors::v3::Cors&,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  CorsFilterConfigSharedPtr config =
-      std::make_shared<CorsFilterConfig>(extra_context.stats_prefix, context.scope());
+  CorsFilterConfigSharedPtr config = std::make_shared<CorsFilterConfig>(
+      extra_context.stats_prefix, extra_context.scopeOr(context));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CorsFilter>(config));
   };

@@ -1,0 +1,18 @@
+diff --git a/quiche/http2/adapter/oghttp2_session.cc b/quiche/http2/adapter/oghttp2_session.cc
+index 74584c0..be5c1d2 100644
+--- a/quiche/http2/adapter/oghttp2_session.cc
++++ b/quiche/http2/adapter/oghttp2_session.cc
+@@ -276,6 +276,13 @@ void OgHttp2Session::PassthroughHeadersHandler::OnHeaderBlockEnd(
+     SetResult(OnHeaderResult::HEADER_HTTP_MESSAGING);
+     return;
+   }
++  if ((type_ == HeaderType::REQUEST_TRAILER ||
++       type_ == HeaderType::RESPONSE_TRAILER) &&
++      !frame_contains_fin_) {
++    QUICHE_VLOG(1) << "Trailers must contain END_STREAM";
++    SetResult(OnHeaderResult::HEADER_HTTP_MESSAGING);
++    return;
++  }
+   if (frame_contains_fin_ && IsResponse(type_) &&
+       StatusIs1xx(status_header())) {
+     QUICHE_VLOG(1) << "Unexpected end of stream without final headers";

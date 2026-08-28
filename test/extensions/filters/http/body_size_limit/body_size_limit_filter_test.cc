@@ -19,7 +19,7 @@ namespace BodySizeLimitFilter {
 
 class BodySizeLimitFilterTest : public testing::Test {
 public:
-  BodySizeLimitFilterConfigSharedPtr setupConfig(uint32_t max_request_bytes = 1024 * 1024) {
+  BodySizeLimitFilterConfigSharedPtr setupConfig(uint64_t max_request_bytes = 1024 * 1024) {
     envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit proto_config;
     proto_config.mutable_max_request_bytes()->set_value(max_request_bytes);
     return std::make_shared<BodySizeLimitFilterConfig>(proto_config);

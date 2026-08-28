@@ -23,6 +23,6 @@ cc_library(
     includes = ["."],
     visibility = ["//visibility:public"],
     deps = [
-        "@com_google_protobuf//:protobuf",
+        "@protobuf",
     ],
 )

@@ -28,6 +28,9 @@
 #include "gtest/gtest.h"
 #include "xds/data/orca/v3/orca_load_report.pb.h"
 
+using testing::Contains;
+using testing::Key;
+
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
@@ -1069,8 +1072,8 @@ TEST(ApplyOrcaOobConnectionOverridesTest, PopulatedProtoIsMerged) {
   EXPECT_EQ(config.port_value, 9001u);
   EXPECT_EQ(config.authority, "backend.example.com");
   ASSERT_NE(config.transport_socket_match_metadata, nullptr);
-  EXPECT_TRUE(config.transport_socket_match_metadata->filter_metadata().contains(
-      "envoy.transport_socket_match"));
+  EXPECT_THAT(config.transport_socket_match_metadata->filter_metadata(),
+              Contains(Key("envoy.transport_socket_match")));
   EXPECT_TRUE(config.transport_socket_match_metadata->filter_metadata()
                   .at("envoy.transport_socket_match")
                   .fields()

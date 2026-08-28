@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package envoy.type.ai.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.type.ai.v3";
+option java_outer_classname = "ApiProtocolProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/ai/v3;aiv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: AI API protocol]
+
+// Identifies the AI API contract spoken on the wire.
+//
+// This names request/response schemas and streaming event semantics, not the
+// organization operating the backend: OpenAI, Azure OpenAI, vLLM, and any
+// other OpenAI-compatible backend all speak ``OPENAI_CHAT_COMPLETIONS``.
+// Provider identity, when needed, must come from configuration or routing
+// metadata.
+//
+// Response framing is separate: JSON, SSE, and streamed JSON-array variants
+// of the same API share one ``ApiProtocol`` value.
+enum ApiProtocol {
+  API_PROTOCOL_UNSPECIFIED = 0;
+
+  // OpenAI-compatible ``/v1/chat/completions`` API.
+  OPENAI_CHAT_COMPLETIONS = 1;
+
+  // OpenAI-compatible ``/v1/responses`` API.
+  OPENAI_RESPONSES = 2;
+
+  // Anthropic-compatible ``/v1/messages`` API.
+  ANTHROPIC_MESSAGES = 3;
+
+  // Gemini ``generateContent`` / ``streamGenerateContent`` APIs.
+  GEMINI_GENERATE_CONTENT = 4;
+}

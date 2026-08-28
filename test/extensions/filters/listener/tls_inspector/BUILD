@@ -19,7 +19,7 @@ envoy_package()
 envoy_cc_test(
     name = "ja4_fingerprint_test",
     srcs = ["ja4_fingerprint_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":tls_utility_lib",
         "//source/common/common:hex_lib",
@@ -30,7 +30,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "tls_inspector_test",
     srcs = ["tls_inspector_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":tls_utility_lib",
         "//source/common/http:utility_lib",
@@ -50,7 +50,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "tls_inspector_ja4_test",
     srcs = ["tls_inspector_ja4_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":tls_utility_lib",
         "//source/common/common:hex_lib",
@@ -81,7 +81,7 @@ envoy_cc_fuzz_test(
     name = "tls_inspector_fuzz_test",
     srcs = ["tls_inspector_fuzz_test.cc"],
     corpus = "tls_inspector_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":tls_inspector_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
@@ -93,7 +93,7 @@ envoy_extension_cc_benchmark_binary(
     name = "tls_inspector_benchmark",
     srcs = ["tls_inspector_benchmark.cc"],
     extension_names = ["envoy.filters.listener.tls_inspector"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":tls_utility_lib",
         "//source/common/http:utility_lib",
@@ -134,7 +134,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:api_version_lib",
         "//source/common/event:dispatcher_includes",

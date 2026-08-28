@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "rds_test",
     srcs = ["rds_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/init:manager_lib",
         "//source/common/rds:rds_lib",

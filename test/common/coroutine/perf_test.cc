@@ -402,9 +402,7 @@ Coroutine::Task<absl::StatusOr<uint64_t>> AsyncSocket::read(Buffer::Instance& bu
       co_return 0;
     }
     ++read_blocks_;
-    if (absl::Status s = co_await whenReady(Read); !s.ok()) {
-      co_return s;
-    }
+    CO_RETURN_IF_ERROR(co_await whenReady(Read));
   }
 }
 
@@ -418,9 +416,7 @@ Coroutine::Task<absl::StatusOr<uint64_t>> AsyncSocket::write(Buffer::Instance& b
       co_return absl::InternalError("write() failed");
     }
     ++write_blocks_;
-    if (absl::Status s = co_await whenReady(Write); !s.ok()) {
-      co_return s;
-    }
+    CO_RETURN_IF_ERROR(co_await whenReady(Write));
   }
 }
 
@@ -430,23 +426,16 @@ Coroutine::Task<absl::Status> coroEcho(AsyncSocket& sock, uint32_t high) {
   while (true) {
     if (buf.length() < high) {
       bool await = buf.length() == 0;
-      absl::StatusOr<uint64_t> n = co_await sock.read(buf, ReadSize, await);
-      if (!n.ok()) {
-        co_return n.status();
-      }
-      if (*n == 0 && await) {
+      ASSIGN_OR_CO_RETURN(uint64_t n, co_await sock.read(buf, ReadSize, await));
+      if (n == 0 && await) {
         co_return absl::InternalError("peer closed before echo completed");
       }
     }
     if (buf.length() > 0) {
-      absl::StatusOr<uint64_t> wrote = co_await sock.write(buf);
-      if (!wrote.ok()) {
-        co_return wrote.status();
-      }
+      ASSIGN_OR_CO_RETURN(auto wrote, co_await sock.write(buf));
+      (void)wrote;
     }
-    if (absl::Status s = co_await YieldToNextIteration(sock); !s.ok()) {
-      co_return s;
-    }
+    CO_RETURN_IF_ERROR(co_await YieldToNextIteration(sock));
   }
 }
 

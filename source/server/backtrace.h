@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <functional>
 #include <iostream>
 #include <ostream>
 
@@ -197,7 +196,7 @@ private:
    * symbolization failed.
    * 3. (void*) The address of the current frame.
    */
-  void visitTrace(const std::function<void(int, const char*, void*)>& visitor) {
+  template <typename F> void visitTrace(F visitor) {
     for (int i = 0; i < stack_depth_; ++i) {
       char out[1024];
       const bool success = absl::Symbolize(stack_trace_[i], out, sizeof(out));
