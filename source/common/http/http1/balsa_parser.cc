@@ -59,23 +59,32 @@ static_assert(!isValidTokenCharacter(' '));
 
 // TODO(#21245): Skip method validation altogether when UHV method validation is
 // enabled.
-bool isMethodValid(absl::string_view method, bool allow_custom_methods) {
+bool isMethodValid(absl::string_view method, bool allow_custom_methods, bool allow_query_method) {
   if (allow_custom_methods) {
     return !method.empty() &&
            std::all_of(method.begin(), method.end(),
                        [](absl::string_view::value_type c) { return isValidTokenCharacter(c); });
   }
 
+  // Must remain sorted: searched by std::binary_search() below.
   static constexpr absl::string_view kValidMethods[] = {
-      "ACL",       "BIND",    "CHECKOUT", "CONNECT", "COPY",       "DELETE",     "GET",
-      "HEAD",      "LINK",    "LOCK",     "MERGE",   "MKACTIVITY", "MKCALENDAR", "MKCOL",
-      "MOVE",      "MSEARCH", "NOTIFY",   "OPTIONS", "PATCH",      "POST",       "PROPFIND",
-      "PROPPATCH", "PURGE",   "PUT",      "REBIND",  "REPORT",     "SEARCH",     "SOURCE",
-      "SUBSCRIBE", "TRACE",   "UNBIND",   "UNLINK",  "UNLOCK",     "UNSUBSCRIBE"};
+      "ACL",       "BIND",      "CHECKOUT", "CONNECT", "COPY",       "DELETE",     "GET",
+      "HEAD",      "LINK",      "LOCK",     "MERGE",   "MKACTIVITY", "MKCALENDAR", "MKCOL",
+      "MOVE",      "MSEARCH",   "NOTIFY",   "OPTIONS", "PATCH",      "POST",       "PROPFIND",
+      "PROPPATCH", "PURGE",     "PUT",      "QUERY",   "REBIND",     "REPORT",     "SEARCH",
+      "SOURCE",    "SUBSCRIBE", "TRACE",    "UNBIND",  "UNLINK",     "UNLOCK",     "UNSUBSCRIBE"};
+  static_assert(std::is_sorted(std::begin(kValidMethods), std::end(kValidMethods)));
 
   const auto* begin = &kValidMethods[0];
   const auto* end = &kValidMethods[std::size(kValidMethods) - 1] + 1;
-  return std::binary_search(begin, end, method);
+  if (!std::binary_search(begin, end, method)) {
+    return false;
+  }
+
+  // Recognizing QUERY (registered by RFC 10008) makes Envoy forward requests it previously
+  // rejected with a 400, so the previous behavior remains available by disabling the runtime
+  // guard `envoy.reloadable_features.http1_allow_query_method`.
+  return allow_query_method || method != Headers::get().MethodValues.Query;
 }
 
 // This function is crafted to match the URL validation behavior of the http-parser library.
@@ -163,7 +172,9 @@ bool isHeaderNameValid(absl::string_view name) {
 BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
                          bool enable_trailers, bool allow_custom_methods)
     : message_type_(type), connection_(connection), enable_trailers_(enable_trailers),
-      allow_custom_methods_(allow_custom_methods) {
+      allow_custom_methods_(allow_custom_methods),
+      allow_query_method_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_allow_query_method")) {
   ASSERT(connection_ != nullptr);
 
   quiche::HttpValidationPolicy http_validation_policy;
@@ -307,7 +318,7 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
   if (status_ == ParserStatus::Error) {
     return;
   }
-  if (!isMethodValid(method_input, allow_custom_methods_)) {
+  if (!isMethodValid(method_input, allow_custom_methods_, allow_query_method_)) {
     status_ = ParserStatus::Error;
     error_message_ = "HPE_INVALID_METHOD";
     return;

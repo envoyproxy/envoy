@@ -1976,6 +1976,9 @@ TEST(Utility, isSafeRequest) {
   EXPECT_FALSE(Utility::isSafeRequest(request_headers));
   request_headers.setMethod("PATCH");
   EXPECT_FALSE(Utility::isSafeRequest(request_headers));
+  // QUERY is safe per RFC 10008 but deliberately excluded; see the TODO in isSafeRequest().
+  request_headers.setMethod("QUERY");
+  EXPECT_FALSE(Utility::isSafeRequest(request_headers));
 
   request_headers.setMethod("GET");
   EXPECT_TRUE(Utility::isSafeRequest(request_headers));

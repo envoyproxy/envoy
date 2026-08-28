@@ -65,7 +65,8 @@ constexpr uint64_t TimeoutPrecisionFactor = 100;
 } // namespace
 
 absl::StatusOr<std::unique_ptr<FilterConfig>>
-FilterConfig::create(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+FilterConfig::create(Stats::StatName stat_prefix,
+                     Server::Configuration::GenericFactoryContext& context,
                      ShadowWriterPtr&& shadow_writer,
                      const envoy::extensions::filters::http::router::v3::Router& config) {
   absl::Status creation_status = absl::OkStatus();
@@ -76,7 +77,7 @@ FilterConfig::create(Stats::StatName stat_prefix, Server::Configuration::Factory
 }
 
 FilterConfig::FilterConfig(Stats::StatName stat_prefix,
-                           Server::Configuration::FactoryContext& context,
+                           Server::Configuration::GenericFactoryContext& context,
                            ShadowWriterPtr&& shadow_writer,
                            const envoy::extensions::filters::http::router::v3::Router& config,
                            absl::Status& creation_status)

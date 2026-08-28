@@ -26,9 +26,9 @@ py_binary(
         requirement("packaging"),
         "//tools/type_whisperer",
         "//tools/type_whisperer:api_type_db_proto_py_proto",
-        "@com_google_protobuf//:protobuf_python",
         "@envoy_api//envoy/annotations:pkg_py_proto",
         "@googleapis//google/api:annotations_py_proto",
+        "@protobuf//:protobuf_python",
         "@xds//udpa/annotations:pkg_py_proto",
         "@xds//xds/annotations/v3:pkg_py_proto",
     ],
@@ -45,7 +45,7 @@ py_library(
 
 py_proto_library(
     name = "validate_py_pb2",
-    deps = ["@com_envoyproxy_protoc_gen_validate//validate:validate_proto"],
+    deps = ["@protoc-gen-validate//validate:validate_proto"],
 )
 
 protoprint_rule(
