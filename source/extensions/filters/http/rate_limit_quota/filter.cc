@@ -95,6 +95,12 @@ addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
   };
 }
 
+std::chrono::milliseconds
+reportingIntervalToMilliseconds(const Protobuf::Duration& reporting_interval) {
+  const uint64_t milliseconds = DurationUtil::durationToMilliseconds(reporting_interval);
+  return std::chrono::milliseconds(milliseconds + (reporting_interval.nanos() % 1000000 != 0));
+}
+
 Http::FilterHeadersStatus sendDenyResponse(Http::StreamDecoderFilterCallbacks* cb,
                                            const DenyResponseSettings& settings,
                                            StreamInfo::CoreResponseFlag flag) {
@@ -184,10 +190,12 @@ RateLimitQuotaFilter::recordBucketUsage(const Matcher::ActionConstSharedPtr& mat
   std::chrono::milliseconds expiration_fallback_ttl =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::seconds(expiration_fallback_ttl_secs));
+  const std::chrono::milliseconds reporting_interval =
+      reportingIntervalToMilliseconds(match_action.bucketSettings().reporting_interval());
 
   // When seeing a new bucket for the first time, request its addition to
   // the global cache. This will be done by the main thread.
-  client_->createBucket(bucket_id_proto, bucket_id, default_bucket_action,
+  client_->createBucket(bucket_id_proto, bucket_id, reporting_interval, default_bucket_action,
                         std::move(expiration_fallback_action), expiration_fallback_ttl,
                         shouldAllowInitialRequest);
   ENVOY_LOG(debug, "Requesting addition to the global RLQS bucket cache: ",

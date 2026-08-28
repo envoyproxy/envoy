@@ -44,11 +44,9 @@ using envoy::type::v3::RateLimitStrategy;
 GlobalRateLimitClientImpl::GlobalRateLimitClientImpl(
     const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
     Server::Configuration::FactoryContext& context, absl::string_view domain_name,
-    std::chrono::milliseconds send_reports_interval,
     Envoy::ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
     Envoy::Event::Dispatcher& main_dispatcher, absl::Status& creation_status)
     : domain_name_(domain_name), buckets_tls_(buckets_tls),
-      send_reports_interval_(send_reports_interval),
       time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()),
       main_dispatcher_(main_dispatcher) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
@@ -109,8 +107,8 @@ void getUsageFromBucket(const CachedBucket& cached_bucket, TimeSource& time_sour
   while (!cached_last_report.compare_exchange_weak(last_report, now, std::memory_order_relaxed)) {
   }
 
-  usage.mutable_time_elapsed()->set_seconds(
-      std::chrono::duration_cast<std::chrono::seconds>(now - last_report).count());
+  usage.mutable_time_elapsed()->MergeFrom(
+      Protobuf::util::TimeUtil::NanosecondsToDuration((now - last_report).count()));
 }
 
 // Read a specific bucket's aggregated usage & build it into a UsageReports
@@ -131,13 +129,18 @@ GlobalRateLimitClientImpl::buildReports(std::shared_ptr<CachedBucket> cached_buc
 // message.
 RateLimitQuotaUsageReports GlobalRateLimitClientImpl::buildReports() {
   RateLimitQuotaUsageReports report;
+  const std::chrono::nanoseconds now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+      time_source_.monotonicTime().time_since_epoch());
   // Build the report from quota bucket source-of-truth. The buckets_cache_ is
   // guaranteed to be safe so long as index deletion & creation only happen in
   // the main thread.
   for (const auto& [_, cached] : buckets_cache_) {
     // If the cached bucket or underlying QuotaUsage are null, it is due to a
     // bug, and should cause a crash.
-    std::shared_ptr<QuotaUsage> cached_usage = cached->quota_usage;
+    const auto last_report = cached->quota_usage->last_report.load(std::memory_order_relaxed);
+    if (now - last_report < cached->reporting_interval) {
+      continue;
+    }
     auto* usage = report.add_bucket_quota_usages();
     getUsageFromBucket(*cached, time_source_, *usage);
   }
@@ -149,21 +152,23 @@ RateLimitQuotaUsageReports GlobalRateLimitClientImpl::buildReports() {
 }
 
 void GlobalRateLimitClientImpl::createBucket(const BucketId& bucket_id, size_t id,
+                                             std::chrono::milliseconds reporting_interval,
                                              const BucketAction& default_bucket_action,
                                              std::unique_ptr<RateLimitStrategy> fallback_action,
                                              std::chrono::milliseconds fallback_ttl,
                                              bool initial_request_allowed) {
   // Mutable to move fallback_action ownership into the main thread then into
   // the created bucket.
-  main_dispatcher_.post([&, bucket_id, id, default_bucket_action,
+  main_dispatcher_.post([&, bucket_id, id, reporting_interval, default_bucket_action,
                          fallback_action_ptr = std::move(fallback_action), fallback_ttl,
                          initial_request_allowed]() mutable {
-    createBucketImpl(bucket_id, id, default_bucket_action, std::move(fallback_action_ptr),
-                     fallback_ttl, initial_request_allowed);
+    createBucketImpl(bucket_id, id, reporting_interval, default_bucket_action,
+                     std::move(fallback_action_ptr), fallback_ttl, initial_request_allowed);
   });
 }
 
 void GlobalRateLimitClientImpl::createBucketImpl(const BucketId& bucket_id, size_t id,
+                                                 std::chrono::milliseconds reporting_interval,
                                                  const BucketAction& default_bucket_action,
                                                  std::unique_ptr<RateLimitStrategy> fallback_action,
                                                  std::chrono::milliseconds fallback_ttl,
@@ -211,13 +216,15 @@ void GlobalRateLimitClientImpl::createBucketImpl(const BucketId& bucket_id, size
 
   buckets_cache_[id] = std::make_shared<CachedBucket>(
       bucket_id,
-      std::make_shared<QuotaUsage>(initial_request_allowed, !initial_request_allowed, now), nullptr,
-      std::move(fallback_action), fallback_ttl, default_bucket_action, nullptr);
+      std::make_shared<QuotaUsage>(initial_request_allowed, !initial_request_allowed, now),
+      reporting_interval, nullptr, std::move(fallback_action), fallback_ttl, default_bucket_action,
+      nullptr);
 
   // Send initial usage report for this new bucket to notify the RLQS server of
   // the new bucket's activation.
   RateLimitQuotaUsageReports initial_report = buildReports(buckets_cache_[id]);
   sendUsageReportImpl(initial_report);
+  scheduleNextReportTimer();
 
   writeBucketsToTLS();
   if (callbacks_ != nullptr) {
@@ -321,6 +328,7 @@ void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse
     std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
         /*bucket_id=*/cached_bucket->bucket_id,
         /*quota_usage=*/cached_bucket->quota_usage,
+        /*reporting_interval=*/cached_bucket->reporting_interval,
         /*cached_action=*/std::make_unique<BucketAction>(action),
         /*fallback_action=*/cached_bucket->fallback_action,
         /*fallback_ttl=*/cached_bucket->fallback_ttl,
@@ -375,6 +383,7 @@ void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse
   }
   // Push updates to TLS.
   writeBucketsToTLS();
+  scheduleNextReportTimer();
   if (callbacks_ != nullptr) {
     callbacks_->onQuotaResponseProcessed();
   }
@@ -413,23 +422,51 @@ void GlobalRateLimitClientImpl::startSendReportsTimerImpl() {
     if (callbacks_ != nullptr) {
       callbacks_->onUsageReportsSent();
     }
-    send_reports_timer_->enableTimer(send_reports_interval_);
   });
-  send_reports_timer_->enableTimer(send_reports_interval_);
+}
+
+void GlobalRateLimitClientImpl::scheduleNextReportTimer() {
+  if (send_reports_timer_ == nullptr) {
+    return;
+  }
+  if (buckets_cache_.empty()) {
+    send_reports_timer_->disableTimer();
+    return;
+  }
+
+  const std::chrono::nanoseconds now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+      time_source_.monotonicTime().time_since_epoch());
+  std::chrono::nanoseconds next_deadline = std::chrono::nanoseconds::max();
+  for (const auto& [_, cached] : buckets_cache_) {
+    const auto deadline = cached->quota_usage->last_report.load(std::memory_order_relaxed) +
+                          cached->reporting_interval;
+    next_deadline = std::min(next_deadline, deadline);
+  }
+
+  const auto delay = next_deadline > now
+                         ? std::chrono::ceil<std::chrono::milliseconds>(next_deadline - now)
+                         : std::chrono::milliseconds::zero();
+  send_reports_timer_->enableTimer(delay);
 }
 
 void GlobalRateLimitClientImpl::onSendReportsTimer() {
   RateLimitQuotaUsageReports reports = buildReports();
+  if (reports.bucket_quota_usages().empty()) {
+    scheduleNextReportTimer();
+    return;
+  }
   if (stream_ == nullptr) {
     ENVOY_LOG(debug, "The RLQS stream is not currently open. Attempting to start / "
                      "restart it now.");
     if (!startStreamImpl()) {
       ENVOY_LOG(error, "Failed to start the RLQS stream. Dropping the collected usage "
                        "reports.");
+      scheduleNextReportTimer();
       return;
     }
   }
   sendUsageReportImpl(reports);
+  scheduleNextReportTimer();
 }
 
 void GlobalRateLimitClientImpl::startActionExpirationTimer(CachedBucket* cached_bucket, size_t id) {
@@ -466,6 +503,7 @@ void GlobalRateLimitClientImpl::onActionExpirationTimer(CachedBucket* bucket, si
     buckets_cache_[id] = std::make_shared<CachedBucket>(
         /*bucket_id=*/cached_bucket->bucket_id,
         /*quota_usage=*/cached_bucket->quota_usage,
+        /*reporting_interval=*/cached_bucket->reporting_interval,
         /*cached_action=*/nullptr,
         /*fallback_action=*/cached_bucket->fallback_action,
         /*fallback_ttl=*/cached_bucket->fallback_ttl,
@@ -507,6 +545,7 @@ void GlobalRateLimitClientImpl::onActionExpirationTimer(CachedBucket* bucket, si
   std::shared_ptr<CachedBucket> new_bucket = std::make_shared<CachedBucket>(
       /*bucket_id=*/cached_bucket->bucket_id,
       /*quota_usage=*/cached_bucket->quota_usage,
+      /*reporting_interval=*/cached_bucket->reporting_interval,
       /*cached_action=*/std::move(new_action),
       /*fallback_action=*/cached_bucket->fallback_action,
       /*fallback_ttl=*/cached_bucket->fallback_ttl,
@@ -548,6 +587,7 @@ void GlobalRateLimitClientImpl::onFallbackExpirationTimer(CachedBucket* bucket, 
   buckets_cache_[id] = std::make_shared<CachedBucket>(
       /*bucket_id=*/cached_bucket->bucket_id,
       /*quota_usage=*/cached_bucket->quota_usage,
+      /*reporting_interval=*/cached_bucket->reporting_interval,
       /*cached_action=*/nullptr,
       /*fallback_action=*/cached_bucket->fallback_action,
       /*fallback_ttl=*/cached_bucket->fallback_ttl,
