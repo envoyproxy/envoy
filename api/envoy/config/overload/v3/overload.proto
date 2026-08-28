@@ -160,6 +160,7 @@ message OverloadAction {
   // The name of the overload action. Most actions use a well-known string that listeners can use
   // for registering callbacks. An action with a ``ScaleTimersOverloadActionConfig`` may instead use
   // a unique name to distinguish multiple independently triggered ``reduce_timeouts`` instances.
+  // Custom names must not use the reserved ``envoy.overload_actions.`` prefix.
   // Valid known overload actions include:
   // - envoy.overload_actions.stop_accepting_requests
   // - envoy.overload_actions.disable_http_keepalive
@@ -179,7 +180,10 @@ message OverloadAction {
   // in this list.
   repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
 
-  // Configuration for the action being instantiated if applicable.
+  // Configuration for the action being instantiated if applicable. For an action with a custom
+  // name, the type of this configuration identifies the action implementation. Currently,
+  // ``ScaleTimersOverloadActionConfig`` is the only configuration that supports custom action
+  // names; it identifies the action as a ``reduce_timeouts`` instance.
   google.protobuf.Any typed_config = 3;
 }
 

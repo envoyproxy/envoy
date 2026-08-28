@@ -313,7 +313,7 @@ would be computed based on the maximum (specified elsewhere). So if ``idle_timeo
 again 600 seconds, then the minimum timer value would be :math:`10\% \cdot 600s = 60s`.
 
 Named reduce-timeouts actions
-""""""""""""""""""""""""
+"""""""""""""""""""""""""""""
 
 By default all timers in ``timer_scale_factors`` share the action-level triggers and their scale
 factors are driven by the maximum pressure across those triggers. To give groups of timer types
@@ -322,12 +322,15 @@ independent triggers, configure multiple actions with unique names and a
 <envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>` ``typed_config``. The
 ``typed_config`` identifies these named action instances as ``reduce_timeouts`` actions. The
 well-known ``envoy.overload_actions.reduce_timeouts`` name remains supported for existing
-configurations.
+configurations. Custom names cannot use the reserved ``envoy.overload_actions.`` prefix.
 
-Each named action may configure one or more timer types that share its triggers. A timer type cannot
-be configured by more than one action. A named action without a ``ScaleTimersOverloadActionConfig``,
-a name that collides with another well-known overload action, or duplicate timer ownership causes
-the overload manager configuration to be rejected at startup.
+The legacy ``envoy.overload_actions.reduce_timeouts`` action and named instances can coexist in the
+same configuration. Each action may configure one or more timer types that share its triggers, and
+each timer type can be claimed by at most one legacy or named action. A timer type that is not
+configured by any action is not scaled by the overload manager. If multiple actions claim the same
+timer type, the configuration is rejected with an error that identifies both actions. A named
+action without a ``ScaleTimersOverloadActionConfig`` or with a name that collides with another
+well-known overload action is also rejected at startup.
 
 .. code-block:: yaml
 

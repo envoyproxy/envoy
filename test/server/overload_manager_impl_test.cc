@@ -228,11 +228,16 @@ protected:
     return proto;
   }
 
-  std::unique_ptr<TestOverloadManager> createOverloadManager(const std::string& config) {
+  std::unique_ptr<TestOverloadManager>
+  createOverloadManager(const envoy::config::overload::v3::OverloadManager& config) {
     absl::Status creation_status = absl::OkStatus();
     return std::make_unique<TestOverloadManager>(dispatcher_, *stats_.rootScope(), thread_local_,
-                                                 parseConfig(config), validation_visitor_, *api_,
-                                                 options_, runtime_, creation_status);
+                                                 config, validation_visitor_, *api_, options_,
+                                                 runtime_, creation_status);
+  }
+
+  std::unique_ptr<TestOverloadManager> createOverloadManager(const std::string& config) {
+    return createOverloadManager(parseConfig(config));
   }
 
   FakeResourceMonitorFactory<Envoy::Protobuf::Struct> factory1_;
@@ -828,7 +833,7 @@ TEST_F(OverloadManagerImplTest, ShrinkHeapWithoutTypedConfig) {
   EXPECT_FALSE(config_opt.has_value());
 }
 
-TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithoutAction) {
+TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithoutTypedConfig) {
   const std::string config = R"EOF(
     actions:
       - name: "envoy.overload_actions.reduce_timeouts"
@@ -878,6 +883,26 @@ TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsWithTypedStructConfig) {
   EXPECT_NO_THROW(createOverloadManager(config));
 }
 
+TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsWithMalformedTypedStructConfig) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "connection_idle_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/xds.type.v3.TypedStruct
+          type_url: type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          value:
+            timer_scale_factors:
+              - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+                min_timeout: 1s
+  )EOF";
+
+  auto proto = parseConfig(config);
+  proto.mutable_actions(0)->mutable_typed_config()->set_value("malformed");
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(proto), EnvoyException,
+                          "Overload action \"connection_idle_timeouts\" has an invalid "
+                          "typed_config: Unable to unpack as xds.type.v3.TypedStruct");
+}
+
 TEST_F(OverloadManagerImplTest, NamedActionWithoutScaleTimersConfigIsRejected) {
   const std::string config = R"EOF(
     actions:
@@ -901,8 +926,27 @@ TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsCannotUseAnotherWellKnownActi
               min_timeout: 1s
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
-                          "Overload action name .* conflicts with its typed config");
+  EXPECT_THROW_WITH_MESSAGE(
+      createOverloadManager(config), EnvoyException,
+      "Overload action name \"envoy.overload_actions.stop_accepting_requests\" conflicts with its "
+      "typed config");
+}
+
+TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsCannotUseReservedActionName) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.custom_reduce_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 1s
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createOverloadManager(config), EnvoyException,
+      "Overload action name \"envoy.overload_actions.custom_reduce_timeouts\" uses reserved prefix "
+      "\"envoy.overload_actions.\"");
 }
 
 TEST_F(OverloadManagerImplTest, ReduceTimeoutsTimerConfiguredByMultipleActions) {
@@ -922,8 +966,10 @@ TEST_F(OverloadManagerImplTest, ReduceTimeoutsTimerConfiguredByMultipleActions) 
               min_timeout: 2s
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
-                          "Timer type is configured by both overload actions.*");
+  EXPECT_THROW_WITH_MESSAGE(
+      createOverloadManager(config), EnvoyException,
+      "Timer type is configured by both overload actions "
+      "\"envoy.overload_actions.reduce_timeouts\" and \"connection_idle_timeouts\"");
 }
 
 constexpr char kMultipleReduceTimeoutsActionsConfig[] = R"YAML(
@@ -1022,12 +1068,13 @@ constexpr char kTwoNamedReduceTimeoutsActionsConfig[] = R"YAML(
 TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsCreateStats) {
   auto manager(createOverloadManager(kMultipleReduceTimeoutsActionsConfig));
 
-  Stats::Gauge& active_gauge = stats_.gauge("overload.connection_idle_timeouts.active",
-                                            Stats::Gauge::ImportMode::Accumulate);
-  Stats::Gauge& scale_percent_gauge = stats_.gauge(
-      "overload.connection_idle_timeouts.scale_percent", Stats::Gauge::ImportMode::Accumulate);
-  EXPECT_EQ(0, active_gauge.value());
-  EXPECT_EQ(0, scale_percent_gauge.value());
+  const auto active_gauge = stats_.findGaugeByString("overload.connection_idle_timeouts.active");
+  ASSERT_TRUE(active_gauge.has_value());
+  EXPECT_EQ(0, active_gauge->get().value());
+  const auto scale_percent_gauge =
+      stats_.findGaugeByString("overload.connection_idle_timeouts.scale_percent");
+  ASSERT_TRUE(scale_percent_gauge.has_value());
+  EXPECT_EQ(0, scale_percent_gauge->get().value());
 }
 
 TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsAdjustScaleFactorIndependently) {
