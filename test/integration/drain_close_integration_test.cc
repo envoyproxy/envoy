@@ -246,7 +246,7 @@ TEST_P(DrainCloseIntegrationTest, AdminNonGracefulDrainSkipExit) {
   BufferingStreamDecoderPtr admin_response =
       IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners?skip_exit",
                                          "", downstreamProtocol(), version_);
-  EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
+  EXPECT_THAT(admin_response->headers(), Http::HttpStatusIs("200"));
 
   // Listeners should remain open.
   EXPECT_EQ(test_server_->counter("listener_manager.listener_stopped")->value(), 0);
@@ -274,7 +274,7 @@ TEST_P(DrainCloseIntegrationTest, AdminNonGracefulDrainSkipExit) {
   second_codec_client_->rawConnection().close(Network::ConnectionCloseType::NoFlush);
   admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
-  EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
+  EXPECT_THAT(admin_response->headers(), Http::HttpStatusIs("200"));
 
   test_server_->waitForCounter("listener_manager.listener_stopped", Eq(1));
   ASSERT_TRUE(waitForPortAvailable(http_port));

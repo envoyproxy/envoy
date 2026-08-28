@@ -87,14 +87,13 @@ TEST_P(AdminInstanceTest, NonGracefulDrainNotifiesListeners) {
   // so the notification carries the server-wide strategy just as a graceful drain's does.
   ON_CALL(server_.options_, drainStrategy())
       .WillByDefault(testing::Return(Server::DrainStrategy::Gradual));
-  Network::ConnectionDrainEvent captured;
   EXPECT_CALL(server_.listener_manager_, onServerDrainStart(Network::DrainDirection::All, _))
-      .WillOnce(
-          testing::Invoke([&captured](Network::DrainDirection,
-                                      Network::ConnectionDrainEvent event) { captured = event; }));
+      .WillOnce([](Network::DrainDirection, Network::ConnectionDrainEvent event) {
+        EXPECT_EQ(Server::DrainStrategy::Gradual, event.strategy);
+      });
+
   EXPECT_CALL(server_.listener_manager_, stopListeners(ListenerManager::StopListenersType::All, _));
   EXPECT_EQ(Http::Code::OK, postCallback("/drain_listeners", header_map, data));
-  EXPECT_EQ(Server::DrainStrategy::Gradual, captured.strategy);
 
   // Inbound-only drains pass the narrower direction through, as for a graceful drain.
   EXPECT_CALL(server_.listener_manager_,
