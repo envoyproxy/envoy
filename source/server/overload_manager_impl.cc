@@ -209,8 +209,8 @@ parseTimerMinimums(const Protobuf::Any& typed_config,
   return timer_minimums;
 }
 
-// Routes timer types configured by named reduce_timeouts actions to independently scaled timer
-// managers. Other timer types and timers created with an explicit minimum use the main manager.
+// Routes timer types owned by named reduce_timeouts actions to per-action managers; all other
+// timers use the main manager.
 class MultiActionScaledRangeTimerManager : public Event::ScaledRangeTimerManager {
 public:
   explicit MultiActionScaledRangeTimerManager(Event::ScaledRangeTimerManagerPtr main_manager)
@@ -229,8 +229,7 @@ public:
   }
 
   void setScaleFactor(UnitFloat scale_factor) override {
-    // Preserve the interface's global override contract. Normal overload action callbacks update
-    // their action's manager directly and do not use this broadcast path.
+    // Global interface override; action callbacks update only their own manager.
     main_manager_->setScaleFactor(scale_factor);
     for (const auto& action_manager : action_managers_) {
       action_manager->setScaleFactor(scale_factor);
@@ -670,6 +669,13 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
 
   // Validate the trigger resources for Load shedPoints.
   for (const auto& point : config.loadshed_points()) {
+    if (actions_.contains(action_symbol_table_.get(point.name()))) {
+      creation_status = absl::InvalidArgumentError(
+          fmt::format("Load shed point \"{}\" conflicts with an overload action of the same name",
+                      point.name()));
+      return;
+    }
+
     for (const auto& trigger : point.triggers()) {
       if (!resources_.contains(trigger.name())) {
         creation_status = absl::InvalidArgumentError(fmt::format(

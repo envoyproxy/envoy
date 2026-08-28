@@ -330,7 +330,8 @@ each timer type can be claimed by at most one legacy or named action. A timer ty
 configured by any action is not scaled by the overload manager. If multiple actions claim the same
 timer type, the configuration is rejected with an error that identifies both actions. A named
 action without a ``ScaleTimersOverloadActionConfig`` or with a name that collides with another
-well-known overload action is also rejected at startup.
+well-known overload action is also rejected at startup. Action names cannot duplicate load shed
+point names because both emit stats under the ``overload.<name>`` prefix.
 
 Timers created with an explicit minimum instead of a timer type always use the legacy
 ``envoy.overload_actions.reduce_timeouts`` action. If only named instances are configured, these

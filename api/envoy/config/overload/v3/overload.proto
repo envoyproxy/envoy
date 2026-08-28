@@ -157,11 +157,12 @@ message OverloadAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadAction";
 
-  // The name of the overload action. Most actions use a well-known string that listeners can use
-  // for registering callbacks. An action with a ``ScaleTimersOverloadActionConfig`` may instead use
-  // a unique name to distinguish multiple independently triggered ``reduce_timeouts`` instances.
-  // Custom names must not use the reserved ``envoy.overload_actions.`` prefix. Action stats use the
-  // configured name, for example ``overload.<name>.active`` and ``overload.<name>.scale_percent``.
+  // The action name. Most actions use a well-known string for listener callback registration.
+  // ``ScaleTimersOverloadActionConfig`` actions may use unique custom names for independently
+  // triggered ``reduce_timeouts`` instances. Custom names must not use the reserved
+  // ``envoy.overload_actions.`` prefix. No action name may duplicate a ``LoadShedPoint`` name.
+  // Stats use the configured name, for example ``overload.<name>.active`` and
+  // ``overload.<name>.scale_percent``.
   // Valid known overload actions include:
   // - envoy.overload_actions.stop_accepting_requests
   // - envoy.overload_actions.disable_http_keepalive
@@ -181,10 +182,9 @@ message OverloadAction {
   // in this list.
   repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
 
-  // Configuration for the action being instantiated if applicable. For an action with a custom
-  // name, the type of this configuration identifies the action implementation. Currently,
-  // ``ScaleTimersOverloadActionConfig`` is the only configuration that supports custom action
-  // names; it identifies the action as a ``reduce_timeouts`` instance.
+  // Optional implementation configuration. For a custom name, its type identifies the action.
+  // Currently only ``ScaleTimersOverloadActionConfig`` supports custom names, identifying a
+  // ``reduce_timeouts`` instance.
   google.protobuf.Any typed_config = 3;
 }
 

@@ -1031,7 +1031,7 @@ private:
       return monitor;
     }
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      // FactoryRegistry requires each registered factory to have a distinct config proto type.
+      // Registered factories require distinct config proto types.
       return std::make_unique<Protobuf::Timestamp>();
     }
     std::string name() const override {
@@ -1052,15 +1052,13 @@ INSTANTIATE_TEST_SUITE_P(Protocols, MultipleReduceTimeoutsActionsIntegrationTest
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// Verifies that multiple reduce_timeouts actions drive their timer types independently.
 TEST_P(MultipleReduceTimeoutsActionsIntegrationTest, TimerTypesScaleIndependently) {
   initializeOverloadManager();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   ASSERT_TRUE(codec_client_->connected());
 
-  // Saturating only the resource for the legacy action reduces the maximum connection duration
-  // to 3 seconds. The idle timeout owned by the named action remains at 20 seconds.
+  // Scale max duration to 3 seconds; named idle timeout remains 20 seconds.
   updateResource(0.9);
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
                              Eq(100));
@@ -1072,8 +1070,7 @@ TEST_P(MultipleReduceTimeoutsActionsIntegrationTest, TimerTypesScaleIndependentl
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
   codec_client_->close();
 
-  // Saturating only the named action's resource reduces the idle timeout to 5 seconds. A new
-  // connection's maximum duration remains at 20 seconds.
+  // Scale idle timeout to 5 seconds; the new connection's max duration remains 20 seconds.
   updateResource(0);
   updateSecondResource(0.9);
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",

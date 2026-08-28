@@ -887,6 +887,22 @@ TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsWithTypedStructConfig) {
   EXPECT_NO_THROW(createOverloadManager(config));
 }
 
+TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsWithLegacyTypedStructConfig) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "connection_idle_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+          type_url: type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          value:
+            timer_scale_factors:
+              - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+                min_timeout: 1s
+  )EOF";
+
+  EXPECT_NO_THROW(createOverloadManager(config));
+}
+
 TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsWithMalformedTypedStructConfig) {
   const std::string config = R"EOF(
     actions:
@@ -953,6 +969,37 @@ TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsCannotUseReservedActionName) 
       "\"envoy.overload_actions.\"");
 }
 
+TEST_F(OverloadManagerImplTest, OverloadActionCannotShareNameWithLoadShedPoint) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "connection_idle_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 1s
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+    loadshed_points:
+      - name: "connection_idle_timeouts"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createOverloadManager(config), EnvoyException,
+      "Load shed point \"connection_idle_timeouts\" conflicts with an overload action of the same "
+      "name");
+}
+
 TEST_F(OverloadManagerImplTest, ReduceTimeoutsTimerConfiguredByMultipleActions) {
   const std::string config = R"EOF(
     actions:
@@ -974,6 +1021,41 @@ TEST_F(OverloadManagerImplTest, ReduceTimeoutsTimerConfiguredByMultipleActions) 
       createOverloadManager(config), EnvoyException,
       "Timer type is configured by both overload actions "
       "\"envoy.overload_actions.reduce_timeouts\" and \"connection_idle_timeouts\"");
+}
+
+TEST_F(OverloadManagerImplTest, TimerConfiguredByMultipleNamedReduceTimeoutsActions) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "first_connection_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 1s
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.8
+      - name: "second_connection_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 2s
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createOverloadManager(config), EnvoyException,
+      "Timer type is configured by both overload actions \"first_connection_timeouts\" and "
+      "\"second_connection_timeouts\"");
 }
 
 constexpr char kMultipleReduceTimeoutsActionsConfig[] = R"YAML(
@@ -1126,7 +1208,7 @@ TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsCreateTimerRouting)
 
   EXPECT_CALL(mock_dispatcher, post).WillRepeatedly([](Event::PostCb cb) { cb(); });
 
-  // Timers with an explicit minimum use the main manager.
+  // Explicit-minimum timers use the main manager.
   Event::MockTimer* min_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(*mock_main_manager, createTimer_(_, _)).WillOnce(Return(min_timer));
   auto t1 =
