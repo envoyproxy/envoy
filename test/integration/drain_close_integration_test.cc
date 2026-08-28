@@ -1,7 +1,3 @@
-#include "envoy/network/drain_decision.h"
-#include "envoy/server/instance.h"
-#include "envoy/server/listener_manager.h"
-
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
 
@@ -21,26 +17,6 @@ protected:
   void useLegacyDrainClose() {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.use_connection_event_drain",
                                       "false");
-  }
-
-  // Starts a server-wide drain the way production does: push the drain notification to every
-  // listener so each connection learns of the drain, then start the drain sequence. Mirrors
-  // InstanceBase::drainListeners() and ListenersHandler::handlerDrainListeners(). Blocks until the
-  // main thread has run both.
-  void startServerDrain() {
-    absl::Notification drain_sequence_started;
-    test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-      Server::Instance& server = test_server_->server();
-      // The start time and strategy are captured once, so every notified connection shares one
-      // drain timeline.
-      server.listenerManager().onServerDrainStart(
-          Network::DrainDirection::All,
-          Network::ConnectionDrainEvent{server.api().timeSource().monotonicTime(),
-                                        server.options().drainStrategy()});
-      test_server_->drainManager().startDrainSequence(Network::DrainDirection::All, [] {});
-      drain_sequence_started.Notify();
-    });
-    drain_sequence_started.WaitForNotification();
   }
 };
 
