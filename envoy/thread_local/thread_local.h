@@ -50,7 +50,7 @@ public:
 
   /**
    * Set thread local data on all threads registered via registerThread(). If new threads are
-   * registered in the future, the callback will also be invoked on the newly registered thread
+   * registered in the future, the callback will also be posted to the newly registered thread
    * so long as the slot is still active.
    * @param initializeCb supplies the functor that will be called *on each thread*. The functor
    *                     returns the thread local object which is then stored. The storage is via
@@ -137,7 +137,7 @@ public:
 
   /**
    * Set thread local data on all threads registered via registerThread(). If new threads are
-   * registered in the future, the callback will also be invoked on the newly registered thread
+   * registered in the future, the callback will also be posted to the newly registered thread
    * so long as the slot is still active.
    * @param initializeCb supplies the functor that will be called *on each thread*. The functor
    *                     returns the thread local object which is then stored. The storage is via
@@ -220,8 +220,8 @@ class Instance : public SlotAllocator {
 public:
   /**
    * Register a thread (via its dispatcher) to receive thread local data updates.
-   * Any active slots that had set() called will have their initialize callback invoked
-   * on this dispatcher.
+   * Any active slots that had set() called will have their initialize callback posted
+   * to this dispatcher.
    * @param dispatcher supplies the thread's dispatcher.
    * @param main_thread supplies whether this is the main program thread or not. (The only
    *                    difference is that callbacks fire immediately on the main thread when posted
