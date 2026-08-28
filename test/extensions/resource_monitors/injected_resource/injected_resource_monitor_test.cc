@@ -65,7 +65,9 @@ protected:
     config.set_filename(resource_filename_);
     Server::Configuration::ResourceMonitorFactoryContextImpl context(
         *dispatcher_, options_, *api_, ProtobufMessage::getStrictValidationVisitor(), runtime_);
-    return std::make_unique<TestableInjectedResourceMonitor>(config, context);
+    auto monitor = std::make_unique<TestableInjectedResourceMonitor>(config, context);
+    THROW_IF_NOT_OK(monitor->init());
+    return monitor;
   }
 
   Api::ApiPtr api_;

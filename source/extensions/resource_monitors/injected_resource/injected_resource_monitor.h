@@ -24,6 +24,8 @@ public:
           config,
       Server::Configuration::ResourceMonitorFactoryContext& context);
 
+  absl::Status init();
+
   // Server::ResourceMonitor
   void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
