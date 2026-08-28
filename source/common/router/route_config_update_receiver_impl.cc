@@ -110,8 +110,8 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
       // We have received the first valid route configuration update and the VHDS configuration has
       // changed. Then create a new subscription but use a noop init manager for this subscription
       // to avoid blocking the main init manager.
-      // This is for the backward compatibility because the previous implementation doesn't won't
-      // block the new RDS update if the updated VHDS subscription is not ready.
+      // This is for backward compatibility: the previous implementation didn't block the new RDS
+      // update if the updated VHDS subscription was not ready.
       vhds_noop_init_manager = std::make_unique<Init::ManagerImpl>(
           fmt::format("VHDS noop init manager for {}", new_route_config->name()));
       vhds_noop_init_watcher = std::make_unique<Init::WatcherImpl>(
