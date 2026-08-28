@@ -14,16 +14,17 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
 
-Server::ResourceMonitorPtr CpuUtilizationMonitorFactory::createResourceMonitorFromProtoTyped(
+absl::StatusOr<Server::ResourceMonitorPtr>
+CpuUtilizationMonitorFactory::createResourceMonitorFromProtoTyped(
     const envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig& config,
     Server::Configuration::ResourceMonitorFactoryContext& context) {
-  // In the future, the below can be configurable based on the operating system.
   std::unique_ptr<CpuStatsReader> cpu_stats_reader;
   if (config.mode() ==
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER) {
-    // Use factory method to create appropriate cgroup reader (v1 or v2)
-    cpu_stats_reader = LinuxContainerCpuStatsReader::create(context.api().fileSystem(),
-                                                            context.api().timeSource());
+    auto reader_or_error = LinuxContainerCpuStatsReader::create(context.api().fileSystem(),
+                                                                context.api().timeSource());
+    RETURN_IF_NOT_OK(reader_or_error.status());
+    cpu_stats_reader = std::move(reader_or_error.value());
   } else {
     cpu_stats_reader = std::make_unique<LinuxCpuStatsReader>();
   }
