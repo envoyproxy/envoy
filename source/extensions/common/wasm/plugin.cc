@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "absl/strings/str_cat.h"
 #include "include/proxy-wasm/wasm.h"
 
 namespace Envoy {
@@ -9,8 +10,29 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) : config_(config) {
-  for (auto& capability : config_.capability_restriction_config().allowed_capabilities()) {
+envoy::extensions::wasm::v3::PluginConfig
+normalizeConfig(const envoy::extensions::wasm::v3::PluginConfig& config) {
+  // The capability restrictions are applied when the Wasm VM is created and are shared by every
+  // plugin running in it, so they belong to the VM configuration. The plugin level field is
+  // deprecated in favor of the VM level one: move it there and clear it, so that the VM level field
+  // is the only place the restrictions are ever read from.
+  if (!config.has_capability_restriction_config()) {
+    return config;
+  }
+  envoy::extensions::wasm::v3::PluginConfig normalized = config;
+  // The VM level restrictions win when both are set.
+  if (!config.vm_config().has_capability_restriction_config()) {
+    *normalized.mutable_vm_config()->mutable_capability_restriction_config() =
+        config.capability_restriction_config();
+  }
+  normalized.clear_capability_restriction_config();
+  return normalized;
+}
+
+WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config)
+    : config_(normalizeConfig(config)) {
+  for (auto& capability :
+       config_.vm_config().capability_restriction_config().allowed_capabilities()) {
     // TODO(rapilado): Set the SanitizationConfig fields once sanitization is implemented.
     allowed_capabilities_[capability.first] = proxy_wasm::SanitizationConfig();
   }
@@ -52,6 +74,23 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
       }
     }
   }
+}
+
+std::string Plugin::createPluginKey(const envoy::extensions::wasm::v3::PluginConfig& config) {
+  // Every field of the plugin configuration is part of the plugin identity, so that distinct
+  // configurations never share an instance and identical configurations always do (which keeps the
+  // plugin reusable across xDS updates and bounds the number of root contexts). `vm_config` is
+  // excluded because two plugins can only share a root context when they share a VM, and VM
+  // identity is the VM key that proxy-wasm prepends to this key when caching thread-local plugins.
+  // That key covers the fields of `vm_config` the VM is built from (see the `makeVmKey()` call in
+  // wasm.cc), so between the two keys the only fields left out are the ones that affect neither the
+  // VM nor the plugin, namely `allow_precompiled` and `nack_on_code_cache_miss`.
+  //
+  // The copy below only happens when a plugin is configured, and the plugin configuration is deep
+  // copied by WasmConfig anyway.
+  envoy::extensions::wasm::v3::PluginConfig key_config = config;
+  key_config.clear_vm_config();
+  return absl::StrCat(config.name(), "||", MessageUtil::hash(key_config));
 }
 
 } // namespace Wasm

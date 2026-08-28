@@ -21,14 +21,14 @@ public:
               (std::function<void()> cb, std::function<void()> main_callback));
 
   // Server::ThreadLocal
-  MOCK_METHOD(SlotPtr, allocateSlot, ());
+  MOCK_METHOD(SlotSharedPtr, allocateSlot, ());
   MOCK_METHOD(void, registerThread, (Event::Dispatcher & dispatcher, bool main_thread));
   void shutdownGlobalThreading() override { shutdown_ = true; }
   MOCK_METHOD(void, shutdownThread, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   bool isShutdown() const override { return shutdown_; }
 
-  SlotPtr allocateSlotMock() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
+  SlotSharedPtr allocateSlotMock() { return SlotSharedPtr{new SlotImpl(*this, current_slot_++)}; }
   void runOnAllThreads1(std::function<void()> cb) { cb(); }
   void runOnAllThreads2(std::function<void()> cb, std::function<void()> main_callback) {
     cb();

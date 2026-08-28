@@ -7,13 +7,16 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::Contains;
+using testing::IsSupersetOf;
 using testing::Key;
+using testing::Pair;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
@@ -693,14 +696,11 @@ TEST_F(NetworkExtProcFilterTest, UntypedMetadataForwarding) {
             // Verify the request has metadata
             EXPECT_TRUE(request.has_metadata());
 
-            // Verify it has the test-namespace but not other-namespace
-            const auto& metadata = request.metadata().filter_metadata();
-            EXPECT_THAT(metadata, UnorderedElementsAre(Key("test-namespace")));
-
-            // Verify the key-value pairs within test-namespace
-            const auto& test_ns = metadata.at("test-namespace");
-            EXPECT_THAT(test_ns.fields(), Contains(Key("key1")));
-            EXPECT_EQ(test_ns.fields().at("key1").string_value(), "value1");
+            // Verify it has the expected test-namespace and key-value pair.
+            EXPECT_THAT(request.metadata().filter_metadata(),
+                        UnorderedElementsAre(
+                            Pair("test-namespace",
+                                 HasStructFields(Contains(IsStructString("key1", "value1"))))));
           }));
 
   EXPECT_CALL(*client_, start(_, _, _, _))
@@ -795,11 +795,9 @@ TEST_F(NetworkExtProcFilterTest, BothTypedAndUntypedMetadataForwarding) {
             EXPECT_TRUE(request.has_metadata());
 
             // Verify untyped metadata
-            const auto& filter_metadata = request.metadata().filter_metadata();
-            EXPECT_THAT(filter_metadata, Contains(Key("untyped-ns")));
-            const auto& untyped_ns = filter_metadata.at("untyped-ns");
-            EXPECT_THAT(untyped_ns.fields(), Contains(Key("key1")));
-            EXPECT_EQ(untyped_ns.fields().at("key1").string_value(), "value1");
+            EXPECT_THAT(request.metadata().filter_metadata(),
+                        Contains(Pair("untyped-ns", HasStructFields(Contains(
+                                                        IsStructString("key1", "value1"))))));
 
             // Verify typed metadata
             const auto& typed_metadata = request.metadata().typed_filter_metadata();
@@ -1683,8 +1681,9 @@ TEST_F(NetworkExtProcFilterTest, SendRequestWithConnectionAttributes) {
     EXPECT_EQ("hello", req.read_data().data());
     EXPECT_EQ(1, req.attributes().size());
     auto proto_struct = req.attributes().at("envoy.filters.network.ext_proc");
-    EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false);
-    EXPECT_EQ(proto_struct.fields().at("connection.id").number_value(), 12345);
+    EXPECT_THAT(proto_struct.fields(),
+                UnorderedElementsAre(IsStructBool("connection.mtls", false),
+                                     IsStructNumber("connection.id", 12345)));
   });
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -1727,8 +1726,8 @@ TEST_F(NetworkExtProcFilterTest, SendRequestWithFilterStateStringAccessor) {
     EXPECT_TRUE(req.has_read_data());
     EXPECT_EQ(1, req.attributes().size());
     auto proto_struct = req.attributes().at("envoy.filters.network.ext_proc");
-    EXPECT_EQ(proto_struct.fields().at("filter_state['authority']").string_value(),
-              "example.com:443");
+    EXPECT_THAT(proto_struct.fields(),
+                Contains(IsStructString("filter_state['authority']", "example.com:443")));
   });
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -1770,7 +1769,8 @@ TEST_F(NetworkExtProcFilterTest, ConnectionAttributesSentOnlyOnce) {
   EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
     EXPECT_EQ(1, req.attributes().size());
     auto proto_struct = req.attributes().at("envoy.filters.network.ext_proc");
-    EXPECT_EQ(proto_struct.fields().at("filter_state['authority']").string_value(), "foo.bar.com");
+    EXPECT_THAT(proto_struct.fields(),
+                Contains(IsStructString("filter_state['authority']", "foo.bar.com")));
   });
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data1, false));

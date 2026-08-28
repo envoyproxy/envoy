@@ -21,20 +21,26 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 
 using testing::_;
+using testing::AllOf;
 using testing::AtLeast;
+using testing::Contains;
 using testing::Eq;
+using testing::Field;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
+using testing::IsSupersetOf;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrEq;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -2787,8 +2793,8 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
                                              .fields()
                                              .at("complex")
                                              .struct_value();
-  EXPECT_EQ("abcd", meta_complex.fields().at("x").string_value());
-  EXPECT_EQ(1234.0, meta_complex.fields().at("y").number_value());
+  EXPECT_THAT(meta_complex.fields(),
+              UnorderedElementsAre(IsStructString("x", "abcd"), IsStructNumber("y", 1234.0)));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
@@ -3281,6 +3287,144 @@ TEST_F(LuaHttpFilterTest, LuaFilterContext) {
                 filter_->encodeHeaders(response_headers_2, true));
     });
   }
+}
+
+// The filter-level filter_context is what a route which configures none of its own sees, and a
+// route that does configure one replaces it rather than merging into it.
+TEST_F(LuaHttpFilterTest, LuaFilterLevelFilterContext) {
+  const std::string SCRIPT_WITH_ACCESS_FILTER_CONTEXT{R"EOF(
+    function envoy_on_request(request_handle)
+      if request_handle:filterContext():get("foo") == nil then
+        request_handle:logTrace("foo in filter context is nil")
+      else
+        request_handle:logTrace(request_handle:filterContext():get("foo"))
+      end
+    end
+    function envoy_on_response(response_handle)
+      if response_handle:filterContext():get("foo") == nil then
+        response_handle:logTrace("foo in filter context is nil")
+      else
+        response_handle:logTrace(response_handle:filterContext():get("foo"))
+      end
+    end
+  )EOF"};
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(SCRIPT_WITH_ACCESS_FILTER_CONTEXT);
+  (*proto_config.mutable_filter_context()->mutable_fields())["foo"].set_string_value(
+      "foo_value_in_filter_level_context");
+
+  // No per route configuration at all: the filter-level context is used, on both the request and
+  // the response path.
+  {
+    setupConfig(proto_config, {});
+    setupFilter();
+
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(nullptr));
+
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    EXPECT_LOG_CONTAINS("trace", "foo_value_in_filter_level_context", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    });
+
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    EXPECT_LOG_CONTAINS("trace", "foo_value_in_filter_level_context", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->encodeHeaders(response_headers, true));
+    });
+    filter_->onDestroy();
+  }
+
+  // A per route configuration which does not set filter_context: still the filter-level context.
+  {
+    const envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+
+    setupConfig(proto_config, per_route_proto_config);
+    setupFilter();
+
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(per_route_config_.get()));
+
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    EXPECT_LOG_CONTAINS("trace", "foo_value_in_filter_level_context", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    });
+    filter_->onDestroy();
+  }
+
+  // A per route filter_context replaces the filter-level one.
+  {
+    envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+    (*per_route_proto_config.mutable_filter_context()->mutable_fields())["foo"].set_string_value(
+        "foo_value_in_route_context");
+
+    setupConfig(proto_config, per_route_proto_config);
+    setupFilter();
+
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(per_route_config_.get()));
+
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    EXPECT_LOG_CONTAINS("trace", "foo_value_in_route_context", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    });
+    filter_->onDestroy();
+  }
+
+  // An explicitly empty per route filter_context hides the filter-level one rather than falling
+  // back to it.
+  {
+    envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+    per_route_proto_config.mutable_filter_context();
+
+    setupConfig(proto_config, per_route_proto_config);
+    setupFilter();
+
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(per_route_config_.get()));
+
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    EXPECT_LOG_CONTAINS("trace", "foo in filter context is nil", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    });
+  }
+}
+
+// The filter context is a wrapper object rather than a plain Lua table: a key is read with get(),
+// indexing by a key which is not one of the wrapper's methods is nil, and pairs() iterates it.
+TEST_F(LuaHttpFilterTest, LuaFilterContextIsReadWithGet) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local filter_context = request_handle:filterContext()
+      request_handle:logTrace("get=" .. tostring(filter_context:get("foo")))
+      request_handle:logTrace("index=" .. tostring(filter_context["foo"]))
+      local entries = {}
+      for key, value in pairs(filter_context) do
+        table.insert(entries, key .. "=" .. value)
+      end
+      request_handle:logTrace("pairs=" .. table.concat(entries, ","))
+    end
+  )EOF"};
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
+  (*proto_config.mutable_filter_context()->mutable_fields())["foo"].set_string_value("bar");
+
+  setupConfig(proto_config, {});
+  setupFilter();
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"trace", "get=bar"}, {"trace", "index=nil"}, {"trace", "pairs=foo=bar"}}),
+      {
+        EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                  filter_->decodeHeaders(request_headers, true));
+      });
 }
 
 // Writes a module for a script to require, and returns the search pattern that finds it.
@@ -3947,11 +4091,10 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHost) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(
-      decoder_callbacks_,
-      setUpstreamOverrideHost(testing::AllOf(
-          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
-          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, false))));
+  EXPECT_CALL(decoder_callbacks_,
+              setUpstreamOverrideHost(
+                  AllOf(Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+                        Field(&Upstream::LoadBalancerContext::OverrideHost::strict, false))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -3967,11 +4110,10 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostStrict) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(
-      decoder_callbacks_,
-      setUpstreamOverrideHost(testing::AllOf(
-          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
-          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
+  EXPECT_CALL(decoder_callbacks_,
+              setUpstreamOverrideHost(
+                  AllOf(Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+                        Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -4034,11 +4176,10 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostDifferentPaths) {
 
   {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/path1"}};
-    EXPECT_CALL(
-        decoder_callbacks_,
-        setUpstreamOverrideHost(testing::AllOf(
-            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
-            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
+    EXPECT_CALL(decoder_callbacks_,
+                setUpstreamOverrideHost(AllOf(
+                    Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+                    Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   }
 
@@ -4046,11 +4187,10 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostDifferentPaths) {
 
   {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/path2"}};
-    EXPECT_CALL(
-        decoder_callbacks_,
-        setUpstreamOverrideHost(testing::AllOf(
-            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
-            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
+    EXPECT_CALL(decoder_callbacks_,
+                setUpstreamOverrideHost(AllOf(
+                    Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+                    Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   }
 }
