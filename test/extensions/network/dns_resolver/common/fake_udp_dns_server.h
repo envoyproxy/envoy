@@ -53,18 +53,18 @@ protected:
   // Builds up to 2 responses. Empty responses will be skipped.
   virtual std::array<std::vector<uint8_t>, 2> makeResponses(const uint8_t* query, size_t query_len);
 
-private:
-  // Read event handler: answers every datagram queued on the socket.
-  void onReadReady();
-  // Write event handler: sends outgoing queued datagrams.
-  void tryFlushOutgoing();
-
   // Build a DNS response for the given query. Returns empty vector on parse failure.
   std::vector<uint8_t> buildResponse(const uint8_t* query, size_t query_len) const;
 
   // Build a NOERROR/NODATA response returned for an IPv4-only to AAAA query. Returns empty vector
   // on parse failure.
   std::vector<uint8_t> buildNoDataResponse(const uint8_t* query, size_t query_len) const;
+
+private:
+  // Read event handler: answers every datagram queued on the socket.
+  void onReadReady();
+  // Write event handler: sends outgoing queued datagrams.
+  void tryFlushOutgoing();
 
   struct DefaultRecord {
     std::string address;
