@@ -24,6 +24,7 @@ namespace Server {
 namespace {
 
 using TriggerPtr = std::unique_ptr<Trigger>;
+constexpr absl::string_view ReservedOverloadActionNamePrefix = "envoy.overload_actions.";
 
 class ThresholdTriggerImpl final : public Trigger {
 public:
@@ -150,7 +151,7 @@ absl::StatusOr<Event::ScaledTimerType> parseTimerType(
   }
 }
 
-absl::StatusOr<std::string> getFactoryTypeStatus(const Protobuf::Any& typed_config) {
+absl::StatusOr<std::string> resolveFactoryType(const Protobuf::Any& typed_config) {
   std::string factory_type;
   TRY_ASSERT_MAIN_THREAD { factory_type = Envoy::Config::Utility::getFactoryType(typed_config); }
   END_TRY
@@ -163,15 +164,59 @@ bool isScaleTimersConfig(absl::string_view factory_type) {
   return factory_type == Config::default_instance().GetTypeName();
 }
 
+absl::StatusOr<std::optional<std::string>>
+validateAndGetReduceTimeoutsConfigType(const envoy::config::overload::v3::OverloadAction& action) {
+  const auto& name = action.name();
+  const auto& well_known_actions = OverloadActionNames::get().WellKnownActions;
+  const bool is_well_known = std::find(well_known_actions.begin(), well_known_actions.end(),
+                                       name) != well_known_actions.end();
+
+  std::string factory_type;
+  if (action.has_typed_config()) {
+    auto factory_type_or_error = resolveFactoryType(action.typed_config());
+    if (!factory_type_or_error.ok()) {
+      return absl::InvalidArgumentError(
+          fmt::format("Overload action \"{}\" has an invalid typed_config: {}", name,
+                      factory_type_or_error.status().message()));
+    }
+    factory_type = std::move(*factory_type_or_error);
+  }
+
+  const bool has_scale_timers_config = isScaleTimersConfig(factory_type);
+  const bool is_reduce_timeouts = name == OverloadActionNames::get().ReduceTimeouts ||
+                                  (!is_well_known && has_scale_timers_config);
+  if (is_reduce_timeouts && !action.has_typed_config()) {
+    return absl::InvalidArgumentError(
+        fmt::format("Overload action \"{}\" requires typed_config", name));
+  }
+  if (!is_well_known && !is_reduce_timeouts) {
+    return absl::InvalidArgumentError(absl::StrCat("Unknown Overload Manager Action ", name));
+  }
+  if (is_well_known && name != OverloadActionNames::get().ReduceTimeouts &&
+      has_scale_timers_config) {
+    return absl::InvalidArgumentError(
+        fmt::format("Overload action name \"{}\" conflicts with its typed config", name));
+  }
+  if (!is_well_known && has_scale_timers_config &&
+      absl::StartsWith(name, ReservedOverloadActionNamePrefix)) {
+    return absl::InvalidArgumentError(
+        fmt::format("Overload action name \"{}\" uses reserved prefix \"{}\"", name,
+                    ReservedOverloadActionNamePrefix));
+  }
+
+  if (is_reduce_timeouts) {
+    return std::optional<std::string>{std::move(factory_type)};
+  }
+  return std::nullopt;
+}
+
 absl::StatusOr<Event::ScaledTimerTypeMap>
-parseTimerMinimums(const Protobuf::Any& typed_config,
+parseTimerMinimums(const Protobuf::Any& typed_config, absl::string_view factory_type,
                    ProtobufMessage::ValidationVisitor& validation_visitor) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
-  auto factory_type = getFactoryTypeStatus(typed_config);
-  RETURN_IF_NOT_OK(factory_type.status());
-  if (!isScaleTimersConfig(*factory_type)) {
+  if (!isScaleTimersConfig(factory_type)) {
     return absl::InvalidArgumentError(fmt::format("typed_config resolves to {} instead of {}",
-                                                  *factory_type,
+                                                  factory_type,
                                                   Config::default_instance().GetTypeName()));
   }
 
@@ -239,6 +284,7 @@ public:
   Event::ScaledRangeTimerManager* addTimerManager(const Event::ScaledTimerTypeMap& timer_minimums,
                                                   Event::ScaledRangeTimerManagerPtr timer_manager) {
     Event::ScaledRangeTimerManager* manager = timer_manager.get();
+    // Timer ownership was validated before managers are constructed.
     for (const auto& timer_minimum : timer_minimums) {
       const auto [_, inserted] = timer_managers_.emplace(timer_minimum.first, manager);
       UNREFERENCED_PARAMETER(_);
@@ -557,45 +603,9 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     const auto symbol = action_symbol_table_.get(name);
     ENVOY_LOG(debug, "Adding overload action {}", name);
 
-    // Validate that this is a well known overload action.
-    const auto& well_known_actions = OverloadActionNames::get().WellKnownActions;
-    const bool is_well_known = std::find(well_known_actions.begin(), well_known_actions.end(),
-                                         name) != well_known_actions.end();
-    bool has_scale_timers_config = false;
-    if (action.has_typed_config()) {
-      auto factory_type = getFactoryTypeStatus(action.typed_config());
-      if (!factory_type.ok()) {
-        creation_status = absl::InvalidArgumentError(
-            fmt::format("Overload action \"{}\" has an invalid typed_config: {}", name,
-                        factory_type.status().message()));
-        return;
-      }
-      has_scale_timers_config = isScaleTimersConfig(*factory_type);
-    }
-    const bool is_reduce_timeouts = name == OverloadActionNames::get().ReduceTimeouts ||
-                                    (!is_well_known && has_scale_timers_config);
-    if (is_reduce_timeouts && !action.has_typed_config()) {
-      creation_status = absl::InvalidArgumentError(
-          fmt::format("Overload action \"{}\" requires typed_config", name));
-      return;
-    }
-    if (!is_well_known && !is_reduce_timeouts) {
-      creation_status =
-          absl::InvalidArgumentError(absl::StrCat("Unknown Overload Manager Action ", name));
-      return;
-    }
-    if (is_well_known && name != OverloadActionNames::get().ReduceTimeouts &&
-        has_scale_timers_config) {
-      creation_status = absl::InvalidArgumentError(
-          fmt::format("Overload action name \"{}\" conflicts with its typed config", name));
-      return;
-    }
-    if (!is_well_known && has_scale_timers_config &&
-        absl::StartsWith(name, "envoy.overload_actions.")) {
-      creation_status = absl::InvalidArgumentError(fmt::format(
-          "Overload action name \"{}\" uses reserved prefix \"envoy.overload_actions.\"", name));
-      return;
-    }
+    auto reduce_timeouts_config_type_or_error = validateAndGetReduceTimeoutsConfigType(action);
+    SET_AND_RETURN_IF_NOT_OK(reduce_timeouts_config_type_or_error.status(), creation_status);
+    const auto& reduce_timeouts_config_type = *reduce_timeouts_config_type_or_error;
 
     // TODO: use in place construction once https://github.com/abseil/abseil-cpp/issues/388 is
     // addressed
@@ -611,8 +621,9 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       return;
     }
 
-    if (is_reduce_timeouts) {
-      auto timer_or_error = parseTimerMinimums(action.typed_config(), validation_visitor);
+    if (reduce_timeouts_config_type.has_value()) {
+      auto timer_or_error = parseTimerMinimums(action.typed_config(), *reduce_timeouts_config_type,
+                                               validation_visitor);
       SET_AND_RETURN_IF_NOT_OK(timer_or_error.status(), creation_status);
 
       for (const auto& timer_minimum : *timer_or_error) {
