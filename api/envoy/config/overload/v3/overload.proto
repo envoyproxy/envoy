@@ -157,8 +157,9 @@ message OverloadAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadAction";
 
-  // The name of the overload action. This is just a well-known string that
-  // listeners can use for registering callbacks.
+  // The name of the overload action. Most actions use a well-known string that listeners can use
+  // for registering callbacks. An action with a ``ScaleTimersOverloadActionConfig`` may instead use
+  // a unique name to distinguish multiple independently triggered ``reduce_timeouts`` instances.
   // Valid known overload actions include:
   // - envoy.overload_actions.stop_accepting_requests
   // - envoy.overload_actions.disable_http_keepalive

@@ -862,63 +862,47 @@ TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithNoTimersSpecified) {
                           ".* constraint validation failed.*");
 }
 
-TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithInvalidTimerTypeSuffix) {
+TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsWithTypedStructConfig) {
   const std::string config = R"EOF(
     actions:
-      - name: "envoy.overload_actions.reduce_timeouts.INVALID_TIMER_TYPE"
+      - name: "connection_idle_timeouts"
         typed_config:
-          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
-          timer_scale_factors:
-            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
-              min_timeout: 1s
+          "@type": type.googleapis.com/xds.type.v3.TypedStruct
+          type_url: type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          value:
+            timer_scale_factors:
+              - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+                min_timeout: 1s
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
-                          "Invalid reduce_timeouts timer type suffix.*");
+  EXPECT_NO_THROW(createOverloadManager(config));
 }
 
-TEST_F(OverloadManagerImplTest, ReduceTimeoutsSuffixDoesNotMatchConfiguredTimer) {
+TEST_F(OverloadManagerImplTest, NamedActionWithoutScaleTimersConfigIsRejected) {
   const std::string config = R"EOF(
     actions:
-      - name: "envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE"
-        typed_config:
-          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
-          timer_scale_factors:
-            - timer: HTTP_DOWNSTREAM_STREAM_IDLE
-              min_timeout: 1s
-  )EOF";
-
-  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
-                          "configures a timer type that does not match its suffix");
-}
-
-TEST_F(OverloadManagerImplTest, SuffixedReduceTimeoutsConfiguresMultipleTimers) {
-  const std::string config = R"EOF(
-    actions:
-      - name: "envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE"
-        typed_config:
-          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
-          timer_scale_factors:
-            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
-              min_timeout: 1s
-            - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
-              min_timeout: 2s
-  )EOF";
-
-  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
-                          "must configure exactly one timer type");
-}
-
-TEST_F(OverloadManagerImplTest, SuffixedReduceTimeoutsWithWrongTypedConfig) {
-  const std::string config = R"EOF(
-    actions:
-      - name: "envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE"
+      - name: "connection_idle_timeouts"
         typed_config:
           "@type": type.googleapis.com/google.protobuf.Empty
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
-                          "Unable to unpack as .*ScaleTimersOverloadActionConfig");
+                          "Unknown Overload Manager Action connection_idle_timeouts");
+}
+
+TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsCannotUseAnotherWellKnownActionName) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.stop_accepting_requests"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 1s
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Overload action name .* conflicts with its typed config");
 }
 
 TEST_F(OverloadManagerImplTest, ReduceTimeoutsTimerConfiguredByMultipleActions) {
@@ -930,7 +914,7 @@ TEST_F(OverloadManagerImplTest, ReduceTimeoutsTimerConfiguredByMultipleActions) 
           timer_scale_factors:
             - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
               min_timeout: 1s
-      - name: "envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE"
+      - name: "connection_idle_timeouts"
         typed_config:
           "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
           timer_scale_factors:
@@ -964,7 +948,7 @@ constexpr char kMultipleReduceTimeoutsActionsConfig[] = R"YAML(
           scaled:
             scaling_threshold: 0.5
             saturation_threshold: 1.0
-    - name: envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE
+    - name: connection_idle_timeouts
       typed_config:
         "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
         timer_scale_factors:
@@ -977,7 +961,7 @@ constexpr char kMultipleReduceTimeoutsActionsConfig[] = R"YAML(
             saturation_threshold: 1.0
 )YAML";
 
-constexpr char kOnlySuffixedReduceTimeoutsActionConfig[] = R"YAML(
+constexpr char kOnlyNamedReduceTimeoutsActionConfig[] = R"YAML(
   refresh_interval:
     seconds: 1
   resource_monitors:
@@ -985,12 +969,14 @@ constexpr char kOnlySuffixedReduceTimeoutsActionConfig[] = R"YAML(
       typed_config:
         "@type": type.googleapis.com/google.protobuf.Struct
   actions:
-    - name: envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE
+    - name: connection_timeouts
       typed_config:
         "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
         timer_scale_factors:
           - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
             min_timeout: 1s
+          - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+            min_timeout: 2s
       triggers:
         - name: "envoy.resource_monitors.fake_resource1"
           scaled:
@@ -998,7 +984,7 @@ constexpr char kOnlySuffixedReduceTimeoutsActionConfig[] = R"YAML(
             saturation_threshold: 1.0
 )YAML";
 
-constexpr char kTwoSuffixedReduceTimeoutsActionsConfig[] = R"YAML(
+constexpr char kTwoNamedReduceTimeoutsActionsConfig[] = R"YAML(
   refresh_interval:
     seconds: 1
   resource_monitors:
@@ -1009,7 +995,7 @@ constexpr char kTwoSuffixedReduceTimeoutsActionsConfig[] = R"YAML(
       typed_config:
         "@type": type.googleapis.com/google.protobuf.Timestamp
   actions:
-    - name: envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE
+    - name: connection_idle_timeouts
       typed_config:
         "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
         timer_scale_factors:
@@ -1020,7 +1006,7 @@ constexpr char kTwoSuffixedReduceTimeoutsActionsConfig[] = R"YAML(
           scaled:
             scaling_threshold: 0.5
             saturation_threshold: 1.0
-    - name: envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_MAX
+    - name: connection_max_timeouts
       typed_config:
         "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
         timer_scale_factors:
@@ -1036,13 +1022,10 @@ constexpr char kTwoSuffixedReduceTimeoutsActionsConfig[] = R"YAML(
 TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsCreateStats) {
   auto manager(createOverloadManager(kMultipleReduceTimeoutsActionsConfig));
 
-  Stats::Gauge& active_gauge = stats_.gauge(
-      "overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE.active",
-      Stats::Gauge::ImportMode::Accumulate);
-  Stats::Gauge& scale_percent_gauge =
-      stats_.gauge("overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_"
-                   "IDLE.scale_percent",
-                   Stats::Gauge::ImportMode::Accumulate);
+  Stats::Gauge& active_gauge = stats_.gauge("overload.connection_idle_timeouts.active",
+                                            Stats::Gauge::ImportMode::Accumulate);
+  Stats::Gauge& scale_percent_gauge = stats_.gauge(
+      "overload.connection_idle_timeouts.scale_percent", Stats::Gauge::ImportMode::Accumulate);
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(0, scale_percent_gauge.value());
 }
@@ -1052,10 +1035,10 @@ TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsAdjustScaleFactorIn
   auto manager(createOverloadManager(kMultipleReduceTimeoutsActionsConfig));
 
   auto* mock_main_manager = new Event::MockScaledRangeTimerManager();
-  auto* mock_suffixed_manager = new Event::MockScaledRangeTimerManager();
+  auto* mock_named_manager = new Event::MockScaledRangeTimerManager();
   EXPECT_CALL(*manager, createScaledRangeTimerManager)
       .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_main_manager})))
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_suffixed_manager})));
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_named_manager})));
 
   NiceMock<Event::MockDispatcher> mock_dispatcher;
   auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
@@ -1064,14 +1047,12 @@ TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsAdjustScaleFactorIn
 
   EXPECT_CALL(mock_dispatcher, post).WillRepeatedly([](Event::PostCb cb) { cb(); });
 
-  // Resource1 drives only the unsuffixed action.
   EXPECT_CALL(*mock_main_manager,
               setScaleFactor(Property(&UnitFloat::value, FloatNear(0.8, 0.00001))));
   factory1_.monitor_->setPressure(0.6);
   timer_cb_();
 
-  // Resource2 independently drives only the suffixed action.
-  EXPECT_CALL(*mock_suffixed_manager,
+  EXPECT_CALL(*mock_named_manager,
               setScaleFactor(Property(&UnitFloat::value, FloatNear(0.4, 0.00001))));
   factory2_.monitor_->setPressure(0.8);
   timer_cb_();
@@ -1082,10 +1063,10 @@ TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsCreateTimerRouting)
   auto manager(createOverloadManager(kMultipleReduceTimeoutsActionsConfig));
 
   auto* mock_main_manager = new Event::MockScaledRangeTimerManager();
-  auto* mock_suffixed_manager = new Event::MockScaledRangeTimerManager();
+  auto* mock_named_manager = new Event::MockScaledRangeTimerManager();
   EXPECT_CALL(*manager, createScaledRangeTimerManager)
       .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_main_manager})))
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_suffixed_manager})));
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_named_manager})));
 
   NiceMock<Event::MockDispatcher> mock_dispatcher;
   auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
@@ -1101,46 +1082,56 @@ TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsCreateTimerRouting)
       scaled_timer_manager->createTimer(Event::AbsoluteMinimum(std::chrono::seconds(1)), []() {});
   EXPECT_EQ(t1.get(), min_timer);
 
-  // Timer types without a suffixed action use the main manager.
   Event::MockTimer* action_timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(*mock_main_manager, createTypedTimer_(_, _)).WillOnce(Return(action_timer));
   auto t2 = scaled_timer_manager->createTimer(Event::ScaledTimerType::TransportSocketConnectTimeout,
                                               []() {});
   EXPECT_EQ(t2.get(), action_timer);
 
-  // The timer type named by the suffixed action uses its independent manager.
-  Event::MockTimer* suffixed_action_timer = new NiceMock<Event::MockTimer>();
-  EXPECT_CALL(*mock_suffixed_manager, createTypedTimer_(_, _))
-      .WillOnce(Return(suffixed_action_timer));
+  Event::MockTimer* named_action_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mock_named_manager, createTypedTimer_(_, _)).WillOnce(Return(named_action_timer));
   auto t3 = scaled_timer_manager->createTimer(
       Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout, []() {});
-  EXPECT_EQ(t3.get(), suffixed_action_timer);
+  EXPECT_EQ(t3.get(), named_action_timer);
 }
 
-TEST_F(OverloadManagerImplTest, OnlySuffixedReduceTimeoutsActionAdjustsScaleFactor) {
+TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsActionGroupsTimerTypes) {
   setDispatcherExpectation();
-  auto manager(createOverloadManager(kOnlySuffixedReduceTimeoutsActionConfig));
+  auto manager(createOverloadManager(kOnlyNamedReduceTimeoutsActionConfig));
 
   auto* mock_main_manager = new Event::MockScaledRangeTimerManager();
-  auto* mock_suffixed_manager = new Event::MockScaledRangeTimerManager();
+  auto* mock_named_manager = new Event::MockScaledRangeTimerManager();
   EXPECT_CALL(*manager, createScaledRangeTimerManager)
       .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_main_manager})))
-      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_suffixed_manager})));
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_named_manager})));
 
   NiceMock<Event::MockDispatcher> mock_dispatcher;
   auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
+
+  Event::MockTimer* idle_timer = new NiceMock<Event::MockTimer>();
+  Event::MockTimer* max_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mock_named_manager, createTypedTimer_(_, _))
+      .WillOnce(Return(idle_timer))
+      .WillOnce(Return(max_timer));
+  auto routed_idle_timer = scaled_timer_manager->createTimer(
+      Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout, []() {});
+  auto routed_max_timer = scaled_timer_manager->createTimer(
+      Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout, []() {});
+  EXPECT_EQ(routed_idle_timer.get(), idle_timer);
+  EXPECT_EQ(routed_max_timer.get(), max_timer);
+
   manager->start();
 
   EXPECT_CALL(mock_dispatcher, post).WillRepeatedly([](Event::PostCb cb) { cb(); });
-  EXPECT_CALL(*mock_suffixed_manager,
+  EXPECT_CALL(*mock_named_manager,
               setScaleFactor(Property(&UnitFloat::value, FloatNear(0.4, 0.00001))));
   factory1_.monitor_->setPressure(0.8);
   timer_cb_();
 }
 
-TEST_F(OverloadManagerImplTest, TwoSuffixedReduceTimeoutsActionsRouteAndScaleIndependently) {
+TEST_F(OverloadManagerImplTest, TwoNamedReduceTimeoutsActionsRouteAndScaleIndependently) {
   setDispatcherExpectation();
-  auto manager(createOverloadManager(kTwoSuffixedReduceTimeoutsActionsConfig));
+  auto manager(createOverloadManager(kTwoNamedReduceTimeoutsActionsConfig));
 
   auto* mock_main_manager = new Event::MockScaledRangeTimerManager();
   auto* mock_idle_manager = new Event::MockScaledRangeTimerManager();

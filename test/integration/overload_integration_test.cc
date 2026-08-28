@@ -974,7 +974,7 @@ protected:
               timer_scale_factors:
                 - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
                   min_timeout: 3s
-          - name: "envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE"
+          - name: "connection_idle_timeouts"
             triggers:
               - name: "envoy.resource_monitors.testonly.fake_resource_monitor2"
                 scaled:
@@ -1059,14 +1059,12 @@ TEST_P(MultipleReduceTimeoutsActionsIntegrationTest, TimerTypesScaleIndependentl
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   ASSERT_TRUE(codec_client_->connected());
 
-  // Saturating only the resource for the unsuffixed action reduces the maximum connection duration
-  // to 3 seconds. The idle timeout owned by the suffixed action remains at 20 seconds.
+  // Saturating only the resource for the legacy action reduces the maximum connection duration
+  // to 3 seconds. The idle timeout owned by the named action remains at 20 seconds.
   updateResource(0.9);
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
                              Eq(100));
-  test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_"
-                             "CONNECTION_IDLE.scale_percent",
-                             Eq(0));
+  test_server_->waitForGauge("overload.connection_idle_timeouts.scale_percent", Eq(0));
   timeSystem().advanceTimeWait(std::chrono::seconds(3));
   test_server_->waitForCounter("http.config_test.downstream_cx_max_duration_reached", Eq(1));
   const uint64_t max_duration_count =
@@ -1074,15 +1072,13 @@ TEST_P(MultipleReduceTimeoutsActionsIntegrationTest, TimerTypesScaleIndependentl
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
   codec_client_->close();
 
-  // Saturating only the suffixed action's resource reduces the idle timeout to 5 seconds. A new
+  // Saturating only the named action's resource reduces the idle timeout to 5 seconds. A new
   // connection's maximum duration remains at 20 seconds.
   updateResource(0);
   updateSecondResource(0.9);
   test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
                              Eq(0));
-  test_server_->waitForGauge("overload.envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_"
-                             "CONNECTION_IDLE.scale_percent",
-                             Eq(100));
+  test_server_->waitForGauge("overload.connection_idle_timeouts.scale_percent", Eq(100));
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   ASSERT_TRUE(codec_client_->connected());
   timeSystem().advanceTimeWait(std::chrono::seconds(5));

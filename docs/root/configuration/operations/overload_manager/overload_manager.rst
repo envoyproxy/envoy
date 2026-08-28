@@ -312,24 +312,27 @@ Note in the example that the minimum idle time is specified as an absolute durat
 would be computed based on the maximum (specified elsewhere). So if ``idle_timeout`` is
 again 600 seconds, then the minimum timer value would be :math:`10\% \cdot 600s = 60s`.
 
-Per-timer triggers
-""""""""""""""""""
+Named reduce-timeouts actions
+""""""""""""""""""""""""
 
 By default all timers in ``timer_scale_factors`` share the action-level triggers and their scale
-factors are driven by the maximum pressure across those triggers. Multiple ``reduce_timeouts``
-actions can be configured when different timer types need independent triggers. Additional actions
-use the name ``envoy.overload_actions.reduce_timeouts.<TIMER_TYPE>``, where ``<TIMER_TYPE>`` is the
-timer type configured by that action. Each suffixed action must configure exactly one matching timer
-type, and a timer type cannot be configured by more than one action.
+factors are driven by the maximum pressure across those triggers. To give groups of timer types
+independent triggers, configure multiple actions with unique names and a
+:ref:`ScaleTimersOverloadActionConfig
+<envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>` ``typed_config``. The
+``typed_config`` identifies these named action instances as ``reduce_timeouts`` actions. The
+well-known ``envoy.overload_actions.reduce_timeouts`` name remains supported for existing
+configurations.
 
-An invalid timer-type suffix, a suffixed action that configures multiple timer types or a timer type
-that does not match its suffix, or multiple actions that configure the same timer type cause the
-overload manager configuration to be rejected at startup.
+Each named action may configure one or more timer types that share its triggers. A timer type cannot
+be configured by more than one action. A named action without a ``ScaleTimersOverloadActionConfig``,
+a name that collides with another well-known overload action, or duplicate timer ownership causes
+the overload manager configuration to be rejected at startup.
 
 .. code-block:: yaml
 
   actions:
-    - name: "envoy.overload_actions.reduce_timeouts"
+    - name: "fixed_heap_timeouts"
       triggers:
         - name: "envoy.resource_monitors.fixed_heap"
           scaled:
@@ -340,7 +343,9 @@ overload manager configuration to be rejected at startup.
         timer_scale_factors:
           - timer: HTTP_DOWNSTREAM_STREAM_IDLE
             min_timeout: 2s
-    - name: "envoy.overload_actions.reduce_timeouts.HTTP_DOWNSTREAM_CONNECTION_IDLE"
+          - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+            min_timeout: 1s
+    - name: "custom_resource_timeouts"
       triggers:
         - name: "envoy.resource_monitors.custom_resource"
           scaled:
@@ -352,9 +357,10 @@ overload manager configuration to be rejected at startup.
           - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
             min_timeout: 1s
 
-In this configuration ``HTTP_DOWNSTREAM_STREAM_IDLE`` is driven by ``fixed_heap``, while
-``HTTP_DOWNSTREAM_CONNECTION_IDLE`` is independently driven by ``custom_resource``. The suffixed
-action also exposes its own ``active`` and ``scale_percent`` stats under its full action name.
+In this configuration ``HTTP_DOWNSTREAM_STREAM_IDLE`` and ``HTTP_DOWNSTREAM_CONNECTION_MAX`` are
+driven by ``fixed_heap``, while ``HTTP_DOWNSTREAM_CONNECTION_IDLE`` is independently driven by
+``custom_resource``. Each action exposes ``active`` and ``scale_percent`` stats under its configured
+name, for example ``overload.custom_resource_timeouts.scale_percent``.
 
 .. _config_overload_manager_limiting_connections:
 

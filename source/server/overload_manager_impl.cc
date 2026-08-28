@@ -1,6 +1,7 @@
 #include "source/server/overload_manager_impl.h"
 
 #include <chrono>
+#include <vector>
 
 #include "envoy/common/exception.h"
 #include "envoy/config/overload/v3/overload.pb.h"
@@ -8,7 +9,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/fmt.h"
-#include "source/common/common/macros.h"
 #include "source/common/config/utility.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -16,7 +16,6 @@
 #include "source/server/resource_monitor_config_impl.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -154,8 +153,15 @@ absl::StatusOr<Event::ScaledTimerTypeMap>
 parseTimerMinimums(const Protobuf::Any& typed_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
-  const Config action_config =
-      MessageUtil::anyConvertAndValidate<Config>(typed_config, validation_visitor);
+  Config action_config;
+  if (Envoy::Config::Utility::getFactoryType(typed_config) ==
+      Config::default_instance().GetTypeName()) {
+    RETURN_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(typed_config, validation_visitor,
+                                                                   action_config));
+    MessageUtil::validate(action_config, validation_visitor);
+  } else {
+    action_config = MessageUtil::anyConvertAndValidate<Config>(typed_config, validation_visitor);
+  }
 
   Event::ScaledTimerTypeMap timer_minimums;
 
@@ -182,22 +188,7 @@ parseTimerMinimums(const Protobuf::Any& typed_config,
   return timer_minimums;
 }
 
-const std::string& reduceTimeoutsActionPrefix() {
-  CONSTRUCT_ON_FIRST_USE(std::string, absl::StrCat(OverloadActionNames::get().ReduceTimeouts, "."));
-}
-
-absl::StatusOr<Event::ScaledTimerType> parseTimerTypeSuffix(absl::string_view suffix) {
-  using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
-  Config::TimerType config_timer_type;
-  if (!Config::TimerType_Parse(std::string(suffix), &config_timer_type) ||
-      config_timer_type == Config::UNSPECIFIED) {
-    return absl::InvalidArgumentError(
-        fmt::format("Invalid reduce_timeouts timer type suffix {}", suffix));
-  }
-  return parseTimerType(config_timer_type);
-}
-
-// Routes timer types configured by suffixed reduce_timeouts actions to independently scaled timer
+// Routes timer types configured by named reduce_timeouts actions to independently scaled timer
 // managers. Other timer types and timers created with an explicit minimum use the main manager.
 class MultiActionScaledRangeTimerManager : public Event::ScaledRangeTimerManager {
 public:
@@ -219,21 +210,27 @@ public:
   void setScaleFactor(UnitFloat scale_factor) override {
     // Action callbacks normally update sub-managers directly; this interface method overrides all.
     main_manager_->setScaleFactor(scale_factor);
-    for (const auto& timer_manager : timer_managers_) {
-      timer_manager.second->setScaleFactor(scale_factor);
+    for (const auto& action_manager : action_managers_) {
+      action_manager->setScaleFactor(scale_factor);
     }
   }
 
-  Event::ScaledRangeTimerManager* addTimerManager(Event::ScaledTimerType timer_type,
+  Event::ScaledRangeTimerManager* addTimerManager(const Event::ScaledTimerTypeMap& timer_minimums,
                                                   Event::ScaledRangeTimerManagerPtr timer_manager) {
-    const auto [manager, inserted] = timer_managers_.emplace(timer_type, std::move(timer_manager));
-    ASSERT(inserted);
-    return manager->second.get();
+    Event::ScaledRangeTimerManager* manager = timer_manager.get();
+    for (const auto& timer_minimum : timer_minimums) {
+      const auto [_, inserted] = timer_managers_.emplace(timer_minimum.first, manager);
+      UNREFERENCED_PARAMETER(_);
+      ASSERT(inserted);
+    }
+    action_managers_.push_back(std::move(timer_manager));
+    return manager;
   }
 
 private:
   Event::ScaledRangeTimerManagerPtr main_manager_;
-  absl::flat_hash_map<Event::ScaledTimerType, Event::ScaledRangeTimerManagerPtr> timer_managers_;
+  std::vector<Event::ScaledRangeTimerManagerPtr> action_managers_;
+  absl::flat_hash_map<Event::ScaledTimerType, Event::ScaledRangeTimerManager*> timer_managers_;
 };
 
 } // namespace
@@ -532,7 +529,6 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     }
   }
 
-  const absl::string_view reduce_timeouts_prefix = reduceTimeoutsActionPrefix();
   absl::flat_hash_map<Event::ScaledTimerType, std::string> timer_actions;
 
   for (const auto& action : config.actions()) {
@@ -544,18 +540,23 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     const auto& well_known_actions = OverloadActionNames::get().WellKnownActions;
     const bool is_well_known = std::find(well_known_actions.begin(), well_known_actions.end(),
                                          name) != well_known_actions.end();
-    const bool is_suffixed_reduce_timeouts = absl::StartsWith(name, reduce_timeouts_prefix);
-    if (!is_well_known && !is_suffixed_reduce_timeouts) {
+    const bool has_scale_timers_config =
+        action.has_typed_config() &&
+        Config::Utility::getFactoryType(action.typed_config()) ==
+            envoy::config::overload::v3::ScaleTimersOverloadActionConfig::default_instance()
+                .GetTypeName();
+    const bool is_reduce_timeouts = name == OverloadActionNames::get().ReduceTimeouts ||
+                                    (!is_well_known && has_scale_timers_config);
+    if (!is_well_known && !is_reduce_timeouts) {
       creation_status =
           absl::InvalidArgumentError(absl::StrCat("Unknown Overload Manager Action ", name));
       return;
     }
-
-    std::optional<Event::ScaledTimerType> suffixed_timer_type;
-    if (is_suffixed_reduce_timeouts) {
-      auto timer_type_or_error = parseTimerTypeSuffix(name.substr(reduce_timeouts_prefix.size()));
-      SET_AND_RETURN_IF_NOT_OK(timer_type_or_error.status(), creation_status);
-      suffixed_timer_type = *timer_type_or_error;
+    if (is_well_known && name != OverloadActionNames::get().ReduceTimeouts &&
+        has_scale_timers_config) {
+      creation_status = absl::InvalidArgumentError(
+          fmt::format("Overload action name {} conflicts with its typed config", name));
+      return;
     }
 
     // TODO: use in place construction once https://github.com/abseil/abseil-cpp/issues/388 is
@@ -572,22 +573,9 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       return;
     }
 
-    if (name == OverloadActionNames::get().ReduceTimeouts || is_suffixed_reduce_timeouts) {
+    if (is_reduce_timeouts) {
       auto timer_or_error = parseTimerMinimums(action.typed_config(), validation_visitor);
       SET_AND_RETURN_IF_NOT_OK(timer_or_error.status(), creation_status);
-
-      if (suffixed_timer_type.has_value()) {
-        if (timer_or_error->size() != 1) {
-          creation_status = absl::InvalidArgumentError(
-              fmt::format("Overload action {} must configure exactly one timer type", name));
-          return;
-        }
-        if (!timer_or_error->contains(*suffixed_timer_type)) {
-          creation_status = absl::InvalidArgumentError(fmt::format(
-              "Overload action {} configures a timer type that does not match its suffix", name));
-          return;
-        }
-      }
 
       for (const auto& timer_minimum : *timer_or_error) {
         const auto [owner, inserted] = timer_actions.try_emplace(timer_minimum.first, name);
@@ -600,10 +588,10 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
 
       auto timer_minimums =
           std::make_shared<const Event::ScaledTimerTypeMap>(std::move(*timer_or_error));
-      if (suffixed_timer_type.has_value()) {
-        timer_minimums_by_action_.emplace(name, std::move(timer_minimums));
-      } else {
+      if (name == OverloadActionNames::get().ReduceTimeouts) {
         timer_minimums_ = std::move(timer_minimums);
+      } else {
+        timer_minimums_by_action_.emplace(name, std::move(timer_minimums));
       }
     } else if (name == OverloadActionNames::get().ResetStreams) {
       if (!config.has_buffer_factory_config()) {
@@ -753,11 +741,9 @@ Event::ScaledRangeTimerManagerFactory OverloadManagerImpl::scaledTimerFactory() 
     auto multi_action_manager =
         std::make_unique<MultiActionScaledRangeTimerManager>(std::move(main_manager));
     for (const auto& [action_name, timer_minimums] : timer_minimums_by_action_) {
-      ASSERT(timer_minimums->size() == 1);
-      const Event::ScaledTimerType timer_type = timer_minimums->begin()->first;
       auto timer_manager = createScaledRangeTimerManager(dispatcher, timer_minimums);
       Event::ScaledRangeTimerManager* timer_manager_ptr =
-          multi_action_manager->addTimerManager(timer_type, std::move(timer_manager));
+          multi_action_manager->addTimerManager(*timer_minimums, std::move(timer_manager));
       registerForAction(action_name, dispatcher,
                         [timer_manager_ptr](OverloadActionState scale_state) {
                           timer_manager_ptr->setScaleFactor(scale_state.value().invert());
