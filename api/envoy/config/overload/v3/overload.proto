@@ -160,7 +160,8 @@ message OverloadAction {
   // The name of the overload action. Most actions use a well-known string that listeners can use
   // for registering callbacks. An action with a ``ScaleTimersOverloadActionConfig`` may instead use
   // a unique name to distinguish multiple independently triggered ``reduce_timeouts`` instances.
-  // Custom names must not use the reserved ``envoy.overload_actions.`` prefix.
+  // Custom names must not use the reserved ``envoy.overload_actions.`` prefix. Action stats use the
+  // configured name, for example ``overload.<name>.active`` and ``overload.<name>.scale_percent``.
   // Valid known overload actions include:
   // - envoy.overload_actions.stop_accepting_requests
   // - envoy.overload_actions.disable_http_keepalive

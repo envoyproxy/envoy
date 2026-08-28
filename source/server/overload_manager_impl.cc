@@ -158,23 +158,24 @@ absl::StatusOr<std::string> getFactoryTypeStatus(const Protobuf::Any& typed_conf
   return factory_type;
 }
 
+bool isScaleTimersConfig(absl::string_view factory_type) {
+  using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
+  return factory_type == Config::default_instance().GetTypeName();
+}
+
 absl::StatusOr<Event::ScaledTimerTypeMap>
 parseTimerMinimums(const Protobuf::Any& typed_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
   auto factory_type = getFactoryTypeStatus(typed_config);
   RETURN_IF_NOT_OK(factory_type.status());
-  Config action_config;
-  if (*factory_type != Config::default_instance().GetTypeName()) {
-    const absl::Status unpack_status = MessageUtil::unpackTo(typed_config, action_config);
-    if (!unpack_status.ok()) {
-      return absl::InvalidArgumentError(unpack_status.message());
-    }
+  if (!isScaleTimersConfig(*factory_type)) {
     return absl::InvalidArgumentError(fmt::format("typed_config resolves to {} instead of {}",
                                                   *factory_type,
                                                   Config::default_instance().GetTypeName()));
   }
 
+  Config action_config;
   TRY_ASSERT_MAIN_THREAD {
     RETURN_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(typed_config, validation_visitor,
                                                                    action_config));
@@ -228,7 +229,8 @@ public:
   }
 
   void setScaleFactor(UnitFloat scale_factor) override {
-    // Action callbacks normally update sub-managers directly; this interface method overrides all.
+    // Preserve the interface's global override contract. Normal overload action callbacks update
+    // their action's manager directly and do not use this broadcast path.
     main_manager_->setScaleFactor(scale_factor);
     for (const auto& action_manager : action_managers_) {
       action_manager->setScaleFactor(scale_factor);
@@ -569,13 +571,15 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
                         factory_type.status().message()));
         return;
       }
-      has_scale_timers_config =
-          *factory_type ==
-          envoy::config::overload::v3::ScaleTimersOverloadActionConfig::default_instance()
-              .GetTypeName();
+      has_scale_timers_config = isScaleTimersConfig(*factory_type);
     }
     const bool is_reduce_timeouts = name == OverloadActionNames::get().ReduceTimeouts ||
                                     (!is_well_known && has_scale_timers_config);
+    if (is_reduce_timeouts && !action.has_typed_config()) {
+      creation_status = absl::InvalidArgumentError(
+          fmt::format("Overload action \"{}\" requires typed_config", name));
+      return;
+    }
     if (!is_well_known && !is_reduce_timeouts) {
       creation_status =
           absl::InvalidArgumentError(absl::StrCat("Unknown Overload Manager Action ", name));

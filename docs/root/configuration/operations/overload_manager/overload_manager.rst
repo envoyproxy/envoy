@@ -332,6 +332,10 @@ timer type, the configuration is rejected with an error that identifies both act
 action without a ``ScaleTimersOverloadActionConfig`` or with a name that collides with another
 well-known overload action is also rejected at startup.
 
+Timers created with an explicit minimum instead of a timer type always use the legacy
+``envoy.overload_actions.reduce_timeouts`` action. If only named instances are configured, these
+timers remain unscaled.
+
 .. code-block:: yaml
 
   actions:

@@ -839,8 +839,9 @@ TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithoutTypedConfig) {
       - name: "envoy.overload_actions.reduce_timeouts"
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
-                          "Unable to unpack as .*ScaleTimersOverloadActionConfig");
+  EXPECT_THROW_WITH_MESSAGE(
+      createOverloadManager(config), EnvoyException,
+      "Overload action \"envoy.overload_actions.reduce_timeouts\" requires typed_config");
 }
 
 TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithWrongTypedConfigMessage) {
@@ -848,11 +849,14 @@ TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithWrongTypedConfigMessage) {
     actions:
       - name: "envoy.overload_actions.reduce_timeouts"
         typed_config:
-          "@type": type.googleapis.com/google.protobuf.Empty
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            key: value
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
-                          "Unable to unpack as .*ScaleTimersOverloadActionConfig");
+  EXPECT_THROW_WITH_MESSAGE(createOverloadManager(config), EnvoyException,
+                            "typed_config resolves to google.protobuf.Struct instead of "
+                            "envoy.config.overload.v3.ScaleTimersOverloadActionConfig");
 }
 
 TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithNoTimersSpecified) {
