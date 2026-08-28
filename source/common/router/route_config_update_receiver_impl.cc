@@ -63,20 +63,17 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
   new_route_config->CheckTypeAndMergeFrom(rc);
   const uint64_t new_vhds_config_hash =
       new_route_config->has_vhds() ? MessageUtil::hash(new_route_config->vhds()) : 0ul;
+  std::unique_ptr<VirtualHostMap> rds_virtual_hosts;
   if (new_route_config->has_vhds()) {
     // When using VHDS, stash away RDS vhosts, so that they can be merged with VHDS vhosts in
     // onVhdsUpdate.
-    if (rds_virtual_hosts_ == nullptr) {
-      rds_virtual_hosts_ = std::make_unique<VirtualHostMap>();
-    } else {
-      rds_virtual_hosts_->clear();
-    }
+    rds_virtual_hosts = std::make_unique<VirtualHostMap>();
     for (const auto& vhost : new_route_config->virtual_hosts()) {
-      rds_virtual_hosts_->emplace(vhost.name(), vhost);
+      rds_virtual_hosts->emplace(vhost.name(), vhost);
     }
     if (vhds_virtual_hosts_ != nullptr && !vhds_virtual_hosts_->empty()) {
       // If there are vhosts supplied by VHDS, merge them with RDS vhosts.
-      rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, *vhds_virtual_hosts_, *new_route_config);
+      rebuildRouteConfigVirtualHosts(*rds_virtual_hosts, *vhds_virtual_hosts_, *new_route_config);
     }
   }
 
@@ -141,6 +138,7 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
     vhds_subscription_.reset();
   }
   last_vhds_config_hash_ = new_vhds_config_hash;
+  rds_virtual_hosts_ = std::move(rds_virtual_hosts);
 
   base_.startWarming();
 

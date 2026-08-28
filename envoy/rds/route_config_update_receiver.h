@@ -70,8 +70,7 @@ public:
   /**
    * @return bool whether the RouteConfiguration built by a previous RDS update is still warming up,
    * i.e. whether the observer hasn't been notified about it yet. An update that turns out to be a
-   * no-op leaves such an update alone, so this may be true even if the last onRdsUpdate() call
-   * returned false.
+   * no-op leaves such an update alone.
    */
   virtual bool configWarming() const PURE;
 

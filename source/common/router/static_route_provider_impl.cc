@@ -104,11 +104,12 @@ void StaticRouteConfigProviderImpl::VhdsContext::onConfigWarmed() {
   tls_.set([parsed_config](Event::Dispatcher&) {
     return std::make_unique<ThreadLocalConfig>(parsed_config);
   });
+
+  initialized_ = true;
   // A route configuration is live now, so whatever warms up with this provider can proceed. This is
   // what makes a listener with an inline route configuration that uses VHDS wait for the initial
   // VHDS fetch.
   local_init_target_.ready();
-  initialized_ = true;
 
   const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) updates don't populate aliases fields in resources.
