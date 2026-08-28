@@ -154,9 +154,8 @@ protected:
   // Builds a config whose selected_host_key path has more than one segment, so the
   // selected endpoint is written into a nested struct. This exercises the
   // intermediate-segment walk in addSelectedHostKey (path_[i].key_).
-  OverrideHost
-  makeDefaultConfigWithNestedSelectedHostKey(absl::string_view outer_key,
-                                             absl::string_view inner_key) {
+  OverrideHost makeDefaultConfigWithNestedSelectedHostKey(absl::string_view outer_key,
+                                                          absl::string_view inner_key) {
     OverrideHost config;
 
     OverrideHost::OverrideHostSource* host_source = config.add_override_host_sources();
