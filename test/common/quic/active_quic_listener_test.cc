@@ -831,8 +831,17 @@ TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreationNullWriter) {
       .Times(testing::AnyNumber())
       .WillRepeatedly(testing::InvokeWithoutArgs([]() -> QuicPacketWriterPtr { return nullptr; }));
 
-  // Initialize the listener. This will trigger IS_ENVOY_BUG.
-  EXPECT_ENVOY_BUG(initialize(), "quic_packet_writer_factory failed to create quic_writer");
+  listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
+  EXPECT_CALL(listener_config_, filterChainManager())
+      .WillRepeatedly(ReturnRef(filter_chain_manager_));
+
+  // Creating the listener will trigger IS_ENVOY_BUG.
+  EXPECT_ENVOY_BUG(quic_listener_ = staticUniquePointerCast<ActiveQuicListener>(
+                       listener_factory_->createActiveUdpListener(
+                           scoped_runtime_.loader(), 0, connection_handler_,
+                           listener_config_.socket_factories_[0]->getListenSocket(0), *dispatcher_,
+                           listener_config_)),
+                   "quic_packet_writer_factory failed to create quic_writer");
 }
 
 } // namespace Quic
