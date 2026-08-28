@@ -34,9 +34,12 @@ envoy_cc_library(
         "//envoy/secret:secret_provider_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/thread_local:thread_local_object",
+        "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/strings:string_view",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
