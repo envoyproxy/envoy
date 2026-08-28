@@ -302,7 +302,6 @@ envoy_cc_library(
     name = "conn_manager_config_interface",
     hdrs = ["conn_manager_config.h"],
     deps = [
-        ":date_provider_lib",
         "//envoy/config:config_provider_interface",
         "//envoy/http:early_header_mutation_interface",
         "//envoy/http:filter_interface",
@@ -434,22 +433,6 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "date_provider_lib",
-    srcs = ["date_provider_impl.cc"],
-    hdrs = [
-        "date_provider.h",
-        "date_provider_impl.h",
-    ],
-    deps = [
-        "//envoy/event:dispatcher_interface",
-        "//envoy/http:header_map_interface",
-        "//envoy/singleton:instance_interface",
-        "//envoy/thread_local:thread_local_interface",
-        "//source/common/common:utility_lib",
     ],
 )
 

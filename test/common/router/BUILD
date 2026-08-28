@@ -579,6 +579,7 @@ envoy_cc_test(
         "//test/common/memory:memory_test_utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/router:router_filter_interface",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )

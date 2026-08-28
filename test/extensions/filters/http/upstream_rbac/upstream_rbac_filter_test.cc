@@ -12,6 +12,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -48,6 +49,7 @@ public:
   }
   void setUpstreamToDownstream(Router::UpstreamToDownstream&) override {}
 
+  Event::GlobalTimeSystem time_system_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Http::ConnectionPool::Instance::StreamOptions options_{false, false};
   Http::UpstreamCallbacks* registered_callbacks_{};

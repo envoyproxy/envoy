@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <ios>
 #include <limits>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
@@ -255,6 +256,20 @@ public:
    * @return uint64_t the number os seconds since the epoch.
    */
   static uint64_t nowToSeconds(TimeSource& time_source);
+
+  /**
+   * Parses an HTTP-date in any of the three formats a recipient must accept.
+   * See: https://www.rfc-editor.org/rfc/rfc9110.html#section-5.6.7.
+   * @return the parsed time, or nullopt if the input matches none of them.
+   */
+  static std::optional<SystemTime> parseHttpDate(absl::string_view http_date);
+
+  /**
+   * Formats a time as an IMF-fixdate HTTP-date, the format a sender must use.
+   * See: https://www.rfc-editor.org/rfc/rfc9110.html#section-5.6.7.
+   * @return the formatted date.
+   */
+  static std::string httpDate(SystemTime time);
 };
 
 /**

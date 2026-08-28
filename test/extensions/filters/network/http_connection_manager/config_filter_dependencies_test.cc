@@ -105,8 +105,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnregisteredFilterException) {
   hcm_config.add_http_filters()->set_name("envoy.filters.http.router");
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                  route_config_provider_manager_,
+      HttpConnectionManagerConfig(hcm_config, context_, route_config_provider_manager_,
                                   &scoped_routes_config_provider_manager_, tracer_manager_,
                                   filter_config_provider_manager_, creation_status_),
       EnvoyException,
@@ -126,9 +125,8 @@ TEST_F(HttpConnectionManagerConfigTest, AllDependenciesSatisfiedOk) {
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
   HttpConnectionManagerConfig give_me_a_name(
-      hcm_config, context_, date_provider_, route_config_provider_manager_,
-      &scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_,
-      creation_status_);
+      hcm_config, context_, route_config_provider_manager_, &scoped_routes_config_provider_manager_,
+      tracer_manager_, filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
 }
 
@@ -142,9 +140,8 @@ TEST_F(HttpConnectionManagerConfigTest, UnusedProvidencyOk) {
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rf(pf);
 
   HttpConnectionManagerConfig give_me_a_name(
-      hcm_config, context_, date_provider_, route_config_provider_manager_,
-      &scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_,
-      creation_status_);
+      hcm_config, context_, route_config_provider_manager_, &scoped_routes_config_provider_manager_,
+      tracer_manager_, filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
 }
 
@@ -157,8 +154,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyError) {
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
+  HttpConnectionManagerConfig config(hcm_config, context_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),
@@ -178,8 +174,7 @@ TEST_F(HttpConnectionManagerConfigTest, MisorderedDependenciesError) {
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
+  HttpConnectionManagerConfig config(hcm_config, context_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),
@@ -197,8 +192,7 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeUnmetDependencyError) {
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
+  HttpConnectionManagerConfig config(hcm_config, context_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),
@@ -218,8 +212,7 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeDependencyOK) {
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
+  HttpConnectionManagerConfig config(hcm_config, context_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
@@ -242,8 +235,7 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFr
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
+  HttpConnectionManagerConfig config(hcm_config, context_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),
@@ -269,8 +261,7 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFr
   ChefFilterFactory cf;
   Registry::InjectFactory<NamedHttpFilterConfigFactory> rc(cf);
 
-  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
-                                     route_config_provider_manager_,
+  HttpConnectionManagerConfig config(hcm_config, context_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),

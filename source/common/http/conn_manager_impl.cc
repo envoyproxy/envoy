@@ -1928,7 +1928,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   // We want to preserve the original date header, but we add a date header if it is absent
   if (!headers.Date()) {
-    connection_manager_.config_->dateProvider().setDateHeader(headers);
+    headers.setDate(DateUtil::httpDate(connection_manager_.timeSource().systemTime()));
   }
 
   // Following setReference() is safe because serverName() is constant for the life of the

@@ -155,12 +155,12 @@ public:
 
     EXPECT_CALL(
         cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
-        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 10ull));
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 43ull));
     EXPECT_CALL(
         cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
-        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_count"), 1ull));
-    Http::ResponseHeaderMapPtr response_headers(
-        new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_count"), 2ull));
+    Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
+        {":status", "200"}, {"date", "Sun, 06 Nov 1994 08:49:37 GMT"}});
     // NOLINTNEXTLINE: Silence null pointer access warning
     response_decoder->decodeHeaders(std::move(response_headers), false);
 
@@ -3007,11 +3007,11 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
       .Times(3);
   EXPECT_CALL(
       cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
-      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 10ull))
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 43ull))
       .Times(2);
   EXPECT_CALL(
       cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
-      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_count"), 1ull))
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_count"), 2ull))
       .Times(2);
   EXPECT_CALL(
       cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
@@ -3043,8 +3043,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
 
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
 
-  Http::ResponseHeaderMapPtr response_headers1(
-      new Http::TestResponseHeaderMapImpl{{":status", "500"}});
+  Http::ResponseHeaderMapPtr response_headers1(new Http::TestResponseHeaderMapImpl{
+      {":status", "500"}, {"date", "Sun, 06 Nov 1994 08:49:37 GMT"}});
   // Local origin connect success happens for first and third try.
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
@@ -3109,8 +3109,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
 
   // Now write a 200 back. We expect the 2nd stream to be reset and stats to be
   // incremented properly.
-  Http::ResponseHeaderMapPtr response_headers2(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  Http::ResponseHeaderMapPtr response_headers2(new Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"date", "Sun, 06 Nov 1994 08:49:37 GMT"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);

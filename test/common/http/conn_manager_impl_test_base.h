@@ -4,7 +4,6 @@
 
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/context_impl.h"
-#include "source/common/http/date_provider_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
@@ -107,7 +106,6 @@ public:
                                   ServerConnectionCallbacks&, Server::OverloadManager&) override {
     return ServerConnectionPtr{codec_};
   }
-  DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() const override {
     std::chrono::milliseconds timeout(100);
     if (drain_timeout_jitter_percentage_.has_value() &&
@@ -342,7 +340,6 @@ public:
   std::shared_ptr<NiceMock<Tracing::MockTracer>> tracer_{
       std::make_shared<NiceMock<Tracing::MockTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
-  SlowDateProviderImpl date_provider_{test_time_.timeSystem()};
   Http::StreamCallbacks* stream_callbacks_{nullptr};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::MockOverloadManager> overload_manager_;

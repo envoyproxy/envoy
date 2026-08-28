@@ -98,7 +98,7 @@ DrainAwareHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto
 
   absl::Status creation_status = absl::OkStatus();
   auto filter_config = std::make_shared<DrainAwareHttpConnectionManagerConfig>(
-      hcm_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      hcm_config, context, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, proto_config.enable_drain_with_goaway(),
       creation_status);

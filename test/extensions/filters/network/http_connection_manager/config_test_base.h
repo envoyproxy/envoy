@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/common/filter/config_discovery_impl.h"
-#include "source/common/http/date_provider_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -35,8 +34,6 @@ class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   HttpConnectionManagerConfigTest() {}
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Http::SlowDateProviderImpl date_provider_{
-      context_.server_factory_context_.mainThreadDispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
   NiceMock<Tracing::MockTracerManager> tracer_manager_;
@@ -47,9 +44,9 @@ public:
   void createHttpConnectionManagerConfig(const std::string& yaml) {
     creation_status_ = absl::OkStatus();
     [[maybe_unused]] HttpConnectionManagerConfig config(
-        parseHttpConnectionManagerFromYaml(yaml), context_, date_provider_,
-        route_config_provider_manager_, &scoped_routes_config_provider_manager_, tracer_manager_,
-        filter_config_provider_manager_, creation_status_);
+        parseHttpConnectionManagerFromYaml(yaml), context_, route_config_provider_manager_,
+        &scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_,
+        creation_status_);
     THROW_IF_NOT_OK(creation_status_);
   }
   absl::Status creation_status_{absl::OkStatus()};
