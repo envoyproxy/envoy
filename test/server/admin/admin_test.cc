@@ -35,6 +35,10 @@ using testing::StartsWith;
 namespace Envoy {
 namespace Server {
 
+MATCHER_P(HasEventStrategy, m, "") {
+  return testing::ExplainMatchResult(m, arg.strategy, result_listener);
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -87,17 +91,17 @@ TEST_P(AdminInstanceTest, NonGracefulDrainNotifiesListeners) {
   // so the notification carries the server-wide strategy just as a graceful drain's does.
   ON_CALL(server_.options_, drainStrategy())
       .WillByDefault(testing::Return(Server::DrainStrategy::Gradual));
-  EXPECT_CALL(server_.listener_manager_, onServerDrainStart(Network::DrainDirection::All, _))
-      .WillOnce([](Network::DrainDirection, Network::ConnectionDrainEvent event) {
-        EXPECT_EQ(Server::DrainStrategy::Gradual, event.strategy);
-      });
+  EXPECT_CALL(server_.listener_manager_,
+              onServerDrainStart(Network::DrainDirection::All,
+                                 HasEventStrategy(Server::DrainStrategy::Gradual)));
 
   EXPECT_CALL(server_.listener_manager_, stopListeners(ListenerManager::StopListenersType::All, _));
   EXPECT_EQ(Http::Code::OK, postCallback("/drain_listeners", header_map, data));
 
   // Inbound-only drains pass the narrower direction through, as for a graceful drain.
   EXPECT_CALL(server_.listener_manager_,
-              onServerDrainStart(Network::DrainDirection::InboundOnly, _));
+              onServerDrainStart(Network::DrainDirection::InboundOnly,
+                                 HasEventStrategy(Server::DrainStrategy::Gradual)));
   EXPECT_CALL(server_.listener_manager_,
               stopListeners(ListenerManager::StopListenersType::InboundOnly, _));
   EXPECT_EQ(Http::Code::OK, postCallback("/drain_listeners?inboundonly", header_map, data));
