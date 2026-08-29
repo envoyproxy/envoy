@@ -210,11 +210,27 @@ public:
   // Aligns with token_start / token_end values in callbacks.
   size_t nextSourcePosition() const { return body_src_pos_; }
 
-  // Exclusive upper bound for per-depth state tracking (depths 1–8).
-  // Covers the deepest known LLM API schema paths (depth 7) plus one buffer.
+  // Exclusive upper bound for per-depth state tracking: depths 1 through
+  // kMaxTrackedDepth-1 (currently 1–16) have full key/dup/path tracking.
+  // Value covers the deepest known provider schema paths:
+  //   tools[i].function.parameters.properties.<arg>.type      (depth 7)
+  //   messages[i].content[j].content[k].text                  (depth 7)
+  //   [i].candidates[j].content.parts[k].functionCall.args.*  (depth 9+,
+  //     Gemini streamed root arrays; `args` is an arbitrary object)
+  // plus headroom for nested tool arguments.
+  //
   // Nesting beyond kMaxTrackedDepth-1 is rejected with InvalidArgumentError.
+  // Key/dup/path tracking accuracy is bounded by kMaxTrackedDepth-1 because
+  // the per-depth arrays below are stack-allocated at compile time.
+  //
   // Public so callers can pass kMaxTrackedDepth - 1 to parseExtractFieldSpec.
-  static constexpr int kMaxTrackedDepth = 9;
+  //
+  // TODO(tyxia): replace the fixed arrays with std::vector<T> to support
+  // dynamic depth so that max_depth_ can exceed kMaxTrackedDepth-1 without
+  // losing tracking accuracy. This removes the hard compile-time cap at the
+  // cost of per-push heap allocation; evaluate against the request-path perf
+  // budget before doing so.
+  static constexpr int kMaxTrackedDepth = 17;
 
 private:
   Handler& handler_;

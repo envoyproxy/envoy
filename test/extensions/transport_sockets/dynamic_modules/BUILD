@@ -19,7 +19,7 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:transport_socket_integration_test",
     ],
     extension_names = ["envoy.transport_sockets.dynamic_modules"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/event:file_event_interface",
         "//source/common/buffer:buffer_lib",
@@ -49,7 +49,7 @@ envoy_extension_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:transport_socket_integration_test",
     ],
     extension_names = ["envoy.transport_sockets.dynamic_modules"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/network/tcp_proxy:config",

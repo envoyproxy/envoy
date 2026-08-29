@@ -454,15 +454,9 @@ bool envoy_dynamic_module_callback_network_set_filter_state_bytes(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto& stream_info = filter->connection().streamInfo();
-
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-
-  stream_info.filterState()->setData(key_view,
-                                     std::make_unique<Router::StringAccessorImpl>(value_view),
-                                     StreamInfo::FilterState::LifeSpan::Connection);
-  return true;
+  return ContextAccessor::setFilterStateBytes(
+      filter->connection().streamInfo(), absl::string_view(key.ptr, key.length),
+      absl::string_view(value.ptr, value.length), StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 bool envoy_dynamic_module_callback_network_get_filter_state_bytes(
@@ -488,30 +482,9 @@ bool envoy_dynamic_module_callback_network_set_filter_state_typed(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto& stream_info = filter->connection().streamInfo();
-
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-
-  auto* factory =
-      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(key_view);
-  if (factory == nullptr) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "no ObjectFactory registered for filter state key '{}'", key_view);
-    return false;
-  }
-
-  auto object = factory->createFromBytes(value_view);
-  if (object == nullptr) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "ObjectFactory failed to create object for filter state key '{}'",
-                        key_view);
-    return false;
-  }
-
-  stream_info.filterState()->setData(key_view, std::move(object),
-                                     StreamInfo::FilterState::LifeSpan::Connection);
-  return true;
+  return ContextAccessor::setFilterStateTyped(
+      filter->connection().streamInfo(), absl::string_view(key.ptr, key.length),
+      absl::string_view(value.ptr, value.length), StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 bool envoy_dynamic_module_callback_network_get_filter_state_typed(
@@ -546,12 +519,11 @@ void envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
-  auto* metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, filter_namespace);
-  absl::string_view key_view(key.ptr, key.length);
-  absl::string_view value_view(value.ptr, value.length);
-  Protobuf::Struct metadata_value;
-  (*metadata_value.mutable_fields())[key_view].set_string_value(value_view);
-  metadata_namespace->MergeFrom(metadata_value);
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  ContextAccessor::setDynamicMetadataString(
+      filter->connection().streamInfo(),
+      absl::string_view(filter_namespace.ptr, filter_namespace.length),
+      absl::string_view(key.ptr, key.length), absl::string_view(value.ptr, value.length));
 }
 
 bool envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
@@ -591,11 +563,11 @@ void envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, double value) {
-  auto* metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, filter_namespace);
-  absl::string_view key_view(key.ptr, key.length);
-  Protobuf::Struct metadata_value;
-  (*metadata_value.mutable_fields())[key_view].set_number_value(value);
-  metadata_namespace->MergeFrom(metadata_value);
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  ContextAccessor::setDynamicMetadataNumber(
+      filter->connection().streamInfo(),
+      absl::string_view(filter_namespace.ptr, filter_namespace.length),
+      absl::string_view(key.ptr, key.length), value);
 }
 
 bool envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
@@ -1168,6 +1140,16 @@ uint64_t envoy_dynamic_module_callback_network_filter_get_upstream_connection_id
 // -----------------------------------------------------------------------------
 // StartTLS Support Callbacks
 // -----------------------------------------------------------------------------
+
+bool envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (filter->readCallbacks() == nullptr) {
+    return false;
+  }
+
+  return filter->readCallbacks()->connection().startSecureTransport();
+}
 
 bool envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {

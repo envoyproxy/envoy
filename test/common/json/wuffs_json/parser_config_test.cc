@@ -108,12 +108,12 @@ TEST(CaptureAllScalarsTest, CapturesEveryScalarWithoutPathTracking) {
 }
 
 // capture_all_scalars fires at every depth from 1 through kMaxTrackedDepth-1
-// (currently 8). The JSON places one string scalar at each depth via nested
-// "nest" dict keys; all eight must appear in the output.
+// (currently 16). The JSON places one string scalar at each depth via nested
+// "nest" dict keys; all sixteen must appear in the output.
 TEST(CaptureAllScalarsTest, CapturesAtAllDepthsThroughBound) {
-  constexpr int bound = WuffsJsonCursor::kMaxTrackedDepth - 1; // 8
+  constexpr int bound = WuffsJsonCursor::kMaxTrackedDepth - 1; // 16
 
-  // {"d1":"v1","nest":{"d2":"v2","nest":{...{"d8":"v8"}...}}}
+  // {"d1":"v1","nest":{"d2":"v2","nest":{...{"d16":"v16"}...}}}
   std::string json = "{";
   for (int d = 1; d <= bound; ++d) {
     json += "\"d" + std::to_string(d) + "\":\"v" + std::to_string(d) + "\"";
@@ -883,17 +883,23 @@ TEST(ParseExtractFieldSpecTest, BracketAfterBracketAccepted) {
 }
 
 TEST(ParseExtractFieldSpecTest, DepthBoundEnforced) {
-  // 9 segments — one past the cursor's matchable bound of
-  // kMaxTrackedDepth - 1 (currently 8), the value the doc says to pass.
-  constexpr absl::string_view kNineSegments = "a.b.c.d.e.f.g.h.i";
+  // Path with kMaxTrackedDepth segments — one past the cursor's matchable bound of
+  // kMaxTrackedDepth - 1 (currently 16), the value the doc says to pass.
+  std::string over_bound_path;
+  for (int i = 0; i < WuffsJsonCursor::kMaxTrackedDepth; ++i) {
+    if (!over_bound_path.empty()) {
+      over_bound_path += '.';
+    }
+    over_bound_path += "a";
+  }
   // At the exact segment count: accepted.
-  EXPECT_TRUE(parseExtractFieldSpec(kNineSegments, WuffsJsonCursor::kMaxTrackedDepth).ok());
+  EXPECT_TRUE(parseExtractFieldSpec(over_bound_path, WuffsJsonCursor::kMaxTrackedDepth).ok());
   // Over bound: rejected with an informative error.
-  auto result = parseExtractFieldSpec(kNineSegments, WuffsJsonCursor::kMaxTrackedDepth - 1);
+  auto result = parseExtractFieldSpec(over_bound_path, WuffsJsonCursor::kMaxTrackedDepth - 1);
   ASSERT_FALSE(result.ok());
   EXPECT_FALSE(result.status().message().empty());
   // Default (0) means no depth check.
-  EXPECT_TRUE(parseExtractFieldSpec(kNineSegments).ok());
+  EXPECT_TRUE(parseExtractFieldSpec(over_bound_path).ok());
 }
 
 // Error messages must be non-empty and contain relevant context (not just "false").

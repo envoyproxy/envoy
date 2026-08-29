@@ -18,51 +18,19 @@ namespace Wasm {
  * Config registration for the Wasm filter. @see NamedHttpFilterConfigFactory.
  */
 class WasmFilterConfig
-    : public Common::CommonFactoryBase<envoy::extensions::filters::http::wasm::v3::Wasm>,
-      public Server::Configuration::NamedHttpFilterConfigFactory,
-      public Server::Configuration::UpstreamHttpFilterConfigFactory {
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::wasm::v3::Wasm> {
 public:
   WasmFilterConfig()
-      : Common::CommonFactoryBase<envoy::extensions::filters::http::wasm::v3::Wasm>(
+      : Common::UnifiedFactoryBase<envoy::extensions::filters::http::wasm::v3::Wasm>(
             "envoy.filters.http.wasm") {}
 
-  absl::StatusOr<Envoy::Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::FactoryContext& context) override {
-    return createFilterFactoryFromProtoTyped(
-        MessageUtil::downcastAndValidate<const envoy::extensions::filters::http::wasm::v3::Wasm&>(
-            proto_config, context.messageValidationVisitor()),
-        stats_prefix, context, context.serverFactoryContext());
-  }
-
-  absl::StatusOr<Envoy::Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::UpstreamFactoryContext& context) override {
-    return createFilterFactoryFromProtoTyped(
-        MessageUtil::downcastAndValidate<const envoy::extensions::filters::http::wasm::v3::Wasm&&>(
-            proto_config, context.serverFactoryContext().messageValidationVisitor()),
-        stats_prefix, context, context.serverFactoryContext());
-  }
-
-  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProto(
-      const Protobuf::Message& proto_config, Server::Configuration::ServerFactoryContext& context,
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
       Server::Configuration::ExtraFactoryContext& extra_context) override {
-    return createFilterFactoryFromProtoTyped(
-        MessageUtil::downcastAndValidate<const envoy::extensions::filters::http::wasm::v3::Wasm&>(
-            proto_config, context.messageValidationVisitor()),
-        extra_context.stats_prefix, context, context);
-  }
-
-private:
-  template <class FactoryContext>
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config, const std::string&,
-      FactoryContext& context, Server::Configuration::ServerFactoryContext& server_context) {
-    server_context.api().customStatNamespaces().registerStatNamespace(
+    context.api().customStatNamespaces().registerStatNamespace(
         Extensions::Common::Wasm::CustomStatNamespace);
-    auto filter_config = std::make_shared<FilterConfig>(proto_config, context);
+    auto filter_config = std::make_shared<FilterConfig>(proto_config, context, extra_context);
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       auto filter = filter_config->createContext();
       if (!filter) { // Fail open

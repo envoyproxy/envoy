@@ -605,8 +605,17 @@ Example:
 
   local filter_context = handle:filterContext()
 
-Returns the filter context that is configured in the
-:ref:`filter_context <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.filter_context>`.
+Returns the filter context that is configured in the route's
+:ref:`filter_context <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.filter_context>`,
+or, for a request whose route does not configure one, the filter-level
+:ref:`filter_context <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.filter_context>`. A
+route's context replaces the filter-level one rather than merging into it, so a route which
+configures an empty ``filter_context`` sees an empty context. Only the most specific
+``LuaPerRoute`` is consulted, so a context configured on a less specific one is not a fallback for
+a route that has its own ``LuaPerRoute``; the filter-level context is.
+
+The returned object is a wrapper rather than a plain Lua table. Read a key with ``get()``;
+indexing it by key returns ``nil``. It can be iterated with ``pairs()``.
 
 For example, given the following filter context in the route entry:
 
@@ -627,8 +636,25 @@ The filter context can be accessed in the related Lua script as follows:
     local filter_context = request_handle:filterContext()
 
     -- Access the filter context data
-    local value = filter_context["key"]
+    local value = filter_context:get("key")
   end
+
+The same script reads a filter-level context the same way, which is useful for values shared by
+every route the filter serves:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.lua
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+      default_source_code:
+        inline_string: |
+          function envoy_on_request(request_handle)
+            local value = request_handle:filterContext():get("key")
+          end
+      filter_context:
+        key: xxxxxx
 
 ``importPublicKey()``
 ^^^^^^^^^^^^^^^^^^^^^

@@ -58,6 +58,9 @@ void JsonWithExtBufParser::setError(absl::Status status) {
 }
 
 absl::StatusOr<nlohmann::json*> JsonWithExtBufParser::attach(nlohmann::json&& value) {
+  if (++node_count_ > config_.max_nodes) {
+    return absl::InvalidArgumentError("ai json: document exceeds the node budget");
+  }
   if (stack_.empty()) {
     if (root_set_) {
       // Defense in depth: the cursor already rejects trailing bytes.

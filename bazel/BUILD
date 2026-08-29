@@ -9,7 +9,7 @@ load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load(":deprecated_features.bzl", "check_removed_fips_define")
+load(":deprecated_features.bzl", "check_removed_fips_define", "check_removed_wasm_defines")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
@@ -595,29 +595,38 @@ check_removed_fips_define(
     visibility = ["//visibility:public"],
 )
 
+check_removed_wasm_defines(
+    name = "check_removed_wasm_defines",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
 label_flag(
     name = "zlib",
     build_setting_default = "@zlib-ng",
 )
 
+# Wasm engine config settings. The single source of truth for engine selection
+# is @proxy-wasm-cpp-host//bazel:engine (a string_flag defined in that repo).
+# Use --@proxy-wasm-cpp-host//bazel:engine=<value> to select the engine.
 config_setting(
     name = "wasm_v8",
-    values = {"define": "wasm=v8"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "v8"},
 )
 
 config_setting(
     name = "wasm_wamr",
-    values = {"define": "wasm=wamr"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "wamr"},
 )
 
 config_setting(
     name = "wasm_wasmtime",
-    values = {"define": "wasm=wasmtime"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "wasmtime"},
 )
 
 config_setting(
     name = "wasm_disabled",
-    values = {"define": "wasm=disabled"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "disabled"},
 )
 
 # This config setting enables Universal Header Validator and disables

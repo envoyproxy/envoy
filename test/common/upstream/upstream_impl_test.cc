@@ -21,12 +21,15 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/metadata.h"
+#include "source/common/conn_pool/pending_stream.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/queue_policy/fifo_queue_policy.h"
+#include "source/common/queue_policy/queue_policy_base.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
@@ -57,6 +60,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -4102,6 +4106,65 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   }
 }
 
+#if defined(__linux__)
+// With validate_network_namespaces set, a cluster whose upstream bind config references a
+// non-existent network namespace is rejected at config load time.
+TEST_F(StaticClusterImplTest, UpstreamBindConfigInvalidNetworkNamespace) {
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  config.mutable_upstream_bind_config()->set_validate_network_namespaces(true);
+  auto* source_address = config.mutable_upstream_bind_config()->mutable_source_address();
+  source_address->set_address("1.2.3.4");
+  source_address->set_port_value(0);
+  source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_THROW_WITH_REGEX(std::shared_ptr<StaticClusterImpl> cluster =
+                              createCluster(config, factory_context),
+                          EnvoyException, "failed to open network namespace file");
+}
+
+// Without validate_network_namespaces, the invalid network namespace is not validated at config
+// load time, so cluster creation succeeds (preserving the pre-existing behavior).
+TEST_F(StaticClusterImplTest, UpstreamBindConfigInvalidNetworkNamespaceNotValidated) {
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  auto* source_address = config.mutable_upstream_bind_config()->mutable_source_address();
+  source_address->set_address("1.2.3.4");
+  source_address->set_port_value(0);
+  source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_NO_THROW(createCluster(config, factory_context));
+}
+
+// With validate_network_namespaces set, extra source addresses are validated as well.
+TEST_F(StaticClusterImplTest, UpstreamBindConfigInvalidNetworkNamespaceExtraSourceAddress) {
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  config.mutable_upstream_bind_config()->set_validate_network_namespaces(true);
+  auto* source_address = config.mutable_upstream_bind_config()->mutable_source_address();
+  source_address->set_address("1.2.3.4");
+  source_address->set_port_value(0);
+  auto* extra_source_address =
+      config.mutable_upstream_bind_config()->add_extra_source_addresses()->mutable_address();
+  extra_source_address->set_address("2001::1");
+  extra_source_address->set_port_value(0);
+  extra_source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_THROW_WITH_REGEX(std::shared_ptr<StaticClusterImpl> cluster =
+                              createCluster(config, factory_context),
+                          EnvoyException, "failed to open network namespace file");
+}
+#endif
+
 TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourceAddress) {
   envoy::config::cluster::v3::Cluster config;
   config.set_name("staticcluster");
@@ -6884,6 +6947,104 @@ TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                             "Only one of max_requests_per_connection from Cluster or "
                             "HttpProtocolOptions can be specified");
+}
+
+using PendingStreamQueueFactory =
+    Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>;
+
+class RejectingQueuePolicyFactory : public PendingStreamQueueFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<ConnectionPool::PendingStream>>
+  createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
+                    ProtobufMessage::ValidationVisitor&) override {
+    stat_prefix_ = stat_prefix;
+    return absl::InvalidArgumentError("queue policy creation failed");
+  }
+
+  std::string name() const override { return "envoy.queue_policy.rejecting"; }
+  std::string stat_prefix_;
+};
+
+class SuccessfulQueuePolicyFactory : public PendingStreamQueueFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<ConnectionPool::PendingStream>>
+  createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
+                    ProtobufMessage::ValidationVisitor&) override {
+    stat_prefix_ = stat_prefix;
+    return std::make_unique<Extensions::QueuePolicy::FifoQueue<ConnectionPool::PendingStream>>();
+  }
+
+  std::string name() const override { return "envoy.queue_policy.successful"; }
+  std::string stat_prefix_;
+};
+
+TEST_F(ClusterInfoImplTest, InvalidQueuePolicyConfig) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.invalid
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Didn't find a registered queue policy implementation for name: "
+                            "'envoy.queue_policy.invalid'");
+}
+
+TEST_F(ClusterInfoImplTest, QueuePolicyCreationFailure) {
+  RejectingQueuePolicyFactory factory;
+  Registry::InjectFactory<PendingStreamQueueFactory> registered_factory(factory);
+
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.rejecting
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException, "queue policy creation failed");
+  EXPECT_EQ("cluster.cluster1.envoy.queue_policy.rejecting", factory.stat_prefix_);
+}
+
+TEST_F(ClusterInfoImplTest, QueuePolicyCreationSuccess) {
+  SuccessfulQueuePolicyFactory factory;
+  Registry::InjectFactory<PendingStreamQueueFactory> registered_factory(factory);
+
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.successful
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+  const auto policy = cluster->info()->pendingRqQueuePolicy();
+  ASSERT_TRUE(policy.has_value());
+  EXPECT_EQ(&factory, policy->factory_);
+  ASSERT_NE(nullptr, policy->config_);
+  EXPECT_EQ("google.protobuf.Struct", policy->config_->GetTypeName());
+  EXPECT_EQ("cluster.cluster1.envoy.queue_policy.successful", policy->stat_prefix_);
+  EXPECT_EQ(policy->stat_prefix_, factory.stat_prefix_);
 }
 
 TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {

@@ -1419,6 +1419,13 @@ envoy.udp_packet_writer.gso:
   status: stable
   type_urls:
   - envoy.extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory
+envoy.queue_policy.fifo:
+  categories:
+  - envoy.queue_policy
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.queue_policy.fifo.v3.FifoQueuePolicyConfig
 envoy.quic.deterministic_connection_id_generator:
   categories:
   - envoy.quic.connection_id_generator
@@ -1538,6 +1545,13 @@ envoy.route.early_data_policy.default:
   status: stable
   type_urls:
   - envoy.extensions.early_data.v3.DefaultEarlyDataPolicy
+envoy.router.cluster_specifier_plugin.dynamic_modules:
+  categories:
+  - envoy.router.cluster_specifier_plugin
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier
 envoy.router.cluster_specifier_plugin.lua:
   categories:
   - envoy.router.cluster_specifier_plugin
@@ -2027,6 +2041,13 @@ envoy.matching.inputs.dynamic_module_data_input:
   status: alpha
   type_urls:
   - envoy.extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput
+envoy.matching.inputs.dynamic_module_string_data_input:
+  categories:
+  - envoy.matching.http.input
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.http.dynamic_modules.v3.DynamicModuleDataInput
 envoy.matching.inputs.destination_ip:
   categories:
   - envoy.matching.http.input

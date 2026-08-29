@@ -11,12 +11,13 @@ envoy_package()
 envoy_cc_test(
     name = "rds_test",
     srcs = ["rds_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/init:manager_lib",
         "//source/common/rds:rds_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",

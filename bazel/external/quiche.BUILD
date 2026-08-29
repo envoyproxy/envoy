@@ -1,5 +1,3 @@
-load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -13,6 +11,8 @@ load(
     "envoy_quiche_platform_impl_cc_test_library",
     "quiche_copts",
 )
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -1116,7 +1116,10 @@ envoy_cc_library(
     hdrs = ["quiche/http2/hpack/huffman/hpack_huffman_decoder.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    deps = [":quiche_common_platform"],
+    deps = [
+        ":quiche_common_endian_lib",
+        ":quiche_common_platform",
+    ],
 )
 
 envoy_cc_library(
@@ -1127,6 +1130,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":http2_hpack_huffman_huffman_spec_tables_lib",
+        ":quiche_common_endian_lib",
         ":quiche_common_platform",
     ],
 )
@@ -4896,6 +4900,7 @@ envoy_cc_library(
         "quiche/common/quiche_data_reader.h",
         "quiche/common/quiche_data_writer.h",
         "quiche/common/quiche_linked_hash_map.h",
+        "quiche/common/stable_block_list.h",
     ],
     repository = "@envoy",
     deps = [
