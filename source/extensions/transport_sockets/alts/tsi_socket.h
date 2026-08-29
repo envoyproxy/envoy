@@ -50,7 +50,8 @@ class TsiSocket : public Network::TransportSocket,
 public:
   // For Test
   TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
-            Network::TransportSocketPtr&& raw_socket_ptr, bool downstream, absl::string_view target_name = "");
+            Network::TransportSocketPtr&& raw_socket_ptr, bool downstream,
+            absl::string_view target_name = "");
 
   /**
    * @param handshaker_factory a function to initiate a TsiHandshaker

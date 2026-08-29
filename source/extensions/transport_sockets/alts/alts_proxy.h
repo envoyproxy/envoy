@@ -35,7 +35,7 @@ constexpr std::size_t MinMinorRpcVersion = 1;
 class AltsProxy {
 public:
   static absl::StatusOr<std::unique_ptr<AltsProxy>>
-    create(std::shared_ptr<grpc::Channel> handshaker_service_channel,
+  create(std::shared_ptr<grpc::Channel> handshaker_service_channel,
          absl::string_view target_name = "");
 
   ~AltsProxy();
@@ -76,7 +76,8 @@ private:
       std::unique_ptr<grpc::ClientContext> client_context,
       std::unique_ptr<grpc::gcp::HandshakerService::Stub> stub,
       std::unique_ptr<grpc::ClientReaderWriter<grpc::gcp::HandshakerReq, grpc::gcp::HandshakerResp>>
-          stream, absl::string_view target_name);
+          stream,
+      absl::string_view target_name);
 
   std::unique_ptr<grpc::ClientContext> client_context_ = nullptr;
   std::unique_ptr<grpc::gcp::HandshakerService::Stub> stub_;

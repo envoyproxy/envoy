@@ -1,3 +1,4 @@
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/transport_sockets/alts/config.h"

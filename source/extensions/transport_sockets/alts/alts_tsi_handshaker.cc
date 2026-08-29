@@ -25,18 +25,23 @@ using ::grpc::gcp::HandshakerResp;
 constexpr std::size_t AltsAes128GcmRekeyKeyLength = 44;
 
 std::unique_ptr<AltsTsiHandshaker>
-AltsTsiHandshaker::createForClient(std::shared_ptr<grpc::Channel> handshaker_service_channel, absl::string_view target_name) {
-  return absl::WrapUnique(new AltsTsiHandshaker(/*is_client=*/true, handshaker_service_channel, target_name));
+AltsTsiHandshaker::createForClient(std::shared_ptr<grpc::Channel> handshaker_service_channel,
+                                   absl::string_view target_name) {
+  return absl::WrapUnique(
+      new AltsTsiHandshaker(/*is_client=*/true, handshaker_service_channel, target_name));
 }
 
 std::unique_ptr<AltsTsiHandshaker>
 AltsTsiHandshaker::createForServer(std::shared_ptr<grpc::Channel> handshaker_service_channel) {
-  return absl::WrapUnique(new AltsTsiHandshaker(/*is_client=*/false, handshaker_service_channel, /*target_name=*/""));
+  return absl::WrapUnique(
+      new AltsTsiHandshaker(/*is_client=*/false, handshaker_service_channel, /*target_name=*/""));
 }
 
 AltsTsiHandshaker::AltsTsiHandshaker(bool is_client,
-                                     std::shared_ptr<grpc::Channel> handshaker_service_channel, absl::string_view target_name)
-    : is_client_(is_client), handshaker_service_channel_(handshaker_service_channel, target_name_(target_name)) {}
+                                     std::shared_ptr<grpc::Channel> handshaker_service_channel,
+                                     absl::string_view target_name)
+    : is_client_(is_client), handshaker_service_channel_(handshaker_service_channel),
+      target_name_(target_name) {}
 
 absl::Status AltsTsiHandshaker::next(void* handshaker, const unsigned char* received_bytes,
                                      size_t received_bytes_size, OnNextDone on_next_done) {

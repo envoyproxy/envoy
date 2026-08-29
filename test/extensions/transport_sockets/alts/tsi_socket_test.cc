@@ -59,6 +59,7 @@ using ::testing::_;
 using ::testing::Invoke;
 using ::testing::NotNull;
 using ::testing::Return;
+using ::testing::ReturnRefOfCopy;
 using ::testing::WithArgs;
 
 constexpr absl::string_view ApplicationData = "application_data";
@@ -160,20 +161,18 @@ public:
 class TsiSocketTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   TsiSocketTest() : version_(GetParam()) {
-    server_.handshaker_factory_ = [this](<Event::Dispatcher& dispatcher,
-                                         const Network::Address::InstanceConstSharedPtr&,
-                                         const Network::Address::InstanceConstSharedPtr&,
-                                         absl::string_view>) {
-      auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
-      return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
-    };
-    client_.handshaker_factory_ = [this](<Event::Dispatcher& dispatcher,
-                                         const Network::Address::InstanceConstSharedPtr&,
-                                         const Network::Address::InstanceConstSharedPtr&,
-                                         absl::string_view target_name>) {
-      auto handshaker = AltsTsiHandshaker::createForClient(getChannel(), target_name);
-      return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
-    };
+    server_.handshaker_factory_ =
+        [this](Event::Dispatcher& dispatcher, const Network::Address::InstanceConstSharedPtr&,
+               const Network::Address::InstanceConstSharedPtr&, absl::string_view) {
+          auto handshaker = AltsTsiHandshaker::createForServer(getChannel());
+          return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
+        };
+    client_.handshaker_factory_ =
+        [this](Event::Dispatcher& dispatcher, const Network::Address::InstanceConstSharedPtr&,
+               const Network::Address::InstanceConstSharedPtr&, absl::string_view target_name) {
+          auto handshaker = AltsTsiHandshaker::createForClient(getChannel(), target_name);
+          return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
+        };
   }
 
   void TearDown() override {
@@ -418,7 +417,7 @@ TEST_P(TsiSocketTest, UpstreamHandshakeFactoryFailure) {
   auto raw_socket = new Network::MockTransportSocket();
   auto tsi_socket = std::make_unique<TsiSocket>(
       [](Event::Dispatcher&, const Network::Address::InstanceConstSharedPtr&,
-         const Network::Address::InstanceConstSharedPtr&) { return nullptr; },
+         const Network::Address::InstanceConstSharedPtr&, absl::string_view) { return nullptr; },
       nullptr, Network::TransportSocketPtr{raw_socket}, false);
   NiceMock<Network::MockTransportSocketCallbacks> callbacks;
   EXPECT_CALL(*raw_socket, setTransportSocketCallbacks(_));
@@ -433,7 +432,7 @@ TEST_P(TsiSocketTest, DownstreamHandshakeFactoryFailure) {
   auto raw_socket = new Network::MockTransportSocket();
   auto tsi_socket = std::make_unique<TsiSocket>(
       [](Event::Dispatcher&, const Network::Address::InstanceConstSharedPtr&,
-         const Network::Address::InstanceConstSharedPtr&) { return nullptr; },
+         const Network::Address::InstanceConstSharedPtr&, absl::string_view) { return nullptr; },
       nullptr, Network::TransportSocketPtr{raw_socket}, false);
   NiceMock<Network::MockTransportSocketCallbacks> callbacks;
   EXPECT_CALL(*raw_socket, setTransportSocketCallbacks(_));
@@ -867,10 +866,9 @@ TEST_P(TsiSocketTest, DoReadDrainBuffer) {
 TEST_P(TsiSocketTest, TsiSocketFactoryTargetNamePrecedenceAndFallback) {
   std::string captured_target_name;
   HandshakerFactory capturing_factory =
-      [&captured_target_name](<Event::Dispatcher&,
+      [&captured_target_name](Event::Dispatcher&, const Network::Address::InstanceConstSharedPtr&,
                               const Network::Address::InstanceConstSharedPtr&,
-                              const Network::Address::InstanceConstSharedPtr&,
-                              absl::string_view target_name>) -> TsiHandshakerPtr {
+                              absl::string_view target_name) -> TsiHandshakerPtr {
     captured_target_name = std::string(target_name);
     return nullptr;
   };
@@ -881,7 +879,8 @@ TEST_P(TsiSocketTest, TsiSocketFactoryTargetNamePrecedenceAndFallback) {
   auto options_with_override =
       std::make_shared<Network::TransportSocketOptionsImpl>("override.domain.com");
   auto host_with_name = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-  ON_CALL(*host_with_name, hostname()).WillByDefault(ReturnRefOfCopy(std::string("host.domain.com")));
+  ON_CALL(*host_with_name, hostname())
+      .WillByDefault(ReturnRefOfCopy(std::string("host.domain.com")));
 
   auto socket1 = factory.createTransportSocket(options_with_override, host_with_name);
   EXPECT_NE(nullptr, socket1);
@@ -890,14 +889,15 @@ TEST_P(TsiSocketTest, TsiSocketFactoryTargetNamePrecedenceAndFallback) {
   socket1->onConnected();
   EXPECT_EQ("override.domain.com", captured_target_name);
 
-  // Case 2: Fallback to host_description->hostname() when options is nullptr
+  // Case 2: host_description->hostname() is ignored when options is nullptr (only
+  // serverNameOverride is used)
   captured_target_name.clear();
   auto socket2 = factory.createTransportSocket(nullptr, host_with_name);
   EXPECT_NE(nullptr, socket2);
   NiceMock<Network::MockTransportSocketCallbacks> callbacks2;
   socket2->setTransportSocketCallbacks(callbacks2);
   socket2->onConnected();
-  EXPECT_EQ("host.domain.com", captured_target_name);
+  EXPECT_EQ("", captured_target_name);
 
   // Case 3: Empty target name when neither options nor host_description provides hostname
   captured_target_name.clear();

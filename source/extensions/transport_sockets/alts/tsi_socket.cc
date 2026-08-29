@@ -17,9 +17,11 @@ namespace TransportSockets {
 namespace Alts {
 
 TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
-                     Network::TransportSocketPtr&& raw_socket, bool downstream, absl::string_view target_name)
+                     Network::TransportSocketPtr&& raw_socket, bool downstream,
+                     absl::string_view target_name)
     : handshaker_factory_(handshaker_factory), handshake_validator_(handshake_validator),
-      raw_buffer_socket_(std::move(raw_socket)), downstream_(downstream), target_name_(target_name) {}
+      raw_buffer_socket_(std::move(raw_socket)), downstream_(downstream),
+      target_name_(target_name) {}
 
 TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
                      bool downstream, absl::string_view target_name)
@@ -63,10 +65,10 @@ Network::PostIoAction TsiSocket::doHandshakeNext() {
                  raw_read_buffer_.length());
 
   if (!handshaker_) {
-    handshaker_ =
-        handshaker_factory_(callbacks_->connection().dispatcher(),
-                            callbacks_->connection().connectionInfoProvider().localAddress(),
-                            callbacks_->connection().connectionInfoProvider().remoteAddress(), target_name_);
+    handshaker_ = handshaker_factory_(
+        callbacks_->connection().dispatcher(),
+        callbacks_->connection().connectionInfoProvider().localAddress(),
+        callbacks_->connection().connectionInfoProvider().remoteAddress(), target_name_);
     if (!handshaker_) {
       ENVOY_CONN_LOG(warn, "TSI: failed to create handshaker", callbacks_->connection());
       callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
@@ -363,7 +365,7 @@ TsiSocketFactory::TsiSocketFactory(HandshakerFactory handshaker_factory,
 bool TsiSocketFactory::implementsSecureTransport() const { return true; }
 
 Network::TransportSocketPtr
-TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr,
+TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
                                         Upstream::HostDescriptionConstSharedPtr) const {
   std::string target_name;
   if (options != nullptr && options->serverNameOverride().has_value()) {

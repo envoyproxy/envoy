@@ -36,7 +36,8 @@ void AltsProxy::setRpcProtocolVersions(grpc::gcp::RpcProtocolVersions* rpc_proto
 }
 
 absl::StatusOr<std::unique_ptr<AltsProxy>>
-AltsProxy::create(std::shared_ptr<grpc::Channel> handshaker_service_channel, absl::string_view target_name) {
+AltsProxy::create(std::shared_ptr<grpc::Channel> handshaker_service_channel,
+                  absl::string_view target_name) {
   if (handshaker_service_channel == nullptr) {
     return absl::InvalidArgumentError("Handshaker service channel is null.");
   }
@@ -58,9 +59,10 @@ AltsProxy::create(std::shared_ptr<grpc::Channel> handshaker_service_channel, abs
 AltsProxy::AltsProxy(
     std::unique_ptr<grpc::ClientContext> client_context,
     std::unique_ptr<HandshakerService::Stub> stub,
-    std::unique_ptr<grpc::ClientReaderWriter<HandshakerReq, HandshakerResp>> stream)
+    std::unique_ptr<grpc::ClientReaderWriter<HandshakerReq, HandshakerResp>> stream,
+    absl::string_view target_name)
     : client_context_(std::move(client_context)), stub_(std::move(stub)),
-      stream_(std::move(stream), target_name_(target_name)) {}
+      stream_(std::move(stream)), target_name_(target_name) {}
 
 AltsProxy::~AltsProxy() {
   if (stream_ != nullptr) {

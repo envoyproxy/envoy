@@ -50,7 +50,7 @@ public:
 
 private:
   AltsTsiHandshaker(bool is_client, std::shared_ptr<grpc::Channel> handshaker_service_channel,
-                  absl::string_view target_name = "");
+                    absl::string_view target_name = "");
 
   const bool is_client_;
   const std::shared_ptr<grpc::Channel> handshaker_service_channel_;

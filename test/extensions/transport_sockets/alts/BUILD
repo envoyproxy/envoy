@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.transport_sockets.alts"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/extensions/transport_sockets/alts:config",
         "//source/extensions/transport_sockets/alts:tsi_socket",

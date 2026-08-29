@@ -406,14 +406,14 @@ public:
     fake_handshaker_server_thread_->join();
   }
 
-  Network::TransportSocketPtr makeAltsTransportSocket(
-      Network::TransportSocketOptionsConstSharedPtr options = nullptr) {
+  Network::TransportSocketPtr
+  makeAltsTransportSocket(Network::TransportSocketOptionsConstSharedPtr options = nullptr) {
     return client_alts_->createTransportSocket(options,
-                                                /*host=*/nullptr);
-   }
+                                               /*host=*/nullptr);
+  }
 
-  Network::ClientConnectionPtr makeAltsConnection(
-      Network::TransportSocketOptionsConstSharedPtr options = nullptr) {
+  Network::ClientConnectionPtr
+  makeAltsConnection(Network::TransportSocketOptionsConstSharedPtr options = nullptr) {
     auto client_transport_socket = makeAltsTransportSocket(options);
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
@@ -641,7 +641,8 @@ TEST_P(AltsIntegrationTestCapturingHandshaker, CheckMaxFrameSize) {
 // Verifies that StartClientHandshakeReq includes target_name when serverNameOverride is configured.
 TEST_P(AltsIntegrationTestCapturingHandshaker, CheckTargetNameOverride) {
   initialize();
-  auto options = std::make_shared<Network::TransportSocketOptionsImpl>("custom.alts.target.googleapis.com");
+  auto options =
+      std::make_shared<Network::TransportSocketOptionsImpl>("custom.alts.target.googleapis.com");
   codec_client_ = makeRawHttpConnection(makeAltsConnection(options), std::nullopt);
   EXPECT_FALSE(codec_client_->connected());
   EXPECT_EQ("custom.alts.target.googleapis.com", capturing_handshaker_service_->client_target_name);

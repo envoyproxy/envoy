@@ -230,7 +230,7 @@ TEST_F(TransportSocketOptionsImplTest, Http11ProxyInfoInvalidEncodingsAreRejecte
       Http11ProxyInfoFilterState::key());
   ASSERT_NE(nullptr, factory);
 
-  auto expectRejected = [&](absl::string_view bytes) {
+  auto expectRejected = [&](<absl::string_view bytes>) {
     SCOPED_TRACE(std::string(bytes));
     EXPECT_EQ(nullptr, factory->createFromBytes(bytes));
   };
@@ -279,18 +279,18 @@ TEST_F(TransportSocketOptionsImplTest, ServerNameAndAlpnDecoratingChaining) {
   // Test chaining: ServerNameDecorator wrapping AlpnDecorator
   auto base_options = std::make_shared<TransportSocketOptionsImpl>("base.example.com");
   std::vector<std::string> custom_alpns{"custom-alpn"};
-  auto alpn_decorated =
-      std::make_shared<AlpnDecoratingTransportSocketOptions>(custom_alpns, base_options);
+  auto alpn_decorated = std::make_shared<AlpnDecoratingTransportSocketOptions>(
+      std::vector<std::string>(custom_alpns), base_options);
   auto full_decorated = std::make_shared<ServerNameDecoratingTransportSocketOptions>(
       "overridden.example.com", alpn_decorated);
   EXPECT_EQ(std::make_optional<std::string>("overridden.example.com"),
             full_decorated->serverNameOverride());
-  EXPECT_EQ(custom_alpns, full_decorated->applicationProtocolListOverride());
+  EXPECT_EQ(custom_alpns, full_decorated->applicationProtocolFallback());
 }
 
 TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingNullInnerOptions) {
-  auto null_decorated =
-      std::make_shared<ServerNameDecoratingTransportSocketOptions>("standalone.example.com", nullptr);
+  auto null_decorated = std::make_shared<ServerNameDecoratingTransportSocketOptions>(
+      "standalone.example.com", nullptr);
   EXPECT_EQ(std::make_optional<std::string>("standalone.example.com"),
             null_decorated->serverNameOverride());
   EXPECT_TRUE(null_decorated->verifySubjectAltNameListOverride().empty());
@@ -301,25 +301,28 @@ TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingNullInnerOptions) {
   EXPECT_TRUE(null_decorated->downstreamSharedFilterStateObjects().empty());
 }
 
-TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingTransportSocketOptionsOverrideAndPassThrough) {
+TEST_F(TransportSocketOptionsImplTest,
+       ServerNameDecoratingTransportSocketOptionsOverrideAndPassThrough) {
   std::vector<std::string> http_alpns{"h2", "http/1.1"};
   auto inner_options = std::make_shared<TransportSocketOptionsImpl>(
-      "original.server.com",
-      std::vector<std::string>{"san1.com"},
+      "original.server.com", std::vector<std::string>{"san1.com"},
       std::vector<std::string>(http_alpns));
   ServerNameDecoratingTransportSocketOptions decorated("override.service.target", inner_options);
-  EXPECT_EQ(std::make_optional<std::string>("override.service.target"), decorated.serverNameOverride());
+  EXPECT_EQ(std::make_optional<std::string>("override.service.target"),
+            decorated.serverNameOverride());
   EXPECT_EQ(std::vector<std::string>{"san1.com"}, decorated.verifySubjectAltNameListOverride());
   EXPECT_EQ(http_alpns, decorated.applicationProtocolListOverride());
 }
-TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingTransportSocketOptionsEmptyStringIsNullopt) {
+TEST_F(TransportSocketOptionsImplTest,
+       ServerNameDecoratingTransportSocketOptionsEmptyStringIsNullopt) {
   auto inner_options = std::make_shared<TransportSocketOptionsImpl>("original.server.com");
   ServerNameDecoratingTransportSocketOptions decorated("", inner_options);
   EXPECT_EQ(std::nullopt, decorated.serverNameOverride());
 }
 TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingTransportSocketOptionsNullInnerOptions) {
   ServerNameDecoratingTransportSocketOptions decorated("override.service.target", nullptr);
-  EXPECT_EQ(std::make_optional<std::string>("override.service.target"), decorated.serverNameOverride());
+  EXPECT_EQ(std::make_optional<std::string>("override.service.target"),
+            decorated.serverNameOverride());
   EXPECT_TRUE(decorated.verifySubjectAltNameListOverride().empty());
   EXPECT_TRUE(decorated.applicationProtocolListOverride().empty());
   EXPECT_TRUE(decorated.applicationProtocolFallback().empty());
