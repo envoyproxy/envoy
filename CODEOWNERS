@@ -409,6 +409,7 @@
 /*/extensions/health_checkers/grpc @botengyao @UNOWNED
 /*/extensions/health_checkers/http @botengyao @UNOWNED
 /*/extensions/health_checkers/tcp @botengyao @UNOWNED
+/*/extensions/health_checkers/udp @nezdolik @botengyao
 /*/extensions/health_checkers/common @botengyao @UNOWNED
 # Health check event sinks
 /*/extensions/health_check/event_sinks/file @botengyao @yanavlasov
@@ -433,6 +434,7 @@
 /*/extensions/filters/udp/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/clusters/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/load_balancing_policies/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/router/cluster_specifiers/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/matching/input_matchers/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/matching/http/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/transport_sockets/tls/cert_validator/dynamic_modules @agrawroh @mathetake @wbpcode

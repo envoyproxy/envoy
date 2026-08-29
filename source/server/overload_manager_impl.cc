@@ -466,8 +466,14 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
           Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(resource);
       auto config =
           Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
-      auto monitor = factory.createResourceMonitor(*config, context);
-      result = resources_.try_emplace(name, name, std::move(monitor), *this, stats_scope).second;
+      auto monitor_or_error = factory.createResourceMonitor(*config, context);
+      if (!monitor_or_error.ok()) {
+        creation_status = monitor_or_error.status();
+        return;
+      }
+      result = resources_
+                   .try_emplace(name, name, std::move(monitor_or_error.value()), *this, stats_scope)
+                   .second;
     }
     if (!result) {
       creation_status =

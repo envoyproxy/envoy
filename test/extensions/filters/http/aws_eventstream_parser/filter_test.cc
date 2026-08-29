@@ -12,10 +12,15 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::IsSupersetOf;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -323,7 +328,7 @@ TEST_F(AwsEventstreamParserFilterTest, BasicMetadataExtraction) {
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(100, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 100)));
 }
 
 TEST_F(AwsEventstreamParserFilterTest, MultipleMessages) {
@@ -343,7 +348,7 @@ TEST_F(AwsEventstreamParserFilterTest, MultipleMessages) {
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(250, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 250)));
 }
 
 TEST_F(AwsEventstreamParserFilterTest, EmptyPayload) {
@@ -393,7 +398,7 @@ TEST_F(AwsEventstreamParserFilterTest, ChunkedMessage) {
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(100, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 100)));
 }
 
 TEST_F(AwsEventstreamParserFilterTest, MultipleMessagesInSingleBuffer) {
@@ -411,7 +416,7 @@ TEST_F(AwsEventstreamParserFilterTest, MultipleMessagesInSingleBuffer) {
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(42, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 42)));
 }
 
 TEST_F(AwsEventstreamParserFilterTest, TrailersFinalizesRules) {
@@ -514,7 +519,7 @@ TEST_F(AwsEventstreamParserFilterTest, PreserveExistingMetadata) {
 
   // Original value should be preserved
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(999, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 999)));
 }
 
 TEST_F(AwsEventstreamParserFilterTest, StopProcessingEarly) {
@@ -556,7 +561,7 @@ TEST_F(AwsEventstreamParserFilterTest, StopProcessingEarly) {
 
   // First matched value should be stored
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(100, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 100)));
 }
 
 TEST_F(AwsEventstreamParserFilterTest, ContentTypeCaseInsensitive) {
@@ -630,7 +635,7 @@ TEST_F(AwsEventstreamParserFilterTest, SkipProcessingAfterComplete) {
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(100, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 100)));
 }
 
 // Test encodeTrailers when content type didn't match (should not finalize).
@@ -728,9 +733,9 @@ TEST_F(AwsEventstreamParserFilterTest, PreserveExistingDifferentKey) {
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(100, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 100)));
   // Original key should still exist
-  EXPECT_EQ(999, metadata.fields().at("other_key").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("other_key", 999)));
 }
 
 // Test end_stream=true finalizes rules with on_missing fallback.
@@ -858,8 +863,8 @@ TEST_F(AwsEventstreamParserFilterTest, MultipleDeferredFallbackActions) {
   EXPECT_EQ(2, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(0, metadata.fields().at("tokens").number_value());
-  EXPECT_EQ(99, metadata.fields().at("input_tokens").number_value());
+  EXPECT_THAT(metadata.fields(), UnorderedElementsAre(IsStructNumber("tokens", 0),
+                                                      IsStructNumber("input_tokens", 99)));
 }
 
 // Test on_missing without a value field does not write metadata (covers !action.value.has_value()).
@@ -940,8 +945,9 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleStringExtraction) {
   EXPECT_EQ(2, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ("ContentBlockDelta", metadata.fields().at("event_type").string_value());
-  EXPECT_EQ(42, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(),
+              UnorderedElementsAre(IsStructString("event_type", "ContentBlockDelta"),
+                                   IsStructNumber("tokens", 42)));
 }
 
 // Test int32 header extraction.
@@ -979,7 +985,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleInt32Extraction) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(200, metadata.fields().at("status").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("status", 200)));
 }
 
 // Test bool header extraction.
@@ -1017,7 +1023,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleBoolExtraction) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_TRUE(metadata.fields().at("final").bool_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructBool("final", true)));
 }
 
 // Test header on_missing fallback at end of stream.
@@ -1056,7 +1062,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleOnMissingFallback) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ("unknown", metadata.fields().at("event_type").string_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructString("event_type", "unknown")));
 
   // Fallback counter: 2 (content parser dummy on_missing + header rule on_missing)
   EXPECT_EQ(2, findCounter("aws_eventstream_parser.resp.json.metadata_from_fallback"));
@@ -1099,7 +1105,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleOnPresentOverrideValue) {
 
   // Override value (true) should be used instead of the actual header value ("SomeEvent")
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_TRUE(metadata.fields().at("has_event_type").bool_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructBool("has_event_type", true)));
 }
 
 // Test header rule stop_processing_after_matches: first match wins, second is skipped.
@@ -1145,7 +1151,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleStopProcessingAfterMatches) {
 
   // First value should win
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ("FirstEvent", metadata.fields().at("event_type").string_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructString("event_type", "FirstEvent")));
 }
 
 // Test header rule default behavior (stop_processing_after_matches: 0): later matches overwrite.
@@ -1190,7 +1196,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleDefaultOverwritesBehavior) {
 
   // Second value should win (last-write-wins)
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ("SecondEvent", metadata.fields().at("event_type").string_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructString("event_type", "SecondEvent")));
 }
 
 // Test header rule stop_processing_after_matches with on_missing: fires when header never appears.
@@ -1234,7 +1240,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleStopProcessingOnMissingStillFir
 
   // on_missing should fire at finalization
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ("unknown", metadata.fields().at("event_type").string_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructString("event_type", "unknown")));
   EXPECT_EQ(2, findCounter("aws_eventstream_parser.resp.json.metadata_from_fallback"));
 }
 
@@ -1253,7 +1259,7 @@ TEST_F(AwsEventstreamParserFilterTest, NoHeaderRulesBackwardCompatible) {
   // Payload rule should still work; no header metadata expected.
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(100, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 100)));
   EXPECT_FALSE(metadata.fields().contains("event_type"));
 }
 
@@ -1297,7 +1303,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleMatchesInLaterMessage) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data2, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ("MessageStop", metadata.fields().at("event_type").string_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructString("event_type", "MessageStop")));
 }
 
 // Test header rule uses default namespace when none specified.
@@ -1336,7 +1342,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleDefaultNamespace) {
   // Should use the default namespace
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at(
       "envoy.filters.http.aws_eventstream_parser");
-  EXPECT_EQ("ContentBlockDelta", metadata.fields().at("event_type").string_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructString("event_type", "ContentBlockDelta")));
 }
 
 // Test that string-to-number conversion failure produces KIND_NOT_SET and does not write metadata.
@@ -1408,7 +1414,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleByteExtraction) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(42, metadata.fields().at("priority").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("priority", 42)));
 }
 
 // Test short header extraction.
@@ -1446,7 +1452,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleShortExtraction) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(8080, metadata.fields().at("port").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("port", 8080)));
 }
 
 // Test int64 header extraction.
@@ -1484,7 +1490,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleInt64Extraction) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(1234567890123.0, metadata.fields().at("request_id").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("request_id", 1234567890123.0)));
 }
 
 // Test timestamp header extraction.
@@ -1522,7 +1528,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleTimestampExtraction) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(1700000000000.0, metadata.fields().at("ts").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("ts", 1700000000000.0)));
 }
 
 // Test byte array header extraction (hex-encoded).
@@ -1561,7 +1567,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleByteArrayExtraction) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ("deadbeef", metadata.fields().at("checksum").string_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructString("checksum", "deadbeef")));
 }
 
 // Test UUID header extraction (formatted as xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).
@@ -1601,8 +1607,8 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleUuidExtraction) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ("01234567-89ab-cdef-fedc-ba9876543210",
-            metadata.fields().at("trace_id").string_value());
+  EXPECT_THAT(metadata.fields(),
+              Contains(IsStructString("trace_id", "01234567-89ab-cdef-fedc-ba9876543210")));
 }
 
 // Test preserve_existing within the same pending batch (two messages writing same key).
@@ -1643,7 +1649,7 @@ TEST_F(AwsEventstreamParserFilterTest, PreserveExistingInPendingBatch) {
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.preserved_existing_metadata"));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(100, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 100)));
 }
 
 TEST_F(AwsEventstreamParserFilterTest, TypeConversionError) {
@@ -1680,7 +1686,7 @@ TEST_F(AwsEventstreamParserFilterTest, BedrockEnvelopeUnwrap) {
 
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(55, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 55)));
 }
 
 // Test Bedrock envelope with extra fields (e.g. "p") still unwraps correctly.
@@ -1698,7 +1704,7 @@ TEST_F(AwsEventstreamParserFilterTest, BedrockEnvelopeWithExtraFields) {
 
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(77, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 77)));
 }
 
 // Test that invalid base64 in Bedrock envelope falls back to original payload.
@@ -1731,7 +1737,7 @@ TEST_F(AwsEventstreamParserFilterTest, BedrockEnvelopeNoBytesField) {
 
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(33, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 33)));
 }
 
 // Test that non-JSON payload is not treated as a Bedrock envelope (falls through to parser).
@@ -1787,7 +1793,7 @@ TEST_F(AwsEventstreamParserFilterTest, BedrockEnvelopeMixedWithPlainJson) {
 
   EXPECT_EQ(1, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(123, metadata.fields().at("tokens").number_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructNumber("tokens", 123)));
 }
 
 // Test that allHeaderRulesSatisfied() returns true when content parser stops AND header rules
@@ -1835,8 +1841,8 @@ TEST_F(AwsEventstreamParserFilterTest, ContentParserStopWithSatisfiedHeaderRules
 
   EXPECT_EQ(2, findCounter("aws_eventstream_parser.resp.json.metadata_added"));
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(50, metadata.fields().at("tokens").number_value());
-  EXPECT_EQ("MessageStop", metadata.fields().at("event_type").string_value());
+  EXPECT_THAT(metadata.fields(), UnorderedElementsAre(IsStructNumber("tokens", 50),
+                                                      IsStructString("event_type", "MessageStop")));
 }
 
 // Test that allHeaderRulesSatisfied() returns false when a header rule has
@@ -1886,7 +1892,7 @@ TEST_F(AwsEventstreamParserFilterTest, ContentParserStopButHeaderRuleUnlimited) 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data2, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ("SecondEvent", metadata.fields().at("event_type").string_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructString("event_type", "SecondEvent")));
 }
 
 // Test that allHeaderRulesSatisfied() returns false when header rule has
@@ -1941,8 +1947,8 @@ TEST_F(AwsEventstreamParserFilterTest, ContentParserStopButHeaderRuleNotYetSatis
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data3, true));
 
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(10, metadata.fields().at("tokens").number_value());
-  EXPECT_EQ("Found", metadata.fields().at("event_type").string_value());
+  EXPECT_THAT(metadata.fields(), UnorderedElementsAre(IsStructNumber("tokens", 10),
+                                                      IsStructString("event_type", "Found")));
 }
 
 // Test header on_missing with default (empty) namespace.
@@ -1982,7 +1988,7 @@ TEST_F(AwsEventstreamParserFilterTest, HeaderRuleOnMissingDefaultNamespace) {
   // on_missing should write to the default namespace
   const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at(
       "envoy.filters.http.aws_eventstream_parser");
-  EXPECT_EQ("not_found", metadata.fields().at("event_type").string_value());
+  EXPECT_THAT(metadata.fields(), Contains(IsStructString("event_type", "not_found")));
 }
 
 // Test header on_missing without a value field — should not write metadata.

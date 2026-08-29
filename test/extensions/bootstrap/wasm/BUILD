@@ -31,7 +31,7 @@ envoy_extension_cc_test(
         "//test/extensions/bootstrap/wasm/test_data:logging_rust.wasm",
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -56,7 +56,7 @@ envoy_extension_cc_test(
         "//test/extensions/bootstrap/wasm/test_data:http_cpp.wasm",
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/bootstrap/wasm:config",
@@ -74,7 +74,7 @@ envoy_extension_cc_test(
         "//test/extensions/bootstrap/wasm/test_data:start_cpp.wasm",
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
@@ -97,7 +97,7 @@ envoy_extension_cc_test_binary(
         "//test/extensions/bootstrap/wasm/test_data:speed_cpp.wasm",
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//bazel:cpp_runfiles",

@@ -129,6 +129,7 @@ EXTENSIONS = {
     #
     "envoy.matching.inputs.cel_data_input":             "//source/extensions/matching/http/cel_input:cel_input_lib",
     "envoy.matching.inputs.dynamic_module_data_input":  "//source/extensions/matching/http/dynamic_modules:data_input_lib",
+    "envoy.matching.inputs.dynamic_module_string_data_input":  "//source/extensions/matching/http/dynamic_modules:string_data_input_lib",
 
     #
     # Dynamic Metadata Matching Input
@@ -645,8 +646,9 @@ EXTENSIONS = {
     #
     # Cluster specifier plugin
     #
-    "envoy.router.cluster_specifier_plugin.lua":     "//source/extensions/router/cluster_specifiers/lua:config",
-    "envoy.router.cluster_specifier_plugin.matcher": "//source/extensions/router/cluster_specifiers/matcher:config",
+    "envoy.router.cluster_specifier_plugin.dynamic_modules": "//source/extensions/router/cluster_specifiers/dynamic_modules:config",
+    "envoy.router.cluster_specifier_plugin.lua":             "//source/extensions/router/cluster_specifiers/lua:config",
+    "envoy.router.cluster_specifier_plugin.matcher":         "//source/extensions/router/cluster_specifiers/matcher:config",
 
     #
     # Extensions for generic proxy

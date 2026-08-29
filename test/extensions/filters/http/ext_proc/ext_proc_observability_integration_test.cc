@@ -92,7 +92,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadataObservabilityMode) {
 
   auto response = sendDownstreamRequest(std::nullopt);
 
-  testSendDyanmicMetadata();
+  testSendDynamicMetadata();
 
   handleUpstreamRequest();
 

@@ -16,7 +16,8 @@ public:
   explicit ListenerInfoImpl(const envoy::config::listener::v3::Listener& config)
       : name_(config.name()), metadata_(config.metadata()), direction_(config.traffic_direction()),
         is_quic_(config.udp_listener_config().has_quic_options()),
-        bypass_overload_manager_(config.bypass_overload_manager()) {}
+        bypass_overload_manager_(config.bypass_overload_manager()),
+        drain_type_(config.drain_type()) {}
   ListenerInfoImpl() = default;
 
   // Network::ListenerInfo
@@ -26,6 +27,9 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
   bool shouldBypassOverloadManager() const override { return bypass_overload_manager_; };
   bool isQuic() const override { return is_quic_; }
+  envoy::config::listener::v3::Listener::DrainType drainType() const override {
+    return drain_type_;
+  }
 
 private:
   const std::string name_;
@@ -33,6 +37,8 @@ private:
   const envoy::config::core::v3::TrafficDirection direction_{};
   const bool is_quic_{};
   const bool bypass_overload_manager_{};
+  // Defaults to Listener::DEFAULT, which is the proto default (0).
+  const envoy::config::listener::v3::Listener::DrainType drain_type_{};
 };
 
 } // namespace Server
