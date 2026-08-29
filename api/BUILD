@@ -152,6 +152,7 @@ proto_library(
         "//envoy/extensions/access_loggers/open_telemetry/v3:pkg",
         "//envoy/extensions/access_loggers/stats/v3:pkg",
         "//envoy/extensions/access_loggers/stream/v3:pkg",
+        "//envoy/extensions/access_loggers/syslog/v3:pkg",
         "//envoy/extensions/access_loggers/wasm/v3:pkg",
         "//envoy/extensions/bootstrap/dynamic_modules/v3:pkg",
         "//envoy/extensions/bootstrap/internal_listener/v3:pkg",

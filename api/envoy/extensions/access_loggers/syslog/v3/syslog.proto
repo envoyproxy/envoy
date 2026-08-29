@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package envoy.extensions.access_loggers.syslog.v3;
+
+import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/substitution_format_string.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.syslog.v3";
+option java_outer_classname = "SyslogProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/syslog/v3;syslogv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Syslog access log]
+
+// Configuration for the ``envoy.access_loggers.syslog`` access logger.
+// The logger formats access-log records as RFC 3164 or RFC 5424 messages and sends them over UDP
+// or a Unix domain datagram socket. Delivery is best effort: the logger does not block request
+// processing, queue messages, retry failed messages, or wait for receiver acknowledgements. A
+// successful UDP write only means that the local kernel accepted the datagram and does not prove
+// that the receiver processed it.
+//
+// Example UDP configuration:
+//
+// .. validated-code-block:: yaml
+//   :type-name: envoy.extensions.access_loggers.syslog.v3.SyslogAccessLogConfig
+//
+//   server:
+//     socket_address:
+//       address: 127.0.0.1
+//       port_value: 514
+//       protocol: UDP
+//   facility: FACILITY_LOCAL7
+//   severity: INFO
+//   tag: envoy
+//   log_format:
+//     text_format_source:
+//       inline_string: '[%START_TIME%] "%REQ(:METHOD)% %REQ(:PATH)%" %RESPONSE_CODE%'
+// [#extension: envoy.access_loggers.syslog]
+// [#next-free-field: 12]
+message SyslogAccessLogConfig {
+  // Syslog protocol format.
+  enum SyslogFormat {
+    RFC3164 = 0;
+    RFC5424 = 1;
+  }
+
+  // Syslog facility used to calculate the message priority.
+  enum Facility {
+    FACILITY_LOCAL7 = 0;
+    FACILITY_KERN = 1;
+    FACILITY_USER = 2;
+    FACILITY_MAIL = 3;
+    FACILITY_DAEMON = 4;
+    FACILITY_AUTH = 5;
+    FACILITY_INTERN = 6;
+    FACILITY_LPR = 7;
+    FACILITY_NEWS = 8;
+    FACILITY_UUCP = 9;
+    FACILITY_CLOCK = 10;
+    FACILITY_AUTHPRIV = 11;
+    FACILITY_FTP = 12;
+    FACILITY_NTP = 13;
+    FACILITY_AUDIT = 14;
+    FACILITY_ALERT = 15;
+    FACILITY_CRON = 16;
+    FACILITY_LOCAL0 = 17;
+    FACILITY_LOCAL1 = 18;
+    FACILITY_LOCAL2 = 19;
+    FACILITY_LOCAL3 = 20;
+    FACILITY_LOCAL4 = 21;
+    FACILITY_LOCAL5 = 22;
+    FACILITY_LOCAL6 = 23;
+  }
+
+  // Syslog severity used to calculate the message priority.
+  enum Severity {
+    INFO = 0;
+    EMERG = 1;
+    ALERT = 2;
+    CRIT = 3;
+    ERR = 4;
+    WARNING = 5;
+    NOTICE = 6;
+    DEBUG = 7;
+  }
+
+  // An Envoy cluster used as the syslog destination.
+  message Cluster {
+    // Transport protocol used to send syslog records to the cluster.
+    enum Protocol {
+      UDP = 0;
+
+      // Reserved for TCP syslog. TLS is configured by the referenced cluster's transport socket.
+      // TCP is not currently supported by this access logger.
+      TCP = 1;
+    }
+
+    // Name of the Envoy cluster used for service discovery and load balancing.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Transport protocol used with the cluster. Defaults to UDP.
+    Protocol protocol = 2 [(validate.rules).enum = {defined_only: true}];
+  }
+
+  oneof destination {
+    option (validate.required) = true;
+
+    // Address of the syslog server. Socket addresses must use UDP and specify a numeric port value.
+    // Unix domain sockets are also supported.
+    config.core.v3.Address server = 1;
+
+    // Envoy cluster used for service discovery and load balancing. This can reference a
+    // ``STRICT_DNS`` cluster to dynamically resolve and round-robin across DNS addresses.
+    Cluster cluster = 9;
+  }
+
+  // Facility placed in the message priority. Defaults to ``LOCAL7``.
+  Facility facility = 2 [(validate.rules).enum = {defined_only: true}];
+
+  // Severity placed in the message priority. Defaults to ``INFO``.
+  Severity severity = 3 [(validate.rules).enum = {defined_only: true}];
+
+  // Application tag associated with the syslog record. For RFC 3164, this value is emitted as
+  // ``TAG``. For RFC 5424, it is emitted as ``APP-NAME``. Defaults to ``envoy``.
+  string tag = 4 [(validate.rules).string = {max_len: 32}];
+
+  // Omits the local hostname from the message header. RFC 5424 messages use the RFC-defined
+  // NILVALUE (``-``) in the ``HOSTNAME`` field instead.
+  bool no_hostname = 5;
+
+  // Configuration used to format the access-log payload.
+  config.core.v3.SubstitutionFormatString log_format = 6
+      [(validate.rules).message = {required: true}];
+
+  // Optional additional prefix used for statistics emitted by this access logger. If empty,
+  // statistics are rooted at ``access_logs.syslog.``. If non-empty, statistics are rooted at
+  // ``access_logs.syslog.<stat_prefix>.``.
+  string stat_prefix = 7;
+
+  // Maximum size of the complete syslog message in bytes, including its header and payload.
+  // RFC 5424 requires receivers to accept messages up to 480 bytes and recommends accepting
+  // messages up to 2048 bytes. The upper bound is the maximum IPv4 UDP payload size. Defaults to
+  // 2048 bytes.
+  uint32 max_syslog_msg_bytes = 8
+      [(validate.rules).uint32 = {lte: 65507 gte: 480 ignore_empty: true}];
+
+  // Syslog protocol format. Defaults to RFC 3164.
+  SyslogFormat syslog_format = 10 [(validate.rules).enum = {defined_only: true}];
+
+  // Message type placed in the RFC 5424 ``MSGID`` header field. The value must contain between
+  // 1 and 32 printable ASCII characters, excluding spaces. Defaults to ``envoy.access``. This
+  // field is ignored when ``syslog_format`` is RFC 3164.
+  string msg_id = 11 [(validate.rules).string = {pattern: "^[!-~]{1,32}$" ignore_empty: true}];
+}

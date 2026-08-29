@@ -50,3 +50,18 @@ The Fluentd access log has statistics rooted at the *access_logs.fluentd.<stat_p
   events_sent, Counter, Total number of events (Fluentd Forward Mode events) sent to the upstream.
   reconnect_attempts, Counter, Total number of times an attempt to reconnect to the upstream has been made.
   connections_closed, Counter, Total number of times a connection to the upstream cluster was closed.
+
+Syslog access log statistics
+----------------------------
+
+The Syslog access log has statistics rooted at the *access_logs.syslog.* namespace. When
+``stat_prefix`` is configured, statistics are rooted at
+*access_logs.syslog.<stat_prefix>.* instead.
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 3
+
+   send, Counter, "Total messages submitted to the sender, tagged with ``state=full`` or ``state=truncated``."
+   bytes_sent, Counter, Total bytes accepted by the local socket for successfully sent datagrams.
+   dropped, Counter, "Number of Syslog messages not sent for any reason such as an unavailable destination, an oversized message, or a socket write failure."

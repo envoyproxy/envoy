@@ -1,0 +1,158 @@
+#include "source/extensions/access_loggers/syslog/config.h"
+
+#include "envoy/common/exception.h"
+#include "envoy/extensions/access_loggers/syslog/v3/syslog.pb.h"
+#include "envoy/extensions/access_loggers/syslog/v3/syslog.pb.validate.h"
+#include "envoy/registry/registry.h"
+
+#include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_format_utility.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/access_loggers/syslog/syslog_access_log_impl.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace AccessLoggers {
+namespace Syslog {
+
+absl::Status validateServerAddress(const envoy::config::core::v3::Address& server) {
+  switch (server.address_case()) {
+  case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
+    switch (server.socket_address().protocol()) {
+    case envoy::config::core::v3::SocketAddress::UDP:
+      break;
+    // TODO(izumi39): Add RFC 6587 TCP support for RFC 3164 and RFC 5424 messages.
+    case envoy::config::core::v3::SocketAddress::TCP:
+      return absl::UnimplementedError("syslog over TCP is not implemented yet");
+    default:
+      return absl::InvalidArgumentError(
+          fmt::format("invalid syslog server protocol value: {}",
+                      static_cast<int>(server.socket_address().protocol())));
+    }
+    if (server.socket_address().port_specifier_case() ==
+        envoy::config::core::v3::SocketAddress::PortSpecifierCase::PORT_SPECIFIER_NOT_SET) {
+      return absl::InvalidArgumentError("syslog server port must be configured");
+    }
+    if (server.socket_address().has_named_port()) {
+      return absl::InvalidArgumentError("syslog server port must be a numeric port value");
+    }
+    if (server.socket_address().has_port_value() && server.socket_address().port_value() == 0) {
+      return absl::InvalidArgumentError("syslog server port must not be zero");
+    }
+#if !defined(__linux__)
+    if (!server.socket_address().network_namespace_filepath().empty()) {
+      return absl::InvalidArgumentError("syslog network namespace is only supported on Linux");
+    }
+#endif
+    return absl::OkStatus();
+  case envoy::config::core::v3::Address::AddressCase::kPipe:
+#ifdef WIN32
+    return absl::InvalidArgumentError("syslog Unix domain sockets are not supported on Windows");
+#else
+    if (server.pipe().path().empty()) {
+      return absl::InvalidArgumentError("syslog Unix domain socket path must not be empty");
+    }
+    return absl::OkStatus();
+#endif
+  case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
+    return absl::InvalidArgumentError("syslog server does not support Envoy internal addresses");
+  case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
+    return absl::InvalidArgumentError("syslog server address must be configured");
+  }
+  return absl::InvalidArgumentError("syslog server address type is unsupported");
+}
+
+absl::Status validateSyslogConfig(const SyslogAccessLogConfig& config) {
+  if (config.has_server()) {
+    const absl::Status address_status = validateServerAddress(config.server());
+    if (!address_status.ok()) {
+      return address_status;
+    }
+  }
+
+  if (!config.no_hostname()) {
+    const auto hostname = Formatter::SubstitutionFormatUtils::getHostname();
+    if (!hostname.has_value() || hostname->empty()) {
+      return absl::InvalidArgumentError(
+          "syslog local hostname is unavailable; set no_hostname to true to omit it");
+    }
+  }
+
+  return absl::OkStatus();
+}
+
+AccessLog::InstanceSharedPtr SyslogAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::GenericFactoryContext& context,
+    std::vector<Formatter::CommandParserPtr>&& command_parsers) {
+  const auto& proto_config = MessageUtil::downcastAndValidate<const SyslogAccessLogConfig&>(
+      config, context.messageValidationVisitor());
+  THROW_IF_NOT_OK(validateSyslogConfig(proto_config));
+  auto formatter =
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+                                proto_config.log_format(), context, std::move(command_parsers)),
+                            Formatter::FormatterPtr);
+  Network::Address::InstanceConstSharedPtr destination;
+  auto& server_context = context.serverFactoryContext();
+  if (proto_config.has_server()) {
+    destination =
+        THROW_OR_RETURN_VALUE(Network::Address::resolveProtoAddress(proto_config.server()),
+                              Network::Address::InstanceConstSharedPtr);
+  } else {
+    const absl::Status status =
+        server_context.clusterManager().checkActiveStaticCluster(proto_config.cluster().name());
+    if (!status.ok()) {
+      throw EnvoyException(
+          fmt::format("syslog cluster '{}' must refer to an active static cluster: {}",
+                      proto_config.cluster().name(), status.message()));
+    }
+    const auto cluster =
+        server_context.clusterManager().getActiveCluster(proto_config.cluster().name());
+    if (!cluster.has_value()) {
+      throw EnvoyException(
+          fmt::format("cluster '{}' is not active", proto_config.cluster().name()));
+    }
+    const bool uses_secure_transport = cluster->info()
+                                           ->transportSocketMatcher()
+                                           .resolve(nullptr, nullptr)
+                                           .factory_.implementsSecureTransport();
+    if (uses_secure_transport) {
+      // TODO(izumi39): Add syslog over TLS support according to RFC 5425.
+      THROW_IF_NOT_OK(absl::UnimplementedError("syslog over TLS is not implemented yet"));
+    }
+    switch (proto_config.cluster().protocol()) {
+    case SyslogAccessLogConfig::Cluster::UDP:
+      break;
+    case SyslogAccessLogConfig::Cluster::TCP:
+      THROW_IF_NOT_OK(absl::UnimplementedError("syslog over TCP is not implemented yet"));
+      break;
+    default:
+      THROW_IF_NOT_OK(absl::InvalidArgumentError(
+          fmt::format("invalid syslog cluster protocol value: {}",
+                      static_cast<int>(proto_config.cluster().protocol()))));
+    }
+  }
+  auto shared_config = std::make_shared<SyslogAccessLogConfig>(proto_config);
+
+  return std::make_shared<SyslogAccessLog>(
+      std::move(filter), std::move(formatter), std::move(shared_config), std::move(destination),
+      server_context.threadLocal(), server_context.serverScope(), server_context.clusterManager());
+}
+
+ProtobufTypes::MessagePtr SyslogAccessLogFactory::createEmptyConfigProto() {
+  return std::make_unique<SyslogAccessLogConfig>();
+}
+
+std::string SyslogAccessLogFactory::name() const { return "envoy.access_loggers.syslog"; }
+
+/**
+ * Static registration for the syslog access log. @see RegisterFactory.
+ */
+LEGACY_REGISTER_FACTORY(SyslogAccessLogFactory, Envoy::AccessLog::AccessLogInstanceFactory,
+                        "envoy.syslog_access_log");
+
+} // namespace Syslog
+} // namespace AccessLoggers
+} // namespace Extensions
+} // namespace Envoy

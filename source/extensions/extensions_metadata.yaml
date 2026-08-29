@@ -54,6 +54,13 @@ envoy.access_loggers.stats:
   status: wip
   type_urls:
   - envoy.extensions.access_loggers.stats.v3.Config
+envoy.access_loggers.syslog:
+  categories:
+  - envoy.access_loggers
+  security_posture: robust_to_untrusted_downstream
+  status: wip
+  type_urls:
+  - envoy.extensions.access_loggers.syslog.v3.SyslogAccessLogConfig
 envoy.access_loggers.stdout:
   categories:
   - envoy.access_loggers
