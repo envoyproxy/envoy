@@ -61,7 +61,8 @@ public:
   void log(const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info);
 
 private:
-  static constexpr uint64_t DefaultMaxMessageSize = 2048;
+  // Avoid IP fragmentation for IPv4 and IPv6 when the path MTU is 1500 bytes.
+  static constexpr uint64_t DefaultMaxMessageSize = 1452;
   static constexpr bool DefaultSkipOversizedMessage = false;
 
   SenderPtr sender_;

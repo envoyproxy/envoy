@@ -141,10 +141,18 @@ message SyslogAccessLogConfig {
   // ``access_logs.syslog.<stat_prefix>.``.
   string stat_prefix = 7;
 
-  // Maximum size of the complete syslog message in bytes, including its header and payload.
-  // RFC 5424 requires receivers to accept messages up to 480 bytes and recommends accepting
-  // messages up to 2048 bytes. The upper bound is the maximum IPv4 UDP payload size. Defaults to
-  // 2048 bytes.
+  // Maximum size of the complete syslog message in bytes. This is the UDP payload size: it includes
+  // the syslog header and formatted payload, but excludes UDP, IP, and link-layer headers. Messages
+  // exceeding this size are truncated.
+  //
+  // Defaults to 1452 bytes, which avoids IP fragmentation for both IPv4 and IPv6 when the path MTU
+  // is 1500 bytes. For a different path MTU, calculate the limit as:
+  // ``maximum message size = path MTU - IP header size - 8-byte UDP header``.
+  // For example, a 1500-byte path MTU allows ``1500 - 20 - 8 = 1472`` bytes with a 20-byte IPv4
+  // header, or ``1500 - 40 - 8 = 1452`` bytes with a 40-byte IPv6 header. UDP does not retransmit
+  // lost datagrams. A value larger than the calculated limit can cause IP fragmentation; if any
+  // fragment is lost, the entire syslog message is lost. Verify the network path before configuring
+  // a larger value.
   uint32 max_syslog_msg_bytes = 8
       [(validate.rules).uint32 = {lte: 65507 gte: 480 ignore_empty: true}];
 
