@@ -60,10 +60,12 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
                          const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
                          const Network::DrainDecision& drain_decision, TimeSource& time_source,
-                         bool emit_dynamic_metadata, const MongoStatsSharedPtr& mongo_stats)
+                         bool emit_dynamic_metadata, const MongoStatsSharedPtr& mongo_stats,
+                         uint32_t max_bson_depth)
     : stats_(generateStats(stat_prefix, scope)), runtime_(runtime), drain_decision_(drain_decision),
       access_log_(access_log), fault_config_(fault_config), time_source_(time_source),
-      emit_dynamic_metadata_(emit_dynamic_metadata), mongo_stats_(mongo_stats) {
+      emit_dynamic_metadata_(emit_dynamic_metadata), mongo_stats_(mongo_stats),
+      max_bson_depth_(max_bson_depth) {
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
                                           100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we
@@ -389,7 +391,7 @@ Network::FilterStatus ProxyFilter::onWrite(Buffer::Instance& data, bool) {
 }
 
 DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
-  return DecoderPtr{new DecoderImpl(callbacks)};
+  return DecoderPtr{new DecoderImpl(callbacks, max_bson_depth_)};
 }
 
 std::optional<std::chrono::milliseconds> ProxyFilter::delayDuration() {

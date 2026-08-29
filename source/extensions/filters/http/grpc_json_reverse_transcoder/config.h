@@ -11,22 +11,19 @@ namespace HttpFilters {
 namespace GrpcJsonReverseTranscoder {
 
 class GrpcJsonReverseTranscoderFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::grpc_json_reverse_transcoder::
-                                     v3::GrpcJsonReverseTranscoder> {
+    : public Common::UnifiedFactoryBase<
+          envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
+              GrpcJsonReverseTranscoder> {
 public:
   GrpcJsonReverseTranscoderFactory()
-      : FactoryBase("envoy.filters.http.grpc_json_reverse_transcoder") {}
+      : UnifiedFactoryBase("envoy.filters.http.grpc_json_reverse_transcoder") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
-          GrpcJsonReverseTranscoder& proto_config,
-      const std::string&, Server::Configuration::FactoryContext& context) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
           GrpcJsonReverseTranscoder& proto_config,
-      const std::string&, Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <list>
 
 #include "source/extensions/config_subscription/grpc/update_ack.h"

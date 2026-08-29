@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "fixed_heap_monitor_test",
     srcs = ["fixed_heap_monitor_test.cc"],
     extension_names = ["envoy.resource_monitors.fixed_heap"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/resource_monitors/fixed_heap:fixed_heap_monitor",
         "//test/mocks/runtime:runtime_mocks",
@@ -27,7 +27,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.resource_monitors.fixed_heap"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/stats:isolated_store_lib",

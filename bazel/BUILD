@@ -9,7 +9,7 @@ load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load(":deprecated_features.bzl", "check_removed_fips_define")
+load(":deprecated_features.bzl", "check_removed_fips_define", "check_removed_wasm_defines")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
@@ -34,6 +34,20 @@ exports_files([
     "exported_symbols.txt",
     "exported_symbols_apple.txt",
 ])
+
+# TODO(phlax): Cleanup once bzlmod migration is complete
+bool_flag(
+    name = "enable_bzlmod",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "bzlmod_mode",
+    flag_values = {
+        ":enable_bzlmod": "True",
+    },
+    visibility = ["//visibility:public"],
+)
 
 sh_library(
     name = "volatile_env",
@@ -563,11 +577,6 @@ config_setting(
 )
 
 config_setting(
-    name = "using_aws_lc",
-    flag_values = {":ssl": "@aws_lc//:ssl"},
-)
-
-config_setting(
     name = "using_openssl",
     flag_values = {":openssl": "True"},
 )
@@ -577,7 +586,6 @@ selects.config_setting_group(
     name = "using_fips_ssl",
     match_any = [
         ":using_boringssl_fips",
-        ":using_aws_lc",
     ],
 )
 
@@ -587,29 +595,38 @@ check_removed_fips_define(
     visibility = ["//visibility:public"],
 )
 
+check_removed_wasm_defines(
+    name = "check_removed_wasm_defines",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
 label_flag(
     name = "zlib",
     build_setting_default = "@zlib-ng",
 )
 
+# Wasm engine config settings. The single source of truth for engine selection
+# is @proxy-wasm-cpp-host//bazel:engine (a string_flag defined in that repo).
+# Use --@proxy-wasm-cpp-host//bazel:engine=<value> to select the engine.
 config_setting(
     name = "wasm_v8",
-    values = {"define": "wasm=v8"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "v8"},
 )
 
 config_setting(
     name = "wasm_wamr",
-    values = {"define": "wasm=wamr"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "wamr"},
 )
 
 config_setting(
     name = "wasm_wasmtime",
-    values = {"define": "wasm=wasmtime"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "wasmtime"},
 )
 
 config_setting(
     name = "wasm_disabled",
-    values = {"define": "wasm=disabled"},
+    flag_values = {"@proxy-wasm-cpp-host//bazel:engine": "disabled"},
 )
 
 # This config setting enables Universal Header Validator and disables
@@ -691,12 +708,18 @@ config_setting(
 
 config_setting(
     name = "darwin_x86_64",
-    values = {"cpu": "darwin_x86_64"},
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
     name = "darwin_arm64",
-    values = {"cpu": "darwin_arm64"},
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
@@ -940,38 +963,7 @@ alias(
 )
 
 json_data(
-    name = "repository_locations_version_info",
-    data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
-)
-
-json_merge(
-    name = "repository_locations",
-    srcs = [":repository_locations_version_info"],
-    filter = """
-    .[0] as $versions
-    | .[1] as $metadata
-    | $versions
-    | keys
-    | reduce .[] as $k ({};
-        . + {($k): (
-          ($versions[$k] + ($metadata[$k] // {}))
-          | .version as $ver
-          | if .license_url and $ver then
-              .license_url |= (
-                gsub("{version}"; $ver)
-                | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
-                | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
-              )
-            else . end
-        )}
-      )
-    """,
-    visibility = ["//visibility:public"],
-    yaml_srcs = [":deps.yaml"],
-)
-
-json_data(
-    name = "all_repository_locations_version_info",
+    name = "legacy_all_repository_locations_version_info",
     data = merge_dicts(
         load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
         load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
@@ -979,8 +971,8 @@ json_data(
 )
 
 json_merge(
-    name = "all_repository_locations",
-    srcs = [":all_repository_locations_version_info"],
+    name = "legacy_all_repository_locations",
+    srcs = [":legacy_all_repository_locations_version_info"],
     filter = """
     .[0] as $versions
     | .[1] as $metadata1
@@ -1034,7 +1026,7 @@ updater(
 updater(
     name = "api-update",
     data = ["//tools/dependency:check"],
-    dependencies = "@envoy_api//bazel:repository_locations",
+    dependencies = "@envoy_api//bazel:legacy_repository_locations",
     post_script = ":version_update_post.sh",
     pydict = True,
     tags = ["skip_on_windows"],
@@ -1104,4 +1096,14 @@ config_setting(
     flag_values = {
         ":libstdc++": "True",
     },
+)
+
+alias(
+    name = "cpp_runfiles",
+    actual = "@bazel_tools//tools/cpp/runfiles",
+)
+
+alias(
+    name = "all_repository_locations",
+    actual = ":legacy_all_repository_locations",
 )

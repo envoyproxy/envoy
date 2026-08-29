@@ -41,6 +41,7 @@ envoy_cc_library(
         "//envoy/ssl:context_manager_interface",
         "//source/common/access_log:access_log_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:base_logger_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:runtime_utility_lib",
@@ -240,7 +241,10 @@ envoy_cc_library(
         "//envoy/filesystem:filesystem_interface",
         "//source/common/common:logger_lib",
         "//source/common/filesystem:filesystem_lib",
+        "//source/common/singleton:threadsafe_singleton",
+        "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -387,8 +391,9 @@ envoy_cc_library(
     name = "server_base_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
+        ":cgroup_cpu_util_lib",
         ":configuration_lib",
         ":listener_hooks_lib",
         ":listener_manager_factory_lib",
@@ -488,6 +493,7 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
+        "//envoy/network:drain_decision_interface",
         "//envoy/network:exception_interface",
         "//envoy/server:configuration_interface",
         "//envoy/server:guarddog_interface",

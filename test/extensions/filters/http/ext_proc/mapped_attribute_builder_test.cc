@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
 
 #include "source/common/network/address_impl.h"
@@ -6,8 +9,11 @@
 
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -22,6 +28,7 @@ using MappedAttributeBuilderProto = ::envoy::extensions::http::ext_proc::
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 
 class MappedAttributeBuilderTest : public testing::Test {
 protected:
@@ -33,8 +40,10 @@ protected:
 
   void initialize(const std::string& yaml) {
     TestUtility::loadFromYaml(yaml, proto_config_);
-    builder_ =
-        std::make_unique<MappedAttributeBuilder>(proto_config_, expr_builder_, factory_context_);
+    absl::Status creation_status = absl::OkStatus();
+    builder_ = std::make_unique<MappedAttributeBuilder>(proto_config_, expr_builder_,
+                                                        factory_context_, creation_status);
+    EXPECT_OK(creation_status);
     EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
     EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
   }
@@ -74,14 +83,12 @@ TEST_F(MappedAttributeBuilderTest, TwoKeysWithSameValue) {
   envoy::service::ext_proc::v3::ProcessingRequest req;
   EXPECT_TRUE(builder_->modifyRequest(params, req));
 
-  const auto& attributes = req.attributes().at("envoy.filters.http.ext_proc");
-  EXPECT_EQ(3, attributes.fields_size());
-  EXPECT_TRUE(attributes.fields().contains("remapped.path"));
-  EXPECT_EQ("/foo", attributes.fields().at("remapped.path").string_value());
-  EXPECT_TRUE(attributes.fields().contains("remapped.uri"));
-  EXPECT_EQ("/foo", attributes.fields().at("remapped.uri").string_value());
-  EXPECT_TRUE(attributes.fields().contains("remapped.address"));
-  EXPECT_EQ("1.2.3.4:0", attributes.fields().at("remapped.address").string_value());
+  EXPECT_THAT(req.attributes(),
+              UnorderedElementsAre(IsStructField(
+                  "envoy.filters.http.ext_proc",
+                  UnorderedElementsAre(IsStructString("remapped.path", "/foo"),
+                                       IsStructString("remapped.uri", "/foo"),
+                                       IsStructString("remapped.address", "1.2.3.4:0")))));
 }
 
 TEST_F(MappedAttributeBuilderTest, CelFilterState) {
@@ -104,10 +111,10 @@ TEST_F(MappedAttributeBuilderTest, CelFilterState) {
   envoy::service::ext_proc::v3::ProcessingRequest req;
   EXPECT_TRUE(builder_->modifyRequest(params, req));
 
-  const auto& attributes = req.attributes().at("envoy.filters.http.ext_proc");
-  EXPECT_EQ(1, attributes.fields_size());
-  EXPECT_TRUE(attributes.fields().contains("filter_state_key"));
-  EXPECT_EQ("fs_value", attributes.fields().at("filter_state_key").string_value());
+  EXPECT_THAT(req.attributes(),
+              UnorderedElementsAre(IsStructField(
+                  "envoy.filters.http.ext_proc",
+                  UnorderedElementsAre(IsStructString("filter_state_key", "fs_value")))));
 }
 
 TEST_F(MappedAttributeBuilderTest, CelDynamicMetadata) {
@@ -133,10 +140,10 @@ TEST_F(MappedAttributeBuilderTest, CelDynamicMetadata) {
   envoy::service::ext_proc::v3::ProcessingRequest req;
   EXPECT_TRUE(builder_->modifyRequest(params, req));
 
-  const auto& attributes = req.attributes().at("envoy.filters.http.ext_proc");
-  EXPECT_EQ(1, attributes.fields_size());
-  EXPECT_TRUE(attributes.fields().contains("metadata_key"));
-  EXPECT_EQ("metadata_value", attributes.fields().at("metadata_key").string_value());
+  EXPECT_THAT(req.attributes(),
+              UnorderedElementsAre(IsStructField(
+                  "envoy.filters.http.ext_proc",
+                  UnorderedElementsAre(IsStructString("metadata_key", "metadata_value")))));
 }
 
 TEST_F(MappedAttributeBuilderTest, ModifiedOnceForInbound) {
@@ -157,7 +164,9 @@ TEST_F(MappedAttributeBuilderTest, ModifiedOnceForInbound) {
 
   // First call should succeed and modify the request
   EXPECT_TRUE(builder_->modifyRequest(params, req));
-  EXPECT_EQ(1, req.attributes().at("envoy.filters.http.ext_proc").fields_size());
+  EXPECT_THAT(req.attributes(), UnorderedElementsAre(IsStructField(
+                                    "envoy.filters.http.ext_proc",
+                                    UnorderedElementsAre(IsStructString("key", "/")))));
 
   // Second call should do nothing and return false
   envoy::service::ext_proc::v3::ProcessingRequest req2;
@@ -184,10 +193,9 @@ TEST_F(MappedAttributeBuilderTest, ModifiedOnceForOutbound) {
 
   envoy::service::ext_proc::v3::ProcessingRequest req;
   EXPECT_TRUE(builder_->modifyRequest(params, req));
-  const auto& attributes = req.attributes().at("envoy.filters.http.ext_proc");
-  EXPECT_EQ(1, attributes.fields_size());
-  EXPECT_TRUE(attributes.fields().contains("key"));
-  EXPECT_EQ(200, attributes.fields().at("key").number_value());
+  EXPECT_THAT(req.attributes(), UnorderedElementsAre(IsStructField(
+                                    "envoy.filters.http.ext_proc",
+                                    UnorderedElementsAre(IsStructNumber("key", 200)))));
 
   // Second call should do nothing and return false
   envoy::service::ext_proc::v3::ProcessingRequest req2;
@@ -213,8 +221,8 @@ TEST_F(MappedAttributeBuilderTest, CelEvalFailure) {
   // Should still return true because modification was attempted.
   EXPECT_TRUE(builder_->modifyRequest(params, req));
 
-  const auto& attributes = req.attributes().at("envoy.filters.http.ext_proc");
-  EXPECT_EQ(0, attributes.fields_size());
+  EXPECT_THAT(req.attributes(), UnorderedElementsAre(IsStructField("envoy.filters.http.ext_proc",
+                                                                   UnorderedElementsAre())));
 }
 
 #endif

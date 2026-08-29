@@ -28,6 +28,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -126,6 +127,7 @@ public:
         return *iter->second;
       }
       const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
+      Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override { return nullptr; }
 
       const envoy::config::listener::v3::UdpListenerConfig config_;
       std::unique_ptr<Network::ActiveUdpListenerFactory> listener_factory_;
@@ -2139,7 +2141,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   EXPECT_CALL(*access_log_, log(_, _));
   EXPECT_CALL(*timeout, disableTimer());
 
-  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(io_handle, createFileEvent_(_, _, _, _));
   EXPECT_CALL(*listener, onDestroy());
@@ -2366,8 +2368,8 @@ TEST_F(ConnectionHandlerTest, TcpListenerDrainFilterChainsNotifiesConnections) {
   const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
   // onFilterChainDrain must call onDrain() on every connection owned by the listed filter chains
   // without closing them.
-  EXPECT_CALL(*server_connection, onDrain());
-  handler_->onFilterChainDrain(listener_tag, filter_chains);
+  EXPECT_CALL(*server_connection, onDrain(_));
+  handler_->onFilterChainDrain(listener_tag, filter_chains, Network::ConnectionDrainEvent{});
   // Connection remains tracked; only when filter chains are actually removed does it close.
   EXPECT_EQ(1UL, handler_->numConnections());
 
@@ -2397,9 +2399,15 @@ TEST_F(ConnectionHandlerTest, TcpListenerDrainListenersNotifiesAllConnections) {
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
 
   // onListenerDrain should fan out onDrain() to every connection in the listener.
-  EXPECT_CALL(*server_connection, onDrain());
-  handler_->onListenerDrain(listener_tag);
+  EXPECT_CALL(*server_connection, onDrain(_));
+  handler_->onListenerDrain(listener_tag, Network::ConnectionDrainEvent{});
   EXPECT_EQ(1UL, handler_->numConnections());
+
+  // The first event wins: a second notification (a server drain escalating from InboundOnly to
+  // All re-notifies inbound listeners) is dropped rather than fanned out again, since every
+  // connection has already been notified of the first event.
+  EXPECT_CALL(*server_connection, onDrain(_)).Times(0);
+  handler_->onListenerDrain(listener_tag, Network::ConnectionDrainEvent{});
 
   // Cleanup.
   EXPECT_CALL(*access_log_, log(_, _));

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <memory>
+
 #if !defined(__linux__)
 #error "Linux platform file is part of non-Linux build."
 #endif

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 
 #include "contrib/kafka/filters/network/source/broker/filter_config.h"

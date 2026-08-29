@@ -18,6 +18,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/utility.h"
 #include "test/test_common/stats_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -275,7 +276,7 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   EXPECT_EQ("200", request("admin", "GET", "/clusters?format=json", response));
   EXPECT_EQ("application/json", contentType(response));
-  EXPECT_TRUE(Json::Factory::loadFromString(response->body()).status().ok());
+  EXPECT_OK(Json::Factory::loadFromString(response->body()).status());
 
   EXPECT_EQ("400", request("admin", "POST", "/cpuprofiler", response));
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
@@ -696,6 +697,28 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
 #endif
 
   EXPECT_EQ("200", request("admin", "POST", "/cpuprofiler?enable=n", response));
+}
+
+TEST_P(IntegrationAdminTest, AdminStatsHtmlXss) {
+  setUpstreamCount(2);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    *cluster =
+        ConfigHelper::buildStaticCluster("cluster_<script>alert(1)</script>", 0, "127.0.0.1");
+  });
+  initialize();
+
+  BufferingStreamDecoderPtr response;
+#ifdef ENVOY_ADMIN_HTML
+  EXPECT_EQ("200", request("admin", "GET", "/stats?format=html", response));
+  EXPECT_EQ("text/html; charset=UTF-8", contentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("cluster_&lt;script&gt;alert(1)&lt;/script&gt;"));
+  EXPECT_THAT(response->body(), Not(HasSubstr("cluster_<script>alert(1)</script>")));
+#else
+  EXPECT_EQ("400", request("admin", "GET", "/stats?format=html", response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("HTML output was disabled"));
+#endif
 }
 
 class IntegrationAdminIpv4Ipv6Test : public testing::Test, public HttpIntegrationTest {

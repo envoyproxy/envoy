@@ -17,7 +17,7 @@ envoy_proto_library(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":config_cc_proto",
         "//envoy/http:header_validator_factory_interface",
@@ -28,6 +28,7 @@ envoy_cc_test(
         "//test/mocks/http:header_validator_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",

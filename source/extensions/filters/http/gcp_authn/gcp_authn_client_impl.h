@@ -20,7 +20,7 @@ class GcpAuthnClientImpl : public GcpAuthnClient,
 public:
   GcpAuthnClientImpl(
       const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config,
-      Server::Configuration::FactoryContext& context)
+      Server::Configuration::ServerFactoryContext& context)
       : config_(config), context_(context) {}
 
   ~GcpAuthnClientImpl() override { cancel(); }
@@ -55,7 +55,7 @@ private:
                         const std::string& final_url, const std::optional<std::string>& fingerprint,
                         GcpAuthnClient::Callbacks& callbacks);
   const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig& config_;
-  Server::Configuration::FactoryContext& context_;
+  Server::Configuration::ServerFactoryContext& context_;
   Http::AsyncClient::Request* active_request_{};
   GcpAuthnClient::Callbacks* callbacks_{};
   envoy::extensions::filters::http::gcp_authn::v3::Audience audience_;

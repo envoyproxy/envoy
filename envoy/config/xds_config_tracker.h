@@ -5,20 +5,23 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/protobuf/message_validator.h"
-#include "envoy/stats/scope.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
 
-#include "google/rpc/status.pb.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Config {
 
 /**
- * An interface for hooking into xDS update events to provide the ablility to use some external
+ * An interface for hooking into xDS update events to provide the ability to use some external
  * processor in xDS update. This tracker provides the process point when the discovery response
  * is received, when the resources are successfully processed and applied, and when there is any
  * failure.
@@ -83,6 +86,16 @@ public:
   virtual void
   onConfigRejected(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
                    const absl::string_view error_detail) PURE;
+
+  /**
+   * Invoked when the client unsubscribes from a resource of the given type. This is used to
+   * track client-initiated unsubscriptions that do not result in server-side Delta removals.
+   *
+   * @param type_url The type url of xDS message.
+   * @param resources A resource name that the client unsubscribed from.
+   */
+  virtual void onResourceUnsubscribed(const absl::string_view type_url,
+                                      absl::string_view resource) PURE;
 };
 
 using XdsConfigTrackerPtr = std::unique_ptr<XdsConfigTracker>;

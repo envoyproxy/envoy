@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "fragment_test",
     srcs = ["fragment_test.cc"],
     extension_names = ["envoy.filters.http.file_system_buffer"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:fragment",
@@ -32,7 +32,7 @@ envoy_extension_cc_test(
         "filter_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_system_buffer"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:config",
@@ -41,6 +41,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -51,7 +52,7 @@ envoy_extension_cc_test(
         "filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_system_buffer"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 4,
     tags = [
         "cpu:3",

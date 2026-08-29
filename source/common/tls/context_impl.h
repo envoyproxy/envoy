@@ -32,7 +32,7 @@
 #endif
 
 namespace Envoy {
-#if !defined OPENSSL_IS_BORINGSSL && !defined OPENSSL_IS_AWSLC
+#ifndef OPENSSL_IS_BORINGSSL
 #error Envoy requires BoringSSL
 #endif
 
@@ -156,6 +156,8 @@ protected:
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl);
 
   void populateServerNamesMap(Ssl::TlsContext& ctx, const int pkey_id);
+
+  absl::Status setCompliancePolicy(enum ssl_compliance_policy_t policy);
 
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we

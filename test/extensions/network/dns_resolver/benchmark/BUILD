@@ -28,7 +28,7 @@ HICKORY_ABI_IMPL_DEPS = [
 envoy_cc_benchmark_binary(
     name = "dns_resolver_benchmark",
     srcs = ["dns_resolver_benchmark.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         # FakeUdpDnsServer uses POSIX-only APIs (poll, fcntl, etc.).
         "fails_on_clang_cl",

@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["filter_config_test.cc"],
     extension_names = ["envoy.filters.http.gcp_authn"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/gcp_authn:config",
@@ -32,7 +32,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["gcp_authn_filter_test.cc"],
     extension_names = ["envoy.filters.http.gcp_authn"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":gcp_authn_mocks",
         "//source/extensions/filters/http/gcp_authn",
@@ -53,12 +53,14 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.gcp_authn"],
     deps = [
         ":gcp_authn_mocks",
+        "//envoy/common:time_interface",
         "//source/extensions/filters/http/gcp_authn",
         "//source/extensions/filters/http/gcp_authn:config",
         "//test/common/http:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
     ],
@@ -79,7 +81,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["gcp_authn_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.gcp_authn"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/gcp_authn",
         "//source/extensions/filters/http/gcp_authn:config",
@@ -98,7 +100,7 @@ envoy_extension_cc_test(
     name = "token_cache_test",
     srcs = ["token_cache_test.cc"],
     extension_names = ["envoy.filters.http.gcp_authn"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/gcp_authn",
         "//source/extensions/filters/http/gcp_authn:config",
@@ -122,6 +124,7 @@ envoy_extension_cc_test(
         "//envoy/api:api_interface",
         "//source/extensions/filters/http/gcp_authn:crypto_utils",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/status",
     ],

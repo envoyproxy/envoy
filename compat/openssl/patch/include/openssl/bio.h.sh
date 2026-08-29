@@ -35,6 +35,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl BIO_set_mem_eof_return \
   --uncomment-func-decl BIO_s_socket \
   --uncomment-func-decl BIO_new_connect \
+  --uncomment-func-decl BIO_number_read \
   --uncomment-func-decl BIO_new_bio_pair \
   --uncomment-func-decl ERR_print_errors \
   --uncomment-func-decl BIO_ctrl \

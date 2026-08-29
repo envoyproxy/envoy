@@ -7,9 +7,12 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
@@ -28,20 +31,23 @@ namespace ReverseConnection {
 class UpstreamReverseConnectionIOHandleTest : public testing::Test {
 protected:
   UpstreamReverseConnectionIOHandleTest() {
-    // Set up stats scope for extensions if needed.
     stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
     EXPECT_CALL(server_context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
     EXPECT_CALL(server_context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
+
+    // Set up extension and TLS registry so IOHandle can be constructed with
+    // valid histogram pointers and a socket manager for close().
+    socket_interface_ = std::make_unique<ReverseTunnelAcceptor>(server_context_);
+    extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_,
+                                                                  server_context_, config_);
+    tls_registry_ = std::make_unique<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
   }
 
   void TearDown() override {
     io_handle_.reset();
-    if (extension_) {
-      extension_.reset();
-    }
-    if (socket_interface_) {
-      socket_interface_.reset();
-    }
+    tls_registry_.reset();
+    extension_.reset();
+    socket_interface_.reset();
   }
 
   // Helper to create a mock socket with IO handle.
@@ -62,35 +68,9 @@ protected:
     return socket;
   }
 
-  // Helper to set up the upstream extension components (socket interface and extension).
-  void setupUpstreamExtension() {
-    socket_interface_ = std::make_unique<ReverseTunnelAcceptor>(server_context_);
-    extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_,
-                                                                  server_context_, config_);
-
-    // Get the registered socket interface from the global registry and set up its extension.
-    auto* registered_socket_interface =
-        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
-    if (registered_socket_interface) {
-      auto* registered_acceptor = dynamic_cast<ReverseTunnelAcceptor*>(
-          const_cast<Network::SocketInterface*>(registered_socket_interface));
-      if (registered_acceptor) {
-        registered_acceptor->extension_ = extension_.get();
-      }
-    }
-  }
-
-  // Helper to set up thread local slot for tests.
-  void setupThreadLocalSlot() {
-    if (!extension_) {
-      return;
-    }
-    extension_->onServerInitialized(instance_);
-  }
-
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
-  NiceMock<Server::MockInstance> instance_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr stats_scope_;
 
@@ -98,6 +78,7 @@ protected:
   std::unique_ptr<ReverseTunnelAcceptorExtension> extension_;
   envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
       UpstreamReverseConnectionSocketInterface config_;
+  std::unique_ptr<UpstreamSocketThreadLocal> tls_registry_;
 
   std::unique_ptr<UpstreamReverseConnectionIOHandle> io_handle_;
 
@@ -106,8 +87,8 @@ protected:
 };
 
 TEST_F(UpstreamReverseConnectionIOHandleTest, ConnectReturnsSuccess) {
-  io_handle_ =
-      std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(), "test-cluster");
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
   auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080);
 
   auto result = io_handle_->connect(address);
@@ -117,148 +98,36 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, ConnectReturnsSuccess) {
 }
 
 TEST_F(UpstreamReverseConnectionIOHandleTest, GetSocketReturnsConstReference) {
-  io_handle_ =
-      std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(), "test-cluster");
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
   const auto& socket = io_handle_->getSocket();
 
   EXPECT_NE(&socket, nullptr);
 }
 
 TEST_F(UpstreamReverseConnectionIOHandleTest, ShutdownIgnoredWhenOwned) {
-  io_handle_ =
-      std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(), "test-cluster");
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
   auto result = io_handle_->shutdown(SHUT_RDWR);
   EXPECT_EQ(result.return_value_, 0);
   EXPECT_EQ(result.errno_, 0);
 }
 
-// Test close() when socket interface is not registered.
-TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWhenSocketInterfaceNotRegistered) {
-  // Save current factories.
-  auto saved_factories =
-      Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories();
-
-  // Find and remove the specific socket interface factory.
-  auto& factories =
-      Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories();
-  auto it = factories.find("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
-  if (it != factories.end()) {
-    factories.erase(it);
-  }
-
-  // Create IO handle with owned socket.
-  io_handle_ =
-      std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(), "test-cluster");
-
-  // Close should handle the missing interface gracefully.
-  auto result = io_handle_->close();
-
-  // Should return success (falls back to IoSocketHandleImpl::close()).
-  EXPECT_EQ(result.err_, nullptr);
-
-  // Restore the registry.
-  Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories() =
-      saved_factories;
-}
-
-// Test close() when socket interface is registered but is the wrong type.
-TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWhenSocketInterfaceWrongType) {
-  // Create a mock socket interface that is a SocketInterface but not a ReverseTunnelAcceptor.
-  // This will cause the dynamic_cast to ReverseTunnelAcceptor to fail.
-  class WrongTypeSocketInterface : public Network::SocketInterface,
-                                   public Server::Configuration::BootstrapExtensionFactory {
-  public:
-    std::string name() const override {
-      return "envoy.bootstrap.reverse_tunnel.upstream_socket_interface";
-    }
-
-    Server::BootstrapExtensionPtr
-    createBootstrapExtension(const Protobuf::Message&,
-                             Server::Configuration::ServerFactoryContext&) override {
-      return nullptr;
-    }
-
-    ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
-
-    // SocketInterface methods
-    Network::IoHandlePtr socket(Network::Socket::Type, Network::Address::Type,
-                                Network::Address::IpVersion, bool,
-                                const Network::SocketCreationOptions&) const override {
-      return nullptr;
-    }
-
-    Network::IoHandlePtr socket(Network::Socket::Type,
-                                const Network::Address::InstanceConstSharedPtr,
-                                const Network::SocketCreationOptions&) const override {
-      return nullptr;
-    }
-
-    bool ipFamilySupported(int) override { return false; }
-  };
-
-  // Save current factories.
-  auto saved_factories =
-      Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories();
-
-  // Register the wrong type socket interface.
-  WrongTypeSocketInterface wrong_socket_interface;
-  Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories()
-      ["envoy.bootstrap.reverse_tunnel.upstream_socket_interface"] = &wrong_socket_interface;
-
-  // Create IO handle with owned socket.
-  io_handle_ =
-      std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(), "test-cluster");
-
-  // Close should handle the wrong type gracefully.
-  auto result = io_handle_->close();
-
-  // Should return success (falls back to IoSocketHandleImpl::close()).
-  EXPECT_EQ(result.err_, nullptr);
-
-  // Restore the registry.
-  Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories() =
-      saved_factories;
-}
-
-// Test close() when socket interface is registered but TLS slot is not set up.
-TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWhenTLSSlotNotSetUp) {
-  // Set up the upstream extension but do NOT initialize the TLS slot.
-  setupUpstreamExtension();
-
-  // Create IO handle with owned socket.
-  io_handle_ =
-      std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(), "test-cluster");
-
-  // Close should handle the missing TLS slot gracefully.
-  auto result = io_handle_->close();
-
-  // Should return success (falls back to IoSocketHandleImpl::close()).
-  EXPECT_EQ(result.err_, nullptr);
-}
-
-// Test close() when socket interface and TLS slot are properly set up.
+// Test close() notifies the socket manager via the stored registry.
 TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWithSocketManagerNotification) {
-  // Set up the upstream extension and TLS slot.
-  setupUpstreamExtension();
-  setupThreadLocalSlot();
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
 
-  // Create IO handle with owned socket.
-  io_handle_ =
-      std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(), "test-cluster");
-
-  // Close should notify the socket manager and clean up properly.
   auto result = io_handle_->close();
 
-  // Should return success with no error.
   EXPECT_EQ(result.return_value_, 0);
   EXPECT_EQ(result.err_, nullptr);
 }
 
 // Test close() when owned_socket_ is nullptr.
 TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWithoutOwnedSocket) {
-  // Create IO handle with owned socket.
-  io_handle_ =
-      std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(), "test-cluster");
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
 
   // Release the owned socket without closing/invalidating the fd.
   io_handle_->releaseSocketForTest();
@@ -272,9 +141,8 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWithoutOwnedSocket) {
 
 // Test shutdown() when owned_socket_ is nullptr.
 TEST_F(UpstreamReverseConnectionIOHandleTest, ShutdownWhenNotOwned) {
-  // Create IO handle with owned socket.
-  io_handle_ =
-      std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(), "test-cluster");
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
 
   // Release the owned socket without closing/invalidating the fd.
   io_handle_->releaseSocketForTest();
@@ -289,7 +157,7 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, ReadConsumesFullRping) {
   ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
 
   io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createSocketWithFd(fds[0]),
-                                                                   "test-cluster");
+                                                                   "test-cluster", *tls_registry_);
 
   const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
   ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
@@ -309,7 +177,7 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, ReadConsumesRpingAndReturnsTrailin
   ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
 
   io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createSocketWithFd(fds[0]),
-                                                                   "test-cluster");
+                                                                   "test-cluster", *tls_registry_);
 
   const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
   const std::string payload = " value";
@@ -331,7 +199,7 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, OnPingMessageIsNoOpAndDoesNotWrite
   ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
 
   io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createSocketWithFd(fds[0]),
-                                                                   "test-cluster");
+                                                                   "test-cluster", *tls_registry_);
 
   const std::string rping = std::string(ReverseConnectionUtility::PING_MESSAGE);
   ASSERT_EQ(write(fds[1], rping.data(), rping.size()), static_cast<ssize_t>(rping.size()));
@@ -357,7 +225,7 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, NonRpingFirstDisablesPingModeThenR
   ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
 
   io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createSocketWithFd(fds[0]),
-                                                                   "test-cluster");
+                                                                   "test-cluster", *tls_registry_);
 
   const std::string non_rping = "HELLO";
   ASSERT_EQ(write(fds[1], non_rping.data(), non_rping.size()),
@@ -379,6 +247,45 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, NonRpingFirstDisablesPingModeThenR
   EXPECT_EQ(second_buffer.toString(), rping);
 
   close(fds[1]);
+}
+
+// --- Post-upgrade lifetime histogram tests ---
+
+TEST_F(UpstreamReverseConnectionIOHandleTest, PostUpgradeLifetimeHistogramRecordedOnDestroy) {
+  // Swap in a mock before creating the IO handle so the
+  // HistogramCompletableTimespanImpl captures a reference to it.
+  // Unit must be a time unit to pass ensureTimeHistogram().
+  NiceMock<Stats::MockHistogram> mock_histogram;
+  mock_histogram.unit_ = Stats::Histogram::Unit::Milliseconds;
+  tls_registry_->cx_post_upgrade_lifetime_ = &mock_histogram;
+
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
+
+  // Destroying the IO handle calls complete(), which records the duration.
+  EXPECT_CALL(mock_histogram, recordValue(_));
+  io_handle_.reset();
+}
+
+TEST_F(UpstreamReverseConnectionIOHandleTest,
+       PostUpgradeLifetimeHistogramNotCompletedBeforeDestroy) {
+  NiceMock<Stats::MockHistogram> mock_histogram;
+  mock_histogram.unit_ = Stats::Histogram::Unit::Milliseconds;
+  tls_registry_->cx_post_upgrade_lifetime_ = &mock_histogram;
+
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
+
+  // During the handle's active lifetime, no recording should happen.
+  EXPECT_CALL(mock_histogram, recordValue(_)).Times(0);
+  auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080);
+  auto result = io_handle_->connect(address);
+  EXPECT_EQ(result.return_value_, 0);
+
+  // Verify the zero-calls expectation, then clear it before destruction
+  // (which legitimately calls recordValue).
+  testing::Mock::VerifyAndClearExpectations(&mock_histogram);
+  io_handle_.reset();
 }
 
 } // namespace ReverseConnection

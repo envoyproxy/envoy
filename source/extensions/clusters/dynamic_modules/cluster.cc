@@ -394,10 +394,21 @@ bool DynamicModuleCluster::addHosts(
     const std::vector<std::string>& sub_zones,
     const std::vector<std::vector<std::tuple<std::string, std::string, std::string>>>& metadata,
     std::vector<Upstream::HostSharedPtr>& result_hosts, uint32_t priority) {
+  return addHosts(addresses, absl::Span<const absl::string_view>(), weights, regions, zones,
+                  sub_zones, metadata, result_hosts, priority);
+}
+
+bool DynamicModuleCluster::addHosts(
+    const std::vector<std::string>& addresses, absl::Span<const absl::string_view> hostnames,
+    const std::vector<uint32_t>& weights, const std::vector<std::string>& regions,
+    const std::vector<std::string>& zones, const std::vector<std::string>& sub_zones,
+    const std::vector<std::vector<std::tuple<std::string, std::string, std::string>>>& metadata,
+    std::vector<Upstream::HostSharedPtr>& result_hosts, uint32_t priority) {
   ASSERT(addresses.size() == weights.size());
   ASSERT(addresses.size() == regions.size());
   ASSERT(addresses.size() == zones.size());
   ASSERT(addresses.size() == sub_zones.size());
+  ASSERT(hostnames.empty() || hostnames.size() == addresses.size());
   ASSERT(metadata.empty() || metadata.size() == addresses.size());
   result_hosts.clear();
   result_hosts.reserve(addresses.size());
@@ -448,9 +459,12 @@ bool DynamicModuleCluster::addHosts(
       endpoint_metadata = std::move(md);
     }
 
+    const std::string hostname = hostnames.empty() || hostnames[i].empty()
+                                     ? cluster_info->name() + addresses[i]
+                                     : std::string(hostnames[i]);
     auto host_result = Upstream::HostImpl::create(
-        cluster_info, cluster_info->name() + addresses[i], std::move(resolved_address),
-        std::move(endpoint_metadata), nullptr, weights[i], std::move(locality),
+        cluster_info, hostname, std::move(resolved_address), std::move(endpoint_metadata), nullptr,
+        weights[i], std::move(locality),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
         envoy::config::core::v3::UNKNOWN);
     if (!host_result.ok()) {
@@ -889,12 +903,22 @@ DynamicModuleClusterFactory::createClusterWithConfig(
     const envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context) {
 
-  // Validate that CLUSTER_PROVIDED LB policy is used.
-  if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+  // CLUSTER_PROVIDED uses the module's load balancer; the native policies use Envoy's factory
+  // load balancer, with the module supplying only host discovery.
+  const auto policy = cluster.lb_policy();
+  const bool is_module_lb = (policy == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+  const bool is_native_lb = (policy == envoy::config::cluster::v3::Cluster::LEAST_REQUEST ||
+                             policy == envoy::config::cluster::v3::Cluster::ROUND_ROBIN ||
+                             policy == envoy::config::cluster::v3::Cluster::RANDOM ||
+                             policy == envoy::config::cluster::v3::Cluster::RING_HASH ||
+                             policy == envoy::config::cluster::v3::Cluster::MAGLEV);
+
+  if (!is_module_lb && !is_native_lb) {
     return absl::InvalidArgumentError(
         fmt::format("cluster: LB policy {} is not valid for cluster type "
-                    "'envoy.clusters.dynamic_modules'. Only 'CLUSTER_PROVIDED' is allowed.",
-                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy())));
+                    "'envoy.clusters.dynamic_modules'. Supported policies are CLUSTER_PROVIDED, "
+                    "LEAST_REQUEST, ROUND_ROBIN, RANDOM, RING_HASH, and MAGLEV.",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(policy)));
   }
 
   Server::Configuration::ServerFactoryContext& server_context = context.serverFactoryContext();
@@ -938,9 +962,13 @@ DynamicModuleClusterFactory::createClusterWithConfig(
       cluster, std::move(config_or_error.value()), context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
 
-  // Create the thread-aware load balancer.
-  auto handle = std::make_shared<DynamicModuleClusterHandle>(new_cluster);
-  auto lb = std::make_unique<DynamicModuleThreadAwareLoadBalancer>(handle);
+  // Create the thread-aware load balancer only if the module provides LB (CLUSTER_PROVIDED).
+  // For native LB policies, return nullptr so the cluster manager builds the native factory LB.
+  Upstream::ThreadAwareLoadBalancerPtr lb;
+  if (cluster.lb_policy() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+    auto handle = std::make_shared<DynamicModuleClusterHandle>(new_cluster);
+    lb = std::make_unique<DynamicModuleThreadAwareLoadBalancer>(handle);
+  }
 
   return std::make_pair(std::move(new_cluster), std::move(lb));
 }

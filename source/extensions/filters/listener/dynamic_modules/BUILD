@@ -35,6 +35,7 @@ envoy_cc_library(
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_filter_buffer_interface",
+        "//envoy/registry",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:message_lib",
@@ -42,6 +43,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stats:utility_lib",
+        "//source/extensions/dynamic_modules:abi_context_accessors_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
     ],
 )

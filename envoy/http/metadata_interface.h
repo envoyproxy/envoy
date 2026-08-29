@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <iosfwd>
 #include <memory>
@@ -75,8 +76,8 @@ template <> struct formatter<Envoy::Http::MetadataMap> {
   }
 
   template <typename FormatContext>
-  auto format(const Envoy::Http::MetadataMap& map,
-              FormatContext& ctx) const -> decltype(ctx.out()) {
+  auto format(const Envoy::Http::MetadataMap& map, FormatContext& ctx) const
+      -> decltype(ctx.out()) {
     std::ostringstream out;
     out << map;
     auto str = out.str();
@@ -99,8 +100,8 @@ template <> struct formatter<Envoy::Http::MetadataMap, char> {
   }
 
   template <typename FormatContext>
-  auto format(const Envoy::Http::MetadataMap& map,
-              FormatContext& ctx) const -> decltype(ctx.out()) {
+  auto format(const Envoy::Http::MetadataMap& map, FormatContext& ctx) const
+      -> decltype(ctx.out()) {
     std::ostringstream out;
     out << map;
     return std::ranges::copy(std::move(out).str(), ctx.out()).out;
@@ -114,8 +115,8 @@ template <> struct formatter<::Envoy::Http::MetadataMapVector, char> {
   }
 
   template <typename FormatContext>
-  auto format(const Envoy::Http::MetadataMapVector& map,
-              FormatContext& ctx) const -> decltype(ctx.out()) {
+  auto format(const Envoy::Http::MetadataMapVector& map, FormatContext& ctx) const
+      -> decltype(ctx.out()) {
     std::ostringstream out;
     out << map;
     return std::ranges::copy(std::move(out).str(), ctx.out()).out;

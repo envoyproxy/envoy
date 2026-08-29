@@ -1,3 +1,4 @@
+diff --git a/BUILD b/BUILD
 --- a/BUILD
 +++ b/BUILD
 @@ -93,7 +93,7 @@
@@ -9,7 +10,7 @@
      }),
      alwayslink = 1,
  )
-@@ -158,7 +158,7 @@
+@@ -158,7 +158,7 @@ cc_library(
      }),
      deps = [
          ":wasm_vm_headers",
@@ -18,7 +19,7 @@
      ],
  )
  
-@@ -224,7 +224,7 @@
+@@ -224,7 +223,7 @@ cc_library(
      deps = [
          ":base_lib",
          ":wasm_vm_headers",
@@ -27,3 +28,104 @@
      ],
  )
  
+diff --git a/bazel/BUILD b/bazel/BUILD
+--- a/bazel/BUILD
++++ b/bazel/BUILD
+@@ -13,43 +13,90 @@
+ # limitations under the License.
+ 
+ load("@bazel_skylib//lib:selects.bzl", "selects")
++load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+ load(":v8_transition.bzl", "v8_lib_no_pointer_compression")
+ 
+ package(default_visibility = ["//visibility:public"])
+ 
++# Engine selection flag, replacing the legacy --define engine=<value>.
++# Values:
++#   v8          - V8 Wasm engine (default)
++#   wamr        - WebAssembly Micro Runtime, interpreter mode
++#   wamr-interp - WebAssembly Micro Runtime, interpreter mode
++#   wamr-jit    - WebAssembly Micro Runtime, JIT mode
++#   wasmtime    - Wasmtime engine
++#   wasmedge    - WasmEdge engine
++#   null        - Null (no-op) engine
++#   disabled    - No engine; disables all wasm functionality
++#   multi       - Multiple engines
++string_flag(
++    name = "engine",
++    build_setting_default = "v8",
++    values = [
++        "v8",
++        "wamr",
++        "wamr-interp",
++        "wamr-jit",
++        "wasmtime",
++        "wasmedge",
++        "null",
++        "disabled",
++        "multi",
++    ],
++)
++
+ config_setting(
+     name = "engine_null",
+-    values = {"define": "engine=null"},
++    flag_values = {"//bazel:engine": "null"},
+ )
+ 
+ config_setting(
+     name = "engine_v8",
+-    values = {"define": "engine=v8"},
++    flag_values = {"//bazel:engine": "v8"},
+ )
+ 
++# engine_wamr_interp matches both "wamr-interp" and the generic "wamr" alias.
+ config_setting(
++    name = "_engine_wamr_interp_strict",
++    flag_values = {"//bazel:engine": "wamr-interp"},
++)
++
++config_setting(
++    name = "engine_wamr",
++    flag_values = {"//bazel:engine": "wamr"},
++)
++
++selects.config_setting_group(
+     name = "engine_wamr_interp",
+-    values = {"define": "engine=wamr-interp"},
++    match_any = [
++        ":_engine_wamr_interp_strict",
++        ":engine_wamr",
++    ],
+ )
+ 
+ config_setting(
+     name = "engine_wamr_jit",
+-    values = {"define": "engine=wamr-jit"},
++    flag_values = {"//bazel:engine": "wamr-jit"},
+ )
+ 
+ config_setting(
+     name = "engine_wasmedge",
+-    values = {"define": "engine=wasmedge"},
++    flag_values = {"//bazel:engine": "wasmedge"},
+ )
+ 
+ config_setting(
+     name = "engine_wasmtime",
+-    values = {"define": "engine=wasmtime"},
++    flag_values = {"//bazel:engine": "wasmtime"},
+ )
+ 
+ config_setting(
+     name = "multiengine",
+-    values = {"define": "engine=multi"},
++    flag_values = {"//bazel:engine": "multi"},
++)
++
++config_setting(
++    name = "engine_disabled",
++    flag_values = {"//bazel:engine": "disabled"},
+ )
+ 
+ config_setting(

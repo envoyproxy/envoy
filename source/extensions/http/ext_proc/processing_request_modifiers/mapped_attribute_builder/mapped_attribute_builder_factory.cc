@@ -20,7 +20,13 @@ MappedAttributeBuilderFactory::createProcessingRequestModifier(
       const envoy::extensions::http::ext_proc::processing_request_modifiers::
           mapped_attribute_builder::v3::MappedAttributeBuilder&>(
       config, context.messageValidationVisitor());
-  return std::make_unique<MappedAttributeBuilder>(proto_config, builder, context);
+  absl::Status creation_status = absl::OkStatus();
+  auto builder_instance =
+      std::make_unique<MappedAttributeBuilder>(proto_config, builder, context, creation_status);
+
+  // TODO(wbpcode): Consider returning absl::StatusOr<> instead of throwing an exception here.
+  THROW_IF_NOT_OK_REF(creation_status);
+  return builder_instance;
 }
 
 REGISTER_FACTORY(

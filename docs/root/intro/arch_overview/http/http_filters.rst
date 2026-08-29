@@ -101,10 +101,11 @@ will be forwarded to.
 
 In addition to updating the route ``setRoute()`` and ``clearRouteCache()``, downstream HTTP filters could also refresh the
 cluster by invoking ``refreshRouteCluster()`` if the cluster specifier of route supports it. At this point only
-the :ref:`matcher based cluster specifier <config_http_cluster_specifier_matcher>` support the
+the :ref:`matcher based cluster specifier <config_http_cluster_specifier_matcher>` and the
+:ref:`dynamic modules cluster specifier <config_http_cluster_specifier_dynamic_modules>` support the
 ``refreshRouteCluster()`` callback.
 
-This callback will not update the cached route but only refresh the target cluster name. This is
+This callback will not update the cached route but only refresh the cluster selection. This is
 suggested to replace ``clearRouteCache()`` if you only want to determine the target cluster based on
 the latest request attributes that have been updated by the filters and do not want to configure
 multiple similar routes at the route table.
@@ -149,14 +150,14 @@ The per filter config map can be used to provide
 :ref:`route <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
 :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or
 :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.typed_per_filter_config>`
-specific config for http filters.
+specific config for HTTP filters.
 
 
 The key of the per filter config map should match the :ref:`filter config name
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
 
 
-For example, given following http filter config:
+For example, given following HTTP filter config:
 
 .. code-block:: yaml
 
@@ -190,7 +191,7 @@ and setting the :ref:`disabled field <envoy_v3_api_field_config.route.v3.FilterC
 per filter config map in the route configuration. See the
 :ref:`Route specific config <arch_overview_http_filters_per_filter_config>` section for more details.
 
-For example, given following http filter config:
+For example, given following HTTP filter config:
 
 .. code-block:: yaml
 
@@ -214,7 +215,7 @@ In addition, we can set a filter to be disabled by default by setting the :ref:`
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.disabled>`
 in the HttpFilter configuration and then enable it for specific routes if needed.
 
-For example, given following http filter config:
+For example, given following HTTP filter config:
 
 .. code-block:: yaml
 

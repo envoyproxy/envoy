@@ -12,6 +12,8 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/ascii.h"
@@ -22,10 +24,37 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 
+using ::Envoy::StatusHelpers::HasStatus;
+using ::Envoy::StatusHelpers::HasStatusCode;
+using ::Envoy::StatusHelpers::HasStatusMessage;
+
 TEST(DynamicModuleTestGeneral, InvalidPath) {
-  absl::StatusOr<DynamicModulePtr> result = newDynamicModule("invalid_name", false);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module invalid_name", {
+    EXPECT_THAT(newDynamicModule("invalid_name", false),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+  });
+}
+
+// A shared object that is truncated mid-copy has a valid ELF header but is unusable. The failure
+// must be logged so that a corrupt module can be told apart from a healthy one.
+TEST(DynamicModuleTestGeneral, TruncatedSharedObject) {
+  std::ifstream input(testSharedObjectPath("no_op", "c"), std::ios::binary);
+  ASSERT_TRUE(input.good());
+  std::string bytes((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+  ASSERT_GT(bytes.size(), 128);
+
+  const std::filesystem::path truncated =
+      std::filesystem::temp_directory_path() / "envoy_truncated_module.so";
+  {
+    std::ofstream out(truncated, std::ios::binary | std::ios::trunc);
+    out.write(bytes.data(), 128);
+  }
+
+  EXPECT_LOG_CONTAINS("error", absl::StrCat("Unable to load dynamic module ", truncated.string()), {
+    EXPECT_THAT(newDynamicModule(truncated, false),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+  });
+  std::filesystem::remove(truncated);
 }
 
 INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Values("c", "rust"),
@@ -36,10 +65,10 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   using GetSomeVariableFuncType = int (*)(void);
   absl::StatusOr<DynamicModulePtr> module =
       newDynamicModule(testSharedObjectPath("no_op", language), false);
-  EXPECT_TRUE(module.ok());
+  EXPECT_OK(module);
   const auto getSomeVariable =
       module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
-  EXPECT_TRUE(getSomeVariable.ok());
+  EXPECT_OK(getSomeVariable);
   EXPECT_EQ(getSomeVariable.value()(), 1);
   EXPECT_EQ(getSomeVariable.value()(), 2);
   EXPECT_EQ(getSomeVariable.value()(), 3);
@@ -47,12 +76,12 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   // Release the module, and reload it.
   module->reset();
   module = newDynamicModule(testSharedObjectPath("no_op", language), true);
-  EXPECT_TRUE(module.ok());
+  EXPECT_OK(module);
 
   // This module must be reloaded and the variable must be reset.
   const auto getSomeVariable2 =
       (module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable"));
-  EXPECT_TRUE(getSomeVariable2.ok());
+  EXPECT_OK(getSomeVariable2);
   EXPECT_EQ(getSomeVariable2.value()(), 1); // Start from 1 again.
   EXPECT_EQ(getSomeVariable2.value()(), 2);
   EXPECT_EQ(getSomeVariable2.value()(), 3);
@@ -60,71 +89,71 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   // Release the module, and reload it.
   module->reset();
   module = newDynamicModule(testSharedObjectPath("no_op", language), false);
-  EXPECT_TRUE(module.ok());
+  EXPECT_OK(module);
 
   // This module must be the already loaded one, and the variable must be kept.
   const auto getSomeVariable3 =
       module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
-  EXPECT_TRUE(getSomeVariable3.ok());
+  EXPECT_OK(getSomeVariable3);
   EXPECT_EQ(getSomeVariable3.value()(), 4); // Start from 4.
 }
 
 TEST(DynamicModuleTestLanguages, InitFunctionOnlyCalledOnce) {
   const auto path = testSharedObjectPath("program_init_assert", "c");
   absl::StatusOr<DynamicModulePtr> m1 = newDynamicModule(path, false);
-  EXPECT_TRUE(m1.ok());
+  EXPECT_OK(m1);
   // At this point, m1 is alive, so the init function should have been called.
   // When creating a new module with the same path, the init function should not be called again.
   absl::StatusOr<DynamicModulePtr> m2 = newDynamicModule(path, false);
-  EXPECT_TRUE(m2.ok());
+  EXPECT_OK(m2);
   m1->reset();
   m2->reset();
 
   // Even with the do_not_close=true, init function should only be called once.
   m1 = newDynamicModule(path, true);
-  EXPECT_TRUE(m1.ok());
+  EXPECT_OK(m1);
   m1->reset(); // Closing the module, but the module is still alive in the process.
   // This m2 should point to the same module as m1 whose handle is already freed, but
   // the init function should not be called again.
   m2 = newDynamicModule(path, true);
-  EXPECT_TRUE(m2.ok());
+  EXPECT_OK(m2);
 }
 
 TEST(DynamicModuleTestLanguages, LoadLibGlobally) {
   const auto path = testSharedObjectPath("program_global", "c");
   absl::StatusOr<DynamicModulePtr> module = newDynamicModule(path, false, true);
-  EXPECT_TRUE(module.ok());
+  EXPECT_OK(module);
 
   // The child module should be able to access the symbol from the global module.
   const auto child_path = testSharedObjectPath("program_child", "c");
   absl::StatusOr<DynamicModulePtr> child_module = newDynamicModule(child_path, false, false);
-  EXPECT_TRUE(child_module.ok());
+  EXPECT_OK(child_module);
 
   using GetSomeVariableFuncType = int (*)(void);
   const auto getSomeVariable =
       child_module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
-  EXPECT_TRUE(getSomeVariable.ok());
+  EXPECT_OK(getSomeVariable);
   EXPECT_EQ(getSomeVariable.value()(), 42);
 }
 
 TEST_P(DynamicModuleTestLanguages, NoProgramInit) {
   std::string language = GetParam();
-  absl::StatusOr<DynamicModulePtr> result =
-      newDynamicModule(testSharedObjectPath("no_program_init", language), false);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Failed to resolve symbol envoy_dynamic_module_on_program_init"));
+  EXPECT_LOG_CONTAINS("error", "Failed to resolve symbol envoy_dynamic_module_on_program_init", {
+    EXPECT_THAT(newDynamicModule(testSharedObjectPath("no_program_init", language), false),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          testing::HasSubstr("Failed to resolve symbol "
+                                             "envoy_dynamic_module_on_program_"
+                                             "init")));
+  });
 }
 
 TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
   std::string language = GetParam();
-  absl::StatusOr<DynamicModulePtr> result =
-      newDynamicModule(testSharedObjectPath("program_init_fail", language), false);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Failed to initialize dynamic module:"));
+  EXPECT_LOG_CONTAINS("error", "envoy_dynamic_module_on_program_init returned null", {
+    EXPECT_THAT(newDynamicModule(testSharedObjectPath("program_init_fail", language), false),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          testing::HasSubstr("Failed to initialize dynamic module:")));
+  });
 }
 
 TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
@@ -132,7 +161,7 @@ TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
   std::string language = GetParam();
   absl::StatusOr<DynamicModulePtr> result =
       newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 }
 
 TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathSet) {
@@ -143,7 +172,7 @@ TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathSet) {
       1);
 
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
-  EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
+  EXPECT_OK(module) << "Failed to load module";
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
 }
 
@@ -152,7 +181,7 @@ TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathNotSetFallbackToCw
   std::filesystem::path staged_lib = TestEnvironment::substitute("{{ test_rundir }}/libfoo.so");
   std::filesystem::copy(test_lib, staged_lib);
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("foo", false);
-  EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
+  EXPECT_OK(module) << "Failed to load module";
   std::filesystem::remove(staged_lib);
 }
 
@@ -164,7 +193,7 @@ TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
       TestEnvironment::substitute("{{ test_rundir }}/libwhatever.so");
   std::filesystem::copy(test_lib, staged_lib);
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("whatever", false);
-  EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
+  EXPECT_OK(module) << "Failed to load module";
 
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
   std::filesystem::remove(staged_lib);
@@ -172,36 +201,63 @@ TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
 
 TEST(StaticModule, LoadSuccess) {
   absl::StatusOr<DynamicModulePtr> result = newStaticModule("matcher_no_op_static");
-  EXPECT_TRUE(result.ok()) << result.status().message();
+  EXPECT_OK(result);
 }
 
 TEST(StaticModule, SymbolNotFound) {
   // "nonexistent_module" has no prefixed symbols in the binary.
-  absl::StatusOr<DynamicModulePtr> result = newStaticModule("nonexistent_module");
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Failed to resolve symbol "
-                                 "envoy_dynamic_module_on_program_init"));
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module nonexistent_module", {
+    EXPECT_THAT(newStaticModule("nonexistent_module"),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          testing::HasSubstr("Failed to resolve symbol "
+                                             "envoy_dynamic_module_on_program_init")));
+  });
+}
+
+TEST(StaticModule, ProgramInitFail) {
+  EXPECT_LOG_CONTAINS("error",
+                      "Unable to load dynamic module program_init_fail_static: "
+                      "envoy_dynamic_module_on_program_init returned null",
+                      {
+                        EXPECT_THAT(
+                            newStaticModule("program_init_fail_static"),
+                            HasStatus(absl::StatusCode::kInvalidArgument,
+                                      testing::HasSubstr("Failed to initialize static module:")));
+                      });
 }
 
 TEST(StaticModule, MultipleLoads) {
   absl::StatusOr<DynamicModulePtr> c_module =
       newDynamicModuleByName("matcher_no_op_static", /*do_not_close=*/false);
-  EXPECT_TRUE(c_module.ok()) << c_module.status().message();
+  EXPECT_OK(c_module);
 
   absl::StatusOr<DynamicModulePtr> c_module_2 =
       newDynamicModuleByName("matcher_no_op_static", /*do_not_close=*/false);
-  EXPECT_TRUE(c_module_2.ok()) << c_module_2.status().message();
+  EXPECT_OK(c_module_2);
 }
 
 TEST(CreateDynamicModulesByName, ModuleNotFound) {
-  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
-  EXPECT_FALSE(module.ok());
-  EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(module.status().message(),
-              testing::HasSubstr(
-                  "Failed to load dynamic module: libno_op.so not found in any search path"));
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module", {
+    absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
+    EXPECT_THAT(
+        module,
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  testing::HasSubstr(
+                      "Failed to load dynamic module: libno_op.so not found in any search path")));
+  });
+}
+
+TEST(CreateDynamicModulesByName, ModuleNotFoundIncrementsCounter) {
+  Stats::IsolatedStoreImpl store;
+  Stats::Scope& scope = *store.rootScope();
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(scope));
+
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module", {
+    EXPECT_THAT(newDynamicModuleByName("no_op", false, false, context, "my-bridge"),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+  });
+  EXPECT_EQ(1U, failureCounter(scope, ModuleLoadErrorStat, "my-bridge"));
 }
 
 TEST(NewDynamicModuleFromBytes, Success) {
@@ -219,7 +275,7 @@ TEST(NewDynamicModuleFromBytes, Success) {
 
   absl::StatusOr<DynamicModulePtr> module =
       newDynamicModuleFromBytes(module_bytes, sha256, false, false);
-  EXPECT_TRUE(module.ok()) << "Failed to load module from bytes: " << module.status().message();
+  EXPECT_OK(module) << "Failed to load module from bytes";
   EXPECT_TRUE(std::filesystem::exists(temp_path));
 
   // Cleanup.
@@ -236,8 +292,7 @@ TEST(NewDynamicModuleFromBytes, InvalidBytes) {
 
   absl::StatusOr<DynamicModulePtr> module =
       newDynamicModuleFromBytes(garbage, sha256, false, false);
-  EXPECT_FALSE(module.ok());
-  EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(module, HasStatusCode(absl::StatusCode::kInvalidArgument));
 
   // The invalid file should have been cleaned up.
   EXPECT_FALSE(std::filesystem::exists(temp_path));
@@ -254,7 +309,7 @@ TEST(VerifyFileSha256, RoundTripWithComputedDigest) {
   Buffer::OwnedImpl hash_buffer(contents);
   const std::string expected_hex =
       Hex::encode(::Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(hash_buffer));
-  EXPECT_TRUE(verifyFileSha256(tmp, expected_hex).ok());
+  EXPECT_OK(verifyFileSha256(tmp, expected_hex));
   std::filesystem::remove(tmp);
 }
 
@@ -267,9 +322,8 @@ TEST(VerifyFileSha256, MismatchReturnsFailedPrecondition) {
   }
   const std::string wrong_sha = "0000000000000000000000000000000000000000000000000000000000000000";
   auto status = verifyFileSha256(tmp, wrong_sha);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.code(), absl::StatusCode::kFailedPrecondition);
-  EXPECT_THAT(std::string(status.message()), testing::HasSubstr("SHA256 mismatch"));
+  EXPECT_THAT(status, HasStatus(absl::StatusCode::kFailedPrecondition,
+                                testing::HasSubstr("SHA256 mismatch")));
   EXPECT_THAT(std::string(status.message()), testing::HasSubstr(wrong_sha));
   std::filesystem::remove(tmp);
 }
@@ -281,19 +335,19 @@ TEST(VerifyFileSha256, MissingFileReturnsInternal) {
   ASSERT_FALSE(std::filesystem::exists(missing));
   auto status =
       verifyFileSha256(missing, "0000000000000000000000000000000000000000000000000000000000000000");
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.code(), absl::StatusCode::kInternal);
-  EXPECT_THAT(std::string(status.message()),
-              testing::HasSubstr("Failed to open file for SHA256 verification"));
+  EXPECT_THAT(status, HasStatus(absl::StatusCode::kInternal,
+                                testing::HasSubstr("Failed to open file for SHA256 verification")));
 }
 
 TEST(VerifyFileSha256, EmptyFileMatchesEmptyDigest) {
   const std::filesystem::path tmp =
       std::filesystem::temp_directory_path() / "envoy_verify_sha256_empty.bin";
-  { std::ofstream out(tmp, std::ios::binary); }
+  {
+    std::ofstream out(tmp, std::ios::binary);
+  }
   // SHA256 of the empty input.
   const std::string empty_sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-  EXPECT_TRUE(verifyFileSha256(tmp, empty_sha).ok());
+  EXPECT_OK(verifyFileSha256(tmp, empty_sha));
   std::filesystem::remove(tmp);
 }
 
@@ -313,7 +367,7 @@ TEST(VerifyFileSha256, LargeFileExceedingChunkSize) {
   Buffer::OwnedImpl hash_buffer(contents);
   const std::string expected_hex =
       Hex::encode(::Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(hash_buffer));
-  EXPECT_TRUE(verifyFileSha256(tmp, expected_hex).ok());
+  EXPECT_OK(verifyFileSha256(tmp, expected_hex));
   std::filesystem::remove(tmp);
 }
 
@@ -333,7 +387,7 @@ TEST(VerifyFileSha256, MixedCaseExpectedHexNormalised) {
   for (char& c : expected_hex) {
     c = absl::ascii_toupper(c);
   }
-  EXPECT_TRUE(verifyFileSha256(tmp, expected_hex).ok());
+  EXPECT_OK(verifyFileSha256(tmp, expected_hex));
   std::filesystem::remove(tmp);
 }
 
@@ -352,14 +406,14 @@ TEST(NewDynamicModuleFromBytes, RepeatedLoadReusesDlopenHandle) {
   // First load writes and loads the module.
   absl::StatusOr<DynamicModulePtr> module1 =
       newDynamicModuleFromBytes(module_bytes, sha256, true, false);
-  ASSERT_TRUE(module1.ok()) << module1.status().message();
+  ASSERT_OK(module1);
   ASSERT_TRUE(std::filesystem::exists(temp_path));
 
   // Second load with the same sha256 — writes again but the RTLD_NOLOAD check in
   // newDynamicModule returns the existing handle, so the init function is not called twice.
   absl::StatusOr<DynamicModulePtr> module2 =
       newDynamicModuleFromBytes(module_bytes, sha256, true, false);
-  ASSERT_TRUE(module2.ok()) << module2.status().message();
+  ASSERT_OK(module2);
 
   // Cleanup.
   module1->reset();
@@ -416,9 +470,8 @@ protected:
 TEST_F(NewDynamicModuleByConfigTest, NoModuleNorName) {
   ProtoDynamicModuleConfig config;
   auto result = newDynamicModuleByConfig(config, "test_module");
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Either 'name' or 'module' must be specified"));
+  EXPECT_THAT(result,
+              HasStatusMessage(testing::HasSubstr("Either 'name' or 'module' must be specified")));
 }
 
 // By-name loading succeeds synchronously and requires no context (the context-less caller path).
@@ -426,7 +479,7 @@ TEST_F(NewDynamicModuleByConfigTest, ByNameSuccess) {
   ProtoDynamicModuleConfig config;
   config.set_name("no_op");
   auto result = newDynamicModuleByConfig(config, "test_module");
-  ASSERT_TRUE(result.ok()) << result.status().message();
+  ASSERT_OK(result);
   EXPECT_NE(result->loaded, nullptr);
   EXPECT_EQ(result->async, nullptr);
 }
@@ -435,9 +488,11 @@ TEST_F(NewDynamicModuleByConfigTest, ByNameSuccess) {
 TEST_F(NewDynamicModuleByConfigTest, ByNameFailure) {
   ProtoDynamicModuleConfig config;
   config.set_name("nonexistent_module");
-  auto result = newDynamicModuleByConfig(config, "test_module");
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module", {
+    auto result = newDynamicModuleByConfig(config, "test_module", context_);
+    EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to load dynamic module")));
+  });
+  EXPECT_EQ(1U, failureCounter(context_.scope(), ModuleLoadErrorStat, "test_module"));
 }
 
 // Local-file loading succeeds synchronously and requires no context (the context-less caller path).
@@ -445,7 +500,7 @@ TEST_F(NewDynamicModuleByConfigTest, LocalFileSuccess) {
   ProtoDynamicModuleConfig config;
   config.mutable_module()->mutable_local()->set_filename(testSharedObjectPath("no_op", "c"));
   auto result = newDynamicModuleByConfig(config, "test_module");
-  ASSERT_TRUE(result.ok()) << result.status().message();
+  ASSERT_OK(result);
   EXPECT_NE(result->loaded, nullptr);
   EXPECT_EQ(result->async, nullptr);
 }
@@ -455,8 +510,7 @@ TEST_F(NewDynamicModuleByConfigTest, LocalFileFailure) {
   ProtoDynamicModuleConfig config;
   config.mutable_module()->mutable_local()->set_filename("/nonexistent/path/to/module.so");
   auto result = newDynamicModuleByConfig(config, "test_module");
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to load dynamic module")));
 }
 
 // A module data source that is neither a local file path nor a remote source is rejected.
@@ -464,17 +518,15 @@ TEST_F(NewDynamicModuleByConfigTest, ModuleWithoutLocalFileOrRemoteRejected) {
   ProtoDynamicModuleConfig config;
   config.mutable_module()->mutable_local()->set_inline_bytes("AAAA");
   auto result = newDynamicModuleByConfig(config, "test_module");
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Only local file path or remote HTTP source is supported"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr(
+                          "Only local file path or remote HTTP source is supported")));
 }
 
 // A remote source without a factory context is rejected (the context-less caller cannot fetch).
 TEST_F(NewDynamicModuleByConfigTest, RemoteWithoutContextRejected) {
   auto result = newDynamicModuleByConfig(makeRemoteConfig("abc123"), "test_module");
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Remote module sources require a factory context"));
+  EXPECT_THAT(result, HasStatusMessage(
+                          testing::HasSubstr("Remote module sources require a factory context")));
 }
 
 // A cached file whose contents match the expected SHA256 is loaded directly (cache hit).
@@ -487,7 +539,7 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteCacheHitLoads) {
                              std::filesystem::copy_options::overwrite_existing);
 
   auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_);
-  ASSERT_TRUE(result.ok()) << result.status().message();
+  ASSERT_OK(result);
   EXPECT_NE(result->loaded, nullptr);
   EXPECT_EQ(result->async, nullptr);
 
@@ -507,9 +559,8 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteCacheHitTamperedRemoved) {
   ASSERT_TRUE(std::filesystem::exists(cached));
 
   auto result = newDynamicModuleByConfig(makeRemoteConfig(expected_sha), "test_module", context_);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Remote module sources require an init manager"));
+  EXPECT_THAT(result, HasStatusMessage(
+                          testing::HasSubstr("Remote module sources require an init manager")));
   // The tampered cache entry must have been removed.
   EXPECT_FALSE(std::filesystem::exists(cached));
 }
@@ -527,8 +578,7 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteCacheHitValidShaButLoadFails) {
   }
 
   auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Cached remote module failed to load"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Cached remote module failed to load")));
 
   std::filesystem::remove(cached);
 }
@@ -543,8 +593,7 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteNackOnCacheMiss) {
   // The cluster is not initialized in the mock, so the background fetch fails fast; the config is
   // still rejected as a cache miss.
   auto result = newDynamicModuleByConfig(config, "test_module", context_);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("not cached"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("not cached")));
 }
 
 // A remote source with a context but no init manager is rejected.
@@ -553,9 +602,8 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteNoCacheNoInitManager) {
   std::filesystem::remove(moduleTempPath(sha));
 
   auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Remote module sources require an init manager"));
+  EXPECT_THAT(result, HasStatusMessage(
+                          testing::HasSubstr("Remote module sources require an init manager")));
 }
 
 // A remote source with a context and init manager but no on_loaded callback is rejected.
@@ -567,9 +615,8 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteNoOnLoadedCallbackRejected) {
   auto result =
       newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_, init_manager,
                                /*on_loaded=*/nullptr);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Remote module sources require an on_loaded callback"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr(
+                          "Remote module sources require an on_loaded callback")));
 }
 
 // A remote source with a context, init manager, and on_loaded callback starts an asynchronous
@@ -583,7 +630,7 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteAsyncReturnsAsyncState) {
   auto result =
       newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_, init_manager,
                                [&on_loaded_called](DynamicModulePtr) { on_loaded_called = true; });
-  ASSERT_TRUE(result.ok()) << result.status().message();
+  ASSERT_OK(result);
   EXPECT_EQ(result->loaded, nullptr);
   ASSERT_NE(result->async, nullptr);
   EXPECT_NE(result->async->remote_provider, nullptr);

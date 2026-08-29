@@ -314,4 +314,29 @@ TEST_P(DynamicModulesNetworkSdkIntegrationTest, UpstreamConnectionId) {
   tcp_client->close();
 }
 
+TEST_P(DynamicModulesNetworkSdkIntegrationTest, ReadAttributes) {
+  if (GetParam() != "rust") {
+    GTEST_SKIP() << "the read_attributes filter is only in the rust test module";
+  }
+
+  initializeSdkFilter("read_attributes");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->connected());
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // The filter reads source address and connection id on new connection and asserts in the module.
+  // A failure there stops the chain and the upstream never sees data.
+  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
 } // namespace Envoy

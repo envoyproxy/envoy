@@ -72,10 +72,13 @@ void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks,
 
 } // namespace
 
-Http::FilterFactoryCb FilterChainFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> FilterChainFilterFactory::createFilterFactoryFromProtoTyped(
     const FilterChainConfigProto& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
-  auto filter_config = std::make_shared<FilterChainConfig>(proto_config, context, stats_prefix);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config =
+      std::make_shared<FilterChainConfig>(proto_config, context, stats_prefix, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     FilterChains filter_chains = getAllFilterChains(filter_config->filterChain(), callbacks);
@@ -93,14 +96,17 @@ Http::FilterFactoryCb FilterChainFilterFactory::createFilterFactoryFromProtoType
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-FilterChainFilterFactory::createRouteSpecificFilterConfigTyped(
+FilterChainFilterFactory::createHttpFilterRouteConfigTyped(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChainConfigPerRoute&
         proto_config,
-    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   absl::Status creation_status = absl::OkStatus();
   // TODO(wbpcode): use the route name or vhost name as stats prefix?
+  // The init manager of the enclosing route configuration, if any, is handed to the filters of the
+  // embedded filter chain so that they can warm up their own resources.
   auto filter_config = std::make_shared<FilterChainPerRouteConfig>(
-      proto_config, context, "filter_chain.", creation_status);
+      proto_config, context, "filter_chain.", extra_context.init_manager, creation_status);
   RETURN_IF_NOT_OK(creation_status);
   return filter_config;
 }

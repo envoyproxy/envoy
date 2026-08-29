@@ -9,14 +9,13 @@
 #include "source/common/common/utility.h"
 
 namespace Envoy {
-std::string Hex::encode(const uint8_t* data, size_t length) {
+std::string Hex::encode(absl::Span<const uint8_t> data) {
   static const char* const digits = "0123456789abcdef";
 
   std::string ret;
-  ret.reserve(length * 2);
+  ret.reserve(data.size() * 2);
 
-  for (size_t i = 0; i < length; i++) {
-    uint8_t d = data[i];
+  for (const uint8_t d : data) {
     ret.push_back(digits[d >> 4]);
     ret.push_back(digits[d & 0xf]);
   }
@@ -56,7 +55,7 @@ std::string Hex::uint64ToHex(uint64_t value) {
   data[1] = (value & 0x00FF000000000000) >> 48;
   data[0] = (value & 0xFF00000000000000) >> 56;
 
-  return encode(data.data(), data.size());
+  return encode(data);
 }
 
 std::string Hex::uint32ToHex(uint32_t value) {
@@ -69,7 +68,7 @@ std::string Hex::uint32ToHex(uint32_t value) {
   data[1] = (value & 0x00FF0000) >> 16;
   data[0] = (value & 0xFF000000) >> 24;
 
-  return encode(data.data(), data.size());
+  return encode(data);
 }
 
 std::string Hex::uint16ToHex(uint16_t value) {
@@ -80,6 +79,6 @@ std::string Hex::uint16ToHex(uint16_t value) {
   data[1] = (value & 0x00FF);
   data[0] = (value & 0xFF00) >> 8;
 
-  return encode(data.data(), data.size());
+  return encode(data);
 }
 } // namespace Envoy

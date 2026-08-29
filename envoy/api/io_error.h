@@ -1,9 +1,11 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 
-#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
@@ -107,7 +109,7 @@ template <typename ReturnValue> struct IoCallResult {
 };
 
 using IoCallBoolResult = IoCallResult<bool>;
-using IoCallSizeResult = IoCallResult<ssize_t>;
+using IoCallSizeResult = IoCallResult<ptrdiff_t>;
 using IoCallUint64Result = IoCallResult<uint64_t>;
 
 inline Api::IoCallUint64Result ioCallUint64ResultNoError() {

@@ -192,8 +192,10 @@ private:
 class PathMatchPolicyMatcherImpl : public BaseMatcherImpl {
 public:
   PathMatchPolicyMatcherImpl(const RequirementRule& rule,
-                             Server::Configuration::CommonFactoryContext& context)
-      : BaseMatcherImpl(rule, context), uri_template_matcher_(createUriTemplateMatcher(rule)) {}
+                             Server::Configuration::CommonFactoryContext& context,
+                             absl::Status& creation_status)
+      : BaseMatcherImpl(rule, context),
+        uri_template_matcher_(createUriTemplateMatcher(rule, creation_status)) {}
 
   bool matches(const Http::RequestHeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers) &&
@@ -209,7 +211,8 @@ public:
 private:
   const Router::PathMatcherSharedPtr uri_template_matcher_;
 
-  static Router::PathMatcherSharedPtr createUriTemplateMatcher(const RequirementRule& rule) {
+  static Router::PathMatcherSharedPtr createUriTemplateMatcher(const RequirementRule& rule,
+                                                               absl::Status& creation_status) {
     auto& factory = Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(
         rule.match().path_match_policy());
     ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
@@ -219,15 +222,16 @@ private:
     absl::StatusOr<Router::PathMatcherSharedPtr> matcher = factory.createPathMatcher(*config);
 
     if (!matcher.ok()) {
-      throw EnvoyException(std::string(matcher.status().message()));
+      creation_status = matcher.status();
+      return nullptr;
     }
 
     return matcher.value();
   }
 };
 
-MatcherConstPtr Matcher::create(const RequirementRule& rule,
-                                Server::Configuration::CommonFactoryContext& context) {
+absl::StatusOr<MatcherConstPtr>
+Matcher::create(const RequirementRule& rule, Server::Configuration::CommonFactoryContext& context) {
   switch (rule.match().path_specifier_case()) {
   case RouteMatch::PathSpecifierCase::kPrefix:
     return std::make_unique<PrefixMatcherImpl>(rule, context);
@@ -240,7 +244,10 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule,
   case RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
     return std::make_unique<PathSeparatedPrefixMatcherImpl>(rule, context);
   case RouteMatch::PathSpecifierCase::kPathMatchPolicy: {
-    return std::make_unique<PathMatchPolicyMatcherImpl>(rule, context);
+    absl::Status creation_status = absl::OkStatus();
+    auto matcher = std::make_unique<PathMatchPolicyMatcherImpl>(rule, context, creation_status);
+    RETURN_IF_NOT_OK_REF(creation_status);
+    return matcher;
   }
   case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
     break; // Fall through to PANIC.

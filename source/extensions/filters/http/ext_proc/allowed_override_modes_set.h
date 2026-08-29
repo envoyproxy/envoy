@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 
 #include "absl/container/flat_hash_set.h"

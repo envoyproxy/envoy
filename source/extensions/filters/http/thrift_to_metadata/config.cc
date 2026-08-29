@@ -12,24 +12,16 @@ namespace HttpFilters {
 namespace ThriftToMetadata {
 
 ThriftToMetadataConfig::ThriftToMetadataConfig()
-    : FactoryBase("envoy.filters.http.thrift_to_metadata") {}
-
-Http::FilterFactoryCb ThriftToMetadataConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<FilterConfig> config =
-      std::make_shared<FilterConfig>(proto_config, context.scope());
-
-  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Filter>(config));
-  };
-}
+    : UnifiedFactoryBase("envoy.filters.http.thrift_to_metadata") {}
 
 absl::StatusOr<Http::FilterFactoryCb> ThriftToMetadataConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  absl::Status creation_status = absl::OkStatus();
   std::shared_ptr<FilterConfig> config =
-      std::make_shared<FilterConfig>(proto_config, context.scope());
+      std::make_shared<FilterConfig>(proto_config, extra_context.scopeOr(context), creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(config));

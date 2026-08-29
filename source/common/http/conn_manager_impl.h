@@ -558,7 +558,6 @@ private:
     RequestTrailerMapPtr deferred_request_trailers_;
     const Router::Decorator* route_decorator_{nullptr};
     const Router::RouteTracing* route_tracing_{nullptr};
-    const bool trace_refresh_after_route_refresh_{true};
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;

@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include <algorithm>
 #include <iostream>
 
@@ -91,6 +94,59 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespDuplexStrea
 
   handleUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/46841
+// A filter ahead of ext_proc moves the first request body frame into the
+// filter-manager buffer via addDecodedData() and then returns Continue
+// (the pattern a wasm filter follows when it resumes after buffering a chunk).
+// The just-buffered frame must still be forwarded down the chain, so the
+// ext_proc server in FULL_DUPLEX_STREAMED mode must observe the full
+// request body byte-for-byte. Before the fix the first frame was dropped.
+TEST_P(ExtProcIntegrationTest, AddDataAndContinueBeforeExtProcDuplexStreamed) {
+  const std::string body_sent(64 * 1024, 's');
+
+  auto* processing_mode = proto_config_.mutable_processing_mode();
+  processing_mode->set_request_header_mode(ProcessingMode::SEND);
+  processing_mode->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+  processing_mode->set_request_trailer_mode(ProcessingMode::SEND);
+  processing_mode->set_response_header_mode(ProcessingMode::SKIP);
+
+  // initializeConfig() prepends the ext_proc filter; prepending our filter
+  // afterwards places it ahead of ext_proc in the decode chain, i.e.
+  // [add-data-and-continue-filter, ext_proc].
+  initializeConfig();
+  config_helper_.prependFilter(R"EOF(
+    name: add-data-and-continue-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddDataAndContinueFilterConfig
+  )EOF");
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl default_headers;
+  HttpTestUtility::addDefaultHeaders(default_headers);
+  auto encoder_decoder = codec_client_->startRequest(default_headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, body_sent, true);
+
+  // The ext_proc server receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderReq(header_request);
+  // The ext_proc server must receive the entire request body, byte-for-byte.
+  uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent, processor_stream_);
+  EXPECT_GT(total_req_body_msg, 0);
+
+  // Send responses back so the request completes cleanly.
+  serverSendHeaderResp();
+  uint32_t total_resp_body_msg = 2 * total_req_body_msg;
+  const std::string body_upstream(total_resp_body_msg, 'r');
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg, processor_stream_);
+
+  handleUpstreamRequest();
   EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
   verifyDownstreamResponse(*response, 200);
 }
@@ -595,8 +651,7 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessing) {
 }
 
 // without trailers, server fully buffers the message before sending back the response.
-// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
-TEST_P(ExtProcIntegrationTest, DISABLED_TwoExtProcFiltersBothDuplexInBothDirection) {
+TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirection) {
   twoExtProcFiltersFullDuplexConfig();
 
   const std::string body_sent(5 * 1024, 's');
@@ -654,8 +709,7 @@ TEST_P(ExtProcIntegrationTest, DISABLED_TwoExtProcFiltersBothDuplexInBothDirecti
 }
 
 // Without trailers,  server buffers one chunks of body before sending back the response.
-// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
-TEST_P(ExtProcIntegrationTest, DISABLED_TwoExtProcFiltersBothDuplexInBothDirectionNoTrailerRandom) {
+TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionNoTrailerRandom) {
   twoExtProcFiltersFullDuplexConfig();
 
   const std::string body_sent(10 * 1024, 's');
@@ -829,9 +883,8 @@ TEST_P(ExtProcIntegrationTest, KeepContentLengthDuplexStreamed) {
 }
 
 // With trailers, request direction, fully buffered
-// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
 TEST_P(ExtProcIntegrationTest,
-       DISABLED_TwoExtProcFiltersBothDuplexInRequestDirectionWithTrailerFullyBuffered) {
+       TwoExtProcFiltersBothDuplexInRequestDirectionWithTrailerFullyBuffered) {
   two_ext_proc_filters_ = true;
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
     // Filter-1
@@ -902,9 +955,7 @@ TEST_P(ExtProcIntegrationTest,
 }
 
 // With trailers, both directions, server fully buffers.
-// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
-TEST_P(ExtProcIntegrationTest,
-       DISABLED_TwoExtProcFiltersBothDuplexInBothDirectionWithTrailerFullyBuffered) {
+TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionWithTrailerFullyBuffered) {
   twoExtProcFiltersFullDuplexConfig();
 
   const std::string body_sent(10 * 1024, 's');
@@ -1194,7 +1245,47 @@ TEST_P(ExtProcIntegrationTest, FullDuplexStreamedNoDuplicateBodyOnRetry) {
 
   EXPECT_EQ(upstream_request2->body().toString(), expected_body);
 
-  upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true)
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ModeOverrideEmptyBodyBeforeHeadersResponse) {
+  // Set default mode to STREAMED for request body.
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  // Start request, headers only, end_stream = false
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+
+  // Send empty data with end_stream = true
+  codec_client_->sendData(*request_encoder_, 0, true);
+
+  // Process request header message.
+  // The server responds normally (no mode override).
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [](const ProcessingRequest&, ProcessingResponse& resp) {
+                          resp.mutable_request_headers();
+                          return true;
+                        });
+
+  // The server should receive the empty body chunk.
+  processRequestBodyMessage(*grpc_upstreams_[0], false,
+                            [](const HttpBody& body, BodyResponse& resp) {
+                              EXPECT_TRUE(body.end_of_stream());
+                              EXPECT_TRUE(body.body().empty());
+                              resp.mutable_response();
+                              return true;
+                            });
+
+  handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 }
 

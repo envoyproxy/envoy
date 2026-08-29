@@ -9,6 +9,7 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -19,6 +20,7 @@ namespace StatSinks {
 namespace DynamicModules {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
@@ -45,11 +47,11 @@ public:
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
         Extensions::DynamicModules::testSharedObjectPath("stat_sink_no_op", "c"),
         /*do_not_close=*/false);
-    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    ASSERT_OK(dynamic_module);
 
     auto config = newDynamicModuleStatsSinkConfig("test_sink", "test_config",
                                                   std::move(dynamic_module.value()), context_);
-    ASSERT_TRUE(config.ok()) << config.status().message();
+    ASSERT_OK(config);
     config_ = std::move(config.value());
   }
 
@@ -245,10 +247,10 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, DefineGaugeAfterFrozenIsRejected) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("stat_sink_no_op", "c"),
       /*do_not_close=*/false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  ASSERT_OK(dynamic_module);
   auto config = newDynamicModuleStatsSinkConfig("test_sink", "test_config",
                                                 std::move(dynamic_module.value()), context_);
-  ASSERT_TRUE(config.ok()) << config.status().message();
+  ASSERT_OK(config);
 
   size_t id = 0;
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
@@ -417,14 +419,12 @@ TEST(DynamicModuleStatsSinkConfigTest, FactoryFunctionMissingSymbol) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("stat_sink_missing_config_new", "c"),
       /*do_not_close=*/false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  ASSERT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto config_or_error = newDynamicModuleStatsSinkConfig(
       "test_sink", "test_config", std::move(dynamic_module.value()), context);
-  EXPECT_FALSE(config_or_error.ok());
-  EXPECT_THAT(std::string(config_or_error.status().message()),
-              testing::ContainsRegex("config_new"));
+  EXPECT_THAT(config_or_error, HasStatusMessage(testing::ContainsRegex("config_new")));
 }
 
 // When on_stat_sink_config_new returns null, newDynamicModuleStatsSinkConfig
@@ -433,14 +433,13 @@ TEST(DynamicModuleStatsSinkConfigTest, FactoryFunctionModuleReturnsNull) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("stat_sink_config_new_fail", "c"),
       /*do_not_close=*/false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  ASSERT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto config_or_error = newDynamicModuleStatsSinkConfig(
       "test_sink", "test_config", std::move(dynamic_module.value()), context);
-  EXPECT_FALSE(config_or_error.ok());
-  EXPECT_THAT(std::string(config_or_error.status().message()),
-              testing::HasSubstr("Failed to initialize dynamic module stats sink config"));
+  EXPECT_THAT(config_or_error, HasStatusMessage(testing::HasSubstr(
+                                   "Failed to initialize dynamic module stats sink config")));
 }
 
 } // namespace

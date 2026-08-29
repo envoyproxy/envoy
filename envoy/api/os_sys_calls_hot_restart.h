@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #ifndef WIN32
 #include <sys/mman.h> // for mode_t
 

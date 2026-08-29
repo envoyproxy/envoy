@@ -11,7 +11,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/sxg/filters/http/source:config",
@@ -28,7 +28,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/sxg/filters/http/source:config",
@@ -39,6 +39,7 @@ envoy_cc_test(
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg_cc_proto",
     ],
 )

@@ -22,6 +22,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -35,6 +36,7 @@ namespace Http {
 namespace ReverseTunnel {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::testing::_;
 using ::testing::NiceMock;
 using ::testing::Return;
@@ -296,7 +298,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsRemainingCalls) {
 
   Buffer::OwnedImpl data;
   EXPECT_CALL(*inner_raw, dispatch(_)).WillOnce(Return(Envoy::Http::okStatus()));
-  EXPECT_TRUE(codec.dispatch(data).ok());
+  EXPECT_OK(codec.dispatch(data));
 
   EXPECT_CALL(*inner_raw, protocol()).WillOnce(Return(Envoy::Http::Protocol::Http2));
   EXPECT_EQ(Envoy::Http::Protocol::Http2, codec.protocol());
@@ -336,8 +338,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, FactoryCreatesOptionsAndRegistersAdminHan
   ReverseTunnelUpstreamCodecFactory factory;
   auto proto = makeProto(true);
   auto result = factory.createProtocolOptionsConfig(proto, factory_context);
-  ASSERT_TRUE(result.ok()) << result.status().message();
-  ASSERT_NE(result.value(), nullptr);
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
   EXPECT_TRUE(result.value()->upstreamHttpClientCodecFactory().has_value());
 
   // Drive the admin handler with a drain_time_ms query param to exercise its body.
@@ -385,8 +386,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, FactoryDoesNotRegisterAdminHandlerWhenDis
   ReverseTunnelUpstreamCodecFactory factory;
   auto proto = makeProto(false);
   auto result = factory.createProtocolOptionsConfig(proto, factory_context);
-  ASSERT_TRUE(result.ok()) << result.status().message();
-  ASSERT_NE(result.value(), nullptr);
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
   EXPECT_TRUE(result.value()->upstreamHttpClientCodecFactory().has_value());
 }
 
