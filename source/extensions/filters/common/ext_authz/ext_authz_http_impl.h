@@ -112,6 +112,7 @@ public:
    * Returns whether to emit client span.
    */
   bool emitClientSpan() const { return emit_client_span_; }
+
   /**
    * Returns whether or not to strip query params from the path when sending to the auth server.
    */

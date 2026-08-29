@@ -316,20 +316,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         if (!config_->pathOverride().empty()) {
           headers->addCopy(key, config_->pathOverride());
         } else if (!config_->pathPrefix().empty()) {
-          if (config_->stripQueryParams()) {
-            const auto path = header.raw_value();
-            const auto query_pos = path.find('?');
-            const auto path_without_query =
-                query_pos == absl::string_view::npos ? path : path.substr(0, query_pos);
-            headers->addCopy(key, absl::StrCat(config_->pathPrefix(), path_without_query));
-          } else {
-            headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
-          }
-        } else if (config_->stripQueryParams()) {
-          const auto path = header.raw_value();
-          const auto query_pos = path.find('?');
-          headers->addCopy(key,
-                           query_pos == absl::string_view::npos ? path : path.substr(0, query_pos));
+          headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
         } else {
           headers->addCopy(key, header.raw_value());
         }
@@ -350,19 +337,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         if (!config_->pathOverride().empty()) {
           headers->addCopy(key, config_->pathOverride());
         } else if (!config_->pathPrefix().empty()) {
-          if (config_->stripQueryParams()) {
-            const auto query_pos = header.second.find('?');
-            const auto path_without_query =
-                query_pos == std::string::npos ? header.second : header.second.substr(0, query_pos);
-            headers->addCopy(key, absl::StrCat(config_->pathPrefix(), path_without_query));
-          } else {
-            headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
-          }
-        } else if (config_->stripQueryParams()) {
-          const auto query_pos = header.second.find('?');
-          headers->addCopy(key, query_pos == std::string::npos
-                                    ? header.second
-                                    : header.second.substr(0, query_pos));
+          headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
         } else {
           headers->addCopy(key, header.second);
         }

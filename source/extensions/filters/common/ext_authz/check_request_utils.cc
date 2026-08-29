@@ -128,11 +128,17 @@ void CheckRequestUtils::setHttpRequest(
     envoy::service::auth::v3::AttributeContext::HttpRequest& httpreq, uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
     const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool encode_raw_headers, const MatcherSharedPtr& allowed_headers_matcher,
+    bool encode_raw_headers, bool strip_query_params,
+    const MatcherSharedPtr& allowed_headers_matcher,
     const MatcherSharedPtr& disallowed_headers_matcher) {
   httpreq.set_id(std::to_string(stream_id));
   httpreq.set_method(getHeaderStr(headers.Method()));
-  httpreq.set_path(getHeaderStr(headers.Path()));
+  const std::string path = getHeaderStr(headers.Path());
+  if (strip_query_params) {
+    httpreq.set_path(Http::Utility::stripQueryString(path));
+  } else {
+    httpreq.set_path(path);
+  }
   httpreq.set_host(getHeaderStr(headers.Host()));
   httpreq.set_scheme(getHeaderStr(headers.Scheme()));
   httpreq.set_size(stream_info.bytesReceived());
@@ -146,8 +152,9 @@ void CheckRequestUtils::setHttpRequest(
   // Calling mutable_header_map() creates the field in the request; only do so when necessary.
   auto* mutable_header_map = encode_raw_headers ? httpreq.mutable_header_map() : nullptr;
 
-  headers.iterate([encode_raw_headers, allowed_headers_matcher, disallowed_headers_matcher,
-                   mutable_headers, mutable_header_map](const Envoy::Http::HeaderEntry& e) {
+  headers.iterate([encode_raw_headers, strip_query_params, allowed_headers_matcher,
+                   disallowed_headers_matcher, mutable_headers,
+                   mutable_header_map](const Envoy::Http::HeaderEntry& e) {
     // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
     if (e.key().getStringView() == Headers::get().EnvoyAuthPartialBody.get()) {
       return Envoy::Http::HeaderMap::Iterate::Continue;
@@ -162,11 +169,17 @@ void CheckRequestUtils::setHttpRequest(
       return Envoy::Http::HeaderMap::Iterate::Continue;
     }
 
+    // Strip the query string from the path header when configured, so that the path sent to the
+    // authorization service is the same for HTTP and gRPC services.
+    const absl::string_view value =
+        strip_query_params && e.key().getStringView() == Http::Headers::get().Path.get()
+            ? Http::Utility::stripQueryString(e.value().getStringView())
+            : e.value().getStringView();
+
     if (encode_raw_headers) {
-      headerMapAddHeader(*mutable_header_map, key, std::string(e.value().getStringView()));
+      headerMapAddHeader(*mutable_header_map, key, std::string(value));
     } else {
-      const std::string sanitized_value =
-          MessageUtil::sanitizeUtf8String(e.value().getStringView());
+      const std::string sanitized_value = MessageUtil::sanitizeUtf8String(value);
 
       if (mutable_headers->find(key) == mutable_headers->end()) {
         (*mutable_headers)[key] = sanitized_value;
@@ -213,12 +226,13 @@ void CheckRequestUtils::setAttrContextRequest(
     envoy::service::auth::v3::AttributeContext::Request& req, const uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
     const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool encode_raw_headers, const MatcherSharedPtr& allowed_headers_matcher,
+    bool encode_raw_headers, bool strip_query_params,
+    const MatcherSharedPtr& allowed_headers_matcher,
     const MatcherSharedPtr& disallowed_headers_matcher) {
   setRequestTime(req, stream_info);
   setHttpRequest(*req.mutable_http(), stream_id, stream_info, decoding_buffer, headers,
-                 max_request_bytes, pack_as_bytes, encode_raw_headers, allowed_headers_matcher,
-                 disallowed_headers_matcher);
+                 max_request_bytes, pack_as_bytes, encode_raw_headers, strip_query_params,
+                 allowed_headers_matcher, disallowed_headers_matcher);
 }
 
 void CheckRequestUtils::setTLSSession(
@@ -242,7 +256,7 @@ void CheckRequestUtils::createHttpCheck(
     envoy::config::core::v3::Metadata&& route_metadata_context,
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes, bool pack_as_bytes,
     bool encode_raw_headers, bool include_peer_certificate, bool include_tls_session,
-    const Protobuf::Map<std::string, std::string>& destination_labels,
+    bool strip_query_params, const Protobuf::Map<std::string, std::string>& destination_labels,
     const MatcherSharedPtr& allowed_headers_matcher,
     const MatcherSharedPtr& disallowed_headers_matcher) {
 
@@ -259,7 +273,8 @@ void CheckRequestUtils::createHttpCheck(
                      include_peer_certificate);
   setAttrContextRequest(*attrs->mutable_request(), cb->streamId(), cb->streamInfo(),
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
-                        encode_raw_headers, allowed_headers_matcher, disallowed_headers_matcher);
+                        encode_raw_headers, strip_query_params, allowed_headers_matcher,
+                        disallowed_headers_matcher);
 
   if (include_tls_session) {
     setTLSSession(*attrs->mutable_tls_session(), *cb->connection());
