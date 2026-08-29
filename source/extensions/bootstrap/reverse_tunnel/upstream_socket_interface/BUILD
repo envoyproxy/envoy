@@ -75,6 +75,7 @@ envoy_cc_extension(
     visibility = ["//visibility:public"],
     deps = [
         "reverse_tunnel_acceptor_includes",
+        "//envoy/common:base_includes",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/network:io_handle_interface",
