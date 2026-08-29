@@ -554,10 +554,13 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
   return path_str;
 }
 
+absl::string_view Utility::stripQueryString(absl::string_view path) {
+  const size_t query_offset = path.find('?');
+  return path.substr(0, query_offset != path.npos ? query_offset : path.size());
+}
+
 std::string Utility::stripQueryString(const HeaderString& path) {
-  absl::string_view path_str = path.getStringView();
-  size_t query_offset = path_str.find('?');
-  return {path_str.data(), query_offset != path_str.npos ? query_offset : path_str.size()};
+  return std::string(Utility::stripQueryString(path.getStringView()));
 }
 
 std::string Utility::QueryParamsMulti::replaceQueryString(const HeaderString& path) const {
