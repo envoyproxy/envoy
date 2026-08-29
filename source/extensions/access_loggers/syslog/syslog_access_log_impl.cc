@@ -137,13 +137,6 @@ void SyslogAccessLoggerImpl::log(const Formatter::Context& context,
   std::string message = formatter_->format(context, stream_info);
   const bool oversized = message.size() > max_message_size_;
   if (oversized) {
-    if (skip_oversized_message_) {
-      ENVOY_LOG_MISC(debug, "syslog access log message is too large ({} bytes), skipping",
-                     message.size());
-      stats_.dropped_.inc();
-      return;
-    }
-
     message.resize(max_message_size_);
   }
   sender_->send(message);
