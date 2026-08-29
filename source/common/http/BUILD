@@ -198,6 +198,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/router:route_config_provider_manager_interface",
+        "//envoy/server:filter_config_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/filter:config_discovery_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
