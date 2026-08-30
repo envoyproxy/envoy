@@ -104,23 +104,26 @@ SenderPtr makeSender(const SyslogAccessLogConfig& config,
 }
 
 std::string statsPrefix(absl::string_view stat_prefix) {
-  return stat_prefix.empty() ? std::string(SyslogStatsPrefix)
-                             : absl::StrCat(SyslogStatsPrefix, stat_prefix, ".");
+  return absl::StrCat(SyslogStatsPrefix, stat_prefix, ".");
 }
 
 } // namespace
 
 SyslogAccessLogStats::SyslogAccessLogStats(Stats::Scope& scope, absl::string_view stat_prefix)
     : scope_(scope.createScope(statsPrefix(stat_prefix))), stat_names_(scope_->symbolTable()),
-      bytes_sent_name_(stat_names_.add("bytes_sent")), dropped_name_(stat_names_.add("dropped")),
-      send_name_(stat_names_.add("send")), state_name_(stat_names_.add("state")),
-      full_name_(stat_names_.add("full")), truncated_name_(stat_names_.add("truncated")),
-      full_tags_({{state_name_, full_name_}}), truncated_tags_({{state_name_, truncated_name_}}),
+      bytes_sent_name_(stat_names_.add("bytes_sent")),
+      bytes_truncated_name_(stat_names_.add("bytes_truncated")),
+      messages_name_(stat_names_.add("messages")), send_name_(stat_names_.add("send")),
+      state_name_(stat_names_.add("state")), full_name_(stat_names_.add("full")),
+      truncated_name_(stat_names_.add("truncated")), full_tags_({{state_name_, full_name_}}),
+      truncated_tags_({{state_name_, truncated_name_}}),
       bytes_sent_(scope_->counterFromStatName(bytes_sent_name_)),
-      dropped_(scope_->counterFromStatName(dropped_name_)),
-      send_full_(scope_->counterFromTaggedName(send_name_, Stats::StatNameTagSpan(full_tags_), {})),
-      send_truncated_(
-          scope_->counterFromTaggedName(send_name_, Stats::StatNameTagSpan(truncated_tags_), {})) {}
+      bytes_truncated_(scope_->counterFromStatName(bytes_truncated_name_)),
+      messages_full_(
+          scope_->counterFromTaggedName(messages_name_, Stats::StatNameTagSpan(full_tags_), {})),
+      messages_truncated_(scope_->counterFromTaggedName(
+          messages_name_, Stats::StatNameTagSpan(truncated_tags_), {})),
+      send_(scope_->counterFromStatName(send_name_)) {}
 
 SyslogAccessLoggerImpl::SyslogAccessLoggerImpl(const SyslogAccessLogConfig& config,
                                                Formatter::FormatterConstSharedPtr body_formatter,
@@ -133,14 +136,16 @@ SyslogAccessLoggerImpl::SyslogAccessLoggerImpl(const SyslogAccessLogConfig& conf
 void SyslogAccessLoggerImpl::log(const Formatter::Context& context,
                                  const StreamInfo::StreamInfo& stream_info) {
   // format() builds the complete message in a new string. The formatter cannot stop at the Syslog
-  // size limit, so we can only truncate or drop the message after formatting is complete.
+  // size limit, so truncation happens after formatting is complete.
   std::string message = formatter_->format(context, stream_info);
+  const uint64_t original_size = message.size();
   const bool oversized = message.size() > max_message_size_;
   if (oversized) {
     message.resize(max_message_size_);
+    stats_.bytes_truncated_.add(original_size - message.size());
   }
+  (oversized ? stats_.messages_truncated_ : stats_.messages_full_).inc();
   sender_->send(message);
-  (oversized ? stats_.send_truncated_ : stats_.send_full_).inc();
 }
 
 SyslogAccessLog::SyslogAccessLog(AccessLog::FilterPtr&& filter, Formatter::FormatterPtr&& formatter,

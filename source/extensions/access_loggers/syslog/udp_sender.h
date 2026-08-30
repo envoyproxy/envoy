@@ -68,7 +68,6 @@ public:
 private:
   Upstream::ClusterManager& cluster_manager_;
   const std::string cluster_name_;
-  SyslogAccessLogStats& stats_;
   UdpDatagramWriter writer_;
 };
 

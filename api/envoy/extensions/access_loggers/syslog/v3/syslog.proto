@@ -136,10 +136,8 @@ message SyslogAccessLogConfig {
   config.core.v3.SubstitutionFormatString log_format = 6
       [(validate.rules).message = {required: true}];
 
-  // Optional additional prefix used for statistics emitted by this access logger. If empty,
-  // statistics are rooted at ``access_logs.syslog.``. If non-empty, statistics are rooted at
-  // ``access_logs.syslog.<stat_prefix>.``.
-  string stat_prefix = 7;
+  // The prefix to use when emitting :ref:`statistics <config_access_log_stats>`.
+  string stat_prefix = 7 [(validate.rules).string = {min_len: 1}];
 
   // Maximum size of the complete syslog message in bytes. This is the UDP payload size: it includes
   // the syslog header and formatted payload, but excludes UDP, IP, and link-layer headers. Messages

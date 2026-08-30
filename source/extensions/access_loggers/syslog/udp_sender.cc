@@ -14,9 +14,8 @@ namespace Syslog {
 
 void accountWriteResult(const Api::IoCallUint64Result& result, SyslogAccessLogStats& stats) {
   if (result.ok()) {
+    stats.send_.inc();
     stats.bytes_sent_.add(result.return_value_);
-  } else {
-    stats.dropped_.inc();
   }
 }
 
@@ -105,13 +104,11 @@ void StaticUdpSender::send(absl::string_view record) { writer_.write(record, des
 ClusterUdpSender::ClusterUdpSender(Event::Dispatcher& dispatcher,
                                    Upstream::ClusterManager& cluster_manager,
                                    absl::string_view cluster_name, SyslogAccessLogStats& stats)
-    : cluster_manager_(cluster_manager), cluster_name_(cluster_name), stats_(stats),
-      writer_(dispatcher, stats) {}
+    : cluster_manager_(cluster_manager), cluster_name_(cluster_name), writer_(dispatcher, stats) {}
 
 void ClusterUdpSender::send(absl::string_view record) {
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(cluster_name_);
   if (cluster == nullptr) {
-    stats_.dropped_.inc();
     ENVOY_LOG_PERIODIC_MISC(warn, std::chrono::seconds(10),
                             "Syslog UDP cluster '{}' is unavailable; dropping messages",
                             cluster_name_);
@@ -120,14 +117,12 @@ void ClusterUdpSender::send(absl::string_view record) {
   Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
       cluster->loadBalancer().chooseHost(nullptr));
   if (host == nullptr) {
-    stats_.dropped_.inc();
     ENVOY_LOG_PERIODIC_MISC(warn, std::chrono::seconds(10),
                             "Syslog UDP cluster '{}' has no available host; dropping messages",
                             cluster_name_);
     return;
   }
   if (host->address()->type() != Network::Address::Type::Ip) {
-    stats_.dropped_.inc();
     ENVOY_LOG_PERIODIC_MISC(
         warn, std::chrono::seconds(10),
         "Syslog UDP cluster '{}' selected a non-IP host address; dropping messages", cluster_name_);

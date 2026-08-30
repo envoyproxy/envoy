@@ -54,14 +54,17 @@ The Fluentd access log has statistics rooted at the *access_logs.fluentd.<stat_p
 Syslog access log statistics
 ----------------------------
 
-The Syslog access log has statistics rooted at the *access_logs.syslog.* namespace. When
-``stat_prefix`` is configured, statistics are rooted at
-*access_logs.syslog.<stat_prefix>.* instead.
+The Syslog access log has statistics rooted at the
+*access_logs.syslog.<stat_prefix>.* namespace.
 
 .. csv-table::
    :header: Name, Type, Description
    :widths: 1, 1, 3
 
-   send, Counter, "Total messages submitted to the sender, tagged with ``state=full`` or ``state=truncated``."
-   bytes_sent, Counter, Total bytes accepted by the local socket for successfully sent datagrams.
-   dropped, Counter, "Number of Syslog messages not sent for any reason such as an unavailable destination, an oversized message, or a socket write failure."
+   messages, Counter, "Total messages processed by the Syslog logger, tagged with ``state=full`` or ``state=truncated``."
+   bytes_truncated, Counter, Total bytes removed from messages that exceeded the configured maximum message size.
+   send, Counter, Total messages accepted by the local socket.
+   bytes_sent, Counter, Total bytes accepted by the local socket.
+
+The number of messages not accepted by the local socket is the sum of both ``messages`` state
+values minus ``send``.

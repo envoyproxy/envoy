@@ -24,25 +24,26 @@ using testing::StartsWith;
 const std::string TestAccessLog = R"([2026-08-19T14:20:54.123Z] "GET / HTTP/1.1" 200 12 1ms)";
 constexpr int64_t TestTimestampSeconds = 1787149254;
 
-TEST(SyslogStatsTest, DefinesMetricNamesAndSubmittedMessageStateTags) {
+TEST(SyslogStatsTest, DefinesMetricNamesAndMessageStateTags) {
   Stats::IsolatedStoreImpl store;
-  SyslogAccessLogStats default_stats(*store.rootScope(), "");
+  SyslogAccessLogStats default_stats(*store.rootScope(), "default");
   SyslogAccessLogStats stats(*store.rootScope(), "audit");
 
-  EXPECT_EQ("access_logs.syslog.bytes_sent", default_stats.bytes_sent_.name());
-  EXPECT_EQ("access_logs.syslog.dropped", default_stats.dropped_.name());
+  EXPECT_EQ("access_logs.syslog.default.bytes_sent", default_stats.bytes_sent_.name());
+  EXPECT_EQ("access_logs.syslog.default.bytes_truncated", default_stats.bytes_truncated_.name());
+  EXPECT_EQ("access_logs.syslog.default.send", default_stats.send_.name());
 
-  EXPECT_EQ("access_logs.syslog.audit.send.state.full", stats.send_full_.name());
-  EXPECT_EQ("access_logs.syslog.audit.send", stats.send_full_.tagExtractedName());
-  ASSERT_EQ(1, stats.send_full_.tags().size());
-  EXPECT_EQ("state", stats.send_full_.tags()[0].name_);
-  EXPECT_EQ("full", stats.send_full_.tags()[0].value_);
+  EXPECT_EQ("access_logs.syslog.audit.messages.state.full", stats.messages_full_.name());
+  EXPECT_EQ("access_logs.syslog.audit.messages", stats.messages_full_.tagExtractedName());
+  ASSERT_EQ(1, stats.messages_full_.tags().size());
+  EXPECT_EQ("state", stats.messages_full_.tags()[0].name_);
+  EXPECT_EQ("full", stats.messages_full_.tags()[0].value_);
 
-  EXPECT_EQ("access_logs.syslog.audit.send.state.truncated", stats.send_truncated_.name());
-  EXPECT_EQ("access_logs.syslog.audit.send", stats.send_truncated_.tagExtractedName());
-  ASSERT_EQ(1, stats.send_truncated_.tags().size());
-  EXPECT_EQ("state", stats.send_truncated_.tags()[0].name_);
-  EXPECT_EQ("truncated", stats.send_truncated_.tags()[0].value_);
+  EXPECT_EQ("access_logs.syslog.audit.messages.state.truncated", stats.messages_truncated_.name());
+  EXPECT_EQ("access_logs.syslog.audit.messages", stats.messages_truncated_.tagExtractedName());
+  ASSERT_EQ(1, stats.messages_truncated_.tags().size());
+  EXPECT_EQ("state", stats.messages_truncated_.tags()[0].name_);
+  EXPECT_EQ("truncated", stats.messages_truncated_.tags()[0].value_);
 }
 
 TEST(SyslogStatsTest, AccountsWriteResults) {
@@ -53,8 +54,8 @@ TEST(SyslogStatsTest, AccountsWriteResults) {
   accountWriteResult({0, Network::IoSocketError::getIoSocketEagainError()}, stats);
   accountWriteResult({0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)}, stats);
 
+  EXPECT_EQ(1, stats.send_.value());
   EXPECT_EQ(7, stats.bytes_sent_.value());
-  EXPECT_EQ(2, stats.dropped_.value());
 }
 
 class TestBodyFormatter : public Formatter::Formatter {
@@ -86,12 +87,18 @@ public:
   uint64_t send_count_{0};
 };
 
+class FailingSender : public Sender {
+public:
+  void send(absl::string_view) override {}
+};
+
 class SyslogAccessLoggerImplTest : public testing::Test {
 protected:
   SyslogAccessLoggerImplTest()
       : stats_(*store_.rootScope(), "test"), body_(TestAccessLog),
         body_formatter_(std::make_shared<TestBodyFormatter>(body_)) {
     config_.set_no_hostname(true);
+    config_.set_stat_prefix("test");
     sender_ = new FakeSender();
     logger_ = std::make_unique<SyslogAccessLoggerImpl>(config_, body_formatter_, SenderPtr(sender_),
                                                        stats_);
@@ -121,7 +128,7 @@ TEST_F(SyslogAccessLoggerImplTest, FormatsAndSendsRfc3164Message) {
 
   EXPECT_EQ(R"(<190>Aug 19 14:20:54 envoy: [2026-08-19T14:20:54.123Z] "GET / HTTP/1.1" 200 12 1ms)",
             sender_->message_);
-  EXPECT_EQ(1, stats_.send_full_.value());
+  EXPECT_EQ(1, stats_.messages_full_.value());
 }
 
 TEST_F(SyslogAccessLoggerImplTest, FormatsAndSendsRfc5424Message) {
@@ -188,13 +195,27 @@ TEST_F(SyslogAccessLoggerImplTest, EnforcesMaxMessageSize) {
   body_ = std::string(480 - header_size, 'a');
   log();
   EXPECT_EQ(480, sender_->message_.size());
-  EXPECT_EQ(2, stats_.send_full_.value());
+  EXPECT_EQ(2, stats_.messages_full_.value());
 
   body_ = std::string(481 - header_size, 'a');
   log();
   EXPECT_EQ(480, sender_->message_.size());
-  EXPECT_EQ(1, stats_.send_truncated_.value());
-  EXPECT_EQ(2, stats_.send_full_.value());
+  EXPECT_EQ(1, stats_.messages_truncated_.value());
+  EXPECT_EQ(2, stats_.messages_full_.value());
+  EXPECT_EQ(1, stats_.bytes_truncated_.value());
+}
+
+TEST_F(SyslogAccessLoggerImplTest, CountsTruncatedMessageWhenSendFails) {
+  config_.set_max_syslog_msg_bytes(1);
+  logger_ = std::make_unique<SyslogAccessLoggerImpl>(config_, body_formatter_,
+                                                     std::make_unique<FailingSender>(), stats_);
+
+  log();
+
+  EXPECT_EQ(1, stats_.messages_truncated_.value());
+  EXPECT_GT(stats_.bytes_truncated_.value(), 0);
+  EXPECT_EQ(0, stats_.bytes_sent_.value());
+  EXPECT_EQ(0, stats_.send_.value());
 }
 
 class SenderTestBase : public testing::Test {
@@ -217,6 +238,7 @@ protected:
     const Api::IoCallUint64Result result = receiver.ioHandle().recv(data, sizeof(data), 0);
     ASSERT_TRUE(result.ok());
     EXPECT_EQ("message", absl::string_view(data, result.return_value_));
+    EXPECT_EQ(1, stats_.send_.value());
     EXPECT_EQ(sizeof("message") - 1, stats_.bytes_sent_.value());
   }
 
@@ -268,7 +290,7 @@ TEST_F(StaticUdpSenderTest, CountsDatagramSendError) {
   sender.send("message");
 
   EXPECT_EQ(0, stats_.bytes_sent_.value());
-  EXPECT_EQ(1, stats_.dropped_.value());
+  EXPECT_EQ(0, stats_.send_.value());
 }
 #endif
 
@@ -293,7 +315,7 @@ TEST_F(ClusterUdpSenderTest, IgnoresUnavailableDestinations) {
   sender.send("message");
 
   EXPECT_EQ(0, stats_.bytes_sent_.value());
-  EXPECT_EQ(3, stats_.dropped_.value());
+  EXPECT_EQ(0, stats_.send_.value());
 }
 
 TEST_F(ClusterUdpSenderTest, SelectsHostForEveryRecord) {
@@ -330,6 +352,8 @@ TEST_F(ClusterUdpSenderTest, SelectsHostForEveryRecord) {
   result = second_receiver.ioHandle().recv(data, sizeof(data), 0);
   ASSERT_TRUE(result.ok());
   EXPECT_EQ("message", absl::string_view(data, result.return_value_));
+  EXPECT_EQ(2, stats_.send_.value());
+  EXPECT_EQ(2 * (sizeof("message") - 1), stats_.bytes_sent_.value());
 }
 
 } // namespace

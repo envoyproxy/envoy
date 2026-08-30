@@ -20,25 +20,49 @@ namespace {
 using SyslogAccessLogConfig = envoy::extensions::access_loggers::syslog::v3::SyslogAccessLogConfig;
 using testing::Return;
 
-const std::string TestAccessLog = R"([2026-08-19T14:20:54.123Z] "GET / HTTP/1.1" 200 12 1ms)";
+const std::string UdpServerConfigYaml = R"EOF(
+server:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 514
+    protocol: UDP
+no_hostname: true
+stat_prefix: test
+log_format:
+  text_format_source:
+    inline_string: test
+)EOF";
 
-SyslogAccessLogConfig makeClusterConfig(absl::string_view name = "syslog") {
+const std::string UdpClusterConfigYaml = R"EOF(
+cluster:
+  name: syslog
+  protocol: UDP
+no_hostname: true
+stat_prefix: test
+log_format:
+  text_format_source:
+    inline_string: test
+)EOF";
+
+SyslogAccessLogConfig loadConfig(const std::string& yaml) {
   SyslogAccessLogConfig config;
-  config.mutable_cluster()->set_name(name);
-  config.set_no_hostname(true);
-  config.mutable_log_format()->mutable_text_format_source()->set_inline_string(TestAccessLog);
+  TestUtility::loadFromYaml(yaml, config);
   return config;
 }
 
-SyslogAccessLogConfig makeServerConfig() {
-  SyslogAccessLogConfig config;
-  config.set_no_hostname(true);
-  auto* socket_address = config.mutable_server()->mutable_socket_address();
-  socket_address->set_address("127.0.0.1");
-  socket_address->set_port_value(514);
-  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
-  config.mutable_log_format()->mutable_text_format_source()->set_inline_string(TestAccessLog);
-  return config;
+TEST(SyslogConfigTest, AcceptsUdpServerAddress) {
+  const auto config = loadConfig(UdpServerConfigYaml);
+
+  EXPECT_TRUE(validateServerAddress(config.server()).ok());
+}
+
+TEST(SyslogConfigTest, RejectsEmptyStatPrefix) {
+  auto config = loadConfig(UdpServerConfigYaml);
+  config.clear_stat_prefix();
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+
+  EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
+               ProtoValidationException);
 }
 
 TEST(SyslogConfigTest, RejectsTcpServerAndClusterDestinations) {
@@ -48,7 +72,7 @@ TEST(SyslogConfigTest, RejectsTcpServerAndClusterDestinations) {
   EXPECT_EQ(absl::StatusCode::kUnimplemented, tcp_status.code());
   EXPECT_EQ("syslog over TCP is not implemented yet", tcp_status.message());
 
-  auto config = makeClusterConfig();
+  auto config = loadConfig(UdpClusterConfigYaml);
   config.mutable_cluster()->set_protocol(SyslogAccessLogConfig::Cluster::TCP);
 
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
@@ -119,7 +143,8 @@ TEST(SyslogConfigTest, RejectsUnsetAndInternalAddresses) {
 }
 
 TEST(SyslogConfigTest, FactoryRejectsUnknownCluster) {
-  const auto config = makeClusterConfig("unknown");
+  auto config = loadConfig(UdpClusterConfigYaml);
+  config.mutable_cluster()->set_name("unknown");
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   EXPECT_CALL(context.server_context_.cluster_manager_, checkActiveStaticCluster("unknown"))
       .WillOnce(Return(absl::InvalidArgumentError("unknown cluster")));
@@ -130,14 +155,14 @@ TEST(SyslogConfigTest, FactoryRejectsUnknownCluster) {
 }
 
 TEST(SyslogConfigTest, FactoryCreatesUdpAccessLogger) {
-  const auto config = makeServerConfig();
+  const auto config = loadConfig(UdpServerConfigYaml);
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
 
   EXPECT_NE(nullptr, SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context));
 }
 
 TEST(SyslogConfigTest, FactoryCreatesClusterAccessLogger) {
-  const auto config = makeClusterConfig();
+  const auto config = loadConfig(UdpClusterConfigYaml);
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   context.server_context_.cluster_manager_.initializeClusters({"syslog"}, {});
   EXPECT_CALL(context.server_context_.cluster_manager_, checkActiveStaticCluster("syslog"))
@@ -147,7 +172,7 @@ TEST(SyslogConfigTest, FactoryCreatesClusterAccessLogger) {
 }
 
 TEST(SyslogConfigTest, RejectsSecureClusterTransport) {
-  const auto config = makeClusterConfig();
+  const auto config = loadConfig(UdpClusterConfigYaml);
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   context.server_context_.cluster_manager_.initializeClusters({"syslog"}, {});
   EXPECT_CALL(context.server_context_.cluster_manager_, checkActiveStaticCluster("syslog"))

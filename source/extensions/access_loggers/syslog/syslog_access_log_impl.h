@@ -34,7 +34,8 @@ class SyslogAccessLogStats {
   Stats::ScopeSharedPtr scope_;
   Stats::StatNamePool stat_names_;
   const Stats::StatName bytes_sent_name_;
-  const Stats::StatName dropped_name_;
+  const Stats::StatName bytes_truncated_name_;
+  const Stats::StatName messages_name_;
   const Stats::StatName send_name_;
   const Stats::StatName state_name_;
   const Stats::StatName full_name_;
@@ -46,9 +47,10 @@ public:
   SyslogAccessLogStats(Stats::Scope& scope, absl::string_view stat_prefix);
 
   Stats::Counter& bytes_sent_;
-  Stats::Counter& dropped_;
-  Stats::Counter& send_full_;
-  Stats::Counter& send_truncated_;
+  Stats::Counter& bytes_truncated_;
+  Stats::Counter& messages_full_;
+  Stats::Counter& messages_truncated_;
+  Stats::Counter& send_;
 };
 
 /** Worker-local logger that formats and sends syslog records. */
