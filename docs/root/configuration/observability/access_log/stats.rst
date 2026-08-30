@@ -63,8 +63,8 @@ The Syslog access log has statistics rooted at the
 
    messages, Counter, "Total syslog messages, tagged with ``state=full`` or ``state=truncated``."
    bytes_truncated, Counter, Bytes truncated from syslog messages that exceeded the maximum size.
-   send, Counter, Total messages sent to the syslog server.
-   bytes_sent, Counter, "Syslog message bytes sent to the syslog server, including header and payload."
+   send, Counter, Total syslog messages sent.
+   bytes_sent, Counter, "Syslog message bytes sent, including header and payload."
 
 The number of messages that were not sent is the sum of both ``messages`` state
 values minus ``send``.

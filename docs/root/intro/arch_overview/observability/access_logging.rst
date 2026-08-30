@@ -154,10 +154,10 @@ Fluentd
 Syslog
 ******
 
-* Formats access logs as RFC 3164 or RFC 5424 messages and sends them over UDP or a Unix domain
-  datagram socket.
-* Uses best-effort delivery without blocking request processing, queueing messages, retrying failed
-  messages, or waiting for receiver acknowledgements.
+* Sends access logs over syslog. Currently supports UDP and Unix domain sockets.
+* The syslog protocol standard defaults to RFC3164 and also supports RFC5424. Access log
+  content is configured with Envoy's access log format.
+* Delivery is fire-and-forget: Envoy does not buffer, retry, or wait for the receiver.
 
 Further reading
 ---------------
