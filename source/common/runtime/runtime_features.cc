@@ -165,6 +165,10 @@ RUNTIME_GUARD(envoy_reloadable_features_upstream_wasm_filter_uses_root_scope);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_match_on_asterisk);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_mixed_variable_literals);
 RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
+// Decide connection drain-close (HCM, TCP proxy, and the Mongo, Redis, Thrift and generic proxies)
+// from the connection-level drain notification (Network::Connection::onDrain()) instead of by
+// polling the listener DrainDecision. Latched per connection when the network filter is created.
+RUNTIME_GUARD(envoy_reloadable_features_use_connection_event_drain);
 RUNTIME_GUARD(envoy_reloadable_features_use_migration_in_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
