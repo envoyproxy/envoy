@@ -178,6 +178,7 @@ RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
+RUNTIME_GUARD(envoy_reloadable_features_normalize_sds_config);
 // Begin false flags. Most of them should come with a TODO to flip true.
 
 // Sentinel and test flag.
