@@ -9,6 +9,7 @@
 #include "envoy/ssl/tls_certificate_config.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/secret/sds_api.h"
 
 #include "absl/container/node_hash_map.h"
@@ -87,8 +88,15 @@ private:
                  OptRef<Init::Manager> init_manager, bool warm) {
       // Warming and non-warming providers have different init targets: the warming
       // target only fires after a secret is fetched, while non-warming one pre-fetches.
-      const std::string map_key =
-          absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name, warm);
+      std::string map_key;
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.normalize_sds_config")) {
+        auto& mutable_source = const_cast<envoy::config::core::v3::ConfigSource&>(sds_config_source);
+        auto* orig_initial_timeout = mutable_source.release_initial_fetch_timeout();
+        map_key = absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name, warm);
+        mutable_source.set_allocated_initial_fetch_timeout(orig_initial_timeout);
+      } else {
+        map_key = absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name, warm);
+      }
 
       std::shared_ptr<SecretType> secret_provider = dynamic_secret_providers_[map_key].lock();
       if (!secret_provider) {
