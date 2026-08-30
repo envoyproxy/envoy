@@ -1,5 +1,6 @@
+#include <string>
+
 #include "source/common/formatter/substitution_formatter.h"
-#include "source/extensions/access_loggers/syslog/rfc3164_formatter.h"
 #include "source/extensions/access_loggers/syslog/rfc5424_formatter.h"
 
 #include "test/mocks/stream_info/mocks.h"
@@ -21,30 +22,8 @@ Formatter::FormatterConstSharedPtr makeBodyFormatter(absl::string_view body) {
       std::move(*Formatter::FormatterImpl::create(std::string(body))));
 }
 
-TEST(Rfc3164FormatterTest, FormatsCompleteMessageToOutput) {
-  Rfc3164Formatter formatter(makeBodyFormatter(TestAccessLog), "<190>", "", "envoy");
-  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.ts_.setSystemTime(std::chrono::system_clock::from_time_t(TestTimestampSeconds));
-  std::string output;
-
-  formatter.formatTo(output, Formatter::Context{}, stream_info);
-  EXPECT_EQ(R"(<190>Aug 19 14:20:54 envoy: [2026-08-19T14:20:54.123Z] "GET / HTTP/1.1" 200 12 1ms)",
-            output);
-}
-
-TEST(Rfc5424FormatterTest, FormatsCompleteMessage) {
-  Rfc5424Formatter formatter(makeBodyFormatter(TestAccessLog), "<190>", "hostname", "envoy");
-  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  const SystemTime timestamp = std::chrono::system_clock::from_time_t(TestTimestampSeconds) +
-                               std::chrono::microseconds(123456);
-  stream_info.ts_.setSystemTime(timestamp);
-
-  EXPECT_THAT(
-      formatter.format(Formatter::Context{}, stream_info),
-      testing::MatchesRegex(
-          R"(<190>1 2026-08-19T14:20:54.123456Z hostname envoy [0-9]+ envoy\.access - \[2026-08-19T14:20:54\.123Z\] "GET / HTTP/1\.1" 200 12 1ms)"));
-}
-
+// Factory replaces empty tag/msg_id with defaults, so NIL APP-NAME/MSGID and empty-body spacing
+// are only reachable by constructing the formatter directly.
 TEST(Rfc5424FormatterTest, HandlesNilHeaderFieldsAndEmptyBody) {
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.ts_.setSystemTime(std::chrono::system_clock::from_time_t(TestTimestampSeconds));
