@@ -1344,6 +1344,68 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
       "Unexpected SDS secret (expecting abc.com): wrong.name.com");
 }
 
+// Verify that initial_fetch_timeout: 0s is clamped to SdsMinimumFetchTimeoutSeconds.
+TEST_F(SdsApiTest, ZeroInitialFetchTimeoutIsClamped) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.sds_minimum_fetch_timeout", "true"}});
+
+  envoy::config::core::v3::ConfigSource config_source;
+  *config_source.mutable_initial_fetch_timeout() =
+      Protobuf::util::TimeUtil::SecondsToDuration(0);
+
+  // Capture the ConfigSource passed to subscriptionFromConfigSource.
+  envoy::config::core::v3::ConfigSource captured_config;
+  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
+      .WillOnce(Invoke([&captured_config](const envoy::config::core::v3::ConfigSource& cs,
+                                         absl::string_view, Stats::Scope&,
+                                         Config::SubscriptionCallbacks&,
+                                         Config::OpaqueResourceDecoderSharedPtr,
+                                         const Config::SubscriptionOptions&)
+                           -> Config::SubscriptionPtr {
+        captured_config = cs;
+        return std::make_unique<NiceMock<Config::MockSubscription>>();
+      }));
+
+  EXPECT_LOG_CONTAINS("warn", "initial_fetch_timeout of 0s", {
+    TlsCertificateSdsApi sds_api(config_source, "abc.com", subscription_factory_, time_system_,
+                                 validation_visitor_, stats_, []() {}, *dispatcher_, *api_, true);
+  });
+
+  ASSERT_TRUE(captured_config.has_initial_fetch_timeout());
+  EXPECT_EQ(DurationUtil::durationToMilliseconds(captured_config.initial_fetch_timeout()),
+            SdsMinimumFetchTimeoutSeconds * 1000);
+}
+
+// Verify that a non-zero initial_fetch_timeout passes through unchanged.
+TEST_F(SdsApiTest, NonZeroInitialFetchTimeoutPassesThrough) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.sds_minimum_fetch_timeout", "true"}});
+
+  envoy::config::core::v3::ConfigSource config_source;
+  *config_source.mutable_initial_fetch_timeout() =
+      Protobuf::util::TimeUtil::SecondsToDuration(60);
+
+  envoy::config::core::v3::ConfigSource captured_config;
+  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
+      .WillOnce(Invoke([&captured_config](const envoy::config::core::v3::ConfigSource& cs,
+                                         absl::string_view, Stats::Scope&,
+                                         Config::SubscriptionCallbacks&,
+                                         Config::OpaqueResourceDecoderSharedPtr,
+                                         const Config::SubscriptionOptions&)
+                           -> Config::SubscriptionPtr {
+        captured_config = cs;
+        return std::make_unique<NiceMock<Config::MockSubscription>>();
+      }));
+
+  TlsCertificateSdsApi sds_api(config_source, "abc.com", subscription_factory_, time_system_,
+                               validation_visitor_, stats_, []() {}, *dispatcher_, *api_, true);
+
+  ASSERT_TRUE(captured_config.has_initial_fetch_timeout());
+  EXPECT_EQ(DurationUtil::durationToMilliseconds(captured_config.initial_fetch_timeout()), 60000);
+}
+
 } // namespace
 } // namespace Secret
 } // namespace Envoy

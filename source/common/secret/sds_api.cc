@@ -8,6 +8,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/grpc/common.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -15,6 +16,24 @@ namespace Secret {
 
 SdsApiStats SdsApi::generateStats(Stats::Scope& scope) {
   return {ALL_SDS_API_STATS(POOL_COUNTER(scope))};
+}
+
+// Applies the SDS minimum initial_fetch_timeout.
+static envoy::config::core::v3::ConfigSource
+clampInitialFetchTimeout(envoy::config::core::v3::ConfigSource config,
+                         absl::string_view sds_config_name) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.sds_minimum_fetch_timeout") &&
+      config.has_initial_fetch_timeout() &&
+      DurationUtil::durationToMilliseconds(config.initial_fetch_timeout()) == 0) {
+    ENVOY_LOG_MISC(warn,
+                   "SDS config for '{}' has initial_fetch_timeout of 0s. A missing secret would "
+                   "permanently block CDS updates. Applying minimum timeout of {}s.",
+                   sds_config_name, SdsMinimumFetchTimeoutSeconds);
+    *config.mutable_initial_fetch_timeout() =
+        Protobuf::util::TimeUtil::SecondsToDuration(SdsMinimumFetchTimeoutSeconds);
+  }
+  return config;
 }
 
 SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_view sds_config_name,
@@ -30,7 +49,8 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
           {Stats::TagStringView{Envoy::Config::TagNames::get().XDS_RESOURCE_NAME, sds_config_name}},
           absl::StrCat("sds.", sds_config_name, "."))),
       sds_api_stats_(generateStats(*scope_)), resource_type_helper_(validation_visitor, "name"),
-      sds_config_(std::move(sds_config)), sds_config_name_(sds_config_name),
+      sds_config_(clampInitialFetchTimeout(std::move(sds_config), sds_config_name)),
+      sds_config_name_(sds_config_name),
       clean_up_(std::move(destructor_cb)), subscription_factory_(subscription_factory),
       time_source_(time_source),
       secret_data_{sds_config_name_, "uninitialized", time_source_.systemTime()} {
