@@ -89,22 +89,11 @@ message SyslogAccessLogConfig {
     DEBUG = 7;
   }
 
-  // An Envoy cluster that receives syslog messages.
+  // An Envoy cluster that receives syslog messages over UDP. Cluster host addresses
+  // must be IP addresses; Unix domain sockets are not selected through a cluster.
   message Cluster {
-    // Transport used to send syslog messages to the cluster.
-    enum Protocol {
-      UDP = 0;
-
-      // Reserved for TCP syslog. TLS is configured by the referenced cluster's transport socket.
-      // TCP is not currently supported by this access logger.
-      TCP = 1;
-    }
-
     // Name of the Envoy cluster used for service discovery and load balancing.
     string name = 1 [(validate.rules).string = {min_len: 1}];
-
-    // Transport used with the cluster. Defaults to UDP.
-    Protocol protocol = 2 [(validate.rules).enum = {defined_only: true}];
   }
 
   oneof destination {
@@ -114,7 +103,7 @@ message SyslogAccessLogConfig {
     // Unix domain sockets are also supported.
     config.core.v3.Address server = 1;
 
-    // Envoy cluster used for service discovery and load balancing. This can reference a
+    // Envoy cluster used for UDP service discovery and load balancing. This can reference a
     // ``STRICT_DNS`` cluster to dynamically resolve and round-robin across DNS addresses.
     Cluster cluster = 9;
   }

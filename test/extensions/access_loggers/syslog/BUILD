@@ -20,7 +20,6 @@ envoy_extension_cc_test(
         "//envoy/common:exception_lib",
         "//source/extensions/access_loggers/syslog:config",
         "//test/mocks/api:api_mocks",
-        "//test/mocks/network:transport_socket_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",

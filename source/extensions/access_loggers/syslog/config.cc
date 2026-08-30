@@ -22,9 +22,8 @@ absl::Status validateServerAddress(const envoy::config::core::v3::Address& serve
     switch (server.socket_address().protocol()) {
     case envoy::config::core::v3::SocketAddress::UDP:
       break;
-    // TODO(izumi39): Add RFC 6587 TCP support for RFC 3164 and RFC 5424 messages.
     case envoy::config::core::v3::SocketAddress::TCP:
-      return absl::UnimplementedError("syslog over TCP is not implemented yet");
+      return absl::InvalidArgumentError("syslog server socket addresses must use UDP");
     default:
       return absl::InvalidArgumentError(
           fmt::format("invalid syslog server protocol value: {}",
@@ -112,25 +111,6 @@ AccessLog::InstanceSharedPtr SyslogAccessLogFactory::createAccessLogInstance(
     if (!cluster.has_value()) {
       throw EnvoyException(
           fmt::format("cluster '{}' is not active", proto_config.cluster().name()));
-    }
-    const bool uses_secure_transport = cluster->info()
-                                           ->transportSocketMatcher()
-                                           .resolve(nullptr, nullptr)
-                                           .factory_.implementsSecureTransport();
-    if (uses_secure_transport) {
-      // TODO(izumi39): Add syslog over TLS support according to RFC 5425.
-      THROW_IF_NOT_OK(absl::UnimplementedError("syslog over TLS is not implemented yet"));
-    }
-    switch (proto_config.cluster().protocol()) {
-    case SyslogAccessLogConfig::Cluster::UDP:
-      break;
-    case SyslogAccessLogConfig::Cluster::TCP:
-      THROW_IF_NOT_OK(absl::UnimplementedError("syslog over TCP is not implemented yet"));
-      break;
-    default:
-      THROW_IF_NOT_OK(absl::InvalidArgumentError(
-          fmt::format("invalid syslog cluster protocol value: {}",
-                      static_cast<int>(proto_config.cluster().protocol()))));
     }
   }
   auto shared_config = std::make_shared<SyslogAccessLogConfig>(proto_config);

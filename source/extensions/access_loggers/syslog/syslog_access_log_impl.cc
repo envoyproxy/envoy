@@ -78,26 +78,15 @@ SenderPtr makeSender(const SyslogAccessLogConfig& config,
       switch (config.server().socket_address().protocol()) {
       case envoy::config::core::v3::SocketAddress::UDP:
         return std::make_unique<StaticUdpSender>(dispatcher, std::move(destination), stats);
-      case envoy::config::core::v3::SocketAddress::TCP:
-        // TODO(izumi39): Add RFC 6587 TCP support for server destinations.
-        throw EnvoyException("syslog over TCP is not implemented yet");
       default:
-        throw EnvoyException("invalid syslog server protocol");
+        throw EnvoyException("syslog server socket addresses must use UDP");
       }
     default:
       throw EnvoyException("invalid syslog server address type");
     }
   case SyslogAccessLogConfig::kCluster:
-    switch (config.cluster().protocol()) {
-    case SyslogAccessLogConfig::Cluster::UDP:
-      return std::make_unique<ClusterUdpSender>(dispatcher, cluster_manager,
-                                                config.cluster().name(), stats);
-    case SyslogAccessLogConfig::Cluster::TCP:
-      // TODO(izumi39): Add RFC 6587 TCP support for cluster destinations.
-      throw EnvoyException("syslog over TCP is not implemented yet");
-    default:
-      throw EnvoyException("invalid syslog cluster protocol");
-    }
+    return std::make_unique<ClusterUdpSender>(dispatcher, cluster_manager, config.cluster().name(),
+                                              stats);
   default:
     throw EnvoyException("syslog destination is not configured");
   }

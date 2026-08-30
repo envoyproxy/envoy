@@ -52,7 +52,6 @@ log_format:
 constexpr absl::string_view UdpClusterConfigYaml = R"EOF(
 cluster:
   name: syslog
-  protocol: UDP
 no_hostname: true
 stat_prefix: test
 log_format:

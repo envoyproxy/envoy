@@ -9,7 +9,6 @@
 #include "source/extensions/access_loggers/syslog/config.h"
 
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/network/transport_socket.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -42,7 +41,6 @@ log_format:
 constexpr absl::string_view UdpClusterConfigYaml = R"EOF(
 cluster:
   name: syslog
-  protocol: UDP
 no_hostname: true
 stat_prefix: test
 log_format:
@@ -88,8 +86,8 @@ TEST_F(SyslogConfigTest, RejectsInvalidServerAddresses) {
             validateServerAddress(address).message());
 
   address.mutable_socket_address()->set_address("127.0.0.1");
-  EXPECT_EQ("syslog over TCP is not implemented yet", validateServerAddress(address).message());
-  EXPECT_EQ(absl::StatusCode::kUnimplemented, validateServerAddress(address).code());
+  EXPECT_EQ("syslog server socket addresses must use UDP", validateServerAddress(address).message());
+  EXPECT_EQ(absl::StatusCode::kInvalidArgument, validateServerAddress(address).code());
 
   address.mutable_socket_address()->set_protocol(
       static_cast<envoy::config::core::v3::SocketAddress::Protocol>(100));
@@ -182,7 +180,7 @@ TEST_F(SyslogConfigTest, ValidatesHostnameRequirement) {
             validateSyslogConfig(config).message());
 }
 
-TEST_F(SyslogConfigTest, RejectsTcpDestinations) {
+TEST_F(SyslogConfigTest, RejectsTcpServerAddresses) {
   auto server_config = loadConfig(UdpServerConfigYaml);
   server_config.mutable_server()->mutable_socket_address()->set_protocol(
       envoy::config::core::v3::SocketAddress::TCP);
@@ -190,18 +188,7 @@ TEST_F(SyslogConfigTest, RejectsTcpDestinations) {
 
   EXPECT_THROW_WITH_MESSAGE(
       SyslogAccessLogFactory().createAccessLogInstance(server_config, nullptr, server_context),
-      EnvoyException, "syslog over TCP is not implemented yet");
-
-  auto cluster_config = loadConfig(UdpClusterConfigYaml);
-  cluster_config.mutable_cluster()->set_protocol(SyslogAccessLogConfig::Cluster::TCP);
-  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> cluster_context;
-  cluster_context.server_context_.cluster_manager_.initializeClusters({"syslog"}, {});
-  EXPECT_CALL(cluster_context.server_context_.cluster_manager_, checkActiveStaticCluster("syslog"))
-      .WillOnce(Return(absl::OkStatus()));
-
-  EXPECT_THROW_WITH_MESSAGE(
-      SyslogAccessLogFactory().createAccessLogInstance(cluster_config, nullptr, cluster_context),
-      EnvoyException, "syslog over TCP is not implemented yet");
+      EnvoyException, "syslog server socket addresses must use UDP");
 }
 
 TEST_F(SyslogConfigTest, FactoryRejectsUnknownCluster) {
@@ -225,37 +212,6 @@ TEST_F(SyslogConfigTest, FactoryRejectsInactiveCluster) {
   EXPECT_THROW_WITH_MESSAGE(
       SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context), EnvoyException,
       "cluster 'syslog' is not active");
-}
-
-TEST_F(SyslogConfigTest, FactoryRejectsInvalidClusterProtocol) {
-  auto config = loadConfig(UdpClusterConfigYaml);
-  config.mutable_cluster()->set_protocol(static_cast<SyslogAccessLogConfig::Cluster::Protocol>(99));
-  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-
-  EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
-               ProtoValidationException);
-}
-
-TEST_F(SyslogConfigTest, RejectsSecureClusterTransport) {
-  const auto config = loadConfig(UdpClusterConfigYaml);
-  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-  context.server_context_.cluster_manager_.initializeClusters({"syslog"}, {});
-  EXPECT_CALL(context.server_context_.cluster_manager_, checkActiveStaticCluster("syslog"))
-      .WillOnce(Return(absl::OkStatus()));
-  auto& cluster = *context.server_context_.cluster_manager_.active_clusters_.at("syslog");
-  auto& matcher =
-      dynamic_cast<Upstream::MockTransportSocketMatcher&>(cluster.info_->transportSocketMatcher());
-  auto secure_factory = std::make_unique<testing::NiceMock<Network::MockTransportSocketFactory>>();
-  ON_CALL(*secure_factory, implementsSecureTransport()).WillByDefault(Return(true));
-  auto* secure_factory_ptr = secure_factory.get();
-  matcher.socket_factory_ = std::move(secure_factory);
-  EXPECT_CALL(matcher, resolve(nullptr, nullptr, testing::_))
-      .WillOnce(Return(
-          Upstream::TransportSocketMatcher::MatchData(*secure_factory_ptr, matcher.stats_, "tls")));
-
-  EXPECT_THROW_WITH_MESSAGE(
-      SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context), EnvoyException,
-      "syslog over TLS is not implemented yet");
 }
 
 } // namespace
