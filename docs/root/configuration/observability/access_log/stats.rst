@@ -3,7 +3,7 @@
 Statistics
 ==========
 
-Currently only the gRPC and file based access logs have statistics.
+The gRPC, file, Fluentd, and Syslog access logs emit statistics.
 
 gRPC access log statistics
 --------------------------
@@ -61,10 +61,10 @@ The Syslog access log has statistics rooted at the
    :header: Name, Type, Description
    :widths: 1, 1, 3
 
-   messages, Counter, "Total messages processed by the Syslog logger, tagged with ``state=full`` or ``state=truncated``."
-   bytes_truncated, Counter, Total bytes removed from messages that exceeded the configured maximum message size.
-   send, Counter, Total messages accepted by the local socket.
-   bytes_sent, Counter, Total bytes accepted by the local socket.
+   messages, Counter, "Total syslog messages, tagged with ``state=full`` or ``state=truncated``."
+   bytes_truncated, Counter, Bytes truncated from syslog messages that exceeded the maximum size.
+   send, Counter, Total messages sent to the syslog server.
+   bytes_sent, Counter, "Syslog message bytes sent to the syslog server, including header and payload."
 
-The number of messages not accepted by the local socket is the sum of both ``messages`` state
+The number of messages that were not sent is the sum of both ``messages`` state
 values minus ``send``.
