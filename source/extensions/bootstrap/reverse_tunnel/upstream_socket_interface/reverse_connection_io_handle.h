@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "envoy/network/io_handle.h"
@@ -88,6 +89,10 @@ private:
 
   UpstreamSocketThreadLocal& registry_;
   Stats::HistogramCompletableTimespanImpl cx_post_upgrade_lifetime_;
+  // Liveness token for registry_. During shutdown the thread-local registry may be destroyed before
+  // this handle (owned by a cluster-manager conn pool). Checked in close() before touching
+  // registry_ to avoid a use-after-free. See UpstreamSocketThreadLocal::aliveHandle().
+  std::weak_ptr<bool> registry_alive_;
 };
 
 } // namespace ReverseConnection

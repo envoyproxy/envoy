@@ -124,6 +124,27 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWithSocketManagerNotification
   EXPECT_EQ(result.err_, nullptr);
 }
 
+// Regression test: close() must not touch the registry after it has been destroyed.
+// During shutdown the thread-local registry (owned by the bootstrap extension's TLS slot) can be
+// torn down before the cluster-manager conn pool that owns this handle. close() is then invoked
+// on the handle while registry_ dangles; the liveness token must make it skip markSocketDead()
+// instead of dereferencing freed memory (previously a SIGSEGV in UpstreamSocketManager).
+TEST_F(UpstreamReverseConnectionIOHandleTest, CloseAfterRegistryDestroyedIsSafe) {
+  io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),
+                                                                   "test-cluster", *tls_registry_);
+
+  // Simulate shutdown tearing down the thread-local registry (and its socket manager) before the
+  // conn pool that owns this handle.
+  tls_registry_.reset();
+
+  // close() must not dereference the dangling registry_.
+  Api::IoCallUint64Result result = Api::ioCallUint64ResultNoError();
+  EXPECT_LOG_CONTAINS("debug", "registry no longer alive", { result = io_handle_->close(); });
+
+  EXPECT_EQ(result.return_value_, 0);
+  EXPECT_EQ(result.err_, nullptr);
+}
+
 // Test close() when owned_socket_ is nullptr.
 TEST_F(UpstreamReverseConnectionIOHandleTest, CloseWithoutOwnedSocket) {
   io_handle_ = std::make_unique<UpstreamReverseConnectionIOHandle>(createMockSocket(),

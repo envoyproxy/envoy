@@ -64,6 +64,15 @@ public:
   UpstreamSocketManager* socketManager() { return socket_manager_.get(); }
   const UpstreamSocketManager* socketManager() const { return socket_manager_.get(); }
 
+  /**
+   * Liveness token observed by objects that hold a bare reference to this thread-local instance
+   * (e.g. UpstreamReverseConnectionIOHandle). During shutdown the thread-local slot may be torn
+   * down before cluster-manager conn pools that still own such handles; those handles must check
+   * this token before dereferencing the registry to avoid a use-after-free.
+   * @return a weak_ptr that is expired once this instance has been destroyed.
+   */
+  std::weak_ptr<bool> aliveHandle() const { return alive_; }
+
   // Per-worker tracking of unique clusters and nodes (no mutex needed - single worker thread).
   // Maps track connection counts per cluster/node. Size of map = number of unique clusters/nodes.
   absl::flat_hash_map<std::string, uint64_t> cluster_connection_counts_;
@@ -84,6 +93,8 @@ private:
   Event::Dispatcher& dispatcher_;
   // Thread-local socket manager.
   std::unique_ptr<UpstreamSocketManager> socket_manager_;
+  // Liveness token for observers holding a bare reference to this instance. See aliveHandle().
+  const std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
 };
 
 /**

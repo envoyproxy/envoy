@@ -17,7 +17,8 @@ UpstreamReverseConnectionIOHandle::UpstreamReverseConnectionIOHandle(
     : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), cluster_name_(cluster_name),
       owned_socket_(std::move(socket)), registry_{registry},
       cx_post_upgrade_lifetime_{*registry.cx_post_upgrade_lifetime_,
-                                registry.dispatcher().timeSource()} {
+                                registry.dispatcher().timeSource()},
+      registry_alive_{registry.aliveHandle()} {
   ENVOY_LOG(trace, "reverse_tunnel: created IO handle for cluster: {}, fd: {}", cluster_name_, fd_);
 }
 
@@ -40,8 +41,17 @@ Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::close() {
   if (owned_socket_) {
     ENVOY_LOG(debug, "reverse_tunnel: releasing socket for cluster: {}", cluster_name_);
 
-    auto* socket_manager = registry_.socketManager();
-    socket_manager->markSocketDead(fd_);
+    // During shutdown the thread-local registry (and its socket manager) can be destroyed before
+    // the cluster-manager conn pool that owns this handle. Only touch registry_ while it is still
+    // alive; otherwise dereferencing it (or the socket manager) is a use-after-free.
+    if (!registry_alive_.expired()) {
+      if (auto* socket_manager = registry_.socketManager(); socket_manager != nullptr) {
+        socket_manager->markSocketDead(fd_);
+      }
+    } else {
+      ENVOY_LOG(debug, "reverse_tunnel: registry no longer alive; skipping markSocketDead, fd: {}",
+                fd_);
+    }
 
     owned_socket_.reset();
     SET_SOCKET_INVALID(fd_);
