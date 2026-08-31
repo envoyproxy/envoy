@@ -146,6 +146,7 @@ envoy_cc_test(
         ":fake_codec_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/extensions/filters/network/generic_proxy:access_log_lib",
+        "//test/common/formatter:formatter_test_utility_lib",
         "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
