@@ -22,7 +22,16 @@ public:
   enum class FieldNames { Proto, LowerCamelCase };
 
   // Whether the fields the API marks sensitive are emitted, or replaced the way
-  // MessageUtil::redact replaces them.
+  // MessageUtil::redact replaces them. Redacted, a sensitive field emits:
+  //
+  //   string token                        "token": "[redacted]"
+  //   bytes key                           "key": "W3JlZGFjdGVkXQ=="
+  //   Credentials creds                   "creds": {...}, redacted field by field
+  //   uint32 port                         both key and value dropped
+  //   int64 id                            both key and value dropped
+  //   map<string, uint32> ports           "ports": {"http": 0}
+  //   google.protobuf.Int64Value ttl      "ttl": "0"
+  //   google.protobuf.StringValue name    "name": "[redacted]"
   enum class Sensitive { Emit, Redact };
 
   // Emits `message` as an object opened in `level`, which must be expecting a value.
@@ -81,6 +90,11 @@ private:
 
   Frame& pushOwnedFrame(ProtobufTypes::MessagePtr message, BufferStreamer::Level& level,
                         bool ancestor_is_sensitive);
+
+  // Emits the redacted form of `field`'s value, a replacement for text and the type's default for
+  // anything else. Messages are handled by walking them, not redacting as whole.
+  void emitRedactedValue(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
+                         BufferStreamer::Level& level);
 
   // Emits one value of `field`, or pushes a frame for it. `index` is which element of a repeated
   // field to emit, or -1 for a field that is not repeated.

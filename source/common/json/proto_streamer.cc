@@ -42,7 +42,7 @@ const std::string& redactedBase64() {
 }
 
 // Whether redaction clears `field` instead of replacing it, which it does to everything but
-// messages and text.
+// messages and text. See MessageStreamer::Sensitive for what each ends up looking like.
 bool redactionClears(const Field& field) {
   return field.cpp_type() != Field::CPPTYPE_MESSAGE && field.type() != Field::TYPE_STRING &&
          field.type() != Field::TYPE_BYTES;
@@ -204,19 +204,28 @@ void MessageStreamer::emitMapEntry(const Protobuf::Message& message, const Field
   const Protobuf::Message& entry =
       message.GetReflection()->GetRepeatedMessage(message, &field, index);
   const Protobuf::Descriptor& entry_type = *field.message_type();
-  // Keys are left alone, redacting them would collapse the map onto one key.
+  // Keys are left alone if sensitive, redacting them would collapse the map onto one key.
   entries.addKey(mapKeyToString(entry, *entry_type.map_key(), scratch_));
   emitValue(entry, *entry_type.map_value(), -1, entries, is_sensitive);
+}
+
+void MessageStreamer::emitRedactedValue(const Protobuf::Message& message, const Field& field,
+                                        BufferStreamer::Level& level) {
+  if (field.cpp_type() == Field::CPPTYPE_STRING) {
+    level.addString(field.type() == Field::TYPE_BYTES ? absl::string_view(redactedBase64())
+                                                      : RedactedText);
+    return;
+  }
+  // Only a map value or a wrapper reaches here, startField drops anything else it clears.
+  const ProtobufTypes::MessagePtr cleared(message.New());
+  emitValue(*cleared, field, -1, level, false);
 }
 
 void MessageStreamer::emitValue(const Protobuf::Message& message, const Field& field, int index,
                                 BufferStreamer::Level& level, bool is_sensitive) {
   const Protobuf::Reflection& reflection = *message.GetReflection();
-  // A map entry and a wrapper print their value even when unset, and startField cannot drop either,
-  // it never sees the value field. Redaction clears it, so the default comes off an empty message.
-  if (is_sensitive && redactionClears(field)) {
-    const ProtobufTypes::MessagePtr cleared(message.New());
-    emitValue(*cleared, field, -1, level, false);
+  if (is_sensitive && field.cpp_type() != Field::CPPTYPE_MESSAGE) {
+    emitRedactedValue(message, field, level);
     return;
   }
   switch (field.cpp_type()) {
@@ -267,11 +276,6 @@ void MessageStreamer::emitValue(const Protobuf::Message& message, const Field& f
     return;
   }
   case Field::CPPTYPE_STRING: {
-    if (is_sensitive) {
-      level.addString(field.type() == Field::TYPE_BYTES ? absl::string_view(redactedBase64())
-                                                        : RedactedText);
-      return;
-    }
     scratch_.clear();
     const std::string& value =
         index < 0 ? reflection.GetStringReference(message, &field, &scratch_)
@@ -291,6 +295,8 @@ void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStream
   const Protobuf::Descriptor& descriptor = *message.GetDescriptor();
   switch (descriptor.well_known_type()) {
   case Protobuf::Descriptor::WELLKNOWNTYPE_UNSPECIFIED:
+    // A TypedStruct has to be reified before it can be redacted, see redactOpaque in
+    // source/common/protobuf/utility.cc. The copy comes back redacted, so nothing below it is.
     if (redact_ && isTypedStruct(descriptor)) {
       pushOwnedFrame(redactedCopy(message, is_sensitive), level, false);
       return;

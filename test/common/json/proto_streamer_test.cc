@@ -221,6 +221,8 @@ TEST(MessageStreamerTest, Redacts) {
   sensitive.add_sensitive_repeated_int(2);
   (*sensitive.mutable_sensitive_string_map())["key"] = "secret";
   (*sensitive.mutable_sensitive_int_map())["key"] = 3;
+  sensitive.mutable_sensitive_wrapped_int()->set_value(6);
+  sensitive.mutable_sensitive_wrapped_string()->set_value("secret");
 
   sensitive.set_insensitive_string("public");
   sensitive.add_insensitive_repeated_string("public");
@@ -228,6 +230,8 @@ TEST(MessageStreamerTest, Redacts) {
   sensitive.set_insensitive_int(4);
   (*sensitive.mutable_insensitive_string_map())["key"] = "public";
   (*sensitive.mutable_insensitive_int_map())["key"] = 5;
+  sensitive.mutable_insensitive_wrapped_int()->set_value(7);
+  sensitive.mutable_insensitive_wrapped_string()->set_value("public");
   expectSameRedactedJson(sensitive);
 }
 
