@@ -17,7 +17,9 @@ InjectedResourceMonitorFactory::createResourceMonitorFromProtoTyped(
     const envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig&
         config,
     Server::Configuration::ResourceMonitorFactoryContext& context) {
-  return std::make_unique<InjectedResourceMonitor>(config, context);
+  auto monitor = std::make_unique<InjectedResourceMonitor>(config, context);
+  RETURN_IF_NOT_OK(monitor->init());
+  return monitor;
 }
 
 /**
