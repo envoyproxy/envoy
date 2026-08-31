@@ -45,8 +45,7 @@ constexpr uint32_t kMaxBackoffExponent = 32;
 // ``Retry-After`` cool-off, and the maintenance re-check) so agents that fail together
 // de-synchronize their next attempt.
 constexpr uint64_t kReconnectJitterPercent = 15;
-// Steady-state maintenance re-check interval.
-constexpr uint64_t kMaintainIntervalMs = 10000;
+
 // Short re-check interval used while a hot-restart child is waiting to be allowed to dial (i.e.
 // until it has asked the parent to stop accepting). The handoff window is brief, so poll frequently
 // to bound the added latency before the child stands up its own tunnel.
@@ -536,12 +535,8 @@ void ReverseConnectionIOHandle::removeStaleHostAndCloseConnections(const std::st
       connection->close(Network::ConnectionCloseType::FlushWrite);
     }
 
-    // Remove from wrapper-to-host map.
-    conn_wrapper_to_host_map_.erase(wrapper);
-    // Remove the wrapper from connection_wrappers_ vector.
-    std::erase_if(connection_wrappers_, [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) {
-      return w.get() == wrapper;
-    });
+    wrapper->shutdown();
+    removeAndDeferredDeleteWrapper(wrapper);
   }
   // Clear connection keys from host info.
   auto host_it = host_to_conn_info_map_.find(host);
@@ -624,7 +619,7 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
     uint32_t current_connections = host_to_conn_info_map_[key].connection_keys.size();
     uint32_t pending_connections = host_to_conn_info_map_[key].connecting_count;
 
-    ENVOY_LOG(info,
+    ENVOY_LOG(debug,
               "reverse_tunnel: Number of reverse connections to host {} of cluster {} from source "
               "node: {}: "
               "Current: {}, Pending: {}, Required: {}",
@@ -1027,7 +1022,7 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
   // Enable the retry timer to periodically check for missing connections (like maintainConnCount).
   if (rev_conn_retry_timer_) {
     const uint64_t retry_timeout_ms = ReverseConnectionUtility::addJitter(
-        kMaintainIntervalMs, kReconnectJitterPercent, extension_->randomGenerator());
+        config_.maintain_interval_ms, kReconnectJitterPercent, extension_->randomGenerator());
     rev_conn_retry_timer_->enableTimer(std::chrono::milliseconds(retry_timeout_ms));
     ENVOY_LOG(debug, "Enabled retry timer for next connection check in {}ms.", retry_timeout_ms);
   }
@@ -1337,14 +1332,15 @@ void ReverseConnectionIOHandle::onConnectionDone(
     }
   }
 
-  // Safely remove wrapper from tracking.
+  removeAndDeferredDeleteWrapper(wrapper);
+}
+
+void ReverseConnectionIOHandle::removeAndDeferredDeleteWrapper(RCConnectionWrapper* wrapper) {
   conn_wrapper_to_host_map_.erase(wrapper);
 
-  // Find and remove wrapper from vector safely.
   auto wrapper_vector_it = std::find_if(
       connection_wrappers_.begin(), connection_wrappers_.end(),
       [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) { return w.get() == wrapper; });
-
   if (wrapper_vector_it != connection_wrappers_.end()) {
     auto wrapper_to_delete = std::move(*wrapper_vector_it);
     connection_wrappers_.erase(wrapper_vector_it);

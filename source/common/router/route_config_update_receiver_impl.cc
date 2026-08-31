@@ -51,41 +51,102 @@ ConfigTraitsImpl::createConfig(const Protobuf::Message& rc,
       std::shared_ptr<ConfigImpl>);
 }
 
-bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
-                                                const std::string& version_info) {
+absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
+                                                        const std::string& version_info) {
   uint64_t new_hash = base_.getHash(rc);
   if (!base_.checkHash(new_hash)) {
-    return false;
+    // The route configuration is unchanged, so there is nothing to build, warm up or publish. An
+    // update that is still warming up is deliberately left alone.
+    return absl::OkStatus();
   }
   auto new_route_config = std::make_unique<envoy::config::route::v3::RouteConfiguration>();
   new_route_config->CheckTypeAndMergeFrom(rc);
   const uint64_t new_vhds_config_hash =
       new_route_config->has_vhds() ? MessageUtil::hash(new_route_config->vhds()) : 0ul;
+  std::unique_ptr<VirtualHostMap> rds_virtual_hosts;
   if (new_route_config->has_vhds()) {
     // When using VHDS, stash away RDS vhosts, so that they can be merged with VHDS vhosts in
     // onVhdsUpdate.
-    if (rds_virtual_hosts_ == nullptr) {
-      rds_virtual_hosts_ = std::make_unique<VirtualHostMap>();
-    } else {
-      rds_virtual_hosts_->clear();
-    }
+    rds_virtual_hosts = std::make_unique<VirtualHostMap>();
     for (const auto& vhost : new_route_config->virtual_hosts()) {
-      rds_virtual_hosts_->emplace(vhost.name(), vhost);
+      rds_virtual_hosts->emplace(vhost.name(), vhost);
     }
     if (vhds_virtual_hosts_ != nullptr && !vhds_virtual_hosts_->empty()) {
       // If there are vhosts supplied by VHDS, merge them with RDS vhosts.
-      rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, *vhds_virtual_hosts_, *new_route_config);
+      rebuildRouteConfigVirtualHosts(*rds_virtual_hosts, *vhds_virtual_hosts_, *new_route_config);
     }
   }
-  base_.updateConfig(std::move(new_route_config), new_hash, version_info);
-  // No exception, new_route_config is valid, can update the state. This has to happen before the
-  // update is warmed up and published, because publishing runs the subscription's
-  // beforeProviderUpdate() hook, which reads vhdsConfigurationChanged() to decide whether to
-  // (re)start VHDS.
-  vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
+
+  std::string update_id = fmt::format("rds {}:{}", new_route_config->name(), version_info);
+  // The init manager is kept local until the new route configuration is known to be built without
+  // throwing, so that a rejected update leaves a previous update that is still warming up alone.
+  auto update_init_manager = base_.warmer_.createInitManager(update_id);
+  auto config =
+      config_traits_.createConfig(*new_route_config, factory_context_, *update_init_manager,
+                                  false /* not validate unknown cluster */);
+
+  // No exception, the route configuration is valid, now we can try to create VHDS if necessary.
+  const bool vhds_configuration_changed = new_vhds_config_hash != last_vhds_config_hash_;
+
+  // Captured here because the proto is moved into the state below, before it is used to decide
+  // what happens to the VHDS subscription.
+  const bool has_vhds = new_route_config->has_vhds();
+
+  std::unique_ptr<Init::Manager> vhds_noop_init_manager;
+  std::unique_ptr<Init::Watcher> vhds_noop_init_watcher;
+  VhdsSubscriptionPtr new_vhds_subscription;
+  if (has_vhds) {
+    if (!base_.initialized_) {
+      // We are still waiting for the first valid route configuration update but received a
+      // different RDS update again. Then always create a new subscription because the previous init
+      // manager will be dropped and we need add the VHDS subscription to the new init manager.
+      auto subscription_or_error = createVhdsSubscription(*new_route_config, *update_init_manager);
+      RETURN_IF_NOT_OK_REF(subscription_or_error.status());
+      new_vhds_subscription = std::move(subscription_or_error.value());
+    } else if (vhds_configuration_changed || vhds_subscription_ == nullptr) {
+      // We have received the first valid route configuration update and the VHDS configuration has
+      // changed. Then create a new subscription but use a noop init manager for this subscription
+      // to avoid blocking the main init manager.
+      // This is for backward compatibility: the previous implementation didn't block the new RDS
+      // update if the updated VHDS subscription was not ready.
+      vhds_noop_init_manager = std::make_unique<Init::ManagerImpl>(
+          fmt::format("VHDS noop init manager for {}", new_route_config->name()));
+      vhds_noop_init_watcher = std::make_unique<Init::WatcherImpl>(
+          fmt::format("VHDS noop init watcher for {}", new_route_config->name()), []() {});
+      auto subscription_or_error =
+          createVhdsSubscription(*new_route_config, *vhds_noop_init_manager);
+      RETURN_IF_NOT_OK_REF(subscription_or_error.status());
+      new_vhds_subscription = std::move(subscription_or_error.value());
+    }
+    // Otherwise the VHDS configuration is unchanged and its subscription is still around, so that
+    // subscription is kept: it is the one that is delivering the virtual hosts of the route
+    // configuration that is being updated here.
+  }
+
+  // The new route configuration and VHDS subscription have been built without error, now we can
+  // update the state and start warming up.
+  base_.updateState(std::move(new_route_config), new_hash, version_info, std::move(config),
+                    std::move(update_init_manager), std::move(update_id));
+
+  // Now, the state is updated and previous warming update is aborted (if any), we can update the
+  // VHDS subscription here. So the destruction of the previous subscription will not bring any
+  // side effect.
+  if (new_vhds_subscription != nullptr) {
+    vhds_subscription_ = std::move(new_vhds_subscription);
+  } else if (!has_vhds) {
+    // This route configuration doesn't use VHDS, so the subscription of a previous one goes away.
+    vhds_subscription_.reset();
+  }
   last_vhds_config_hash_ = new_vhds_config_hash;
+  rds_virtual_hosts_ = std::move(rds_virtual_hosts);
+
   base_.startWarming();
-  return true;
+
+  if (vhds_noop_init_manager != nullptr) {
+    vhds_noop_init_manager->initialize(*vhds_noop_init_watcher);
+  }
+
+  return absl::OkStatus();
 }
 
 bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
@@ -157,6 +218,12 @@ bool RouteConfigUpdateReceiverImpl::updateVhosts(VirtualHostMap& vhosts,
     vhosts_added = true;
   }
   return vhosts_added;
+}
+
+absl::StatusOr<VhdsSubscriptionPtr> RouteConfigUpdateReceiverImpl::createVhdsSubscription(
+    const envoy::config::route::v3::RouteConfiguration& route_config, Init::Manager& init_manager) {
+  return VhdsSubscription::createVhdsSubscription(route_config, factory_context_, stat_prefix_,
+                                                  *this, init_manager);
 }
 
 } // namespace Router

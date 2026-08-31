@@ -138,12 +138,14 @@ TEST(CancellationStateTest, CancelSetsFlagAndIsIdempotent) {
   EXPECT_EQ(1, fired);
 }
 
-TEST(CancellationStateTest, SetCallbackAfterCancelFiresSynchronously) {
+TEST(CancellationStateTest, SetCallbackAfterCancelDoesNotFireOnStack) {
   CancellationState state;
   state.cancel();
   int fired = 0;
-  state.setCancelCallback([&fired] { ++fired; });
-  EXPECT_EQ(1, fired);
+  EXPECT_ENVOY_BUG(
+      { state.setCancelCallback([&fired] { ++fired; }); },
+      "setCancelCallback called on an already-cancelled CancellationState");
+  EXPECT_EQ(0, fired);
 }
 
 TEST(CancellationStateTest, ClearedCallbackDoesNotFire) {
@@ -580,6 +582,171 @@ TEST(StatusMacrosTest, CoReturnIfErrorFailure) {
   EXPECT_FALSE(result->ok());
   EXPECT_EQ(result->code(), absl::StatusCode::kInternal);
   EXPECT_EQ(result->message(), "status error");
+}
+
+// ---------------------------------------------------------------------------
+// Additional edge cases and coverage tests
+// ---------------------------------------------------------------------------
+
+TEST(TaskTest, MoveAssignment) {
+  Task<absl::StatusOr<int>> t1 = returnsValue(10);
+  Task<absl::StatusOr<int>> t2 = returnsValue(20);
+  // Overwrite an active task with another active task
+  t1 = std::move(t2);
+
+  auto exec = std::make_shared<ManualExecutor>();
+  std::optional<absl::StatusOr<int>> result;
+  DetachedHandle handle = launch(
+      std::move(t1), exec, [&result](absl::StatusOr<int> val) { result = val; }, StartMode::Inline);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(**result, 20);
+
+  // Self-assignment
+  Task<absl::StatusOr<int>>* t_ptr = &t1;
+  t1 = std::move(*t_ptr);
+}
+
+namespace {
+Task<absl::StatusOr<std::unique_ptr<int>>> returnsMoveOnly(int val) {
+  co_return std::make_unique<int>(val);
+}
+
+Task<absl::StatusOr<std::unique_ptr<int>>> awaitMoveOnly(int val) {
+  ASSIGN_OR_CO_RETURN(auto ptr, co_await returnsMoveOnly(val));
+  co_return ptr;
+}
+} // namespace
+
+TEST(TaskTest, MoveOnlyReturnType) {
+  auto exec = std::make_shared<ManualExecutor>();
+  std::optional<absl::StatusOr<std::unique_ptr<int>>> result;
+  DetachedHandle handle = launch(
+      awaitMoveOnly(99), exec,
+      [&result](absl::StatusOr<std::unique_ptr<int>> res) { result = std::move(res); },
+      StartMode::Inline);
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->ok());
+  ASSERT_NE(result->value(), nullptr);
+  EXPECT_EQ(*result->value(), 99);
+}
+
+TEST(LaunchTest, DetachedHandleMoveAssignmentAndNull) {
+  auto exec = std::make_shared<ManualExecutor>();
+  bool ran = false;
+  DetachedHandle h1(nullptr);
+  // Cancel on null handle is a safe no-op
+  h1.cancel();
+
+  DetachedHandle h2 = launch(returnsOk(ran), exec, [](absl::Status) {});
+  h1 = std::move(h2);
+  exec->drain();
+  EXPECT_TRUE(ran);
+}
+
+TEST(LeafAwaitableTest, MultipleCompleteCallsAreIdempotent) {
+  auto exec = std::make_shared<ManualExecutor>();
+  LeafController controller;
+  std::optional<absl::Status> result;
+  DetachedHandle handle = launch(awaitLeaf(controller), exec,
+                                 [&result](absl::Status status) { result = std::move(status); });
+  exec->drain();
+  ASSERT_TRUE(controller.started);
+
+  // First completion succeeds
+  controller.completeWith(absl::OkStatus());
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(result->ok());
+}
+
+TEST(TaskTest, FinalAwaiterAndTaskAwaiterCoverage) {
+  FinalAwaiter final_awaiter;
+  EXPECT_FALSE(final_awaiter.await_ready());
+  final_awaiter.await_resume();
+
+  bool ran = false;
+  Task<absl::Status> t = returnsOk(ran);
+  auto awaiter = std::move(t).operator co_await();
+  EXPECT_FALSE(awaiter.await_ready());
+}
+
+class ImmediateLeaf : public LeafAwaitable<absl::StatusOr<int>> {
+public:
+  ImmediateLeaf(std::optional<int> immediate_val, bool cancel_during_immediate = false)
+      : immediate_val_(immediate_val), cancel_during_immediate_(cancel_during_immediate) {}
+
+  bool started_ = false;
+
+protected:
+  std::optional<absl::StatusOr<int>> tryImmediate() override {
+    if (cancel_during_immediate_) {
+      context().cancellation()->cancel();
+    }
+    if (immediate_val_.has_value()) {
+      return *immediate_val_;
+    }
+    return std::nullopt;
+  }
+
+  void onStart() override {
+    started_ = true;
+    complete(999);
+  }
+  void onCancel() override {}
+
+private:
+  std::optional<int> immediate_val_;
+  bool cancel_during_immediate_ = false;
+};
+
+TEST(LeafAwaitableTest, TryImmediateSuccessAvoidsSuspension) {
+  auto exec = std::make_shared<ManualExecutor>();
+  bool ran = false;
+  std::optional<absl::StatusOr<int>> result;
+
+  auto coro = [&]() -> Task<absl::Status> {
+    ImmediateLeaf leaf(42);
+    ASSIGN_OR_CO_RETURN(int val, co_await leaf);
+    EXPECT_FALSE(leaf.started_);
+    result = val;
+    ran = true;
+    co_return absl::OkStatus();
+  };
+
+  DetachedHandle handle = launch(coro(), exec, [](absl::Status) {}, StartMode::Inline);
+  EXPECT_TRUE(ran);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_OK(*result);
+  EXPECT_EQ(result->value(), 42);
+}
+
+TEST(LeafAwaitableTest, CancellationDuringTryImmediatePreservesResultAndSubsequentAwaitAborts) {
+  auto exec = std::make_shared<ManualExecutor>();
+  bool after_first_await_reached = false;
+  bool after_second_await_reached = false;
+  std::optional<int> received_val;
+  std::optional<absl::Status> final_status;
+
+  auto coro = [&]() -> Task<absl::Status> {
+    ImmediateLeaf leaf1(42, /*cancel_during_immediate=*/true);
+    ASSIGN_OR_CO_RETURN(int val, co_await leaf1);
+    received_val = val;
+    after_first_await_reached = true;
+
+    // Second awaitable must fail-fast due to the cancellation triggered during leaf1
+    ImmediateLeaf leaf2(100);
+    ASSIGN_OR_CO_RETURN(int val2, co_await leaf2);
+    (void)val2;
+    after_second_await_reached = true;
+    co_return absl::OkStatus();
+  };
+
+  DetachedHandle handle = launch(
+      coro(), exec, [&final_status](absl::Status s) { final_status = s; }, StartMode::Inline);
+  EXPECT_TRUE(after_first_await_reached);
+  EXPECT_EQ(received_val, 42);
+  EXPECT_FALSE(after_second_await_reached);
+  ASSERT_TRUE(final_status.has_value());
+  EXPECT_TRUE(absl::IsCancelled(*final_status));
 }
 
 } // namespace

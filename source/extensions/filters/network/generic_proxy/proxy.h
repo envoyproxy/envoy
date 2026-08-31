@@ -18,6 +18,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
+#include "source/common/network/drain_close_util.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
@@ -357,7 +359,7 @@ public:
   Filter(FilterConfigSharedPtr config, Server::Configuration::FactoryContext& context)
       : config_(std::move(config)),
         stats_helper_(config_->codeOrFlags(), config_->stats(), context.scope()),
-        drain_decision_(config_->drainDecision()),
+        drain_decision_(config_->drainDecision()), server_context_(context.serverFactoryContext()),
         time_source_(context.serverFactoryContext().timeSource()),
         runtime_(context.serverFactoryContext().runtime()),
         cluster_manager_(context.serverFactoryContext().clusterManager()) {
@@ -373,7 +375,18 @@ public:
   }
   void initializeReadFilterCallbacks(Envoy::Network::ReadFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
+    // Captured once here rather than plumbed through the filter factory: the drain type belongs
+    // to the listener that accepted this connection, and is reachable from the connection itself.
+    drain_type_ = Network::listenerDrainType(callbacks_->connection());
     callbacks_->connection().addConnectionCallbacks(*this);
+  }
+
+  // Envoy::Network::ConnectionCallbacks
+  // Only records the event; the drain-close decision is made per response in mayBeDrainClose().
+  void onDrain(Network::ConnectionDrainEvent drain_event) override {
+    if (!connection_drain_event_.has_value()) {
+      connection_drain_event_ = drain_event;
+    }
   }
 
   // ServerCodecCallbacks
@@ -424,6 +437,8 @@ public:
   void closeDownstreamConnection();
 
   void mayBeDrainClose();
+  // Returns true if the connection should be drain-closed.
+  bool shouldDrainClose();
 
 protected:
   // This will be called when drain decision is made and all active streams are handled.
@@ -445,6 +460,17 @@ private:
   GenericFilterStatsHelper stats_helper_;
 
   const Network::DrainDecision& drain_decision_;
+  Server::Configuration::ServerFactoryContext& server_context_;
+  // The drain type of the listener owning this connection, used to decide whether
+  // /healthcheck/fail should drain-close it.
+  envoy::config::listener::v3::Listener::DrainType drain_type_{
+      envoy::config::listener::v3::Listener::DEFAULT};
+  // Set when the connection is notified of a drain sequence via onDrain().
+  std::optional<Network::ConnectionDrainEvent> connection_drain_event_;
+  // Latched when the filter is created so it is not re-read on every response. See
+  // shouldDrainClose().
+  const bool use_connection_event_drain_{
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")};
   bool stream_drain_decision_{};
   TimeSource& time_source_;
   Runtime::Loader& runtime_;

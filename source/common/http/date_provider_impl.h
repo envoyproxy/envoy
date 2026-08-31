@@ -44,7 +44,7 @@ private:
 
   void onRefreshDate();
 
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotSharedPtr tls_;
   Event::TimerPtr refresh_timer_;
 };
 

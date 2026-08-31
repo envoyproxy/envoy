@@ -10,6 +10,7 @@ use crate::{
   abi, ClusterHostCount, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
   EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
 };
+use mockall::*;
 use std::ffi::c_void;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
@@ -457,48 +458,71 @@ pub trait ClusterSpecifierConfig: Send + Sync {
   fn on_select(&self, ctx: &mut ClusterSpecifierContext) -> bool;
 }
 
-/// Metrics that a cluster specifier module may define during configuration and record at runtime.
+/// Envoy-side metrics interface for the cluster specifier dynamic module.
+///
+/// This trait provides the ability to define and record custom metrics (counters, gauges,
+/// histograms) scoped to the cluster specifier configuration. Metrics should be defined during
+/// config creation and can be recorded at any point during selection.
+///
+/// Implementations must be `Send + Sync` since they may be accessed from multiple threads.
+#[automock]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyClusterSpecifierMetrics: Send + Sync {
+  // -------------------------------------------------------------------------
+  // Define metrics (call during config creation).
+  // -------------------------------------------------------------------------
+
+  /// Define a new counter with the given name and no labels.
   fn define_counter(
     &self,
     name: &str,
   ) -> Result<EnvoyCounterId, abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Define a new counter vec with the given name and label names.
   fn define_counter_vec<'a>(
     &self,
     name: &str,
     labels: &[&'a str],
   ) -> Result<EnvoyCounterVecId, abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Define a new gauge with the given name and no labels.
   fn define_gauge(
     &self,
     name: &str,
   ) -> Result<EnvoyGaugeId, abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Define a new gauge vec with the given name and label names.
   fn define_gauge_vec<'a>(
     &self,
     name: &str,
     labels: &[&'a str],
   ) -> Result<EnvoyGaugeVecId, abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Define a new histogram with the given name and no labels.
   fn define_histogram(
     &self,
     name: &str,
   ) -> Result<EnvoyHistogramId, abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Define a new histogram vec with the given name and label names.
   fn define_histogram_vec<'a>(
     &self,
     name: &str,
     labels: &[&'a str],
   ) -> Result<EnvoyHistogramVecId, abi::envoy_dynamic_module_type_metrics_result>;
 
+  // -------------------------------------------------------------------------
+  // Record metrics (call at runtime, e.g., during selection).
+  // -------------------------------------------------------------------------
+
+  /// Increment a previously defined counter by the given value.
   fn increment_counter(
     &self,
     id: EnvoyCounterId,
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Increment a previously defined counter vec by the given value with label values.
   fn increment_counter_vec<'a>(
     &self,
     id: EnvoyCounterVecId,
@@ -506,12 +530,14 @@ pub trait EnvoyClusterSpecifierMetrics: Send + Sync {
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Set the value of a previously defined gauge.
   fn set_gauge(
     &self,
     id: EnvoyGaugeId,
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Set the value of a previously defined gauge vec with label values.
   fn set_gauge_vec<'a>(
     &self,
     id: EnvoyGaugeVecId,
@@ -519,12 +545,14 @@ pub trait EnvoyClusterSpecifierMetrics: Send + Sync {
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Increase a previously defined gauge by the given value.
   fn increase_gauge(
     &self,
     id: EnvoyGaugeId,
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Increase a previously defined gauge vec by the given value with label values.
   fn increase_gauge_vec<'a>(
     &self,
     id: EnvoyGaugeVecId,
@@ -532,12 +560,14 @@ pub trait EnvoyClusterSpecifierMetrics: Send + Sync {
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Decrease a previously defined gauge by the given value.
   fn decrease_gauge(
     &self,
     id: EnvoyGaugeId,
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Decrease a previously defined gauge vec by the given value with label values.
   fn decrease_gauge_vec<'a>(
     &self,
     id: EnvoyGaugeVecId,
@@ -545,12 +575,14 @@ pub trait EnvoyClusterSpecifierMetrics: Send + Sync {
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Record a value in a previously defined histogram.
   fn record_histogram_value(
     &self,
     id: EnvoyHistogramId,
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
 
+  /// Record a value in a previously defined histogram vec with label values.
   fn record_histogram_value_vec<'a>(
     &self,
     id: EnvoyHistogramVecId,

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <format>
 #include <memory>
 #include <optional>
 #include <string>
@@ -62,13 +63,13 @@ static std::optional<uint> detectDlbDevice(const uint config_id, const std::stri
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   struct stat buffer;
 
-  std::string device_path = fmt::format("{}/dlb{}", dir, device_id);
+  std::string device_path = std::format("{}/dlb{}", dir, device_id);
   if (os_sys_calls.stat(device_path.c_str(), &buffer).return_value_ != 0) {
     int i = 0;
     // auto detect available dlb devices, now the max number of dlb device id is 63.
     const int max_id = 64;
     for (; i < max_id; i++) {
-      device_path = fmt::format("{}/dlb{}", dir, i);
+      device_path = std::format("{}/dlb{}", dir, i);
       if (os_sys_calls.stat(device_path.c_str(), &buffer).return_value_ == 0) {
         device_id = i;
         break;

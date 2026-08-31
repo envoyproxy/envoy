@@ -491,6 +491,7 @@ public:
     return nullptr;
   }
   bool clearRouteCache() const { return clear_route_cache_; }
+  const Protobuf::Struct& filterContext() const { return filter_context_; }
 
   const LuaFilterStats& stats() const { return stats_; }
   Stats::Scope& luaStatsScope() const { return *lua_stats_scope_; }
@@ -505,6 +506,7 @@ private:
   }
 
   const bool clear_route_cache_{};
+  const Protobuf::Struct filter_context_;
   PerLuaCodeSetupPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
@@ -526,12 +528,14 @@ public:
   bool disabled() const { return disabled_; }
   absl::string_view name() const { return name_; }
   PerLuaCodeSetup* perLuaCodeSetup() const { return per_lua_code_setup_ptr_.get(); }
+  bool hasFilterContext() const { return has_filter_context_; }
   const Protobuf::Struct& filterContext() const { return filter_context_; }
 
 private:
   const bool disabled_;
   const std::string name_;
   PerLuaCodeSetupPtr per_lua_code_setup_ptr_;
+  const bool has_filter_context_ = false;
   const Protobuf::Struct filter_context_;
 };
 
@@ -698,8 +702,10 @@ private:
   }
 
   const Protobuf::Struct& filterContext() const {
-    return per_route_config_ == nullptr ? Protobuf::Struct::default_instance()
-                                        : per_route_config_->filterContext();
+    if (per_route_config_ != nullptr && per_route_config_->hasFilterContext()) {
+      return per_route_config_->filterContext();
+    }
+    return config_->filterContext();
   }
 
   Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,

@@ -48,7 +48,16 @@ pub trait Cluster: Send + Sync {
   ///
   /// Each worker thread gets its own load balancer instance. The `envoy_lb`
   /// provides thread-local access to the cluster's host set.
-  fn new_load_balancer(&self, envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb>;
+  ///
+  /// Return `Some(lb)` if this cluster implements host selection, or `None` if the cluster
+  /// only provides host discovery and Envoy should use its native load balancer.
+  /// When returning `None`, Envoy will use the standard load balancer factory based on
+  /// `lb_policy` + `common_lb_config` (e.g., zone-aware or locality-weighted routing).
+  /// The module's `choose_host` hook will never be called if this returns `None`.
+  fn new_load_balancer(
+    &self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>>;
 
   /// Called on the main thread when a new event is scheduled via
   /// [`EnvoyClusterScheduler::commit`] for this [`Cluster`].
@@ -2560,6 +2569,9 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_destroy(
 /// Wrapper that pairs a module-side load balancer with the Envoy-side LB pointer.
 /// The `lb_envoy_ptr` is needed by [`ClusterLbContextRef::should_select_another_host`] to
 /// resolve host pointers from the priority set.
+///
+/// If the module returns None from `new_load_balancer()`, this wrapper is not created and
+/// a null pointer is returned, signaling to Envoy to use the native factory load balancer.
 struct ClusterLbWrapper {
   lb: Box<dyn ClusterLb>,
   lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
@@ -2578,9 +2590,16 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_new(
     let cluster = cluster_module_ptr as *const *const dyn Cluster;
     let cluster = &**cluster;
     let envoy_lb = EnvoyClusterLoadBalancerImpl::new(lb_envoy_ptr);
-    let lb = cluster.new_load_balancer(&envoy_lb);
-    let wrapper = Box::new(ClusterLbWrapper { lb, lb_envoy_ptr });
-    Box::into_raw(wrapper) as abi::envoy_dynamic_module_type_cluster_lb_module_ptr
+    match cluster.new_load_balancer(&envoy_lb) {
+      Some(lb) => {
+        let wrapper = Box::new(ClusterLbWrapper { lb, lb_envoy_ptr });
+        Box::into_raw(wrapper) as abi::envoy_dynamic_module_type_cluster_lb_module_ptr
+      },
+      None => {
+        // Module does not provide a load balancer; return null so Envoy uses native LB.
+        std::ptr::null()
+      },
+    }
   }))
   .unwrap_or_else(|panic| {
     crate::log_ffi_panic("envoy_dynamic_module_on_cluster_lb_new", panic);

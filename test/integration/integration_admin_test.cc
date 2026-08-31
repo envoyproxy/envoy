@@ -498,6 +498,24 @@ TEST_P(IntegrationAdminTest, AdminPrometheusProtobufFormat) {
   codec_client_->close();
 }
 
+// Validates that /healthcheck/fail does not drain-close admin connections.
+TEST_P(IntegrationAdminTest, AdminNotDrainClosedOnHealthCheckFail) {
+  initialize();
+
+  BufferingStreamDecoderPtr response;
+  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/fail", response));
+
+  // The server is now health check failed. A subsequent admin request must not be drain-closed.
+  EXPECT_EQ("200", request("admin", "GET", "/server_info", response));
+  EXPECT_NE("close", response->headers().getConnectionValue());
+
+  // The header check above only covers HTTP/1; the counter covers both protocols.
+  const Stats::CounterSharedPtr drain_close =
+      test_server_->counter("http.admin.downstream_cx_drain_close");
+  ASSERT_NE(nullptr, drain_close);
+  EXPECT_EQ(0, drain_close->value());
+}
+
 // Validates that the "inboundonly" drains inbound listeners.
 TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
