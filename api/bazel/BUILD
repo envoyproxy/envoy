@@ -1,7 +1,7 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@aspect_bazel_lib//lib:yq.bzl", "yq")
 load("@envoy_toolshed//:macros.bzl", "json_data")
-load("@rules_go//proto:compiler.bzl", "go_proto_compiler")
+load("@io_bazel_rules_go//proto:compiler.bzl", "go_proto_compiler")
 load(
     ":external_proto_deps.bzl",
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",

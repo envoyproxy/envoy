@@ -19,7 +19,7 @@ bazel_dep(name = "protobuf", version = "33.1", repo_name = "com_google_protobuf"
 bazel_dep(name = "protoc-gen-validate", version = "1.2.1.bcr.2")
 bazel_dep(name = "re2", version = "2024-07-02.bcr.1")
 bazel_dep(name = "rules_cc", version = "0.2.22")
-bazel_dep(name = "rules_go", version = "0.59.0")
+bazel_dep(name = "rules_go", version = "0.59.0", repo_name = "io_bazel_rules_go")
 bazel_dep(name = "rules_java", version = "9.0.3")
 bazel_dep(name = "rules_jvm_external", version = "6.8")
 bazel_dep(name = "rules_proto", version = "7.1.0")
@@ -31,7 +31,7 @@ bazel_dep(name = "zipkin-api", version = "1.0.0")
 bazel_dep(name = "googletest", version = "1.17.0", dev_dependency = True)
 
 # Go SDK and toolchain configuration
-go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(version = "1.24.6")
 use_repo(
     go_sdk,

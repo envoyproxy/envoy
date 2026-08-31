@@ -433,7 +433,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "ocp-diag-core-{version}/apis/c++",
         urls = ["https://github.com/opencomputeproject/ocp-diag-core/archive/{version}.zip"],
     ),
-    rules_go = dict(
+    io_bazel_rules_go = dict(
         version = "0.61.1",
         sha256 = "763f4a3f6b03469fdb00a77a333dd0b5546d3ee1fa29db373128c08fee73e0e8",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
