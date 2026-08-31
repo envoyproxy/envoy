@@ -23,10 +23,15 @@
         {%- if 'dev' in version %}<span class="envoy-version-tag">pre</span>{% endif %}
         <span aria-hidden="true">&#9662;</span>
       </summary>
+      {#- Only what this build actually knows: the versions injected from above,
+          or failing that just its own, plus a link out to the full index. #}
       <div class="envoy-version-options">
-        <a href="{{ pathto(master_doc) }}" aria-current="true">{{ version }}</a>
-        <a href="/docs/envoy/latest/">Latest development</a>
-        <a href="/docs/">All versions</a>
+        {%- for release in envoy_versions %}
+        <a href="{{ release.url }}"{% if release.name == version %} aria-current="true"{% endif %}>{{ release.name }}</a>
+        {%- else %}
+        <span class="envoy-version-current" aria-current="true">{{ version }}</span>
+        {%- endfor %}
+        <a class="envoy-version-index" href="{{ envoy_versions_url|default('/docs/', true) }}">All versions</a>
       </div>
     </details>
 

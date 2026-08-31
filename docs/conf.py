@@ -310,6 +310,16 @@ html_favicon = 'favicon.ico'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+# A published copy of the docs knows its own version, but not what has been
+# released since it was built, so the version list cannot be baked in here.
+# Whoever assembles the site can inject it by overriding `envoy_versions` with
+# a list of {'name': ..., 'url': ...}; until then the menu degrades to a single
+# link to the version index.
+html_context = {
+    'envoy_versions': [],
+    'envoy_versions_url': '/docs/',
+}
+
 # envoy.css carries the design tokens and must load first; the component
 # modules below are listed separately so each is a parallel <link> rather than
 # an @import waterfall. See docs/root/_static/css/envoy/.

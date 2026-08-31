@@ -138,10 +138,26 @@ html[data-envoy-theme="dark"] .envoy-doc-logo .envoy-logo-dark {
   text-decoration: none;
 }
 
-.envoy-version-options a:hover,
-.envoy-version-options a[aria-current="true"] {
+.envoy-version-options a:hover {
   background: var(--envoy-surface-2);
   color: var(--envoy-ink);
+}
+
+.envoy-version-options a[aria-current="true"],
+.envoy-version-current {
+  border-radius: 4px;
+  color: var(--envoy-ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 6px 10px;
+}
+
+/* the version index lives outside this build, so it is set apart */
+.envoy-version-index {
+  border-top: 1px solid var(--envoy-rule);
+  border-radius: 0 0 4px 4px;
+  margin-top: 5px;
+  padding-top: 10px;
 }
 
 /* --- search trigger ------------------------------------------------------ */
