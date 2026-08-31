@@ -92,6 +92,14 @@ build --define absl=1
 # Disable ICU linking for googleurl.
 build --@googleurl//build_config:system_icu=0
 
+# Source the V8/wee8 engine from the envoy_toolshed prebuilt static library
+# instead of building V8 from source (30-120min -> seconds). The label_flag is
+# defined in proxy-wasm-cpp-host (bazel/proxy_wasm_cpp_host.patch); its value is
+# resolved in the root repo mapping, so this works in WORKSPACE and bzlmod. The
+# @envoy_toolshed//v8:wee8 alias falls back to @v8//:wee8 on platforms without a
+# prebuilt.
+build --@proxy-wasm-cpp-host//bazel:v8_engine=@envoy_toolshed//v8:wee8
+
 # Test options
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 

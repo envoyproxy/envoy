@@ -1,7 +1,7 @@
 diff --git a/BUILD b/BUILD
 --- a/BUILD
 +++ b/BUILD
-@@ -93,7 +93,7 @@
+@@ -93,7 +93,7 @@ cc_library(
          "@com_google_absl//absl/cleanup",
      ] + select({
          "//bazel:crypto_system": [],
@@ -10,7 +10,16 @@ diff --git a/BUILD b/BUILD
      }),
      alwayslink = 1,
  )
-@@ -158,7 +158,7 @@
+@@ -136,7 +136,7 @@ cc_library(
+     deps = [
+         ":base_lib",
+         ":wasm_vm_headers",
+-        "//bazel:wee8_no_pointer_compression",
++        "//bazel:v8_engine",
+     ],
+ )
+ 
+@@ -158,7 +158,7 @@ cc_library(
      }),
      deps = [
          ":wasm_vm_headers",
@@ -19,7 +28,7 @@ diff --git a/BUILD b/BUILD
      ],
  )
  
-@@ -224,7 +224,7 @@
+@@ -224,7 +224,7 @@ cc_library(
      deps = [
          ":base_lib",
          ":wasm_vm_headers",
@@ -129,13 +138,20 @@ diff --git a/bazel/BUILD b/bazel/BUILD
  )
  
  config_setting(
-@@ -77,4 +124,9 @@
+@@ -77,4 +124,16 @@ v8_lib_no_pointer_compression(
      library = "@v8//:wee8",
  )
  
++# Source of the V8/wee8 engine library, selectable by the consuming (root)
++# module. Defaults to building wee8 from @v8 source (with pointer compression
++# disabled). A consumer can point this at a prebuilt drop-in, e.g.
++#   --//bazel:v8_engine=@envoy_toolshed//v8:wee8
++# The value is resolved in the root module's repo mapping, so this works in both
++# WORKSPACE and bzlmod modes without patching this repo to reference a foreign
++# repository directly.
 +label_flag(
-+    name = "crypto_lib",
-+    build_setting_default = "@envoy//bazel:crypto",
++    name = "v8_engine",
++    build_setting_default = ":wee8_no_pointer_compression",
 +)
 +
  exports_files(["tsan_suppressions.txt"])
