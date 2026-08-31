@@ -66,7 +66,7 @@ public:
                        .setParentSpan(parent_span)
                        // Leave sampled unset so the JWKS fetch span honors the parent span's
                        // sampling decision instead of always being sampled.
-                       .setSampled(absl::nullopt)
+                       .setSampled(std::nullopt)
                        .setChildSpanName("JWT Remote PubKey Fetch");
 
     if (retry_policy_ != nullptr) {
