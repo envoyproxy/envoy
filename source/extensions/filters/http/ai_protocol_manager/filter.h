@@ -173,7 +173,11 @@ private:
 // A route without one is parsed only if the filter opted into
 // parse_unconfigured_routes -- offered for compatibility with chains that want
 // a parsed body on ordinary routes, never a reason to fail a request -- and is
-// otherwise untouched.
+// otherwise untouched. That opt-in covers routes that never asked for it, so it
+// is narrow by construction: only a request that can be held to end of stream
+// without stalling it is taken, which rules out gRPC and Connect streaming,
+// upgrades, and CONNECT (filter.cc, requestIsHoldable()). A declared endpoint
+// carries no such gate.
 //
 // A declared wire API with a registered payload schema is validated at end of
 // payload (schema/schema_registry.h); normalization comes later.
