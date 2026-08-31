@@ -165,19 +165,12 @@ void MessageStreamer::nextElement(Frame& frame) {
   }
 
   const int index = frame.next_element_++;
-  if (!field.is_map()) {
+  if (field.is_map()) {
+    BufferStreamer::Map& map_entries = static_cast<BufferStreamer::Map&>(*frame.elements_);
+    emitMapEntry(frame.message_, field, index, map_entries, frame.field_is_sensitive_);
+  } else {
     emitValue(frame.message_, field, index, *frame.elements_, frame.field_is_sensitive_);
-    return;
   }
-
-  // A repeated field's level is always BufferStreamer::Array, unless it is a map,
-  // in which case it is BufferStreamer::Map, so the static_cast is safe.
-  // The level is created in MessageStreamer::startField.
-  BufferStreamer::Map& entries = static_cast<BufferStreamer::Map&>(*frame.elements_);
-  const Protobuf::Message& entry = reflection.GetRepeatedMessage(frame.message_, &field, index);
-  // Keys are left alone, redacting them would collapse the map onto one key.
-  entries.addKey(mapKeyToString(entry, *field.message_type()->map_key(), scratch_));
-  emitValue(entry, *field.message_type()->map_value(), -1, entries, frame.field_is_sensitive_);
 }
 
 void MessageStreamer::startField(Frame& frame) {
@@ -204,6 +197,16 @@ void MessageStreamer::startField(Frame& frame) {
   }
   ++frame.next_field_;
   emitValue(frame.message_, field, -1, *frame.map_, frame.field_is_sensitive_);
+}
+
+void MessageStreamer::emitMapEntry(const Protobuf::Message& message, const Field& field, int index,
+                                   BufferStreamer::Map& entries, bool is_sensitive) {
+  const Protobuf::Message& entry =
+      message.GetReflection()->GetRepeatedMessage(message, &field, index);
+  const Protobuf::Descriptor& entry_type = *field.message_type();
+  // Keys are left alone, redacting them would collapse the map onto one key.
+  entries.addKey(mapKeyToString(entry, *entry_type.map_key(), scratch_));
+  emitValue(entry, *entry_type.map_value(), -1, entries, is_sensitive);
 }
 
 void MessageStreamer::emitValue(const Protobuf::Message& message, const Field& field, int index,

@@ -87,6 +87,10 @@ private:
   void emitValue(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
                  int index, BufferStreamer::Level& level, bool is_sensitive);
 
+  // Emits entry `index` of the map `field` as a key and a value in `entries`.
+  void emitMapEntry(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
+                    int index, BufferStreamer::Map& entries, bool is_sensitive);
+
   // Emits the value of a message-typed field, which is either a special representation or a new
   // frame.
   void emitMessage(const Protobuf::Message& message, BufferStreamer::Level& level,
