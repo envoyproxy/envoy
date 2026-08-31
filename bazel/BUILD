@@ -31,6 +31,9 @@ exports_files([
     "test_for_benchmark_wrapper.sh",
     "repository_locations.bzl",
     "deps.yaml",
+    "gazelle.patch",
+    "googleapis.patch",
+    "rules_go.patch",
     "exported_symbols.txt",
     "exported_symbols_apple.txt",
 ])
