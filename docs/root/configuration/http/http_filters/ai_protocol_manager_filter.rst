@@ -396,6 +396,11 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
+  request_payload_parsed, Counter, "A held request payload was parsed into a document, and passed its payload schema where the declared API has one."
+  request_parse_error, Counter, A declared AI endpoint's payload was not well-formed JSON and was rejected with a 400.
+  request_schema_invalid, Counter, "A declared AI endpoint's payload parsed but violated its API's payload schema, and was rejected with a 400."
+  request_unparsed_passthrough, Counter, "A payload on an unconfigured route failed to parse under :ref:`parse_unconfigured_routes <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>` and was forwarded unchanged; never a request failure."
+  external_buffer_error, Counter, The external buffer failed irrecoverably and the stream was answered with a 500.
   token_usage_found, Counter, A response yielded token usage and metadata was written (includes ``PARTIAL`` records).
   token_usage_partial, Counter, A published record was flagged ``extraction_status: PARTIAL``.
   token_usage_failed, Counter, A status-only record was published (``extraction_status: FAILED``; no counts recovered).

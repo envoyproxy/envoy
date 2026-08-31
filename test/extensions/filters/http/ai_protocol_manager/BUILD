@@ -132,6 +132,7 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_chain_bridge_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
     ],
 )

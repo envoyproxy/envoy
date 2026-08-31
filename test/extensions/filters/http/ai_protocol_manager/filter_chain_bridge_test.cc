@@ -2,6 +2,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -32,8 +33,11 @@ public:
 // StreamDecoderFilterCallbacks and forwards upstream watermarks.
 class DecoderFilterChainBridgeTest : public testing::Test {
 public:
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  AiProtocolManagerStats stats_{
+      ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(*stats_store_.rootScope(), ""))};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  DecoderFilterChainBridge bridge_{callbacks_};
+  DecoderFilterChainBridge bridge_{callbacks_, stats_};
   RecordingHandler handler_;
 };
 
@@ -96,15 +100,19 @@ TEST_F(DecoderFilterChainBridgeTest, UnrecoverableErrorSendsLocalReply) {
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _,
                                          "ai_protocol_manager_external_buffer_error"));
   bridge_.onUnrecoverableError();
+  EXPECT_EQ(stats_.external_buffer_error_.value(), 1);
 }
 
 // EncoderFilterChainBridge maps the bridge surface onto StreamEncoderFilterCallbacks
 // but subscribes to downstream watermarks through the decoder callbacks.
 class EncoderFilterChainBridgeTest : public testing::Test {
 public:
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  AiProtocolManagerStats stats_{
+      ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(*stats_store_.rootScope(), ""))};
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  EncoderFilterChainBridge bridge_{encoder_callbacks_, decoder_callbacks_};
+  EncoderFilterChainBridge bridge_{encoder_callbacks_, decoder_callbacks_, stats_};
   RecordingHandler handler_;
 };
 
@@ -165,6 +173,7 @@ TEST_F(EncoderFilterChainBridgeTest, UnrecoverableErrorSendsLocalReply) {
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _,
                                                  "ai_protocol_manager_external_buffer_error"));
   bridge_.onUnrecoverableError();
+  EXPECT_EQ(stats_.external_buffer_error_.value(), 1);
 }
 
 } // namespace
