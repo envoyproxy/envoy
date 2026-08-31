@@ -450,6 +450,9 @@ public:
 
   void waitUntilListenersReady();
 
+  // Wait until callbacks already running or queued on every server worker have completed.
+  void waitForWorkerThreads();
+
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value);
   void unsetDynamicContextParam(absl::string_view resource_type_url, absl::string_view key);

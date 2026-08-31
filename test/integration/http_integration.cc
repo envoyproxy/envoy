@@ -507,9 +507,21 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   // will interpret that as an unexpected disconnect. The codec client is not
   // subject to the same failure mode.
   if (fake_upstream_connection_) {
-    AssertionResult result = fake_upstream_connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = fake_upstream_connection_->waitForDisconnect();
+    AssertionResult result = AssertionSuccess();
+    if (fake_upstream_connection_->type() == Http::CodecType::HTTP3) {
+      // QUIC connections do not support half-close.
+      result = fake_upstream_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_upstream_connection_->waitForDisconnect();
+    } else {
+      // A local close only proves that the fake upstream dispatcher closed its socket. Half-close
+      // the fake upstream and wait for Envoy to close the other direction, proving Envoy observed
+      // the FIN. Envoy closes its socket before raising connection callbacks, so also run a worker
+      // barrier to ensure the callback has removed the connection from its connection pool.
+      result = fake_upstream_connection_->halfCloseAndWaitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      test_server_->waitForWorkerThreads();
+    }
     RELEASE_ASSERT(result, result.message());
     result = fake_upstream_connection_->waitForNoPost();
     RELEASE_ASSERT(result, result.message());

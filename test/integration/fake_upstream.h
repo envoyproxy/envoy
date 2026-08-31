@@ -483,6 +483,12 @@ public:
   testing::AssertionResult close(Network::ConnectionCloseType close_type,
                                  std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
+  // Half-close the write side of a TCP connection and wait for the peer to close its side. Unlike
+  // close(), successful completion proves that the peer observed the shutdown.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  halfCloseAndWaitForDisconnect(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   readDisable(bool disable, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);

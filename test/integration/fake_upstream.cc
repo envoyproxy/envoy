@@ -499,6 +499,26 @@ AssertionResult FakeConnectionBase::close(Network::ConnectionCloseType close_typ
       [&close_type](Network::Connection& connection) { connection.close(close_type); }, timeout);
 }
 
+AssertionResult
+FakeConnectionBase::halfCloseAndWaitForDisconnect(std::chrono::milliseconds timeout) {
+  ENVOY_LOG(trace, "FakeConnectionBase half-close and wait for disconnect");
+  if (!shared_connection_.connected()) {
+    return AssertionSuccess();
+  }
+
+  AssertionResult result = shared_connection_.executeOnDispatcher(
+      [](Network::Connection& connection) {
+        connection.enableHalfClose(true);
+        Buffer::OwnedImpl empty;
+        connection.write(empty, true);
+      },
+      timeout);
+  if (!result) {
+    return result;
+  }
+  return waitForDisconnect(timeout);
+}
+
 AssertionResult FakeConnectionBase::readDisable(bool disable, std::chrono::milliseconds timeout) {
   return shared_connection_.executeOnDispatcher(
       [disable](Network::Connection& connection) { connection.readDisable(disable); }, timeout);
