@@ -206,9 +206,6 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // and buffered body immediately and pass the remainder through unbuffered,
   // rather than buffering to end-of-stream.
   if (!isAiEndpoint() && (!config_->parseUnconfiguredRoutes() || !requestIsHoldable(headers))) {
-    // Nothing will look at this payload, so stay out of the way: offloading it
-    // would cost a store round-trip and withhold the headers meanwhile, for
-    // nothing. Decided once here; decode_manager_ being null carries it.
     ENVOY_LOG(trace, "ai_protocol_manager: route has no payload to inspect, passing through");
     return Http::FilterHeadersStatus::Continue;
   }
