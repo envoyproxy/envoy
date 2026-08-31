@@ -341,6 +341,36 @@ namespace alone is not sufficient:
       typed:
       - envoy.ai.token_usage
 
+``response_body_mode: STREAMED`` costs a copy of every response byte across the
+gRPC boundary, which for a long streamed generation is the whole response. When
+the processor only needs the record, :ref:`usage_signal
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.usage_signal>`
+avoids that: ``SYNTHESIZE_TRAILERS`` adds empty response trailers at a clean
+end of stream when the response carries none of its own, so a processor
+configured for trailers alone receives one small message carrying the record
+and no body at all. A response that already has trailers is left untouched —
+publication precedes them either way.
+
+.. code-block:: yaml
+
+  # In the cluster's upstream filter chain:
+  response_handling:
+    token_usage:
+      usage_signal: SYNTHESIZE_TRAILERS
+
+.. code-block:: yaml
+
+  # In the downstream ext_proc filter:
+  processing_mode:
+    response_header_mode: SKIP
+    response_body_mode: NONE
+    response_trailer_mode: SEND
+
+Note that HTTP/1.1 downstreams drop the added trailers at the codec unless
+:ref:`enable_trailers
+<envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.enable_trailers>` is
+set, while HTTP/2 and HTTP/3 clients receive an empty trailers frame.
+
 Upstream (cluster) installation
 -------------------------------
 
@@ -409,3 +439,4 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   response_body_too_large, Counter, A JSON response exceeded ``max_json_body_size``; extraction skipped.
   sse_event_too_large, Counter, Pending or complete SSE event data exceeded ``max_sse_event_size``; that entire event was skipped.
   unsupported_content_encoding, Counter, The response carried a non-identity ``content-encoding``; extraction skipped.
+  usage_trailers_synthesized, Counter, Empty response trailers were synthesized at end of stream to carry token usage to a downstream consumer.

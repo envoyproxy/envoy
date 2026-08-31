@@ -444,6 +444,14 @@ public:
         .WillByDefault(Invoke([this](const std::string& ns, const Protobuf::Any& value) {
           typed_metadata_writes_.emplace_back(ns, value);
         }));
+    ON_CALL(encoder_callbacks_, addEncodedTrailers())
+        .WillByDefault(Invoke([this]() -> Http::ResponseTrailerMap& {
+          added_trailers_++;
+          if (!synthesized_trailers_) {
+            synthesized_trailers_ = std::make_unique<Http::TestResponseTrailerMapImpl>();
+          }
+          return *synthesized_trailers_;
+        }));
   }
 
   void TearDown() override {
@@ -499,6 +507,8 @@ public:
   std::unique_ptr<AiProtocolManagerFilter> filter_;
   std::vector<std::pair<std::string, Protobuf::Struct>> metadata_writes_;
   std::vector<std::pair<std::string, Protobuf::Any>> typed_metadata_writes_;
+  int added_trailers_{0};
+  Http::ResponseTrailerMapPtr synthesized_trailers_;
 };
 
 // An SSE response is teed, usage extracted, and published at end of stream
@@ -821,6 +831,58 @@ TEST_F(AiProtocolManagerFilterResponseTest, TrailersFinalize) {
   Http::TestResponseTrailerMapImpl trailers{{"grpc-status", "0"}};
   EXPECT_EQ(filter_->encodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
   EXPECT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
+}
+
+// With the trailer signal configured, a response that ends on a data frame
+// gets empty trailers added after the record is published -- which is what
+// gives a trailer-driven consumer (ext_proc) a message to carry it on.
+TEST_F(AiProtocolManagerFilterResponseTest, UsageSignalSynthesizesTrailers) {
+  setup("{usage_signal: SYNTHESIZE_TRAILERS}");
+  sendHeaders("application/json");
+  sendData(R"({"object":"chat.completion","model":"gpt-4o","usage":)"
+           R"({"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}})",
+           true);
+  ASSERT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
+  EXPECT_EQ(added_trailers_, 1);
+  EXPECT_EQ(counterValue("usage_trailers_synthesized"), 1);
+}
+
+// Nothing published, nothing to signal: a response carrying no usage must not
+// grow trailers it did not have.
+TEST_F(AiProtocolManagerFilterResponseTest, NoTrailersWhenNothingPublished) {
+  setup("{usage_signal: SYNTHESIZE_TRAILERS}");
+  sendHeaders("application/json");
+  sendData(R"({"object":"chat.completion","model":"gpt-4o"})", true);
+  EXPECT_TRUE(typed_metadata_writes_.empty());
+  EXPECT_EQ(added_trailers_, 0);
+  EXPECT_EQ(counterValue("usage_trailers_synthesized"), 0);
+}
+
+// A response that carries its own trailers is left alone: publication in
+// encodeTrailers() already precedes them down the chain, and adding a second
+// set is not possible.
+TEST_F(AiProtocolManagerFilterResponseTest, ResponseWithOwnTrailersNotSynthesized) {
+  setup("{usage_signal: SYNTHESIZE_TRAILERS}");
+  sendHeaders("application/json");
+  sendData(R"({"object":"chat.completion","model":"gpt-4o","usage":)"
+           R"({"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}})",
+           false);
+  Http::TestResponseTrailerMapImpl trailers{{"grpc-status", "0"}};
+  EXPECT_EQ(filter_->encodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
+  ASSERT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
+  EXPECT_EQ(added_trailers_, 0);
+}
+
+// The signal is opt-in; the default publishes and adds nothing.
+TEST_F(AiProtocolManagerFilterResponseTest, DefaultSignalAddsNoTrailers) {
+  setup();
+  sendHeaders("application/json");
+  sendData(R"({"object":"chat.completion","model":"gpt-4o","usage":)"
+           R"({"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}})",
+           true);
+  ASSERT_TRUE(singleTypedWrite("envoy.ai.token_usage").has_value());
+  EXPECT_EQ(added_trailers_, 0);
+  EXPECT_EQ(counterValue("usage_trailers_synthesized"), 0);
 }
 
 // A JSON response whose body ends via trailers (no end_stream data frame) is

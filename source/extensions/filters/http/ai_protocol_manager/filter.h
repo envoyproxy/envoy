@@ -81,6 +81,7 @@ public:
   bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
   ApiProtocol defaultApiProtocol() const { return default_api_protocol_; }
   const std::string& metadataNamespace() const { return metadata_namespace_; }
+  bool synthesizeUsageTrailers() const { return synthesize_usage_trailers_; }
   uint32_t maxSseEventSize() const { return max_sse_event_size_; }
   uint32_t maxJsonBodySize() const { return max_json_body_size_; }
   uint32_t maxParsedSseEvents() const { return max_parsed_sse_events_; }
@@ -96,6 +97,7 @@ private:
   const bool include_unconfigured_routes_ = false;
   const ApiProtocol default_api_protocol_ = ApiProtocol::Unspecified;
   const std::string metadata_namespace_;
+  const bool synthesize_usage_trailers_ = false;
   const uint32_t max_sse_event_size_ = 0;
   const uint32_t max_json_body_size_ = 0;
   const uint32_t max_parsed_sse_events_ = 0;
@@ -225,7 +227,8 @@ private:
 
   // Publish the accumulated token usage as dynamic metadata and account stats.
   // Called exactly once, at response end of stream (data or trailers).
-  void finalizeResponseHandling();
+  // Returns whether a record was published for this stream.
+  bool finalizeResponseHandling();
 
   ExternalBufferFactory& buffer_factory_;
   FilterConfigSharedPtr config_;
