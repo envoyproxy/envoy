@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "source/common/config/utility.h"
 #include "source/extensions/filters/http/composite/filter.h"
@@ -62,8 +63,8 @@ CompositeFilterFactory::compileNamedFilterChains(
               filter_config);
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
           filter_config.typed_config(), context.messageValidationVisitor(), factory);
-      auto callback_or_status =
-          factory.createFilterFactoryFromProto(*message, stats_prefix, context);
+      auto callback_or_status = Server::Configuration::createHttpFilterFactory(
+          factory, *message, stats_prefix, context);
       if (!callback_or_status.status().ok()) {
         return absl::InvalidArgumentError(
             fmt::format("Failed to create filter factory for filter '{}' in named filter chain "
