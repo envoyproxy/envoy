@@ -1060,6 +1060,7 @@ TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreationNullWriter) {
   listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
   EXPECT_CALL(listener_config_, filterChainManager())
       .WillRepeatedly(ReturnRef(filter_chain_manager_));
+  EXPECT_OK(listener_factory_->initializeWorkerRouting(listener_config_.socket_factories_));
 
   // Creating the listener will trigger IS_ENVOY_BUG.
   EXPECT_ENVOY_BUG(quic_listener_ = staticUniquePointerCast<ActiveQuicListener>(
