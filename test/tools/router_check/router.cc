@@ -139,7 +139,8 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
   auto config = *Router::ConfigImpl::create(route_config, *factory_context,
-                                            ProtobufMessage::getNullValidationVisitor(), false);
+                                            ProtobufMessage::getNullValidationVisitor(),
+                                            factory_context->initManager(), false);
   if (!disable_deprecation_check) {
     ProtobufMessage::StrictValidationVisitorImpl visitor;
     visitor.setRuntime(factory_context->runtime_loader_);
@@ -329,6 +330,7 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
           return this->compareRedirectPath(params..., stream_info);
         },
         [this](auto&... params) -> bool { return this->compareRedirectCode(params...); },
+        [this](auto&... params) -> bool { return this->compareTimeout(params...); },
         [this](auto&... params) -> bool { return this->compareRequestHeaderFields(params...); },
         [this](auto&... params) -> bool { return this->compareResponseHeaderFields(params...); },
     };
@@ -524,6 +526,25 @@ bool RouterCheckTool::compareRedirectCode(
   }
   if (matches && has_direct_response_entry) {
     coverage_.markRedirectCodeCovered(tool_config.route_);
+  }
+  return matches;
+}
+
+bool RouterCheckTool::compareTimeout(ToolConfig& tool_config,
+                                     const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                                     envoy::RouterCheckToolSchema::ValidationFailure& failure) {
+  if (!expected.has_timeout()) {
+    return true;
+  }
+  const bool has_route_entry =
+      tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
+  const uint64_t actual = has_route_entry ? tool_config.route_->routeEntry()->timeout().count() : 0;
+  const uint64_t expected_ms = DurationUtil::durationToMilliseconds(expected.timeout());
+  const bool matches = compareResults(actual, expected_ms, "timeout");
+  if (!matches) {
+    *failure.mutable_expected_timeout() = expected.timeout();
+    failure.mutable_actual_timeout()->set_seconds(actual / 1000);
+    failure.mutable_actual_timeout()->set_nanos((actual % 1000) * 1000000);
   }
   return matches;
 }

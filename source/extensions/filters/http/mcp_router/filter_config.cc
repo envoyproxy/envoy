@@ -76,7 +76,7 @@ template <typename Config> std::vector<McpBackendConfig> parseBackends(const Con
 McpRouterConfigImpl::McpRouterConfigImpl(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope,
-    Server::Configuration::FactoryContext& context)
+    Server::Configuration::ServerFactoryContext& context)
     : backends_(parseBackends(proto_config)),
       default_backend_name_(backends_.size() == 1 ? backends_[0].name : ""),
       factory_context_(context), lazy_initialization_(proto_config.lazy_initialization()),

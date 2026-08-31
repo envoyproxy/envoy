@@ -109,7 +109,7 @@ public:
   /**
    * Allocate a new scope, optionally supplying tags and a pre-built tagged name (with tag values
    * interleaved). NOTE: The behavior is implementation-defined for now because both legacy and
-   * tag-aware scopes are still supported.
+   * explicit-tags scopes are still supported.
    *
    * @param base_name supplies the scope's tag-extracted name.
    * @param name_tags tags to associate with (and propagate from) the scope, as string_view pairs.

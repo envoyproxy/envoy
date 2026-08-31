@@ -64,7 +64,16 @@ retrieveAudience(Upstream::ThreadLocalCluster* cluster) {
 
 using ::Envoy::Router::RouteConstSharedPtr;
 using Http::FilterHeadersStatus;
-using JwtVerify::Status;
+
+FilterConfig::FilterConfig(const FilterConfigProto& config,
+                           Server::Configuration::ServerFactoryContext& context,
+                           const std::string& stats_prefix, Stats::Scope& scope)
+    : config_(config), context_(context),
+      stats_{ALL_GCP_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix))} {
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.cache_config(), cache_size, 0) > 0) {
+    token_cache_ = std::make_shared<TokenCache>(config.cache_config(), context);
+  }
+}
 
 std::optional<std::string>
 GcpAuthnFilter::getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster) {
@@ -91,14 +100,14 @@ GcpAuthnFilter::getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster) 
     return std::nullopt;
   }
 
-  auto fingerprint_or_error = cert_fingerprinter_->getFingerprintFromPem(cert_pem);
+  auto fingerprint_or_error = fingerprinter_->getFingerprintFromPem(cert_pem);
   if (!fingerprint_or_error.ok()) {
     ENVOY_LOG(warn, "Failed to calculate certificate fingerprint: {}",
               fingerprint_or_error.status().message());
     return std::nullopt;
   }
 
-  stats_.client_cert_fingerprint_calculated_.inc();
+  filter_config_->stats().client_cert_fingerprint_calculated_.inc();
   return fingerprint_or_error.value();
 }
 
@@ -114,12 +123,12 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   initiating_call_ = true;
 
   Envoy::Upstream::ThreadLocalCluster* cluster =
-      context_.serverFactoryContext().clusterManager().getThreadLocalCluster(
+      filter_config_->context().clusterManager().getThreadLocalCluster(
           route->routeEntry()->clusterName());
 
   auto audience_opt = retrieveAudience(cluster);
   if (!audience_opt.has_value()) {
-    stats_.retrieve_audience_failed_.inc();
+    filter_config_->stats().retrieve_audience_failed_.inc();
     state_ = State::Complete;
     return FilterHeadersStatus::Continue;
   }
@@ -146,7 +155,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   if (jwt_token_cache_ != nullptr) {
     auto token = jwt_token_cache_->lookUp(audience_, client_cert_fingerprint_);
     if (token.has_value()) {
-      addTokenToRequest(hdrs, token.value(), filter_config_->token_header());
+      addTokenToRequest(hdrs, token.value(), filter_config_->config().token_header());
       state_ = State::Complete;
       return FilterHeadersStatus::Continue;
     }
@@ -165,7 +174,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     client_->fetchUnboundJwt(audience_, *this);
   } else {
     ENVOY_LOG(warn, "Audience is configured but no token is specified, continuing without token.");
-    stats_.empty_audience_.inc();
+    filter_config_->stats().empty_audience_.inc();
     state_ = State::Complete;
     return FilterHeadersStatus::Continue;
   }
@@ -173,10 +182,6 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   initiating_call_ = false;
   return state_ == State::Complete ? FilterHeadersStatus::Continue
                                    : Http::FilterHeadersStatus::StopAllIterationAndWatermark;
-}
-
-void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-  decoder_callbacks_ = &callbacks;
 }
 
 void GcpAuthnFilter::onComplete(absl::StatusOr<GcpToken> token) {
@@ -187,7 +192,8 @@ void GcpAuthnFilter::onComplete(absl::StatusOr<GcpToken> token) {
       // `Authorization: Bearer ID_TOKEN` header).
       GcpToken token_val = *token;
       if (request_header_map_ != nullptr) {
-        addTokenToRequest(*request_header_map_, token_val.token, filter_config_->token_header());
+        addTokenToRequest(*request_header_map_, token_val.token,
+                          filter_config_->config().token_header());
       } else {
         ENVOY_LOG(debug, "No request header to be modified.");
       }

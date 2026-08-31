@@ -16,6 +16,7 @@ envoy_cc_test(
         "//test/common/mocks/event:event_mocks",
         "@envoy//source/common/http:context_lib",
         "@envoy//source/common/stats:isolated_store_lib",
+        "@envoy//source/common/stream_info:filter_state_lib",
         "@envoy//test/common/http:common_lib",
         "@envoy//test/mocks/buffer:buffer_mocks",
         "@envoy//test/mocks/event:event_mocks",

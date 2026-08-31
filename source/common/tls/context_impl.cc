@@ -26,7 +26,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
-#include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/cert_compression.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
@@ -386,6 +385,12 @@ ContextImpl::ContextImpl(
       break;
     case ProtoPolicy::CNSA2_202603:
       creation_status = setCompliancePolicy(ssl_compliance_policy_cnsa2_202603);
+      if (!creation_status.ok()) {
+        return;
+      }
+      break;
+    case ProtoPolicy::CNSA1_202603:
+      creation_status = setCompliancePolicy(ssl_compliance_policy_cnsa1_202603);
       if (!creation_status.ok()) {
         return;
       }

@@ -12,6 +12,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -403,6 +404,12 @@ credentials:
   EXPECT_EQ("default_username", credentials9.username);
   EXPECT_EQ("default_password", credentials9.password);
 }
+
+// The proto ``protocol_version`` → ``ProxyFilterConfig::protocolVersion()`` read (which
+// config.cc forwards to the conn pool) is unit-pinned by
+// RedisProxyFilterConfigTest.ProtocolVersionDefaultsToResp2 / .ProtocolVersionResp3IsHonored in
+// proxy_filter_test.cc; its observable RESP2 vs RESP3 effect is covered end-to-end by the
+// RESP2/RESP3 fixtures in proxy_filter_test.cc and redis_proxy_integration_test.cc.
 
 } // namespace RedisProxy
 } // namespace NetworkFilters

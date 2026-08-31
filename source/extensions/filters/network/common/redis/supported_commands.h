@@ -85,7 +85,7 @@ struct SupportedCommands {
   // NOLINTNEXTLINE(readability-identifier-naming)
   static const absl::flat_hash_set<std::string>& ClusterScopeCommands() {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "script", "flushall", "flushdb",
-                           "slowlog", "config", "info", "keys", "select", "role", "hello");
+                           "slowlog", "config", "info", "keys", "select", "role");
   }
 
   /**
@@ -103,7 +103,7 @@ struct SupportedCommands {
   static const CommandSubcommandMap& commandSubcommandValidationMap() {
     CONSTRUCT_ON_FIRST_USE(CommandSubcommandMap,
                            // Command name - Sub commands that are allowed
-                           {{"cluster", {"info", "slots", "keyslot", "nodes"}}});
+                           {{"cluster", {"info", "slots", "keyslot", "nodes", "shards"}}});
     // Add other commands with restricted subcommands here:
   }
 
@@ -119,6 +119,15 @@ struct SupportedCommands {
    * @return hello command
    */
   static const std::string& hello() { CONSTRUCT_ON_FIRST_USE(std::string, "hello"); }
+
+  /**
+   * @return client command. The proxy supports a narrow subset of subcommands
+   * (``SETINFO`` / ``SETNAME``) used by RESP3 clients for connection identity setup;
+   * other CLIENT subcommands are rejected at the splitter to avoid exposing
+   * upstream-side state (CLIENT LIST, CLIENT KILL, etc.) through a multiplexed
+   * connection.
+   */
+  static const std::string& client() { CONSTRUCT_ON_FIRST_USE(std::string, "client"); }
 
   /**
    * @return auth command

@@ -81,6 +81,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(5001)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(std::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, perUpstreamPreconnectRatio()).WillByDefault(Return(1.0));
+  ON_CALL(*this, shouldPreconnect(_)).WillByDefault(Return(true));
   ON_CALL(*this, perConnectionBufferHighWatermarkTimeout())
       .WillByDefault(Return(std::chrono::milliseconds(0)));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
@@ -147,6 +148,11 @@ MockClusterInfo::MockClusterInfo()
               std::make_unique<Config::TypedMetadataImpl<ClusterTypedMetadataFactory>>(metadata_);
         }
         return *typed_metadata_;
+      }));
+  ON_CALL(*this, pendingRqQueuePolicy())
+      .WillByDefault(Invoke([this]() -> OptRef<const ClusterInfo::PendingRqQueuePolicy> {
+        return makeOptRefFromPtr<const ClusterInfo::PendingRqQueuePolicy>(
+            pending_rq_queue_policy_.get());
       }));
   ON_CALL(*this, clusterType())
       .WillByDefault(

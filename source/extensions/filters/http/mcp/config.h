@@ -15,20 +15,16 @@ namespace Mcp {
  * Config factory for MCP filter.
  */
 class McpFilterConfigFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::mcp::v3::Mcp,
-                                 envoy::extensions::filters::http::mcp::v3::McpOverride> {
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::mcp::v3::Mcp,
+                                        envoy::extensions::filters::http::mcp::v3::McpOverride> {
 public:
-  McpFilterConfigFactory() : FactoryBase("envoy.filters.http.mcp") {}
+  McpFilterConfigFactory() : UnifiedFactoryBase("envoy.filters.http.mcp") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

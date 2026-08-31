@@ -33,5 +33,6 @@ envoy_cc_library(
     deps = [
         ":reverse_connection_utility_lib",
         "//source/common/network:default_socket_interface_lib",
+        "//source/common/network:io_socket_error_lib",
     ],
 )

@@ -23,6 +23,9 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 constexpr absl::string_view kDefaultVersion = "00";
+// The sampled bit of the W3C trace flags carried in the low 8 bits of the OTLP span flags.
+// See https://www.w3.org/TR/trace-context/#sampled-flag.
+constexpr uint32_t TraceFlagsSampledMask = 0x1;
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 
@@ -77,7 +80,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
                                   SystemTime start_time) {
   // Build span_context from the current span, then generate the child span from that context.
   SpanContext span_context(kDefaultVersion, getTraceId(), spanId(), sampled(),
-                           std::string(tracestate()));
+                           std::string(tracestate()), /*is_remote=*/false);
   return parent_tracer_.startSpan(name, stream_info_, start_time, span_context, {},
                                   ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
 }
@@ -86,6 +89,19 @@ void Span::finishSpan() {
   // Call into the parent tracer so we can access the shared exporter.
   span_.set_end_time_unix_nano(
       std::chrono::nanoseconds(time_source_.systemTime().time_since_epoch()).count());
+  // Bits 0-7 of the span flags carry the W3C trace flags; bits 8 and 9 encode the tri-state
+  // "is the parent context remote" (unknown/local/remote). The parent's remoteness is always
+  // known here, so the HAS_IS_REMOTE bit is set unconditionally.
+  uint32_t flags = static_cast<uint32_t>(
+      ::opentelemetry::proto::trace::v1::SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK);
+  if (parent_context_is_remote_) {
+    flags |=
+        static_cast<uint32_t>(::opentelemetry::proto::trace::v1::SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK);
+  }
+  if (sampled()) {
+    flags |= TraceFlagsSampledMask;
+  }
+  span_.set_flags(flags);
   if (sampled()) {
     parent_tracer_.sendSpan(span_);
   }
@@ -209,10 +225,10 @@ Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_s
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
                const ResourceConstSharedPtr resource, SamplerSharedPtr sampler,
-               uint64_t max_cache_size)
+               uint64_t max_cache_size, bool set_instrumentation_scope)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
       tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler),
-      max_cache_size_(max_cache_size) {
+      max_cache_size_(max_cache_size), set_instrumentation_scope_(set_instrumentation_scope) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
     flushSpans();
@@ -251,9 +267,11 @@ void Tracer::flushSpans() {
 
   ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span = resource_span->add_scope_spans();
 
-  // set the instrumentation scope name and version
-  *scope_span->mutable_scope()->mutable_name() = "envoy";
-  *scope_span->mutable_scope()->mutable_version() = Envoy::VersionInfo::version();
+  if (set_instrumentation_scope_) {
+    // set the instrumentation scope name and version
+    *scope_span->mutable_scope()->mutable_name() = "envoy";
+    *scope_span->mutable_scope()->mutable_version() = Envoy::VersionInfo::version();
+  }
 
   for (const auto& pending_span : span_buffer_) {
     (*scope_span->add_spans()) = pending_span;
@@ -325,6 +343,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   // Create a new span and populate details from the span context.
   auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
                                          *this, span_kind, false);
+  new_span->setParentContextIsRemote(parent_context.isRemote());
   new_span->setTraceId(parent_context.traceId());
   if (!parent_context.spanId().empty()) {
     new_span->setParentId(parent_context.spanId());

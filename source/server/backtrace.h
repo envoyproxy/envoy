@@ -1,6 +1,6 @@
 #pragma once
 
-#include <functional>
+#include <algorithm>
 #include <iostream>
 #include <ostream>
 
@@ -39,6 +39,18 @@ namespace Envoy {
 class BackwardsTrace : Logger::Loggable<Logger::Id::backtrace> {
 public:
   BackwardsTrace() = default;
+
+  /**
+   * Construct a trace directly from raw frame pointers that were captured
+   * elsewhere. The number of frames copied is clamped to MaxStackDepth.
+   *
+   * @param frames Pointer to an array of captured frame addresses.
+   * @param depth Number of valid entries in @p frames.
+   */
+  BackwardsTrace(void* const* frames, int depth) {
+    stack_depth_ = std::min(depth, MaxStackDepth);
+    std::copy(frames, frames + stack_depth_, stack_trace_);
+  }
 
   /**
    * Attempts to get the memory offsets of the current process, so the
@@ -184,7 +196,7 @@ private:
    * symbolization failed.
    * 3. (void*) The address of the current frame.
    */
-  void visitTrace(const std::function<void(int, const char*, void*)>& visitor) {
+  template <typename F> void visitTrace(F visitor) {
     for (int i = 0; i < stack_depth_; ++i) {
       char out[1024];
       const bool success = absl::Symbolize(stack_trace_[i], out, sizeof(out));

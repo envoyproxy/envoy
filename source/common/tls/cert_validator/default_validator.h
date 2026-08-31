@@ -152,7 +152,7 @@ public:
    * @param subject_alt_names the configured subject_alt_names to match
    * @return true if the verification succeeds
    */
-  static bool verifySubjectAltName(X509* cert, const std::vector<std::string>& subject_alt_names);
+  static bool verifySubjectAltName(X509* cert, absl::Span<const std::string> subject_alt_names);
 
   /**
    * Performs subjectAltName matching with the provided matchers.

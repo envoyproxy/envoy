@@ -8,8 +8,11 @@ namespace Extensions {
 namespace Router {
 namespace Lua {
 
-PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls)
-    : lua_state_(lua_code, tls) {
+PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
+                                 absl::Status& creation_status)
+    : lua_state_(lua_code, tls, creation_status) {
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+
   lua_state_.registerType<HeaderMapWrapper>();
   lua_state_.registerType<RouteHandleWrapper>();
   lua_state_.registerType<ClusterWrapper>();
@@ -18,8 +21,9 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
 
   cluster_function_slot_ = lua_state_.registerGlobal("envoy_on_route", initializers);
   if (lua_state_.getGlobalRef(cluster_function_slot_) == LUA_REFNIL) {
-    throw EnvoyException(
-        "envoy_on_route() function not found. Lua will not hook cluster specifier.");
+    SET_AND_RETURN(absl::InvalidArgumentError(
+                       "envoy_on_route() function not found. Lua will not hook cluster specifier."),
+                   creation_status);
   }
 }
 
@@ -89,7 +93,10 @@ LuaClusterSpecifierConfig::LuaClusterSpecifierConfig(
     : cm_(context.clusterManager()), default_cluster_(config.default_cluster()) {
   const std::string code_str = THROW_OR_RETURN_VALUE(
       Config::DataSource::read(config.source_code(), true, context.api()), std::string);
-  per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
+  absl::Status creation_status = absl::OkStatus();
+  per_lua_code_setup_ptr_ =
+      std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal(), creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
 }
 
 LuaClusterSpecifierPlugin::LuaClusterSpecifierPlugin(LuaClusterSpecifierConfigSharedPtr config)
@@ -107,11 +114,9 @@ std::string LuaClusterSpecifierPlugin::startLua(const Http::HeaderMap& headers) 
   handle.reset(
       RouteHandleWrapper::create(coroutine->luaState(), headers, config_->clusterManager()), true);
 
-  TRY_NEEDS_AUDIT {
-    coroutine->start(function_ref_, 1, []() {});
-  }
-  END_TRY catch (const Filters::Common::Lua::LuaException& e) {
-    ENVOY_LOG(error, "script log: {}, use default cluster", e.what());
+  const absl::Status status = coroutine->start(function_ref_, 1, []() { return absl::OkStatus(); });
+  if (!status.ok()) {
+    ENVOY_LOG(error, "script log: {}, use default cluster", status.message());
     return config_->defaultCluster();
   }
   if (!lua_isstring(coroutine->luaState(), -1)) {

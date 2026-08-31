@@ -21,13 +21,16 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::NiceMock;
+using ::testing::Not;
 
 namespace Envoy {
 namespace Upstream {
@@ -513,7 +516,7 @@ transport_socket:
   auto result_or = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
                                                       mock_factory_context_, mock_default_factory_,
                                                       *stats_scope_);
-  ASSERT_TRUE(result_or.ok()) << result_or.status();
+  ASSERT_OK(result_or);
   matcher_ = std::move(*result_or);
 
   auto& factory = matcher_->resolve(nullptr, nullptr).factory_;
@@ -539,7 +542,7 @@ transport_socket:
     auto created = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
                                                       mock_factory_context_, mock_default_factory_,
                                                       *stats_scope_);
-    EXPECT_FALSE(created.ok());
+    EXPECT_THAT(created, Not(IsOk()));
     EXPECT_TRUE(absl::IsInvalidArgument(created.status())) << created.status();
   }
 
@@ -573,7 +576,7 @@ transport_socket:
     auto created = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
                                                       mock_factory_context_, mock_default_factory_,
                                                       *stats_scope_);
-    EXPECT_FALSE(created.ok());
+    EXPECT_THAT(created, Not(IsOk()));
     EXPECT_TRUE(absl::IsInvalidArgument(created.status())) << created.status();
   }
 }

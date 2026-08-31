@@ -1176,6 +1176,9 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnEncodingPat
 }
 
 TEST_F(HttpConnectionManagerImplTest, InboundOnlyDrainNoConnectionCloseForOutbound) {
+  // This test covers the legacy path where drain-close is decided by polling the DrainDecision.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   std::string yaml = R"EOF(
 address:
   socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -1228,6 +1231,9 @@ traffic_direction: OUTBOUND
 }
 
 TEST_F(HttpConnectionManagerImplTest, InboundOnlyDrainConnectionCloseForInbound) {
+  // This test covers the legacy path where drain-close is decided by polling the DrainDecision.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   std::string yaml = R"EOF(
 address:
   socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -1281,6 +1287,9 @@ traffic_direction: INBOUND
 }
 
 TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
+  // This test covers the legacy path where drain-close is decided by polling the DrainDecision.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   setup();
 
   EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
@@ -1314,6 +1323,162 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("close", headers.getConnectionValue());
+      }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+}
+
+// Equivalent of DisableKeepAliveWhenDraining using the connection-level drain path: the connection
+// is notified via onDrain() (Immediate strategy) and the HTTP/1.1 "Connection: close" response is
+// driven from that event rather than by polling the DrainDecision (which must not be consulted).
+TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDrainingViaConnectionDrain) {
+  setup();
+
+  EXPECT_CALL(drain_close_, drainClose(_)).Times(0);
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
+                                                                 {":path", "/"},
+                                                                 {":method", "GET"},
+                                                                 {"connection", "keep-alive"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("close", headers.getConnectionValue());
+      }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+}
+
+// Equivalent of InboundOnlyDrainConnectionCloseForInbound using the connection-level drain path. In
+// production the listener manager only notifies inbound listeners for an InboundOnly server drain,
+// so an inbound connection receives onDrain() and drains. Here we deliver that notification and
+// verify the "close" header; the DrainDecision must not be polled.
+TEST_F(HttpConnectionManagerImplTest, InboundOnlyDrainConnectionCloseForInboundViaConnectionDrain) {
+  std::string yaml = R"EOF(
+address:
+  socket_address: { address: 127.0.0.1, port_value: 1234 }
+metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+traffic_direction: INBOUND
+  )EOF";
+  auto cfg = Server::parseListenerFromV3Yaml(yaml);
+  const Network::ListenerInfo& listener_info = Server::Configuration::FakeListenerInfo(cfg);
+  EXPECT_CALL(factory_context_, listenerInfo()).WillOnce(ReturnRef(listener_info));
+  setup();
+
+  EXPECT_CALL(drain_close_, drainClose(_)).Times(0);
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
+                                                                 {":path", "/"},
+                                                                 {":method", "GET"},
+                                                                 {"connection", "keep-alive"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("close", headers.getConnectionValue());
+      }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+}
+
+// Equivalent of InboundOnlyDrainNoConnectionCloseForOutbound using the connection-level drain path.
+// In production an outbound listener is NOT notified for an InboundOnly server drain, so its
+// connections never receive onDrain(). Here we omit the notification and verify no "close" header
+// is added; the DrainDecision must not be polled.
+TEST_F(HttpConnectionManagerImplTest,
+       InboundOnlyDrainNoConnectionCloseForOutboundViaConnectionDrain) {
+  std::string yaml = R"EOF(
+address:
+  socket_address: { address: 127.0.0.1, port_value: 1234 }
+metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+traffic_direction: OUTBOUND
+  )EOF";
+  auto cfg = Server::parseListenerFromV3Yaml(yaml);
+  const Network::ListenerInfo& listener_info = Server::Configuration::FakeListenerInfo(cfg);
+  EXPECT_CALL(factory_context_, listenerInfo()).WillOnce(ReturnRef(listener_info));
+  setup();
+
+  // The outbound connection is never notified of the inbound-only drain, and the DrainDecision is
+  // not polled, so no drain-close occurs.
+  EXPECT_CALL(drain_close_, drainClose(_)).Times(0);
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
+                                                                 {":path", "/"},
+                                                                 {":method", "GET"},
+                                                                 {"connection", "keep-alive"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_NE("close", headers.getConnectionValue());
       }));
 
   Buffer::OwnedImpl fake_input;
@@ -2731,6 +2896,61 @@ TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamConnectionTimePoin
   EXPECT_EQ(connection_begin, logged_connection_begin.value());
   ASSERT_TRUE(logged_connection_end.has_value());
   EXPECT_EQ(MonotonicTime(std::chrono::milliseconds(30)), logged_connection_end.value());
+}
+
+// The COMMON_DURATION downstream TLS handshake time points (DS_HS_BEG/DS_HS_END) are recorded at
+// connection level and copied onto each request-level stream info for access logging.
+TEST_F(HttpConnectionManagerImplTest, CommonDurationDownstreamHandshakeTimePoints) {
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+  access_logs_ = {handler};
+  setup();
+
+  // The downstream TLS handshake happened at connection level, before the stream is created.
+  const MonotonicTime handshake_start(std::chrono::milliseconds(5));
+  const MonotonicTime handshake_complete(std::chrono::milliseconds(8));
+  filter_callbacks_.connection_.stream_info_.downstream_timing_.setDownstreamHandshakeStart(
+      handshake_start);
+  filter_callbacks_.connection_.stream_info_.downstream_timing_.setDownstreamHandshakeComplete(
+      handshake_complete);
+
+  std::optional<MonotonicTime> logged_handshake_start;
+  std::optional<MonotonicTime> logged_handshake_complete;
+  EXPECT_CALL(*handler, log(_, _))
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        auto timing = stream_info.downstreamTiming();
+        ASSERT_TRUE(timing.has_value());
+        logged_handshake_start = timing->downstreamHandshakeStart();
+        logged_handshake_complete = timing->downstreamHandshakeComplete();
+      }));
+
+  Buffer::OwnedImpl fake_input("input");
+  conn_manager_->createCodec(fake_input);
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), /*end_stream=*/false);
+    return Http::okStatus();
+  }));
+
+  conn_manager_->onData(fake_input, /*end_stream=*/false);
+
+  // The request-level stream info reflects the connection-level handshake time points.
+  auto hs_start = decoder_->streamInfo().downstreamTiming().downstreamHandshakeStart();
+  ASSERT_TRUE(hs_start.has_value());
+  EXPECT_EQ(handshake_start, hs_start.value());
+  auto hs_complete = decoder_->streamInfo().downstreamTiming().downstreamHandshakeComplete();
+  ASSERT_TRUE(hs_complete.has_value());
+  EXPECT_EQ(handshake_complete, hs_complete.value());
+
+  // Close the connection so the access logger runs.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  ASSERT_TRUE(logged_handshake_start.has_value());
+  EXPECT_EQ(handshake_start, logged_handshake_start.value());
+  ASSERT_TRUE(logged_handshake_complete.has_value());
+  EXPECT_EQ(handshake_complete, logged_handshake_complete.value());
 }
 
 // The COMMON_DURATION downstream connection time points are shared by all streams on a connection.

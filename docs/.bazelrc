@@ -1,2 +1,4 @@
 
 try-import ../.bazelrc
+
+common --@proxy-wasm-cpp-host//bazel:engine=disabled

@@ -10,15 +10,22 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CacheV2 {
 
-class CacheFilterFactory : public Common::ExceptionFreeFactoryBase<
+class CacheFilterFactory : public Common::UnifiedFactoryBase<
                                envoy::extensions::filters::http::cache_v2::v3::CacheV2Config> {
 public:
-  CacheFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.cache_v2") {}
+  CacheFilterFactory() : UnifiedFactoryBase("envoy.filters.http.cache_v2") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+
+  // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
+  // (ServerFactoryContext) paths.
+  static absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactory(const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
+                      Server::Configuration::ServerFactoryContext& context);
 };
 
 } // namespace CacheV2

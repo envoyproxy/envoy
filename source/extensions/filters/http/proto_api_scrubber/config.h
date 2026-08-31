@@ -16,16 +16,24 @@ namespace HttpFilters {
 namespace ProtoApiScrubber {
 
 class FilterFactoryCreator
-    : public Envoy::Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
+    : public Envoy::Extensions::HttpFilters::Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig> {
 public:
   FilterFactoryCreator();
 
 private:
-  absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
           proto_config,
-      const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
+      Envoy::Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+
+  // Shared factory creation used by the listener/cluster and route/vhost-level paths. Stats are
+  // scoped to the given scope.
+  static absl::StatusOr<Envoy::Http::FilterFactoryCb> createFilterFactory(
+      const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
+          proto_config,
+      Envoy::Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
 };
 } // namespace ProtoApiScrubber
 } // namespace HttpFilters

@@ -9,23 +9,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 
-Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-
-  auto config = std::make_shared<McpFilterConfig>(proto_config, stats_prefix,
-                                                  context.serverFactoryContext().scope());
-
-  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<McpFilter>(config));
-  };
-}
-
 absl::StatusOr<Http::FilterFactoryCb> McpFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
 
-  auto config = std::make_shared<McpFilterConfig>(proto_config, stats_prefix, context.scope());
+  auto config =
+      std::make_shared<McpFilterConfig>(proto_config, extra_context.stats_prefix, context.scope());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<McpFilter>(config));

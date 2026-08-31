@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
+#include "envoy/common/pure.h"
 #include "envoy/compression/decompressor/decompressor.h"
 
 namespace Envoy {
