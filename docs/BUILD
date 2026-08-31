@@ -158,6 +158,7 @@ pkg_files(
     name = "sphinx_root",
     srcs = glob([
         "root/**/*.css",
+        "root/**/*.html",
         "root/**/*.ico",
         "root/**/*.jpeg",
         "root/**/*.jpg",

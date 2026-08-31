@@ -237,6 +237,7 @@ exclude_patterns = [
     '_venv',
     'Thumbs.db',
     '.DS_Store',
+    '**/._*',
 ]
 
 # The reST default role (used for this markup: `text`) to use for all
@@ -278,6 +279,11 @@ html_theme = 'sphinx_rtd_theme'
 html_theme_options = {
     'logo_only': True,
     'includehidden': False,
+    'collapse_navigation': True,
+    'sticky_navigation': True,
+    'navigation_depth': 4,
+    'titles_only': True,
+    'style_external_links': True,
 }
 
 # Add any paths that contain custom themes here, relative to this directory.
@@ -305,6 +311,7 @@ html_favicon = 'favicon.ico'
 html_static_path = ['_static']
 
 html_style = 'css/envoy.css'
+html_js_files = ['js/envoy.js']
 
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied

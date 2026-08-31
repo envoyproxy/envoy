@@ -70,16 +70,6 @@ Envoy will parse the config file according to the file extension, please see the
 
 .. tabs::
 
-   .. tab:: System
-
-      To start Envoy as a system daemon :download:`download the demo configuration <_include/envoy-demo.yaml>`, and start
-      as follows:
-
-      .. code-block:: console
-
-         $ envoy -c envoy-demo.yaml
-         ...
-
    .. tab:: Docker (Linux Image)
 
       You can start the Envoy Docker image without specifying a configuration file, and
@@ -88,7 +78,6 @@ Envoy will parse the config file according to the file extension, please see the
       .. substitution-code-block:: console
 
          $ docker run --rm -it \
-               -p 9901:9901 \
                -p 10000:10000 \
                envoyproxy/|envoy_docker_image|
          ...
@@ -101,10 +90,23 @@ Envoy will parse the config file according to the file extension, please see the
 
          $ docker run --rm -it \
                -v $(pwd)/envoy-custom.yaml:/envoy-custom.yaml \
-               -p 9901:9901 \
                -p 10000:10000 \
                envoyproxy/|envoy_docker_image| \
                    -c /envoy-custom.yaml
+         ...
+
+      These examples publish only the demo listener. Follow the
+      :ref:`admin quick start guide <start_quick_start_admin>` before exposing the
+      unauthenticated admin interface.
+
+   .. tab:: System
+
+      To start Envoy as a system daemon :download:`download the demo configuration <_include/envoy-demo.yaml>`, and start
+      as follows:
+
+      .. code-block:: console
+
+         $ envoy -c envoy-demo.yaml
          ...
 
 Check Envoy is proxying on http://localhost:10000.
@@ -169,7 +171,7 @@ Next, start the Envoy server using the override configuration:
       .. substitution-code-block:: console
 
          $ docker run --rm -it \
-               -p 9902:9902 \
+               -p 127.0.0.1:9902:9902 \
                -p 10000:10000 \
                envoyproxy/|envoy_docker_image| \
                    -c /etc/envoy/envoy.yaml \
@@ -360,7 +362,6 @@ which are set to ``debug`` and ``trace`` respectively.
       .. substitution-code-block:: console
 
          $ docker run --rm -d \
-               -p 9901:9901 \
                -p 10000:10000 \
                envoyproxy/|envoy_docker_image| \
                    -c /etc/envoy/envoy.yaml \

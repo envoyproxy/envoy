@@ -1,0 +1,112 @@
+{% extends "!layout.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  <meta name="color-scheme" content="light dark">
+{% endblock %}
+
+{% block extrabody %}
+  {{ super() }}
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="{{ pathto(master_doc) }}"
+       aria-label="Envoy documentation home">
+      <img src="{{ pathto('_static/img/envoy-logo.png', 1) }}" alt="Envoy">
+    </a>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span class="envoy-version-label">Version</span>
+        <span>{{ version }}</span>
+        <span class="fa fa-angle-down" aria-hidden="true"></span>
+      </summary>
+      <div class="envoy-version-options">
+        <a href="{{ pathto(master_doc) }}" aria-current="true">{{ version }}</a>
+        <a href="/docs/envoy/latest/">Latest development</a>
+        <a href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <form class="envoy-doc-search" action="{{ pathto('search') }}" method="get" role="search">
+      <label for="envoy-doc-search-input">
+        <span class="envoy-visually-hidden">Search Envoy documentation</span>
+        <span class="fa fa-search" aria-hidden="true"></span>
+      </label>
+      <input id="envoy-doc-search-input" type="search" name="q"
+             placeholder="Search documentation" autocomplete="off">
+      <kbd data-envoy-search-shortcut aria-hidden="true">⌘ K</kbd>
+      <input type="hidden" name="check_keywords" value="yes">
+      <input type="hidden" name="area" value="default">
+    </form>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <span class="fa fa-github" aria-hidden="true"></span>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <span class="fa fa-moon-o envoy-theme-icon-dark" aria-hidden="true"></span>
+        <span class="fa fa-sun-o envoy-theme-icon-light" aria-hidden="true"></span>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <span class="fa fa-bars" aria-hidden="true"></span>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button>
+{% endblock %}
+
+{% block sidebartitle %}
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <span class="fa fa-times" aria-hidden="true"></span>
+    </button>
+  </div>
+
+  <div class="envoy-sidebar-mobile-tools">
+    <div class="envoy-sidebar-version">
+      <span>{{ version }}</span>
+      <a href="/docs/">All versions</a>
+    </div>
+    <form class="envoy-sidebar-search" action="{{ pathto('search') }}" method="get" role="search">
+      <label for="envoy-sidebar-search-input">
+        <span class="envoy-visually-hidden">Search Envoy documentation</span>
+        <span class="fa fa-search" aria-hidden="true"></span>
+      </label>
+      <input id="envoy-sidebar-search-input" type="search" name="q"
+             placeholder="Search documentation" autocomplete="off">
+      <input type="hidden" name="check_keywords" value="yes">
+      <input type="hidden" name="area" value="default">
+    </form>
+    <a class="envoy-sidebar-github" href="https://github.com/envoyproxy/envoy"
+       target="_blank" rel="noopener">
+      <span class="fa fa-github" aria-hidden="true"></span>
+      GitHub
+    </a>
+  </div>
+{% endblock %}
+
+{% block mobile_nav %}{% endblock %}
+
+{% block content %}
+  <div class="envoy-content-layout{% if toc %} envoy-has-page-toc{% endif %}">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      {{ super() }}
+    </div>
+    {% if toc %}
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        {{ toc }}
+      </aside>
+    {% endif %}
+  </div>
+{% endblock %}
