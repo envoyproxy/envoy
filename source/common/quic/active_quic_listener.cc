@@ -113,8 +113,12 @@ ActiveQuicListener::ActiveQuicListener(
     QuicPacketWriterPtr quic_writer = quic_packet_writer_factory->createQuicPacketWriter(
         listen_socket_.ioHandle(), listener_config.listenerScope(), dispatcher,
         std::move(on_can_write_cb));
-    quic_packet_writer_ = quic_writer.get();
-    quic_dispatcher_->InitializeWithWriter(quic_writer.release());
+    if (quic_writer != nullptr) {
+      quic_packet_writer_ = quic_writer.get();
+      quic_dispatcher_->InitializeWithWriter(quic_writer.release());
+    } else {
+      IS_ENVOY_BUG("quic_packet_writer_factory failed to create quic_writer");
+    }
   } else {
     // TODO(panting): This fallback is a temporary migration bridge. We must keep this
     // logic because there is currently no QUIC GSO batch factory implemented to create

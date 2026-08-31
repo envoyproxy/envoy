@@ -1,11 +1,11 @@
 load("@grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@grpc//bazel:python_rules.bzl", _py_proto_library = "py_proto_library")
-load("@io_bazel_rules_go//go:def.bzl", "go_test")
-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 load("@protobuf//bazel:java_lite_proto_library.bzl", "java_lite_proto_library")
 load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@protoc-gen-validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_test")
+load("@rules_go//go:def.bzl", "go_test")
+load("@rules_go//proto:def.bzl", "go_proto_library")
 load(
     "//bazel:external_proto_deps.bzl",
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
@@ -161,9 +161,9 @@ def api_proto_package(
         has_services = has_services,
     )
 
-    compilers = ["@io_bazel_rules_go//proto:go_proto", "@protoc-gen-validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
+    compilers = ["@rules_go//proto:go_proto", "@protoc-gen-validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
     if has_services:
-        compilers = ["@io_bazel_rules_go//proto:go_proto", "@io_bazel_rules_go//proto:go_grpc_v2", "@protoc-gen-validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
+        compilers = ["@rules_go//proto:go_proto", "@rules_go//proto:go_grpc_v2", "@protoc-gen-validate//bazel/go:pgv_plugin_go", "@envoy_api//bazel:vtprotobuf_plugin_go"]
 
     deps = (
         [_go_proto_mapping(dep) for dep in deps] +
