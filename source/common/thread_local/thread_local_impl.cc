@@ -24,25 +24,26 @@ InstanceImpl::~InstanceImpl() {
   thread_local_data_.data_.clear();
 }
 
-SlotPtr InstanceImpl::allocateSlot() {
+SlotSharedPtr InstanceImpl::allocateSlot() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(!shutdown_);
 
   if (free_slot_indexes_.empty()) {
-    SlotPtr slot = std::make_unique<SlotImpl>(*this, uint32_t(slots_.size()));
-    slots_.push_back(slot.get());
+    const uint32_t idx = uint32_t(slots_.size());
+    auto slot = std::make_shared<SlotImpl>(*this, idx);
+    slots_.push_back(slot);
     return slot;
   }
   const uint32_t idx = free_slot_indexes_.back();
   free_slot_indexes_.pop_back();
   ASSERT(idx < slots_.size());
-  SlotPtr slot = std::make_unique<SlotImpl>(*this, idx);
-  slots_[idx] = slot.get();
+  auto slot = std::make_shared<SlotImpl>(*this, idx);
+  slots_[idx] = slot;
   return slot;
 }
 
 InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
-    : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
+    : parent_(parent), index_(index) {}
 
 InstanceImpl::SlotImpl::~SlotImpl() {
   // Do nothing if the parent is already shutdown. Return early here to avoid accessing the main
@@ -71,13 +72,8 @@ InstanceImpl::SlotImpl::~SlotImpl() {
 }
 
 std::function<void()> InstanceImpl::SlotImpl::wrapCallback(const std::function<void()>& cb) {
-  // See the header file comments for still_alive_guard_ for the purpose of this capture and the
-  // expired check below.
-  //
-  // Note also that this logic is duplicated below and dataCallback(), rather
-  // than incurring another lambda redirection.
-  return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb] {
-    if (!still_alive_guard.expired()) {
+  return [weak_slot = weak_from_this(), cb] {
+    if (auto slot = weak_slot.lock()) {
       cb();
     }
   };
@@ -99,14 +95,8 @@ ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::getWorker(uint32_t index) {
 ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() { return getWorker(index_); }
 
 std::function<void()> InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
-  // See the header file comments for still_alive_guard_ for why we capture index_.
-  return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb = std::move(cb),
-          index = index_]() mutable {
-    // This duplicates logic in wrapCallback() (above). Using wrapCallback also
-    // works, but incurs another indirection of lambda at runtime. As the
-    // duplicated logic is only an if-statement and a bool function, it doesn't
-    // seem worth factoring that out to a helper function.
-    if (!still_alive_guard.expired()) {
+  return [weak_slot = weak_from_this(), cb = std::move(cb), index = index_]() mutable {
+    if (auto slot = weak_slot.lock()) {
       cb(getWorker(index));
     }
   };
@@ -126,12 +116,13 @@ void InstanceImpl::SlotImpl::set(InitializeCb cb) {
   ASSERT(!parent_.shutdown_);
 
   for (Event::Dispatcher& dispatcher : parent_.registered_threads_) {
-    // See the header file comments for still_alive_guard_ for why we capture index_.
     dispatcher.post(wrapCallback(
         [index = index_, cb, &dispatcher]() -> void { setThreadLocal(index, cb(dispatcher)); }));
   }
 
   // Handle main thread.
+  ASSERT(parent_.main_thread_dispatcher_ != nullptr,
+         "main thread dispatcher must be registered before initializing thread local slots");
   setThreadLocal(index_, cb(*parent_.main_thread_dispatcher_));
 }
 
@@ -160,7 +151,7 @@ void InstanceImpl::removeSlot(uint32_t slot) {
     return;
   }
 
-  slots_[slot] = nullptr;
+  slots_[slot].reset();
   ASSERT(std::find(free_slot_indexes_.begin(), free_slot_indexes_.end(), slot) ==
              free_slot_indexes_.end(),
          fmt::format("slot index {} already in free slot set!", slot));

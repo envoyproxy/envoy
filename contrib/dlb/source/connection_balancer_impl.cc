@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <format>
 #include <memory>
 
 #include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.h"
@@ -21,11 +22,11 @@ Envoy::Network::ConnectionBalancerSharedPtr
 DlbConnectionBalanceFactory::fallback(const std::string& message) {
   switch (fallback_policy) {
   case envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::ExactConnectionBalance: {
-    ENVOY_LOG(warn, fmt::format("error: {}, fallback to Exact Connection Balance", message));
+    ENVOY_LOG(warn, std::format("error: {}, fallback to Exact Connection Balance", message));
     return std::make_shared<Network::ExactConnectionBalancerImpl>();
   }
   case envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::NopConnectionBalance: {
-    ENVOY_LOG(warn, fmt::format("error: {}, fallback to Nop Connection Balance", message));
+    ENVOY_LOG(warn, std::format("error: {}, fallback to Nop Connection Balance", message));
     return std::make_shared<Network::NopConnectionBalancerImpl>();
   }
   case envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb::None:
@@ -42,7 +43,7 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
   envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb_config;
   auto status = Envoy::MessageUtil::unpackTo(typed_config.typed_config(), dlb_config);
   if (!status.ok()) {
-    return fallback(fmt::format("unexpected dlb config: {}", typed_config.DebugString()));
+    return fallback(std::format("unexpected dlb config: {}", typed_config.DebugString()));
   }
 
   fallback_policy = dlb_config.fallback_policy();
@@ -73,14 +74,14 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
 
   dlb_resources_t rsrcs;
   if (dlb_open(device_id, &dlb) == -1) {
-    return fallback(fmt::format("dlb_open {}", errorDetails(errno)));
+    return fallback(std::format("dlb_open {}", errorDetails(errno)));
   }
   if (dlb_get_dev_capabilities(dlb, &cap)) {
-    return fallback(fmt::format("dlb_get_dev_capabilities {}", errorDetails(errno)));
+    return fallback(std::format("dlb_get_dev_capabilities {}", errorDetails(errno)));
   }
 
   if (dlb_get_num_resources(dlb, &rsrcs)) {
-    return fallback(fmt::format("dlb_get_num_resources {}", errorDetails(errno)));
+    return fallback(std::format("dlb_get_num_resources {}", errorDetails(errno)));
   }
 
   ENVOY_LOG(debug,
@@ -92,18 +93,18 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
             rsrcs.num_ldb_credits, rsrcs.max_contiguous_ldb_credits, rsrcs.num_ldb_credit_pools);
 
   if (rsrcs.num_ldb_ports < 2 * worker_num) {
-    return fallback(fmt::format("no available dlb port resources, request: {}, available: {}",
+    return fallback(std::format("no available dlb port resources, request: {}, available: {}",
                                 2 * worker_num, rsrcs.num_ldb_ports));
   }
 
   domain_id = createSchedDomain(dlb, rsrcs, cap, 2 * worker_num);
   if (domain_id == -1) {
-    return fallback(fmt::format("dlb_create_sched_domain_ {}", errorDetails(errno)));
+    return fallback(std::format("dlb_create_sched_domain_ {}", errorDetails(errno)));
   }
 
   domain = dlb_attach_sched_domain(dlb, domain_id);
   if (domain == nullptr) {
-    return fallback(fmt::format("dlb_attach_sched_domain {}", errorDetails(errno)));
+    return fallback(std::format("dlb_attach_sched_domain {}", errorDetails(errno)));
   }
 
   const int partial_resources = 100;
@@ -114,13 +115,13 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     ldb_pool_id = dlb_create_ldb_credit_pool(domain, max_ldb_credits);
 
     if (ldb_pool_id == -1) {
-      return fallback(fmt::format("dlb_create_ldb_credit_pool {}", errorDetails(errno)));
+      return fallback(std::format("dlb_create_ldb_credit_pool {}", errorDetails(errno)));
     }
 
     dir_pool_id = dlb_create_dir_credit_pool(domain, max_dir_credits);
 
     if (dir_pool_id == -1) {
-      return fallback(fmt::format("dlb_create_dir_credit_pool {}", errorDetails(errno)));
+      return fallback(std::format("dlb_create_dir_credit_pool {}", errorDetails(errno)));
     }
   } else {
     int max_credits = rsrcs.num_credits * partial_resources / 100;
@@ -128,58 +129,58 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     ldb_pool_id = dlb_create_credit_pool(domain, max_credits);
 
     if (ldb_pool_id == -1) {
-      return fallback(fmt::format("dlb_create_credit_pool {}", errorDetails(errno)));
+      return fallback(std::format("dlb_create_credit_pool {}", errorDetails(errno)));
     }
   }
 
   tx_queue_id = createLdbQueue(domain);
   if (tx_queue_id == -1) {
-    return fallback(fmt::format("tx create_ldb_queue {}", errorDetails(errno)));
+    return fallback(std::format("tx create_ldb_queue {}", errorDetails(errno)));
   }
 
   for (uint i = 0; i < worker_num; i++) {
     int tx_port_id = createLdbPort(domain, cap, ldb_pool_id, dir_pool_id);
     if (tx_port_id == -1) {
-      return fallback(fmt::format("tx dlb_create_ldb_port {}", errorDetails(errno)));
+      return fallback(std::format("tx dlb_create_ldb_port {}", errorDetails(errno)));
     }
 
     dlb_port_hdl_t tx_port = dlb_attach_ldb_port(domain, tx_port_id);
     if (tx_port == nullptr) {
-      return fallback(fmt::format("tx dlb_attach_ldb_port {}", errorDetails(errno)));
+      return fallback(std::format("tx dlb_attach_ldb_port {}", errorDetails(errno)));
     }
     tx_ports.push_back(tx_port);
 
     int rx_port_id = createLdbPort(domain, cap, ldb_pool_id, dir_pool_id);
     if (rx_port_id == -1) {
-      return fallback(fmt::format("rx dlb_create_ldb_port {}", errorDetails(errno)));
+      return fallback(std::format("rx dlb_create_ldb_port {}", errorDetails(errno)));
     }
 
     dlb_port_hdl_t rx_port = dlb_attach_ldb_port(domain, rx_port_id);
     if (rx_port == nullptr) {
-      return fallback(fmt::format("rx dlb_attach_ldb_port {}", errorDetails(errno)));
+      return fallback(std::format("rx dlb_attach_ldb_port {}", errorDetails(errno)));
     }
     rx_ports.push_back(rx_port);
 
     if (dlb_link_queue(rx_port, tx_queue_id, 0) == -1) {
-      return fallback(fmt::format("dlb_link_queue {}", errorDetails(errno)));
+      return fallback(std::format("dlb_link_queue {}", errorDetails(errno)));
     }
 
     int efd = eventfd(0, EFD_NONBLOCK);
     if (efd < 0) {
-      return fallback(fmt::format("dlb eventfd {}", errorDetails(errno)));
+      return fallback(std::format("dlb eventfd {}", errorDetails(errno)));
     }
     if (dlb_enable_cq_epoll(rx_port, true, efd)) {
-      return fallback(fmt::format("dlb_enable_cq_epoll {}", errorDetails(errno)));
+      return fallback(std::format("dlb_enable_cq_epoll {}", errorDetails(errno)));
     }
     efds.push_back(efd);
   }
 
   if (dlb_launch_domain_alert_thread(domain, nullptr, nullptr)) {
-    return fallback(fmt::format("dlb_launch_domain_alert_thread {}", errorDetails(errno)));
+    return fallback(std::format("dlb_launch_domain_alert_thread {}", errorDetails(errno)));
   }
 
   if (dlb_start_sched_domain(domain)) {
-    return fallback(fmt::format("dlb_start_sched_domain {}", errorDetails(errno)));
+    return fallback(std::format("dlb_start_sched_domain {}", errorDetails(errno)));
   }
 #endif
   DlbConnectionBalanceFactorySingleton::initialize(this);

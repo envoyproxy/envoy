@@ -1,5 +1,7 @@
 #pragma once
 
+#include <format>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
@@ -144,7 +146,7 @@ inline Listener getDownstreamListener(const std::string& name, int num_listeners
   listener.set_name(name);
 
   auto* sa = listener.mutable_address()->mutable_socket_address();
-  sa->set_address(fmt::format("rc://{}:{}:{}@{}:{}", name, downstreamCluster, downstreamTenant,
+  sa->set_address(std::format("rc://{}:{}:{}@{}:{}", name, downstreamCluster, downstreamTenant,
                               downstreamCluster, num_listeners));
   sa->set_port_value(0);
   sa->set_resolver_name(downstreamResolver);

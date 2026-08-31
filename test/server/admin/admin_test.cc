@@ -49,6 +49,37 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
                       EXPECT_EQ(Http::Code::MethodNotAllowed, getCallback(path, header_map, data)));
 }
 
+// A graceful drain notifies the listeners that draining has begun, so that connection-level drain
+// logic (Network::Connection::onDrain()) applies to connections on -- and accepted by -- the
+// listeners covered by the drain. DrainManagerImpl deliberately does not do this itself: its
+// per-listener children must not fan out, so each server-drain entry point notifies instead.
+TEST_P(AdminInstanceTest, GracefulDrainNotifiesListeners) {
+  Buffer::OwnedImpl data;
+  Http::TestResponseHeaderMapImpl header_map;
+
+  // The event carries the server's configured strategy, so connections can reproduce the same
+  // gradual/immediate drain behavior the pull model applied.
+  ON_CALL(server_.options_, drainStrategy())
+      .WillByDefault(testing::Return(Server::DrainStrategy::Gradual));
+  Network::ConnectionDrainEvent captured;
+  EXPECT_CALL(server_.listener_manager_, onServerDrainStart(Network::DrainDirection::All, _))
+      .WillOnce(
+          testing::Invoke([&captured](Network::DrainDirection,
+                                      Network::ConnectionDrainEvent event) { captured = event; }));
+  EXPECT_EQ(Http::Code::OK, postCallback("/drain_listeners?graceful", header_map, data));
+  EXPECT_EQ(Server::DrainStrategy::Gradual, captured.strategy);
+
+  // Inbound-only drains pass the narrower direction through.
+  EXPECT_CALL(server_.listener_manager_,
+              onServerDrainStart(Network::DrainDirection::InboundOnly, _));
+  EXPECT_EQ(Http::Code::OK,
+            postCallback("/drain_listeners?graceful&inboundonly", header_map, data));
+
+  // A non-graceful drain stops the listeners outright; there is no drain window to notify about.
+  EXPECT_CALL(server_.listener_manager_, onServerDrainStart(_, _)).Times(0);
+  EXPECT_EQ(Http::Code::OK, postCallback("/drain_listeners", header_map, data));
+}
+
 TEST_P(AdminInstanceTest, Getters) {
   EXPECT_EQ(&admin_.mutableSocket(), &admin_.socket());
   EXPECT_EQ(1, admin_.concurrency());
@@ -367,6 +398,18 @@ TEST_P(AdminInstanceTest, Overrides) {
   peer.listener().udpListenerConfig();
   peer.listener().listenerInfo()->direction();
   peer.listener().tcpBacklogSize();
+}
+
+// The admin listener declares MODIFY_ONLY so that the connection-level drain decision (see
+// Network::shouldDrainClose()) agrees with the drain decision the admin connection manager is
+// constructed with, namely the global drain manager, which is also MODIFY_ONLY (see
+// ProdComponentFactory::createDrainManager). In particular /healthcheck/fail must not drain-close
+// admin connections, which would break keep-alive for admin clients that hold a connection while
+// the server is health check failed.
+TEST_P(AdminInstanceTest, ListenerDrainTypeIsModifyOnly) {
+  AdminTestingPeer peer(admin_);
+  EXPECT_EQ(envoy::config::listener::v3::Listener::MODIFY_ONLY,
+            peer.listener().listenerInfo()->drainType());
 }
 
 } // namespace Server

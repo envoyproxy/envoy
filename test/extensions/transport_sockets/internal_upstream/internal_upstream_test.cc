@@ -12,7 +12,11 @@
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
+
+using testing::Contains;
+using testing::Pair;
 
 namespace Envoy {
 namespace Extensions {
@@ -94,8 +98,9 @@ TEST_F(InternalSocketTest, PassthroughStateInjected) {
   EXPECT_CALL(*state, initialize(_, _))
       .WillOnce(Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
                            const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
-        ASSERT_EQ("val",
-                  metadata->filter_metadata().at("envoy.test").fields().at("key").string_value());
+        ASSERT_THAT(
+            metadata->filter_metadata(),
+            Contains(Pair("envoy.test", HasStructFields(Contains(IsStructString("key", "val"))))));
         ASSERT_EQ(1, filter_state_objects.size());
         const auto& object = filter_state_objects.at(0);
         ASSERT_EQ("test.object", object.name_);

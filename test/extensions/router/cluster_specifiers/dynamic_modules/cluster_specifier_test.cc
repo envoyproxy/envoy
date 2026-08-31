@@ -1,3 +1,4 @@
+#include <array>
 #include <limits>
 
 #include "envoy/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
@@ -5,6 +6,8 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/custom_stat_namespaces_impl.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/router/cluster_specifiers/dynamic_modules/config.h"
 
@@ -12,7 +15,10 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -28,6 +34,16 @@ namespace {
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::ReturnRef;
+
+void mockCustomStatNamespaces(Server::Configuration::MockServerFactoryContext& context,
+                              Stats::CustomStatNamespacesImpl& custom_stat_namespaces) {
+  ON_CALL(context.api_, customStatNamespaces())
+      .WillByDefault(testing::ReturnRef(custom_stat_namespaces));
+}
+
+envoy_dynamic_module_type_module_buffer metricBuffer(absl::string_view value) {
+  return {.ptr = value.data(), .length = value.size()};
+}
 
 // Builds a proto config that loads the named module with the given in-module specifier name.
 DynamicModuleClusterSpecifierProto protoConfig(absl::string_view module_name,
@@ -52,6 +68,7 @@ public:
                                TestEnvironment::substitute(
                                    "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
                                1);
+    mockCustomStatNamespaces(context_, custom_stat_namespaces_);
   }
 
   // Returns the number of times the no-op module has been handed its configuration back, so that a
@@ -72,6 +89,7 @@ public:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces_;
   DynamicModuleClusterSpecifierPluginFactoryConfig factory_;
 };
 
@@ -207,7 +225,68 @@ TEST_F(DynamicModuleClusterSpecifierFactoryTest, EmptyOverrideRejected) {
   (*proto_config.mutable_route_action_overrides())["empty"] = {};
   EXPECT_THROW_WITH_REGEX(factory_.createClusterSpecifierPlugin(proto_config, context_),
                           EnvoyException,
-                          "Route action override must specify at least one property to replace");
+                          "Route action override must replace at least one route action property");
+}
+
+// Only the envoy.lb entry of a metadata match is used, so an override whose only property is a
+// metadata match without one replaces nothing even though the proto looks populated.
+TEST_F(DynamicModuleClusterSpecifierFactoryTest, OverrideWithNonLoadBalancingMetadataOnlyRejected) {
+  auto proto_config = protoConfig("cluster_specifier_no_op", "test_cluster_specifier");
+  auto& entry = (*proto_config.mutable_route_action_overrides())["hollow"];
+  Protobuf::Struct metadata;
+  (*metadata.mutable_fields())["shard"] = ValueUtil::stringValue("a");
+  (*entry.mutable_metadata_match()->mutable_filter_metadata())["envoy.not_lb"] = metadata;
+  EXPECT_THROW_WITH_REGEX(factory_.createClusterSpecifierPlugin(proto_config, context_),
+                          EnvoyException,
+                          "Route action override must replace at least one route action property");
+}
+
+// The route level cluster validation only walks the mirror policies of the matched route, so the
+// plugin has to validate the ones its overrides carry.
+TEST_F(DynamicModuleClusterSpecifierFactoryTest, UnknownMirrorClusterInOverrideRejected) {
+  auto proto_config = protoConfig("cluster_specifier_no_op", "test_cluster_specifier");
+  (*proto_config.mutable_route_action_overrides())["mirror"]
+      .add_request_mirror_policies()
+      ->set_cluster("absent-cluster");
+  auto plugin = factory_.createClusterSpecifierPlugin(proto_config, context_);
+  EXPECT_CALL(context_.cluster_manager_, hasCluster(absl::string_view("absent-cluster")))
+      .WillOnce(Return(false));
+  EXPECT_THAT(plugin->validateClusters(context_.cluster_manager_).message(),
+              testing::HasSubstr("route action override 'mirror': unknown shadow cluster "
+                                 "'absent-cluster'"));
+}
+
+TEST_F(DynamicModuleClusterSpecifierFactoryTest, KnownMirrorClusterInOverrideAccepted) {
+  auto proto_config = protoConfig("cluster_specifier_no_op", "test_cluster_specifier");
+  (*proto_config.mutable_route_action_overrides())["mirror"]
+      .add_request_mirror_policies()
+      ->set_cluster("present-cluster");
+  auto plugin = factory_.createClusterSpecifierPlugin(proto_config, context_);
+  EXPECT_CALL(context_.cluster_manager_, hasCluster(absl::string_view("present-cluster")))
+      .WillOnce(Return(true));
+  EXPECT_TRUE(plugin->validateClusters(context_.cluster_manager_).ok());
+}
+
+// A mirror policy that names its cluster through a header resolves it per request, so there is
+// nothing to look up at configuration load.
+TEST_F(DynamicModuleClusterSpecifierFactoryTest, HeaderNamedMirrorClusterNotValidated) {
+  auto proto_config = protoConfig("cluster_specifier_no_op", "test_cluster_specifier");
+  (*proto_config.mutable_route_action_overrides())["mirror"]
+      .add_request_mirror_policies()
+      ->set_cluster_header("x-mirror");
+  auto plugin = factory_.createClusterSpecifierPlugin(proto_config, context_);
+  EXPECT_CALL(context_.cluster_manager_, hasCluster(testing::_)).Times(0);
+  EXPECT_TRUE(plugin->validateClusters(context_.cluster_manager_).ok());
+}
+
+// An override without mirror policies has no cluster to validate.
+TEST_F(DynamicModuleClusterSpecifierFactoryTest, OverrideWithoutMirrorPolicyNotValidated) {
+  auto proto_config = protoConfig("cluster_specifier_no_op", "test_cluster_specifier");
+  (*proto_config.mutable_route_action_overrides())["retry"].mutable_retry_policy()->set_retry_on(
+      "5xx");
+  auto plugin = factory_.createClusterSpecifierPlugin(proto_config, context_);
+  EXPECT_CALL(context_.cluster_manager_, hasCluster(testing::_)).Times(0);
+  EXPECT_TRUE(plugin->validateClusters(context_.cluster_manager_).ok());
 }
 
 // An override key must not be empty.
@@ -245,6 +324,7 @@ public:
         TestEnvironment::substitute(
             "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
         1);
+    mockCustomStatNamespaces(context_, custom_stat_namespaces_);
   }
 
   // Creates the plugin from a YAML fragment appended to the base module configuration.
@@ -279,6 +359,7 @@ specifier_name: test_cluster_specifier
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::shared_ptr<NiceMock<Envoy::Router::MockRoute>> parent_{
       std::make_shared<NiceMock<Envoy::Router::MockRoute>>()};
@@ -487,6 +568,53 @@ TEST_F(DynamicModuleClusterSpecifierTest, DefaultPriorityReplaced) {
   EXPECT_EQ(Upstream::ResourcePriority::Default, resolveRouteEntry(headers)->priority());
 }
 
+TEST_F(DynamicModuleClusterSpecifierTest, ClusterNotFoundResponseCodeDelegatesByDefault) {
+  setUpPlugin();
+  EXPECT_CALL(parent_->route_entry_, clusterNotFoundResponseCode())
+      .WillRepeatedly(Return(Http::Code::InternalServerError));
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "prod"}};
+  EXPECT_EQ(Http::Code::InternalServerError,
+            resolveRouteEntry(headers)->clusterNotFoundResponseCode());
+}
+
+TEST_F(DynamicModuleClusterSpecifierTest, ClusterNotFoundResponseCodeReplaced) {
+  setUpPlugin();
+  EXPECT_CALL(parent_->route_entry_, clusterNotFoundResponseCode()).Times(0);
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/"}, {"env", "prod"}, {"x-not-found-code", "404"}};
+  EXPECT_EQ(Http::Code::NotFound, resolveRouteEntry(headers)->clusterNotFoundResponseCode());
+}
+
+// The code is only read once the selected cluster turns out to be missing, so an invalid one would
+// otherwise surface as a malformed response far from the module call that set it.
+TEST_F(DynamicModuleClusterSpecifierTest, OutOfRangeClusterNotFoundResponseCodeRejected) {
+  setUpPlugin();
+  EXPECT_CALL(parent_->route_entry_, clusterNotFoundResponseCode())
+      .WillRepeatedly(Return(Http::Code::ServiceUnavailable));
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/"}, {"env", "prod"}, {"x-not-found-code", "max"}};
+  EXPECT_LOG_CONTAINS("warn", "out of range cluster not found response code", {
+    EXPECT_EQ(Http::Code::ServiceUnavailable,
+              resolveRouteEntry(headers)->clusterNotFoundResponseCode());
+  });
+}
+
+// A refresh replaces the whole decision, so a response code an earlier call set goes back to the
+// matched route.
+TEST_F(DynamicModuleClusterSpecifierTest, RefreshWithoutResponseCodeRevertsToMatchedRoute) {
+  setUpPlugin();
+  ON_CALL(parent_->route_entry_, clusterNotFoundResponseCode())
+      .WillByDefault(Return(Http::Code::ServiceUnavailable));
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/"}, {"env", "prod"}, {"x-not-found-code", "404"}};
+  const auto* entry = resolveRouteEntry(headers);
+  EXPECT_EQ(Http::Code::NotFound, entry->clusterNotFoundResponseCode());
+
+  headers.remove(Http::LowerCaseString("x-not-found-code"));
+  entry->refreshRouteCluster(headers, stream_info_);
+  EXPECT_EQ(Http::Code::ServiceUnavailable, entry->clusterNotFoundResponseCode());
+}
+
 // Tests that assert the values the module read through the context callbacks. The module echoes the
 // value named by the x-echo header into the cluster name, so every read is observable.
 class DynamicModuleClusterSpecifierReadTest : public DynamicModuleClusterSpecifierTest {
@@ -551,6 +679,31 @@ TEST_F(DynamicModuleClusterSpecifierReadTest, AbsentDynamicMetadataReadable) {
   setUpPlugin();
   Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "prod"}};
   EXPECT_EQ("absent", echoedValue(headers, "dynamic-metadata"));
+  EXPECT_EQ("absent", echoedValue(headers, "dynamic-metadata-number"));
+  EXPECT_EQ("absent", echoedValue(headers, "dynamic-metadata-bool"));
+}
+
+TEST_F(DynamicModuleClusterSpecifierReadTest, NumberAndBoolDynamicMetadataReadable) {
+  setUpPlugin();
+  Protobuf::Struct metadata;
+  (*metadata.mutable_fields())["weight"] = ValueUtil::numberValue(7);
+  (*metadata.mutable_fields())["enabled"] = ValueUtil::boolValue(true);
+  (*stream_info_.metadata_.mutable_filter_metadata())["envoy.test"] = metadata;
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "prod"}};
+  EXPECT_EQ("7", echoedValue(headers, "dynamic-metadata-number"));
+  EXPECT_EQ("true", echoedValue(headers, "dynamic-metadata-bool"));
+}
+
+// A value of the wrong type is not returned, so a module cannot read a string as a number.
+TEST_F(DynamicModuleClusterSpecifierReadTest, MistypedDynamicMetadataNotReadable) {
+  setUpPlugin();
+  Protobuf::Struct metadata;
+  (*metadata.mutable_fields())["weight"] = ValueUtil::stringValue("7");
+  (*metadata.mutable_fields())["enabled"] = ValueUtil::stringValue("true");
+  (*stream_info_.metadata_.mutable_filter_metadata())["envoy.test"] = metadata;
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "prod"}};
+  EXPECT_EQ("absent", echoedValue(headers, "dynamic-metadata-number"));
+  EXPECT_EQ("absent", echoedValue(headers, "dynamic-metadata-bool"));
 }
 
 TEST_F(DynamicModuleClusterSpecifierReadTest, RouteNameReadable) {
@@ -607,9 +760,31 @@ route_action_overrides:
   mirror_only:
     request_mirror_policies:
     - cluster: mirror-cluster
+  hash_only:
+    hash_policy:
+    - header:
+        header_name: x-hash
 )EOF");
   }
 };
+
+TEST_F(DynamicModuleRouteActionOverrideTest, HashPolicyOverrideReplacesRouteHashPolicy) {
+  setUpPluginWithOverrides();
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/"}, {"env", "prod"}, {"x-override", "hash_only"}, {"x-hash", "tenant-a"}};
+  const auto* entry = resolveRouteEntry(headers);
+  ASSERT_NE(nullptr, entry->hashPolicy());
+  Http::HashPolicy::AddCookieCallback add_cookie_nop;
+  EXPECT_TRUE(entry->hashPolicy()->generateHash(headers, stream_info_, add_cookie_nop).has_value());
+}
+
+TEST_F(DynamicModuleRouteActionOverrideTest, HashPolicyOverrideDelegatesWhenNotSelected) {
+  setUpPluginWithOverrides();
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "prod"}};
+  const auto* matched_hash_policy = parent_->route_entry_.hashPolicy();
+  EXPECT_CALL(parent_->route_entry_, hashPolicy()).WillOnce(Return(matched_hash_policy));
+  EXPECT_EQ(matched_hash_policy, resolveRouteEntry(headers)->hashPolicy());
+}
 
 TEST_F(DynamicModuleRouteActionOverrideTest, OverrideReplacesRouteActionProperties) {
   setUpPluginWithOverrides();
@@ -670,10 +845,14 @@ TEST_F(DynamicModuleRouteActionOverrideTest, RefreshWithoutOverrideDelegatesToMa
 }
 
 // Metadata under a namespace other than envoy.lb is ignored, matching RouteAction.metadata_match.
+// The retry policy makes the override replace something, since one that replaces nothing is
+// rejected at configuration load.
 TEST_F(DynamicModuleClusterSpecifierTest, NonLoadBalancingMetadataIgnored) {
   setUpPlugin(R"EOF(
 route_action_overrides:
   other:
+    retry_policy:
+      num_retries: 7
     metadata_match:
       filter_metadata:
         envoy.other:
@@ -681,7 +860,502 @@ route_action_overrides:
 )EOF");
   const auto* matched_route_criteria = giveMatchedRouteMetadataMatchCriteria();
   Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "prod"}, {"x-override", "other"}};
-  EXPECT_EQ(matched_route_criteria, resolveRouteEntry(headers)->metadataMatchCriteria());
+  const auto* entry = resolveRouteEntry(headers);
+  EXPECT_EQ(matched_route_criteria, entry->metadataMatchCriteria());
+  // The retry policy still comes from the override, so the entry itself was selected.
+  EXPECT_EQ(7, entry->retryPolicy()->numRetries());
+}
+
+class DynamicModuleClusterSpecifierHostCountAbiTest : public testing::Test {
+public:
+  DynamicModuleClusterSpecifierHostCountAbiTest() {
+    TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+                               TestEnvironment::substitute(
+                                   "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
+                               1);
+    EXPECT_CALL(context_, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager_));
+    mockCustomStatNamespaces(context_, custom_stat_namespaces_);
+  }
+
+  DynamicModuleClusterSpecifierConfigSharedPtr makeConfig() {
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+        Extensions::DynamicModules::testSharedObjectPath("cluster_specifier_no_op", "c"),
+        /*do_not_close=*/true);
+    EXPECT_TRUE(dynamic_module.ok());
+    auto config_or_error = newDynamicModuleClusterSpecifierConfig(
+        protoConfig("cluster_specifier_no_op", "test_cluster_specifier"),
+        std::move(dynamic_module.value()), context_);
+    EXPECT_TRUE(config_or_error.ok());
+    return config_or_error.value();
+  }
+
+  ClusterSpecifierContext makeContext(DynamicModuleClusterSpecifierConfigSharedPtr config) {
+    return ClusterSpecifierContext{*config, headers_, stream_info_, route_name_, /*random=*/0, {}};
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces_;
+  Upstream::MockClusterManager cluster_manager_;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  Http::TestRequestHeaderMapImpl headers_;
+  const std::string route_name_{"named-route"};
+};
+
+TEST_F(DynamicModuleClusterSpecifierHostCountAbiTest, UnknownClusterReturnsFalse) {
+  auto config = makeConfig();
+  auto context = makeContext(config);
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view("absent")))
+      .WillOnce(testing::Return(nullptr));
+  size_t total = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+      static_cast<void*>(&context), {"absent", 6}, 0, &total, nullptr, nullptr));
+}
+
+TEST_F(DynamicModuleClusterSpecifierHostCountAbiTest, HostCountsReturnedForKnownCluster) {
+  auto config = makeConfig();
+  auto context = makeContext(config);
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view("present")))
+      .WillOnce(testing::Return(&thread_local_cluster_));
+  auto* mock_host_set = thread_local_cluster_.cluster_.priority_set_.getMockHostSet(0);
+  mock_host_set->hosts_.resize(4);
+  mock_host_set->healthy_hosts_.resize(2);
+  mock_host_set->degraded_hosts_.resize(1);
+
+  size_t total = 0;
+  size_t healthy = 0;
+  size_t degraded = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+      static_cast<void*>(&context), {"present", 7}, 0, &total, &healthy, &degraded));
+  EXPECT_EQ(4, total);
+  EXPECT_EQ(2, healthy);
+  EXPECT_EQ(1, degraded);
+}
+
+TEST_F(DynamicModuleClusterSpecifierReadTest, ClusterHostCountReadable) {
+  setUpPlugin();
+  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(absl::string_view("cluster_0")))
+      .WillOnce(testing::Return(nullptr));
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"},
+                                         {"env", "prod"},
+                                         {"x-echo", "cluster-host-count"},
+                                         {"x-query-cluster", "cluster_0"}};
+  EXPECT_EQ("absent", echoedValue(headers, "cluster-host-count"));
+}
+
+class DynamicModuleClusterSpecifierMetricsAbiTest : public testing::Test {
+public:
+  DynamicModuleClusterSpecifierMetricsAbiTest() {
+    TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+                               TestEnvironment::substitute(
+                                   "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
+                               1);
+    EXPECT_CALL(context_, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager_));
+    mockCustomStatNamespaces(context_, custom_stat_namespaces_);
+  }
+
+  static void unfreezeStatCreation(DynamicModuleClusterSpecifierConfig& config) {
+    config.stat_creation_frozen_.store(false, std::memory_order_release);
+  }
+
+  DynamicModuleClusterSpecifierConfigSharedPtr makeConfig() {
+    return makeConfig(protoConfig("cluster_specifier_no_op", "test_cluster_specifier"));
+  }
+
+  DynamicModuleClusterSpecifierConfigSharedPtr
+  makeConfig(const DynamicModuleClusterSpecifierProto& proto_config) {
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+        Extensions::DynamicModules::testSharedObjectPath("cluster_specifier_no_op", "c"),
+        /*do_not_close=*/true);
+    EXPECT_TRUE(dynamic_module.ok());
+    auto config_or_error = newDynamicModuleClusterSpecifierConfig(
+        proto_config, std::move(dynamic_module.value()), context_);
+    EXPECT_TRUE(config_or_error.ok());
+    return config_or_error.value();
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces_;
+  Upstream::MockClusterManager cluster_manager_;
+};
+
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, CounterDefineAndIncrement) {
+  auto config = makeConfig();
+  unfreezeStatCreation(*config);
+  auto* config_ptr = static_cast<void*>(config.get());
+
+  size_t counter_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+                config_ptr, metricBuffer("test_counter"), nullptr, 0, &counter_id));
+  EXPECT_EQ(1, counter_id);
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+                config_ptr, counter_id, nullptr, 0, 5));
+  auto counter = TestUtility::findCounter(context_.store_, "dynamicmodulescustom.test_counter");
+  ASSERT_NE(nullptr, counter);
+  EXPECT_EQ(5, counter->value());
+}
+
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, CustomMetricsNamespaceUsed) {
+  auto proto_config = protoConfig("cluster_specifier_no_op", "test_cluster_specifier");
+  proto_config.mutable_dynamic_module_config()->set_metrics_namespace("cluster_specifier_custom");
+  auto config = makeConfig(proto_config);
+  unfreezeStatCreation(*config);
+
+  size_t counter_id = 0;
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Success,
+      envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+          static_cast<void*>(config.get()), metricBuffer("test_counter"), nullptr, 0, &counter_id));
+  EXPECT_NE(nullptr,
+            TestUtility::findCounter(context_.store_, "cluster_specifier_custom.test_counter"));
+}
+
+// Test that the legacy behavior registers the custom stat namespace when the runtime guard is
+// enabled.
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, RegisterStatNamespaceWithRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix", "true"}});
+
+  auto proto_config = protoConfig("cluster_specifier_no_op", "test_cluster_specifier");
+  proto_config.mutable_dynamic_module_config()->set_metrics_namespace("cluster_specifier_custom");
+  auto config = makeConfig(proto_config);
+  EXPECT_TRUE(custom_stat_namespaces_.registered("cluster_specifier_custom"));
+}
+
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, ScalarGaugeDefineAndOperate) {
+  auto config = makeConfig();
+  unfreezeStatCreation(*config);
+  auto* config_ptr = static_cast<void*>(config.get());
+
+  size_t gauge_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
+                config_ptr, metricBuffer("test_gauge"), nullptr, 0, &gauge_id));
+  EXPECT_EQ(1, gauge_id);
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
+                config_ptr, gauge_id, nullptr, 0, 10));
+  auto gauge = TestUtility::findGauge(context_.store_, "dynamicmodulescustom.test_gauge");
+  ASSERT_NE(nullptr, gauge);
+  EXPECT_EQ(10, gauge->value());
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(
+                config_ptr, gauge_id, nullptr, 0, 3));
+  EXPECT_EQ(7, gauge->value());
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(config_ptr, gauge_id,
+                                                                             nullptr, 0, 42));
+  EXPECT_EQ(42, gauge->value());
+}
+
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, ScalarHistogramDefineAndRecord) {
+  auto config = makeConfig();
+  unfreezeStatCreation(*config);
+  auto* config_ptr = static_cast<void*>(config.get());
+
+  size_t histogram_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+                config_ptr, metricBuffer("test_histogram"), nullptr, 0, &histogram_id));
+  EXPECT_EQ(1, histogram_id);
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+                config_ptr, histogram_id, nullptr, 0, 42));
+  EXPECT_TRUE(config->getHistogramById(histogram_id).has_value());
+}
+
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, MetricIdsAreSequentialAndIndependent) {
+  auto config = makeConfig();
+  unfreezeStatCreation(*config);
+  auto* config_ptr = static_cast<void*>(config.get());
+
+  size_t first_counter_id = 0;
+  size_t second_counter_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+                config_ptr, metricBuffer("first_counter"), nullptr, 0, &first_counter_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+                config_ptr, metricBuffer("second_counter"), nullptr, 0, &second_counter_id));
+  EXPECT_EQ(1, first_counter_id);
+  EXPECT_EQ(2, second_counter_id);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+                config_ptr, second_counter_id, nullptr, 0, 7));
+  auto first_counter =
+      TestUtility::findCounter(context_.store_, "dynamicmodulescustom.first_counter");
+  auto second_counter =
+      TestUtility::findCounter(context_.store_, "dynamicmodulescustom.second_counter");
+  ASSERT_NE(nullptr, first_counter);
+  ASSERT_NE(nullptr, second_counter);
+  EXPECT_EQ(0, first_counter->value());
+  EXPECT_EQ(7, second_counter->value());
+
+  size_t first_gauge_id = 0;
+  size_t second_gauge_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
+                config_ptr, metricBuffer("first_gauge"), nullptr, 0, &first_gauge_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
+                config_ptr, metricBuffer("second_gauge"), nullptr, 0, &second_gauge_id));
+  EXPECT_EQ(1, first_gauge_id);
+  EXPECT_EQ(2, second_gauge_id);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(
+                config_ptr, second_gauge_id, nullptr, 0, 9));
+  auto first_gauge = TestUtility::findGauge(context_.store_, "dynamicmodulescustom.first_gauge");
+  auto second_gauge = TestUtility::findGauge(context_.store_, "dynamicmodulescustom.second_gauge");
+  ASSERT_NE(nullptr, first_gauge);
+  ASSERT_NE(nullptr, second_gauge);
+  EXPECT_EQ(0, first_gauge->value());
+  EXPECT_EQ(9, second_gauge->value());
+
+  size_t first_histogram_id = 0;
+  size_t second_histogram_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+                config_ptr, metricBuffer("first_histogram"), nullptr, 0, &first_histogram_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+                config_ptr, metricBuffer("second_histogram"), nullptr, 0, &second_histogram_id));
+  EXPECT_EQ(1, first_histogram_id);
+  EXPECT_EQ(2, second_histogram_id);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+                config_ptr, second_histogram_id, nullptr, 0, 11));
+  EXPECT_TRUE(config->getHistogramById(first_histogram_id).has_value());
+  EXPECT_TRUE(config->getHistogramById(second_histogram_id).has_value());
+}
+
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, LabeledMetricsDefineAndOperate) {
+  auto config = makeConfig();
+  unfreezeStatCreation(*config);
+  auto* config_ptr = static_cast<void*>(config.get());
+  std::array<envoy_dynamic_module_type_module_buffer, 2> label_names = {metricBuffer("source"),
+                                                                        metricBuffer("result")};
+  std::array<envoy_dynamic_module_type_module_buffer, 2> label_values = {metricBuffer("module"),
+                                                                         metricBuffer("success")};
+
+  size_t counter_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+                config_ptr, metricBuffer("labeled_counter"), label_names.data(), label_names.size(),
+                &counter_id));
+  EXPECT_EQ(1, counter_id);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+                config_ptr, counter_id, label_values.data(), label_values.size(), 5));
+  auto counter = TestUtility::findCounter(
+      context_.store_, "dynamicmodulescustom.labeled_counter.source.module.result.success");
+  ASSERT_NE(nullptr, counter);
+  EXPECT_EQ(5, counter->value());
+  EXPECT_EQ("dynamicmodulescustom.labeled_counter", counter->tagExtractedName());
+  EXPECT_THAT(counter->tags(), testing::ElementsAre(Stats::Tag{"source", "module"},
+                                                    Stats::Tag{"result", "success"}));
+
+  size_t gauge_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
+                config_ptr, metricBuffer("labeled_gauge"), label_names.data(), label_names.size(),
+                &gauge_id));
+  EXPECT_EQ(1, gauge_id);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
+                config_ptr, gauge_id, label_values.data(), label_values.size(), 10));
+  auto gauge = TestUtility::findGauge(
+      context_.store_, "dynamicmodulescustom.labeled_gauge.source.module.result.success");
+  ASSERT_NE(nullptr, gauge);
+  EXPECT_EQ(10, gauge->value());
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(
+                config_ptr, gauge_id, label_values.data(), label_values.size(), 3));
+  EXPECT_EQ(7, gauge->value());
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(
+                config_ptr, gauge_id, label_values.data(), label_values.size(), 42));
+  EXPECT_EQ(42, gauge->value());
+
+  size_t histogram_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+                config_ptr, metricBuffer("labeled_histogram"), label_names.data(),
+                label_names.size(), &histogram_id));
+  EXPECT_EQ(1, histogram_id);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+                config_ptr, histogram_id, label_values.data(), label_values.size(), 42));
+  EXPECT_TRUE(config->getHistogramVecById(histogram_id).has_value());
+}
+
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, InvalidMetricIdsReturnMetricNotFound) {
+  auto config = makeConfig();
+  auto* config_ptr = static_cast<void*>(config.get());
+  auto label_value = metricBuffer("module");
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+                config_ptr, 0, nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(config_ptr, 0,
+                                                                                   nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(config_ptr, 0,
+                                                                                   nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(config_ptr, 0, nullptr,
+                                                                             0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+                config_ptr, 0, nullptr, 0, 1));
+
+  constexpr size_t invalid_id = 9999;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+                config_ptr, invalid_id, &label_value, 1, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
+                config_ptr, invalid_id, &label_value, 1, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(
+                config_ptr, invalid_id, &label_value, 1, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(config_ptr, invalid_id,
+                                                                             &label_value, 1, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+                config_ptr, invalid_id, &label_value, 1, 1));
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+                config_ptr, invalid_id, nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
+                config_ptr, invalid_id, nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(
+                config_ptr, invalid_id, nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(config_ptr, invalid_id,
+                                                                             nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+                config_ptr, invalid_id, nullptr, 0, 1));
+}
+
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, ScalarMetricIdsWithLabelsReturnMetricNotFound) {
+  auto config = makeConfig();
+  unfreezeStatCreation(*config);
+  auto* config_ptr = static_cast<void*>(config.get());
+  auto label_value = metricBuffer("module");
+
+  size_t counter_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+                config_ptr, metricBuffer("scalar_counter"), nullptr, 0, &counter_id));
+  size_t gauge_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
+                config_ptr, metricBuffer("scalar_gauge"), nullptr, 0, &gauge_id));
+  size_t histogram_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+                config_ptr, metricBuffer("scalar_histogram"), nullptr, 0, &histogram_id));
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+                config_ptr, counter_id, &label_value, 1, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
+                config_ptr, gauge_id, &label_value, 1, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(
+                config_ptr, gauge_id, &label_value, 1, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(config_ptr, gauge_id,
+                                                                             &label_value, 1, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+                config_ptr, histogram_id, &label_value, 1, 1));
+}
+
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, MissingOrExtraLabelsReturnInvalidLabels) {
+  auto config = makeConfig();
+  unfreezeStatCreation(*config);
+  auto* config_ptr = static_cast<void*>(config.get());
+  auto label_name = metricBuffer("source");
+  std::array<envoy_dynamic_module_type_module_buffer, 2> extra_label_values = {
+      metricBuffer("module"), metricBuffer("extra")};
+
+  size_t counter_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+                config_ptr, metricBuffer("labeled_counter"), &label_name, 1, &counter_id));
+  size_t gauge_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
+                config_ptr, metricBuffer("labeled_gauge"), &label_name, 1, &gauge_id));
+  size_t histogram_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+                config_ptr, metricBuffer("labeled_histogram"), &label_name, 1, &histogram_id));
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+                config_ptr, counter_id, nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
+                config_ptr, gauge_id, nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(
+                config_ptr, gauge_id, nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(config_ptr, gauge_id,
+                                                                             nullptr, 0, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+                config_ptr, histogram_id, nullptr, 0, 1));
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+                config_ptr, counter_id, extra_label_values.data(), extra_label_values.size(), 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
+                config_ptr, gauge_id, extra_label_values.data(), extra_label_values.size(), 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(
+                config_ptr, gauge_id, extra_label_values.data(), extra_label_values.size(), 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(
+                config_ptr, gauge_id, extra_label_values.data(), extra_label_values.size(), 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_InvalidLabels,
+            envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+                config_ptr, histogram_id, extra_label_values.data(), extra_label_values.size(), 1));
+}
+
+TEST_F(DynamicModuleClusterSpecifierMetricsAbiTest, MetricDefinitionsAfterFreezeReturnFrozen) {
+  auto config = makeConfig();
+  auto* config_ptr = static_cast<void*>(config.get());
+  auto label_name = metricBuffer("source");
+  size_t metric_id = 0;
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+                config_ptr, metricBuffer("late_counter"), &label_name, 1, &metric_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
+                config_ptr, metricBuffer("late_gauge"), &label_name, 1, &metric_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+                config_ptr, metricBuffer("late_histogram"), &label_name, 1, &metric_id));
 }
 
 } // namespace

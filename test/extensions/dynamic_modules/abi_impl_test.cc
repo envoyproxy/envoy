@@ -632,6 +632,12 @@ WEAK_STUB(MatcherGetHeaderValue,
           envoy_dynamic_module_callback_matcher_get_header_value(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
               nullptr, 0, nullptr))
+WEAK_STUB(MatcherDataInputGetHeaderValue,
+          envoy_dynamic_module_callback_matcher_data_input_get_header_value(
+              nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
+              nullptr, 0, nullptr))
+WEAK_STUB(MatcherDataInputSetResult,
+          envoy_dynamic_module_callback_matcher_data_input_set_result(nullptr, {nullptr, 0}))
 
 WEAK_STUB(NetworkFilterWrite,
           envoy_dynamic_module_callback_network_filter_write(nullptr, {nullptr, 0}, false))
@@ -768,6 +774,8 @@ WEAK_STUB(NetworkFilterHasUpstreamHost,
           envoy_dynamic_module_callback_network_filter_has_upstream_host(nullptr))
 WEAK_STUB(NetworkFilterGetUpstreamConnectionId,
           envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(nullptr))
+WEAK_STUB(NetworkFilterStartDownstreamSecureTransport,
+          envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(nullptr))
 WEAK_STUB(NetworkFilterStartUpstreamSecureTransport,
           envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(nullptr))
 WEAK_STUB(NetworkFilterReadEnabled,
@@ -1798,8 +1806,17 @@ WEAK_STUB(ClusterSpecifierGetAttributeString,
 WEAK_STUB(ClusterSpecifierGetDynamicMetadata,
           envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata(
               nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(ClusterSpecifierGetDynamicMetadataBool,
+          envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_bool(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(ClusterSpecifierGetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
 WEAK_STUB(ClusterSpecifierGetRandomValue,
           envoy_dynamic_module_callback_cluster_specifier_get_random_value(nullptr))
+WEAK_STUB(ClusterSpecifierGetClusterHostCount,
+          envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+              nullptr, {nullptr, 0}, 0, nullptr, nullptr, nullptr))
 WEAK_STUB(ClusterSpecifierGetRequestHeaderValue,
           envoy_dynamic_module_callback_cluster_specifier_get_request_header_value(
               nullptr, {nullptr, 0}, nullptr, 0, nullptr))
@@ -1811,6 +1828,9 @@ WEAK_STUB(ClusterSpecifierGetRouteName,
           envoy_dynamic_module_callback_cluster_specifier_get_route_name(nullptr, nullptr))
 WEAK_STUB(ClusterSpecifierSetClusterName,
           envoy_dynamic_module_callback_cluster_specifier_set_cluster_name(nullptr, {nullptr, 0}))
+WEAK_STUB(ClusterSpecifierSetClusterNotFoundResponseCode,
+          envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_response_code(
+              nullptr, 503))
 WEAK_STUB(ClusterSpecifierSetIdleTimeout,
           envoy_dynamic_module_callback_cluster_specifier_set_idle_timeout(nullptr, 0))
 WEAK_STUB(ClusterSpecifierSetPriority,
@@ -1823,6 +1843,31 @@ WEAK_STUB(ClusterSpecifierSetRouteActionOverride,
                                                                                     {nullptr, 0}))
 WEAK_STUB(ClusterSpecifierSetTimeout,
           envoy_dynamic_module_callback_cluster_specifier_set_timeout(nullptr, 0))
+WEAK_STUB(ClusterSpecifierConfigDefineCounter,
+          envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(ClusterSpecifierConfigIncrementCounter,
+          envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(nullptr, 0,
+                                                                                   nullptr, 0, 0))
+WEAK_STUB(ClusterSpecifierConfigDefineGauge,
+          envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(nullptr, {nullptr, 0},
+                                                                              nullptr, 0, nullptr))
+WEAK_STUB(ClusterSpecifierConfigSetGauge,
+          envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(nullptr, 0, nullptr, 0,
+                                                                           0))
+WEAK_STUB(ClusterSpecifierConfigIncrementGauge,
+          envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(nullptr, 0,
+                                                                                 nullptr, 0, 0))
+WEAK_STUB(ClusterSpecifierConfigDecrementGauge,
+          envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(nullptr, 0,
+                                                                                 nullptr, 0, 0))
+WEAK_STUB(ClusterSpecifierConfigDefineHistogram,
+          envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(ClusterSpecifierConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(nullptr, 0,
+                                                                                        nullptr, 0,
+                                                                                        0))
 
 WEAK_STUB(FormatterGetAccessLogType,
           envoy_dynamic_module_callback_formatter_get_access_log_type(nullptr))

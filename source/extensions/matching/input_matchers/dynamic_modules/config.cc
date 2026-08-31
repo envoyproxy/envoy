@@ -22,8 +22,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
 
   const auto& matcher_name = proto_config.matcher_name();
   const auto& module_config = proto_config.dynamic_module_config();
-  // Input matchers do not support remote module sources, so no init manager or async callback is
-  // passed; only the synchronous local-file and by-name paths can succeed here.
+  // Input matchers pass no async callback, so a remote source that is not already cached is
+  // rejected rather than fetched.
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
       module_config, proto_config.matcher_name(), context);
   if (!load_result.ok()) {
@@ -90,10 +90,15 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   auto shared_module =
       std::shared_ptr<Extensions::DynamicModules::DynamicModule>(std::move(dynamic_module));
 
-  return [shared_module, on_config_destroy = on_config_destroy.value(), on_match = on_match.value(),
-          in_module_config] {
-    return std::make_unique<DynamicModuleInputMatcher>(shared_module, on_config_destroy, on_match,
-                                                       in_module_config);
+  // Own the in-module configuration in a shared holder so it is destroyed exactly once through
+  // on_matcher_config_destroy, whether the factory callback runs zero, one, or many times. The
+  // deleter also holds the module so the destroy hook is never called into an unloaded module.
+  std::shared_ptr<const void> shared_config(
+      in_module_config, [shared_module, on_config_destroy = on_config_destroy.value()](
+                            const void* config) { on_config_destroy(config); });
+
+  return [shared_module, on_match = on_match.value(), shared_config] {
+    return std::make_unique<DynamicModuleInputMatcher>(shared_module, on_match, shared_config);
   };
 }
 

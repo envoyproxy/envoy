@@ -4807,6 +4807,21 @@ uint64_t envoy_dynamic_module_callback_network_filter_get_upstream_connection_id
 // ---------------------- StartTLS Support Callbacks ---------------------------
 
 /**
+ * envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport is called by the
+ * module to convert the downstream connection from non-secure to secure mode (StartTLS).
+ *
+ * This signals the downstream connection to enable secure transport mode. This is done when the
+ * downstream connection's transport socket is of startTLS type. At the moment it is the only
+ * transport socket type which can be programmatically converted from non-secure to secure mode.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if the downstream transport was successfully converted to secure mode, false
+ * otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
  * envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport is called by the
  * module to convert the upstream connection from non-secure to secure mode (StartTLS).
  *
@@ -12027,6 +12042,119 @@ bool envoy_dynamic_module_callback_matcher_get_header_value(
     size_t index, size_t* total_count_out);
 
 // =============================================================================
+// Matcher Data Input Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_matcher_data_input_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleDataInput class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_matcher_data_input_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_matcher_data_input_config_module_ptr is a pointer to an in-module
+ * matcher data input configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_matcher_data_input_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_matcher_data_input_envoy_ptr is a raw pointer to the matcher data input
+ * in Envoy. This represents the matching data available during a single get evaluation.
+ *
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the get event hook.
+ */
+typedef void* envoy_dynamic_module_type_matcher_data_input_envoy_ptr;
+
+// =============================================================================
+// Matcher Data Input Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_matcher_data_input_config_new is called when a new matcher data input
+ * configuration is created. This is called on the main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleDataInput object.
+ * @param name is the data input config name.
+ * @param config is the configuration for the data input.
+ * @return a pointer to the in-module data input configuration. Returning nullptr indicates a
+ *         failure to initialize the module, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_matcher_data_input_config_module_ptr
+envoy_dynamic_module_on_matcher_data_input_config_new(
+    envoy_dynamic_module_type_matcher_data_input_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_matcher_data_input_config_destroy is called when the matcher data input
+ * configuration is destroyed.
+ *
+ * @param config_module_ptr is a pointer to the in-module data input configuration.
+ */
+void envoy_dynamic_module_on_matcher_data_input_config_destroy(
+    envoy_dynamic_module_type_matcher_data_input_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_matcher_data_input_get is called to extract a value used for matching.
+ * This is called on worker threads.
+ *
+ * The data_input_envoy_ptr is only valid during this callback. The module must not store this
+ * pointer or use it after the callback returns. The module reads matching data with the matcher
+ * data input callbacks (e.g. envoy_dynamic_module_callback_matcher_data_input_get_header_value) and
+ * provides the extracted value with envoy_dynamic_module_callback_matcher_data_input_set_result.
+ * When the module does not set a result, Envoy treats the input as having no value.
+ *
+ * @param config_module_ptr is the pointer to the in-module data input configuration.
+ * @param data_input_envoy_ptr is the pointer to the Envoy matcher data input (valid during this
+ *        call only).
+ */
+void envoy_dynamic_module_on_matcher_data_input_get(
+    envoy_dynamic_module_type_matcher_data_input_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_matcher_data_input_envoy_ptr data_input_envoy_ptr);
+
+// =============================================================================
+// Matcher Data Input Callbacks
+// =============================================================================
+
+/**
+ * Get a specific header value by key during a matcher data input get evaluation.
+ *
+ * Since a header can have multiple values, the index is used to get the specific value. This
+ * returns the total number of values for the given key via total_count_out, so it can be used to
+ * iterate over all values by starting from 0 and incrementing the index.
+ *
+ * @param data_input_envoy_ptr is the pointer to the matcher data input.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @param key is the key of the header to look up.
+ * @param result is the buffer where the header value will be stored.
+ * @param index is the index of the header value in the list of values for the given key.
+ * @param total_count_out is the pointer to the variable where the total number of values for the
+ *        given key will be stored. This parameter is optional and can be null.
+ * @return true if the header value is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_matcher_data_input_get_header_value(
+    envoy_dynamic_module_type_matcher_data_input_envoy_ptr data_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * Set the value extracted by the module for this get evaluation. Envoy copies the buffer, so the
+ * module may release it after this call returns. Calling this more than once overwrites the
+ * previous value. When this is not called, the input is treated as having no value.
+ *
+ * @param data_input_envoy_ptr is the pointer to the matcher data input.
+ * @param result is the value extracted by the module, owned by the module and copied by Envoy.
+ */
+void envoy_dynamic_module_callback_matcher_data_input_set_result(
+    envoy_dynamic_module_type_matcher_data_input_envoy_ptr data_input_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer result);
+
+// =============================================================================
 // ============================ Cert Validator ==================================
 // =============================================================================
 //
@@ -14891,6 +15019,36 @@ bool envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata(
     envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
+ * envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_number is called by the
+ * module to get a number value from dynamic metadata by filter name and key path.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result receives the number value. It is left untouched when this returns false.
+ * @return true if a number value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, double* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_bool is called by the module
+ * to get a boolean value from dynamic metadata by filter name and key path.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result receives the boolean value. It is left untouched when this returns false.
+ * @return true if a boolean value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, bool* result);
+
+/**
  * envoy_dynamic_module_callback_cluster_specifier_get_route_name is called by the module to get the
  * name of the matched route.
  *
@@ -14915,12 +15073,37 @@ bool envoy_dynamic_module_callback_cluster_specifier_get_route_name(
 uint64_t envoy_dynamic_module_callback_cluster_specifier_get_random_value(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr);
 
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count retrieves the host counts
+ * for a cluster by name. This lets a module check whether a cluster is routable from the current
+ * worker before naming it with set_cluster_name.
+ *
+ * The lookup uses getThreadLocalCluster(), so false is returned when the cluster is not routable
+ * from this worker at the moment, which can happen even when the cluster is configured but not yet
+ * warmed or propagated. Healthy and degraded host counts are eventually consistent.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param cluster_name is the name of the cluster to query owned by the module.
+ * @param priority is the priority level to query (0 for default priority).
+ * @param total_count is the pointer to store the total number of hosts. Can be null if not needed.
+ * @param healthy_count is the pointer to store the number of healthy hosts. Can be null if not
+ * needed.
+ * @param degraded_count is the pointer to store the number of degraded hosts. Can be null if not
+ * needed.
+ * @return true if the counts were retrieved successfully, false otherwise (e.g., cluster not
+ * routable from this worker).
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name, uint32_t priority, size_t* total_count,
+    size_t* healthy_count, size_t* degraded_count);
+
 // ------------------- Cluster Specifier Callbacks - Selection -----------------
 
 /**
  * envoy_dynamic_module_callback_cluster_specifier_set_cluster_name sets the upstream cluster for
  * the request. When the cluster does not exist, the request is failed with the cluster-not-found
- * response code of the matched route.
+ * response code of the matched route. Use get_cluster_host_count to check `routability` first.
  *
  * @param context_envoy_ptr is the pointer to the cluster selection context.
  * @param cluster_name is the name of the cluster to route to. Envoy copies the buffer. An empty
@@ -14987,6 +15170,22 @@ void envoy_dynamic_module_callback_cluster_specifier_set_priority(
     envoy_dynamic_module_type_resource_priority priority);
 
 /**
+ * envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_response_code sets the
+ * status code Envoy replies with when the selected cluster does not exist, replacing the one of the
+ * matched route. A module that derives cluster names from the request can use this to distinguish a
+ * name that resolves to nothing from an upstream that is unavailable.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param status_code is the HTTP status code to reply with. Only codes in the range [200, 600) are
+ * accepted, because the code is used to terminate the request.
+ * @return true if the status code was accepted, false when it is out of range, in which case the
+ * call changes nothing.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_response_code(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    uint32_t status_code);
+
+/**
  * envoy_dynamic_module_callback_cluster_specifier_set_route_action_override selects one of the
  * route action overrides declared in the cluster specifier configuration. The selected override
  * replaces the retry policy, the subset load balancing metadata match criteria and the request
@@ -15005,6 +15204,182 @@ void envoy_dynamic_module_callback_cluster_specifier_set_priority(
 bool envoy_dynamic_module_callback_cluster_specifier_set_route_action_override(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name);
+
+// =============================================================================
+// Cluster Specifier Callbacks - Metrics
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_define_counter is called by the module
+ * during initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param label_names is the labels of the counter to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_cluster_specifier_config_increment_counter
+ * together with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_increment_counter is called by the module
+ * to increment a previously defined counter.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING COUNTER DEFINITION.**
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_define_gauge is called by the module
+ * during initialization to create a template for generating Stats::Gauges with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param label_names is the labels of the gauge to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
+ * be passed to envoy_dynamic_module_callback_cluster_specifier_config_set_gauge together with
+ * config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_set_gauge is called by the module to set
+ * the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be set.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge is called by the module to
+ * increase the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge is called by the module to
+ * decrease the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be decremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_define_histogram is called by the module
+ * during initialization to create a template for generating Stats::Histograms with the given name
+ * and labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param label_names is the labels of the histogram to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value
+ * together with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value is called by the
+ * module to record a value in a previously defined histogram.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param label_values is the values of the labels to be recorded.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING HISTOGRAM DEFINITION.**
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
 
 #ifdef __cplusplus
 }

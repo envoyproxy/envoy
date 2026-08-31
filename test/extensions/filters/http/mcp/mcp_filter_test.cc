@@ -3,10 +3,15 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::HasSubstr;
+using testing::IsSupersetOf;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -1680,10 +1685,11 @@ TEST_F(McpFilterTest, PerRouteParserConfig) {
   // Expect dynamic metadata to be set with extracted field custom_val and group method_group
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce(Invoke([](const std::string&, const Protobuf::Struct& metadata) {
-        EXPECT_EQ(
-            "hello",
-            metadata.fields().at("params").struct_value().fields().at("custom_val").string_value());
-        EXPECT_EQ("custom_override_group", metadata.fields().at("method_group").string_value());
+        EXPECT_THAT(metadata.fields(),
+                    IsSupersetOf(StructMatchers(
+                        IsStructStruct("params",
+                                       UnorderedElementsAre(IsStructString("custom_val", "hello"))),
+                        IsStructString("method_group", "custom_override_group"))));
       }));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -1804,8 +1810,8 @@ TEST(McpFilterStateObjectTest, SerializationReturnsJson) {
 
   auto serialized = obj->serializeAsString();
   ASSERT_TRUE(serialized.has_value());
-  EXPECT_THAT(serialized.value(), testing::HasSubstr("\"jsonrpc\":"));
-  EXPECT_THAT(serialized.value(), testing::HasSubstr("\"id\":"));
+  EXPECT_THAT(serialized.value(), HasSubstr("\"jsonrpc\":"));
+  EXPECT_THAT(serialized.value(), HasSubstr("\"id\":"));
 }
 
 TEST(McpFilterStateObjectTest, SerializationEmptyReturnsNullopt) {

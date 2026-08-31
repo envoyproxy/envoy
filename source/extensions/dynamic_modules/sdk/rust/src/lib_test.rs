@@ -1838,6 +1838,13 @@ pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_upstream_conn
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> bool {
+  MOCK_START_TLS_RESULT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
   _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
 ) -> bool {
@@ -2066,6 +2073,30 @@ fn test_http_get_upstream_connection_id_unavailable() {
 // =============================================================================
 // StartTLS Tests
 // =============================================================================
+
+#[test]
+fn test_start_downstream_secure_transport_success() {
+  reset_upstream_host_mock();
+  set_start_tls_result(true);
+
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert!(filter.start_downstream_secure_transport());
+}
+
+#[test]
+fn test_start_downstream_secure_transport_failure() {
+  reset_upstream_host_mock();
+  set_start_tls_result(false);
+
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert!(!filter.start_downstream_secure_transport());
+}
 
 #[test]
 fn test_start_upstream_secure_transport_success() {
@@ -5045,6 +5076,105 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_config_record_histogram_
   abi::envoy_dynamic_module_type_metrics_result::Success
 }
 
+// Cluster specifier config metrics FFI stubs for testing.
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  counter_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  unsafe {
+    *counter_id_ptr = 1;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  unsafe {
+    *gauge_id_ptr = 1;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _name: abi::envoy_dynamic_module_type_module_buffer,
+  _label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_names_length: usize,
+  histogram_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  unsafe {
+    *histogram_id_ptr = 1;
+  }
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
+  _id: usize,
+  _label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  _label_values_length: usize,
+  _value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
@@ -6973,7 +7103,10 @@ fn test_cluster_callout_done_with_null_buffers_yields_none() {
   struct TestCluster;
   impl Cluster for TestCluster {
     fn on_init(&mut self, _envoy_cluster: &dyn EnvoyCluster) {}
-    fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
+    fn new_load_balancer(
+      &self,
+      _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    ) -> Option<Box<dyn ClusterLb>> {
       unimplemented!("not exercised by this test")
     }
 
@@ -7098,6 +7231,188 @@ fn test_matcher_get_all_headers() {
   assert!(ctx
     .get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
     .is_none());
+}
+
+// =============================================================================
+// Matcher Data Input FFI stubs and tests.
+// =============================================================================
+
+// Controls whether the data input header lookup stub reports the header as present.
+static STUB_DATA_INPUT_HEADER_PRESENT: AtomicBool = AtomicBool::new(true);
+// Canned request header value returned by the data input header lookup stub.
+const STUB_DATA_INPUT_HEADER_VALUE: &[u8] = b"cluster_0";
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_matcher_data_input_get_header_value(
+  _data_input_envoy_ptr: abi::envoy_dynamic_module_type_matcher_data_input_envoy_ptr,
+  _header_type: abi::envoy_dynamic_module_type_http_header_type,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  _index: usize,
+  total_count_out: *mut usize,
+) -> bool {
+  if !STUB_DATA_INPUT_HEADER_PRESENT.load(std::sync::atomic::Ordering::SeqCst) {
+    if !total_count_out.is_null() {
+      unsafe { *total_count_out = 0 };
+    }
+    return false;
+  }
+  if !total_count_out.is_null() {
+    unsafe { *total_count_out = 1 };
+  }
+  unsafe {
+    *result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: STUB_DATA_INPUT_HEADER_VALUE.as_ptr() as *mut _,
+      length: STUB_DATA_INPUT_HEADER_VALUE.len(),
+    };
+  }
+  true
+}
+
+// Captures the value the module hands back through set_result so tests can assert on it.
+static CAPTURED_DATA_INPUT_RESULT: std::sync::Mutex<Vec<u8>> = std::sync::Mutex::new(Vec::new());
+static DATA_INPUT_RESULT_SET: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_matcher_data_input_set_result(
+  _data_input_envoy_ptr: abi::envoy_dynamic_module_type_matcher_data_input_envoy_ptr,
+  result: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  let bytes =
+    unsafe { crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length) };
+  *CAPTURED_DATA_INPUT_RESULT.lock().unwrap() = bytes.to_vec();
+  DATA_INPUT_RESULT_SET.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+// Test data input that echoes the request header named by its config bytes.
+struct TestStringDataInput {
+  header: String,
+}
+
+impl crate::matcher_data_input::MatcherDataInput for TestStringDataInput {
+  fn new(_name: &str, config: &[u8]) -> Result<Self, String> {
+    if config.is_empty() {
+      return Err("a header name is required".to_string());
+    }
+    Ok(Self {
+      header: String::from_utf8_lossy(config).to_string(),
+    })
+  }
+
+  fn get(&self, ctx: &crate::matcher_data_input::DataInputContext) -> Option<Vec<u8>> {
+    // The sentinel header name drives the fail-closed panic path in a test.
+    if self.header == "panic" {
+      panic!("test panic in data input get");
+    }
+    ctx.get_request_header(&self.header).map(<[u8]>::to_vec)
+  }
+}
+
+declare_matcher_data_input!(TestStringDataInput);
+
+#[test]
+fn test_matcher_data_input_context_reads_header() {
+  let ctx = crate::matcher_data_input::DataInputContext::new(std::ptr::null_mut());
+
+  STUB_DATA_INPUT_HEADER_PRESENT.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert_eq!(
+    ctx.get_request_header("x-route"),
+    Some(STUB_DATA_INPUT_HEADER_VALUE)
+  );
+
+  // Response header and response trailer lookups reach the same callback.
+  assert_eq!(
+    ctx.get_response_header("x-route"),
+    Some(STUB_DATA_INPUT_HEADER_VALUE)
+  );
+  assert_eq!(
+    ctx.get_response_trailer("x-route"),
+    Some(STUB_DATA_INPUT_HEADER_VALUE)
+  );
+
+  // An absent header is reported as None.
+  STUB_DATA_INPUT_HEADER_PRESENT.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert_eq!(ctx.get_request_header("x-route"), None);
+}
+
+#[test]
+fn test_matcher_data_input_hooks() {
+  let name = b"test";
+  let name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: name.as_ptr() as *mut _,
+    length: name.len(),
+  };
+
+  // config_new rejects an empty config by returning null.
+  let empty_config = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: std::ptr::null_mut(),
+    length: 0,
+  };
+  let null_config = envoy_dynamic_module_on_matcher_data_input_config_new(
+    std::ptr::null_mut(),
+    name_buf,
+    empty_config,
+  );
+  assert!(null_config.is_null());
+
+  // config_new succeeds when a header name is provided.
+  let header_name = b"x-route";
+  let config_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: header_name.as_ptr() as *mut _,
+    length: header_name.len(),
+  };
+  let config_ptr = envoy_dynamic_module_on_matcher_data_input_config_new(
+    std::ptr::null_mut(),
+    name_buf,
+    config_buf,
+  );
+  assert!(!config_ptr.is_null());
+
+  // A present header is handed back through set_result.
+  STUB_DATA_INPUT_HEADER_PRESENT.store(true, std::sync::atomic::Ordering::SeqCst);
+  DATA_INPUT_RESULT_SET.store(false, std::sync::atomic::Ordering::SeqCst);
+  envoy_dynamic_module_on_matcher_data_input_get(config_ptr, std::ptr::null_mut());
+  assert!(DATA_INPUT_RESULT_SET.load(std::sync::atomic::Ordering::SeqCst));
+  assert_eq!(
+    *CAPTURED_DATA_INPUT_RESULT.lock().unwrap(),
+    STUB_DATA_INPUT_HEADER_VALUE
+  );
+
+  // An absent header leaves the result unset, so the input has no value.
+  STUB_DATA_INPUT_HEADER_PRESENT.store(false, std::sync::atomic::Ordering::SeqCst);
+  DATA_INPUT_RESULT_SET.store(false, std::sync::atomic::Ordering::SeqCst);
+  envoy_dynamic_module_on_matcher_data_input_get(config_ptr, std::ptr::null_mut());
+  assert!(!DATA_INPUT_RESULT_SET.load(std::sync::atomic::Ordering::SeqCst));
+
+  envoy_dynamic_module_on_matcher_data_input_config_destroy(config_ptr);
+}
+
+#[test]
+fn test_matcher_data_input_get_recovers_from_panic() {
+  let name = b"test";
+  let name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: name.as_ptr() as *mut _,
+    length: name.len(),
+  };
+  // The config selects the header name "panic", which makes the test get() panic.
+  let panic_header = b"panic";
+  let config_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: panic_header.as_ptr() as *mut _,
+    length: panic_header.len(),
+  };
+  let config_ptr = envoy_dynamic_module_on_matcher_data_input_config_new(
+    std::ptr::null_mut(),
+    name_buf,
+    config_buf,
+  );
+  assert!(!config_ptr.is_null());
+
+  // A panic in get() is caught and no result is set, so the input has no value.
+  DATA_INPUT_RESULT_SET.store(false, std::sync::atomic::Ordering::SeqCst);
+  envoy_dynamic_module_on_matcher_data_input_get(config_ptr, std::ptr::null_mut());
+  assert!(!DATA_INPUT_RESULT_SET.load(std::sync::atomic::Ordering::SeqCst));
+
+  envoy_dynamic_module_on_matcher_data_input_config_destroy(config_ptr);
 }
 
 // =============================================================================
@@ -8783,6 +9098,7 @@ struct StubSpecifierSelection {
   idle_timeout_ms: Option<u64>,
   request_body_buffer_limit: Option<u64>,
   priority: Option<abi::envoy_dynamic_module_type_resource_priority>,
+  cluster_not_found_response_code: Option<u32>,
   route_action_override: Option<String>,
 }
 
@@ -8793,6 +9109,7 @@ static STUB_SPECIFIER_SELECTION: std::sync::Mutex<StubSpecifierSelection> =
     idle_timeout_ms: None,
     request_body_buffer_limit: None,
     priority: None,
+    cluster_not_found_response_code: None,
     route_action_override: None,
   });
 
@@ -8928,6 +9245,54 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_dynamic_me
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_number(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _path: abi::envoy_dynamic_module_type_module_buffer,
+  result: *mut f64,
+) -> bool {
+  if !STUB_SPECIFIER_STATE_PRESENT.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  unsafe { *result = 0.25 };
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_bool(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _path: abi::envoy_dynamic_module_type_module_buffer,
+  result: *mut bool,
+) -> bool {
+  if !STUB_SPECIFIER_STATE_PRESENT.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  unsafe { *result = true };
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  _priority: u32,
+  total_count: *mut usize,
+  healthy_count: *mut usize,
+  degraded_count: *mut usize,
+) -> bool {
+  if !STUB_SPECIFIER_STATE_PRESENT.load(std::sync::atomic::Ordering::SeqCst) {
+    return false;
+  }
+  unsafe {
+    *total_count = 5;
+    *healthy_count = 3;
+    *degraded_count = 1;
+  }
+  true
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_get_route_name(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
   result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
@@ -8987,6 +9352,21 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_priority(
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_response_code(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  status_code: u32,
+) -> bool {
+  if !(200..600).contains(&status_code) {
+    return false;
+  }
+  STUB_SPECIFIER_SELECTION
+    .lock()
+    .unwrap()
+    .cluster_not_found_response_code = Some(status_code);
+  true
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_action_override(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
   name: abi::envoy_dynamic_module_type_module_buffer,
@@ -9012,8 +9392,9 @@ fn test_envoy_dynamic_module_on_cluster_specifier_config_new_impl() {
   }
 
   let mut new_fn: NewClusterSpecifierConfigFunction =
-    |_, _| Some(Box::new(TestClusterSpecifierConfig));
+    |_, _, _| Some(Box::new(TestClusterSpecifierConfig));
   let result = cluster_specifier::envoy_dynamic_module_on_cluster_specifier_config_new_impl(
+    std::ptr::null_mut(),
     "test_cluster_specifier",
     b"config",
     &new_fn,
@@ -9024,8 +9405,9 @@ fn test_envoy_dynamic_module_on_cluster_specifier_config_new_impl() {
   }
 
   // None should result in a null pointer (e.g. unknown specifier name).
-  new_fn = |_, _| None;
+  new_fn = |_, _, _| None;
   let result = cluster_specifier::envoy_dynamic_module_on_cluster_specifier_config_new_impl(
+    std::ptr::null_mut(),
     "test_cluster_specifier",
     b"config",
     &new_fn,
@@ -9049,8 +9431,10 @@ fn test_envoy_dynamic_module_on_cluster_specifier_config_destroy() {
     }
   }
 
-  let new_fn: NewClusterSpecifierConfigFunction = |_, _| Some(Box::new(TestClusterSpecifierConfig));
+  let new_fn: NewClusterSpecifierConfigFunction =
+    |_, _, _| Some(Box::new(TestClusterSpecifierConfig));
   let config_ptr = cluster_specifier::envoy_dynamic_module_on_cluster_specifier_config_new_impl(
+    std::ptr::null_mut(),
     "test_cluster_specifier",
     b"",
     &new_fn,
@@ -9079,11 +9463,12 @@ fn test_envoy_dynamic_module_on_cluster_specifier_select() {
     }
   }
 
-  let new_fn: NewClusterSpecifierConfigFunction = |_, config| {
+  let new_fn: NewClusterSpecifierConfigFunction = |_, config, _| {
     CONFIG_BYTES_SEEN.lock().unwrap().extend_from_slice(config);
     Some(Box::new(TestClusterSpecifierConfig { decide: true }))
   };
   let config_ptr = cluster_specifier::envoy_dynamic_module_on_cluster_specifier_config_new_impl(
+    std::ptr::null_mut(),
     "test_cluster_specifier",
     b"prefix",
     &new_fn,
@@ -9113,8 +9498,9 @@ fn test_envoy_dynamic_module_on_cluster_specifier_select() {
   // A config that reports no decision is reported as such, which makes Envoy discard everything
   // the module set.
   let new_fn: NewClusterSpecifierConfigFunction =
-    |_, _| Some(Box::new(TestClusterSpecifierConfig { decide: false }));
+    |_, _, _| Some(Box::new(TestClusterSpecifierConfig { decide: false }));
   let config_ptr = cluster_specifier::envoy_dynamic_module_on_cluster_specifier_config_new_impl(
+    std::ptr::null_mut(),
     "test_cluster_specifier",
     b"",
     &new_fn,
@@ -9210,10 +9596,22 @@ fn test_cluster_specifier_context_reads_request_state() {
       .as_slice()
   );
   assert_eq!(
+    Some(0.25),
+    ctx.get_dynamic_metadata_number("envoy.test", "weight")
+  );
+  assert_eq!(
+    Some(true),
+    ctx.get_dynamic_metadata_bool("envoy.test", "canary")
+  );
+  assert_eq!(
     STUB_SPECIFIER_ROUTE_NAME.as_bytes(),
     ctx.route_name().unwrap().as_slice()
   );
   assert_eq!(STUB_SPECIFIER_RANDOM_VALUE, ctx.random_value());
+  let counts = ctx.get_cluster_host_count("prod", 0).unwrap();
+  assert_eq!(5, counts.total);
+  assert_eq!(3, counts.healthy);
+  assert_eq!(1, counts.degraded);
 
   // An empty header map returns an empty vector without invoking the fill callback.
   STUB_SPECIFIER_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -9238,6 +9636,13 @@ fn test_cluster_specifier_context_reads_request_state() {
     .get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::HealthCheck)
     .is_none());
   assert!(ctx.get_dynamic_metadata("envoy.test", "shard").is_none());
+  assert!(ctx
+    .get_dynamic_metadata_number("envoy.test", "weight")
+    .is_none());
+  assert!(ctx
+    .get_dynamic_metadata_bool("envoy.test", "canary")
+    .is_none());
+  assert!(ctx.get_cluster_host_count("prod", 0).is_none());
   assert!(ctx.route_name().is_none());
   STUB_SPECIFIER_STATE_PRESENT.store(true, std::sync::atomic::Ordering::SeqCst);
 }
@@ -9254,6 +9659,7 @@ fn test_cluster_specifier_context_records_selection() {
   ctx.set_idle_timeout(std::time::Duration::from_millis(4321));
   ctx.set_request_body_buffer_limit(9999);
   ctx.set_priority(ResourcePriority::High);
+  assert!(ctx.set_cluster_not_found_response_code(404));
   assert!(ctx.set_route_action_override(STUB_SPECIFIER_OVERRIDE_NAME));
 
   {
@@ -9266,6 +9672,7 @@ fn test_cluster_specifier_context_records_selection() {
       Some(abi::envoy_dynamic_module_type_resource_priority::High),
       selection.priority
     );
+    assert_eq!(Some(404), selection.cluster_not_found_response_code);
     assert_eq!(
       Some(STUB_SPECIFIER_OVERRIDE_NAME.to_string()),
       selection.route_action_override
@@ -9275,8 +9682,10 @@ fn test_cluster_specifier_context_records_selection() {
   // Sub-millisecond precision is truncated, and the default priority maps to its own ABI value.
   ctx.set_timeout(std::time::Duration::from_micros(1500));
   ctx.set_priority(ResourcePriority::Default);
-  // An override that the configuration does not declare is reported as not found.
+  // An override that the configuration does not declare is reported as not found, and so is a
+  // status code that is not an HTTP response code.
   assert!(!ctx.set_route_action_override("unknown"));
+  assert!(!ctx.set_cluster_not_found_response_code(600));
 
   {
     let selection = STUB_SPECIFIER_SELECTION.lock().unwrap();
@@ -9285,6 +9694,7 @@ fn test_cluster_specifier_context_records_selection() {
       Some(abi::envoy_dynamic_module_type_resource_priority::Default),
       selection.priority
     );
+    assert_eq!(Some(404), selection.cluster_not_found_response_code);
     assert_eq!(
       Some(STUB_SPECIFIER_OVERRIDE_NAME.to_string()),
       selection.route_action_override
@@ -9299,4 +9709,271 @@ fn test_cluster_specifier_context_records_selection() {
   let selection = STUB_SPECIFIER_SELECTION.lock().unwrap();
   assert_eq!(Some(u64::MAX), selection.timeout_ms);
   assert_eq!(Some(u64::MAX), selection.idle_timeout_ms);
+}
+
+// =============================================================================
+// Cluster Specifier Metrics Tests
+// =============================================================================
+
+// The cluster specifier module is not glob re-exported at the crate root, so bring its metrics
+// trait into scope to call it on the generated mock.
+use crate::cluster_specifier::EnvoyClusterSpecifierMetrics;
+
+#[test]
+fn test_cluster_specifier_metrics_define_counter() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_counter()
+    .with(mockall::predicate::eq("test_counter"))
+    .returning(|_| Ok(EnvoyCounterId(1)));
+  let result = mock.define_counter("test_counter");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyCounterId(1));
+}
+
+#[test]
+fn test_cluster_specifier_metrics_define_gauge() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_gauge()
+    .with(mockall::predicate::eq("test_gauge"))
+    .returning(|_| Ok(EnvoyGaugeId(1)));
+  let result = mock.define_gauge("test_gauge");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyGaugeId(1));
+}
+
+#[test]
+fn test_cluster_specifier_metrics_define_histogram() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_histogram()
+    .with(mockall::predicate::eq("test_histogram"))
+    .returning(|_| Ok(EnvoyHistogramId(1)));
+  let result = mock.define_histogram("test_histogram");
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyHistogramId(1));
+}
+
+#[test]
+fn test_cluster_specifier_metrics_increment_counter() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_increment_counter()
+    .with(
+      mockall::predicate::eq(EnvoyCounterId(1)),
+      mockall::predicate::eq(5u64),
+    )
+    .returning(|_, _| Ok(()));
+  assert!(mock.increment_counter(EnvoyCounterId(1), 5).is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_increment_counter_invalid_id() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_increment_counter()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock.increment_counter(EnvoyCounterId(999), 1).is_err());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_gauge_operations() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_set_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(42u64),
+    )
+    .returning(|_, _| Ok(()));
+  mock
+    .expect_increase_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(10u64),
+    )
+    .returning(|_, _| Ok(()));
+  mock
+    .expect_decrease_gauge()
+    .with(
+      mockall::predicate::eq(EnvoyGaugeId(1)),
+      mockall::predicate::eq(5u64),
+    )
+    .returning(|_, _| Ok(()));
+  assert!(mock.set_gauge(EnvoyGaugeId(1), 42).is_ok());
+  assert!(mock.increase_gauge(EnvoyGaugeId(1), 10).is_ok());
+  assert!(mock.decrease_gauge(EnvoyGaugeId(1), 5).is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_gauge_invalid_id() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_set_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_increase_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_decrease_gauge()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock.set_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(mock.increase_gauge(EnvoyGaugeId(999), 1).is_err());
+  assert!(mock.decrease_gauge(EnvoyGaugeId(999), 1).is_err());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_record_histogram_value() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_record_histogram_value()
+    .with(
+      mockall::predicate::eq(EnvoyHistogramId(1)),
+      mockall::predicate::eq(42u64),
+    )
+    .returning(|_, _| Ok(()));
+  assert!(mock.record_histogram_value(EnvoyHistogramId(1), 42).is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_record_histogram_value_invalid_id() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_record_histogram_value()
+    .returning(|_, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock
+    .record_histogram_value(EnvoyHistogramId(999), 1)
+    .is_err());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_define_all_metric_types_and_use() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_counter()
+    .returning(|_| Ok(EnvoyCounterId(1)));
+  mock
+    .expect_define_gauge()
+    .returning(|_| Ok(EnvoyGaugeId(1)));
+  mock
+    .expect_define_histogram()
+    .returning(|_| Ok(EnvoyHistogramId(1)));
+  mock.expect_increment_counter().returning(|_, _| Ok(()));
+  mock.expect_set_gauge().returning(|_, _| Ok(()));
+  mock
+    .expect_record_histogram_value()
+    .returning(|_, _| Ok(()));
+
+  let counter_id = mock.define_counter("c").unwrap();
+  let gauge_id = mock.define_gauge("g").unwrap();
+  let histogram_id = mock.define_histogram("h").unwrap();
+  assert!(mock.increment_counter(counter_id, 1).is_ok());
+  assert!(mock.set_gauge(gauge_id, 100).is_ok());
+  assert!(mock.record_histogram_value(histogram_id, 50).is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_define_counter_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_counter_vec()
+    .returning(|_, _| Ok(EnvoyCounterVecId(1)));
+  let result = mock.define_counter_vec("test_counter", &["region", "zone"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyCounterVecId(1));
+}
+
+#[test]
+fn test_cluster_specifier_metrics_define_gauge_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_gauge_vec()
+    .returning(|_, _| Ok(EnvoyGaugeVecId(1)));
+  let result = mock.define_gauge_vec("test_gauge", &["env"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyGaugeVecId(1));
+}
+
+#[test]
+fn test_cluster_specifier_metrics_define_histogram_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_define_histogram_vec()
+    .returning(|_, _| Ok(EnvoyHistogramVecId(1)));
+  let result = mock.define_histogram_vec("test_histogram", &["method"]);
+  assert!(result.is_ok());
+  assert_eq!(result.unwrap(), EnvoyHistogramVecId(1));
+}
+
+#[test]
+fn test_cluster_specifier_metrics_increment_counter_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_increment_counter_vec()
+    .returning(|_, _, _| Ok(()));
+  assert!(mock
+    .increment_counter_vec(EnvoyCounterVecId(1), &["us-east-1"], 1)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_set_gauge_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock.expect_set_gauge_vec().returning(|_, _, _| Ok(()));
+  assert!(mock
+    .set_gauge_vec(EnvoyGaugeVecId(1), &["prod"], 42)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_increase_gauge_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock.expect_increase_gauge_vec().returning(|_, _, _| Ok(()));
+  assert!(mock
+    .increase_gauge_vec(EnvoyGaugeVecId(1), &["prod"], 10)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_decrease_gauge_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock.expect_decrease_gauge_vec().returning(|_, _, _| Ok(()));
+  assert!(mock
+    .decrease_gauge_vec(EnvoyGaugeVecId(1), &["prod"], 5)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_record_histogram_value_vec() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_record_histogram_value_vec()
+    .returning(|_, _, _| Ok(()));
+  assert!(mock
+    .record_histogram_value_vec(EnvoyHistogramVecId(1), &["GET"], 100)
+    .is_ok());
+}
+
+#[test]
+fn test_cluster_specifier_metrics_vec_metric_invalid_id() {
+  let mut mock = cluster_specifier::MockEnvoyClusterSpecifierMetrics::new();
+  mock
+    .expect_increment_counter_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_set_gauge_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  mock
+    .expect_record_histogram_value_vec()
+    .returning(|_, _, _| Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound));
+  assert!(mock
+    .increment_counter_vec(EnvoyCounterVecId(999), &["v1"], 1)
+    .is_err());
+  assert!(mock
+    .set_gauge_vec(EnvoyGaugeVecId(999), &["v1"], 1)
+    .is_err());
+  assert!(mock
+    .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
+    .is_err());
 }
