@@ -24,17 +24,17 @@ public:
     pressure_ = usage.resource_pressure_;
   }
 
-  void onFailure(const EnvoyException& error) override { error_ = error; }
+  void onFailure(const absl::Status& error) override { error_ = error; }
 
   bool hasPressure() const { return pressure_.has_value(); }
   bool hasError() const { return error_.has_value(); }
 
   double pressure() const { return *pressure_; }
-  const EnvoyException& error() const { return *error_; }
+  const absl::Status& error() const { return *error_; }
 
 private:
   std::optional<double> pressure_;
-  std::optional<EnvoyException> error_;
+  std::optional<absl::Status> error_;
 };
 
 // Helper to create a V2 stats reader backed by a mock filesystem.
@@ -174,7 +174,7 @@ TEST(CgroupMemoryMonitorTest, HandlesUsageReadError) {
   monitor->updateResourceUsage(resource);
   EXPECT_FALSE(resource.hasPressure());
   EXPECT_TRUE(resource.hasError());
-  EXPECT_THAT(resource.error().what(), testing::HasSubstr("Unable to read memory stats file"));
+  EXPECT_THAT(resource.error().message(), testing::HasSubstr("Unable to read memory stats file"));
 }
 
 TEST(CgroupMemoryMonitorTest, HandlesLimitReadError) {
@@ -192,7 +192,7 @@ TEST(CgroupMemoryMonitorTest, HandlesLimitReadError) {
   monitor->updateResourceUsage(resource);
   EXPECT_FALSE(resource.hasPressure());
   EXPECT_TRUE(resource.hasError());
-  EXPECT_THAT(resource.error().what(), testing::HasSubstr("Unable to read memory stats file"));
+  EXPECT_THAT(resource.error().message(), testing::HasSubstr("Unable to read memory stats file"));
 }
 
 } // namespace

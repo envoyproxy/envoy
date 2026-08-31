@@ -32,21 +32,21 @@ void InjectedResourceMonitor::updateResourceUsage(Server::ResourceUpdateCallback
     file_changed_ = false;
     auto file_or_error = api_.fileSystem().fileReadToEnd(filename_);
     if (!file_or_error.ok()) {
-      error_ = EnvoyException(std::string(file_or_error.status().message()));
+      error_ = file_or_error.status();
       pressure_.reset();
     } else {
       const std::string contents = file_or_error.value();
       double pressure;
       if (absl::SimpleAtod(contents, &pressure)) {
         if (pressure < 0 || pressure > 1) {
-          error_ = EnvoyException("pressure out of range");
+          error_ = absl::InvalidArgumentError("pressure out of range");
           pressure_.reset();
         } else {
           pressure_ = pressure;
           error_.reset();
         }
       } else {
-        error_ = EnvoyException("failed to parse injected resource pressure");
+        error_ = absl::InvalidArgumentError("failed to parse injected resource pressure");
         pressure_.reset();
       }
     }

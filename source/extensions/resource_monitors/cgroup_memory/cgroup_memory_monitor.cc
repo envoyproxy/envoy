@@ -1,7 +1,5 @@
 #include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_monitor.h"
 
-#include "envoy/common/exception.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
@@ -15,13 +13,13 @@ CgroupMemoryMonitor::CgroupMemoryMonitor(
 void CgroupMemoryMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   auto usage_or = stats_reader_->getMemoryUsage();
   if (!usage_or.ok()) {
-    callbacks.onFailure(EnvoyException(std::string(usage_or.status().message())));
+    callbacks.onFailure(usage_or.status());
     return;
   }
 
   auto limit_or = stats_reader_->getMemoryLimit();
   if (!limit_or.ok()) {
-    callbacks.onFailure(EnvoyException(std::string(limit_or.status().message())));
+    callbacks.onFailure(limit_or.status());
     return;
   }
 
