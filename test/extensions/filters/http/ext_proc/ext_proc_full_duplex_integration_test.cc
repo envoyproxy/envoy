@@ -1245,7 +1245,7 @@ TEST_P(ExtProcIntegrationTest, FullDuplexStreamedNoDuplicateBodyOnRetry) {
 
   EXPECT_EQ(upstream_request2->body().toString(), expected_body);
 
-  upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true)
+  upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);
 }
 
