@@ -1308,6 +1308,7 @@ envoy_cc_library(
         ":quiche_common_callbacks",
         ":quiche_common_circular_deque_lib",
         ":quiche_common_platform",
+        "@abseil-cpp//absl/container:chunked_queue",
     ],
 )
 
@@ -5174,7 +5175,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_balsa_balsa_frame_lib",
     srcs = ["quiche/balsa/balsa_frame.cc"],
-    hdrs = ["quiche/balsa/balsa_frame.h"],
+    hdrs = [
+        "quiche/balsa/balsa_frame.h",
+        "quiche/balsa/http_protocol_defects.h",
+    ],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
