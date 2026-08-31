@@ -9,11 +9,12 @@
  * indentation carry the hierarchy.
  */
 
-/** `Enum config.listener.v3.Listener.DrainType` and friends. */
-const KIND_PREFIXES = [
-  [/^Enum\s+/i, 'enum'],
-  [/^Service\s+/i, 'svc'],
-];
+/**
+ * protodoc titles enums and services with the kind in front of the name. The
+ * word is stripped here so the outline shows the symbol; the kind itself is
+ * shown by the coloured dot that envoy/proto.js adds.
+ */
+const KIND_PREFIXES = [/^Enum\s+/i, /^Service\s+/i];
 
 /** A dotted proto symbol: a lower-case package then CamelCase segments. */
 const SYMBOL = /^(?:[a-z][\w]*\.)+[A-Z]\w*(?:\.[A-Z]\w*)*$/;
@@ -36,17 +37,9 @@ function commonPackage(symbols) {
 function renderSymbolToc(toc, links) {
   const entries = links.map((link) => {
     const text = link.textContent.trim();
-    let kind = null;
-    let symbol = text;
+    const symbol = KIND_PREFIXES.reduce((name, pattern) => name.replace(pattern, ''), text);
 
-    KIND_PREFIXES.forEach(([pattern, name]) => {
-      if (pattern.test(symbol)) {
-        kind = name;
-        symbol = symbol.replace(pattern, '');
-      }
-    });
-
-    return {link, symbol, kind, isSymbol: SYMBOL.test(symbol)};
+    return {link, symbol, isSymbol: SYMBOL.test(symbol)};
   });
 
   const symbols = entries.filter((entry) => entry.isSymbol);
@@ -74,13 +67,6 @@ function renderSymbolToc(toc, links) {
 
     entry.link.textContent = segments[segments.length - 1];
     entry.link.title = entry.symbol;
-
-    if (entry.kind) {
-      const badge = document.createElement('span');
-      badge.className = 'envoy-symbol-kind';
-      badge.textContent = entry.kind;
-      entry.link.append(badge);
-    }
   });
 }
 

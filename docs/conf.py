@@ -324,6 +324,7 @@ html_css_files = [
     'css/envoy/admonitions.css',
     'css/envoy/tables.css',
     'css/envoy/toc.css',
+    'css/envoy/proto.css',
     'css/envoy/search.css',
     # loaded last so its overrides win without extra specificity
     'css/envoy/responsive.css',
