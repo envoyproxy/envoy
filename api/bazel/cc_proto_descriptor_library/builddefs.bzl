@@ -3,7 +3,8 @@
 """
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
-load("@com_google_protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
+load("@envoy_toolshed//toolchains:utils.bzl", "get_proto_compiler", "use_proto_toolchain")
+load("@protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
@@ -137,7 +138,13 @@ def _cc_library_func(ctx, name, hdrs, srcs, copts, includes, dep_ccinfos):
         cc_toolchain = toolchain,
         compilation_outputs = compilation_outputs,
         linking_contexts = linking_contexts,
-        disallow_dynamic_library = cc_common.is_enabled(feature_configuration = feature_configuration, feature_name = "targets_windows"),
+        disallow_dynamic_library = cc_common.is_enabled(
+            feature_configuration = feature_configuration,
+            feature_name = "targets_windows",
+        ) or not cc_common.action_is_enabled(
+            feature_configuration = feature_configuration,
+            action_name = "c++-link-nodeps-dynamic-library",
+        ),
         **blaze_only_args
     )
 
@@ -203,7 +210,7 @@ def _compile_protos(ctx, generator, proto_info, proto_sources):
         ),
         tools = [tool],
         outputs = srcs + hdrs,
-        executable = ctx.executable._protoc,
+        executable = get_proto_compiler(ctx),
         arguments = [args],
         progress_message = "Generating descriptor protos for :" + ctx.label.name,
         mnemonic = "GenDescriptorProtos",
@@ -312,11 +319,6 @@ cc_proto_descriptor_library_aspect = aspect(
             cfg = "exec",
             default = "//bazel/cc_proto_descriptor_library:file_descriptor_generator",
         ),
-        "_protoc": attr.label(
-            executable = True,
-            cfg = "exec",
-            default = "@com_google_protobuf//:protoc",
-        ),
         "_cc_toolchain": attr.label(
             default = "@bazel_tools//tools/cpp:current_cc_toolchain",
         ),
@@ -331,7 +333,7 @@ cc_proto_descriptor_library_aspect = aspect(
     provides = _get_cc_proto_descriptor_library_aspect_provides(),
     attr_aspects = ["deps"],
     fragments = ["cpp"],
-    toolchains = use_cpp_toolchain(),
+    toolchains = use_cpp_toolchain() + use_proto_toolchain(),
 )
 
 cc_proto_descriptor_library = rule(

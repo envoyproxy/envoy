@@ -130,8 +130,9 @@ TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInter
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", "endpoint_id_0",
                                                                 sock_interface);
 
-  ASSERT_DEATH(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, address,
-                                                     nullptr, Network::SocketCreationOptions{}),
+  ASSERT_DEATH(std::ignore =
+                   std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, address,
+                                                         nullptr, Network::SocketCreationOptions{}),
                "");
 }
 

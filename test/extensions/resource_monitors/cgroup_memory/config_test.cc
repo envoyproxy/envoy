@@ -171,11 +171,13 @@ TEST(CgroupMemoryConfigTest, CreateMonitorIgnoresContext) {
   Server::Configuration::ResourceMonitorFactoryContextImpl context2(
       dispatcher2, options2, mock_api, ProtobufMessage::getStrictValidationVisitor(), runtime2);
 
-  auto monitor1 = factory->createResourceMonitor(config, context1);
-  auto monitor2 = factory->createResourceMonitor(config, context2);
+  auto monitor1_or_error = factory->createResourceMonitor(config, context1);
+  auto monitor2_or_error = factory->createResourceMonitor(config, context2);
 
-  EXPECT_NE(monitor1, nullptr);
-  EXPECT_NE(monitor2, nullptr);
+  EXPECT_TRUE(monitor1_or_error.ok());
+  EXPECT_TRUE(monitor2_or_error.ok());
+  EXPECT_NE(monitor1_or_error.value(), nullptr);
+  EXPECT_NE(monitor2_or_error.value(), nullptr);
 }
 
 } // namespace CgroupMemory

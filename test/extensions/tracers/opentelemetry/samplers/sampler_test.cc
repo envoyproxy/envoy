@@ -110,7 +110,8 @@ TEST_F(SamplerFactoryTest, TestWithInvalidSampler) {
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
-  EXPECT_THROW(std::make_unique<Driver>(opentelemetry_config, context), EnvoyException);
+  EXPECT_THROW(std::ignore = std::make_unique<Driver>(opentelemetry_config, context),
+               EnvoyException);
 }
 
 // Test OTLP tracer with a sampler

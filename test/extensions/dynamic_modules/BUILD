@@ -33,7 +33,7 @@ envoy_cc_test(
     ],
     # This is to test dlopen with the current working directory (rundir in Bazel).
     env = {"LD_LIBRARY_PATH": "."},
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":util",
         "//source/common/buffer:buffer_lib",
@@ -43,8 +43,10 @@ envoy_cc_test(
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",
+        "//test/extensions/dynamic_modules/test_data/c:program_init_fail_static",
         "//test/mocks/init:init_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
     ],

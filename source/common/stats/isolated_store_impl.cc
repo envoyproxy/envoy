@@ -66,20 +66,23 @@ ScopeSharedPtr IsolatedScopeImpl::createScopeWithTaggedName(
     bool evictable, const ScopeStatsLimitSettings& limits, StatsMatcherSharedPtr matcher) {
   // Intern the string-based tag-extracted name, name_tags and (optional) tagged name into a
   // temporary pool, then delegate to the StatName-based variant.
+  std::string sanitize_buffer;
   StatNamePool tag_pool(symbolTable());
-  StatName stat_name = tag_pool.add(Utility::sanitizeStatsName(base_name));
+  StatName stat_name = tag_pool.add(Utility::sanitizeStatsName(base_name, sanitize_buffer));
   StatName stat_tagged_name;
   if (!name_tags.empty()) {
     // The tagged name is only meaningful when there are tags to interleave; otherwise it is
     // ignored and the TagStatNameJoiner will use the tag-extracted name as the flat tagged name.
-    stat_tagged_name =
-        tagged_name.empty() ? StatName() : tag_pool.add(Utility::sanitizeStatsName(tagged_name));
+    stat_tagged_name = tagged_name.empty()
+                           ? StatName()
+                           : tag_pool.add(Utility::sanitizeStatsName(tagged_name, sanitize_buffer));
   }
 
   StatNameTagVec stat_name_tags;
   stat_name_tags.reserve(name_tags.size());
   for (const auto& [tag, value] : name_tags) {
-    stat_name_tags.emplace_back(tag_pool.add(tag), tag_pool.add(value));
+    stat_name_tags.emplace_back(tag_pool.add(Utility::sanitizeStatsName(tag, sanitize_buffer)),
+                                tag_pool.add(Utility::sanitizeStatsName(value, sanitize_buffer)));
   }
   return scopeFromTaggedName(stat_name, stat_name_tags, stat_tagged_name, evictable, limits,
                              std::move(matcher));

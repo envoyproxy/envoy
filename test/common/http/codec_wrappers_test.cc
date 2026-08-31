@@ -1,6 +1,7 @@
 #include "source/common/http/codec_wrappers.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -78,12 +79,8 @@ TEST(RequestEncoderWrapper, HeaderOnlyEncode) {
   MockRequestEncoderWrapper wrapper;
 
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, true));
-  EXPECT_TRUE(
-      wrapper
-          .encodeHeaders(
-              TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}},
-              true)
-          .ok());
+  EXPECT_OK(wrapper.encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}, true));
   EXPECT_TRUE(wrapper.encodeComplete());
 }
 
@@ -91,12 +88,8 @@ TEST(RequestEncoderWrapper, HeaderAndBodyEncode) {
   MockRequestEncoderWrapper wrapper;
 
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, false));
-  EXPECT_TRUE(
-      wrapper
-          .encodeHeaders(
-              TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}},
-              false)
-          .ok());
+  EXPECT_OK(wrapper.encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}, false));
   EXPECT_FALSE(wrapper.encodeComplete());
 
   Buffer::OwnedImpl data;
@@ -109,12 +102,8 @@ TEST(RequestEncoderWrapper, HeaderAndBodyAndTrailersEncode) {
   MockRequestEncoderWrapper wrapper;
 
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, false));
-  EXPECT_TRUE(
-      wrapper
-          .encodeHeaders(
-              TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}},
-              false)
-          .ok());
+  EXPECT_OK(wrapper.encodeHeaders(
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}, false));
   EXPECT_FALSE(wrapper.encodeComplete());
 
   Buffer::OwnedImpl data;

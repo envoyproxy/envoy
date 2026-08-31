@@ -1,13 +1,17 @@
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
+
+#include "envoy/registry/registry.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
 
 #include "absl/strings/str_split.h"
 
@@ -574,6 +578,60 @@ ContextAccessor::accessLogTypeToAbi(Formatter::AccessLogType log_type) {
   default:
     return envoy_dynamic_module_type_access_log_type_NotSet;
   }
+}
+
+void ContextAccessor::setDynamicMetadataString(StreamInfo::StreamInfo& stream_info,
+                                               absl::string_view filter_name, absl::string_view key,
+                                               absl::string_view value) {
+  Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key].set_string_value(value);
+  stream_info.setDynamicMetadata(std::string(filter_name), metadata_value);
+}
+
+void ContextAccessor::setDynamicMetadataNumber(StreamInfo::StreamInfo& stream_info,
+                                               absl::string_view filter_name, absl::string_view key,
+                                               double value) {
+  Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key].set_number_value(value);
+  stream_info.setDynamicMetadata(std::string(filter_name), metadata_value);
+}
+
+bool ContextAccessor::setFilterStateBytes(
+    StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
+    std::optional<StreamInfo::FilterState::LifeSpan> life_span) {
+  auto accessor = std::make_unique<Router::StringAccessorImpl>(value);
+  if (life_span.has_value()) {
+    stream_info.filterState()->setData(key, std::move(accessor), life_span.value());
+  } else {
+    stream_info.filterState()->setData(key, std::move(accessor));
+  }
+  return true;
+}
+
+bool ContextAccessor::setFilterStateTyped(
+    StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
+    std::optional<StreamInfo::FilterState::LifeSpan> life_span) {
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(key);
+  if (factory == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "no ObjectFactory registered for filter state key '{}'", key);
+    return false;
+  }
+
+  auto object = factory->createFromBytes(value);
+  if (object == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "ObjectFactory failed to create object for filter state key '{}'", key);
+    return false;
+  }
+
+  if (life_span.has_value()) {
+    stream_info.filterState()->setData(key, std::move(object), life_span.value());
+  } else {
+    stream_info.filterState()->setData(key, std::move(object));
+  }
+  return true;
 }
 
 } // namespace DynamicModules

@@ -85,7 +85,7 @@ public:
   virtual void verify(ContextSharedPtr context) const PURE;
 
   // Factory method for creating verifiers.
-  static VerifierConstPtr create(
+  static absl::StatusOr<VerifierConstPtr> create(
       const envoy::extensions::filters::http::jwt_authn::v3::JwtRequirement& requirement,
       const Protobuf::Map<std::string,
                           envoy::extensions::filters::http::jwt_authn::v3::JwtProvider>& providers,

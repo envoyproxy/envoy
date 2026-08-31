@@ -19,13 +19,8 @@ namespace Wasm {
 class FilterConfig : public Extensions::Common::Wasm::PluginConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
-               Server::Configuration::FactoryContext& context);
-
-  FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
-               Server::Configuration::UpstreamFactoryContext& context);
-
-  FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
-               Server::Configuration::ServerFactoryContext& context);
+               Server::Configuration::ServerFactoryContext& context,
+               Server::Configuration::ExtraFactoryContext& extra_context);
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

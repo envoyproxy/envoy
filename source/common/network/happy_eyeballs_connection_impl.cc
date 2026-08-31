@@ -10,22 +10,23 @@ namespace Envoy {
 namespace Network {
 
 HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
-    Event::Dispatcher& dispatcher, const std::vector<Address::InstanceConstSharedPtr>& address_list,
+    Event::Dispatcher& dispatcher,
+    const Upstream::HostDescription::SharedConstAddressVector& sorted_address_list,
     const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
         upstream_local_address_selector,
     UpstreamTransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const Upstream::HostDescriptionConstSharedPtr& host,
-    const ConnectionSocket::OptionsSharedPtr options,
-    const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
-        happy_eyeballs_config)
-    : dispatcher_(dispatcher), address_list_(sortAddresses(address_list, happy_eyeballs_config)),
+    const ConnectionSocket::OptionsSharedPtr options)
+    : dispatcher_(dispatcher), address_list_(sorted_address_list),
       upstream_local_address_selector_(upstream_local_address_selector),
       socket_factory_(socket_factory), transport_socket_options_(transport_socket_options),
-      host_(host), options_(options) {}
+      host_(host), options_(options) {
+  ASSERT(address_list_ != nullptr && !address_list_->empty());
+}
 
 bool HappyEyeballsConnectionProvider::hasNextConnection() {
-  return next_address_ < address_list_.size();
+  return next_address_ < address_list_->size();
 }
 
 ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const uint64_t id) {
@@ -37,8 +38,8 @@ ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const 
   first_connection_created_ = true;
   ASSERT(hasNextConnection());
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "C[{}] address={}", id,
-                  address_list_[next_address_]->asStringView());
-  auto& address = address_list_[next_address_++];
+                  (*address_list_)[next_address_]->asStringView());
+  auto& address = (*address_list_)[next_address_++];
   auto upstream_local_address = upstream_local_address_selector_->getUpstreamLocalAddress(
       address, options_, makeOptRefFromPtr(transport_socket_options_.get()));
 
@@ -50,7 +51,7 @@ ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const 
 
 size_t HappyEyeballsConnectionProvider::nextConnection() { return next_address_; }
 
-size_t HappyEyeballsConnectionProvider::totalConnections() { return address_list_.size(); }
+size_t HappyEyeballsConnectionProvider::totalConnections() { return address_list_->size(); }
 
 namespace {
 

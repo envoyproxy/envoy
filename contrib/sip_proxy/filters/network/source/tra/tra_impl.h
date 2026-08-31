@@ -30,6 +30,8 @@ using TrafficRoutingAssistantAsyncRequestCallbacks = Grpc::AsyncRequestCallbacks
     envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>;
 using TrafficRoutingAssistantAsyncStreamCallbacks = Grpc::AsyncStreamCallbacks<
     envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>;
+using TraServiceResponsePtr = Grpc::ResponsePtr<
+    envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>;
 
 // TODO: We should have only one client per thread, but today we create one per filter stack.
 // This will require support for more than one outstanding request per client.
@@ -67,19 +69,12 @@ public:
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
-  void
-  onSuccess(std::unique_ptr<
-                envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
-                response,
-            Tracing::Span& span) override;
+  void onSuccess(TraServiceResponsePtr&& response, Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
 
   // Grpc::AsyncStreamCallbacks
-  void onReceiveMessage(
-      std::unique_ptr<
-          envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
-          message) override;
+  void onReceiveMessage(TraServiceResponsePtr&& message) override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
@@ -110,11 +105,7 @@ private:
     void onCreateInitialMetadata(Http::RequestHeaderMap& data) override {
       return parent_.onCreateInitialMetadata(data);
     }
-    void onSuccess(
-        std::unique_ptr<
-            envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
-            response,
-        Tracing::Span& span) override {
+    void onSuccess(TraServiceResponsePtr&& response, Tracing::Span& span) override {
       parent_.onSuccess(std::move(response), span);
       cleanup();
     }
@@ -148,10 +139,7 @@ private:
     void onCreateInitialMetadata(Http::RequestHeaderMap& data) override {
       return parent_.onCreateInitialMetadata(data);
     }
-    void onReceiveMessage(
-        std::unique_ptr<
-            envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>&&
-            message) override {
+    void onReceiveMessage(TraServiceResponsePtr&& message) override {
       parent_.onReceiveMessage(std::move(message));
     }
     void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {

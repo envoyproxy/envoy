@@ -18,7 +18,7 @@ public:
   FixedHeapMonitorFactory() : FactoryBase("envoy.resource_monitors.fixed_heap") {}
 
 private:
-  Server::ResourceMonitorPtr createResourceMonitorFromProtoTyped(
+  absl::StatusOr<Server::ResourceMonitorPtr> createResourceMonitorFromProtoTyped(
       const envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig& config,
       Server::Configuration::ResourceMonitorFactoryContext& context) override;
 };

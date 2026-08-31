@@ -36,7 +36,7 @@ public:
   virtual QuicPacketWriterPtr
   createQuicPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope,
                          Event::Dispatcher& dispatcher,
-                         absl::AnyInvocable<void() &&> on_can_write_cb) PURE;
+                         absl::AnyInvocable<void()> on_can_write_cb) PURE;
 };
 
 using QuicPacketWriterFactoryPtr = std::unique_ptr<QuicPacketWriterFactory>;

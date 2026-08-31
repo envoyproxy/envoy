@@ -1,7 +1,7 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@aspect_bazel_lib//lib:yq.bzl", "yq")
 load("@envoy_toolshed//:macros.bzl", "json_data")
-load("@io_bazel_rules_go//proto:compiler.bzl", "go_proto_compiler")
+load("@rules_go//proto:compiler.bzl", "go_proto_compiler")
 load(
     ":external_proto_deps.bzl",
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
@@ -34,7 +34,7 @@ go_proto_compiler(
 )
 
 json_data(
-    name = "repository_locations_version_info",
+    name = "legacy_repository_locations_version_info",
     data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
 )
 
@@ -46,10 +46,10 @@ yq(
 )
 
 jq(
-    name = "repository_locations",
+    name = "legacy_repository_locations",
     srcs = [
         ":deps_yaml_to_json",
-        ":repository_locations_version_info",
+        ":legacy_repository_locations_version_info",
     ],
     out = "repository_locations.json",
     args = ["--slurp"],

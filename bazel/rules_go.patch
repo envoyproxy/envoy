@@ -1,0 +1,170 @@
+diff --git a/go/private/BUILD.sdk.bazel b/go/private/BUILD.sdk.bazel
+index 952b0111..a8219013 100755
+--- a/go/private/BUILD.sdk.bazel
++++ b/go/private/BUILD.sdk.bazel
+@@ -1,4 +1,4 @@
+-load("@io_bazel_rules_go//go/private:sdk_build_defs.bzl", "STDLIB_SRCS_EXCLUDE", "define_sdk_repository_targets")
++load("@rules_go//go/private:sdk_build_defs.bzl", "STDLIB_SRCS_EXCLUDE", "define_sdk_repository_targets")
+ 
+ package(default_visibility = ["//visibility:public"])
+ 
+diff --git a/go/private/common.bzl b/go/private/common.bzl
+index 83441838..1a98b793 100755
+--- a/go/private/common.bzl
++++ b/go/private/common.bzl
+@@ -12,7 +12,7 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-GO_TOOLCHAIN = "@io_bazel_rules_go//go:toolchain"
++GO_TOOLCHAIN = "@rules_go//go:toolchain"
+ GO_TOOLCHAIN_LABEL = Label(GO_TOOLCHAIN)
+ 
+ go_exts = [
+diff --git a/go/private/go_toolchain.bzl b/go/private/go_toolchain.bzl
+index 8cbcadd8..73741a81 100755
+--- a/go/private/go_toolchain.bzl
++++ b/go/private/go_toolchain.bzl
+@@ -246,8 +246,8 @@ def declare_bazel_toolchains(
+             continue
+ 
+         cgo_constraints = (
+-            "@io_bazel_rules_go//go/toolchain:cgo_off",
+-            "@io_bazel_rules_go//go/toolchain:cgo_on",
++            "@rules_go//go/toolchain:cgo_off",
++            "@rules_go//go/toolchain:cgo_on",
+         )
+         constraints = [c for c in p.constraints if c not in cgo_constraints]
+ 
+@@ -256,8 +256,8 @@ def declare_bazel_toolchains(
+             name = prefix + "go_" + p.name,
+             toolchain_type = GO_TOOLCHAIN,
+             exec_compatible_with = [
+-                "@io_bazel_rules_go//go/toolchain:" + exec_goos,
+-                "@io_bazel_rules_go//go/toolchain:" + exec_goarch,
++                "@rules_go//go/toolchain:" + exec_goos,
++                "@rules_go//go/toolchain:" + exec_goarch,
+             ],
+             target_compatible_with = constraints,
+             target_settings = [
+diff --git a/go/private/platforms.bzl b/go/private/platforms.bzl
+index 57a26803..55bc9ca4 100755
+--- a/go/private/platforms.bzl
++++ b/go/private/platforms.bzl
+@@ -156,7 +156,7 @@ CGO_GOOS_GOARCH = {
+ 
+ def _generate_constraints(names, bazel_constraints):
+     return {
+-        name: bazel_constraints.get(name, "@io_bazel_rules_go//go/toolchain:" + name)
++        name: bazel_constraints.get(name, "@rules_go//go/toolchain:" + name)
+         for name in names
+     }
+ 
+@@ -174,7 +174,7 @@ def _generate_platforms():
+             name = goos + "_" + goarch,
+             goos = goos,
+             goarch = goarch,
+-            constraints = constraints + ["@io_bazel_rules_go//go/toolchain:cgo_off"],
++            constraints = constraints + ["@rules_go//go/toolchain:cgo_off"],
+             cgo = False,
+         ))
+         if (goos, goarch) in CGO_GOOS_GOARCH:
+@@ -185,7 +185,7 @@ def _generate_platforms():
+                 name = goos + "_" + goarch + "_cgo",
+                 goos = goos,
+                 goarch = goarch,
+-                constraints = constraints + ["@io_bazel_rules_go//go/toolchain:cgo_on"] + mingw,
++                constraints = constraints + ["@rules_go//go/toolchain:cgo_on"] + mingw,
+                 cgo = True,
+             ))
+ 
+diff --git a/go/private/repositories.bzl b/go/private/repositories.bzl
+index 865c41fd..4a75db7c 100755
+--- a/go/private/repositories.bzl
++++ b/go/private/repositories.bzl
+@@ -364,9 +364,16 @@ _go_host_compatible_s_d_k_label = repository_rule(
+     },
+ )
+ 
++def _with_rules_go_repo_mapping(kwargs):
++    kwargs = dict(kwargs)
++    repo_mapping = dict(kwargs.pop("repo_mapping", {}))
++    repo_mapping["@io_bazel_rules_go"] = "@rules_go"
++    kwargs["repo_mapping"] = repo_mapping
++    return kwargs
++
+ def _maybe(repo_rule, name, **kwargs):
+     if name not in native.existing_rules():
+-        repo_rule(name = name, **kwargs)
++        repo_rule(name = name, **_with_rules_go_repo_mapping(kwargs))
+ 
+ def _always(repo_rule, name, **kwargs):
+-    repo_rule(name = name, **kwargs)
++    repo_rule(name = name, **_with_rules_go_repo_mapping(kwargs))
+diff --git a/go/private/sdk.bzl b/go/private/sdk.bzl
+index 087b0b42..14db1be3 100755
+--- a/go/private/sdk.bzl
++++ b/go/private/sdk.bzl
+@@ -260,7 +260,7 @@ def go_toolchains_build_file_content(
+         fail("all lists must have the same length")
+ 
+     loads = [
+-        """load("@io_bazel_rules_go//go/private:go_toolchain.bzl", "declare_bazel_toolchains")""",
++        """load("@rules_go//go/private:go_toolchain.bzl", "declare_bazel_toolchains")""",
+     ]
+     chunks = [
+         """package(default_visibility = ["//visibility:public"])""",
+diff --git a/go/private/sdk_build_defs.bzl b/go/private/sdk_build_defs.bzl
+index beee5796..ee4b0c5a 100755
+--- a/go/private/sdk_build_defs.bzl
++++ b/go/private/sdk_build_defs.bzl
+@@ -12,12 +12,12 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-load("@io_bazel_rules_go//go:def.bzl", "go_sdk")
+-load("@io_bazel_rules_go//go/private:common.bzl", "RULES_GO_STDLIB_PREFIX")
+-load("@io_bazel_rules_go//go/private:go_toolchain.bzl", "declare_go_toolchains")
+-load("@io_bazel_rules_go//go/private/rules:binary.bzl", "go_tool_binary")
+-load("@io_bazel_rules_go//go/private/rules:sdk.bzl", "package_list")
+-load("@io_bazel_rules_go//go/private/rules:transition.bzl", "non_go_reset_target")
++load("@rules_go//go:def.bzl", "go_sdk")
++load("@rules_go//go/private:common.bzl", "RULES_GO_STDLIB_PREFIX")
++load("@rules_go//go/private:go_toolchain.bzl", "declare_go_toolchains")
++load("@rules_go//go/private/rules:binary.bzl", "go_tool_binary")
++load("@rules_go//go/private/rules:sdk.bzl", "package_list")
++load("@rules_go//go/private/rules:transition.bzl", "non_go_reset_target")
+ 
+ STDLIB_SRCS_EXCLUDE = [
+     "src/**/*_test.go",
+@@ -64,7 +64,7 @@ def define_sdk_repository_targets(
+ 
+     go_tool_binary(
+         name = "builder",
+-        srcs = ["@io_bazel_rules_go//go/tools/builders:builder_srcs"],
++        srcs = ["@rules_go//go/tools/builders:builder_srcs"],
+         exec_compatible_with = exec_compatible_with,
+         ldflags = "-X main.rulesGoStdlibPrefix={}".format(RULES_GO_STDLIB_PREFIX),
+         # The .exe suffix is required on Windows and harmless on other platforms.
+diff --git a/go/toolchain/toolchains.bzl b/go/toolchain/toolchains.bzl
+index b4e070cf..6a342da7 100755
+--- a/go/toolchain/toolchains.bzl
++++ b/go/toolchain/toolchains.bzl
+@@ -34,7 +34,7 @@ def declare_constraints():
+     @bazel_tools//platforms:default_platform will be used most of the time).
+     """
+     for goos, constraint in GOOS_CONSTRAINTS.items():
+-        if constraint.startswith("@io_bazel_rules_go//go/toolchain:"):
++        if constraint.startswith("@rules_go//go/toolchain:"):
+             native.constraint_value(
+                 name = goos,
+                 constraint_setting = "@platforms//os:os",
+@@ -46,7 +46,7 @@ def declare_constraints():
+             )
+ 
+     for goarch, constraint in GOARCH_CONSTRAINTS.items():
+-        if constraint.startswith("@io_bazel_rules_go//go/toolchain:"):
++        if constraint.startswith("@rules_go//go/toolchain:"):
+             native.constraint_value(
+                 name = goarch,
+                 constraint_setting = "@platforms//cpu:cpu",

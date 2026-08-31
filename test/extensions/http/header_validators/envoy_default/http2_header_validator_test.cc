@@ -383,7 +383,7 @@ TEST_F(Http2HeaderValidatorTest, UpstreamUpgradeRequestTransformedToExtendedConn
       {":authority", "envoy.com"}, {"upgrade", "websocket"}, {"connection", "upgrade,keep-alive"}};
   auto uhv = createH2ClientUhv(empty_config);
   auto result = uhv->transformRequestHeaders(headers);
-  EXPECT_TRUE(result.status.ok());
+  EXPECT_ACCEPT(result.status);
   // Expect the extended CONNECT request
   EXPECT_EQ(result.new_headers->getMethodValue(), "CONNECT");
   EXPECT_EQ(result.new_headers->getProtocolValue(), "websocket");
@@ -405,7 +405,7 @@ TEST_F(Http2HeaderValidatorTest, UpstreamExtendedConnectResponseTransformedToUpg
       {":authority", "envoy.com"}, {"upgrade", "websocket"}, {"connection", "upgrade,keep-alive"}};
   auto uhv = createH2ClientUhv(empty_config);
   auto result = uhv->transformRequestHeaders(headers);
-  EXPECT_TRUE(result.status.ok());
+  EXPECT_ACCEPT(result.status);
   // Make sure transformation produced valid H/2 extended CONNECT
   EXPECT_ACCEPT(uhv->validateRequestHeaders(*result.new_headers));
 
@@ -691,8 +691,8 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNormalizePath) {
                                                   {":authority", "envoy.com"}};
   auto uhv = createH2ServerUhv(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaders(headers).ok());
-  EXPECT_TRUE(uhv->transformRequestHeaders(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   EXPECT_EQ(headers.getPathValue(), "/dir2");
 }
 
@@ -777,7 +777,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailersRejectUnderscoreHeaders)
 TEST_F(Http2HeaderValidatorTest, ValidateResponseTrailerMap) {
   auto uhv = createH2ClientUhv(empty_config);
   ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer1", "value1"}};
-  EXPECT_TRUE(uhv->validateResponseTrailers(response_trailer_map).ok());
+  EXPECT_ACCEPT(uhv->validateResponseTrailers(response_trailer_map));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateInvalidResponseTrailerMap) {

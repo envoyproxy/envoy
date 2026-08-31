@@ -5,6 +5,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/evwatch.h"
+#include "envoy/event/evwatch_observer_manager.h"
 #include "envoy/event/schedulable_cb.h"
 #include "envoy/event/timer.h"
 
@@ -62,8 +63,11 @@ public:
   using OnCheckCallback = std::function<void()>;
 
   explicit LibeventScheduler(TimeSource& time_source);
+  LibeventScheduler(TimeSource& time_source, EvwatchObserverManagerPtr evwatch_manager);
+  ~LibeventScheduler() override;
 
-  Evwatch::ObserverHandlePtr registerEvwatchObserver(Evwatch::ObserverPtr observer);
+  void registerEvwatchObserver(Evwatch::Observer& observer);
+  void unregisterEvwatchObserver(Evwatch::Observer& observer);
 
   // Scheduler
   TimerPtr createTimer(const TimerCb& cb, Dispatcher& dispatcher) override;
@@ -140,8 +144,7 @@ private:
   timeval check_time_{};     // timestamp immediately after polling
   OnPrepareCallback prepare_callback_; // callback to be called from onPrepareForCallback()
   OnCheckCallback check_callback_;     // callback to be called from onCheckForCallback()
-  std::vector<std::weak_ptr<Evwatch::Observer>> evwatch_observers_;
-  bool evwatch_observers_registered_{false};
+  EvwatchObserverManagerPtr evwatch_manager_;
 };
 
 } // namespace Event

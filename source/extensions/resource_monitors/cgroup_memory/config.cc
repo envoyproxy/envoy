@@ -12,7 +12,8 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace CgroupMemory {
 
-Server::ResourceMonitorPtr CgroupMemoryMonitorFactory::createResourceMonitorFromProtoTyped(
+absl::StatusOr<Server::ResourceMonitorPtr>
+CgroupMemoryMonitorFactory::createResourceMonitorFromProtoTyped(
     const envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig& config,
     Server::Configuration::ResourceMonitorFactoryContext& context) {
   return std::make_unique<CgroupMemoryMonitor>(config, context.api().fileSystem());

@@ -29,8 +29,7 @@ WasmFilterSinkFactory::createStatsSink(const Protobuf::Message& proto_config,
   setGlobalTags(&startup_tags);
 
   auto plugin_config = std::make_unique<Common::Wasm::PluginConfig>(
-      config.wasm_config(), context, context.scope(), context.initManager(),
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, true);
+      config.wasm_config(), context, context.scope(), context.initManager(), true);
 
   setGlobalTags(nullptr);
 

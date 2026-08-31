@@ -12,6 +12,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 using testing::ReturnRef;
@@ -21,11 +22,14 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
+// Resolve the aws-c-auth-testdata testdata directory via the runfiles library.
+// The data target @aws-c-auth-testdata//:sigv4a_tests is declared in the BUILD target,
+// so the runfiles library handles the apparent→canonical repo name mapping automatically.
 std::vector<std::string> directoryListing() {
   std::vector<std::string> directories;
-  for (auto const& entry : std::filesystem::directory_iterator(
-           TestEnvironment::runfilesDirectory("aws-c-auth-testdata") +
-           "/tests/aws-signing-test-suite/v4a")) {
+  const std::string path =
+      TestEnvironment::runfilesPath("tests/aws-signing-test-suite/v4a", "aws-c-auth-testdata");
+  for (auto const& entry : std::filesystem::directory_iterator(path)) {
     directories.push_back(entry.path().string());
   }
   return directories;
@@ -178,7 +182,7 @@ public:
 
     auto ec_key_or =
         sigv4a_key_derivation->derivePrivateKey(absl::string_view(akid), absl::string_view(skid));
-    EXPECT_TRUE(ec_key_or.ok());
+    EXPECT_OK(ec_key_or);
     sigv4a_key_derivation->derivePublicKey(ec_key_or.value());
     signature = Hex::decode(calculated_signature);
 
