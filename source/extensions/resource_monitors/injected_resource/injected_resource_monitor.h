@@ -37,7 +37,7 @@ private:
   bool file_changed_{true};
   Filesystem::WatcherPtr watcher_;
   std::optional<double> pressure_;
-  std::optional<absl::Status> error_;
+  absl::Status error_;
   Api::Api& api_;
 };
 

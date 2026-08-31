@@ -43,7 +43,7 @@ void InjectedResourceMonitor::updateResourceUsage(Server::ResourceUpdateCallback
           pressure_.reset();
         } else {
           pressure_ = pressure;
-          error_.reset();
+          error_ = absl::OkStatus();
         }
       } else {
         error_ = absl::InvalidArgumentError("failed to parse injected resource pressure");
@@ -52,11 +52,11 @@ void InjectedResourceMonitor::updateResourceUsage(Server::ResourceUpdateCallback
     }
   }
 
-  ASSERT(pressure_.has_value() != error_.has_value());
+  ASSERT(pressure_.has_value() == error_.ok());
   if (pressure_.has_value()) {
     callbacks.onSuccess({*pressure_});
   } else {
-    callbacks.onFailure(*error_);
+    callbacks.onFailure(error_);
   }
 }
 
