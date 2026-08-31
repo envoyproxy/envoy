@@ -77,6 +77,7 @@ public:
 
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
+  uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
   bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
   ApiProtocol defaultApiProtocol() const { return default_api_protocol_; }
@@ -92,6 +93,7 @@ private:
   mutable AiProtocolManagerStats stats_;
   const bool request_handling_enabled_ = false;
   const bool parse_unconfigured_routes_ = false;
+  const uint32_t inline_string_threshold_bytes_ = 0;
   const bool token_usage_enabled_ = false;
   const bool include_unconfigured_routes_ = false;
   const ApiProtocol default_api_protocol_ = ApiProtocol::Unspecified;

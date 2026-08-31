@@ -61,6 +61,20 @@ message RequestHandling {
   // route that declared no AI wire contract has nothing to hold its payload
   // to, so a body that fails to parse is forwarded unchanged.
   bool parse_unconfigured_routes = 1;
+
+  // Maximum size, in bytes, of a decoded request payload string value kept
+  // inline in the parsed document. A value larger than this is left in the
+  // external buffer and recorded as a reference to its bytes, so a large
+  // prompt costs one small node instead of a per-stream copy.
+  //
+  // Defaults to 1KiB, sized so that ordinary metadata (model names, roles,
+  // tool names) stays inline and directly usable while conversation content
+  // goes to the buffer. Raising it buys inline access to larger values at the
+  // cost of per-stream memory. Lowering it past the metadata a payload schema
+  // requires inline — ``model`` and ``role`` are declared non-offloadable —
+  // makes such payloads fail validation with a 400 on declared AI endpoints.
+  google.protobuf.UInt32Value inline_string_threshold_bytes = 2
+      [(validate.rules).uint32 = {lte: 1048576 gte: 1}];
 }
 
 // Response-side processing configuration. Individual response features are

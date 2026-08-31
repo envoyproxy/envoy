@@ -49,7 +49,11 @@ forwarded for the upstream to interpret differently. Parsing is incremental and 
 stream, so an invalid payload fails as soon as the offending byte arrives rather
 than after the whole upload. Oversized string values are left in the external
 buffer and referenced by offset, so a large prompt does not reappear in
-per-stream memory.
+per-stream memory. What counts as oversized is
+:ref:`inline_string_threshold_bytes
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.inline_string_threshold_bytes>`,
+1KiB by default -- large enough that ordinary metadata stays inline and small
+enough that conversation content does not.
 
 Upon stream completion, the parsed document is validated against the payload
 schema of the route's declared :ref:`wire API

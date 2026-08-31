@@ -74,13 +74,19 @@ public:
   // Run at trace so debug/trace-log argument expressions execute too.
   LogLevelSetter log_level_setter_{spdlog::level::trace};
 
-  // A test wanting a different filter-level config calls this again first.
-  void createFilter(bool parse_unconfigured_routes = false) {
+  // A test wanting a different filter-level config calls this again first. A
+  // zero threshold leaves the field unset, so the default applies.
+  void createFilter(bool parse_unconfigured_routes = false,
+                    uint32_t inline_string_threshold_bytes = 0) {
     if (filter_ != nullptr) {
       filter_->onDestroy();
     }
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
     proto.mutable_request_handling()->set_parse_unconfigured_routes(parse_unconfigured_routes);
+    if (inline_string_threshold_bytes != 0) {
+      proto.mutable_request_handling()->mutable_inline_string_threshold_bytes()->set_value(
+          inline_string_threshold_bytes);
+    }
     filter_ = std::make_unique<AiProtocolManagerFilter>(
         factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope()));
     filter_->setDecoderFilterCallbacks(callbacks_);
@@ -112,6 +118,14 @@ public:
     route_config_ = std::make_unique<RouteConfig>(proto);
     ON_CALL(callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(testing::Return(route_config_.get()));
+  }
+
+  // A valid chat-completions payload whose `model` sits between the default
+  // 1KiB inline-string threshold and 4KiB, so which side of the threshold it
+  // lands on is the configured value's doing.
+  static std::string oversizedModelPayload() {
+    return R"({"model":")" + std::string(2000, 'm') +
+           R"(","messages":[{"role":"user","content":"hi"}]})";
   }
 
   static Http::TestRequestHeaderMapImpl requestHeaders() {
@@ -1143,6 +1157,40 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
 
   const std::string payload =
       R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}],"stream":true,"max_tokens":256})";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(injected_.toString(), payload);
+  EXPECT_TRUE(injected_end_stream_);
+}
+
+// A payload whose `model` is larger than the inline-string threshold: the
+// parser offloads the value, and the schema declares `model` non-offloadable,
+// so the default 1KiB threshold rejects it.
+TEST_F(AiProtocolManagerFilterTest, ModelOverInlineStringThresholdIsRejected) {
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(oversizedModelPayload());
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
+  EXPECT_EQ(inject_calls_, 0);
+}
+
+// The same payload is accepted once the configured threshold is raised above
+// the value: the configured threshold, not the default, reaches the parser.
+TEST_F(AiProtocolManagerFilterTest, RaisedInlineStringThresholdKeepsLargeValuesInline) {
+  createFilter(/*parse_unconfigured_routes=*/false, /*inline_string_threshold_bytes=*/4096);
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string payload = oversizedModelPayload();
   Buffer::OwnedImpl body(payload);
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();

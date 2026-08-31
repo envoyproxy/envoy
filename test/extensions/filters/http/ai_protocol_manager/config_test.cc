@@ -5,6 +5,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -123,6 +124,40 @@ TEST(AiProtocolManagerConfigTest, RejectsZeroCaps) {
         ->mutable_limits()
         ->mutable_max_parsed_sse_events()
         ->set_value(0);
+    EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
+                 EnvoyException);
+  }
+}
+
+// The parser's inline-string threshold comes from the request-handling config,
+// falling back to the parser's own default when unset.
+TEST(AiProtocolManagerConfigTest, InlineStringThresholdDefaultsAndOverrides) {
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_request_handling();
+    const FilterConfig config(proto_config, *stats_store.rootScope());
+    EXPECT_EQ(config.inlineStringThresholdBytes(),
+              JsonWithExtBufParser::kDefaultInlineStringThresholdBytes);
+  }
+  {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_request_handling()->mutable_inline_string_threshold_bytes()->set_value(
+        4096);
+    const FilterConfig config(proto_config, *stats_store.rootScope());
+    EXPECT_EQ(config.inlineStringThresholdBytes(), 4096);
+  }
+}
+
+// The threshold is bounded on both ends: zero would offload every non-empty
+// string, and an unbounded value would defeat the offload it gates.
+TEST(AiProtocolManagerConfigTest, RejectsOutOfRangeInlineStringThreshold) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  AiProtocolManagerFilterConfigFactory factory;
+  for (const uint32_t value : {0u, 2u * 1024u * 1024u}) {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    proto_config.mutable_request_handling()->mutable_inline_string_threshold_bytes()->set_value(
+        value);
     EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
                  EnvoyException);
   }

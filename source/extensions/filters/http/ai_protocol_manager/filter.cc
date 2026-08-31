@@ -116,6 +116,9 @@ FilterConfig::FilterConfig(
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
       parse_unconfigured_routes_(proto.request_handling().parse_unconfigured_routes()),
+      inline_string_threshold_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          proto.request_handling(), inline_string_threshold_bytes,
+          JsonWithExtBufParser::kDefaultInlineStringThresholdBytes)),
       token_usage_enabled_(proto.response_handling().has_token_usage()),
       include_unconfigured_routes_(
           proto.response_handling().token_usage().include_unconfigured_routes()),
@@ -193,7 +196,9 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     return Http::FilterHeadersStatus::Continue;
   }
 
-  request_parser_ = std::make_unique<JsonWithExtBufParser>(JsonWithExtBufParser::Config{});
+  JsonWithExtBufParser::Config parser_config;
+  parser_config.inline_string_threshold_bytes = config_->inlineStringThresholdBytes();
+  request_parser_ = std::make_unique<JsonWithExtBufParser>(parser_config);
   // Built here, not at setDecoderFilterCallbacks(), so a pass-through stream pays
   // for none of it: constructing it subscribes to upstream watermarks and claims
   // a schedulable callback.
