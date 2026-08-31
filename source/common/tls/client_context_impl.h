@@ -59,7 +59,7 @@ public:
   // Ssl::ClientContext
   // Restricted to single-context callers.
   const Ssl::TlsContext& getTlsContext() const override {
-    ASSERT(tls_contexts_.size() == 1);
+    ASSERT(tls_contexts_.size() == 1 && tls_certificate_selector_ == nullptr);
     return tls_contexts_[0];
   }
 
