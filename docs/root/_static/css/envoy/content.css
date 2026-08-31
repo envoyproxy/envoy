@@ -171,18 +171,30 @@
   font-weight: 600;
 }
 
-/* In a monochrome interface a link cannot be marked by hue, so it carries a
-   hairline underline that darkens to full ink on hover. */
+/* Colour and underline, not one or the other. Envoy's prose is dense with
+   inline code and proto references, and a link that is only tinted disappears
+   inside a mono run. The underline sits at 42% of the accent so a paragraph
+   with six links does not turn into six hard rules; hover takes it to full.
+   Browsers without color-mix() fall back to a full-strength underline. */
 .envoy-content-main .rst-content a {
-  color: var(--envoy-ink);
+  color: var(--envoy-accent);
   text-decoration: underline;
-  text-decoration-color: var(--envoy-rule-strong);
+  text-decoration-color: color-mix(in srgb, var(--envoy-accent) 42%, transparent);
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
 
 .envoy-content-main .rst-content a:hover {
-  text-decoration-color: var(--envoy-ink);
+  text-decoration-color: var(--envoy-accent);
+}
+
+.envoy-content-main .rst-content a:visited {
+  opacity: 0.78;
+}
+
+.envoy-content-main .rst-content a code.literal,
+.envoy-content-main .rst-content a code.docutils {
+  color: var(--envoy-accent);
 }
 
 .envoy-content-main .rst-content a.reference.external::after {
@@ -261,11 +273,6 @@
   word-break: break-word;
 }
 
-.envoy-content-main .rst-content a code.literal,
-.envoy-content-main .rst-content a code.docutils {
-  color: var(--envoy-ink);
-}
-
 .envoy-content-main .rst-content kbd {
   background: var(--envoy-surface);
   border: 1px solid var(--envoy-rule-strong);
@@ -336,7 +343,7 @@
 }
 
 .envoy-content-main .rst-content .toctree-wrapper ul ul a:hover {
-  color: var(--envoy-ink);
+  color: var(--envoy-accent);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -363,8 +370,8 @@
 }
 
 .envoy-content-main .rst-content .sphinx-tabs-tab[aria-selected="true"] {
-  border-bottom-color: var(--envoy-ink);
-  color: var(--envoy-ink);
+  border-bottom-color: var(--envoy-accent);
+  color: var(--envoy-accent);
   font-weight: 600;
 }
 

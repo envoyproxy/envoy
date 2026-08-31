@@ -43,6 +43,7 @@
 .envoy-search-field input {
   background: transparent;
   border: 0;
+  caret-color: var(--envoy-accent);
   color: var(--envoy-ink);
   flex: 1;
   font-size: 15px;
@@ -95,7 +96,7 @@
 .envoy-search-hit:hover,
 .envoy-search-hit.is-active {
   background: var(--envoy-surface);
-  border-left-color: var(--envoy-ink);
+  border-left-color: var(--envoy-accent);
 }
 
 .envoy-search-hit-title {
@@ -105,11 +106,11 @@
   overflow-wrap: anywhere;
 }
 
-/* a match is marked by weight and a rule, not by a highlighter fill */
+/* A match is marked by the accent and weight, not by a highlighter fill.
+   Inside a mono symbol a weight-only highlight is invisible. */
 .envoy-search-hit-title mark {
   background: transparent;
-  box-shadow: inset 0 -2px 0 var(--envoy-rule-strong);
-  color: var(--envoy-ink);
+  color: var(--envoy-accent);
   font-weight: 600;
 }
 

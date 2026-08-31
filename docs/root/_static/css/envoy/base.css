@@ -40,9 +40,10 @@ select {
   display: none !important;
 }
 
+/* the focus ring is interaction, so it takes the accent like every link */
 :focus-visible {
   border-radius: 2px;
-  outline: 2px solid var(--envoy-ink);
+  outline: 2px solid var(--envoy-accent);
   outline-offset: 2px;
 }
 

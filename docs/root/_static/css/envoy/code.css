@@ -13,9 +13,11 @@
    * the code surface follows the theme rather than being a permanent dark
      block punched down a white page.
 
-   Colour: three hues plus ink and grey. Structural names — YAML and JSON keys,
-   proto fields, function names — take weight rather than hue, because in a
-   config file the key is what you scan for and there are hundreds per page. */
+   Colour: four roles, and only four. Keys, strings, numbers and comments take
+   a hue; values, keywords, types and punctuation stay in ink. That is what
+   keeps a forty-line listener config from becoming a rainbow while still
+   letting you find `port_value` without reading — the blue keys give the block
+   a left edge you can follow down six levels of nesting. */
 
 .envoy-content-main .rst-content div[class*="highlight-"],
 .envoy-content-main .rst-content .literal-block-wrapper {
@@ -135,28 +137,28 @@
    from custom properties. One theme switch then repaints every block, which
    `pygments_style` alone cannot do. */
 
+/* values and plain names — the bulk of a config file, left in ink */
 .envoy-content-main .rst-content .highlight .n,
 .envoy-content-main .rst-content .highlight .nx,
 .envoy-content-main .rst-content .highlight .py,
 .envoy-content-main .rst-content .highlight .nl,
 .envoy-content-main .rst-content .highlight .ni,
+.envoy-content-main .rst-content .highlight .l,
 .envoy-content-main .rst-content .highlight .w {
   color: var(--envoy-code-text);
 }
 
-/* keys, attributes, field and function names — weight, not hue */
+/* ROLE 1 — keys and attributes. The spine of a YAML or JSON block. */
 .envoy-content-main .rst-content .highlight .nt,
 .envoy-content-main .rst-content .highlight .na,
 .envoy-content-main .rst-content .highlight .nf,
-.envoy-content-main .rst-content .highlight .fm,
-.envoy-content-main .rst-content .highlight .nv,
-.envoy-content-main .rst-content .highlight .vc,
-.envoy-content-main .rst-content .highlight .vg,
-.envoy-content-main .rst-content .highlight .vi {
+.envoy-content-main .rst-content .highlight .fm {
   color: var(--envoy-code-key);
-  font-weight: 600;
+  font-weight: 500;
 }
 
+/* keywords, types and classes stay in ink — colouring them too would put a
+   hue on nearly every token in C++ and Lua samples */
 .envoy-content-main .rst-content .highlight .k,
 .envoy-content-main .rst-content .highlight .kd,
 .envoy-content-main .rst-content .highlight .kn,
@@ -167,8 +169,12 @@
 .envoy-content-main .rst-content .highlight .nn,
 .envoy-content-main .rst-content .highlight .ne,
 .envoy-content-main .rst-content .highlight .nd,
+.envoy-content-main .rst-content .highlight .nv,
+.envoy-content-main .rst-content .highlight .vc,
+.envoy-content-main .rst-content .highlight .vg,
+.envoy-content-main .rst-content .highlight .vi,
 .envoy-content-main .rst-content .highlight .ow {
-  color: var(--envoy-code-keyword);
+  color: var(--envoy-code-ink);
 }
 
 .envoy-content-main .rst-content .highlight .s,
@@ -187,6 +193,7 @@
 .envoy-content-main .rst-content .highlight .sx {
   color: var(--envoy-code-string);
 }
+/* ROLE 2 — strings, above. ROLE 3 — numbers and constants, below. */
 
 .envoy-content-main .rst-content .highlight .m,
 .envoy-content-main .rst-content .highlight .mb,
@@ -208,13 +215,17 @@
 .envoy-content-main .rst-content .highlight .cpf,
 .envoy-content-main .rst-content .highlight .ch,
 .envoy-content-main .rst-content .highlight .cs {
+  /* ROLE 4 — comments */
   color: var(--envoy-code-comment);
   font-style: italic;
 }
 
+/* Tango, the style protodoc inherits, sets punctuation bold; at 13.5px that
+   makes every colon and brace heavier than the value beside it. */
 .envoy-content-main .rst-content .highlight .o,
 .envoy-content-main .rst-content .highlight .p {
   color: var(--envoy-code-punct);
+  font-weight: 400;
 }
 
 /* console prompts are not part of what you copy */

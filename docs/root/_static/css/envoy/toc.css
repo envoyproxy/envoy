@@ -69,8 +69,8 @@
 
 .envoy-page-toc a.is-current,
 .envoy-page-toc a[aria-current="location"] {
-  border-left-color: var(--envoy-ink);
-  color: var(--envoy-ink);
+  border-left-color: var(--envoy-accent);
+  color: var(--envoy-accent);
   font-weight: 600;
 }
 
@@ -87,14 +87,3 @@
   letter-spacing: -0.012em;
 }
 
-.envoy-symbol-kind {
-  border: 1px solid var(--envoy-rule-strong);
-  border-radius: 2px;
-  color: var(--envoy-ink-muted);
-  font-family: var(--envoy-font-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  margin-left: 6px;
-  padding: 0 3px;
-  vertical-align: 1px;
-}

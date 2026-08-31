@@ -175,11 +175,13 @@
   font-weight: 600;
 }
 
-/* the current page itself: weight plus the rail */
+/* The current page itself: weight plus the rail, in the accent. The page you
+   are on is also "where you are going", so it uses the link ink rather than a
+   second vocabulary for one idea. */
 .wy-menu-vertical a.current,
 .wy-menu-vertical li.current > a.current {
-  border-left-color: var(--envoy-ink);
-  color: var(--envoy-ink);
+  border-left-color: var(--envoy-accent);
+  color: var(--envoy-accent);
   font-weight: 600;
 }
 
