@@ -34,23 +34,29 @@
 
 /* --- kind label ---------------------------------------------------------- */
 
+/* An inverted chip rather than coloured text: on a page of forty symbols the
+   label is the thing you scan for, and it has to hold its own against the
+   17px mono name directly underneath it. */
 .envoy-proto-kind {
-  color: var(--envoy-kind-message);
-  display: block;
+  background: var(--envoy-kind-message);
+  border-radius: 3px;
+  color: var(--envoy-ground);
+  display: inline-block;
   font-family: var(--envoy-font-mono);
   font-size: 9.5px;
   font-weight: 500;
   letter-spacing: 0.15em;
-  margin-bottom: 6px;
+  margin-bottom: 9px;
+  padding: 2px 7px;
   text-transform: uppercase;
 }
 
 .envoy-kind-enum > .envoy-proto-kind {
-  color: var(--envoy-kind-enum);
+  background: var(--envoy-kind-enum);
 }
 
 .envoy-kind-service > .envoy-proto-kind {
-  color: var(--envoy-kind-service);
+  background: var(--envoy-kind-service);
 }
 
 /* --- symbol heading ------------------------------------------------------

@@ -1,25 +1,35 @@
-/* Admonitions — hue says what kind, rule weight says how serious.
+/* Admonitions — hue says what kind, weight says how serious.
 
    Counted across docs/root, the tree uses seven directives and ignores the
    rest: note 197, attention 81, warning 30, tip 25, important 5, seealso 4,
    deprecated 4, and zero uses of caution, danger, error or hint. So this maps
    every directive onto four levels rather than styling nine in isolation.
 
-   Two encodings, so neither is load-bearing on its own: the ink is redundant
-   with the rule weight, which keeps the ladder readable in greyscale and to
-   colour-blind readers. Body text stays in ordinary ink — only the rail and
-   the label take the hue, so a page with six notes does not stripe. */
+   Every level is a box: a 1px border in a softened hue, a 4%-tint ground and a
+   3px left edge at full strength. The tint is light enough that a page with six
+   notes does not stripe, and the boxes keep an aside visibly separate from the
+   prose around it.
+
+   Severity is still carried by two cues, so neither is load-bearing alone: the
+   hue, and the label treatment — note, tip and attention take a coloured label,
+   and warning takes an inverted chip, which is what makes it read loudest in a
+   page of asides.
+
+   The border-color declarations are ordered so that a browser without
+   color-mix() falls back to the plain rule colour rather than dropping the
+   border entirely. */
 
 .envoy-content-main .rst-content .admonition,
 .envoy-content-main .rst-content .admonition-todo {
-  background: transparent;
-  border: 0;
-  border-left: 2px solid var(--envoy-info);
-  border-radius: 0;
+  background: var(--envoy-info-tint);
+  border: 1px solid var(--envoy-rule);
+  border-color: color-mix(in srgb, var(--envoy-info) 32%, var(--envoy-rule));
+  border-left: 3px solid var(--envoy-info);
+  border-radius: 5px;
   box-shadow: none;
   color: var(--envoy-ink-body);
   margin: 24px 0;
-  padding: 2px 0 2px 16px;
+  padding: 14px 16px;
 }
 
 .envoy-content-main .rst-content .admonition > .admonition-title {
@@ -30,7 +40,7 @@
   font-weight: 500;
   letter-spacing: 0.14em;
   line-height: 1.5;
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   padding: 0;
   text-transform: uppercase;
 }
@@ -49,6 +59,8 @@
 .envoy-content-main .rst-content .admonition.tip,
 .envoy-content-main .rst-content .admonition.hint,
 .envoy-content-main .rst-content .admonition.important {
+  background: var(--envoy-affirm-tint);
+  border-color: color-mix(in srgb, var(--envoy-affirm) 32%, var(--envoy-rule));
   border-left-color: var(--envoy-affirm);
 }
 
@@ -61,6 +73,7 @@
 /* --- info: note, seealso ------------------------------------------------- */
 
 .envoy-content-main .rst-content .admonition.seealso {
+  background: var(--envoy-info-tint);
   border-left-color: var(--envoy-info);
 }
 
@@ -72,8 +85,9 @@
 
 .envoy-content-main .rst-content .admonition.attention,
 .envoy-content-main .rst-content .admonition.caution {
-  border-left: 3px solid var(--envoy-caution);
-  padding-left: 15px;
+  background: var(--envoy-caution-tint);
+  border-color: color-mix(in srgb, var(--envoy-caution) 32%, var(--envoy-rule));
+  border-left-color: var(--envoy-caution);
 }
 
 .envoy-content-main .rst-content .admonition.attention > .admonition-title,
@@ -85,21 +99,21 @@
 
    In Envoy's prose a `warning` almost always means "this is unsafe or will
    break" — confused-deputy attacks, unstable output, GODEBUG=cgocheck=0. It is
-   the only filled block in the system, and 30 pages have earned it. */
+   the only level with an inverted label, and 30 pages have earned it. */
 
 .envoy-content-main .rst-content .admonition.warning,
 .envoy-content-main .rst-content .admonition.danger,
 .envoy-content-main .rst-content .admonition.error {
   background: var(--envoy-critical-tint);
-  border: 1px solid var(--envoy-critical);
-  border-radius: 5px;
-  padding: 14px 16px;
+  border-color: color-mix(in srgb, var(--envoy-critical) 42%, var(--envoy-rule));
+  border-left-color: var(--envoy-critical);
 }
 
 .envoy-content-main .rst-content .admonition.warning > .admonition-title,
 .envoy-content-main .rst-content .admonition.danger > .admonition-title,
 .envoy-content-main .rst-content .admonition.error > .admonition-title {
   background: var(--envoy-critical);
+  border-radius: 3px;
   color: var(--envoy-ground);
   display: inline-block;
   margin-bottom: 9px;
@@ -109,20 +123,27 @@
 /* --- versionadded / versionchanged / deprecated --------------------------
 
    These are not `.admonition` in the generated markup, but they read as the
-   same kind of aside, so they take the same ladder. */
+   same kind of aside, so they take the same treatment. */
 
-.envoy-content-main .rst-content .versionadded,
-.envoy-content-main .rst-content .versionchanged,
-.envoy-content-main .rst-content .deprecated {
+/* Sphinx puts the same class on the wrapper and on the label span inside it
+   (`<div class="deprecated"><span class="versionmodified deprecated">`), so
+   these are scoped to the div or the box is drawn twice. */
+.envoy-content-main .rst-content div.versionadded,
+.envoy-content-main .rst-content div.versionchanged,
+.envoy-content-main .rst-content div.deprecated {
+  background: var(--envoy-caution-tint);
+  border: 1px solid var(--envoy-rule);
+  border-color: color-mix(in srgb, var(--envoy-caution) 32%, var(--envoy-rule));
   border-left: 3px solid var(--envoy-caution);
+  border-radius: 5px;
   margin: 24px 0;
-  padding: 2px 0 2px 15px;
+  padding: 14px 16px;
 }
 
-.envoy-content-main .rst-content .versionadded {
+.envoy-content-main .rst-content div.versionadded {
+  background: var(--envoy-affirm-tint);
+  border-color: color-mix(in srgb, var(--envoy-affirm) 32%, var(--envoy-rule));
   border-left-color: var(--envoy-affirm);
-  border-left-width: 2px;
-  padding-left: 16px;
 }
 
 .envoy-content-main .rst-content .versionmodified {
@@ -132,16 +153,16 @@
   font-size: 10.5px;
   font-style: normal;
   letter-spacing: 0.14em;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   text-transform: uppercase;
 }
 
-.envoy-content-main .rst-content .versionadded .versionmodified {
+.envoy-content-main .rst-content div.versionadded .versionmodified {
   color: var(--envoy-affirm);
 }
 
-.envoy-content-main .rst-content .versionadded p:last-child,
-.envoy-content-main .rst-content .versionchanged p:last-child,
-.envoy-content-main .rst-content .deprecated p:last-child {
+.envoy-content-main .rst-content div.versionadded p:last-child,
+.envoy-content-main .rst-content div.versionchanged p:last-child,
+.envoy-content-main .rst-content div.deprecated p:last-child {
   margin-bottom: 0;
 }

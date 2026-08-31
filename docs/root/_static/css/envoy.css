@@ -52,6 +52,12 @@
   --envoy-affirm: #186b49;
   --envoy-caution: #8a5a00;
   --envoy-critical: #a62828;
+
+  /* admonition grounds — 4% of the ink, enough to read as a block without
+     turning a page of six notes into stripes */
+  --envoy-info-tint: #f1f6fc;
+  --envoy-affirm-tint: #f0f8f4;
+  --envoy-caution-tint: #fcf7ed;
   --envoy-critical-tint: #fcf4f4;
 
   /* proto kinds — the rail down each symbol */
@@ -101,6 +107,10 @@
     --envoy-affirm: #68cfa0;
     --envoy-caution: #dfb25a;
     --envoy-critical: #f08c86;
+
+    --envoy-info-tint: #0d151f;
+    --envoy-affirm-tint: #0c1712;
+    --envoy-caution-tint: #191308;
     --envoy-critical-tint: #1a1010;
 
     --envoy-kind-message: #5fcfc7;
@@ -139,6 +149,10 @@ html[data-envoy-theme="dark"] {
   --envoy-affirm: #68cfa0;
   --envoy-caution: #dfb25a;
   --envoy-critical: #f08c86;
+
+  --envoy-info-tint: #0d151f;
+  --envoy-affirm-tint: #0c1712;
+  --envoy-caution-tint: #191308;
   --envoy-critical-tint: #1a1010;
 
   --envoy-kind-message: #5fcfc7;
