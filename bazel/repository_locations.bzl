@@ -30,8 +30,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.8",
-        sha256 = "f887fd8cc8bd2853692b00d1973da1a249396e1751883f34c688cb661874def3",
+        version = "0.4.9",
+        sha256 = "5d8207675350daeeaedde48de9d42640afc400240f19688f741216c859faa6b8",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -433,7 +433,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "ocp-diag-core-{version}/apis/c++",
         urls = ["https://github.com/opencomputeproject/ocp-diag-core/archive/{version}.zip"],
     ),
-    io_bazel_rules_go = dict(
+    rules_go = dict(
         version = "0.61.1",
         sha256 = "763f4a3f6b03469fdb00a77a333dd0b5546d3ee1fa29db373128c08fee73e0e8",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],

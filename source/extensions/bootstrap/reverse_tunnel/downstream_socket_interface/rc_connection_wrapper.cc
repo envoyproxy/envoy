@@ -339,6 +339,11 @@ void RCConnectionWrapper::shutdown() {
   }
   shutdown_called_ = true;
 
+  // Stop handshake reads before tearing down the connection.
+  read_filter_->clearParent();
+  http1_parse_connection_ = nullptr;
+  http1_client_codec_.reset();
+
   if (!connection_) {
     ENVOY_LOG(error, "RCConnectionWrapper: Connection already null, nothing to shutdown");
     return;

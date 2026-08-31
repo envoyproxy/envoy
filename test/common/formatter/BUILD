@@ -37,10 +37,26 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test_library(
+    name = "formatter_test_utility_lib",
+    srcs = ["formatter_test_utility.cc"],
+    hdrs = ["formatter_test_utility.h"],
+    deps = [
+        "//envoy/formatter:substitution_formatter_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/formatter:serializer_lib",
+        "//source/common/formatter:stream_info_formatter_extension_lib",
+        "//source/common/json:json_utility_lib",
+        "//source/common/protobuf",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_test_library(
     name = "command_extension_lib",
     srcs = ["command_extension.cc"],
     hdrs = ["command_extension.h"],
     deps = [
+        "//source/common/formatter:serializer_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/protobuf:utility_lib",
     ],
@@ -52,6 +68,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         ":command_extension_lib",
+        ":formatter_test_utility_lib",
         "//source/common/common:utility_lib",
         "//source/common/formatter:coalesce_formatter_lib",
         "//source/common/formatter:formatter_extension_lib",

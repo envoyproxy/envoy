@@ -22,6 +22,10 @@ public:
                                     const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const Envoy::Formatter::Context& context,
                               const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const Envoy::Formatter::Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(Envoy::Formatter::ValueSink& sink, const Envoy::Formatter::Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   const ::Envoy::LocalInfo::LocalInfo& local_info_;

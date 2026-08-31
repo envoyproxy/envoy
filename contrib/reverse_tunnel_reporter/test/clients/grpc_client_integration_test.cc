@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <format>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -113,7 +114,7 @@ struct GrpcServer {
   TestingService service_;
 
   explicit GrpcServer(absl::string_view localhost) {
-    std::string server_address = fmt::format("{}:{}", localhost, reportingPort);
+    std::string server_address = std::format("{}:{}", localhost, reportingPort);
     grpc::ServerBuilder builder;
 
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
@@ -252,7 +253,7 @@ protected:
   }
 
   std::string getTenantIsolatedName(std::string name) {
-    return fmt::format("{}:{}", downstreamTenant, name);
+    return std::format("{}:{}", downstreamTenant, name);
   }
 
   std::vector<std::string> getTenantIsolatedNames(std::vector<std::string> names) {
@@ -458,7 +459,7 @@ TEST_P(GrpcClientIntegrationTest, LoadTest) {
   int sz = 1000;
   std::vector<std::string> nodes(sz);
   for (int i = 0; i < sz; i++) {
-    nodes[i] = fmt::format("node-{}", i);
+    nodes[i] = std::format("node-{}", i);
   }
 
   std::vector<Listener> listeners(sz);

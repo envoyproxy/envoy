@@ -24,6 +24,7 @@ envoy_cc_test(
     deps = [
         "//source/common/formatter:substitution_format_string_lib",
         "//source/extensions/formatter/dynamic_modules:config",
+        "//test/common/formatter:formatter_test_utility_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",

@@ -54,6 +54,24 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "allocate_conn_pool_integration_test",
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//conditions:default": ["allocate_conn_pool_integration_test.cc"],
+    }),
+    deps = [
+        ":http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:quic_client_factory_lib",
+        "//source/extensions/upstreams/http:config",
+    ]),
+)
+
+envoy_cc_test(
     name = "ads_integration_test",
     size = "large",
     srcs = envoy_select_admin_functionality(
@@ -404,6 +422,7 @@ envoy_cc_test(
     ],
     deps = [
         ":vhds_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -453,6 +472,9 @@ envoy_cc_test(
     ],
     deps = [
         ":http_protocol_integration_lib",
+        "//envoy/network:drain_decision_interface",
+        "//envoy/server:instance_interface",
+        "//envoy/server:listener_manager_interface",
         "//test/test_common:utility_lib",
     ],
 )
@@ -1448,6 +1470,9 @@ envoy_cc_test_library(
         ":fake_upstream_lib",
         ":integration_tcp_client_lib",
         ":utility_lib",
+        "//envoy/network:drain_decision_interface",
+        "//envoy/server:instance_interface",
+        "//envoy/server:listener_manager_interface",
         "//source/common/common:thread_lib",
         "//source/common/config:api_version_lib",
         "//source/common/tls:context_config_lib",
@@ -1467,6 +1492,7 @@ envoy_cc_test_library(
         "//test/test_common:resources_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",

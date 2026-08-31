@@ -126,6 +126,7 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         ":listener_manager_impl_test_lib",
         "//source/common/formatter:formatter_extension_lib",
+        "//source/common/quic:quic_packet_writer_interface",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/matching/network/common:inputs_lib",

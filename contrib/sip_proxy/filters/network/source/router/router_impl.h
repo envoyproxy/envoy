@@ -232,7 +232,7 @@ public:
 
 private:
   const std::string cluster_name_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotSharedPtr tls_;
   std::chrono::milliseconds transaction_timeout_;
 };
 

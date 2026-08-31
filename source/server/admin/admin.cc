@@ -108,7 +108,8 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                      bool ignore_global_conn_limit)
-    : server_(server), listener_info_(std::make_shared<ListenerInfoImpl>()),
+    : server_(server), listener_info_(std::make_shared<ListenerInfoImpl>(
+                           envoy::config::listener::v3::Listener::MODIFY_ONLY)),
       factory_context_(server, listener_info_),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
@@ -315,7 +316,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
       shared_from_this(), server_.drainManager(), server_.api().randomGenerator(),
       server_.httpContext(), server_.runtime(), server_.localInfo(), server_.clusterManager(),
       server_.nullOverloadManager(), server_.timeSource(),
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED)});
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, server_.serverFactoryContext())});
   return true;
 }
 
