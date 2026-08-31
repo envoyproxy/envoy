@@ -16,18 +16,16 @@ namespace {
 using ::test::common::json::TestMessage;
 using ::test::common::json::TestNested;
 
-std::pair<std::string, uint32_t>
-stream(const Protobuf::Message& message,
-       MessageStreamer::FieldNames field_names = MessageStreamer::FieldNames::Proto,
-       MessageStreamer::Sensitive sensitive = MessageStreamer::Sensitive::Emit) {
+std::pair<std::string, uint32_t> stream(const Protobuf::Message& message,
+                                        MessageStreamer::Options options = {
+                                            .preserve_proto_field_names = true}) {
   std::string emitted;
   uint32_t pieces = 0;
   Buffer::OwnedImpl buffer;
   {
     BufferStreamer streamer(buffer);
     BufferStreamer::ArrayPtr array = streamer.makeRootArray();
-    MessageStreamer message_streamer(message, *array, MessageStreamer::TypeUrl::Omit, field_names,
-                                     sensitive);
+    MessageStreamer message_streamer(message, *array, options);
     while (message_streamer.next()) {
       emitted += buffer.toString();
       buffer.drain(buffer.length());
@@ -130,7 +128,7 @@ TEST(MessageStreamerTest, LowerCamelCaseKeys) {
   std::string printed;
   ASSERT_TRUE(Protobuf::util::MessageToJsonString(message, &printed, options).ok());
   EXPECT_EQ(absl::StrCat("[", printed, "]"),
-            stream(message, MessageStreamer::FieldNames::LowerCamelCase).first);
+            stream(message, {.preserve_proto_field_names = false}).first);
 }
 
 TEST(MessageStreamerTest, DurationsAndTimestamps) {
@@ -207,7 +205,7 @@ void expectSameRedactedJson(const envoy::test::Sensitive& message) {
   MessageUtil::redact(redacted);
   EXPECT_EQ(
       printedInArray(redacted),
-      stream(message, MessageStreamer::FieldNames::Proto, MessageStreamer::Sensitive::Redact).first)
+      stream(message, {.preserve_proto_field_names = true, .redact_sensitive_fields = true}).first)
       << message.DebugString();
 }
 
@@ -298,9 +296,7 @@ TEST(MessageStreamerTest, DestroyedMidStream) {
   {
     BufferStreamer streamer(buffer);
     BufferStreamer::ArrayPtr array = streamer.makeRootArray();
-    MessageStreamer message_streamer(message, *array, MessageStreamer::TypeUrl::Omit,
-                                     MessageStreamer::FieldNames::Proto,
-                                     MessageStreamer::Sensitive::Emit);
+    MessageStreamer message_streamer(message, *array, {.preserve_proto_field_names = true});
     ASSERT_TRUE(message_streamer.next());
     ASSERT_TRUE(message_streamer.next());
   }

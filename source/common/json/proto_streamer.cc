@@ -96,11 +96,10 @@ absl::string_view mapKeyToString(const Protobuf::Message& entry, const Field& fi
 } // namespace
 
 MessageStreamer::MessageStreamer(const Protobuf::Message& message, BufferStreamer::Level& level,
-                                 TypeUrl type_url, FieldNames field_names, Sensitive sensitive)
-    : json_names_(field_names == FieldNames::LowerCamelCase),
-      redact_(sensitive == Sensitive::Redact) {
+                                 Options options)
+    : options_(options) {
   const std::string name =
-      type_url == TypeUrl::Emit
+      options_.emit_type_url
           ? TypeUtil::descriptorFullNameToTypeUrl(message.GetDescriptor()->full_name())
           : "";
   emitNamedMessage(message, level, name, false);
@@ -177,14 +176,15 @@ void MessageStreamer::startField(Frame& frame) {
   const Field& field = *frame.fields_[frame.next_field_];
 
   frame.field_is_sensitive_ =
-      redact_ && (frame.ancestor_is_sensitive_ || MessageUtil::isSensitiveField(field));
+      options_.redact_sensitive_fields &&
+      (frame.ancestor_is_sensitive_ || MessageUtil::isSensitiveField(field));
   // A cleared field is unset, so it drops out of the output instead of printing a default.
   if (frame.field_is_sensitive_ && redactionClears(field)) {
     ++frame.next_field_;
     return;
   }
 
-  frame.map_->addKey(json_names_ ? field.json_name() : field.name());
+  frame.map_->addKey(options_.preserve_proto_field_names ? field.name() : field.json_name());
   // is_map implies is_repeated, so handle it first.
   // https://protobuf.dev/programming-guides/proto3/#backwards
   if (field.is_map()) {
@@ -297,7 +297,7 @@ void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStream
   case Protobuf::Descriptor::WELLKNOWNTYPE_UNSPECIFIED:
     // A TypedStruct has to be reified before it can be redacted, see redactOpaque in
     // source/common/protobuf/utility.cc. The copy comes back redacted, so nothing below it is.
-    if (redact_ && isTypedStruct(descriptor)) {
+    if (options_.redact_sensitive_fields && isTypedStruct(descriptor)) {
       pushOwnedFrame(redactedCopy(message, is_sensitive), level, false);
       return;
     }

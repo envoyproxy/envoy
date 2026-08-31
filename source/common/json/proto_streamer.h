@@ -14,29 +14,28 @@ namespace Json {
  */
 class MessageStreamer {
 public:
-  // Whether to emit a leading @type naming the message.
-  enum class TypeUrl { Omit, Emit };
-
-  // Whether the keys are the proto field names or the lowerCamelCase ProtoJSON defaults to.
-  // https://protobuf.dev/programming-guides/json/#field-names
-  enum class FieldNames { Proto, LowerCamelCase };
-
-  // Whether the fields the API marks sensitive are emitted, or replaced the way
-  // MessageUtil::redact replaces them. Redacted, a sensitive field emits:
-  //
-  //   string token                        "token": "[redacted]"
-  //   bytes key                           "key": "W3JlZGFjdGVkXQ=="
-  //   Credentials creds                   "creds": {...}, redacted field by field
-  //   uint32 port                         both key and value dropped
-  //   int64 id                            both key and value dropped
-  //   map<string, uint32> ports           "ports": {"http": 0}
-  //   google.protobuf.Int64Value ttl      "ttl": "0"
-  //   google.protobuf.StringValue name    "name": "[redacted]"
-  enum class Sensitive { Emit, Redact };
+  struct Options {
+    // Whether to emit a leading @type naming the message.
+    bool emit_type_url = false;
+    // Whether the keys are the proto field names or the lowerCamelCase ProtoJSON defaults to.
+    // https://protobuf.dev/programming-guides/json/#field-names
+    bool preserve_proto_field_names = false;
+    // Whether the fields the API marks sensitive are emitted, or replaced the way
+    // MessageUtil::redact replaces them. Redacted, a sensitive field emits:
+    //
+    //   string token                        "token": "[redacted]"
+    //   bytes key                           "key": "W3JlZGFjdGVkXQ=="
+    //   Credentials creds                   "creds": {...}, redacted field by field
+    //   uint32 port                         both key and value dropped
+    //   int64 id                            both key and value dropped
+    //   map<string, uint32> ports           "ports": {"http": 0}
+    //   google.protobuf.Int64Value ttl      "ttl": "0"
+    //   google.protobuf.StringValue name    "name": "[redacted]"
+    bool redact_sensitive_fields = false;
+  };
 
   // Emits `message` as an object opened in `level`, which must be expecting a value.
-  MessageStreamer(const Protobuf::Message& message, BufferStreamer::Level& level, TypeUrl type_url,
-                  FieldNames field_names, Sensitive sensitive);
+  MessageStreamer(const Protobuf::Message& message, BufferStreamer::Level& level, Options options);
   ~MessageStreamer();
 
   /**
@@ -118,10 +117,7 @@ private:
   void emitSpecialRepresentation(const Protobuf::Message& message, BufferStreamer::Level& level,
                                  bool is_sensitive);
 
-  // Whether the keys are json_name(), for the whole walk.
-  const bool json_names_;
-  // Whether sensitive fields are redacted, for the whole walk.
-  const bool redact_;
+  const Options options_;
   std::deque<Frame> stack_;
   std::string scratch_;
 };
