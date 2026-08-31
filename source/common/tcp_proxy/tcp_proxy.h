@@ -63,6 +63,7 @@ constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_b
 #define ALL_TCP_PROXY_STATS(COUNTER, GAUGE)                                                        \
   COUNTER(downstream_cx_drain_close)                                                               \
   COUNTER(downstream_cx_no_route)                                                                  \
+  COUNTER(downstream_cx_overload_close)                                                            \
   COUNTER(downstream_cx_rx_bytes_total)                                                            \
   COUNTER(downstream_cx_total)                                                                     \
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
@@ -272,6 +273,9 @@ public:
     proxyProtocolTlvMergePolicy() const {
       return proxy_protocol_tlv_merge_policy_;
     }
+    Server::LoadShedPoint* tcpProxyUpstreamConnectLoadShedPoint() const {
+      return tcp_proxy_upstream_connect_loadshed_point_;
+    }
 
     // Evaluate dynamic TLV formatters and combine with static TLVs.
     Network::ProxyProtocolTLVVector
@@ -310,6 +314,7 @@ public:
     envoy::extensions::filters::network::tcp_proxy::v3::ProxyProtocolTlvMergePolicy
         proxy_protocol_tlv_merge_policy_{
             envoy::extensions::filters::network::tcp_proxy::v3::ADD_IF_ABSENT};
+    Server::LoadShedPoint* tcp_proxy_upstream_connect_loadshed_point_{nullptr};
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -386,6 +391,9 @@ public:
   Network::DrainDirection drainCloseScope() const { return drain_close_scope_; }
   Server::Configuration::ServerFactoryContext& serverFactoryContext() const {
     return server_factory_context_;
+  }
+  Server::LoadShedPoint* tcpProxyUpstreamConnectLoadShedPoint() const {
+    return shared_config_->tcpProxyUpstreamConnectLoadShedPoint();
   }
 
 private:

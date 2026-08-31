@@ -5,6 +5,7 @@
 
 #include "source/common/protobuf/utility.h"
 
+#include "test/config/utility.h"
 #include "test/integration/base_overload_integration_test.h"
 #include "test/integration/filters/block_filter.pb.h"
 #include "test/integration/http_protocol_integration.h"
@@ -1665,6 +1666,72 @@ TEST_P(OverloadIntegrationTest, WorkerWatchdogMegaMissDisabled) {
 
   EXPECT_TRUE(response->waitForEndStream(std::chrono::seconds(20)));
   EXPECT_TRUE(response->complete());
+}
+
+class TcpProxyLoadShedPointIntegrationTest
+    : public BaseOverloadIntegrationTest,
+      public BaseIntegrationTest,
+      public testing::TestWithParam<Network::Address::IpVersion> {
+public:
+  TcpProxyLoadShedPointIntegrationTest()
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {
+    // Disable half-close so server-initiated closes trigger a full RemoteClose on the client.
+    enableHalfClose(false);
+  }
+
+  void
+  initializeOverloadManager(const envoy::config::overload::v3::LoadShedPoint& load_shed_point) {
+    setupOverloadManagerConfig(load_shed_point);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    initialize();
+    updateResource(0);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyLoadShedPointIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(TcpProxyLoadShedPointIntegrationTest, TcpProxyUpstreamConnectShedsLoad) {
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.tcp_proxy_upstream_connect"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // Put envoy in overloaded state and check that it drops the downstream connection
+  // when establishing upstream connection.
+  updateResource(0.95);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.tcp_proxy_upstream_connect.scale_percent", Eq(100));
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  // Pass ignore_spurious_events = true to loop until disconnected_ == true.
+  // In heavily loaded CI environments (especially under MSAN/ASAN/TSAN), the socket's Connected
+  // event and RemoteClose event can arrive in separate dispatcher iterations. Without this flag,
+  // the default single block step unblocks on the Connected event and immediately asserts
+  // EXPECT_TRUE(disconnected_) before the second iteration has a chance to process the disconnect.
+  tcp_client->waitForDisconnect(/*ignore_spurious_events=*/true);
+  test_server_->waitForCounter("tcp.tcpproxy_stats.downstream_cx_overload_close", Eq(1));
+
+  // Disable overload, connections should succeed.
+  updateResource(0.80);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.tcp_proxy_upstream_connect.scale_percent", Eq(0));
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("listener_0"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(tcp_client2->write("hello"));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5, &data));
+  EXPECT_EQ("hello", data);
+  tcp_client2->close();
 }
 
 } // namespace Envoy
