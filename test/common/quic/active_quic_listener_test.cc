@@ -786,7 +786,7 @@ public:
 
   MOCK_METHOD(QuicPacketWriterPtr, createQuicPacketWriter,
               (Network::IoHandle & io_handle, Stats::Scope& scope,
-               Envoy::Event::Dispatcher& dispatcher, absl::AnyInvocable<void() &&> on_can_write_cb),
+               Envoy::Event::Dispatcher& dispatcher, absl::AnyInvocable<void()> on_can_write_cb),
               (override));
 };
 
@@ -803,7 +803,7 @@ TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreation) {
   FakeQuicPacketWriter* raw_writer = nullptr;
   EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _))
       .WillOnce(Invoke([&raw_writer](Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
-                                     absl::AnyInvocable<void() &&>) -> QuicPacketWriterPtr {
+                                     absl::AnyInvocable<void()>) -> QuicPacketWriterPtr {
         auto writer = std::make_unique<FakeQuicPacketWriter>();
         raw_writer = writer.get();
         return writer;
