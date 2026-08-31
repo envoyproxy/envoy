@@ -535,12 +535,8 @@ void ReverseConnectionIOHandle::removeStaleHostAndCloseConnections(const std::st
       connection->close(Network::ConnectionCloseType::FlushWrite);
     }
 
-    // Remove from wrapper-to-host map.
-    conn_wrapper_to_host_map_.erase(wrapper);
-    // Remove the wrapper from connection_wrappers_ vector.
-    std::erase_if(connection_wrappers_, [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) {
-      return w.get() == wrapper;
-    });
+    wrapper->shutdown();
+    removeAndDeferredDeleteWrapper(wrapper);
   }
   // Clear connection keys from host info.
   auto host_it = host_to_conn_info_map_.find(host);
@@ -1336,14 +1332,15 @@ void ReverseConnectionIOHandle::onConnectionDone(
     }
   }
 
-  // Safely remove wrapper from tracking.
+  removeAndDeferredDeleteWrapper(wrapper);
+}
+
+void ReverseConnectionIOHandle::removeAndDeferredDeleteWrapper(RCConnectionWrapper* wrapper) {
   conn_wrapper_to_host_map_.erase(wrapper);
 
-  // Find and remove wrapper from vector safely.
   auto wrapper_vector_it = std::find_if(
       connection_wrappers_.begin(), connection_wrappers_.end(),
       [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) { return w.get() == wrapper; });
-
   if (wrapper_vector_it != connection_wrappers_.end()) {
     auto wrapper_to_delete = std::move(*wrapper_vector_it);
     connection_wrappers_.erase(wrapper_vector_it);

@@ -478,6 +478,12 @@ private:
   void removeStaleHostAndCloseConnections(const std::string& host);
 
   /**
+   * Drop a wrapper from tracking and deferred-delete it on the worker dispatcher.
+   * @param wrapper the handshake wrapper to remove
+   */
+  void removeAndDeferredDeleteWrapper(RCConnectionWrapper* wrapper);
+
+  /**
    * Per-host connection tracking for better management.
    * Contains all information needed to track and manage connections to a specific host.
    */
