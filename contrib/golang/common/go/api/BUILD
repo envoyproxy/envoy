@@ -1,5 +1,5 @@
 load(
-    "@rules_go//go:def.bzl",
+    "@io_bazel_rules_go//go:def.bzl",
     "go_library",
 )
 
@@ -16,16 +16,16 @@ go_library(
     ],
     cgo = True,
     clinkopts = select({
-        "@rules_go//go/platform:android": [
+        "@io_bazel_rules_go//go/platform:android": [
             "-Wl,-unresolved-symbols=ignore-all",
         ],
-        "@rules_go//go/platform:darwin": [
+        "@io_bazel_rules_go//go/platform:darwin": [
             "-Wl,-undefined,dynamic_lookup",
         ],
-        "@rules_go//go/platform:ios": [
+        "@io_bazel_rules_go//go/platform:ios": [
             "-Wl,-undefined,dynamic_lookup",
         ],
-        "@rules_go//go/platform:linux": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "-Wl,-unresolved-symbols=ignore-all",
         ],
         "//conditions:default": [],

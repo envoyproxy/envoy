@@ -17,14 +17,12 @@ def api_dependencies(bzlmod = False):
     external_http_archive(
         name = "prometheus_metrics_model",
         build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
-        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
     )
     external_http_archive(
         name = "com_github_chrusty_protoc_gen_jsonschema",
         repo_mapping = {
             "@bazel_gazelle": "@gazelle",
             "@com_google_protobuf": "@protobuf",
-            "@io_bazel_rules_go": "@rules_go",
         },
     )
     external_http_archive(
@@ -54,17 +52,13 @@ def api_dependencies(bzlmod = False):
             "@com_google_absl": "@abseil-cpp",
             "@com_github_grpc_grpc": "@grpc",
             "@com_google_protobuf": "@protobuf",
-            "@io_bazel_rules_go": "@rules_go",
         },
     )
     external_http_archive(
         name = "googleapis",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:googleapis.patch"],
         repo_mapping = {
             "@com_github_grpc_grpc": "@grpc",
             "@com_google_protobuf": "@protobuf",
-            "@io_bazel_rules_go": "@rules_go",
         },
     )
     external_http_archive(
@@ -75,7 +69,6 @@ def api_dependencies(bzlmod = False):
             "@com_google_protobuf": "@protobuf",
             "@com_github_grpc_grpc": "@grpc",
             "@com_googlesource_code_re2": "@re2",
-            "@io_bazel_rules_go": "@rules_go",
         },
     )
     external_http_archive(
@@ -89,7 +82,6 @@ def api_dependencies(bzlmod = False):
         name = "zipkin-api",
         location_name = "zipkin_api",
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
-        repo_mapping = {"@io_bazel_rules_go": "@rules_go"},
     )
     external_http_archive(
         name = "opentelemetry-proto",
@@ -98,7 +90,6 @@ def api_dependencies(bzlmod = False):
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
             "@com_google_protobuf": "@protobuf",
-            "@io_bazel_rules_go": "@rules_go",
         },
         # Avoid shadowing the C++ standard <version> header on case-insensitive file systems.
         patch_cmds = ["rm VERSION"],
@@ -109,13 +100,12 @@ def api_dependencies(bzlmod = False):
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
             "@com_google_protobuf": "@protobuf",
-            "@io_bazel_rules_go": "@rules_go",
         },
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
-load("@rules_go//proto:def.bzl", "go_proto_library")
+load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
 api_cc_py_proto_library(
     name = "client_model",
@@ -136,7 +126,7 @@ go_proto_library(
 ZIPKINAPI_BUILD_CONTENT = """
 
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
-load("@rules_go//proto:def.bzl", "go_proto_library")
+load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
 api_cc_py_proto_library(
     name = "zipkin",
@@ -165,7 +155,7 @@ load("@grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@grpc//bazel:python_rules.bzl", "py_proto_library", "py_grpc_library")
 load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@protobuf//bazel:proto_library.bzl", "proto_library")
-load("@rules_go//proto:def.bzl", "go_proto_library", "go_grpc_library")
+load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library", "go_grpc_library")
 
 package(default_visibility = ["//visibility:public"])
 
