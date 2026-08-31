@@ -58,6 +58,13 @@ class ResourceMonitorFactory : public Config::TypedFactory {
 public:
   ~ResourceMonitorFactory() override = default;
 
+  /**
+   * Create a particular resource monitor implementation.
+   * @param config const ProtoBuf::Message& supplies the config for the resource monitor
+   *        implementation.
+   * @param context ResourceMonitorFactoryContext& supplies the resource monitor's context.
+   * @return ResourceMonitorPtr the resource monitor instance. Should not be nullptr.
+   */
   virtual absl::StatusOr<ResourceMonitorPtr>
   createResourceMonitor(const Protobuf::Message& config,
                         ResourceMonitorFactoryContext& context) PURE;
