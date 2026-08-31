@@ -44,7 +44,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["on_demand_integration_test.cc"],
     extension_names = ["envoy.filters.http.on_demand"],
-    rbe_pool = "linux_x64_small",
+    rbe_pool = "linux_x64_medium",
     shard_count = 4,
     tags = ["cpu:2"],
     deps = [
