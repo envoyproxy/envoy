@@ -1,4 +1,5 @@
 #include <string>
+#include <type_traits>
 
 #include "source/common/common/macros.h"
 #include "source/common/common/mutex_tracer_impl.h"
@@ -664,6 +665,41 @@ TEST_F(StatNameTest, JoinerRejoin) {
 
   joiner.join({makeStat("g.h"), makeStat("i.j")}, table_);
   EXPECT_EQ("g.h.i.j", table_.toString(joiner.statName()));
+}
+
+// Moving a joiner transfers ownership of the joined bytes; the moved-to statName() stays valid
+// because the storage lives on the heap, not inside the joiner.
+TEST_F(StatNameTest, JoinerMove) {
+  StatNameJoiner joiner({makeStat("a.b"), makeStat("c.d")}, table_);
+  const uint8_t* joined_bytes = joiner.statName().dataIncludingSize();
+
+  StatNameJoiner moved(std::move(joiner));
+  EXPECT_EQ("a.b.c.d", table_.toString(moved.statName()));
+  EXPECT_EQ(joined_bytes, moved.statName().dataIncludingSize());
+
+  StatNameJoiner assigned;
+  assigned = std::move(moved);
+  EXPECT_EQ("a.b.c.d", table_.toString(assigned.statName()));
+  EXPECT_EQ(joined_bytes, assigned.statName().dataIncludingSize());
+}
+
+// An elided joiner references a caller name; moving it must carry that reference over.
+TEST_F(StatNameTest, JoinerMoveElided) {
+  StatName name = makeStat("a.b");
+  StatNameJoiner joiner({StatName(), name}, table_);
+  StatNameJoiner moved(std::move(joiner));
+  EXPECT_EQ(name.dataIncludingSize(), moved.statName().dataIncludingSize());
+  EXPECT_EQ("a.b", table_.toString(moved.statName()));
+}
+
+// TagStatNameJoiner is stored in containers by callers, so it must remain movable.
+TEST_F(StatNameTest, TagStatNameJoinerMovable) {
+  static_assert(std::is_move_constructible_v<TagUtility::TagStatNameJoiner>);
+  std::vector<TagUtility::TagStatNameJoiner> joiners;
+  joiners.emplace_back(makeStat("prefix"), makeStat("name"), std::nullopt, table_);
+  joiners.emplace_back(StatName(), makeStat("name"), std::nullopt, table_);
+  EXPECT_EQ("prefix.name", table_.toString(joiners[0].nameWithTags()));
+  EXPECT_EQ("name", table_.toString(joiners[1].nameWithTags()));
 }
 
 // Validates that we don't get tsan or other errors when concurrently creating

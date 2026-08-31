@@ -786,13 +786,26 @@ private:
  * storage is allocated and statName() references the caller's name directly. Callers must
  * therefore keep the joined names valid for the lifetime of this object.
  *
- * This is not movable: statName() may reference storage owned by this object.
+ * Movable but not copyable: the joined bytes live on the heap, so a move transfers ownership
+ * without invalidating statName(). Copying would mean duplicating that storage.
  */
 class StatNameJoiner {
 public:
   StatNameJoiner() = default;
   StatNameJoiner(absl::Span<const StatName> stat_names, const SymbolTable& symbol_table) {
     join(stat_names, symbol_table);
+  }
+  StatNameJoiner(StatNameJoiner&& other) noexcept
+      : storage_(std::move(other.storage_)), stat_name_(other.stat_name_) {
+    other.stat_name_ = StatName();
+  }
+  StatNameJoiner& operator=(StatNameJoiner&& other) noexcept {
+    if (this != &other) {
+      storage_ = std::move(other.storage_);
+      stat_name_ = other.stat_name_;
+      other.stat_name_ = StatName();
+    }
+    return *this;
   }
   StatNameJoiner(const StatNameJoiner&) = delete;
   StatNameJoiner& operator=(const StatNameJoiner&) = delete;
