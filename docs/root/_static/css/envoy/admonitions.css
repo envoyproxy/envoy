@@ -32,16 +32,23 @@
   padding: 14px 16px;
 }
 
+/* The label is an inverted chip at every level, not just on warning: it is the
+   thing you scan for down a page, and a chip holds against the body text in a
+   way a coloured word does not. The ladder is carried by the hue instead —
+   red reads loudest, then amber, then blue and green, which is the order the
+   levels already sit in. */
 .envoy-content-main .rst-content .admonition > .admonition-title {
-  background: transparent;
-  color: var(--envoy-info);
+  background: var(--envoy-info);
+  border-radius: 3px;
+  color: var(--envoy-ground);
+  display: inline-block;
   font-family: var(--envoy-font-mono);
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.14em;
   line-height: 1.5;
-  margin: 0 0 8px;
-  padding: 0;
+  margin: 0 0 9px;
+  padding: 2px 7px;
   text-transform: uppercase;
 }
 
@@ -67,7 +74,7 @@
 .envoy-content-main .rst-content .admonition.tip > .admonition-title,
 .envoy-content-main .rst-content .admonition.hint > .admonition-title,
 .envoy-content-main .rst-content .admonition.important > .admonition-title {
-  color: var(--envoy-affirm);
+  background: var(--envoy-affirm);
 }
 
 /* --- info: note, seealso ------------------------------------------------- */
@@ -78,7 +85,7 @@
 }
 
 .envoy-content-main .rst-content .admonition.seealso > .admonition-title {
-  color: var(--envoy-info);
+  background: var(--envoy-info);
 }
 
 /* --- caution: attention, caution ----------------------------------------- */
@@ -92,7 +99,7 @@
 
 .envoy-content-main .rst-content .admonition.attention > .admonition-title,
 .envoy-content-main .rst-content .admonition.caution > .admonition-title {
-  color: var(--envoy-caution);
+  background: var(--envoy-caution);
 }
 
 /* --- critical: warning, danger, error ------------------------------------
@@ -105,19 +112,15 @@
 .envoy-content-main .rst-content .admonition.danger,
 .envoy-content-main .rst-content .admonition.error {
   background: var(--envoy-critical-tint);
-  border-color: color-mix(in srgb, var(--envoy-critical) 42%, var(--envoy-rule));
+  border-color: color-mix(in srgb, var(--envoy-critical) 55%, var(--envoy-rule));
   border-left-color: var(--envoy-critical);
+  border-left-width: 4px;
 }
 
 .envoy-content-main .rst-content .admonition.warning > .admonition-title,
 .envoy-content-main .rst-content .admonition.danger > .admonition-title,
 .envoy-content-main .rst-content .admonition.error > .admonition-title {
   background: var(--envoy-critical);
-  border-radius: 3px;
-  color: var(--envoy-ground);
-  display: inline-block;
-  margin-bottom: 9px;
-  padding: 2px 7px;
 }
 
 /* --- versionadded / versionchanged / deprecated --------------------------
@@ -146,19 +149,24 @@
   border-left-color: var(--envoy-affirm);
 }
 
+/* Sphinx puts this label inside the paragraph rather than above it, so it
+   needs to be told to take its own line like every other level's chip. */
 .envoy-content-main .rst-content .versionmodified {
-  color: var(--envoy-caution);
-  display: block;
+  background: var(--envoy-caution);
+  border-radius: 3px;
+  color: var(--envoy-ground);
+  display: table;
   font-family: var(--envoy-font-mono);
   font-size: 10.5px;
   font-style: normal;
   letter-spacing: 0.14em;
-  margin-bottom: 8px;
+  margin-bottom: 9px;
+  padding: 2px 7px;
   text-transform: uppercase;
 }
 
 .envoy-content-main .rst-content div.versionadded .versionmodified {
-  color: var(--envoy-affirm);
+  background: var(--envoy-affirm);
 }
 
 .envoy-content-main .rst-content div.versionadded p:last-child,
