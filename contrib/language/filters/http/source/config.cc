@@ -1,5 +1,7 @@
 #include "contrib/language/filters/http/source/config.h"
 
+#include <format>
+
 #include "envoy/registry/registry.h"
 
 #include "contrib/language/filters/http/source/language_filter.h"
@@ -25,7 +27,7 @@ absl::StatusOr<Http::FilterFactoryCb> LanguageFilterFactory::createHttpFilterFac
 
   if (default_locale.isBogus()) {
     return absl::InvalidArgumentError(
-        fmt::format("Failed to create icu::Locale from default_language: {}",
+        std::format("Failed to create icu::Locale from default_language: {}",
                     proto_config.default_language().data()));
   }
 
@@ -35,7 +37,7 @@ absl::StatusOr<Http::FilterFactoryCb> LanguageFilterFactory::createHttpFilterFac
     const auto locale = icu::Locale(supported_language.data());
 
     if (locale.isBogus()) {
-      return absl::InvalidArgumentError(fmt::format(
+      return absl::InvalidArgumentError(std::format(
           "Failed to create icu::Locale from supported_languages: {}", supported_language.data()));
     }
 
@@ -51,7 +53,7 @@ absl::StatusOr<Http::FilterFactoryCb> LanguageFilterFactory::createHttpFilterFac
 
   if (U_FAILURE(errorCode)) {
     return absl::InvalidArgumentError(
-        fmt::format("Failed to initialize icu::LocaleMatcher::Builder: ICU error "
+        std::format("Failed to initialize icu::LocaleMatcher::Builder: ICU error "
                     "code icu::LocaleMatcher::Builder build: {}",
                     static_cast<int>(errorCode)));
   }
