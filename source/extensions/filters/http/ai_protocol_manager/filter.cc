@@ -63,7 +63,7 @@ bool isJsonContentType(absl::string_view content_type) {
 // Content type alone misses those: gRPC and Connect spell their streaming
 // framing with a JSON suffix, and an upgrade or CONNECT can carry plain
 // "application/json". So the protocol is checked first.
-bool requestIsHoldable(const Http::RequestHeaderMap& headers) {
+bool canHoldRequest(const Http::RequestHeaderMap& headers) {
   if (Grpc::Common::isGrpcRequestHeaders(headers) ||
       Grpc::Common::isConnectStreamingRequestHeaders(headers)) {
     return false;
@@ -201,11 +201,11 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
 
   // A declared AI endpoint is parsed strictly. Any other route is parsed only
   // if the filter opted into parsing unconfigured routes, and only for a request
-  // that can be held to end of stream without stalling it (requestIsHoldable).
+  // that can be held to end of stream without stalling it (canHoldRequest).
   // TODO(penguingao): on a best-effort parse failure, release the held headers
   // and buffered body immediately and pass the remainder through unbuffered,
   // rather than buffering to end-of-stream.
-  if (!isAiEndpoint() && (!config_->parseUnconfiguredRoutes() || !requestIsHoldable(headers))) {
+  if (!isAiEndpoint() && (!config_->parseUnconfiguredRoutes() || !canHoldRequest(headers))) {
     ENVOY_LOG(trace, "ai_protocol_manager: route has no payload to inspect, passing through");
     return Http::FilterHeadersStatus::Continue;
   }

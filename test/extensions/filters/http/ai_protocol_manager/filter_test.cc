@@ -106,7 +106,7 @@ public:
 
   // decodeHeaders() with these headers, on a filter that parses unconfigured
   // routes and a route that declared nothing -- the exact combination
-  // requestIsHoldable() gates. The SchedulableCallback is created only when the
+  // canHoldRequest() gates. The SchedulableCallback is created only when the
   // stream is expected to engage, since a gated one builds no BufferManager and
   // would leave the mock's expectation unsatisfied.
   Http::FilterHeadersStatus decodeHeadersUnconfigured(Http::TestRequestHeaderMapImpl headers,
@@ -1563,7 +1563,7 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsMissingContentType) {
 
 // The gate belongs to best effort alone. A declared AI endpoint is the operator's
 // explicit choice, so its payload is managed whatever the content type says.
-TEST_F(AiProtocolManagerFilterTest, DeclaredEndpointIgnoresHoldableGate) {
+TEST_F(AiProtocolManagerFilterTest, DeclaredEndpointIgnoresGate) {
   setRouteConfig();
   replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
   Http::TestRequestHeaderMapImpl headers{
