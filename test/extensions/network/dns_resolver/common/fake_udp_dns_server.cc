@@ -4,6 +4,7 @@
 #include <netinet/in.h>
 
 #include <cstring>
+#include <optional>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/io_handle.h"
@@ -44,6 +45,32 @@ static std::string parseDnsName(const uint8_t* data, size_t len, size_t& offset)
     offset += label_len;
   }
   return name;
+}
+
+static constexpr size_t kDnsHeaderSize = 12;
+
+struct ParsedQuestion {
+  uint16_t qtype{0};
+  // Offset just past the end of the question section.
+  size_t question_end{0};
+};
+
+std::optional<ParsedQuestion> parseQuestion(const uint8_t* query, size_t query_len) {
+  if (query_len < kDnsHeaderSize) {
+    return std::nullopt;
+  }
+
+  size_t offset = kDnsHeaderSize;
+  parseDnsName(query, query_len, offset);
+  if (offset + 4 > query_len) {
+    return std::nullopt;
+  }
+
+  return ParsedQuestion{
+      .qtype = static_cast<uint16_t>((static_cast<uint16_t>(query[offset]) << 8) |
+                                     static_cast<uint16_t>(query[offset + 1])),
+      .question_end = offset + 4, // `QTYPE`(2) + `QCLASS`(2).
+  };
 }
 } // namespace
 
@@ -145,20 +172,12 @@ std::array<std::vector<std::uint8_t>, 2> FakeUdpDnsServer::makeResponses(const u
 }
 
 std::vector<uint8_t> FakeUdpDnsServer::buildResponse(const uint8_t* query, size_t query_len) const {
-  static constexpr size_t kDnsHeaderSize = 12;
-  if (query_len < kDnsHeaderSize) {
+  const auto question = parseQuestion(query, query_len);
+  if (!question.has_value()) {
     return {};
   }
-
-  // Parse the question by skipping the header, read name + `QTYPE` + `QCLASS`.
-  size_t offset = kDnsHeaderSize;
-  parseDnsName(query, query_len, offset);
-  if (offset + 4 > query_len) {
-    return {};
-  }
-  const uint16_t qtype =
-      (static_cast<uint16_t>(query[offset]) << 8) | static_cast<uint16_t>(query[offset + 1]);
-  const size_t question_end = offset + 4; // `QTYPE`(2) + `QCLASS`(2).
+  const uint16_t qtype = question->qtype;
+  const size_t question_end = question->question_end;
 
   // Select response data.
   const DefaultRecord* record = nullptr;
@@ -236,6 +255,42 @@ std::vector<uint8_t> FakeUdpDnsServer::buildResponse(const uint8_t* query, size_
       resp.insert(resp.end(), bytes, bytes + 16);
     }
   }
+
+  return resp;
+}
+
+std::vector<uint8_t> FakeUdpDnsServer::buildNoDataResponse(const uint8_t* query,
+                                                           size_t query_len) const {
+  const auto question = parseQuestion(query, query_len);
+  if (!question.has_value()) {
+    return {};
+  }
+  const size_t question_end = question->question_end;
+
+  std::vector<uint8_t> resp;
+  resp.reserve(question_end);
+
+  // Header: copy ID, set response flags.
+  resp.push_back(query[0]);
+  resp.push_back(query[1]);
+  // Byte 2: QR=1 OPCODE=0000 AA=1 TC=0 RD=1 -> 0x85.
+  resp.push_back(0x85);
+  // Byte 3: RA=1 Z=000 `RCODE`=0 (`NOERROR`).
+  resp.push_back(0x80);
+
+  // QDCOUNT=1. `ANCOUNT`=0 alongside `NOERROR` is what makes this `NODATA` and not `NXDOMAIN`.
+  resp.push_back(0x00);
+  resp.push_back(0x01);
+  resp.push_back(0x00);
+  resp.push_back(0x00);
+  // `NSCOUNT`=0, `ARCOUNT`=0.
+  resp.push_back(0x00);
+  resp.push_back(0x00);
+  resp.push_back(0x00);
+  resp.push_back(0x00);
+
+  // Echo the question section.
+  resp.insert(resp.end(), query + kDnsHeaderSize, query + question_end);
 
   return resp;
 }

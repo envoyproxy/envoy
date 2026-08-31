@@ -62,6 +62,10 @@ private:
   // Build a DNS response for the given query. Returns empty vector on parse failure.
   std::vector<uint8_t> buildResponse(const uint8_t* query, size_t query_len) const;
 
+  // Build a NOERROR/NODATA response returned for an IPv4-only to AAAA query. Returns empty vector
+  // on parse failure.
+  std::vector<uint8_t> buildNoDataResponse(const uint8_t* query, size_t query_len) const;
+
   struct DefaultRecord {
     std::string address;
     uint32_t ttl{300};
