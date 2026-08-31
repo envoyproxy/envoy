@@ -1,0 +1,147 @@
+/* Admonitions — hue says what kind, rule weight says how serious.
+
+   Counted across docs/root, the tree uses seven directives and ignores the
+   rest: note 197, attention 81, warning 30, tip 25, important 5, seealso 4,
+   deprecated 4, and zero uses of caution, danger, error or hint. So this maps
+   every directive onto four levels rather than styling nine in isolation.
+
+   Two encodings, so neither is load-bearing on its own: the ink is redundant
+   with the rule weight, which keeps the ladder readable in greyscale and to
+   colour-blind readers. Body text stays in ordinary ink — only the rail and
+   the label take the hue, so a page with six notes does not stripe. */
+
+.envoy-content-main .rst-content .admonition,
+.envoy-content-main .rst-content .admonition-todo {
+  background: transparent;
+  border: 0;
+  border-left: 2px solid var(--envoy-info);
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--envoy-ink-body);
+  margin: 24px 0;
+  padding: 2px 0 2px 16px;
+}
+
+.envoy-content-main .rst-content .admonition > .admonition-title {
+  background: transparent;
+  color: var(--envoy-info);
+  font-family: var(--envoy-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  line-height: 1.5;
+  margin: 0 0 6px;
+  padding: 0;
+  text-transform: uppercase;
+}
+
+/* the theme's icon font is not part of this design */
+.envoy-content-main .rst-content .admonition > .admonition-title::before {
+  content: none;
+}
+
+.envoy-content-main .rst-content .admonition p:last-child {
+  margin-bottom: 0;
+}
+
+/* --- affirm: tip, hint, important ---------------------------------------- */
+
+.envoy-content-main .rst-content .admonition.tip,
+.envoy-content-main .rst-content .admonition.hint,
+.envoy-content-main .rst-content .admonition.important {
+  border-left-color: var(--envoy-affirm);
+}
+
+.envoy-content-main .rst-content .admonition.tip > .admonition-title,
+.envoy-content-main .rst-content .admonition.hint > .admonition-title,
+.envoy-content-main .rst-content .admonition.important > .admonition-title {
+  color: var(--envoy-affirm);
+}
+
+/* --- info: note, seealso ------------------------------------------------- */
+
+.envoy-content-main .rst-content .admonition.seealso {
+  border-left-color: var(--envoy-info);
+}
+
+.envoy-content-main .rst-content .admonition.seealso > .admonition-title {
+  color: var(--envoy-info);
+}
+
+/* --- caution: attention, caution ----------------------------------------- */
+
+.envoy-content-main .rst-content .admonition.attention,
+.envoy-content-main .rst-content .admonition.caution {
+  border-left: 3px solid var(--envoy-caution);
+  padding-left: 15px;
+}
+
+.envoy-content-main .rst-content .admonition.attention > .admonition-title,
+.envoy-content-main .rst-content .admonition.caution > .admonition-title {
+  color: var(--envoy-caution);
+}
+
+/* --- critical: warning, danger, error ------------------------------------
+
+   In Envoy's prose a `warning` almost always means "this is unsafe or will
+   break" — confused-deputy attacks, unstable output, GODEBUG=cgocheck=0. It is
+   the only filled block in the system, and 30 pages have earned it. */
+
+.envoy-content-main .rst-content .admonition.warning,
+.envoy-content-main .rst-content .admonition.danger,
+.envoy-content-main .rst-content .admonition.error {
+  background: var(--envoy-critical-tint);
+  border: 1px solid var(--envoy-critical);
+  border-radius: 5px;
+  padding: 14px 16px;
+}
+
+.envoy-content-main .rst-content .admonition.warning > .admonition-title,
+.envoy-content-main .rst-content .admonition.danger > .admonition-title,
+.envoy-content-main .rst-content .admonition.error > .admonition-title {
+  background: var(--envoy-critical);
+  color: var(--envoy-ground);
+  display: inline-block;
+  margin-bottom: 9px;
+  padding: 2px 7px;
+}
+
+/* --- versionadded / versionchanged / deprecated --------------------------
+
+   These are not `.admonition` in the generated markup, but they read as the
+   same kind of aside, so they take the same ladder. */
+
+.envoy-content-main .rst-content .versionadded,
+.envoy-content-main .rst-content .versionchanged,
+.envoy-content-main .rst-content .deprecated {
+  border-left: 3px solid var(--envoy-caution);
+  margin: 24px 0;
+  padding: 2px 0 2px 15px;
+}
+
+.envoy-content-main .rst-content .versionadded {
+  border-left-color: var(--envoy-affirm);
+  border-left-width: 2px;
+  padding-left: 16px;
+}
+
+.envoy-content-main .rst-content .versionmodified {
+  color: var(--envoy-caution);
+  display: block;
+  font-family: var(--envoy-font-mono);
+  font-size: 10.5px;
+  font-style: normal;
+  letter-spacing: 0.14em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.envoy-content-main .rst-content .versionadded .versionmodified {
+  color: var(--envoy-affirm);
+}
+
+.envoy-content-main .rst-content .versionadded p:last-child,
+.envoy-content-main .rst-content .versionchanged p:last-child,
+.envoy-content-main .rst-content .deprecated p:last-child {
+  margin-bottom: 0;
+}

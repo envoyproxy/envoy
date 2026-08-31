@@ -310,8 +310,31 @@ html_favicon = 'favicon.ico'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+# envoy.css carries the design tokens and must load first; the component
+# modules below are listed separately so each is a parallel <link> rather than
+# an @import waterfall. See docs/root/_static/css/envoy/.
 html_style = 'css/envoy.css'
-html_js_files = ['js/envoy.js']
+
+html_css_files = [
+    'css/envoy/base.css',
+    'css/envoy/topbar.css',
+    'css/envoy/sidebar.css',
+    'css/envoy/content.css',
+    'css/envoy/code.css',
+    'css/envoy/admonitions.css',
+    'css/envoy/tables.css',
+    'css/envoy/toc.css',
+    'css/envoy/search.css',
+    # loaded last so its overrides win without extra specificity
+    'css/envoy/responsive.css',
+]
+
+# envoy-theme.js is a classic script so the stored theme applies before the
+# first paint; everything else is a deferred module. See _static/js/envoy/.
+html_js_files = [
+    'js/envoy-theme.js',
+    ('js/envoy.js', {'type': 'module'}),
+]
 
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied

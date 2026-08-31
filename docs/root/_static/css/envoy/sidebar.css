@@ -1,0 +1,215 @@
+/* Sidebar — one accordion section per toctree caption.
+
+   The Envoy tree has nine top-level areas and thousands of pages behind them.
+   Rendering all of it flat gives no sense of place, so each caption becomes a
+   disclosure and only the section you are in starts open. */
+
+.wy-nav-side {
+  background: var(--envoy-ground);
+  border-right: 1px solid var(--envoy-rule);
+  bottom: 0;
+  left: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+  top: var(--envoy-topbar-height);
+  width: var(--envoy-sidebar-width);
+  z-index: 195;
+}
+
+.wy-side-scroll {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  width: 100%;
+}
+
+.wy-side-nav-search {
+  background: transparent;
+  margin: 0;
+  padding: 0;
+}
+
+.envoy-sidebar-heading {
+  align-items: center;
+  color: var(--envoy-ink-muted);
+  display: flex;
+  font-family: var(--envoy-font-mono);
+  font-size: 10px;
+  justify-content: space-between;
+  letter-spacing: 0.14em;
+  padding: 20px 20px 10px;
+  text-transform: uppercase;
+}
+
+.envoy-sidebar-close {
+  display: none;
+}
+
+.wy-menu-vertical {
+  padding-bottom: 40px;
+  width: auto;
+}
+
+.wy-menu-vertical ul {
+  margin: 0;
+}
+
+.wy-menu-vertical li {
+  display: block;
+}
+
+/* --- accordion sections -------------------------------------------------- */
+
+.envoy-nav-section {
+  border-bottom: 1px solid var(--envoy-rule);
+}
+
+.envoy-nav-section > summary {
+  align-items: center;
+  color: var(--envoy-ink);
+  cursor: pointer;
+  display: flex;
+  font-size: 13.5px;
+  font-weight: 600;
+  gap: 10px;
+  list-style: none;
+  padding: 11px 20px;
+}
+
+.envoy-nav-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.envoy-nav-section > summary:hover {
+  background: var(--envoy-surface);
+}
+
+.envoy-nav-section > summary::after {
+  border-bottom: 1px solid var(--envoy-ink-muted);
+  border-right: 1px solid var(--envoy-ink-muted);
+  content: "";
+  height: 6px;
+  margin-left: auto;
+  transform: rotate(45deg) translate(-2px, -2px);
+  width: 6px;
+}
+
+.envoy-nav-section[open] > summary::after {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.envoy-nav-section > ul {
+  padding-bottom: 12px;
+}
+
+/* captions are consumed by the accordion; keep a style for any that are not */
+.wy-menu-vertical p.caption {
+  color: var(--envoy-ink-muted);
+  font-family: var(--envoy-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  margin: 22px 0 8px;
+  padding: 0 20px;
+  text-transform: uppercase;
+}
+
+.envoy-nav-section p.caption {
+  display: none;
+}
+
+/* --- links --------------------------------------------------------------- */
+
+/* sphinx_rtd_theme paints the current branch in four shades of grey, some of
+   them through descendant selectors. Clear the lot, then mark the current page
+   with a rail and a weight bump instead. */
+.wy-menu-vertical li.current,
+.wy-menu-vertical li.current > ul,
+.wy-menu-vertical li.on a,
+.wy-menu-vertical li.current > a,
+.wy-menu-vertical li.current > a:hover,
+.wy-menu-vertical li.toctree-l2.current > a,
+.wy-menu-vertical li.toctree-l2.current li.toctree-l3 > a,
+.wy-menu-vertical li.toctree-l3.current > a,
+.wy-menu-vertical li.toctree-l3.current li.toctree-l4 > a,
+.wy-menu-vertical li.toctree-l4.current > a,
+.wy-menu-vertical li.toctree-l4.current li.toctree-l5 > a {
+  background: transparent;
+}
+
+.wy-menu-vertical a,
+.wy-menu-vertical li.current a {
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+  color: var(--envoy-ink-body);
+  display: block;
+  font-size: 13.5px;
+  line-height: 1.45;
+  padding: 5px 14px 5px 18px;
+  text-decoration: none;
+}
+
+.wy-menu-vertical a:hover,
+.wy-menu-vertical li.current a:hover {
+  background: var(--envoy-surface);
+  color: var(--envoy-ink);
+}
+
+/* an ancestor of the current page: weight only */
+.wy-menu-vertical li.current > a,
+.wy-menu-vertical li.toctree-l1.current > a,
+.wy-menu-vertical li.toctree-l2.current > a,
+.wy-menu-vertical li.toctree-l3.current > a,
+.wy-menu-vertical li.toctree-l4.current > a,
+.wy-menu-vertical li.toctree-l5.current > a {
+  background: transparent;
+  /* the theme boxes the current branch with 1px rules top and bottom */
+  border-bottom: 0;
+  border-left-color: transparent;
+  border-top: 0;
+  color: var(--envoy-ink);
+  font-weight: 600;
+}
+
+/* the current page itself: weight plus the rail */
+.wy-menu-vertical a.current,
+.wy-menu-vertical li.current > a.current {
+  border-left-color: var(--envoy-ink);
+  color: var(--envoy-ink);
+  font-weight: 600;
+}
+
+/* nested levels get a guide line rather than deeper indentation alone */
+.wy-menu-vertical li.toctree-l2,
+.wy-menu-vertical li.toctree-l3,
+.wy-menu-vertical li.toctree-l4 {
+  border-left: 1px solid var(--envoy-rule);
+  margin-left: 20px;
+}
+
+.wy-menu-vertical li.toctree-l2 a,
+.wy-menu-vertical li.toctree-l3 a,
+.wy-menu-vertical li.toctree-l4 a {
+  background: transparent;
+  font-size: 13px;
+  margin-left: -1px;
+  padding-left: 14px;
+}
+
+.wy-menu-vertical li button.toctree-expand {
+  background: transparent;
+  border: 0;
+  color: var(--envoy-ink-muted);
+  cursor: pointer;
+  float: right;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.wy-menu-vertical li button.toctree-expand:hover {
+  color: var(--envoy-ink);
+}
