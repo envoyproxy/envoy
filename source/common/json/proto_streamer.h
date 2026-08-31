@@ -24,7 +24,7 @@ public:
     // MessageUtil::redact replaces them. Redacted, a sensitive field emits:
     //
     //   string token                        "token": "[redacted]"
-    //   bytes key                           "key": "W3JlZGFjdGVkXQ=="
+    //   bytes key                           "key": "<base64 of [redacted]>"
     //   Credentials creds                   "creds": {...}, redacted field by field
     //   uint32 port                         both key and value dropped
     //   int64 id                            both key and value dropped
