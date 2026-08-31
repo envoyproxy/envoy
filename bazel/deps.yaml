@@ -549,22 +549,6 @@ intel_ittapi:
   extensions:
   - envoy.wasm.runtime.v8
 
-io_bazel_rules_go:
-  project_name: "Go rules for Bazel"
-  project_desc: "Bazel rules for the Go language"
-  project_url: "https://github.com/bazelbuild/rules_go"
-  release_date: "2026-06-04"
-  use_category:
-  - build
-  - api
-  implied_untracked_deps:
-  - com_github_golang_protobuf
-  - io_bazel_rules_nogo
-  - org_golang_google_protobuf
-  - org_golang_x_tools
-  license: "Apache-2.0"
-  license_url: "https://github.com/bazelbuild/rules_go/blob/v{version}/LICENSE.txt"
-
 ipp_crypto:
   project_name: "libipp-crypto"
   project_desc: "Intel® Integrated Performance Primitives Cryptography"
@@ -1083,6 +1067,23 @@ rules_fuzzing:
   - rules_fuzzing_oss_fuzz
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_fuzzing/blob/v{version}/LICENSE"
+
+rules_go:
+  project_name: "Go rules for Bazel"
+  project_desc: "Bazel rules for the Go language"
+  project_url: "https://github.com/bazelbuild/rules_go"
+  apparent_name: io_bazel_rules_go
+  release_date: "2026-06-04"
+  use_category:
+  - build
+  - api
+  implied_untracked_deps:
+  - com_github_golang_protobuf
+  - io_bazel_rules_nogo
+  - org_golang_google_protobuf
+  - org_golang_x_tools
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_go/blob/v{version}/LICENSE.txt"
 
 rules_java:
   project_name: "Java rules for Bazel"
