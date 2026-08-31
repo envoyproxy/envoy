@@ -20,9 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Sends access logs over syslog. Currently supports UDP and Unix domain sockets.
 // The syslog protocol standard defaults to RFC3164 and also supports RFC5424.
 // Access log content is configured with Envoy's access log format.
-// Delivery is fire-and-forget: Envoy does not buffer, retry, or wait for the receiver.
-// A successful send only means that the local kernel accepted the datagram and does not prove
-// that the receiver processed it.
+// Envoy does not retry failed sends or retransmit lost syslog messages.
 //
 // Example UDP configuration:
 //

@@ -86,7 +86,8 @@ TEST_F(SyslogConfigTest, RejectsInvalidServerAddresses) {
             validateServerAddress(address).message());
 
   address.mutable_socket_address()->set_address("127.0.0.1");
-  EXPECT_EQ("syslog server socket addresses must use UDP", validateServerAddress(address).message());
+  EXPECT_EQ("syslog server socket addresses must use UDP",
+            validateServerAddress(address).message());
   EXPECT_EQ(absl::StatusCode::kInvalidArgument, validateServerAddress(address).code());
 
   address.mutable_socket_address()->set_protocol(
