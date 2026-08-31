@@ -12,6 +12,7 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/bool_accessor.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -226,6 +227,11 @@ Config::SharedConfig::SharedConfig(
   ENVOY_LOG_ONCE_MISC_IF(
       trace, tcp_proxy_on_data_loadshed_point_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.tcp_proxy_on_data is not found. Is it configured?");
+  tcp_proxy_upstream_connect_loadshed_point_ =
+      overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyUpstreamConnect);
+  ENVOY_LOG_ONCE_MISC_IF(trace, tcp_proxy_upstream_connect_loadshed_point_ == nullptr,
+                         "LoadShedPoint envoy.load_shed_points.tcp_proxy_upstream_connect is not "
+                         "found. Is it configured?");
 }
 
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
@@ -670,6 +676,17 @@ void Filter::UpstreamCallbacks::drain(Drainer& drainer) {
 }
 
 Network::FilterStatus Filter::establishUpstreamConnection() {
+  if (config_->tcpProxyUpstreamConnectLoadShedPoint() != nullptr &&
+      config_->tcpProxyUpstreamConnectLoadShedPoint()->shouldShedLoad()) {
+    ENVOY_CONN_LOG(debug, "load shedding in establishUpstreamConnection",
+                   read_callbacks_->connection());
+    config_->stats().downstream_cx_overload_close_.inc();
+    getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::OverloadManager);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                        StreamInfo::LocalCloseReasons::get().OverloadManagerClose);
+    return Network::FilterStatus::StopIteration;
+  }
+
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
   ENVOY_CONN_LOG(debug, "establishUpstreamConnection called: cluster_name={}, route_={}",
                  read_callbacks_->connection(), cluster_name, route_ != nullptr);
@@ -1140,7 +1157,12 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
         }
         // If delay_route_selection_ is unset, route should already be set in onNewConnection().
         ASSERT(route_ != nullptr);
-        establishUpstreamConnection();
+        // If load shedding rejected and closed the downstream connection in
+        // establishUpstreamConnection(), stop iteration immediately to avoid
+        // performing further buffer checks or stats tracking on a closed connection.
+        if (establishUpstreamConnection() == Network::FilterStatus::StopIteration) {
+          return Network::FilterStatus::StopIteration;
+        }
       }
     }
 

@@ -274,6 +274,10 @@ The following core load shed points are supported:
       (e.g., during early data buffering or active proxying) if Envoy is under resource pressure,
       typically memory.
 
+  * - envoy.load_shed_points.tcp_proxy_upstream_connect
+    - Envoy will close the downstream TCP connection in the TCP proxy filter when establishing an
+      upstream connection if Envoy is under resource pressure, typically memory.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts
