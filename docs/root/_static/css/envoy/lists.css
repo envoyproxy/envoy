@@ -1,0 +1,117 @@
+/* Lists of links.
+
+   One row treatment for every index on the site. Rows rather than lines:
+   padding, a radius and a hover band make each entry a target you can point at
+   instead of a run of underlined text.
+
+   The markup these rules need is added by _static/js/envoy/lists.js, which
+   changes no order, grouping or text — only how it is drawn. */
+
+.envoy-content-main .rst-content .envoy-list-rows > ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+
+.envoy-content-main .rst-content .envoy-list-rows ul ul {
+  list-style: none;
+  margin: 4px 0 0;
+  padding-left: 0;
+}
+
+.envoy-content-main .rst-content .envoy-list-rows li {
+  margin: 0;
+}
+
+/* --- the file that heads each group -------------------------------------- */
+
+.envoy-content-main .rst-content .envoy-list-rows > ul > li {
+  margin-bottom: 26px;
+}
+
+.envoy-content-main .rst-content a.envoy-list-head {
+  border-bottom: 1px solid var(--envoy-rule);
+  color: var(--envoy-ink);
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  padding: 0 10px 8px;
+  text-decoration: none;
+}
+
+.envoy-content-main .rst-content a.envoy-list-head:hover {
+  color: var(--envoy-accent);
+}
+
+/* --- symbol rows ---------------------------------------------------------
+
+   In mono the repeated package stacks into a column and the segments that
+   differ line up, which is most of what makes a 74-row index readable. */
+
+.envoy-content-main .rst-content .envoy-list-rows a.envoy-list-symbol {
+  align-items: baseline;
+  border-radius: 4px;
+  color: var(--envoy-ink);
+  display: flex;
+  font-family: var(--envoy-font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  /* the theme puts a 12px bottom margin on links inside a toctree, which on a
+     74-row index is a third of the scroll */
+  margin: 0;
+  overflow: hidden;
+  padding: 5px 10px;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Position already says "link" when every row is one, so the accent and the
+   underline are held back until the row is pointed at. */
+.envoy-content-main .rst-content .envoy-list-rows a.envoy-list-symbol:hover,
+.envoy-content-main .rst-content .envoy-list-rows a.envoy-list-symbol:focus-visible {
+  background: var(--envoy-surface);
+}
+
+.envoy-content-main .rst-content .envoy-list-rows a.envoy-list-symbol:hover .envoy-list-name,
+.envoy-content-main .rst-content .envoy-list-rows a.envoy-list-symbol:focus-visible .envoy-list-name {
+  color: var(--envoy-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* every character of the package is still here, just set out of the way */
+.envoy-list-prefix {
+  color: var(--envoy-ink-muted);
+  flex: none;
+}
+
+.envoy-list-name {
+  flex: none;
+}
+
+/* replaces protodoc's literal "Enum " prefix, so every name starts level */
+.envoy-list-dot {
+  background: var(--envoy-kind-message);
+  border-radius: 50%;
+  flex: none;
+  height: 5px;
+  margin-right: 10px;
+  position: relative;
+  top: -1px;
+  width: 5px;
+}
+
+.envoy-list-dot.envoy-kind-enum {
+  background: var(--envoy-kind-enum);
+}
+
+.envoy-list-dot.envoy-kind-service {
+  background: var(--envoy-kind-service);
+}
+
+/* an index of identifiers is not prose, so it gets the whole column */
+.envoy-content-main .rst-content:has(.envoy-list-rows) {
+  max-width: 100%;
+}

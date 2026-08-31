@@ -202,6 +202,40 @@
   padding-left: 14px;
 }
 
+/* --- top-level areas -----------------------------------------------------
+
+   Nine areas rendered as nine identical text rows read as a wall. A 14px line
+   icon gives the column a fixed left edge and something to recognise without
+   reading. Nested entries are files and symbols rather than areas, so they get
+   no icon — one on every row would be the noise this removes. */
+
+.wy-menu-vertical a.envoy-nav-area {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.envoy-nav-icon {
+  color: var(--envoy-ink-muted);
+  flex: none;
+}
+
+.wy-menu-vertical a.envoy-nav-area:hover .envoy-nav-icon,
+.wy-menu-vertical a.envoy-nav-area.current .envoy-nav-icon {
+  color: var(--envoy-accent);
+}
+
+/* A 77-character title wraps to five lines; two plus the full text in the
+   tooltip keeps every row the same height so the column scans. */
+.wy-menu-vertical li.toctree-l2 a,
+.wy-menu-vertical li.toctree-l3 a,
+.wy-menu-vertical li.toctree-l4 a {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  display: -webkit-box;
+  overflow: hidden;
+}
+
 .wy-menu-vertical li button.toctree-expand {
   background: transparent;
   border: 0;
