@@ -127,9 +127,12 @@ envoy_cc_library(
     hdrs = envoy_select_enable_http3(["envoy_tls_server_handshaker.h"]),
     external_deps = ["ssl"],
     deps = envoy_select_enable_http3([
+        ":envoy_quic_proof_verifier_lib",
+        ":envoy_quic_server_cert_verifier_lib",
         ":envoy_quic_server_session_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/tls:server_context_lib",
         "@quiche//:quic_server_session_lib",
     ]),
@@ -179,19 +182,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_quic_server_proof_verifier_lib",
-    srcs = envoy_select_enable_http3(["envoy_quic_server_proof_verifier.cc"]),
-    hdrs = envoy_select_enable_http3(["envoy_quic_server_proof_verifier.h"]),
+    name = "envoy_quic_server_cert_verifier_lib",
+    srcs = envoy_select_enable_http3(["envoy_quic_server_cert_verifier.cc"]),
+    hdrs = envoy_select_enable_http3(["envoy_quic_server_cert_verifier.h"]),
+    external_deps = ["ssl"],
     deps = envoy_select_enable_http3([
         ":envoy_quic_proof_verifier_base_lib",
         ":envoy_quic_proof_verifier_lib",
         ":envoy_quic_utils_lib",
-        ":quic_server_transport_socket_factory_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/runtime:runtime_features_lib",
-        "//source/common/stream_info:stream_info_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/tls:context_lib",
-        "@quiche//:quic_platform",
     ]),
 )
 
@@ -522,8 +523,8 @@ envoy_cc_library(
         ":envoy_quic_packet_writer_lib",
         ":envoy_quic_proof_source_factory_interface",
         ":envoy_quic_proof_source_lib",
+        ":envoy_quic_server_cert_verifier_lib",
         ":envoy_quic_server_preferred_address_config_factory_interface",
-        ":envoy_quic_server_proof_verifier_lib",
         ":envoy_quic_utils_lib",
         ":quic_packet_writer_interface",
         "//envoy/network:listener_interface",

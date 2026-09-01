@@ -25,12 +25,10 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
           quic_transport.downstream_tls_context(), context, server_names, true);
   RETURN_IF_NOT_OK(server_config_or_error.status());
   auto server_config = std::move(server_config_or_error.value());
-  // QUIC client certificate authentication is gated by a runtime guard so the
-  // feature can be disabled to restore the prior "not supported" startup error.
-  // Configurations that require a client certificate must also pin a trust
-  // anchor, since `customVerifyCertChainForQuic` short-circuits to success
-  // when the `SSL_CTX` verify mode is `SSL_VERIFY_NONE` and `ACCEPT_UNTRUSTED`
-  // makes `X509_verify_cert` failures non-fatal.
+  // QUIC client certificate authentication is gated by a runtime guard so it can be disabled to
+  // restore the prior "not supported" startup error. A client certificate requirement also needs a
+  // trust anchor and must not use `ACCEPT_UNTRUSTED`, since either would let the server accept any
+  // client certificate.
   if (server_config->requireClientCertificate()) {
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_mtls_server_enabled")) {
       return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");

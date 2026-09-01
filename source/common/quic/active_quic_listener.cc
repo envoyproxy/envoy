@@ -23,7 +23,7 @@
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
-#include "source/common/quic/envoy_quic_server_proof_verifier.h"
+#include "source/common/quic/envoy_quic_server_cert_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_network_connection.h"
 #include "source/common/quic/quic_packet_writer_interface.h"
@@ -67,17 +67,16 @@ ActiveQuicListener::ActiveQuicListener(
 
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
-
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
       absl::string_view(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
       quic::QuicRandom::GetInstance(),
       proof_source_factory.createQuicProofSource(
           listen_socket_, listener_config.filterChainManager(), stats_, dispatcher.timeSource()),
       quic::KeyExchangeSource::Default(),
-      // Proof verifier used by QUICHE to validate client certificates when a filter chain has
-      // `require_client_certificate` set.
-      std::make_unique<EnvoyQuicServerProofVerifier>(
-          listen_socket_, listener_config.filterChainManager(), dispatcher.timeSource()));
+      // Fail-closed safety net. The default crypto stream validates client certificates in
+      // `EnvoyTlsServerHandshaker`. This verifier is reached only if a custom crypto stream leaves
+      // validation to the shared verifier, in which case the certificate is rejected.
+      std::make_unique<EnvoyQuicServerFailClosedProofVerifier>());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
                                    quic::QuicCryptoServerConfig::ConfigOptions());
@@ -289,8 +288,6 @@ size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
 void ActiveQuicListener::updateListenerConfig(Network::ListenerConfig& config) {
   config_ = &config;
   dynamic_cast<EnvoyQuicProofSource*>(crypto_config_->proof_source())
-      ->updateFilterChainManager(config.filterChainManager());
-  dynamic_cast<EnvoyQuicServerProofVerifier*>(crypto_config_->proof_verifier())
       ->updateFilterChainManager(config.filterChainManager());
   quic_dispatcher_->updateListenerConfig(config);
 }

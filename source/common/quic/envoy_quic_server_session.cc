@@ -211,11 +211,10 @@ quic::QuicConnection* EnvoyQuicServerSession::quicConnection() {
 
 void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   quic::QuicServerSessionBase::OnTlsHandshakeComplete();
-  // The client certificate has been validated by `EnvoyQuicServerProofVerifier`
-  // before QUICHE reaches this hook. Surface the validated state to consumers
-  // such as RBAC, ext_authz, access loggers, and Lua. The check is gated on
-  // `requiresClientCertificate()` so a client certificate presented to a chain that
-  // does not require one is not marked as validated.
+  // The client certificate is already validated by `EnvoyTlsServerHandshaker` before this hook
+  // runs. Surface the validated state to downstream consumers, but only when the matched chain
+  // sets `requiresClientCertificate()`, so a certificate presented to a chain that does not
+  // require one is not marked as validated.
   if (position_.has_value() && quic_ssl_info_->peerCertificatePresented()) {
     const auto& transport_socket_factory = dynamic_cast<const QuicServerTransportSocketFactory&>(
         position_->filter_chain_.transportSocketFactory());

@@ -17,10 +17,9 @@ namespace Quic {
 // access to the SSL object in QUIC crypto stream.
 //
 // QUICHE configures BoringSSL with the `CRYPTO_BUFFER`-based X509 method, so the base class
-// certificate accessors that call `SSL_get_certificate`, `SSL_get_peer_certificate`, or
-// `SSL_get_peer_full_cert_chain` abort on the QUIC `SSL` object. Every peer- and local-certificate
-// accessor is therefore overridden here: peer fields are decoded from `SSL_get0_peer_certificates`
-// on demand, while the raw-PEM and local-certificate accessors return empty.
+// certificate accessors abort on the QUIC `SSL` object. The peer certificate accessors are
+// therefore overridden here to decode the chain from `SSL_get0_peer_certificates` on demand.
+// Raw-PEM and local certificate accessors return empty.
 class QuicSslConnectionInfo : public Extensions::TransportSockets::Tls::ConnectionInfoImplBase {
 public:
   QuicSslConnectionInfo(quic::QuicSession& session) : session_(session) {}
@@ -83,7 +82,7 @@ public:
 
   // Peer certificate accessors. QUICHE stores the peer chain as `CRYPTO_BUFFER`s, so these decode
   // certificates on demand instead of using the base class X509 accessors, which abort on the QUIC
-  // SSL object.
+  // `SSL` object.
   const std::string& sha256PeerCertificateDigest() const override {
     return getCachedCertificateValue<std::string>(&cached_sha256_digest_, [this]() -> std::string {
       const CRYPTO_BUFFER* cert = getPeerLeafCertificate();

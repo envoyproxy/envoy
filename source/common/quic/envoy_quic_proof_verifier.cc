@@ -82,7 +82,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     IS_ENVOY_BUG("QUIC proof verify context was not setup correctly.");
     return quic::QUIC_FAILURE;
   }
-  // Server-side client certificate validation is handled by `EnvoyQuicServerProofVerifier`.
+  // Server-side client certificate validation is handled by `EnvoyTlsServerHandshaker`.
   ASSERT(!verify_context->isServer());
 
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());

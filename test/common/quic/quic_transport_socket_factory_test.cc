@@ -269,7 +269,7 @@ downstream_tls_context:
 }
 
 // `require_client_certificate: true` without `validation_context.trusted_ca`
-// is rejected because the SSL_CTX would remain `SSL_VERIFY_NONE` and accept
+// is rejected because the `SSL_CTX` would remain `SSL_VERIFY_NONE` and accept
 // any client certificate chain.
 TEST_F(QuicServerTransportSocketFactoryConfigTest, RequireClientCertWithoutTrustedCa) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(

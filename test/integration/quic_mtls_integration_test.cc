@@ -114,8 +114,9 @@ public:
                                           std::nullopt, /*wait_till_connected=*/false);
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     ASSERT_NE(codec_client_->connection(), nullptr);
-    EXPECT_THAT(std::string(codec_client_->connection()->transportFailureReason()),
-                testing::HasSubstr(expected_error_contains));
+    const std::string failure_reason(codec_client_->connection()->transportFailureReason());
+    EXPECT_FALSE(failure_reason.empty());
+    EXPECT_THAT(failure_reason, testing::HasSubstr(expected_error_contains));
   }
 };
 
@@ -123,8 +124,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, QuicMtlsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Successful mTLS connection: client presents a valid certificate, the server
-// validates it, and the client cert details are forwarded via XFCC.
+// Successful mTLS connection where the client presents a valid certificate, the
+// server validates it, and the client cert details are forwarded via XFCC.
 TEST_P(QuicMtlsIntegrationTest, SuccessfulMtlsWithClientCertificate) {
   setupServerWithClientCertValidation();
   initialize();
@@ -394,12 +395,18 @@ TEST_P(QuicMtlsIntegrationTest, QuicSslConnectionInfoComprehensiveCoverage) {
     EXPECT_FALSE(serial.empty());
   }
 
-  // IP, email, otherName SANs and OIDs may or may not be populated for the
-  // integration test certificate. Just exercise the accessors.
-  ssl_info->ipSansPeerCertificate();
-  ssl_info->emailSansPeerCertificate();
-  ssl_info->othernameSansPeerCertificate();
-  ssl_info->oidsPeerCertificate();
+  // IP, email, otherName SANs and OIDs may or may not be populated for the integration test
+  // certificate, so assert repeated reads are stable rather than asserting specific values.
+  auto to_vector = [](absl::Span<const std::string> span) {
+    return std::vector<std::string>(span.begin(), span.end());
+  };
+  EXPECT_EQ(to_vector(ssl_info->ipSansPeerCertificate()),
+            to_vector(ssl_info->ipSansPeerCertificate()));
+  EXPECT_EQ(to_vector(ssl_info->emailSansPeerCertificate()),
+            to_vector(ssl_info->emailSansPeerCertificate()));
+  EXPECT_EQ(to_vector(ssl_info->othernameSansPeerCertificate()),
+            to_vector(ssl_info->othernameSansPeerCertificate()));
+  EXPECT_EQ(to_vector(ssl_info->oidsPeerCertificate()), to_vector(ssl_info->oidsPeerCertificate()));
 
   // Local certificate accessors return empty for QUIC.
   EXPECT_TRUE(ssl_info->ipSansLocalCertificate().empty());
