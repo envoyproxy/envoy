@@ -6,11 +6,11 @@ diff --git a/BUILD b/BUILD
      ] + select({
          "//bazel:crypto_system": [],
 -        "//conditions:default": ["@boringssl//:crypto"],
-+        "//conditions:default": ["@envoy//bazel:crypto"],
++        "//conditions:default": ["//bazel:crypto_lib"],
      }),
      alwayslink = 1,
  )
-@@ -158,7 +158,7 @@ cc_library(
+@@ -158,7 +158,7 @@
      }),
      deps = [
          ":wasm_vm_headers",
@@ -19,7 +19,7 @@ diff --git a/BUILD b/BUILD
      ],
  )
  
-@@ -224,7 +223,7 @@ cc_library(
+@@ -224,7 +224,7 @@
      deps = [
          ":base_lib",
          ":wasm_vm_headers",
@@ -77,15 +77,15 @@ diff --git a/bazel/BUILD b/bazel/BUILD
      name = "engine_v8",
 -    values = {"define": "engine=v8"},
 +    flag_values = {"//bazel:engine": "v8"},
- )
- 
-+# engine_wamr_interp matches both "wamr-interp" and the generic "wamr" alias.
- config_setting(
-+    name = "_engine_wamr_interp_strict",
-+    flag_values = {"//bazel:engine": "wamr-interp"},
 +)
 +
++# engine_wamr_interp matches both "wamr-interp" and the generic "wamr" alias.
 +config_setting(
++    name = "_engine_wamr_interp_strict",
++    flag_values = {"//bazel:engine": "wamr-interp"},
+ )
+ 
+ config_setting(
 +    name = "engine_wamr",
 +    flag_values = {"//bazel:engine": "wamr"},
 +)
@@ -129,3 +129,13 @@ diff --git a/bazel/BUILD b/bazel/BUILD
  )
  
  config_setting(
+@@ -77,4 +124,9 @@
+     library = "@v8//:wee8",
+ )
+ 
++label_flag(
++    name = "crypto_lib",
++    build_setting_default = "@envoy//bazel:crypto",
++)
++
+ exports_files(["tsan_suppressions.txt"])
