@@ -122,11 +122,15 @@ def main():
     use_categories = defaultdict(lambda: defaultdict(list))
     # Bin rendered dependencies into per-use category lists.
     for k, v in repository_locations.items():
+        if k == "antlr4-cpp-runtime" and not v.get("version"):
+            continue
         cpe = v.get('cpe', '')
         if cpe == 'N/A':
             cpe = ''
         if cpe:
             cpe = rst_link(cpe, nist_cpe_url(cpe))
+        if not v.get("project_name"):
+            raise Exception(f"Missing project_name: {k} {v}")
         project_name = v['project_name']
         project_url = v['project_url']
         name = rst_link(project_name, project_url)
@@ -138,7 +142,7 @@ def main():
             if license_url:
                 license = rst_link(license, license_url)
         dep = Dep(name, project_name.lower(), version, cpe, release_date, license)
-        for category in v['use_category']:
+        for category in v.get('use_category', []):
             for ext in v.get('extensions', ['core']):
                 use_categories[category][ext].append(dep)
 

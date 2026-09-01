@@ -49,38 +49,40 @@ googleapis:
   project_name: "Google APIs"
   project_desc: "Public interface definitions of Google APIs"
   project_url: "https://github.com/googleapis/googleapis"
+  apparent_name: com_google_googleapis
   release_date: "2024-09-16"
   use_category:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/googleapis/googleapis/blob/{version}/LICENSE"
 
-opentelemetry_proto:
+opentelemetry-proto:
   project_name: "OpenTelemetry Proto"
   project_desc: "Language Independent Interface Types For OpenTelemetry"
   project_url: "https://github.com/open-telemetry/opentelemetry-proto"
-  apparent_name: opentelemetry-proto
+  apparent_name: opentelemetry_proto
   release_date: "2026-07-21"
   use_category:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/open-telemetry/opentelemetry-proto/blob/v{version}/LICENSE"
 
-prometheus_metrics_model:
+prometheus-metrics-model:
   project_name: "Prometheus client model"
   project_desc: "Data model artifacts for Prometheus"
   project_url: "https://github.com/prometheus/client_model"
+  apparent_name: prometheus_metrics_model
   release_date: "2025-04-11"
   use_category:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/prometheus/client_model/blob/v{version}/LICENSE"
 
-protoc_gen_validate:
-  apparent_name: protoc-gen-validate
+protoc-gen-validate:
   project_name: "protoc-gen-validate (PGV)"
   project_desc: "protoc plugin to generate polyglot message validators"
   project_url: "https://github.com/bufbuild/protoc-gen-validate"
+  apparent_name: com_envoyproxy_protoc_gen_validate
   release_date: "2026-02-18"
   use_category:
   - api
@@ -136,11 +138,11 @@ xds:
   license: "Apache-2.0"
   license_url: "https://github.com/cncf/xds/blob/{version}/LICENSE"
 
-zipkin_api:
+zipkin-api:
   project_name: "Zipkin API"
   project_desc: "Zipkin's language independent model and HTTP Api Definitions"
   project_url: "https://github.com/openzipkin/zipkin-api"
-  apparent_name: zipkin-api
+  apparent_name: zipkin_api
   release_date: "2020-11-22"
   use_category:
   - api

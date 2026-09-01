@@ -981,11 +981,17 @@ json_merge(
     | .[1] as $metadata1
     | .[2] as $metadata2
     | ($metadata1 * $metadata2) as $metadata
-    | $versions
+    | $metadata
     | keys
     | reduce .[] as $k ({};
-        . + {($k): (
-          ($versions[$k] + ($metadata[$k] // {}))
+        ([$k,
+          ($metadata[$k].apparent_name // empty),
+          ($k | gsub("-"; "_")),
+          ($k | gsub("_"; "-"))]
+         | map(select($versions[.] != null))
+         | first) as $vkey
+        | . + {($k): (
+          (if $vkey then $versions[$vkey] else {} end) + $metadata[$k]
           | .version as $ver
           | if .license_url and $ver then
               .license_url |= (
