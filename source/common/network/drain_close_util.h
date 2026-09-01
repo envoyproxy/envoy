@@ -3,11 +3,21 @@
 #include <optional>
 
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/server/factory_context.h"
 
 namespace Envoy {
 namespace Network {
+
+/**
+ * @param connection supplies the connection whose owning listener is queried.
+ * @return the drain type of the listener that owns @param connection, or DEFAULT if the connection
+ *         has no listener info. The latter is the case for connections that were not accepted by a
+ *         network listener, such as API listener connections, and DEFAULT matches the proto default
+ *         that a configured listener would have.
+ */
+envoy::config::listener::v3::Listener::DrainType listenerDrainType(const Connection& connection);
 
 /**
  * Computes whether a connection should now be drain-closed.
@@ -25,9 +35,7 @@ namespace Network {
  *
  * @param context supplies the server context, used for the health check state, the configured
  *        drain time, the time source and the random generator.
- * @param drain_type supplies the drain type of the listener owning the connection, from
- *        Network::ListenerInfo::drainType(). For a downstream connection this is reached via
- *        Connection::connectionInfoProvider().listenerInfo().
+ * @param drain_type supplies the drain type of the listener owning the connection.
  * @param drain_event supplies the drain sequence the connection has been notified of, or
  *        std::nullopt if it has not been notified of one.
  */

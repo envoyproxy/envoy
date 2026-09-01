@@ -129,6 +129,7 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_fix_defer_logging_miss_for_half_clo
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
 RUNTIME_GUARD(envoy_reloadable_features_quic_signal_headers_only_to_http1_backend);
+RUNTIME_GUARD(envoy_reloadable_features_quic_support_additional_ecdsa_curves);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_client_certificates);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_socket_use_address_cache_for_read);
@@ -164,6 +165,10 @@ RUNTIME_GUARD(envoy_reloadable_features_upstream_wasm_filter_uses_root_scope);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_match_on_asterisk);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_mixed_variable_literals);
 RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
+// Decide connection drain-close (HCM, TCP proxy, and the Mongo, Redis, Thrift and generic proxies)
+// from the connection-level drain notification (Network::Connection::onDrain()) instead of by
+// polling the listener DrainDecision. Latched per connection when the network filter is created.
+RUNTIME_GUARD(envoy_reloadable_features_use_connection_event_drain);
 RUNTIME_GUARD(envoy_reloadable_features_use_migration_in_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);

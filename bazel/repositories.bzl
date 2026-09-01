@@ -139,14 +139,24 @@ def _cc_deps():
 def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
-    if "io_bazel_rules_go" not in skip_targets:
+    if "io_bazel_rules_go" not in skip_targets and "rules_go" not in skip_targets:
         external_http_archive(
-            name = "io_bazel_rules_go",
-            repo_mapping = {"@com_google_protobuf": "@protobuf"},
+            name = "rules_go",
+            patch_args = ["-p1"],
+            patches = ["@envoy//bazel:rules_go.patch"],
+            repo_mapping = {
+                "@com_google_protobuf": "@protobuf",
+                "@io_bazel_rules_go": "@rules_go",
+            },
         )
         external_http_archive(
             name = "gazelle",
-            repo_mapping = {"@com_google_protobuf": "@protobuf"},
+            patch_args = ["-p1"],
+            patches = ["@envoy//bazel:gazelle.patch"],
+            repo_mapping = {
+                "@com_google_protobuf": "@protobuf",
+                "@io_bazel_rules_go": "@rules_go",
+            },
         )
 
 def _rust_deps():
@@ -398,7 +408,10 @@ def _com_github_bazel_buildtools():
     #  cf: https://github.com/bazelbuild/buildtools/issues/367
     external_http_archive(
         name = "buildtools",
-        repo_mapping = {"@com_google_protobuf": "@protobuf"},
+        repo_mapping = {
+            "@com_google_protobuf": "@protobuf",
+            "@io_bazel_rules_go": "@rules_go",
+        },
     )
 
 def _c_ares():
@@ -613,6 +626,7 @@ def _cel_cpp():
             "@com_google_protobuf": "@protobuf",
             "@com_github_google_flatbuffers": "@flatbuffers",
             "@com_googlesource_code_re2": "@re2",
+            "@io_bazel_rules_go": "@rules_go",
         },
     )
 
@@ -623,6 +637,7 @@ def _cel_cpp():
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
             "@com_google_protobuf": "@protobuf",
+            "@io_bazel_rules_go": "@rules_go",
         },
     )
 
@@ -926,6 +941,7 @@ def _rules_proto_grpc():
             "@com_github_grpc_grpc": "@grpc",
             "@bazel_gazelle": "@gazelle",
             "@com_google_protobuf": "@protobuf",
+            "@io_bazel_rules_go": "@rules_go",
         },
     )
 

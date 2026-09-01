@@ -786,7 +786,7 @@ public:
 
   MOCK_METHOD(QuicPacketWriterPtr, createQuicPacketWriter,
               (Network::IoHandle & io_handle, Stats::Scope& scope,
-               Envoy::Event::Dispatcher& dispatcher, absl::AnyInvocable<void() &&> on_can_write_cb),
+               Envoy::Event::Dispatcher& dispatcher, absl::AnyInvocable<void()> on_can_write_cb),
               (override));
 };
 
@@ -803,7 +803,7 @@ TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreation) {
   FakeQuicPacketWriter* raw_writer = nullptr;
   EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _))
       .WillOnce(Invoke([&raw_writer](Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
-                                     absl::AnyInvocable<void() &&>) -> QuicPacketWriterPtr {
+                                     absl::AnyInvocable<void()>) -> QuicPacketWriterPtr {
         auto writer = std::make_unique<FakeQuicPacketWriter>();
         raw_writer = writer.get();
         return writer;
@@ -817,6 +817,31 @@ TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreation) {
 
   // Verify that the listener keeps a member pointing to the created writer.
   EXPECT_EQ(quic_listener_->quicPacketWriter(), raw_writer);
+}
+
+TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreationNullWriter) {
+  MockQuicPacketWriterFactory quic_packet_writer_factory;
+
+  // Override the quicPacketWriterFactory mock to return our QUIC factory.
+  EXPECT_CALL(udp_listener_config_, quicPacketWriterFactory())
+      .WillRepeatedly(Return(&quic_packet_writer_factory));
+
+  // Expect createQuicPacketWriter to return nullptr.
+  EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _))
+      .Times(testing::AnyNumber())
+      .WillRepeatedly(testing::InvokeWithoutArgs([]() -> QuicPacketWriterPtr { return nullptr; }));
+
+  listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
+  EXPECT_CALL(listener_config_, filterChainManager())
+      .WillRepeatedly(ReturnRef(filter_chain_manager_));
+
+  // Creating the listener will trigger IS_ENVOY_BUG.
+  EXPECT_ENVOY_BUG(quic_listener_ = staticUniquePointerCast<ActiveQuicListener>(
+                       listener_factory_->createActiveUdpListener(
+                           scoped_runtime_.loader(), 0, connection_handler_,
+                           listener_config_.socket_factories_[0]->getListenSocket(0), *dispatcher_,
+                           listener_config_)),
+                   "quic_packet_writer_factory failed to create quic_writer");
 }
 
 } // namespace Quic
