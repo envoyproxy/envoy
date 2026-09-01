@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <stack>
 
 #include "source/common/json/json_streamer.h"
@@ -98,9 +99,9 @@ private:
                          BufferStreamer::Level& level);
 
   // Emits one value of `field`, or pushes a frame for it. `index` is which element of a repeated
-  // field to emit, or -1 for a field that is not repeated.
+  // field to emit, or nullopt for a field that is not repeated.
   void emitValue(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
-                 int index, BufferStreamer::Level& level, bool is_sensitive);
+                 std::optional<int> index, BufferStreamer::Level& level, bool is_sensitive);
 
   // Emits entry `index` of the map `field` as a key and a value in `entries`.
   void emitMapEntry(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,

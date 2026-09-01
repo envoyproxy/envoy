@@ -1,7 +1,5 @@
 #include "source/common/json/proto_streamer.h"
 
-#include <cmath>
-
 #include "source/common/common/base64.h"
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/utility.h"
@@ -15,10 +13,10 @@ namespace {
 using Field = Protobuf::FieldDescriptor;
 
 // Returns the value of `field`, from element `index` if the field is repeated.
-// Pass a negative `index` to get the whole field.
+// Pass nullopt to get the whole field.
 #define REFLECTION_GET(Type, field, index)                                                         \
-  (index < 0 ? reflection.Get##Type(message, &field)                                               \
-             : reflection.GetRepeated##Type(message, &field, index))
+  (index.has_value() ? reflection.GetRepeated##Type(message, &field, *index)                       \
+                     : reflection.Get##Type(message, &field))
 
 // Whether ProtoJSON gives `message` a special representation rather than an object of its fields,
 // which is every `well_known_type()` other than Any. Any is excluded, this streamer expands it into
@@ -196,7 +194,7 @@ void MessageStreamer::startField(Frame& frame) {
     return;
   }
   ++frame.next_field_;
-  emitValue(frame.message_, field, -1, *frame.map_, frame.field_is_sensitive_);
+  emitValue(frame.message_, field, std::nullopt, *frame.map_, frame.field_is_sensitive_);
 }
 
 void MessageStreamer::emitMapEntry(const Protobuf::Message& message, const Field& field, int index,
@@ -206,7 +204,7 @@ void MessageStreamer::emitMapEntry(const Protobuf::Message& message, const Field
   const Protobuf::Descriptor& entry_type = *field.message_type();
   // Keys are left alone if sensitive, redacting them would collapse the map onto one key.
   entries.addKey(mapKeyToString(entry, *entry_type.map_key(), scratch_));
-  emitValue(entry, *entry_type.map_value(), -1, entries, is_sensitive);
+  emitValue(entry, *entry_type.map_value(), std::nullopt, entries, is_sensitive);
 }
 
 void MessageStreamer::emitRedactedValue(const Protobuf::Message& message, const Field& field,
@@ -218,11 +216,12 @@ void MessageStreamer::emitRedactedValue(const Protobuf::Message& message, const 
   }
   // Only a map value or a wrapper reaches here, startField drops anything else it clears.
   const ProtobufTypes::MessagePtr cleared(message.New());
-  emitValue(*cleared, field, -1, level, false);
+  emitValue(*cleared, field, std::nullopt, level, false);
 }
 
-void MessageStreamer::emitValue(const Protobuf::Message& message, const Field& field, int index,
-                                BufferStreamer::Level& level, bool is_sensitive) {
+void MessageStreamer::emitValue(const Protobuf::Message& message, const Field& field,
+                                std::optional<int> index, BufferStreamer::Level& level,
+                                bool is_sensitive) {
   const Protobuf::Reflection& reflection = *message.GetReflection();
   if (is_sensitive && field.cpp_type() != Field::CPPTYPE_MESSAGE) {
     emitRedactedValue(message, field, level);
@@ -278,8 +277,9 @@ void MessageStreamer::emitValue(const Protobuf::Message& message, const Field& f
   case Field::CPPTYPE_STRING: {
     scratch_.clear();
     const std::string& value =
-        index < 0 ? reflection.GetStringReference(message, &field, &scratch_)
-                  : reflection.GetRepeatedStringReference(message, &field, index, &scratch_);
+        index.has_value()
+            ? reflection.GetRepeatedStringReference(message, &field, *index, &scratch_)
+            : reflection.GetStringReference(message, &field, &scratch_);
     // ProtoJSON spells bytes as base64.
     level.addString(field.type() == Field::TYPE_BYTES ? Base64::encode(value) : value);
     return;
@@ -316,7 +316,7 @@ void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStream
   case Protobuf::Descriptor::WELLKNOWNTYPE_BYTESVALUE:
   case Protobuf::Descriptor::WELLKNOWNTYPE_BOOLVALUE:
     // A wrapper is spelled as the value of its only field.
-    emitValue(message, *descriptor.field(0), -1, level, is_sensitive);
+    emitValue(message, *descriptor.field(0), std::nullopt, level, is_sensitive);
     return;
   case Protobuf::Descriptor::WELLKNOWNTYPE_DURATION:
     if (!is_sensitive) {
