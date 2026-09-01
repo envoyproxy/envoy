@@ -226,8 +226,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                 "listeners. This behaviour and duration is configurable via server options "
                 "or CLI"},
                {ParamDescriptor::Type::Boolean, "skip_exit",
-                "When draining listeners, do not exit after the drain period. "
-                "This must be used with graceful"},
+                "When draining listeners, drain the connections but never stop the listeners. The "
+                "graceful parameter has no effect when this is set, since the drain period only "
+                "delays stopping the listeners"},
                {ParamDescriptor::Type::Boolean, "inboundonly",
                 "Drains all inbound listeners. traffic_direction field in "
                 "envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a "
