@@ -241,8 +241,8 @@ common:fips-common --@envoy//bazel:fips=True
 
 # BoringSSL FIPS
 common:boringssl-fips --config=fips-common
-common:boringssl-fips --@envoy//bazel:ssl=@boringssl_fips//:ssl
-common:boringssl-fips --@envoy//bazel:crypto=@boringssl_fips//:crypto
+common:boringssl-fips --@envoy//bazel:ssl=@boringssl-fips//:ssl
+common:boringssl-fips --@envoy//bazel:crypto=@boringssl-fips//:crypto
 
 # OpenSSL
 common:openssl --@envoy//bazel:openssl=True
