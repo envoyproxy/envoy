@@ -253,7 +253,6 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
     _io_opentelemetry_api_cpp()
     _colm()
     _ragel()
-    _dlb()
     _zlib_ng()
     _boost()
     _brotli()
@@ -1047,21 +1046,6 @@ def _wasmtime():
             "@proxy-wasm-cpp-host//:bazel/external/prefixed_wasmtime.patch",
         ],
         patch_args = ["-p1"],
-    )
-
-def _dlb():
-    external_http_archive(
-        name = "dlb",
-        build_file_content = """
-filegroup(
-    name = "libdlb",
-    srcs = glob(["dlb/libdlb/*"]),
-    visibility = ["@envoy//contrib/dlb/source:__pkg__"],
-)
-""",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
-        patch_cmds = ["cp dlb/driver/dlb2/uapi/linux/dlb2_user.h dlb/libdlb/"],
     )
 
 def _rules_fuzzing():
