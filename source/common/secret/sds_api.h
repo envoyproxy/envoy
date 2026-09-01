@@ -25,19 +25,11 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/watched_directory.h"
 #include "source/common/init/target_impl.h"
-#include "source/common/protobuf/utility.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
 
 namespace Envoy {
 namespace Secret {
-
-/**
- * Minimum SDS initial_fetch_timeout applied when the operator configures 0s.
- * A zero timeout leaves the cluster init_manager permanently incomplete if the secret never
- * arrives, which deadlocks the CDS pipeline. 30s provides a bounded escape hatch.
- */
-static constexpr uint64_t SdsMinimumFetchTimeoutSeconds = 30;
 
 /**
  * All SDS API. @see stats_macros.h
