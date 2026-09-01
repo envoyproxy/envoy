@@ -60,7 +60,7 @@ public:
   /**
    * Requests RST on a subsequent close().
    */
-  virtual void requestRst() PURE;
+  virtual void setAbortiveClose() PURE;
 
   /**
    * Clean up IoHandle resources

@@ -52,7 +52,7 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
   }
 }
 
-void IoUringSocketHandleImpl::requestRst() {
+void IoUringSocketHandleImpl::setAbortiveClose() {
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
   // Enabling SO_LINGER with a timeout of zero results in an abortive close.
   struct linger l;

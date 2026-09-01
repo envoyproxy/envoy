@@ -66,7 +66,7 @@ IoHandleImpl::~IoHandleImpl() {
   }
 }
 
-void IoHandleImpl::requestRst() {
+void IoHandleImpl::setAbortiveClose() {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_send_rst_on_user_space_socket")) {
     rst_requested_ = true;

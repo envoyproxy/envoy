@@ -47,7 +47,7 @@ public:
     ASSERT(false, "not supported");
     return INVALID_SOCKET;
   }
-  void requestRst() override;
+  void setAbortiveClose() override;
   Api::IoCallUint64Result close() override;
   bool isOpen() const override;
   bool wasConnected() const override;
@@ -195,8 +195,8 @@ private:
   // Indicates whether this handle has sent EOF to the peer by calling setEof().
   bool sent_eof_{false};
 
-  // Set by requestRst() to indicate that a subsequent close() operation should propagate an RST
-  // (rather than a FIN).
+  // Set by setAbortiveClose() to indicate that a subsequent close() operation should propagate an
+  // RST (rather than a FIN).
   bool rst_requested_{false};
 
   // Shared state between peer handles.

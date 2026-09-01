@@ -448,7 +448,7 @@ public:
   /**
    * Request RST on a subsequent close().
    */
-  virtual void requestRst() PURE;
+  virtual void setAbortiveClose() PURE;
 
   /**
    * Close the underlying socket.

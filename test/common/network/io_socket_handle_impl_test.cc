@@ -87,7 +87,7 @@ TEST(IoSocketHandleImpl, CloseWithSendRstTrueSetsLingerZeroAndCloses) {
       }));
   EXPECT_CALL(os_sys_calls, close(test_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
 
-  io_handle.requestRst();
+  io_handle.setAbortiveClose();
   auto res = io_handle.close();
   EXPECT_EQ(0, res.return_value_);
   EXPECT_FALSE(io_handle.isOpen());

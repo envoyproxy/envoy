@@ -373,7 +373,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   connection_stats_.reset();
 
   if (abort_reset) {
-    socket_->requestRst();
+    socket_->setAbortiveClose();
   }
 
   // It is safe to call close() since there is an IO handle check.

@@ -34,7 +34,7 @@ public:
                           std::optional<int> domain = std::nullopt, bool is_server_socket = false);
   ~IoUringSocketHandleImpl() override;
 
-  void requestRst() override;
+  void setAbortiveClose() override;
   Api::IoCallUint64Result close() override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;

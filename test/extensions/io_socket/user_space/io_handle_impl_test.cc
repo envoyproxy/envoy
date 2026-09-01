@@ -1307,7 +1307,7 @@ TEST_F(IoHandleImplTest, ResetCloseEmitsConnectionResetErrorOnReadGuardEnabled) 
 
   EXPECT_TRUE(io_handle_->isOpen());
   EXPECT_TRUE(io_handle_peer_->isOpen());
-  io_handle_peer_->requestRst();
+  io_handle_peer_->setAbortiveClose();
   io_handle_peer_->close();
   EXPECT_FALSE(io_handle_peer_->isOpen());
   EXPECT_TRUE(io_handle_->isOpen());
@@ -1336,7 +1336,7 @@ TEST_F(IoHandleImplTest, ResetCloseEmitsEofOnReadGuardDisabled) {
 
   EXPECT_TRUE(io_handle_->isOpen());
   EXPECT_TRUE(io_handle_peer_->isOpen());
-  io_handle_peer_->requestRst();
+  io_handle_peer_->setAbortiveClose();
   io_handle_peer_->close();
   EXPECT_FALSE(io_handle_peer_->isOpen());
   EXPECT_TRUE(io_handle_->isOpen());
