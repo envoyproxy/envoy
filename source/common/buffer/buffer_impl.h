@@ -61,7 +61,7 @@ public:
         base_(storage_.get()) {
     if (account) {
       account->charge(capacity_);
-      account_ = account;
+      extras().account_ = account;
     }
   }
 
@@ -80,7 +80,7 @@ public:
 
     if (account) {
       account->charge(capacity_);
-      account_ = account;
+      extras().account_ = account;
     }
   }
 
@@ -92,7 +92,7 @@ public:
       : capacity_(fragment.size()), storage_(nullptr),
         base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))),
         reservable_(fragment.size()) {
-    releasor_ = [&fragment]() { fragment.done(); };
+    extras().releasor_ = [&fragment]() { fragment.done(); };
   }
 
   Slice(Slice&& rhs) noexcept {
@@ -101,9 +101,7 @@ public:
     base_ = rhs.base_;
     data_ = rhs.data_;
     reservable_ = rhs.reservable_;
-    drain_trackers_ = std::move(rhs.drain_trackers_);
-    account_ = std::move(rhs.account_);
-    releasor_.swap(rhs.releasor_);
+    extras_ = std::move(rhs.extras_);
 
     rhs.capacity_ = 0;
     rhs.base_ = nullptr;
@@ -114,19 +112,14 @@ public:
   Slice& operator=(Slice&& rhs) noexcept {
     if (this != &rhs) {
       callAndClearDrainTrackersAndCharges();
+      callAndClearReleasor();
 
       capacity_ = rhs.capacity_;
       storage_ = std::move(rhs.storage_);
       base_ = rhs.base_;
       data_ = rhs.data_;
       reservable_ = rhs.reservable_;
-      drain_trackers_ = std::move(rhs.drain_trackers_);
-      account_ = std::move(rhs.account_);
-      if (releasor_) {
-        releasor_();
-      }
-      releasor_ = rhs.releasor_;
-      rhs.releasor_ = nullptr;
+      extras_ = std::move(rhs.extras_);
 
       rhs.capacity_ = 0;
       rhs.base_ = nullptr;
@@ -139,9 +132,7 @@ public:
 
   ~Slice() {
     callAndClearDrainTrackersAndCharges();
-    if (releasor_) {
-      releasor_();
-    }
+    callAndClearReleasor();
   }
 
   /**
@@ -298,18 +289,21 @@ public:
    * Move all drain trackers and charges from the current slice to the destination slice.
    */
   void transferDrainTrackersTo(Slice& destination) {
-    destination.drain_trackers_.splice(destination.drain_trackers_.end(), drain_trackers_);
-    ASSERT(drain_trackers_.empty());
+    if (extras_ != nullptr && !extras_->drain_trackers_.empty()) {
+      auto& destination_trackers = destination.extras().drain_trackers_;
+      destination_trackers.splice(destination_trackers.end(), extras_->drain_trackers_);
+      ASSERT(extras_->drain_trackers_.empty());
+    }
     // The releasor needn't to be transferred, and actually if there is releasor, this
     // slice can't coalesce. Then there won't be a chance to calling this method.
-    ASSERT(releasor_ == nullptr);
+    ASSERT(extras_ == nullptr || extras_->releasor_ == nullptr);
   }
 
   /**
    * Add a drain tracker to the slice.
    */
   void addDrainTracker(std::function<void()> drain_tracker) {
-    drain_trackers_.emplace_back(std::move(drain_tracker));
+    extras().drain_trackers_.emplace_back(std::move(drain_tracker));
   }
 
   /**
@@ -317,14 +311,17 @@ public:
    * the drain tracker list.
    */
   void callAndClearDrainTrackersAndCharges() {
-    for (const auto& drain_tracker : drain_trackers_) {
+    if (extras_ == nullptr) {
+      return;
+    }
+    for (const auto& drain_tracker : extras_->drain_trackers_) {
       drain_tracker();
     }
-    drain_trackers_.clear();
+    extras_->drain_trackers_.clear();
 
-    if (account_) {
-      account_->credit(capacity_);
-      account_.reset();
+    if (extras_->account_) {
+      extras_->account_->credit(capacity_);
+      extras_->account_.reset();
     }
   }
 
@@ -335,11 +332,12 @@ public:
    * - the slice owns backing memory
    */
   void maybeChargeAccount(const BufferMemoryAccountSharedPtr& account) {
-    if (account_ != nullptr || storage_ == nullptr || account == nullptr) {
+    if (storage_ == nullptr || account == nullptr ||
+        (extras_ != nullptr && extras_->account_ != nullptr)) {
       return;
     }
     account->charge(capacity_);
-    account_ = account;
+    extras().account_ = account;
   }
 
   static constexpr uint32_t default_slice_size_ = 16384;
@@ -387,15 +385,43 @@ protected:
    * also the end of the Data section. */
   uint64_t reservable_ = 0;
 
-  /** Hooks to execute when the slice is destroyed. */
-  std::list<std::function<void()>> drain_trackers_;
+  /** Slice state that is unset on the vast majority of slices. It is held out of line to keep
+   * sizeof(Slice) small: OwnedImpl embeds an inline ring of InlineRingCapacity slices, so every
+   * byte in Slice is paid for InlineRingCapacity times by every buffer, empty ones included. */
+  struct Extras {
+    /** Hooks to execute when the slice is destroyed. */
+    std::list<std::function<void()>> drain_trackers_;
 
-  /** Account associated with this slice. This may be null. When
-   * coalescing with another slice, we do not transfer over their account. */
-  BufferMemoryAccountSharedPtr account_;
+    /** Account associated with this slice. This may be null. When
+     * coalescing with another slice, we do not transfer over their account. */
+    BufferMemoryAccountSharedPtr account_;
 
-  /** The releasor for the BufferFragment */
-  std::function<void()> releasor_;
+    /** The releasor for the BufferFragment */
+    std::function<void()> releasor_;
+  };
+
+  /** Null until one of the Extras fields is first set. */
+  std::unique_ptr<Extras> extras_;
+
+  /**
+   * @return the extras for this slice, allocating them on first use.
+   */
+  Extras& extras() {
+    if (extras_ == nullptr) {
+      extras_ = std::make_unique<Extras>();
+    }
+    return *extras_;
+  }
+
+  /**
+   * Call the releasor for the BufferFragment, if there is one, then clear it.
+   */
+  void callAndClearReleasor() {
+    if (extras_ != nullptr && extras_->releasor_) {
+      extras_->releasor_();
+      extras_->releasor_ = nullptr;
+    }
+  }
 };
 
 class OwnedImpl;
