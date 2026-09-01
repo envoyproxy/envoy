@@ -73,7 +73,7 @@ cc_test(
         ":patched_bssl_tests",
     ],
     data = [
-        "@boringssl//:test_data",
+        "@boringssl-source//:test_data",
     ],
     env = {
         "BORINGSSL_TEST_DATA_ROOT": "./external/boringssl",
@@ -100,7 +100,7 @@ cc_test(
         ":patched_bssl_tests",
     ],
     data = [
-        "@boringssl//:test_data",
+        "@boringssl-source//:test_data",
     ],
     env = {
         "BORINGSSL_TEST_DATA_ROOT": "./external/boringssl",
@@ -110,8 +110,8 @@ cc_test(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@boringssl//:crypto",
-        "@boringssl//:ssl",
+        "@boringssl-source//:crypto",
+        "@boringssl-source//:ssl",
         "@googletest//:gtest",
     ],
 )
