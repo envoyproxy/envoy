@@ -84,8 +84,10 @@ public:
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
     proto.mutable_request_handling()->set_parse_unconfigured_routes(parse_unconfigured_routes);
     if (inline_string_threshold_bytes != 0) {
-      proto.mutable_request_handling()->mutable_inline_string_threshold_bytes()->set_value(
-          inline_string_threshold_bytes);
+      proto.mutable_request_handling()
+          ->mutable_limits()
+          ->mutable_inline_string_threshold_bytes()
+          ->set_value(inline_string_threshold_bytes);
     }
     filter_ = std::make_unique<AiProtocolManagerFilter>(
         factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope()));

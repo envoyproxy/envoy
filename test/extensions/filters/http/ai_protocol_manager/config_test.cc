@@ -142,22 +142,27 @@ TEST(AiProtocolManagerConfigTest, InlineStringThresholdDefaultsAndOverrides) {
   }
   {
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
-    proto_config.mutable_request_handling()->mutable_inline_string_threshold_bytes()->set_value(
-        4096);
+    proto_config.mutable_request_handling()
+        ->mutable_limits()
+        ->mutable_inline_string_threshold_bytes()
+        ->set_value(4096);
     const FilterConfig config(proto_config, *stats_store.rootScope());
     EXPECT_EQ(config.inlineStringThresholdBytes(), 4096);
   }
 }
 
-// The threshold is bounded on both ends: zero would offload every non-empty
-// string, and an unbounded value would defeat the offload it gates.
+// The threshold is bounded on both ends: a value under the floor offloads
+// strings a payload schema fixes in size, and an unbounded value would defeat
+// the offload it gates.
 TEST(AiProtocolManagerConfigTest, RejectsOutOfRangeInlineStringThreshold) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   AiProtocolManagerFilterConfigFactory factory;
-  for (const uint32_t value : {0u, 2u * 1024u * 1024u}) {
+  for (const uint32_t value : {0u, 32u, 2u * 1024u * 1024u}) {
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
-    proto_config.mutable_request_handling()->mutable_inline_string_threshold_bytes()->set_value(
-        value);
+    proto_config.mutable_request_handling()
+        ->mutable_limits()
+        ->mutable_inline_string_threshold_bytes()
+        ->set_value(value);
     EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
                  EnvoyException);
   }

@@ -117,7 +117,7 @@ FilterConfig::FilterConfig(
       request_handling_enabled_(proto.has_request_handling()),
       parse_unconfigured_routes_(proto.request_handling().parse_unconfigured_routes()),
       inline_string_threshold_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          proto.request_handling(), inline_string_threshold_bytes,
+          proto.request_handling().limits(), inline_string_threshold_bytes,
           JsonWithExtBufParser::kDefaultInlineStringThresholdBytes)),
       token_usage_enabled_(proto.response_handling().has_token_usage()),
       include_unconfigured_routes_(
