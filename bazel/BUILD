@@ -1069,7 +1069,7 @@ py_test(
     target_compatible_with = select({
         ":bzlmod_mode": [],
         "//conditions:default": ["@platforms//:incompatible"],
-    })
+    }),
 )
 
 # A dependency required by python protobuf
