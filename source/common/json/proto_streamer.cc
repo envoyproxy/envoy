@@ -46,6 +46,9 @@ bool redactionClears(const Field& field) {
          field.type() != Field::TYPE_BYTES;
 }
 
+// The streamer delegates types with a special representation to
+// MessageUtil::getJsonStringFromMessage and TypedStruct reification to MessageUtil::redact.
+// Both work on whole messages, so these subtrees are copied and redacted up front.
 ProtobufTypes::MessagePtr redactedCopy(const Protobuf::Message& message,
                                        bool ancestor_is_sensitive) {
   ProtobufTypes::MessagePtr copy(message.New());
