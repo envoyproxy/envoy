@@ -3,6 +3,7 @@ load(
     "envoy_benchmark_test",
     "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
@@ -13,6 +14,16 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_cc_test_library(
+    name = "fake_bridge_lib",
+    hdrs = ["fake_bridge.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:filter_chain_bridge_lib",
+    ],
+)
 
 envoy_extension_cc_test(
     name = "external_buffer_impl_test",
@@ -68,6 +79,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
     rbe_pool = "linux_x64_small",
     deps = [
+        ":fake_bridge_lib",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:buffer_manager_lib",
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
@@ -114,12 +126,57 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:serializer_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "serializer_test",
+    srcs = ["serializer_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        ":fake_bridge_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/coroutine:dispatcher_executor_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:buffer_manager_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:serializer_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "filter_manager_test",
+    srcs = ["filter_manager_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        ":fake_bridge_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/coroutine:async_queue_lib",
+        "//source/common/coroutine:dispatcher_executor_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:buffer_manager_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:filter_manager_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:serializer_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@nlohmann_json//:json",
     ],
 )
 

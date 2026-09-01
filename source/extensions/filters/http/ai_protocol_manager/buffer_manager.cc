@@ -66,6 +66,7 @@ void BufferManager::endStream() {
 void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback done) {
   // One replay at a time: the caller chains sub-ranges from the done callback.
   ASSERT(!replaying_ && !replay_requested_);
+  replay_source_ = ReplaySource::ExternalBuffer;
   replay_offset_ = offset;
   replay_end_ = offset + length;
   replay_done_ = std::move(done);
@@ -80,6 +81,30 @@ void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback 
   // completion starts replay via maybeStartReplay() instead.
   if (!write_in_flight_ && pending_.length() == 0) {
     replay_cb_->scheduleCallbackCurrentIteration();
+  }
+}
+
+void BufferManager::replay(Buffer::Instance& data, ReplayDoneCallback done) {
+  ASSERT(!replaying_ && !replay_requested_);
+  replay_source_ = ReplaySource::InMemory;
+  replay_in_memory_data_.move(data);
+  replay_done_ = std::move(done);
+  replay_requested_ = true;
+  ENVOY_LOG(debug, "ai_protocol_manager: in-memory replay requested for {} bytes",
+            replay_in_memory_data_.length());
+  if (!write_in_flight_ && pending_.length() == 0) {
+    replay_cb_->scheduleCallbackCurrentIteration();
+  }
+}
+
+void BufferManager::cancelReplay() {
+  replay_requested_ = false;
+  replaying_ = false;
+  replay_source_ = ReplaySource::None;
+  replay_done_ = nullptr;
+  replay_in_memory_data_.drain(replay_in_memory_data_.length());
+  if (replay_cb_) {
+    replay_cb_->cancel();
   }
 }
 
@@ -137,8 +162,12 @@ void BufferManager::maybeStartReplay() {
   }
   replay_requested_ = false;
   replaying_ = true;
-  ENVOY_LOG(debug, "ai_protocol_manager: replaying [{}, {})", replay_offset_, replay_end_);
-  maybeReadNextChunk();
+  if (replay_source_ == ReplaySource::InMemory) {
+    maybeDrainInMemoryReplay();
+  } else if (replay_source_ == ReplaySource::ExternalBuffer) {
+    ENVOY_LOG(debug, "ai_protocol_manager: replaying [{}, {})", replay_offset_, replay_end_);
+    maybeReadNextChunk();
+  }
 }
 
 void BufferManager::updateIngestBackpressure() {
@@ -158,6 +187,38 @@ void BufferManager::updateIngestBackpressure() {
     ENVOY_LOG(debug, "ai_protocol_manager: ingest low watermark ({} bytes not durable)", unacked);
     bridge_->resumeSource();
   }
+}
+
+void BufferManager::maybeDrainInMemoryReplay() {
+  ASSERT(!destroyed_);
+  if (!replaying_) {
+    return;
+  }
+
+  replay_sync_chunks_ = 0;
+  while (replay_in_memory_data_.length() > 0) {
+    if (replay_high_watermark_count_ > 0) {
+      ENVOY_LOG(trace, "ai_protocol_manager: in-memory replay paused (chain back-pressure)");
+      return;
+    }
+    if (replay_sync_chunks_ >= ReplayChunksPerIteration) {
+      ENVOY_LOG(trace, "ai_protocol_manager: in-memory replay yielding after {} chunks",
+                replay_sync_chunks_);
+      replay_cb_->scheduleCallbackNextIteration();
+      return;
+    }
+    ++replay_sync_chunks_;
+    const uint64_t to_inject =
+        std::min(ReadChunkSize, static_cast<uint64_t>(replay_in_memory_data_.length()));
+    Buffer::OwnedImpl chunk;
+    chunk.move(replay_in_memory_data_, to_inject);
+    bridge_->injectData(chunk);
+    if (destroyed_) {
+      return;
+    }
+  }
+
+  finishReplay();
 }
 
 void BufferManager::maybeReadNextChunk() {
@@ -233,7 +294,9 @@ void BufferManager::onReplayContinuation() {
   // advancing a fresh burst twice.
   if (!replaying_) {
     maybeStartReplay();
-  } else {
+  } else if (replay_source_ == ReplaySource::InMemory) {
+    maybeDrainInMemoryReplay();
+  } else if (replay_source_ == ReplaySource::ExternalBuffer) {
     maybeReadNextChunk();
   }
 }
@@ -279,7 +342,8 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
 
 void BufferManager::finishReplay() {
   replaying_ = false;
-  ENVOY_LOG(trace, "ai_protocol_manager: replay range [.., {}) complete", replay_end_);
+  replay_source_ = ReplaySource::None;
+  ENVOY_LOG(trace, "ai_protocol_manager: replay complete");
   // Hand control back to the caller. Its callback may start the next sub-range or
   // terminate the stream; move the callback out first so it can re-arm replay().
   ReplayDoneCallback done = std::move(replay_done_);

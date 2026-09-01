@@ -13,6 +13,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 
 #include "absl/functional/any_invocable.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -123,6 +124,11 @@ public:
   // Only call after endStream(). It may wait until all write is done before start streaming.
   void replay(uint64_t offset, uint64_t length, ReplayDoneCallback done);
 
+  // Replays in-memory `data` (e.g. from serializer's small buffer) back into the filter
+  // chain as data frames, pacing against watermark flow control and burst limits,
+  // invoking `done` once all bytes have been drained.
+  void replay(Buffer::Instance& data, ReplayDoneCallback done);
+
   // Total number of bytes offloaded so far (durable, queued, and in-flight). The
   // caller uses this to size replay ranges; it is final once endStream() has been
   // called.
@@ -134,6 +140,9 @@ public:
   bool empty() const {
     return buffer_ == nullptr || buffer_->length() + pending_.length() + in_flight_write_size_ == 0;
   }
+
+  // Cancels any in-flight or requested replay operation and disarms callbacks.
+  void cancelReplay();
 
   // Detaches the manager from the filter chain: releases the external buffer,
   // unsubscribes from replay watermarks, and cancels the pending replay
@@ -187,6 +196,9 @@ private:
   // via replay_cb_ and resumes next iteration. An asynchronous store drives one
   // chunk per completion and paces itself.
   void maybeReadNextChunk();
+
+  // Drains in-memory replay data to the filter chain with respect to watermark flow control.
+  void maybeDrainInMemoryReplay();
 
   // Target of replay_cb_. Runs off the caller's stack to either start replay
   // deferred from replay() (the caller may invoke it from a data callback, where
@@ -261,6 +273,10 @@ private:
   // True while the data source is paused for ingest back-pressure; tracked so we
   // pause/resume the source exactly once per crossing.
   bool source_paused_{false};
+
+  enum class ReplaySource { None, ExternalBuffer, InMemory };
+  ReplaySource replay_source_{ReplaySource::None};
+  Buffer::OwnedImpl replay_in_memory_data_;
 
   // True while a replay range is actively being streamed (from maybeStartReplay()
   // until finishReplay()).

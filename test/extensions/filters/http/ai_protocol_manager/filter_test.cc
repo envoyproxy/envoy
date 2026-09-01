@@ -10,6 +10,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -19,6 +20,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
 
 using testing::Invoke;
 using testing::NiceMock;
@@ -1148,7 +1150,7 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(), payload);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
   EXPECT_TRUE(injected_end_stream_);
 }
 
@@ -1280,7 +1282,7 @@ TEST_F(AiProtocolManagerFilterTest, PassesThroughUnknownFields) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(), payload);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
   EXPECT_TRUE(injected_end_stream_);
 }
 
@@ -1299,8 +1301,9 @@ TEST_F(AiProtocolManagerFilterTest, ChunkedBodyWithEmptyTerminalFrame) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(),
-            R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(
+      nlohmann::json::parse(injected_.toString()),
+      nlohmann::json::parse(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})"));
 }
 
 // With trailers, no data frame carries end_stream, so the trailers close it.
@@ -1315,8 +1318,9 @@ TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedJsonIsParsed) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(),
-            R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(
+      nlohmann::json::parse(injected_.toString()),
+      nlohmann::json::parse(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})"));
   EXPECT_EQ(continue_calls_, 1);
 }
 
@@ -1478,8 +1482,24 @@ TEST_F(AiProtocolManagerFilterTest, PassThroughEndpointIsParsedAndForwarded) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(),
-            R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(
+      nlohmann::json::parse(injected_.toString()),
+      nlohmann::json::parse(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})"));
+}
+
+TEST_F(AiProtocolManagerFilterTest, SetsFilterStateObjectOnParsedPayload) {
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  auto* fs = callbacks_.stream_info_.filterState()->getDataReadOnly<APMRequestPayloadIndex>(
+      APMRequestPayloadIndex::kFilterStateKey);
+  ASSERT_NE(fs, nullptr);
+  EXPECT_EQ(fs->index().json()["model"], "gpt-4");
 }
 
 // A payload with valid JSON syntax but violating the route's schema is rejected with 400.

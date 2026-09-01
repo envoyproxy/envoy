@@ -12,6 +12,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
+#include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include "absl/strings/match.h"
@@ -135,6 +136,9 @@ FilterConfig::FilterConfig(
                                           max_parsed_sse_events, DefaultMaxParsedSseEvents)) {}
 
 void AiProtocolManagerFilter::onDestroy() {
+  if (filter_manager_ != nullptr) {
+    filter_manager_->cancel();
+  }
   if (decode_manager_ != nullptr) {
     // Detach the manager (releases the external buffer and unsubscribes from
     // watermarks) but do NOT free it here. onDestroy() can run synchronously while
@@ -294,16 +298,7 @@ Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& dat
 
   decode_manager_->onData(data);
   if (end_stream) {
-    // The full body has been offloaded. The filter owns replay and end-of-stream:
-    // a future change will assemble and inspect the request here (and may replay
-    // sub-ranges); for now replay the whole body, then emit the terminal frame.
-    decode_manager_->endStream();
-    decode_manager_->replay(0, decode_manager_->length(), [this]() {
-      // Terminate the stream with an empty end_stream data frame after the replayed
-      // body (also releases the held headers when the body was empty).
-      Buffer::OwnedImpl end_marker;
-      decoder_callbacks_->injectDecodedDataToFilterChain(end_marker, /*end_stream=*/true);
-    });
+    finalizeDecode(/*has_trailers=*/false);
   }
   // Hold the chain here; the BufferManager replays the payload once told to.
   return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -330,16 +325,49 @@ Http::FilterTrailersStatus AiProtocolManagerFilter::decodeTrailers(Http::Request
     }
   }
 
-  // The body ended without end_stream on a data frame; the trailers carry it.
-  decode_manager_->endStream();
-  decode_manager_->replay(0, decode_manager_->length(), [this]() {
-    // Body fully replayed; release the held trailers (they carry END_STREAM) so
-    // they follow the body in order.
-    decoder_callbacks_->continueDecoding();
-  });
+  finalizeDecode(/*has_trailers=*/true);
   // Hold the trailers behind the replayed body until the replay-done callback
   // above releases them.
   return Http::FilterTrailersStatus::StopIteration;
+}
+
+void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
+  decode_manager_->endStream();
+  auto on_complete = [this, has_trailers]() {
+    if (has_trailers) {
+      // Body fully replayed; release the held trailers (they carry END_STREAM) so
+      // they follow the body in order.
+      decoder_callbacks_->continueDecoding();
+    } else {
+      // Terminate the stream with an empty end_stream data frame after the replayed
+      // body (also releases the held headers when the body was empty).
+      Buffer::OwnedImpl end_marker;
+      decoder_callbacks_->injectDecodedDataToFilterChain(end_marker, /*end_stream=*/true);
+    }
+  };
+
+  if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
+    std::vector<AiFilterPtr> filters;
+    filter_manager_ = std::make_unique<FilterManager>(
+        std::move(filters), std::move(request_json_), decode_manager_.get(),
+        decoder_callbacks_->dispatcher(), decoder_callbacks_->streamInfo(),
+        [this](Http::Code code, std::string details) {
+          ENVOY_LOG(debug, "ai_protocol_manager: rejecting request via local reply: {} {}",
+                    static_cast<uint32_t>(code), details);
+          payload_rejected_ = true;
+          decoder_callbacks_->sendLocalReply(code, details, nullptr, std::nullopt,
+                                             "ai_protocol_manager_filter_rejected");
+        });
+    filter_manager_->start([this, on_complete = std::move(on_complete)](absl::Status status) {
+      if (!status.ok()) {
+        rejectInvalidPayload(status);
+      } else {
+        on_complete();
+      }
+    });
+  } else {
+    decode_manager_->replay(0, decode_manager_->length(), std::move(on_complete));
+  }
 }
 
 Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseHeaderMap& headers,

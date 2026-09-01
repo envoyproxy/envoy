@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 
+#include "test/extensions/filters/http/ai_protocol_manager/fake_bridge.h"
 #include "test/mocks/event/mocks.h"
 
 #include "gmock/gmock.h"
@@ -20,45 +21,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 namespace {
-
-// Hand-written FilterChainBridge that records everything the BufferManager does
-// to the (notional) filter chain, so the path-agnostic offload/replay logic can
-// be unit-tested without any HTTP filter mocks. Tests drive replay back-pressure
-// through the captured ReplayWatermarkHandler, exactly as a real decoder/encoder
-// bridge would when the connection manager raises a watermark.
-class FakeBridge : public FilterChainBridge {
-public:
-  explicit FakeBridge(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
-
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  uint32_t bufferLimit() override { return buffer_limit_; }
-  void injectData(Buffer::Instance& data) override {
-    injected_.add(data);
-    ++inject_calls_;
-    // Simulate downstream back-pressure arising mid-replay: when configured, raise
-    // the replay high watermark right after the Nth injected chunk, as a real
-    // chain would when its write buffer fills.
-    if (handler_ != nullptr && inject_calls_ == raise_replay_watermark_at_inject_) {
-      handler_->onReplayAboveHighWatermark();
-    }
-  }
-  void pauseSource() override { ++pause_source_calls_; }
-  void resumeSource() override { ++resume_source_calls_; }
-  void registerReplayWatermarks(ReplayWatermarkHandler& handler) override { handler_ = &handler; }
-  void unregisterReplayWatermarks() override { handler_ = nullptr; }
-  void onUnrecoverableError() override { ++error_calls_; }
-
-  Event::Dispatcher& dispatcher_;
-  uint32_t buffer_limit_{1024 * 1024};
-  ReplayWatermarkHandler* handler_{nullptr};
-
-  Buffer::OwnedImpl injected_;
-  int inject_calls_{0};
-  int pause_source_calls_{0};
-  int resume_source_calls_{0};
-  int error_calls_{0};
-  int raise_replay_watermark_at_inject_{0}; // 0 = never.
-};
 
 // An ExternalBuffer that completes both write and read asynchronously, via
 // dispatcher.post() -- modelling a network/disk-backed store. Used to exercise
@@ -773,6 +735,57 @@ TEST_F(BufferManagerTest, ResumeSkipsReadWhileOneInFlight) {
   drain();
   EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), big);
+}
+
+// In-memory replay injects small buffer data into the filter chain verbatim and triggers done
+// callback.
+TEST_F(BufferManagerTest, ReplaysInMemoryDataVerbatim) {
+  Buffer::OwnedImpl body("{\"messages\":[\"hello\"]}");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  Buffer::OwnedImpl in_memory_data("{\"modified\":true}");
+  bool in_mem_done = false;
+  manager_->replay(in_memory_data, [&in_mem_done]() { in_mem_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  EXPECT_TRUE(in_mem_done);
+  EXPECT_EQ(bridge_->injected_.toString(), "{\"modified\":true}");
+}
+
+// In-memory replay pauses when high watermark is hit and resumes when low watermark drains.
+TEST_F(BufferManagerTest, ReplaysInMemoryDataWithWatermarkBackpressure) {
+  Buffer::OwnedImpl body("initial");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  // Set bridge to raise high watermark on the first injected chunk.
+  bridge_->raise_replay_watermark_at_inject_ = 1;
+
+  const std::string big_payload(200 * 1024, 'z'); // Multiple 64KB chunks
+  Buffer::OwnedImpl in_memory_data(big_payload);
+  bool in_mem_done = false;
+  manager_->replay(in_memory_data, [&in_mem_done]() { in_mem_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // The first chunk injected and triggered high watermark, pausing replay.
+  EXPECT_FALSE(in_mem_done);
+  EXPECT_EQ(bridge_->injected_.length(), 64 * 1024);
+
+  // Now clear the watermark: low watermark schedules continuation to resume draining.
+  ASSERT_NE(bridge_->handler_, nullptr);
+  bridge_->handler_->onReplayBelowLowWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  EXPECT_TRUE(in_mem_done);
+  EXPECT_EQ(bridge_->injected_.toString(), big_payload);
 }
 
 } // namespace
