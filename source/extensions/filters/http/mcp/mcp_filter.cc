@@ -312,6 +312,15 @@ bool McpFilter::needsBody() const {
     return true;
   }
 
+  const auto& parser_config = parserConfig();
+  const std::string name_path = parser_config.getNameAttributePath(header_method_);
+
+  for (const auto& rule : parser_config.getFieldsForMethod(header_method_)) {
+    if (rule.path != name_path) {
+      return true;
+    }
+  }
+
   if (config_->propagateTraceContext().has_value() || config_->propagateBaggage().has_value() ||
       rejectDuplicateKeys()) {
     return true;

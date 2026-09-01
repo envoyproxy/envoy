@@ -239,6 +239,32 @@ TEST_F(McpFilterTest, HeadersAttributeSourceBuffersWhenDuplicateKeyCheckEnabled)
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
+TEST_F(McpFilterTest, HeadersAttributeSourceBuffersForBodyOnlyExtractionRule) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
+  proto_config.set_attribute_source(envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS);
+
+  auto* method_config = proto_config.mutable_parser_config()->add_methods();
+  method_config->set_method("tools/call");
+  method_config->add_extraction_rules()->set_path("params.arguments");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-method", "tools/call"},
+                                         {"mcp-name", "get_weather"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(_));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
 TEST_F(McpFilterTest, HeadersMismatchIsStatOnlyWhenBodyIsParsed) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
