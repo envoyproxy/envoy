@@ -222,10 +222,34 @@
    reading. Nested entries are files and symbols rather than areas, so they get
    no icon — one on every row would be the noise this removes. */
 
-.wy-menu-vertical a.envoy-nav-area {
+/* The area rows stick to the top of the scrolling column, so the icon and the
+   name of the section you are in stay visible however deep the tree goes.
+   Each one is pushed out by the next, which is what keeps this to a single
+   pinned row rather than nine of them eating the column. */
+/* Qualified through `li.toctree-l1` so it outranks the theme's
+   `.wy-menu-vertical li.current > a { position: relative }`, which otherwise
+   un-sticks the one row that matters — the area you are currently inside. */
+.wy-menu-vertical li.toctree-l1 > a.envoy-nav-area {
   align-items: center;
+  background: var(--envoy-ground);
   display: flex;
   gap: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* an opaque row over a scrolling list needs a foot, or the text underneath
+   appears to touch it */
+.wy-menu-vertical li.toctree-l1 > a.envoy-nav-area::after {
+  background: linear-gradient(var(--envoy-ground), transparent);
+  content: "";
+  height: 6px;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
 }
 
 .envoy-nav-icon {
@@ -233,8 +257,8 @@
   flex: none;
 }
 
-.wy-menu-vertical a.envoy-nav-area:hover .envoy-nav-icon,
-.wy-menu-vertical a.envoy-nav-area.current .envoy-nav-icon {
+.wy-menu-vertical li.toctree-l1 > a.envoy-nav-area:hover .envoy-nav-icon,
+.wy-menu-vertical li.toctree-l1 > a.envoy-nav-area.current .envoy-nav-icon {
   color: var(--envoy-accent);
 }
 
