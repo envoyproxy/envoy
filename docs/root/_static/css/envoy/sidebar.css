@@ -258,10 +258,11 @@
    no icon — one on every row would be the noise this removes. */
 
 /* The area rows stick to the top of the scrolling column, so the icon and the
-   name of the section you are in stay visible however deep the tree goes.
-   Each one is pushed out by the next, which is what keeps this to a single
-   pinned row rather than nine of them eating the column. */
-/* Qualified through `li.toctree-l1` so it outranks the theme's
+   name of the section you are in stay visible however deep the tree goes. Each
+   one is pushed out by the next, which keeps this to a single pinned row
+   rather than nine of them eating the column.
+
+   Qualified through li.toctree-l1 so it outranks the theme's
    `.wy-menu-vertical li.current > a { position: relative }`, which otherwise
    un-sticks the one row that matters — the area you are currently inside. */
 .wy-menu-vertical li.toctree-l1 > a.envoy-nav-area {
@@ -360,7 +361,7 @@
 
 /* open: the chevron turns to point down */
 .wy-menu-vertical li.current > a button.toctree-expand::after,
-.wy-menu-vertical li.on > a button.toctree-expand::after {
+.wy-menu-vertical li.on a button.toctree-expand::after {
   transform: rotate(45deg) translate(-2px, -2px);
 }
 
