@@ -185,21 +185,34 @@
   font-weight: 600;
 }
 
-/* nested levels get a guide line rather than deeper indentation alone */
-.wy-menu-vertical li.toctree-l2,
-.wy-menu-vertical li.toctree-l3,
-.wy-menu-vertical li.toctree-l4 {
+/* Depth is shown by the guide line, not by the indent, so the step gets
+   smaller as it goes: the API tree is five levels deep, and a flat 20px each
+   time spent 80px of a 280px column before the title even started. */
+.wy-menu-vertical li.toctree-l2 {
   border-left: 1px solid var(--envoy-rule);
-  margin-left: 20px;
+  margin-left: 18px;
 }
 
+.wy-menu-vertical li.toctree-l3,
+.wy-menu-vertical li.toctree-l4,
+.wy-menu-vertical li.toctree-l5 {
+  border-left: 1px solid var(--envoy-rule);
+  margin-left: 9px;
+}
+
+/* Deliberately not clamped. These titles are prose and their distinguishing
+   word is at the end — "Bootstrap settings for downstream reverse connection
+   socket interface" against "Upstream reverse connection socket interface" —
+   so truncating them hides the only part that tells them apart. The column is
+   widened instead. */
 .wy-menu-vertical li.toctree-l2 a,
 .wy-menu-vertical li.toctree-l3 a,
-.wy-menu-vertical li.toctree-l4 a {
+.wy-menu-vertical li.toctree-l4 a,
+.wy-menu-vertical li.toctree-l5 a {
   background: transparent;
   font-size: 13px;
   margin-left: -1px;
-  padding-left: 14px;
+  padding-left: 12px;
 }
 
 /* --- top-level areas -----------------------------------------------------
@@ -223,17 +236,6 @@
 .wy-menu-vertical a.envoy-nav-area:hover .envoy-nav-icon,
 .wy-menu-vertical a.envoy-nav-area.current .envoy-nav-icon {
   color: var(--envoy-accent);
-}
-
-/* A 77-character title wraps to five lines; two plus the full text in the
-   tooltip keeps every row the same height so the column scans. */
-.wy-menu-vertical li.toctree-l2 a,
-.wy-menu-vertical li.toctree-l3 a,
-.wy-menu-vertical li.toctree-l4 a {
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  display: -webkit-box;
-  overflow: hidden;
 }
 
 .wy-menu-vertical li button.toctree-expand {

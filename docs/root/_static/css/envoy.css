@@ -29,7 +29,9 @@
 :root {
   /* layout */
   --envoy-topbar-height: 56px;
-  --envoy-sidebar-width: 280px;
+  /* the API tree is five levels deep and its leaf titles are prose, so the
+     column is sized for those rather than for the nine top-level areas */
+  --envoy-sidebar-width: 320px;
   --envoy-toc-width: 240px;
   --envoy-measure: 72ch;
   --envoy-gutter: 56px;
