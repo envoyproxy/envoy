@@ -31,12 +31,14 @@ public:
    * @param scope the stats scope to write stats to.
    * @param dispatcher the dispatcher for the thread.
    * @param on_can_write_cb callback to invoke when the writer becomes writable.
+   * @param worker_index index of the worker thread.
    * @return the QuicPacketWriter created.
    */
-  virtual QuicPacketWriterPtr
-  createQuicPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope,
-                         Event::Dispatcher& dispatcher,
-                         absl::AnyInvocable<void()> on_can_write_cb) PURE;
+  virtual QuicPacketWriterPtr createQuicPacketWriter(Network::IoHandle& io_handle,
+                                                     Stats::Scope& scope,
+                                                     Event::Dispatcher& dispatcher,
+                                                     absl::AnyInvocable<void()> on_can_write_cb,
+                                                     uint32_t worker_index) PURE;
 };
 
 using QuicPacketWriterFactoryPtr = std::unique_ptr<QuicPacketWriterFactory>;

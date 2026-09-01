@@ -22,7 +22,8 @@ class FakeQuicPacketWriterFactory : public Quic::QuicPacketWriterFactory {
 public:
   Quic::QuicPacketWriterPtr createQuicPacketWriter(Network::IoHandle&, Stats::Scope&,
                                                    Event::Dispatcher&,
-                                                   absl::AnyInvocable<void()>) override {
+                                                   absl::AnyInvocable<void()>,
+                                                   uint32_t) override {
     return nullptr;
   }
 };
