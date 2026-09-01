@@ -48,8 +48,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     absl::Status& creation_status)
     : Rds::RdsRouteConfigSubscription(std::move(config_update), std::move(resource_decoder),
                                       rds.config_source(), rds.route_config_name(),
-                                      manager_identifier, factory_context, stat_prefix + "rds.",
-                                      "RDS", route_config_provider_manager, creation_status),
+                                      manager_identifier, factory_context, stat_prefix, "RDS",
+                                      route_config_provider_manager, creation_status),
       config_update_info_(static_cast<RouteConfigUpdateReceiver*>(
           Rds::RdsRouteConfigSubscription::config_update_info_.get())) {}
 
@@ -147,7 +147,7 @@ RouteConfigProviderSharedPtr RdsFactoryImpl::createRdsRouteConfigProvider(
       rds, rds.route_config_name(), init_manager,
       [&factory_context, &rds, &stat_prefix, &manager, &proto_traits](uint64_t manager_identifier) {
         auto config_update = std::make_unique<RouteConfigUpdateReceiverImpl>(
-            proto_traits, factory_context, stat_prefix + "rds.");
+            proto_traits, factory_context, stat_prefix, /*from_rds=*/true);
         auto resource_decoder = std::make_shared<
             Envoy::Config::OpaqueResourceDecoderImpl<envoy::config::route::v3::RouteConfiguration>>(
             factory_context.messageValidationContext().dynamicValidationVisitor(), "name");

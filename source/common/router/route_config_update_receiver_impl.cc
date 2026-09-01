@@ -223,7 +223,7 @@ bool RouteConfigUpdateReceiverImpl::updateVhosts(VirtualHostMap& vhosts,
 absl::StatusOr<VhdsSubscriptionPtr> RouteConfigUpdateReceiverImpl::createVhdsSubscription(
     const envoy::config::route::v3::RouteConfiguration& route_config, Init::Manager& init_manager) {
   return VhdsSubscription::createVhdsSubscription(route_config, factory_context_, stat_prefix_,
-                                                  *this, init_manager);
+                                                  from_rds_, *this, init_manager);
 }
 
 } // namespace Router
