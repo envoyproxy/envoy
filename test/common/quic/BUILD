@@ -129,15 +129,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "envoy_quic_server_cert_verifier_test",
-    srcs = envoy_select_enable_http3(["envoy_quic_server_cert_verifier_test.cc"]),
+    name = "envoy_quic_downstream_cert_verifier_test",
+    srcs = envoy_select_enable_http3(["envoy_quic_downstream_cert_verifier_test.cc"]),
     data = [
         "//test/common/tls/test_data:certs",
     ],
     rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/quic:envoy_quic_proof_verifier_lib",
-        "//source/common/quic:envoy_quic_server_cert_verifier_lib",
+        "//source/common/quic:envoy_quic_downstream_cert_verifier_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_config_lib",

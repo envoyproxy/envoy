@@ -1,4 +1,4 @@
-#include "source/common/quic/envoy_quic_server_cert_verifier.h"
+#include "source/common/quic/envoy_quic_downstream_cert_verifier.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"

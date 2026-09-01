@@ -1,5 +1,5 @@
+#include "source/common/quic/envoy_quic_downstream_cert_verifier.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
-#include "source/common/quic/envoy_quic_server_cert_verifier.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
 
@@ -19,9 +19,9 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Quic {
 
-class EnvoyQuicServerCertVerifierTest : public testing::Test {
+class EnvoyQuicDownstreamCertVerifierTest : public testing::Test {
 public:
-  EnvoyQuicServerCertVerifierTest() : api_(Api::createApiForTest(store_)) {
+  EnvoyQuicDownstreamCertVerifierTest() : api_(Api::createApiForTest(store_)) {
     ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(factory_context_.server_context_, threadLocal())
         .WillByDefault(ReturnRef(thread_local_));
@@ -64,7 +64,7 @@ require_client_certificate: true
 };
 
 // An empty chain is rejected because the client presented no certificate.
-TEST_F(EnvoyQuicServerCertVerifierTest, EmptyChainRejected) {
+TEST_F(EnvoyQuicDownstreamCertVerifierTest, EmptyChainRejected) {
   std::string error_details;
   std::unique_ptr<quic::ProofVerifyDetails> details;
   std::vector<absl::string_view> certs;
@@ -76,7 +76,7 @@ TEST_F(EnvoyQuicServerCertVerifierTest, EmptyChainRejected) {
 }
 
 // A chain that is not valid DER is rejected with a parse error.
-TEST_F(EnvoyQuicServerCertVerifierTest, MalformedCertificateRejected) {
+TEST_F(EnvoyQuicDownstreamCertVerifierTest, MalformedCertificateRejected) {
   std::string error_details;
   std::unique_ptr<quic::ProofVerifyDetails> details;
   std::vector<absl::string_view> certs{"not-a-valid-der-certificate"};
@@ -88,7 +88,7 @@ TEST_F(EnvoyQuicServerCertVerifierTest, MalformedCertificateRejected) {
 }
 
 // A well-formed certificate that does not chain to the trusted CA is rejected.
-TEST_F(EnvoyQuicServerCertVerifierTest, UntrustedCertificateRejected) {
+TEST_F(EnvoyQuicDownstreamCertVerifierTest, UntrustedCertificateRejected) {
   std::stringstream pem_stream{std::string(quic::test::kTestCertificateChainPem)};
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
   ASSERT_FALSE(chain.empty());
@@ -103,7 +103,7 @@ TEST_F(EnvoyQuicServerCertVerifierTest, UntrustedCertificateRejected) {
 }
 
 // A certificate that chains to the trusted CA is accepted and the details are marked valid.
-TEST_F(EnvoyQuicServerCertVerifierTest, TrustedCertificateAccepted) {
+TEST_F(EnvoyQuicDownstreamCertVerifierTest, TrustedCertificateAccepted) {
   const std::string pem = TestEnvironment::readFileToStringForTest(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
   std::stringstream pem_stream{pem};
@@ -123,7 +123,7 @@ TEST_F(EnvoyQuicServerCertVerifierTest, TrustedCertificateAccepted) {
 
 // The fail-closed safety-net verifier rejects any client certificate, so a non-Envoy crypto stream
 // cannot accept one without validation.
-TEST_F(EnvoyQuicServerCertVerifierTest, FailClosedVerifierRejects) {
+TEST_F(EnvoyQuicDownstreamCertVerifierTest, FailClosedVerifierRejects) {
   EnvoyQuicServerFailClosedProofVerifier verifier;
   std::string error_details;
   std::unique_ptr<quic::ProofVerifyDetails> details;
@@ -137,7 +137,7 @@ TEST_F(EnvoyQuicServerCertVerifierTest, FailClosedVerifierRejects) {
 
 // `CertVerifyResult::Clone` preserves the validity bit so `quiche's` internal copies carry the same
 // decision.
-TEST_F(EnvoyQuicServerCertVerifierTest, CertVerifyResultClone) {
+TEST_F(EnvoyQuicDownstreamCertVerifierTest, CertVerifyResultClone) {
   CertVerifyResult valid(true);
   EXPECT_TRUE(valid.isValid());
   auto valid_cloned =

@@ -1,8 +1,8 @@
 #include "source/common/quic/envoy_tls_server_handshaker.h"
 
 #include "source/common/common/macros.h"
+#include "source/common/quic/envoy_quic_downstream_cert_verifier.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
-#include "source/common/quic/envoy_quic_server_cert_verifier.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/runtime/runtime_features.h"
 

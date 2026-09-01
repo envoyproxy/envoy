@@ -128,7 +128,7 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = envoy_select_enable_http3([
         ":envoy_quic_proof_verifier_lib",
-        ":envoy_quic_server_cert_verifier_lib",
+        ":envoy_quic_downstream_cert_verifier_lib",
         ":envoy_quic_server_session_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
@@ -182,9 +182,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_quic_server_cert_verifier_lib",
-    srcs = envoy_select_enable_http3(["envoy_quic_server_cert_verifier.cc"]),
-    hdrs = envoy_select_enable_http3(["envoy_quic_server_cert_verifier.h"]),
+    name = "envoy_quic_downstream_cert_verifier_lib",
+    srcs = envoy_select_enable_http3(["envoy_quic_downstream_cert_verifier.cc"]),
+    hdrs = envoy_select_enable_http3(["envoy_quic_downstream_cert_verifier.h"]),
     external_deps = ["ssl"],
     deps = envoy_select_enable_http3([
         ":envoy_quic_proof_verifier_base_lib",
@@ -523,7 +523,7 @@ envoy_cc_library(
         ":envoy_quic_packet_writer_lib",
         ":envoy_quic_proof_source_factory_interface",
         ":envoy_quic_proof_source_lib",
-        ":envoy_quic_server_cert_verifier_lib",
+        ":envoy_quic_downstream_cert_verifier_lib",
         ":envoy_quic_server_preferred_address_config_factory_interface",
         ":envoy_quic_utils_lib",
         ":quic_packet_writer_interface",
