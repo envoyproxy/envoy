@@ -14,6 +14,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/type/v3/ratelimit_strategy.pb.h"
 
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/filter.h"
 #include "source/extensions/filters/http/rate_limit_quota/filter_persistence.h"
@@ -60,9 +61,13 @@ RateLimitQuotaFilterFactory::createHttpFilterFactoryFromProtoTyped(
                                        ? config->rlqs_server().envoy_grpc().cluster_name()
                                        : config->rlqs_server().google_grpc().target_uri();
 
+  // Defaults to 5 seconds when the reporting interval is not set.
+  std::chrono::milliseconds reporting_interval(
+      PROTOBUF_GET_MS_OR_DEFAULT(filter_config, reporting_interval, 5000));
+
   // Get the TLS store from the global map, or create one if it doesn't exist.
-  auto tls_store_or = GlobalTlsStores::getTlsStore(config_with_hash_key, context,
-                                                   rlqs_server_target, filter_config.domain());
+  auto tls_store_or = GlobalTlsStores::getTlsStore(
+      config_with_hash_key, context, rlqs_server_target, filter_config.domain(), reporting_interval);
   RETURN_IF_NOT_OK_REF(tls_store_or.status());
   std::shared_ptr<TlsStore> tls_store = std::move(tls_store_or.value());
 
