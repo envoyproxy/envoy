@@ -516,7 +516,7 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
       // A local close only proves that the fake upstream dispatcher closed its socket. Initiate a
       // fake-upstream FIN; closing the downstream below also makes TCP proxy and CONNECT paths that
       // enable upstream half-close fully close their paired upstream.
-      result = fake_upstream_connection_->halfClose();
+      result = fake_upstream_connection_->halfCloseForCleanup();
     }
     RELEASE_ASSERT(result, result.message());
     if (codec_client_) {

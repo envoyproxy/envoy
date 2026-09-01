@@ -472,6 +472,24 @@ FakeHttpConnection::FakeHttpConnection(
 
 FakeHttpConnection::~FakeHttpConnection() { shared_connection_.clearDisconnectCallback(); }
 
+AssertionResult FakeHttpConnection::halfCloseForCleanup(std::chrono::milliseconds timeout) {
+  ENVOY_LOG(trace, "FakeHttpConnection half-close for cleanup");
+  if (!shared_connection_.connected()) {
+    return AssertionSuccess();
+  }
+
+  return shared_connection_.executeOnDispatcher(
+      [this](Network::Connection& connection) {
+        shutting_down_for_cleanup_ = true;
+        if (!connection.isHalfCloseEnabled()) {
+          connection.enableHalfClose(true);
+        }
+        Buffer::OwnedImpl empty;
+        connection.write(empty, true);
+      },
+      timeout);
+}
+
 void FakeHttpConnection::initialize() {
   FakeConnectionBase::initialize();
   if (deferred_read_enable_ && shared_connection_.connected() &&
@@ -503,23 +521,6 @@ AssertionResult FakeConnectionBase::close(Network::ConnectionCloseType close_typ
   }
   return shared_connection_.executeOnDispatcher(
       [&close_type](Network::Connection& connection) { connection.close(close_type); }, timeout);
-}
-
-AssertionResult FakeConnectionBase::halfClose(std::chrono::milliseconds timeout) {
-  ENVOY_LOG(trace, "FakeConnectionBase half-close");
-  if (!shared_connection_.connected()) {
-    return AssertionSuccess();
-  }
-
-  return shared_connection_.executeOnDispatcher(
-      [](Network::Connection& connection) {
-        if (!connection.isHalfCloseEnabled()) {
-          connection.enableHalfClose(true);
-        }
-        Buffer::OwnedImpl empty;
-        connection.write(empty, true);
-      },
-      timeout);
 }
 
 AssertionResult
