@@ -1,6 +1,7 @@
 #include "envoy/access_log/access_log_config.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
 
@@ -135,6 +136,21 @@ TEST_F(OpenTelemetryAccessLogConfigTest, NoTransportConfigFails) {
       EnvoyException,
       "OpenTelemetry access logger requires one of: grpc_service, http_service, or "
       "common_config.grpc_service to be configured.");
+}
+
+// Verifies that configuring a valid resource detector succeeds.
+TEST_F(OpenTelemetryAccessLogConfigTest, ValidResourceDetectorOk) {
+  setupGrpcConfig();
+  auto* detector = access_log_config_.add_resource_detectors();
+  detector->set_name("envoy.tracers.opentelemetry.resource_detectors.environment");
+  envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+      EnvironmentResourceDetectorConfig env_config;
+  detector->mutable_typed_config()->PackFrom(env_config);
+  TestUtility::jsonConvert(access_log_config_, *message_);
+
+  ::Envoy::AccessLog::InstanceSharedPtr instance =
+      factory_->createAccessLogInstance(*message_, std::move(filter_), context_);
+  EXPECT_NE(nullptr, instance);
 }
 
 } // namespace

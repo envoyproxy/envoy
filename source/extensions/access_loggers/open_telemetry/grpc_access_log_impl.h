@@ -7,10 +7,12 @@
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/access_loggers/common/grpc_access_logger.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
@@ -40,7 +42,10 @@ public:
       const Grpc::RawAsyncClientSharedPtr& client,
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
           config,
-      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+      Event::Dispatcher& dispatcher, Stats::Scope& scope,
+      Server::Configuration::ServerFactoryContext& context,
+      const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider =
+          ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{});
 
 private:
   class OTelLogRequestCallbacks
@@ -112,7 +117,7 @@ class GrpcAccessLoggerCacheImpl
 public:
   GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
                             ThreadLocal::SlotAllocator& tls,
-                            const LocalInfo::LocalInfo& local_info);
+                            Server::Configuration::ServerFactoryContext& context);
 
 private:
   // Common::GrpcAccessLoggerCache
@@ -121,7 +126,7 @@ private:
           config,
       Event::Dispatcher& dispatcher) override;
 
-  const LocalInfo::LocalInfo& local_info_;
+  Server::Configuration::ServerFactoryContext& context_;
 };
 
 /**

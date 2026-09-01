@@ -30,7 +30,9 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
     const Grpc::RawAsyncClientSharedPtr& client,
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
-    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
+    Event::Dispatcher& dispatcher, Stats::Scope& scope,
+    Server::Configuration::ServerFactoryContext& context,
+    const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider)
     : GrpcAccessLogger(
           config.common_config(), dispatcher, scope, std::nullopt,
           std::make_unique<Common::UnaryGrpcAccessLogClient<ExportLogsServiceRequest,
@@ -41,7 +43,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
               GrpcCommon::optionalRetryPolicy(config.common_config()), genOTelCallbacksFactory())),
       stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(
           scope, absl::StrCat(OtlpAccessLogStatsPrefix, config.stat_prefix())))}) {
-  root_ = initOtlpMessageRoot(message_, config, local_info);
+  root_ = initOtlpMessageRoot(message_, config, context, resource_provider);
 }
 
 std::function<GrpcAccessLoggerImpl::OTelLogRequestCallbacks&()>
@@ -73,11 +75,10 @@ void GrpcAccessLoggerImpl::clearMessage() { root_->clear_log_records(); }
 
 uint32_t GrpcAccessLoggerImpl::countLogEntries() const { return batched_log_entries_; }
 
-GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager,
-                                                     Stats::Scope& scope,
-                                                     ThreadLocal::SlotAllocator& tls,
-                                                     const LocalInfo::LocalInfo& local_info)
-    : GrpcAccessLoggerCache(async_client_manager, scope, tls), local_info_(local_info) {}
+GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(
+    Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
+    ThreadLocal::SlotAllocator& tls, Server::Configuration::ServerFactoryContext& context)
+    : GrpcAccessLoggerCache(async_client_manager, scope, tls), context_(context) {}
 
 GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
@@ -92,8 +93,8 @@ GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
   THROW_IF_NOT_OK_REF(factory_or_error.status());
   auto client = THROW_OR_RETURN_VALUE(factory_or_error.value()->createUncachedRawAsyncClient(),
                                       Grpc::RawAsyncClientPtr);
-  return std::make_shared<GrpcAccessLoggerImpl>(std::move(client), config, dispatcher, local_info_,
-                                                scope_);
+  return std::make_shared<GrpcAccessLoggerImpl>(std::move(client), config, dispatcher, scope_,
+                                                context_);
 }
 
 } // namespace OpenTelemetry

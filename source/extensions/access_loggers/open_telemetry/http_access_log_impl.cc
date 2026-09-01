@@ -21,6 +21,10 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace OpenTelemetry {
 
+namespace {
+using opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest;
+} // namespace
+
 HttpAccessLoggerImpl::HttpAccessLoggerImpl(
     Upstream::ClusterManager& cluster_manager,
     const envoy::config::core::v3::HttpService& http_service,
@@ -36,7 +40,7 @@ HttpAccessLoggerImpl::HttpAccessLoggerImpl(
           POOL_COUNTER_PREFIX(server_context.serverScope(),
                               absl::StrCat(OtlpAccessLogStatsPrefix, config.stat_prefix())))}) {
 
-  root_ = initOtlpMessageRoot(message_, config, server_context.localInfo());
+  root_ = initOtlpMessageRoot(message_, config, server_context);
 
   // Sets up the flush timer.
   flush_timer_ = dispatcher.createTimer([this]() {

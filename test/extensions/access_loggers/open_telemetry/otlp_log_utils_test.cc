@@ -3,6 +3,7 @@
 #include "source/extensions/access_loggers/open_telemetry/otlp_log_utils.h"
 
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -15,7 +16,9 @@ namespace AccessLoggers {
 namespace OpenTelemetry {
 namespace {
 
+using testing::_;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 
 // A minimal command parser that resolves the "%FAKE_COMMAND%" token to a fixed value, used to
@@ -454,12 +457,12 @@ TEST(OtlpLogUtilsTest, InitOtlpMessageRootWithBuiltinLabels) {
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
   config.set_log_name("test_log");
 
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
-  ON_CALL(local_info, zoneName()).WillByDefault(ReturnRef(kTestZone));
-  ON_CALL(local_info, clusterName()).WillByDefault(ReturnRef(kTestCluster));
-  ON_CALL(local_info, nodeName()).WillByDefault(ReturnRef(kTestNode));
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.local_info_, zoneName()).WillByDefault(ReturnRef(kTestZone));
+  ON_CALL(context.local_info_, clusterName()).WillByDefault(ReturnRef(kTestCluster));
+  ON_CALL(context.local_info_, nodeName()).WillByDefault(ReturnRef(kTestNode));
 
-  auto* root = initOtlpMessageRoot(message, config, local_info);
+  auto* root = initOtlpMessageRoot(message, config, context);
 
   ASSERT_NE(nullptr, root);
   ASSERT_EQ(1, message.resource_logs_size());
@@ -487,9 +490,9 @@ TEST(OtlpLogUtilsTest, InitOtlpMessageRootDisableBuiltinLabels) {
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
   config.set_disable_builtin_labels(true);
 
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  auto* root = initOtlpMessageRoot(message, config, local_info);
+  auto* root = initOtlpMessageRoot(message, config, context);
 
   ASSERT_NE(nullptr, root);
   ASSERT_EQ(1, message.resource_logs_size());
@@ -507,9 +510,9 @@ TEST(OtlpLogUtilsTest, InitOtlpMessageRootWithResourceAttributes) {
   kv->set_key("custom_key");
   kv->mutable_value()->set_string_value("custom_value");
 
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  auto* root = initOtlpMessageRoot(message, config, local_info);
+  auto* root = initOtlpMessageRoot(message, config, context);
 
   ASSERT_NE(nullptr, root);
 
@@ -517,6 +520,95 @@ TEST(OtlpLogUtilsTest, InitOtlpMessageRootWithResourceAttributes) {
   auto* attr = expected_resource.add_attributes();
   attr->set_key("custom_key");
   attr->mutable_value()->set_string_value("custom_value");
+
+  EXPECT_TRUE(TestUtility::protoEqual(message.resource_logs(0).resource(), expected_resource));
+}
+
+class MockResourceProvider : public Extensions::Tracers::OpenTelemetry::ResourceProvider {
+public:
+  MOCK_METHOD(Extensions::Tracers::OpenTelemetry::Resource, getResource,
+              (const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+                   resource_detectors,
+               Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
+               const Extensions::Tracers::OpenTelemetry::ResourceProviderOptions& options),
+              (const));
+};
+
+// Verifies that resource detectors detect and populate resource attributes and schema URL.
+TEST(OtlpLogUtilsTest, InitOtlpMessageRootWithResourceDetectors) {
+  opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_disable_builtin_labels(true);
+  auto* detector = config.add_resource_detectors();
+  detector->set_name("mock_detector");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  MockResourceProvider mock_resource_provider;
+
+  Extensions::Tracers::OpenTelemetry::Resource detected_resource;
+  detected_resource.schema_url_ = "https://opentelemetry.io/schemas/1.24.0";
+  detected_resource.attributes_["host.name"] = "test-host";
+  detected_resource.attributes_["service.name"] = "test-service";
+
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, _))
+      .WillOnce(
+          [&](const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&,
+              Server::Configuration::ServerFactoryContext&, absl::string_view service_name,
+              const Extensions::Tracers::OpenTelemetry::ResourceProviderOptions& options) {
+            EXPECT_TRUE(service_name.empty());
+            EXPECT_FALSE(options.set_service_name_resource_attribute);
+            EXPECT_FALSE(options.set_telemetry_sdk_resource_attributes);
+            return detected_resource;
+          });
+
+  auto* root = initOtlpMessageRoot(message, config, context, mock_resource_provider);
+
+  ASSERT_NE(nullptr, root);
+  ASSERT_EQ(1, message.resource_logs_size());
+  EXPECT_EQ("https://opentelemetry.io/schemas/1.24.0", message.resource_logs(0).schema_url());
+
+  const auto& resource = message.resource_logs(0).resource();
+  EXPECT_EQ(2, resource.attributes_size());
+  absl::flat_hash_map<std::string, std::string> actual_attrs;
+  for (const auto& attr : resource.attributes()) {
+    actual_attrs[attr.key()] = attr.value().string_value();
+  }
+  EXPECT_EQ((absl::flat_hash_map<std::string, std::string>{{"host.name", "test-host"},
+                                                           {"service.name", "test-service"}}),
+            actual_attrs);
+}
+
+// Verifies that both resource detectors and custom resource_attributes are added together.
+TEST(OtlpLogUtilsTest, InitOtlpMessageRootWithResourceDetectorsAndResourceAttributes) {
+  opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_disable_builtin_labels(true);
+  auto* detector = config.add_resource_detectors();
+  detector->set_name("mock_detector");
+  auto* kv = config.mutable_resource_attributes()->add_values();
+  kv->set_key("custom_key");
+  kv->mutable_value()->set_string_value("custom_val");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  MockResourceProvider mock_resource_provider;
+
+  Extensions::Tracers::OpenTelemetry::Resource detected_resource;
+  detected_resource.attributes_["detected_key"] = "detected_val";
+
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, _)).WillOnce(Return(detected_resource));
+
+  auto* root = initOtlpMessageRoot(message, config, context, mock_resource_provider);
+
+  ASSERT_NE(nullptr, root);
+  ASSERT_EQ(1, message.resource_logs_size());
+
+  opentelemetry::proto::resource::v1::Resource expected_resource;
+  auto* attr = expected_resource.add_attributes();
+  attr->set_key("detected_key");
+  attr->mutable_value()->set_string_value("detected_val");
+  attr = expected_resource.add_attributes();
+  attr->set_key("custom_key");
+  attr->mutable_value()->set_string_value("custom_val");
 
   EXPECT_TRUE(TestUtility::protoEqual(message.resource_logs(0).resource(), expected_resource));
 }

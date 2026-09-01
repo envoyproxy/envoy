@@ -1,3 +1,5 @@
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.h"
+
 #include "source/common/http/http_service_headers.h"
 #include "source/extensions/access_loggers/open_telemetry/http_access_log_impl.h"
 
@@ -5,6 +7,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -396,6 +399,52 @@ TEST(HttpAccessLoggerCacheTest, CreateApplicatorFailure) {
   auto cache = std::make_shared<HttpAccessLoggerCacheImpl>(server_context);
 
   EXPECT_THROW(cache->getOrCreateApplicator(http_service, server_context), EnvoyException);
+}
+
+TEST_F(HttpAccessLoggerImplTest, LogWithResourceDetectors) {
+  envoy::config::core::v3::HttpService http_service;
+  http_service.mutable_http_uri()->set_uri("https://some-o11y.com/otlp/v1/logs");
+  http_service.mutable_http_uri()->set_cluster("my_o11y_backend");
+  http_service.mutable_http_uri()->mutable_timeout()->set_nanos(250000000);
+
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_log_name("http_test_log");
+
+  auto* detector = config.add_resource_detectors();
+  detector->set_name("envoy.tracers.opentelemetry.resource_detectors.environment");
+  envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+      EnvironmentResourceDetectorConfig env_config;
+  detector->mutable_typed_config()->PackFrom(env_config);
+
+  TestEnvironment::setEnvVar("OTEL_RESOURCE_ATTRIBUTES", "service.name=http-service", 1);
+
+  setupWithConfig(http_service, config);
+
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest request_msg;
+            EXPECT_TRUE(request_msg.ParseFromString(message->bodyAsString()));
+            EXPECT_EQ(1, request_msg.resource_logs_size());
+            const auto& resource = request_msg.resource_logs(0).resource();
+            bool found_service_name = false;
+            for (const auto& attr : resource.attributes()) {
+              if (attr.key() == "service.name" && attr.value().string_value() == "http-service") {
+                found_service_name = true;
+              }
+            }
+            EXPECT_TRUE(found_service_name);
+            return nullptr;
+          }));
+
+  opentelemetry::proto::logs::v1::LogRecord entry;
+  entry.set_severity_text("test-severity");
+  http_access_logger_->log(std::move(entry));
+
+  timer_->invokeCallback();
+
+  TestEnvironment::unsetEnvVar("OTEL_RESOURCE_ATTRIBUTES");
 }
 
 } // namespace OpenTelemetry

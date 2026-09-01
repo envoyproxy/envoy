@@ -29,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // populate `opentelemetry.proto.collector.v1.logs.ExportLogsServiceRequest.resource_logs <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto>`_.
 // In addition, the request start time is set in the dedicated field.
 // [#extension: envoy.access_loggers.open_telemetry]
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message OpenTelemetryAccessLogConfig {
   // [#comment:TODO(itamarkam): add 'filter_state_objects_to_log' to logs.]
   // Deprecated. Use ``grpc_service`` or ``http_service`` instead.
@@ -59,7 +59,20 @@ message OpenTelemetryAccessLogConfig {
   // OpenTelemetry `Resource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/logs/v1/logs.proto#L51>`_
   // attributes are filled with Envoy node info.
   // Example: ``resource_attributes { values { key: "region" value { string_value: "cn-north-7" } } }``.
+  //
+  // If both ``resource_detectors`` and ``resource_attributes`` are specified, attributes from
+  // ``resource_detectors`` are populated first, followed by attributes configured in ``resource_attributes``.
   opentelemetry.proto.common.v1.KeyValueList resource_attributes = 4;
+
+  // An ordered list of resource detectors to detect OpenTelemetry resource information such as
+  // attributes and schema URL.
+  //
+  // Attributes detected by ``resource_detectors`` will be added to the resource attributes.
+  // If both ``resource_detectors`` and ``resource_attributes`` are specified, the attributes from
+  // ``resource_detectors`` are added first, and any attributes configured in ``resource_attributes``
+  // are appended afterwards.
+  // [#extension-category: envoy.tracers.opentelemetry.resource_detectors]
+  repeated config.core.v3.TypedExtensionConfig resource_detectors = 15;
 
   // OpenTelemetry `LogResource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/logs/v1/logs.proto>`_
   // fields, following `Envoy access logging formatting <https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage>`_.

@@ -193,15 +193,30 @@ opentelemetry::proto::logs::v1::ScopeLogs* initOtlpMessageRoot(
     opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest& message,
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
-    const LocalInfo::LocalInfo& local_info) {
+    Server::Configuration::ServerFactoryContext& context,
+    const Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider) {
   auto* resource_logs = message.add_resource_logs();
   auto* root = resource_logs->add_scope_logs();
   auto* resource = resource_logs->mutable_resource();
   if (!config.disable_builtin_labels()) {
     *resource->add_attributes() = getStringKeyValue("log_name", getLogName(config));
-    *resource->add_attributes() = getStringKeyValue("zone_name", local_info.zoneName());
-    *resource->add_attributes() = getStringKeyValue("cluster_name", local_info.clusterName());
-    *resource->add_attributes() = getStringKeyValue("node_name", local_info.nodeName());
+    *resource->add_attributes() = getStringKeyValue("zone_name", context.localInfo().zoneName());
+    *resource->add_attributes() =
+        getStringKeyValue("cluster_name", context.localInfo().clusterName());
+    *resource->add_attributes() = getStringKeyValue("node_name", context.localInfo().nodeName());
+  }
+  if (!config.resource_detectors().empty()) {
+    Extensions::Tracers::OpenTelemetry::ResourceProviderOptions options;
+    options.set_service_name_resource_attribute = false;
+    options.set_telemetry_sdk_resource_attributes = false;
+    Extensions::Tracers::OpenTelemetry::Resource detected_resource =
+        resource_provider.getResource(config.resource_detectors(), context, "", options);
+    if (!detected_resource.schema_url_.empty()) {
+      resource_logs->set_schema_url(detected_resource.schema_url_);
+    }
+    for (const auto& [key, value] : detected_resource.attributes_) {
+      *resource->add_attributes() = getStringKeyValue(key, value);
+    }
   }
   for (const auto& pair : config.resource_attributes().values()) {
     *resource->add_attributes() = pair;
