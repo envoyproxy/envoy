@@ -12,14 +12,12 @@ envoy_extension_package()
 envoy_cc_library(
     name = "syslog_access_log_lib",
     srcs = [
-        "rfc3164_formatter.cc",
-        "rfc5424_formatter.cc",
+        "formatter.cc",
         "syslog_access_log_impl.cc",
         "udp_sender.cc",
     ],
     hdrs = [
-        "rfc3164_formatter.h",
-        "rfc5424_formatter.h",
+        "formatter.h",
         "sender.h",
         "syslog_access_log_impl.h",
         "udp_sender.h",
@@ -40,6 +38,8 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "//source/extensions/access_loggers/common:access_log_base",
         "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:string_view",
         "@envoy_api//envoy/extensions/access_loggers/syslog/v3:pkg_cc_proto",
     ],
 )

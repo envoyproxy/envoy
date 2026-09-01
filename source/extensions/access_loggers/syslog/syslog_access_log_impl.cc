@@ -1,9 +1,6 @@
 #include "source/extensions/access_loggers/syslog/syslog_access_log_impl.h"
 
-#include "source/common/common/utility.h"
-#include "source/common/formatter/substitution_format_utility.h"
-#include "source/extensions/access_loggers/syslog/rfc3164_formatter.h"
-#include "source/extensions/access_loggers/syslog/rfc5424_formatter.h"
+#include "source/extensions/access_loggers/syslog/formatter.h"
 #include "source/extensions/access_loggers/syslog/udp_sender.h"
 
 #include "absl/strings/str_cat.h"
@@ -15,58 +12,7 @@ namespace Syslog {
 
 namespace {
 
-constexpr absl::string_view DefaultAppName = "envoy";
 constexpr absl::string_view SyslogStatsPrefix = "access_logs.syslog.";
-
-// Proto 0 is the Envoy default (LOCAL7 / INFO). Remaining enumerators are RFC
-// 5424 codes + 1 so they stay non-zero. DEBUG is already RFC 7, so it is not
-// shifted.
-uint32_t rfcPriority(SyslogAccessLogConfig::Facility facility_enum,
-                     SyslogAccessLogConfig::Severity severity_enum) {
-  uint32_t facility = static_cast<uint32_t>(facility_enum);
-  if (facility_enum == SyslogAccessLogConfig::FACILITY_LOCAL7) {
-    facility = 23;
-  } else {
-    --facility;
-  }
-
-  uint32_t severity = static_cast<uint32_t>(severity_enum);
-  if (severity_enum == SyslogAccessLogConfig::INFO) {
-    severity = 6;
-  } else if (severity_enum != SyslogAccessLogConfig::DEBUG) {
-    --severity;
-  }
-  return facility * 8 + severity;
-}
-
-Formatter::FormatterPtr makeFormatter(const SyslogAccessLogConfig& config,
-                                      Formatter::FormatterConstSharedPtr body_formatter) {
-  const std::string priority =
-      absl::StrCat("<", rfcPriority(config.facility(), config.severity()), ">");
-  const std::string hostname =
-      config.no_hostname() ? "" : Formatter::SubstitutionFormatUtils::getHostname().value_or("");
-  const std::string app_name = config.tag().empty() ? std::string(DefaultAppName) : config.tag();
-
-  if (config.syslog_format() == SyslogAccessLogConfig::RFC5424) {
-    const std::string msg_id =
-        config.msg_id().empty() ? std::string(DefaultRfc5424MessageId) : config.msg_id();
-    return std::make_unique<Rfc5424Formatter>(std::move(body_formatter), priority, hostname,
-                                              app_name, msg_id);
-  }
-  return std::make_unique<Rfc3164Formatter>(std::move(body_formatter), priority, hostname,
-                                            app_name);
-}
-
-SenderPtr makeSender(const SyslogAccessLogConfig& config,
-                     Network::Address::InstanceConstSharedPtr destination,
-                     Event::Dispatcher& dispatcher, Upstream::ClusterManager& cluster_manager,
-                     SyslogAccessLogStats& stats) {
-  if (config.has_server()) {
-    return std::make_unique<StaticUdpSender>(dispatcher, std::move(destination), stats);
-  }
-  return std::make_unique<ClusterUdpSender>(dispatcher, cluster_manager, config.cluster().name(),
-                                            stats);
-}
 
 std::string statsPrefix(absl::string_view stat_prefix) {
   return absl::StrCat(SyslogStatsPrefix, stat_prefix, ".");
@@ -94,9 +40,20 @@ SyslogAccessLoggerImpl::SyslogAccessLoggerImpl(const SyslogAccessLogConfig& conf
                                                Formatter::FormatterConstSharedPtr body_formatter,
                                                SenderPtr sender, SyslogAccessLogStats& stats)
     : sender_(std::move(sender)), stats_(stats),
-      formatter_(makeFormatter(config, std::move(body_formatter))),
       max_message_size_(config.max_syslog_msg_bytes() == 0 ? DefaultMaxMessageSize
-                                                           : config.max_syslog_msg_bytes()) {}
+                                                           : config.max_syslog_msg_bytes()) {
+  if (config.syslog_format() == SyslogAccessLogConfig::RFC5424) {
+    formatter_ = std::make_unique<Rfc5424Formatter>(
+        std::move(body_formatter),
+        Rfc5424HeaderFormatter(config.facility(), config.severity(), config.no_hostname(),
+                               config.tag(), config.msg_id()));
+  } else {
+    formatter_ = std::make_unique<Rfc3164Formatter>(
+        std::move(body_formatter),
+        Rfc3164HeaderFormatter(config.facility(), config.severity(), config.no_hostname(),
+                               config.tag()));
+  }
+}
 
 void SyslogAccessLoggerImpl::log(const Formatter::Context& context,
                                  const StreamInfo::StreamInfo& stream_info) {
@@ -123,7 +80,13 @@ SyslogAccessLog::SyslogAccessLog(AccessLog::FilterPtr&& filter, Formatter::Forma
       config_(std::move(config)), destination_(std::move(destination)) {
   tls_slot_->set([config = config_, formatter = formatter_, destination = destination_,
                   &cluster_manager, stats = &stats_](Event::Dispatcher& dispatcher) {
-    SenderPtr sender = makeSender(*config, destination, dispatcher, cluster_manager, *stats);
+    SenderPtr sender;
+    if (config->has_server()) {
+      sender = std::make_unique<StaticUdpSender>(dispatcher, destination, *stats);
+    } else {
+      sender = std::make_unique<ClusterUdpSender>(dispatcher, cluster_manager,
+                                                  config->cluster().name(), *stats);
+    }
     return std::make_shared<ThreadLocalLogger>(
         std::make_shared<SyslogAccessLoggerImpl>(*config, formatter, std::move(sender), *stats));
   });

@@ -41,10 +41,9 @@ envoy_extension_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:socket_lib",
         "//source/extensions/access_loggers/syslog:config",
+        "//source/extensions/access_loggers/syslog:syslog_access_log_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
-        "//test/mocks/upstream:host_mocks",
-        "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
@@ -70,7 +69,6 @@ envoy_extension_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
-        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",
     ],
 )
@@ -84,6 +82,7 @@ envoy_extension_cc_test(
         "//source/common/formatter:substitution_formatter_lib",
         "//source/extensions/access_loggers/syslog:syslog_access_log_lib",
         "//test/mocks/stream_info:stream_info_mocks",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",
     ],
 )

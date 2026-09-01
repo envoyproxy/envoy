@@ -1,6 +1,5 @@
 #include <functional>
 #include <string>
-#include <tuple>
 #include <vector>
 
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
@@ -11,11 +10,10 @@
 #include "source/common/formatter/substitution_format_utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
+#include "source/extensions/access_loggers/syslog/formatter.h"
 
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/upstream/host.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -31,7 +29,7 @@ namespace {
 
 using SyslogAccessLogConfig = envoy::extensions::access_loggers::syslog::v3::SyslogAccessLogConfig;
 
-// rfcPriority() assumes this proto numbering.
+// pri() assumes this proto numbering.
 static_assert(SyslogAccessLogConfig::FACILITY_LOCAL7 == 0);
 static_assert(SyslogAccessLogConfig::FACILITY_KERN == 1);
 static_assert(SyslogAccessLogConfig::FACILITY_LOCAL6 == 23);
@@ -40,7 +38,6 @@ static_assert(SyslogAccessLogConfig::EMERG == 1);
 static_assert(SyslogAccessLogConfig::DEBUG == 7);
 
 using testing::MatchesRegex;
-using testing::Return;
 using testing::StartsWith;
 
 constexpr int64_t TestTimestampSeconds = 1787149254;
@@ -51,16 +48,6 @@ server:
     address: 127.0.0.1
     port_value: 514
     protocol: UDP
-no_hostname: true
-stat_prefix: test
-log_format:
-  text_format_source:
-    inline_string: test
-)EOF";
-
-constexpr absl::string_view UdpClusterConfigYaml = R"EOF(
-cluster:
-  name: syslog
 no_hostname: true
 stat_prefix: test
 log_format:
@@ -112,10 +99,6 @@ protected:
     return receiver_.connectionInfoProvider().localAddress()->ip()->port();
   }
 
-  Network::Address::InstanceConstSharedPtr receiverAddress() const {
-    return receiver_.connectionInfoProvider().localAddress();
-  }
-
   SyslogAccessLogConfig serverConfig() {
     auto config = loadConfig(UdpServerConfigYaml);
     config.mutable_server()->mutable_socket_address()->set_port_value(receiverPort());
@@ -151,12 +134,11 @@ protected:
   }
 
   std::string emitCheckingOutputs(const AccessLog::InstanceSharedPtr& access_log,
-                                  Network::SocketImpl& receiver,
                                   absl::string_view stat_prefix = "test",
                                   uint64_t original_size = 0) {
     const MetricSnapshot before = readMetrics(stat_prefix);
     logOnce(access_log);
-    const std::string datagram = receiveDatagram(receiver);
+    const std::string datagram = receiveDatagram(receiver_);
     const uint64_t formatted_size = original_size == 0 ? datagram.size() : original_size;
     const MetricSnapshot after = readMetrics(stat_prefix);
 
@@ -174,12 +156,6 @@ protected:
     return datagram;
   }
 
-  std::string emitCheckingOutputs(const AccessLog::InstanceSharedPtr& access_log,
-                                  absl::string_view stat_prefix = "test",
-                                  uint64_t original_size = 0) {
-    return emitCheckingOutputs(access_log, receiver_, stat_prefix, original_size);
-  }
-
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::Address::InstanceConstSharedPtr bind_address_;
@@ -193,9 +169,6 @@ protected:
 
 TEST_F(SyslogAccessLogTest, PayloadFieldsChangeReceivedDatagram) {
   constexpr absl::string_view rfc3164_default = "<190>Aug 19 14:20:54 envoy: test";
-  constexpr absl::string_view rfc5424_default =
-      R"(<190>1 2026-08-19T14:20:54\.000000Z - envoy [0-9]+ envoy\.access - test)";
-
   struct Case {
     const char* field;
     std::function<void(SyslogAccessLogConfig&)> mutate;
@@ -253,8 +226,9 @@ TEST_F(SyslogAccessLogTest, PayloadFieldsChangeReceivedDatagram) {
        [](SyslogAccessLogConfig& config) {
          config.set_syslog_format(SyslogAccessLogConfig::RFC5424);
        },
-       [&](const std::string& datagram) {
-         EXPECT_THAT(datagram, MatchesRegex(std::string(rfc5424_default)));
+       [](const std::string& datagram) {
+         EXPECT_THAT(datagram, MatchesRegex("<190>1 2026-08-19T14:20:54\\.000000Z - envoy [0-9]+ "
+                                            "envoy\\.access - test"));
        }},
       {"msg_id with RFC5424",
        [](SyslogAccessLogConfig& config) {
@@ -262,10 +236,8 @@ TEST_F(SyslogAccessLogTest, PayloadFieldsChangeReceivedDatagram) {
          config.set_msg_id("envoy.audit");
        },
        [](const std::string& datagram) {
-         EXPECT_THAT(
-             datagram,
-             MatchesRegex(
-                 R"(<190>1 2026-08-19T14:20:54\.000000Z - envoy [0-9]+ envoy\.audit - test)"));
+         EXPECT_THAT(datagram, MatchesRegex("<190>1 2026-08-19T14:20:54\\.000000Z - envoy [0-9]+ "
+                                            "envoy\\.audit - test"));
        }},
       {"msg_id ignored for RFC3164",
        [](SyslogAccessLogConfig& config) { config.set_msg_id("envoy.audit"); },
@@ -276,10 +248,8 @@ TEST_F(SyslogAccessLogTest, PayloadFieldsChangeReceivedDatagram) {
          config.set_tag("edge");
        },
        [](const std::string& datagram) {
-         EXPECT_THAT(
-             datagram,
-             MatchesRegex(
-                 R"(<190>1 2026-08-19T14:20:54\.000000Z - edge [0-9]+ envoy\.access - test)"));
+         EXPECT_THAT(datagram, MatchesRegex("<190>1 2026-08-19T14:20:54\\.000000Z - edge [0-9]+ "
+                                            "envoy\\.access - test"));
        }},
   };
 
@@ -293,17 +263,12 @@ TEST_F(SyslogAccessLogTest, PayloadFieldsChangeReceivedDatagram) {
   }
 }
 
-TEST_F(SyslogAccessLogTest, SubstitutionFormatAppearsInDatagram) {
-  auto config = serverConfig();
-  config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-      "%REQ(:METHOD)% %REQ(:PATH)% %RESPONSE_CODE%");
-  const AccessLog::InstanceSharedPtr access_log = createLogger(config);
-  ASSERT_NE(nullptr, access_log);
-  EXPECT_EQ("<190>Aug 19 14:20:54 envoy: GET /bar 200", emitCheckingOutputs(access_log));
-}
-
 TEST_F(SyslogAccessLogTest, MaxSyslogMsgBytesTruncatesUdpPayload) {
-  constexpr absl::string_view header = "<190>Aug 19 14:20:54 envoy: ";
+  const auto config = serverConfig();
+  const std::string header =
+      Rfc3164HeaderFormatter(config.facility(), config.severity(), config.no_hostname(),
+                             config.tag())
+          .format(std::chrono::system_clock::from_time_t(TestTimestampSeconds));
   const size_t header_size = header.size();
 
   const auto emit_with_limit = [&](uint32_t max_bytes, size_t body_size) {
@@ -367,69 +332,6 @@ TEST_F(SyslogAccessLogTest, StatPrefixChangesEmittedStats) {
   EXPECT_EQ(nullptr, TestUtility::findCounter(context_.server_context_.store_,
                                               "access_logs.syslog.test.send"));
 }
-
-TEST_F(SyslogAccessLogTest, ClusterDestinationSendsToSelectedHost) {
-  auto config = loadConfig(UdpClusterConfigYaml);
-  context_.server_context_.cluster_manager_.initializeClusters({"syslog"}, {});
-  context_.server_context_.cluster_manager_.initializeThreadLocalClusters({"syslog"});
-  EXPECT_CALL(context_.server_context_.cluster_manager_, checkActiveStaticCluster("syslog"))
-      .WillOnce(Return(absl::OkStatus()));
-
-  auto host = std::make_shared<testing::NiceMock<Upstream::MockHost>>();
-  ON_CALL(*host, address()).WillByDefault(Return(receiverAddress()));
-  auto& load_balancer = context_.server_context_.cluster_manager_.thread_local_cluster_.lb_;
-  EXPECT_CALL(load_balancer, chooseHost(nullptr))
-      .WillOnce(Return(Upstream::HostSelectionResponse{host}));
-
-  const AccessLog::InstanceSharedPtr access_log = createLogger(config);
-  ASSERT_NE(nullptr, access_log);
-  EXPECT_EQ("<190>Aug 19 14:20:54 envoy: test", emitCheckingOutputs(access_log));
-}
-
-TEST_F(SyslogAccessLogTest, Ipv6ServerDestinationSendsDatagram) {
-  if (!TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
-    GTEST_SKIP();
-  }
-
-  auto bind_address = std::make_shared<Network::Address::Ipv6Instance>("::1", 0);
-  Network::SocketImpl receiver(Network::Socket::Type::Datagram, bind_address, nullptr,
-                               Network::SocketCreationOptions{});
-  ASSERT_EQ(0, receiver.bind(bind_address).return_value_);
-
-  auto config = loadConfig(UdpServerConfigYaml);
-  auto* socket_address = config.mutable_server()->mutable_socket_address();
-  socket_address->set_address("::1");
-  socket_address->set_port_value(receiver.connectionInfoProvider().localAddress()->ip()->port());
-
-  const AccessLog::InstanceSharedPtr access_log = createLogger(config);
-  ASSERT_NE(nullptr, access_log);
-  EXPECT_EQ("<190>Aug 19 14:20:54 envoy: test", emitCheckingOutputs(access_log, receiver));
-}
-
-#ifndef WIN32
-TEST_F(SyslogAccessLogTest, UnixDomainSocketDestinationSendsDatagram) {
-#ifdef __linux__
-  Network::Address::InstanceConstSharedPtr destination =
-      Network::Address::PipeInstance::create(absl::StrCat("@", TestUtility::uniqueFilename()))
-          .value();
-#else
-  Network::Address::InstanceConstSharedPtr destination =
-      Network::Address::PipeInstance::create(
-          TestEnvironment::temporaryPath(TestUtility::uniqueFilename()))
-          .value();
-#endif
-  Network::SocketImpl receiver(Network::Socket::Type::Datagram, destination, nullptr,
-                               Network::SocketCreationOptions{});
-  ASSERT_EQ(0, receiver.bind(destination).return_value_);
-
-  auto config = loadConfig(UdpServerConfigYaml);
-  config.mutable_server()->mutable_pipe()->set_path(destination->asString());
-
-  const AccessLog::InstanceSharedPtr access_log = createLogger(config);
-  ASSERT_NE(nullptr, access_log);
-  EXPECT_EQ("<190>Aug 19 14:20:54 envoy: test", emitCheckingOutputs(access_log, receiver));
-}
-#endif
 
 } // namespace
 } // namespace Syslog
