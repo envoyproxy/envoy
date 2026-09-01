@@ -228,16 +228,6 @@ dd_trace_cpp:
   license: "Apache-2.0"
   license_url: "https://github.com/DataDog/dd-trace-cpp/blob/v{version}/LICENSE.md"
 
-dlb:
-  project_name: "Intel Dlb"
-  project_desc: "Dlb"
-  project_url: "https://networkbuilders.intel.com/solutionslibrary/queue-management-and-load-balancing-on-intel-architecture"
-  release_date: "2023-12-15"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.network.connection_balance.dlb
-
 dragonbox:
   project_name: "Dragonbox"
   project_desc: |
