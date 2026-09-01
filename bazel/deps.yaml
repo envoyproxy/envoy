@@ -306,6 +306,12 @@ envoy_toolshed:
   - sysroot_linux_arm64
   - tsan_libs
   - msan_libs
+  # Prebuilt wee8 static-library repos defined by setup_wee8_prebuilt()
+  # (bazel/repositories_extra.bzl); the @envoy_toolshed//v8:wee8 alias selects
+  # the right one per platform.
+  - wee8_prebuilt_x86_64
+  - wee8_prebuilt_x86_64_libstdcxx
+  - wee8_prebuilt_aarch64
   license: "Apache-2.0"
   license_url: "https://github.com/envoyproxy/toolshed/blob/bazel-v{version}/LICENSE"
 
