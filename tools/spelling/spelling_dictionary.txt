@@ -1813,3 +1813,12 @@ acq
 interleavings
 millis
 msgs
+ClientHello
+CRYSTALS
+encapsulation
+Kyber
+MLKEM
+PQC
+quantum
+ServerHello
+X25519MLKEM768
