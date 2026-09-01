@@ -462,9 +462,15 @@ FakeHttpConnection::FakeHttpConnection(
     ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
   }
+  // The codec holds a reference to the network connection. Destroy it from the disconnect callback,
+  // while the connection is guaranteed to still be alive and before waitForDisconnect() can wake
+  // the test thread.
+  shared_connection_.setDisconnectCallback([this]() { codec_.reset(); });
   shared_connection_.connection().addReadFilter(
       Network::ReadFilterSharedPtr{new ReadFilter(*this)});
 }
+
+FakeHttpConnection::~FakeHttpConnection() { shared_connection_.clearDisconnectCallback(); }
 
 void FakeHttpConnection::initialize() {
   FakeConnectionBase::initialize();
@@ -499,6 +505,23 @@ AssertionResult FakeConnectionBase::close(Network::ConnectionCloseType close_typ
       [&close_type](Network::Connection& connection) { connection.close(close_type); }, timeout);
 }
 
+AssertionResult FakeConnectionBase::halfClose(std::chrono::milliseconds timeout) {
+  ENVOY_LOG(trace, "FakeConnectionBase half-close");
+  if (!shared_connection_.connected()) {
+    return AssertionSuccess();
+  }
+
+  return shared_connection_.executeOnDispatcher(
+      [](Network::Connection& connection) {
+        if (!connection.isHalfCloseEnabled()) {
+          connection.enableHalfClose(true);
+        }
+        Buffer::OwnedImpl empty;
+        connection.write(empty, true);
+      },
+      timeout);
+}
+
 AssertionResult
 FakeConnectionBase::halfCloseAndWaitForDisconnect(std::chrono::milliseconds timeout) {
   ENVOY_LOG(trace, "FakeConnectionBase half-close and wait for disconnect");
@@ -506,8 +529,13 @@ FakeConnectionBase::halfCloseAndWaitForDisconnect(std::chrono::milliseconds time
     return AssertionSuccess();
   }
 
+  bool half_close_was_enabled = false;
   AssertionResult result = shared_connection_.executeOnDispatcher(
-      [](Network::Connection& connection) {
+      [&half_close_was_enabled](Network::Connection& connection) {
+        half_close_was_enabled = connection.isHalfCloseEnabled();
+        if (half_close_was_enabled) {
+          return;
+        }
         connection.enableHalfClose(true);
         Buffer::OwnedImpl empty;
         connection.write(empty, true);
@@ -515,6 +543,10 @@ FakeConnectionBase::halfCloseAndWaitForDisconnect(std::chrono::milliseconds time
       timeout);
   if (!result) {
     return result;
+  }
+  if (half_close_was_enabled) {
+    return AssertionFailure()
+           << "Cannot wait for a reciprocal close on a connection configured for half-close.";
   }
   return waitForDisconnect(timeout);
 }

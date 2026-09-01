@@ -508,32 +508,34 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   // subject to the same failure mode.
   if (fake_upstream_connection_) {
     AssertionResult result = AssertionSuccess();
-    if (fake_upstream_connection_->type() == Http::CodecType::HTTP3) {
+    const bool is_http3 = fake_upstream_connection_->type() == Http::CodecType::HTTP3;
+    if (is_http3) {
       // QUIC connections do not support half-close.
       result = fake_upstream_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_upstream_connection_->waitForDisconnect();
     } else {
-      // A local close only proves that the fake upstream dispatcher closed its socket. Envoy's HTTP
-      // upstream connections do not enable half-close, so half-close the fake upstream and wait for
-      // Envoy to close the other direction, proving it observed the FIN. If close-through-filter-
-      // manager defers the close, the reciprocal close is deferred with it. Envoy closes its socket
-      // before raising connection callbacks, so also run a worker barrier to ensure the callback
-      // has removed the connection from its connection pool.
-      result = fake_upstream_connection_->halfCloseAndWaitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-      // Some fixtures stop the server before cleaning up their fake upstreams. They cannot issue
-      // another request, so no worker barrier is needed.
-      if (test_server_) {
-        test_server_->waitForWorkerThreads();
-      }
+      // A local close only proves that the fake upstream dispatcher closed its socket. Initiate a
+      // fake-upstream FIN; closing the downstream below also makes TCP proxy and CONNECT paths that
+      // enable upstream half-close fully close their paired upstream.
+      result = fake_upstream_connection_->halfClose();
     }
     RELEASE_ASSERT(result, result.message());
+    if (codec_client_) {
+      codec_client_->close();
+    }
+    result = fake_upstream_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+
+    // Envoy closes its socket before raising connection callbacks, so run a worker barrier after
+    // observing its close to ensure the callback has removed the connection from its connection
+    // pool. Some fixtures stop the server before cleaning up their fake upstreams; they cannot
+    // issue another request, so no worker barrier is needed.
+    if (!is_http3 && test_server_) {
+      test_server_->waitForWorkerThreads();
+    }
     result = fake_upstream_connection_->waitForNoPost();
     RELEASE_ASSERT(result, result.message());
     fake_upstream_connection_.reset();
-  }
-  if (codec_client_) {
+  } else if (codec_client_) {
     codec_client_->close();
   }
 }
