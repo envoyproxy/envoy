@@ -242,7 +242,7 @@ def format_api(mode, outfile, printed, build_file):
             try:
                 _label = label.split('//', 1)[1].replace(':', '/')
             except IndexError:
-                raise ValueError(f"Unexpected label format (no '//'): {label}")
+                raise ValueError(f"Unexpected label format (no '//'): {label}") from None
             source = printed_dir.joinpath(f"{_label}.proto")
             target = dst_dir.joinpath(_label)
             target.parent.mkdir(exist_ok=True, parents=True)
