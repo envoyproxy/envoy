@@ -128,7 +128,7 @@ void MessageStreamer::emitNamedMessage(const Protobuf::Message& message,
 
 MessageStreamer::~MessageStreamer() {
   while (!stack_.empty()) {
-    stack_.pop_back();
+    stack_.pop();
   }
 }
 
@@ -137,14 +137,14 @@ bool MessageStreamer::next() {
     return false;
   }
 
-  Frame& frame = stack_.back();
+  Frame& frame = stack_.top();
   if (frame.elements_ != nullptr) {
     nextElement(frame);
     return true;
   }
 
   if (frame.next_field_ >= frame.fields_.size()) {
-    stack_.pop_back();
+    stack_.pop();
     return !stack_.empty();
   }
 
@@ -379,7 +379,7 @@ void MessageStreamer::emitSpecialRepresentation(const Protobuf::Message& message
 MessageStreamer::Frame& MessageStreamer::pushFrame(const Protobuf::Message& message,
                                                    BufferStreamer::Level& level,
                                                    bool ancestor_is_sensitive) {
-  Frame& frame = stack_.emplace_back(message, level.addMap());
+  Frame& frame = stack_.emplace(message, level.addMap());
   frame.ancestor_is_sensitive_ = ancestor_is_sensitive;
   return frame;
 }

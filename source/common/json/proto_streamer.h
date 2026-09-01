@@ -1,6 +1,6 @@
 #pragma once
 
-#include <deque>
+#include <stack>
 
 #include "source/common/json/json_streamer.h"
 #include "source/common/protobuf/protobuf.h"
@@ -120,7 +120,7 @@ private:
                                  bool is_sensitive);
 
   const Options options_;
-  std::deque<Frame> stack_;
+  std::stack<Frame> stack_;
   std::string scratch_;
 };
 
