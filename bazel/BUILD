@@ -1050,7 +1050,7 @@ json_merge(
                     )
                   else . end
               )}
-            else .
+            else . + {($k): $metadata[$k]}
             end
         )
     """,
@@ -1066,6 +1066,10 @@ py_test(
     srcs = ["all_repository_locations_test.py"],
     args = ["$(location :all_repository_locations)"],
     data = [":all_repository_locations"],
+    target_compatible_with = select({
+        ":bzlmod_mode": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    })
 )
 
 # A dependency required by python protobuf

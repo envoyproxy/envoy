@@ -192,7 +192,7 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
     _foreign_cc_dependencies()
 
     # BoringSSL:
-    # - BoringSSL FIPS from @boringssl_fips//:ssl,
+    # - BoringSSL FIPS from @boringssl-fips//:ssl,
     # - non-FIPS BoringSSL from @boringssl//:ssl.
     # SSL/crypto dependencies are resolved via EXTERNAL_DEPS_MAP in envoy_internal.bzl
     _boringssl()
@@ -334,7 +334,7 @@ def _boringssl():
 
 def _boringssl_fips():
     external_http_archive(
-        name = "boringssl_fips",
+        name = "boringssl-fips",
         location_name = "boringssl",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
     )
