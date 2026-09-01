@@ -316,6 +316,59 @@ TEST_F(FilterManagerTest, FilterLocalReply) {
   EXPECT_EQ(local_reply_details, "access denied by auth filter");
 }
 
+TEST_F(FilterManagerTest, FilterErrorTriggersLocalReply) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+
+  Http::Code local_reply_code = Http::Code::OK;
+  std::string local_reply_details;
+
+  std::vector<AiFilterPtr> filters;
+  filters.push_back(std::make_unique<TestErrorFilter>());
+
+  FilterManager manager(
+      std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
+        local_reply_code = code;
+        local_reply_details = std::move(details);
+      });
+
+  absl::Status status;
+  bool completed = false;
+  manager.start([&status, &completed](absl::Status s) {
+    status = std::move(s);
+    completed = true;
+  });
+
+  drain();
+  EXPECT_TRUE(completed);
+  EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kInternal));
+  EXPECT_EQ(local_reply_code, Http::Code::BadRequest);
+  EXPECT_EQ(local_reply_details, "intentional filter error");
+}
+
+TEST_F(FilterManagerTest, FilterLocalReplyWithoutLocalReplyFnInvokesCompletionWithCancelled) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+
+  std::vector<AiFilterPtr> filters;
+  filters.push_back(std::make_unique<TestLocalReplyFilter>());
+
+  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
+                        stream_info_, /*local_reply_fn=*/nullptr);
+
+  absl::Status status;
+  bool completed = false;
+  manager.start([&status, &completed](absl::Status s) {
+    status = std::move(s);
+    completed = true;
+  });
+
+  drain();
+  EXPECT_TRUE(completed);
+  EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kCancelled));
+}
+
 TEST_F(FilterManagerTest, CancelCancelsCoroutines) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});
@@ -351,7 +404,8 @@ TEST_F(FilterManagerTest, DestructWhileSuspendedIsSafe) {
       EXPECT_THAT(req_or.status(), HasStatusCode(absl::StatusCode::kCancelled));
 
       // Calling propagate_request should also safely return CancelledError.
-      auto status = co_await std::move(propagate_request)(nullptr);
+      auto status =
+          co_await std::move(propagate_request)(std::make_unique<AiRequest>(JsonWithExtBuf()));
       EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kCancelled));
 
       // Calling reply_locally should safely no-op without crashing.
@@ -440,16 +494,51 @@ TEST_F(FilterManagerTest, InvalidReceiverAndPropagatorInvocation) {
           AiRequestPropagator p2(
               [](AiRequestPtr) -> Coroutine::Task<absl::Status> { co_return absl::OkStatus(); });
           EXPECT_TRUE(p2.valid());
-          auto status2 = co_await std::move(p2)(nullptr);
+          auto status2 = co_await std::move(p2)(std::make_unique<AiRequest>(JsonWithExtBuf()));
           EXPECT_TRUE(status2.ok());
           EXPECT_FALSE(p2.valid());
-          std::ignore = co_await std::move(p2)(nullptr);
+          std::ignore = co_await std::move(p2)(std::make_unique<AiRequest>(JsonWithExtBuf()));
           co_return absl::OkStatus();
         };
         auto handle =
             Coroutine::launch(test_coro(), executor, [](auto) {}, Coroutine::StartMode::Inline);
       },
       "AiRequestPropagator invoked on an invalid or already moved instance");
+}
+
+class TestNullPropagatorFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
+    co_return co_await std::move(propagate_request)(nullptr);
+  }
+};
+
+TEST_F(FilterManagerTest, FilterNullPropagationFails) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+
+  std::vector<AiFilterPtr> filters;
+  filters.push_back(std::make_unique<TestNullPropagatorFilter>());
+
+  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
+                        stream_info_);
+
+  EXPECT_ENVOY_BUG(
+      {
+        absl::Status status;
+        bool completed = false;
+        manager.start([&status, &completed](absl::Status s) {
+          status = std::move(s);
+          completed = true;
+        });
+        drain();
+        EXPECT_TRUE(completed);
+        EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kInvalidArgument));
+      },
+      "cannot propagate null AiRequestPtr");
 }
 
 } // namespace

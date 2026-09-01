@@ -4,6 +4,7 @@
 #include <utility>
 #include <vector>
 
+#include "source/common/common/assert.h"
 #include "source/common/coroutine/async_queue.h"
 #include "source/common/coroutine/dispatcher_executor.h"
 #include "source/common/coroutine/launch.h"
@@ -55,8 +56,12 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
   }
 
   Coroutine::Task<absl::Status> propagateRequest(size_t index, AiRequestPtr req) {
+    if (req == nullptr) {
+      IS_ENVOY_BUG("cannot propagate null AiRequestPtr");
+      co_return absl::InvalidArgumentError("cannot propagate null AiRequestPtr");
+    }
     filter_contexts_[index].propagated = true;
-    return filter_contexts_[index + 1].handoff->push(std::move(req));
+    co_return co_await filter_contexts_[index + 1].handoff->push(std::move(req));
   }
 
   Coroutine::Task<absl::Status> runSink() {
@@ -66,6 +71,7 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
     }
 
     final_req_ = std::move(*res);
+    ASSERT(final_req_ != nullptr);
 
     ASSIGN_OR_CO_RETURN(
         auto new_doc, co_await Serializer::calculateSerializedOffsets(final_req_->request_index()));
@@ -83,6 +89,7 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
     terminated_ = true;
     if (on_complete_ != nullptr) {
       auto cb = std::move(on_complete_);
+      on_complete_ = nullptr;
       cb(absl::OkStatus());
     }
     co_return absl::OkStatus();
@@ -127,11 +134,18 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
     if (terminated_) {
       return;
     }
-    terminated_ = true;
+    cancel();
     ENVOY_LOG(debug, "ai_protocol_manager: filter chain error: {}", status.message());
-    if (on_complete_ != nullptr) {
-      auto cb = std::move(on_complete_);
-      cb(std::move(status));
+    auto reply_fn = std::move(local_reply_fn_);
+    local_reply_fn_ = nullptr;
+    auto on_complete = std::move(on_complete_);
+    on_complete_ = nullptr;
+
+    if (reply_fn != nullptr) {
+      reply_fn(Http::Code::BadRequest, std::string(status.message()));
+    }
+    if (on_complete != nullptr) {
+      on_complete(std::move(status));
     }
   }
 
@@ -139,15 +153,19 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
     if (terminated_) {
       return;
     }
-    terminated_ = true;
+    cancel();
     ENVOY_LOG(debug, "ai_protocol_manager: filter chain triggered local reply: {} {}",
               static_cast<uint32_t>(code), details);
-    if (local_reply_fn_ != nullptr) {
-      local_reply_fn_(code, std::move(details));
+    auto reply_fn = std::move(local_reply_fn_);
+    local_reply_fn_ = nullptr;
+    auto on_complete = std::move(on_complete_);
+    on_complete_ = nullptr;
+
+    if (reply_fn != nullptr) {
+      reply_fn(code, std::move(details));
     }
-    if (on_complete_ != nullptr) {
-      auto cb = std::move(on_complete_);
-      cb(absl::CancelledError("local reply sent"));
+    if (on_complete != nullptr) {
+      on_complete(absl::CancelledError("local reply sent"));
     }
   }
 

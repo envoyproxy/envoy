@@ -152,6 +152,41 @@ TEST_F(SerializerTest, ExternalRefNullBufferFails) {
   EXPECT_THAT(result_or.status(), HasStatusCode(absl::StatusCode::kInvalidArgument));
 }
 
+TEST_F(SerializerTest, ExternalRefOutOfBoundsFails) {
+  std::string secret = "hello world";
+  Buffer::OwnedImpl secret_buf(secret);
+  buffer_manager_.onData(secret_buf);
+  buffer_manager_.endStream();
+  drain();
+
+  // ref offset + length exceeds buffer length (11 bytes)
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{
+      {"prompt", JsonWithExtBuf::makeExternalRef({5, 100})},
+  });
+
+  auto result_or = runSerialize(doc, &buffer_manager_);
+  EXPECT_THAT(result_or.status(), HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(result_or.status().message(), testing::HasSubstr("exceeds buffer length"));
+}
+
+TEST_F(SerializerTest, ExternalRefOffsetOutOfBoundsFails) {
+  std::string secret = "hello world";
+  Buffer::OwnedImpl secret_buf(secret);
+  buffer_manager_.onData(secret_buf);
+  buffer_manager_.endStream();
+  drain();
+
+  // ref offset itself exceeds buffer length (11 bytes)
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{
+      {"prompt", JsonWithExtBuf::makeExternalRef({100, 0})},
+  });
+
+  auto result_or = runSerialize(doc, &buffer_manager_);
+  EXPECT_THAT(result_or.status(), HasStatusCode(absl::StatusCode::kInvalidArgument));
+}
+
 TEST_F(SerializerTest, NestedStructureWithMultipleRefs) {
   std::string part1 = "System instructions";
   std::string part2 = "User query text";

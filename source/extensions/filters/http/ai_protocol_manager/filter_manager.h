@@ -29,7 +29,19 @@ public:
                 StreamInfo::StreamInfo& stream_info, LocalReplyFn local_reply_fn = nullptr);
   ~FilterManager();
 
-  // Launches the filter chain. Invokes on_complete with the final completion status.
+  // Launches the filter chain. Invokes `on_complete` with the final completion status.
+  //
+  // Contract between caller (`AiProtocolManagerFilter`) and `FilterManager`:
+  // 1. Success: when the filter chain completes and the payload is serialized and replayed,
+  //    `on_complete` is invoked with `absl::OkStatus()`.
+  // 2. Filter-initiated local reply: when an `AiFilter` invokes `LocalReplier`, all coroutines
+  //    are cancelled, `local_reply_fn` is called with the HTTP code and details string, and
+  //    `on_complete` is invoked with `absl::CancelledError`.
+  // 3. FilterManager internal error: when an `AiFilter` returns a non-OK status or an internal
+  //    error occurs, all coroutines are cancelled, `local_reply_fn` is called with a 400 Bad
+  //    Request local reply, and `on_complete` is invoked with that error status.
+  // 4. Cancellation: when `cancel()` is called, all coroutines are cancelled and neither
+  //    `local_reply_fn` nor `on_complete` is invoked.
   void start(absl::AnyInvocable<void(absl::Status)> on_complete);
 
   // Cancels all in-flight coroutines and cleans up state on stream reset.

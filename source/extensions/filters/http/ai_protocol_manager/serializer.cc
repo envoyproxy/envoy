@@ -10,6 +10,7 @@
 #include "source/common/coroutine/status_macros.h"
 
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -108,6 +109,17 @@ private:
       co_return ref_or.status();
     }
     const auto& ref = *ref_or;
+    if (mode_ == SerializationMode::Emit) {
+      if (buffer_manager_ == nullptr) {
+        co_return absl::InternalError("buffer_manager is null for ExternalRef node");
+      }
+      if (ref.offset > buffer_manager_->length() ||
+          ref.length > buffer_manager_->length() - ref.offset) {
+        co_return absl::InvalidArgumentError(
+            absl::StrCat("external buffer reference [", ref.offset, ", ", ref.offset + ref.length,
+                         ") exceeds buffer length ", buffer_manager_->length()));
+      }
+    }
     small_buf_.add("\"");
     uint64_t new_offset = byte_counter_ + small_buf_.length();
     new_node = JsonWithExtBuf::makeExternalRef({new_offset, ref.length});
@@ -116,9 +128,6 @@ private:
       byte_counter_ += ref.length;
       switch (mode_) {
       case SerializationMode::Emit:
-        if (buffer_manager_ == nullptr) {
-          co_return absl::InternalError("buffer_manager is null for ExternalRef node");
-        }
         CO_RETURN_IF_ERROR(co_await ReplayAwaitable(*buffer_manager_, ref.offset, ref.length));
         break;
       case SerializationMode::Counting:

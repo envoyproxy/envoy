@@ -358,10 +358,8 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
           decoder_callbacks_->sendLocalReply(code, details, nullptr, std::nullopt,
                                              "ai_protocol_manager_filter_rejected");
         });
-    filter_manager_->start([this, on_complete = std::move(on_complete)](absl::Status status) {
-      if (!status.ok()) {
-        rejectInvalidPayload(status);
-      } else {
+    filter_manager_->start([on_complete = std::move(on_complete)](absl::Status status) {
+      if (status.ok()) {
         on_complete();
       }
     });
