@@ -262,16 +262,81 @@
   color: var(--envoy-accent);
 }
 
-.wy-menu-vertical li button.toctree-expand {
-  background: transparent;
-  border: 0;
-  color: var(--envoy-ink-muted);
-  cursor: pointer;
-  float: right;
-  line-height: 1;
-  padding: 2px 4px;
+/* --- expand toggles ------------------------------------------------------
+
+   The theme hangs these off the left of the label with a float, so their x
+   position follows each level's indent and its content width — they moved
+   every time a branch opened. They now sit in one fixed column at the right
+   edge of the sidebar, at the same x for every level and every state.
+
+   The boxed plus/minus is a Font Awesome glyph; a chevron that rotates says
+   the same thing and makes the state change legible at 12px. */
+
+.wy-menu-vertical li > a {
+  position: relative;
 }
 
-.wy-menu-vertical li button.toctree-expand:hover {
+/* only reserve the gutter on rows that actually have a toggle */
+.wy-menu-vertical li > a:has(button.toctree-expand) {
+  padding-right: 34px;
+}
+
+/* Every toggle rule below is repeated for `li.current > a` and `li.on a`.
+   The theme styles those variants at a higher specificity than the plain
+   button selector, and they match exactly the rows that are open — so a rule
+   written only against `li button.toctree-expand` styles every toggle except
+   the ones you are looking at. */
+.wy-menu-vertical li button.toctree-expand,
+.wy-menu-vertical li.current > a button.toctree-expand,
+.wy-menu-vertical li.on a button.toctree-expand {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--envoy-ink-muted);
+  cursor: pointer;
+  display: grid;
+  float: none;
+  height: 22px;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+  place-items: center;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+}
+
+/* The boxed plus/minus is a Font Awesome character on ::before. Its `content`
+   is set by a theme selector that outranks anything scoped to the button, so
+   it is removed with `display`, which that selector does not set. */
+.wy-menu-vertical li button.toctree-expand::before,
+.wy-menu-vertical li.current > a button.toctree-expand::before,
+.wy-menu-vertical li.on a button.toctree-expand::before {
+  display: none;
+}
+
+.wy-menu-vertical li button.toctree-expand::after,
+.wy-menu-vertical li.current > a button.toctree-expand::after,
+.wy-menu-vertical li.on a button.toctree-expand::after {
+  border-bottom: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  content: "";
+  height: 6px;
+  transform: rotate(-45deg) translate(-1px, -1px);
+  width: 6px;
+}
+
+/* open: the chevron turns to point down */
+.wy-menu-vertical li.current > a button.toctree-expand::after,
+.wy-menu-vertical li.on > a button.toctree-expand::after {
+  transform: rotate(45deg) translate(-2px, -2px);
+}
+
+.wy-menu-vertical li button.toctree-expand:hover,
+.wy-menu-vertical li.current > a button.toctree-expand:hover,
+.wy-menu-vertical li.on a button.toctree-expand:hover {
+  background: var(--envoy-surface-2);
   color: var(--envoy-ink);
 }
