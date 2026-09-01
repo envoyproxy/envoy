@@ -17,9 +17,11 @@ public:
   struct Options {
     // Whether to emit a leading @type naming the message.
     bool emit_type_url = false;
+
     // Whether the keys are the proto field names or the lowerCamelCase ProtoJSON defaults to.
     // https://protobuf.dev/programming-guides/json/#field-names
     bool preserve_proto_field_names = false;
+
     // Whether the fields the API marks sensitive are emitted, or replaced the way
     // MessageUtil::redact replaces them. Redacted, a sensitive field emits:
     //
