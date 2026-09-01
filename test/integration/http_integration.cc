@@ -514,13 +514,19 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
       RELEASE_ASSERT(result, result.message());
       result = fake_upstream_connection_->waitForDisconnect();
     } else {
-      // A local close only proves that the fake upstream dispatcher closed its socket. Half-close
-      // the fake upstream and wait for Envoy to close the other direction, proving Envoy observed
-      // the FIN. Envoy closes its socket before raising connection callbacks, so also run a worker
-      // barrier to ensure the callback has removed the connection from its connection pool.
+      // A local close only proves that the fake upstream dispatcher closed its socket. Envoy's HTTP
+      // upstream connections do not enable half-close, so half-close the fake upstream and wait for
+      // Envoy to close the other direction, proving it observed the FIN. If close-through-filter-
+      // manager defers the close, the reciprocal close is deferred with it. Envoy closes its socket
+      // before raising connection callbacks, so also run a worker barrier to ensure the callback
+      // has removed the connection from its connection pool.
       result = fake_upstream_connection_->halfCloseAndWaitForDisconnect();
       RELEASE_ASSERT(result, result.message());
-      test_server_->waitForWorkerThreads();
+      // Some fixtures stop the server before cleaning up their fake upstreams. They cannot issue
+      // another request, so no worker barrier is needed.
+      if (test_server_) {
+        test_server_->waitForWorkerThreads();
+      }
     }
     RELEASE_ASSERT(result, result.message());
     result = fake_upstream_connection_->waitForNoPost();
