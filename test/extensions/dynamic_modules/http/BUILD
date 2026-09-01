@@ -3,6 +3,7 @@ load(
     "envoy_cc_test",
     "envoy_package",
 )
+load("//test/extensions/dynamic_modules:dynamic_module_test.bzl", "envoy_cc_dynamic_module_test")
 
 licenses(["notice"])  # Apache 2
 
@@ -68,7 +69,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dynamic_module_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = [
@@ -109,7 +110,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dynamic_module_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
     data = [
@@ -141,7 +142,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dynamic_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [

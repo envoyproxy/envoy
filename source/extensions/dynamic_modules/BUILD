@@ -9,6 +9,22 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
+# Generates the Windows module-definition file that exports the host callbacks so a loaded module
+# can resolve them. The list is derived from the callbacks defined in abi_impl.cc (the abi_impl
+# target), which are present in any binary that links it. Extension-specific callbacks defined in
+# other abi_impl.cc files are not included; the Windows module loader will need the full union.
+genrule(
+    name = "windows_exports_def",
+    srcs = ["abi_impl.cc"],
+    outs = ["dynamic_modules_windows_exports.def"],
+    cmd = "$(location //tools/dynamic_modules:generate_windows_exports_def) $(location abi_impl.cc) $@",
+    tools = ["//tools/dynamic_modules:generate_windows_exports_def"],
+    visibility = [
+        "//test/extensions/dynamic_modules:__subpackages__",
+        "//tools/dynamic_modules:__pkg__",
+    ],
+)
+
 envoy_cc_library(
     name = "dynamic_modules_lib",
     srcs = [

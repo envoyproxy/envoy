@@ -175,7 +175,8 @@ def envoy_cc_test(
         flaky = False,
         env = {},
         rbe_pool = None,
-        exec_properties = {}):
+        exec_properties = {},
+        win_def_file = None):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
     exec_properties = exec_properties | select({
         repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
@@ -193,6 +194,7 @@ def envoy_cc_test(
         additional_linker_inputs = envoy_exported_symbols_input(),
         linkopts = _envoy_test_linkopts() + linkopts,
         linkstatic = envoy_linkstatic(),
+        win_def_file = win_def_file,
         malloc = tcmalloc_external_dep(repository),
         deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//test:main",
