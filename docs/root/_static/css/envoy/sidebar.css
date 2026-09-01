@@ -212,7 +212,42 @@
   background: transparent;
   font-size: 13px;
   margin-left: -1px;
+}
+
+/* --- one indent system ---------------------------------------------------
+
+   The theme indents the *current* branch a second time, through a padding-left
+   that grows per level (2.427em, 4.045em, 5.663em …). Its own design can do
+   that because it never renders the branches you are not in — but this one
+   also indents with a margin on the li, to hang the guide line off. The two
+   stack, so a page you are inside sits 20px further right than its own
+   sibling: "v3 API reference" and "Supported API versions" are the same level
+   and did not look like it.
+
+   Depth is the margin. Being current is weight and the accent rail, never
+   position. These selectors mirror the theme's own so they meet it on
+   specificity; the right-hand value is the toggle gutter, applied to every row
+   so the text column is the same width whether a row has a toggle or not. */
+.wy-menu-vertical li a,
+.wy-menu-vertical li.current a,
+.wy-menu-vertical li.current > a,
+.wy-menu-vertical li.on a,
+.wy-menu-vertical li.toctree-l2.current > a,
+.wy-menu-vertical li.toctree-l3.current > a,
+.wy-menu-vertical li.toctree-l4.current > a,
+.wy-menu-vertical li.toctree-l5.current > a,
+.wy-menu-vertical li.toctree-l2.current li.toctree-l3 > a,
+.wy-menu-vertical li.toctree-l3.current li.toctree-l4 > a,
+.wy-menu-vertical li.toctree-l4.current li.toctree-l5 > a,
+.wy-menu-vertical li.toctree-l5.current li.toctree-l6 > a {
   padding-left: 12px;
+  padding-right: 34px;
+}
+
+/* the nine areas are the one level that is not nested */
+.wy-menu-vertical li.toctree-l1 > a,
+.wy-menu-vertical li.toctree-l1.current > a {
+  padding-left: 18px;
 }
 
 /* --- top-level areas -----------------------------------------------------
@@ -274,11 +309,6 @@
 
 .wy-menu-vertical li > a {
   position: relative;
-}
-
-/* only reserve the gutter on rows that actually have a toggle */
-.wy-menu-vertical li > a:has(button.toctree-expand) {
-  padding-right: 34px;
 }
 
 /* Every toggle rule below is repeated for `li.current > a` and `li.on a`.
