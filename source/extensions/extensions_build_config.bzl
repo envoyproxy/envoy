@@ -614,6 +614,7 @@ EXTENSIONS = {
     #
     # HTTP Early Header Mutation
     #
+    "envoy.http.early_header_mutation.exact_path_rewrite": "//source/extensions/http/early_header_mutation/exact_path_rewrite:config",
     "envoy.http.early_header_mutation.header_mutation": "//source/extensions/http/early_header_mutation/header_mutation:config",
 
     #
