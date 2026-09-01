@@ -253,6 +253,9 @@ private:
   // Once set, later frames on the dying stream are dropped, not offloaded.
   bool payload_rejected_{false};
 
+  // Request headers for this stream. Held by pointer during decode path.
+  Http::RequestHeaderMap* request_headers_{nullptr};
+
   // FilterManager orchestrating the AI filter chain.
   std::unique_ptr<FilterManager> filter_manager_;
 

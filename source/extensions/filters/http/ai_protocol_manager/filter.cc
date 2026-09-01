@@ -154,6 +154,7 @@ void AiProtocolManagerFilter::onDestroy() {
 
 Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                                  bool end_stream) {
+  request_headers_ = &headers;
   // Request-side processing is off entirely; per-route declarations still
   // matter to the encode path, which resolves them itself.
   if (!config_->requestHandlingEnabled()) {
@@ -347,6 +348,8 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
   };
 
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
+    ASSERT(request_headers_ != nullptr);
+    request_headers_->removeContentLength();
     std::vector<AiFilterPtr> filters;
     filter_manager_ = std::make_unique<FilterManager>(
         std::move(filters), std::move(request_json_), decode_manager_.get(),

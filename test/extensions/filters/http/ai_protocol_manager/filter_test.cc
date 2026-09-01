@@ -94,8 +94,8 @@ public:
   // its expectation goes unsatisfied.
   Http::FilterHeadersStatus decodeHeadersEngaging() {
     replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
-    Http::TestRequestHeaderMapImpl headers = requestHeaders();
-    return filter_->decodeHeaders(headers, /*end_stream=*/false);
+    request_headers_ = requestHeaders();
+    return filter_->decodeHeaders(request_headers_, /*end_stream=*/false);
   }
 
   // Engages the filter where the payload is not what the test is about:
@@ -148,6 +148,7 @@ public:
   NiceMock<Event::MockSchedulableCallback>* replay_cb_{nullptr};
   std::unique_ptr<RouteConfig> route_config_;
   std::unique_ptr<AiProtocolManagerFilter> filter_;
+  Http::TestRequestHeaderMapImpl request_headers_;
 
   Buffer::OwnedImpl injected_;
   bool injected_end_stream_{false};
@@ -1152,6 +1153,26 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
   EXPECT_TRUE(injected_end_stream_);
+}
+
+// Content-Length header is removed when the filter manager serializes the payload.
+TEST_F(AiProtocolManagerFilterTest, RemovesContentLengthOnReplay) {
+  setRouteConfig();
+  replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+  request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                    {":path", "/chat/completions"},
+                                                    {"content-type", "application/json"},
+                                                    {"content-length", "61"}};
+  ASSERT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  EXPECT_NE(request_headers_.ContentLength(), nullptr);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(request_headers_.ContentLength(), nullptr);
 }
 
 // Malformed JSON is answered with a 400 and never reaches the upstream.

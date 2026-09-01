@@ -216,8 +216,9 @@ void FilterManager::start(absl::AnyInvocable<void(absl::Status)> on_complete) {
   if (async_state_->terminated_) {
     return;
   }
-  async_state_->filter_contexts_[0].handoff->tryPush(
+  bool payload_index_pushed = async_state_->filter_contexts_[0].handoff->tryPush(
       std::make_unique<AiRequest>(std::move(payload_index_)));
+  ASSERT(payload_index_pushed);
 }
 
 void FilterManager::launchFilters() {
