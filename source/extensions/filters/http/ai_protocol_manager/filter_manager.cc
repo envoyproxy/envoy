@@ -120,7 +120,9 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
             }
           },
           Coroutine::StartMode::Inline);
-      handles_.push_back(std::move(handle));
+      if (!terminated_) {
+        handles_.push_back(std::move(handle));
+      }
       return;
     }
 
@@ -207,13 +209,22 @@ FilterManager::~FilterManager() { cancel(); }
 void FilterManager::start(absl::AnyInvocable<void(absl::Status)> on_complete) {
   async_state_->on_complete_ = std::move(on_complete);
   launchFilters();
+  if (async_state_->terminated_) {
+    return;
+  }
   launchSink();
+  if (async_state_->terminated_) {
+    return;
+  }
   async_state_->filter_contexts_[0].handoff->tryPush(
       std::make_unique<AiRequest>(std::move(payload_index_)));
 }
 
 void FilterManager::launchFilters() {
   for (size_t i = 0; i < filters_.size(); ++i) {
+    if (async_state_->terminated_) {
+      break;
+    }
     std::weak_ptr<AsyncState> weak_state = async_state_;
 
     AiRequestReceiver receiver([weak_state, i]() -> Coroutine::Task<absl::StatusOr<AiRequestPtr>> {
@@ -248,7 +259,9 @@ void FilterManager::launchFilters() {
           }
         },
         Coroutine::StartMode::Inline);
-    async_state_->handles_.push_back(std::move(handle));
+    if (!async_state_->terminated_) {
+      async_state_->handles_.push_back(std::move(handle));
+    }
   }
 }
 
@@ -265,7 +278,9 @@ void FilterManager::launchSink() {
         }
       },
       Coroutine::StartMode::Inline);
-  async_state_->handles_.push_back(std::move(handle));
+  if (!async_state_->terminated_) {
+    async_state_->handles_.push_back(std::move(handle));
+  }
 }
 
 void FilterManager::cancel() { async_state_->cancel(); }

@@ -369,6 +369,97 @@ TEST_F(FilterManagerTest, FilterLocalReplyWithoutLocalReplyFnInvokesCompletionWi
   EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kCancelled));
 }
 
+class TestImmediateErrorFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier) override {
+    co_return absl::InternalError("synchronous filter startup error");
+  }
+};
+
+class TestCountingFilter : public AiFilter {
+public:
+  explicit TestCountingFilter(int& start_count) : start_count_(start_count) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ++start_count_;
+    ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
+    co_return co_await std::move(propagate_request)(std::move(req));
+  }
+
+private:
+  int& start_count_;
+};
+
+class TestImmediateLocalReplyFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier reply_locally) override {
+    std::move(reply_locally)(Http::Code::Unauthorized, "synchronous auth rejection");
+    co_return absl::OkStatus();
+  }
+};
+
+TEST_F(FilterManagerTest, SynchronousFilterErrorStopsSubsequentFilterLaunches) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+
+  int filter2_started = 0;
+  std::vector<AiFilterPtr> filters;
+  filters.push_back(std::make_unique<TestImmediateErrorFilter>());
+  filters.push_back(std::make_unique<TestCountingFilter>(filter2_started));
+
+  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
+                        stream_info_);
+
+  absl::Status status;
+  bool completed = false;
+  manager.start([&status, &completed](absl::Status s) {
+    status = std::move(s);
+    completed = true;
+  });
+
+  drain();
+  EXPECT_TRUE(completed);
+  EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kInternal));
+  EXPECT_EQ(filter2_started, 0);
+}
+
+TEST_F(FilterManagerTest, SynchronousFilterLocalReplyStopsSubsequentFilterLaunches) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+
+  Http::Code local_reply_code = Http::Code::OK;
+  std::string local_reply_details;
+  int filter2_started = 0;
+
+  std::vector<AiFilterPtr> filters;
+  filters.push_back(std::make_unique<TestImmediateLocalReplyFilter>());
+  filters.push_back(std::make_unique<TestCountingFilter>(filter2_started));
+
+  FilterManager manager(
+      std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
+        local_reply_code = code;
+        local_reply_details = std::move(details);
+      });
+
+  absl::Status status;
+  bool completed = false;
+  manager.start([&status, &completed](absl::Status s) {
+    status = std::move(s);
+    completed = true;
+  });
+
+  drain();
+  EXPECT_TRUE(completed);
+  EXPECT_EQ(local_reply_code, Http::Code::Unauthorized);
+  EXPECT_EQ(local_reply_details, "synchronous auth rejection");
+  EXPECT_EQ(filter2_started, 0);
+}
+
 TEST_F(FilterManagerTest, CancelCancelsCoroutines) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});

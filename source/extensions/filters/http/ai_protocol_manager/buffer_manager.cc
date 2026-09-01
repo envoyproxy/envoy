@@ -307,6 +307,9 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
   // below ends the stream -- handled by the runtime check after injectData().)
   ASSERT(!destroyed_);
   read_in_flight_ = false;
+  if (!replaying_) {
+    return;
+  }
   if (status != ExternalBufferStatus::Ok) {
     onExternalBufferError();
     return;

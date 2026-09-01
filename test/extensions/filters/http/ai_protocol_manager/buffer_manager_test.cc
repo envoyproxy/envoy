@@ -788,6 +788,49 @@ TEST_F(BufferManagerTest, ReplaysInMemoryDataWithWatermarkBackpressure) {
   EXPECT_EQ(bridge_->injected_.toString(), big_payload);
 }
 
+// cancelReplay cancels in-flight external buffer replay so late read completions are dropped.
+TEST_F(BufferManagerTest, CancelReplayCancelsPendingExternalBufferReplay) {
+  resetManager(posting_factory_);
+
+  Buffer::OwnedImpl body("message data for offload");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  replayAll();
+
+  // A deferred replay was scheduled; fire replay_cb_ to issue read().
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // The read callback was posted to dispatcher, so read is currently in flight.
+  EXPECT_FALSE(posted_.empty());
+
+  // Now cancel replay before the posted read callback completes.
+  manager_->cancelReplay();
+
+  // Run the remaining posted read callback.
+  drain();
+
+  EXPECT_FALSE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.length(), 0);
+}
+
+// cancelReplay cancels in-flight in-memory replay so scheduled callbacks do not inject.
+TEST_F(BufferManagerTest, CancelReplayCancelsPendingInMemoryReplay) {
+  Buffer::OwnedImpl in_memory_data("{\"modified\":true}");
+  bool in_mem_done = false;
+  manager_->replay(in_memory_data, [&in_mem_done]() { in_mem_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  manager_->cancelReplay();
+  EXPECT_FALSE(replay_cb_->enabled());
+
+  drain();
+  EXPECT_FALSE(in_mem_done);
+  EXPECT_EQ(bridge_->injected_.length(), 0);
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters
