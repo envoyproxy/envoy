@@ -6,16 +6,16 @@ load(
 )
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
+load("//test/extensions/dynamic_modules:dynamic_module_test.bzl", "envoy_cc_dynamic_module_test")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_cc_dynamic_module_test(
     name = "dynamic_modules_test",
     srcs = ["dynamic_modules_test.cc"],
     data = [
@@ -52,7 +52,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dynamic_module_test(
     name = "abi_impl_test",
     size = "large",
     srcs = ["abi_impl_test.cc"],
