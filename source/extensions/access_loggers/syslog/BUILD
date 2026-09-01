@@ -13,12 +13,14 @@ envoy_cc_library(
     name = "syslog_access_log_lib",
     srcs = [
         "formatter.cc",
+        "stats.cc",
         "syslog_access_log_impl.cc",
         "udp_sender.cc",
     ],
     hdrs = [
         "formatter.h",
         "sender.h",
+        "stats.h",
         "syslog_access_log_impl.h",
         "udp_sender.h",
     ],
@@ -32,7 +34,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:utility_lib",
         "//source/common/formatter:substitution_format_utility_lib",
-        "//source/common/network:io_socket_error_lib",
         "//source/common/network:socket_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/stats:symbol_table_lib",

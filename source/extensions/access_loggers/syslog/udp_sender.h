@@ -17,8 +17,6 @@ namespace Syslog {
 
 class SyslogAccessLogStats;
 
-void accountWriteResult(const Api::IoCallUint64Result& result, SyslogAccessLogStats& stats);
-
 class UdpDatagramWriter {
 public:
   UdpDatagramWriter(Event::Dispatcher& dispatcher, SyslogAccessLogStats& stats);
@@ -35,7 +33,7 @@ private:
   };
 
   SocketState& stateFor(const Network::Address::Instance& destination);
-  void initialize(Network::Address::InstanceConstSharedPtr destination);
+  void ensureInitialized(Network::Address::InstanceConstSharedPtr destination);
   void resetFileEvents(SocketState& state);
 
   Event::Dispatcher& dispatcher_;

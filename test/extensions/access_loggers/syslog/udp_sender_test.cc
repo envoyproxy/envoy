@@ -24,6 +24,12 @@ namespace AccessLoggers {
 namespace Syslog {
 namespace {
 
+uint64_t counterValue(Stats::IsolatedStoreImpl& store, absl::string_view name) {
+  const auto counter =
+      TestUtility::findCounter(store, absl::StrCat("access_logs.syslog.test.", name));
+  return counter != nullptr ? counter->value() : 0;
+}
+
 class TestBodyFormatter : public Formatter::Formatter {
 public:
   explicit TestBodyFormatter(const std::string& body) : body_(body) {}
@@ -89,10 +95,10 @@ TEST(SyslogAccessLoggerImplTest, CountsTruncatedMessageWhenSendFails) {
 
   logger.log(Formatter::Context{}, testing::NiceMock<StreamInfo::MockStreamInfo>());
 
-  EXPECT_EQ(1, stats.messages_truncated_.value());
-  EXPECT_GT(stats.bytes_truncated_.value(), 0);
-  EXPECT_EQ(0, stats.bytes_sent_.value());
-  EXPECT_EQ(0, stats.send_.value());
+  EXPECT_EQ(1, counterValue(store, "messages.state.truncated"));
+  EXPECT_GT(counterValue(store, "bytes_truncated"), 0);
+  EXPECT_EQ(0, counterValue(store, "bytes_sent"));
+  EXPECT_EQ(0, counterValue(store, "send"));
 }
 
 class SenderTestBase : public testing::Test {
@@ -127,8 +133,8 @@ TEST_F(StaticUdpSenderTest, CountsDatagramSendError) {
 
   sender.send("message");
 
-  EXPECT_EQ(0, stats_.bytes_sent_.value());
-  EXPECT_EQ(0, stats_.send_.value());
+  EXPECT_EQ(0, counterValue(store_, "bytes_sent"));
+  EXPECT_EQ(0, counterValue(store_, "send"));
 }
 #endif
 
@@ -143,14 +149,14 @@ TEST_F(StaticUdpSenderTest, RecoversAfterWriteBecomesWritable) {
 
   sender.send("message");
   sender.send("message");
-  EXPECT_EQ(0, stats_.send_.value());
-  EXPECT_EQ(0, stats_.bytes_sent_.value());
+  EXPECT_EQ(0, counterValue(store_, "send"));
+  EXPECT_EQ(0, counterValue(store_, "bytes_sent"));
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   sender.send("message");
 
-  EXPECT_EQ(1, stats_.send_.value());
-  EXPECT_EQ(7, stats_.bytes_sent_.value());
+  EXPECT_EQ(1, counterValue(store_, "send"));
+  EXPECT_EQ(7, counterValue(store_, "bytes_sent"));
 }
 
 class ClusterUdpSenderTest : public SenderTestBase {};
@@ -173,8 +179,8 @@ TEST_F(ClusterUdpSenderTest, IgnoresUnavailableDestinations) {
   sender.send("message");
   sender.send("message");
 
-  EXPECT_EQ(0, stats_.bytes_sent_.value());
-  EXPECT_EQ(0, stats_.send_.value());
+  EXPECT_EQ(0, counterValue(store_, "bytes_sent"));
+  EXPECT_EQ(0, counterValue(store_, "send"));
 }
 
 TEST_F(ClusterUdpSenderTest, SendsToIpv4AndIpv6Hosts) {
@@ -217,8 +223,9 @@ TEST_F(ClusterUdpSenderTest, SendsToIpv4AndIpv6Hosts) {
   result = v6_receiver.ioHandle().recv(data, sizeof(data), 0);
   ASSERT_TRUE(result.ok());
   EXPECT_EQ("v6-message", absl::string_view(data, result.return_value_));
-  EXPECT_EQ(2, stats_.send_.value());
-  EXPECT_EQ(sizeof("v4-message") + sizeof("v6-message") - 2, stats_.bytes_sent_.value());
+  EXPECT_EQ(2, counterValue(store_, "send"));
+  EXPECT_EQ(sizeof("v4-message") + sizeof("v6-message") - 2,
+            counterValue(store_, "bytes_sent"));
 }
 
 TEST_F(ClusterUdpSenderTest, SelectsHostForEveryRecord) {
@@ -255,8 +262,8 @@ TEST_F(ClusterUdpSenderTest, SelectsHostForEveryRecord) {
   result = second_receiver.ioHandle().recv(data, sizeof(data), 0);
   ASSERT_TRUE(result.ok());
   EXPECT_EQ("message", absl::string_view(data, result.return_value_));
-  EXPECT_EQ(2, stats_.send_.value());
-  EXPECT_EQ(2 * (sizeof("message") - 1), stats_.bytes_sent_.value());
+  EXPECT_EQ(2, counterValue(store_, "send"));
+  EXPECT_EQ(2 * (sizeof("message") - 1), counterValue(store_, "bytes_sent"));
 }
 
 } // namespace

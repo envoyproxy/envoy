@@ -2,22 +2,14 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-#include "source/common/network/io_socket_error_impl.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
-#include "source/extensions/access_loggers/syslog/syslog_access_log_impl.h"
+#include "source/extensions/access_loggers/syslog/stats.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace Syslog {
-
-void accountWriteResult(const Api::IoCallUint64Result& result, SyslogAccessLogStats& stats) {
-  if (result.ok()) {
-    stats.send_.inc();
-    stats.bytes_sent_.add(result.return_value_);
-  }
-}
 
 UdpDatagramWriter::UdpDatagramWriter(Event::Dispatcher& dispatcher, SyslogAccessLogStats& stats)
     : dispatcher_(dispatcher), stats_(stats) {}
@@ -25,7 +17,7 @@ UdpDatagramWriter::UdpDatagramWriter(Event::Dispatcher& dispatcher, SyslogAccess
 UdpDatagramWriter::UdpDatagramWriter(Event::Dispatcher& dispatcher, SyslogAccessLogStats& stats,
                                      Network::Address::InstanceConstSharedPtr destination)
     : UdpDatagramWriter(dispatcher, stats) {
-  initialize(std::move(destination));
+  ensureInitialized(std::move(destination));
 }
 
 UdpDatagramWriter::~UdpDatagramWriter() {
@@ -48,7 +40,8 @@ UdpDatagramWriter::stateFor(const Network::Address::Instance& destination) {
   return destination.ip()->version() == Network::Address::IpVersion::v4 ? ipv4_ : ipv6_;
 }
 
-void UdpDatagramWriter::initialize(Network::Address::InstanceConstSharedPtr destination) {
+void UdpDatagramWriter::ensureInitialized(
+    Network::Address::InstanceConstSharedPtr destination) {
   RELEASE_ASSERT(destination != nullptr, "Syslog UDP destination must not be null");
   SocketState& state = stateFor(*destination);
   if (state.socket_ != nullptr) {
@@ -71,14 +64,19 @@ void UdpDatagramWriter::initialize(Network::Address::InstanceConstSharedPtr dest
 
 void UdpDatagramWriter::write(absl::string_view record,
                               Network::Address::InstanceConstSharedPtr destination) {
-  initialize(destination);
+  ensureInitialized(destination);
   SocketState& state = stateFor(*destination);
 
   if (state.writer_->isWriteBlocked()) {
-    accountWriteResult({0, Network::IoSocketError::getIoSocketEagainError()}, stats_);
+    ENVOY_LOG_PERIODIC_MISC(
+        warn, std::chrono::seconds(10),
+        "Syslog writer for destination '{}' is blocked; dropping messages",
+        destination->asString());
     return;
   }
 
+  // UdpDefaultWriter reads the buffer synchronously and does not retain it. Reference the record
+  // directly to avoid copying the formatted message.
   Buffer::BufferFragmentImpl fragment(record.data(), record.size(), nullptr);
   Buffer::OwnedImpl buffer;
   buffer.addBufferFragment(fragment);
@@ -86,7 +84,14 @@ void UdpDatagramWriter::write(absl::string_view record,
   if (state.writer_->isWriteBlocked()) {
     state.socket_->ioHandle().enableFileEvents(Event::FileReadyType::Write);
   }
-  accountWriteResult(result, stats_);
+  if (result.ok()) {
+    stats_.sent(result.return_value_);
+  } else {
+    ENVOY_LOG_PERIODIC_MISC(
+        warn, std::chrono::seconds(10),
+        "Syslog write to destination '{}' failed: {}; dropping messages", destination->asString(),
+        result.err_->getErrorDetails());
+  }
 }
 
 StaticUdpSender::StaticUdpSender(Event::Dispatcher& dispatcher,
@@ -105,7 +110,7 @@ void ClusterUdpSender::send(absl::string_view record) {
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(cluster_name_);
   if (cluster == nullptr) {
     ENVOY_LOG_PERIODIC_MISC(warn, std::chrono::seconds(10),
-                            "Syslog UDP cluster '{}' is unavailable; dropping messages",
+                            "Syslog cluster '{}' is unavailable; dropping messages",
                             cluster_name_);
     return;
   }
@@ -113,14 +118,14 @@ void ClusterUdpSender::send(absl::string_view record) {
       cluster->loadBalancer().chooseHost(nullptr));
   if (host == nullptr) {
     ENVOY_LOG_PERIODIC_MISC(warn, std::chrono::seconds(10),
-                            "Syslog UDP cluster '{}' has no available host; dropping messages",
+                            "Syslog cluster '{}' has no available host; dropping messages",
                             cluster_name_);
     return;
   }
   if (host->address()->type() != Network::Address::Type::Ip) {
     ENVOY_LOG_PERIODIC_MISC(
         warn, std::chrono::seconds(10),
-        "Syslog UDP cluster '{}' selected a non-IP host address; dropping messages", cluster_name_);
+        "Syslog cluster '{}' selected a non-IP host address; dropping messages", cluster_name_);
     return;
   }
   writer_.write(record, host->address());

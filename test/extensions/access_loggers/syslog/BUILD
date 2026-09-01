@@ -60,6 +60,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:io_socket_error_lib",
         "//source/common/network:socket_lib",
         "//source/extensions/access_loggers/syslog:syslog_access_log_lib",
         "//test/mocks/api:api_mocks",

@@ -10,15 +10,14 @@
 #include "envoy/extensions/access_loggers/syslog/v3/syslog.pb.validate.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/formatter/substitution_formatter.h"
-#include "source/common/stats/symbol_table.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"
 #include "source/extensions/access_loggers/syslog/sender.h"
+#include "source/extensions/access_loggers/syslog/stats.h"
 
 #include "absl/strings/string_view.h"
 
@@ -29,29 +28,6 @@ namespace Syslog {
 
 using SyslogAccessLogConfig = envoy::extensions::access_loggers::syslog::v3::SyslogAccessLogConfig;
 using SyslogAccessLogConfigSharedPtr = std::shared_ptr<SyslogAccessLogConfig>;
-
-class SyslogAccessLogStats {
-  Stats::ScopeSharedPtr scope_;
-  Stats::StatNamePool stat_names_;
-  const Stats::StatName bytes_sent_name_;
-  const Stats::StatName bytes_truncated_name_;
-  const Stats::StatName messages_name_;
-  const Stats::StatName send_name_;
-  const Stats::StatName state_name_;
-  const Stats::StatName full_name_;
-  const Stats::StatName truncated_name_;
-  const Stats::StatNameTagVector full_tags_;
-  const Stats::StatNameTagVector truncated_tags_;
-
-public:
-  SyslogAccessLogStats(Stats::Scope& scope, absl::string_view stat_prefix);
-
-  Stats::Counter& bytes_sent_;
-  Stats::Counter& bytes_truncated_;
-  Stats::Counter& messages_full_;
-  Stats::Counter& messages_truncated_;
-  Stats::Counter& send_;
-};
 
 /** Worker-local logger that formats and sends syslog records. */
 class SyslogAccessLoggerImpl : public Logger::Loggable<Logger::Id::misc> {
