@@ -17,7 +17,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// Filter state object holding the reserialized JsonWithExtBuf index.
+// Filter state object holding the serialized JsonWithExtBuf index.
 class APMRequestPayloadIndex : public StreamInfo::FilterState::Object {
 public:
   explicit APMRequestPayloadIndex(JsonWithExtBuf index) : index_(std::move(index)) {}
@@ -34,7 +34,7 @@ private:
 class Serializer {
 public:
   // Dry-run calculation: computes new byte offsets for all ExternalRef nodes in doc as they
-  // will appear in the reserialized output stream, returning a new JsonWithExtBuf instance.
+  // will appear in the serialized output stream, returning a new JsonWithExtBuf instance.
   static Coroutine::Task<absl::StatusOr<JsonWithExtBuf>>
   calculateSerializedOffsets(const JsonWithExtBuf& doc);
 

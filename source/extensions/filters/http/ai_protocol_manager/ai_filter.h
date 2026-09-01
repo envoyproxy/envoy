@@ -19,7 +19,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// Callable awaitable that delivers the `AiRequest` to a filter. Callable on rvalue only.
+// Callable awaitable that delivers the `AiRequest` to a filter. Callable on r-value only.
 class AiRequestReceiver {
 public:
   using Impl = absl::AnyInvocable<Coroutine::Task<absl::StatusOr<AiRequestPtr>>() &&>;
@@ -43,7 +43,7 @@ private:
 };
 
 // Callable awaitable that forwards the `AiRequest` to the next filter in the chain. Callable on
-// rvalue only.
+// r-value only.
 class AiRequestPropagator {
 public:
   using Impl = absl::AnyInvocable<Coroutine::Task<absl::Status>(AiRequestPtr) &&>;
