@@ -121,7 +121,7 @@ CompressorFilterConfig::DirectionConfig::contentTypeMatcherList(
     for (const auto& type : default_content_encodings) {
       envoy::type::matcher::v3::StringMatcher matcher;
       matcher.set_exact(type);
-      matcher.set_ignore_case(true); // We can force lowercasing of the default content types
+      matcher.set_ignore_case(true);
       list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
     }
     return list;
@@ -146,7 +146,7 @@ CompressorFilterConfig::DirectionConfig::contentTypeMatcherList(
     for (const auto& type : content_types) {
       envoy::type::matcher::v3::StringMatcher matcher;
       matcher.set_exact(type);
-      matcher.set_ignore_case(true); // We can force lowercasing of the legacy content types
+      matcher.set_ignore_case(true);
       list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
     }
   }
