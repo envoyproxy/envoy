@@ -1,14 +1,15 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 
-#if defined(ENVOY_ENABLE_QUIC)
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/quic/quic_packet_writer_interface.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
-#endif
 
 #include "test/common/listener_manager/listener_manager_impl_test.h"
 #include "test/integration/filters/test_listener_filter.h"
 #include "test/mocks/network/mocks.h"
 #include "test/server/utility.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 namespace Envoy {
@@ -16,6 +17,30 @@ namespace Server {
 namespace {
 
 using ::testing::Return;
+
+class FakeQuicPacketWriterFactory : public Quic::QuicPacketWriterFactory {
+public:
+  Quic::QuicPacketWriterPtr createQuicPacketWriter(Network::IoHandle&, Stats::Scope&,
+                                                   Event::Dispatcher&,
+                                                   absl::AnyInvocable<void()>) override {
+    return nullptr;
+  }
+};
+
+class FakeQuicPacketWriterFactoryFactory : public Quic::QuicPacketWriterFactoryFactory {
+public:
+  Quic::QuicPacketWriterFactoryPtr
+  createQuicPacketWriterFactory(const envoy::config::core::v3::TypedExtensionConfig&,
+                                Server::Configuration::ListenerFactoryContext&) override {
+    return std::make_unique<FakeQuicPacketWriterFactory>();
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  std::string name() const override { return "envoy.test.quic_packet_writer"; }
+};
 
 class MockSupportsUdpGso : public Api::OsSysCallsImpl {
 public:
@@ -272,6 +297,64 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
       server_.dispatcher_, []() {});
   // Even though GSO is enabled, the default writer should be used.
   EXPECT_EQ(false, udp_packet_writer->isBatchMode());
+}
+
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicPacketWriterFactoryFromConfig) {
+  FakeQuicPacketWriterFactoryFactory factory;
+  Registry::InjectFactory<Quic::QuicPacketWriterFactoryFactory> registered(factory);
+
+  std::string yaml = getBasicConfig();
+  yaml = yaml + R"EOF(
+  udp_packet_packet_writer_config:
+    name: envoy.test.quic_packet_writer
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
+  EXPECT_CALL(server_.api_.random_, uuid());
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           expectedNumSocketOptions(),
+                           ListenerComponentFactory::BindType::ReusePort);
+
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#ifdef SO_RXQ_OVFL
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
+                   /* expected_sockopt_name */ SO_RXQ_OVFL,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#endif
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
+                   /* expected_sockopt_name */ SO_REUSEPORT,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#ifdef UDP_GRO
+  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
+                     /* expected_sockopt_name */ UDP_GRO,
+                     /* expected_value */ 1,
+                     /* expected_num_calls */ 1);
+  }
+#endif
+
+#ifdef ENVOY_IP_DONTFRAG
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ IP_DONTFRAG,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#else
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
+                   /* expected_value */ IP_PMTUDISC_DO,
+                   /* expected_num_calls */ 1);
+#endif
+
+  addOrUpdateListener(listener_proto);
+  EXPECT_EQ(1u, manager_->listeners().size());
+  EXPECT_NE(nullptr, manager_->listeners()[0].get().udpListenerConfig()->quicPacketWriterFactory());
 }
 
 TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithExplictConnectionIdConfig) {

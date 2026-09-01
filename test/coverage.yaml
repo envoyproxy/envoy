@@ -35,6 +35,7 @@ directories:
   source/extensions/common/wasm: 95.6  # flaky: be careful adjusting
   source/extensions/common/wasm/ext: 100.0
   source/extensions/clusters/dynamic_modules: 97.7
+  source/extensions/dynamic_modules/posix: 85.7
   source/extensions/filters/common: 97.1
   source/extensions/filters/common/ext_authz: 98.0
   source/extensions/filters/common/fault: 94.5
