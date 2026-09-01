@@ -4,7 +4,7 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
-    "envoy_extension_cc_test",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
@@ -28,7 +28,7 @@ HICKORY_ABI_IMPL_DEPS = [
     "//source/extensions/upstreams/http/dynamic_modules:abi_impl",
 ]
 
-envoy_extension_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "hickory_dns_impl_test",
     srcs = ["hickory_dns_impl_test.cc"],
     data = [
@@ -63,7 +63,7 @@ envoy_extension_cc_test(
     ] + HICKORY_ABI_IMPL_DEPS,
 )
 
-envoy_extension_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "hickory_dns_integration_test",
     srcs = ["hickory_dns_integration_test.cc"],
     extension_names = ["envoy.network.dns_resolver.hickory"],
