@@ -1232,8 +1232,8 @@ absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann:
     sendErrorResponse(Http::Code::OK, BridgeStatus::RequestMcpMethodMalformed,
                       generateErrorJsonResponse(-32600, "MCP method field is not a string").dump());
     return absl::InvalidArgumentError("MCP method field is not a string");
-  } else if (json_rpc[McpConstants::METHOD_FIELD] ==
-             McpConstants::Methods::NOTIFICATION_INITIALIZED) {
+  } else if (McpConstants::Methods::NOTIFICATION_INITIALIZED ==
+             json_rpc[McpConstants::METHOD_FIELD].get_ref<const nlohmann::json::string_t&>()) {
     // The notifications/initialized request is not required to have an ID
     // field.
   } else if (!session_id.ok()) {

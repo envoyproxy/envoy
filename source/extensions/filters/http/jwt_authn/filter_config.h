@@ -73,8 +73,9 @@ class FilterConfigImpl : public Logger::Loggable<Logger::Id::jwt>,
                          public AuthFactory {
 public:
   FilterConfigImpl(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
-                   const std::string& stats_prefix, Server::Configuration::FactoryContext& context,
-                   absl::Status& creation_status);
+                   const std::string& stats_prefix,
+                   Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+                   OptRef<Init::Manager> init_manager, absl::Status& creation_status);
 
   ~FilterConfigImpl() override = default;
 

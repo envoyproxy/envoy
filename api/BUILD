@@ -417,6 +417,7 @@ proto_library(
         "//envoy/extensions/retry/host/omit_host_metadata/v3:pkg",
         "//envoy/extensions/retry/host/previous_hosts/v3:pkg",
         "//envoy/extensions/retry/priority/previous_priorities/v3:pkg",
+        "//envoy/extensions/router/cluster_specifiers/dynamic_modules/v3:pkg",
         "//envoy/extensions/router/cluster_specifiers/lua/v3:pkg",
         "//envoy/extensions/router/cluster_specifiers/matcher/v3:pkg",
         "//envoy/extensions/stat_sinks/dynamic_modules/v3:pkg",

@@ -433,6 +433,7 @@
 /*/extensions/filters/udp/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/clusters/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/load_balancing_policies/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/router/cluster_specifiers/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/matching/input_matchers/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/matching/http/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/transport_sockets/tls/cert_validator/dynamic_modules @agrawroh @mathetake @wbpcode

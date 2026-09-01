@@ -11,6 +11,7 @@ pub mod buffer;
 pub mod catch_unwind;
 pub mod cert_validator;
 pub mod cluster;
+pub mod cluster_specifier;
 pub mod dns_resolver;
 // Implementation detail. Public so SDK-provided macros (for example, `declare_matcher!`) that
 // expand in user crates can reach the safe helpers; users should not depend on this module
@@ -681,6 +682,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `transport_socket:` — [`NewTransportSocketFactoryConfigFunction`] for transport sockets
 /// - `access_logger:` — [`NewAccessLoggerConfigFunction`] for access loggers
 /// - `formatter:` — [`NewFormatterConfigFunction`] for formatters
+/// - `cluster_specifier:` — [`NewClusterSpecifierConfigFunction`] for cluster specifiers
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 ///
 /// # Examples
@@ -892,6 +894,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_FORMATTER_CONFIG_FUNCTION,
       $fn,
       "NEW_FORMATTER_CONFIG_FUNCTION"
+    );
+  };
+  (@register cluster_specifier : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
     );
   };
   (@register stat_sink : $fn:expr) => {
@@ -1227,6 +1236,86 @@ macro_rules! declare_formatter_init_functions {
           envoy_proxy_dynamic_modules_rust_sdk::NEW_FORMATTER_CONFIG_FUNCTION,
           $new_formatter_config_fn,
           "NEW_FORMATTER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      })) {
+        ::std::result::Result::Ok(v) => v,
+        ::std::result::Result::Err(payload) => {
+          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
+          ::std::ptr::null()
+        },
+      }
+    }
+  };
+}
+
+// =================================================================================================
+// Cluster Specifier Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new cluster specifier configuration.
+///
+/// The `name` is the value of `specifier_name` from the `dynamic_modules` cluster specifier
+/// configuration, allowing a single module to dispatch to different cluster specifier
+/// implementations. The `config` is the raw bytes from the `specifier_config` field. Returning
+/// `None` causes Envoy to reject the cluster specifier configuration.
+pub type NewClusterSpecifierConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn cluster_specifier::ClusterSpecifierConfig>>;
+
+/// The global factory function for cluster specifiers. This is set via the `cluster_specifier:` arm
+/// of [`declare_all_init_functions!`] (or the [`declare_cluster_specifier_init_functions!`] shim)
+/// and is not intended to be set directly.
+pub static NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION: OnceLock<NewClusterSpecifierConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a cluster specifier dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewClusterSpecifierConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::cluster_specifier::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_cluster_specifier_config(
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn ClusterSpecifierConfig>> {
+///   Some(Box::new(MyClusterSpecifierConfig {}))
+/// }
+///
+/// struct MyClusterSpecifierConfig {}
+///
+/// impl ClusterSpecifierConfig for MyClusterSpecifierConfig {
+///   fn on_select(&self, ctx: &mut ClusterSpecifierContext) -> bool {
+///     ctx.set_cluster_name("my_cluster");
+///     true
+///   }
+/// }
+///
+/// declare_cluster_specifier_init_functions!(program_init, new_cluster_specifier_config);
+/// ```
+#[macro_export]
+macro_rules! declare_cluster_specifier_init_functions {
+  ($f:ident, $new_cluster_specifier_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION,
+          $new_cluster_specifier_config_fn,
+          "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
         );
         if ($f()) {
           envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()

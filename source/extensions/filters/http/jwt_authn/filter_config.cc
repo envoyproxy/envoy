@@ -15,12 +15,11 @@ namespace JwtAuthn {
 
 FilterConfigImpl::FilterConfigImpl(
     envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context,
-    absl::Status& creation_status)
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context,
+    Stats::Scope& scope, OptRef<Init::Manager> init_manager, absl::Status& creation_status)
     : proto_config_(std::move(proto_config)),
-      stats_(generateStats(stats_prefix, proto_config_.stat_prefix(), context.scope())),
-      cm_(context.serverFactoryContext().clusterManager()),
-      time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {
+      stats_(generateStats(stats_prefix, proto_config_.stat_prefix(), scope)),
+      cm_(context.clusterManager()), time_source_(context.mainThreadDispatcher().timeSource()) {
 
   ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
 
@@ -41,7 +40,7 @@ FilterConfigImpl::FilterConfigImpl(
   }
 
   auto jwks_cache_or =
-      JwksCache::create(proto_config_, context, Common::JwksFetcher::create, stats_);
+      JwksCache::create(proto_config_, context, init_manager, Common::JwksFetcher::create, stats_);
   SET_AND_RETURN_IF_NOT_OK(jwks_cache_or.status(), creation_status);
   jwks_cache_ = std::move(jwks_cache_or.value());
 
@@ -83,7 +82,7 @@ FilterConfigImpl::FilterConfigImpl(
   for (const auto& rule : proto_config_.rules()) {
     switch (rule.requirement_type_case()) {
     case RequirementRule::RequirementTypeCase::kRequires: {
-      auto matcher_or = Matcher::create(rule, context.serverFactoryContext());
+      auto matcher_or = Matcher::create(rule, context);
       SET_AND_RETURN_IF_NOT_OK(matcher_or.status(), creation_status);
       auto verifier_or = Verifier::create(rule.requires_(), proto_config_.providers(), *this);
       SET_AND_RETURN_IF_NOT_OK(verifier_or.status(), creation_status);
@@ -99,14 +98,14 @@ FilterConfigImpl::FilterConfigImpl(
                         rule.requirement_name(), all_requirement_names_));
         return;
       }
-      auto matcher_or = Matcher::create(rule, context.serverFactoryContext());
+      auto matcher_or = Matcher::create(rule, context);
       SET_AND_RETURN_IF_NOT_OK(matcher_or.status(), creation_status);
       auto verifier_or = Verifier::create(map_it->second, proto_config_.providers(), *this);
       SET_AND_RETURN_IF_NOT_OK(verifier_or.status(), creation_status);
       rule_pairs_.emplace_back(std::move(matcher_or.value()), std::move(verifier_or.value()));
     } break;
     case RequirementRule::RequirementTypeCase::REQUIREMENT_TYPE_NOT_SET: {
-      auto matcher_or = Matcher::create(rule, context.serverFactoryContext());
+      auto matcher_or = Matcher::create(rule, context);
       SET_AND_RETURN_IF_NOT_OK(matcher_or.status(), creation_status);
       rule_pairs_.emplace_back(std::move(matcher_or.value()), nullptr);
       break;
