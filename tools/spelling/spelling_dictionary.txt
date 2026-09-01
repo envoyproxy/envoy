@@ -223,6 +223,7 @@ EVP
 EWOULDBLOCK
 EXPECTs
 EXPR
+FACILITY
 FAQ
 FASTOPEN
 FB
@@ -329,6 +330,7 @@ iss
 jti
 KB
 KDS
+KERN
 keycloak
 Karlsson
 KiB
@@ -357,6 +359,7 @@ libcurl
 libsxg
 LLVM
 LLM
+LOCAL7
 LPT
 LRS
 Loggable
@@ -369,6 +372,7 @@ MPTCP
 MQ
 MSDN
 MSET
+MSGID
 MSVC
 MTLS
 MTU
@@ -381,6 +385,8 @@ NBSP
 NDEBUG
 NEXTHDR
 NGHTTP
+NIL
+NILVALUE
 NLOHMANN
 NOAUTH
 NOCHECKRESP
@@ -451,6 +457,7 @@ PNG
 Pointwise
 PostCBs
 PREBIND
+PRI
 PRNG
 PROT
 Postgre
@@ -1393,6 +1400,7 @@ restarter
 resumable
 resync
 ret
+retransmit
 retransmissions
 retransmitted
 retransmitting
@@ -1550,6 +1558,7 @@ sys
 syscall
 syscalls
 sysctl
+syslog
 sysroot
 sz
 tchar
