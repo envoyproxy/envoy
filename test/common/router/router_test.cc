@@ -6014,7 +6014,8 @@ TEST_F(RouterTest, InternalRedirectOnHeaderStrippedOnRedirect) {
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   // Header must have been removed from the downstream headers before the second pass.
-  EXPECT_TRUE(default_request_headers_.get(Http::LowerCaseString("x-envoy-internal-redirect-on")).empty());
+  EXPECT_TRUE(
+      default_request_headers_.get(Http::LowerCaseString("x-envoy-internal-redirect-on")).empty());
   router_->onDestroy();
 }
 
