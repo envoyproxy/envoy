@@ -119,14 +119,14 @@ public:
   // Replays the byte range [offset, offset+length) back into the filter chain as
   // data frames, invoking `done` once the whole range has been injected. The
   // caller may stream further sub-ranges with another replay(). Only one replay may be in flight
-  // at a time. The range must lie within length().
+  // at a time. The range must lie within length(). Must not be called after cancelReplay().
   //
   // Only call after endStream(). It may wait until all write is done before start streaming.
   void replay(uint64_t offset, uint64_t length, ReplayDoneCallback done);
 
   // Replays in-memory `data` (e.g. from serializer's small buffer) back into the filter
   // chain as data frames, pacing against watermark flow control and burst limits,
-  // invoking `done` once all bytes have been drained.
+  // invoking `done` once all bytes have been drained. Must not be called after cancelReplay().
   void replay(Buffer::Instance& data, ReplayDoneCallback done);
 
   // Total number of bytes offloaded so far (durable, queued, and in-flight). The
@@ -142,6 +142,7 @@ public:
   }
 
   // Cancels any in-flight or requested replay operation and disarms callbacks.
+  // Permanent: once cancelled, no further replay operations may be started on this manager.
   void cancelReplay();
 
   // Detaches the manager from the filter chain: releases the external buffer,
@@ -249,6 +250,8 @@ private:
   // True once endStream() has been called; gates flushing the batched backlog (the
   // tail is written even if it is below WriteFlushThreshold).
   bool end_stream_seen_{false};
+  // True once cancelReplay() has been called. Permanent: disables all subsequent replay attempts.
+  bool replay_cancelled_{false};
   // True once replay() has been requested by the caller and not yet started.
   // Replay starts once this is set and the write queue has fully drained (no write
   // in flight, nothing pending).

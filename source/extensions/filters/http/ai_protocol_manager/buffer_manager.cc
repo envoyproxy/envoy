@@ -29,8 +29,8 @@ BufferManager::BufferManager(ExternalBufferFactory& buffer_factory, FilterChainB
 void BufferManager::onDestroy() {
   destroyed_ = true;
   bridge_->unregisterReplayWatermarks();
-  // Cancel any pending replay continuation so it cannot fire after teardown.
-  replay_cb_->cancel();
+  // Cancel any requested or in-flight replay operation and disarm callbacks.
+  cancelReplay();
   // Dropping the buffer cancels any pending write/read completion callbacks.
   buffer_.reset();
 }
@@ -65,7 +65,7 @@ void BufferManager::endStream() {
 
 void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback done) {
   // One replay at a time: the caller chains sub-ranges from the done callback.
-  ASSERT(!replaying_ && !replay_requested_);
+  ASSERT(!replay_cancelled_ && !replaying_ && !replay_requested_);
   replay_source_ = ReplaySource::ExternalBuffer;
   replay_offset_ = offset;
   replay_end_ = offset + length;
@@ -85,7 +85,7 @@ void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback 
 }
 
 void BufferManager::replay(Buffer::Instance& data, ReplayDoneCallback done) {
-  ASSERT(!replaying_ && !replay_requested_);
+  ASSERT(!replay_cancelled_ && !replaying_ && !replay_requested_);
   replay_source_ = ReplaySource::InMemory;
   replay_in_memory_data_.move(data);
   replay_done_ = std::move(done);
@@ -98,6 +98,7 @@ void BufferManager::replay(Buffer::Instance& data, ReplayDoneCallback done) {
 }
 
 void BufferManager::cancelReplay() {
+  replay_cancelled_ = true;
   replay_requested_ = false;
   replaying_ = false;
   replay_source_ = ReplaySource::None;
@@ -157,7 +158,8 @@ void BufferManager::onWriteComplete(ExternalBufferStatus status) {
 void BufferManager::maybeStartReplay() {
   // Start only once the caller has requested a replay and every accepted byte is
   // durable. Consumes the request; the range was set by replay().
-  if (replaying_ || !replay_requested_ || write_in_flight_ || pending_.length() > 0) {
+  if (replay_cancelled_ || replaying_ || !replay_requested_ || write_in_flight_ ||
+      pending_.length() > 0) {
     return;
   }
   replay_requested_ = false;
@@ -286,6 +288,9 @@ void BufferManager::maybeReadNextChunk() {
 void BufferManager::onReplayContinuation() {
   // onDestroy() cancels replay_cb_, so the continuation never fires once detached.
   ASSERT(!destroyed_);
+  if (replay_cancelled_) {
+    return;
+  }
   // Off the caller's stack: either start replay deferred from replay() (the
   // offload was already durable when the caller requested it), resume after the
   // per-iteration burst budget was spent, or resume after chain back-pressure
@@ -307,7 +312,7 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
   // below ends the stream -- handled by the runtime check after injectData().)
   ASSERT(!destroyed_);
   read_in_flight_ = false;
-  if (!replaying_) {
+  if (replay_cancelled_ || !replaying_) {
     return;
   }
   if (status != ExternalBufferStatus::Ok) {

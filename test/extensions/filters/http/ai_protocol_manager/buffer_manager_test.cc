@@ -831,6 +831,38 @@ TEST_F(BufferManagerTest, CancelReplayCancelsPendingInMemoryReplay) {
   EXPECT_EQ(bridge_->injected_.length(), 0);
 }
 
+// onDestroy cancels in-flight in-memory replay so scheduled callbacks do not inject or trigger
+// done.
+TEST_F(BufferManagerTest, DestroyCancelsPendingInMemoryReplay) {
+  Buffer::OwnedImpl in_memory_data("{\"modified\":true}");
+  bool in_mem_done = false;
+  manager_->replay(in_memory_data, [&in_mem_done]() { in_mem_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  manager_->onDestroy();
+  EXPECT_FALSE(replay_cb_->enabled());
+
+  drain();
+  EXPECT_FALSE(in_mem_done);
+  EXPECT_EQ(bridge_->injected_.length(), 0);
+}
+
+// cancelReplay permanently disables starting any new replay.
+TEST_F(BufferManagerTest, CancelReplayPermanentlyPreventsFurtherReplay) {
+  Buffer::OwnedImpl body("some payload");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  manager_->cancelReplay();
+
+  // Attempting to replay after cancelReplay triggers an assert in debug builds.
+  EXPECT_DEBUG_DEATH(manager_->replay(0, 5, []() {}), ".*");
+
+  Buffer::OwnedImpl in_mem("test");
+  EXPECT_DEBUG_DEATH(manager_->replay(in_mem, []() {}), ".*");
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters
