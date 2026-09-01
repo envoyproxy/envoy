@@ -24,6 +24,15 @@ envoy_cc_library(
         "-Wno-unused-parameter",
     ],
     deps = [
+        # The toolshed prebuilt wee8 excludes abseil from libwee8.a by design
+        # (consumers provide their own to avoid ODR/ABI clashes), so this
+        # minimal v8_lib consumer must supply the absl symbols wee8 references.
+        # The from-source @v8//:wee8 propagates these transitively; the prebuilt
+        # does not.
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/synchronization",
         "@proxy-wasm-cpp-host//:base_lib",
         "@proxy-wasm-cpp-host//:v8_lib",
     ],
