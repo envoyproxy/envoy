@@ -19,7 +19,15 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   bool end_stream = false;
   std::optional<Api::IoError::IoErrorCode> err = std::nullopt;
   do {
-    Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, std::nullopt);
+    if (max_read_buffer_size_.has_value() && buffer.length() >= max_read_buffer_size_.value()) {
+      break;
+    }
+
+    const std::optional<uint64_t> max_length =
+        max_read_buffer_size_.has_value()
+            ? std::make_optional(max_read_buffer_size_.value() - buffer.length())
+            : std::nullopt;
+    Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, max_length);
 
     if (result.ok()) {
       ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.return_value_);
@@ -29,7 +37,9 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
         break;
       }
       bytes_read += result.return_value_;
-      if (callbacks_->shouldDrainReadBuffer()) {
+      const bool read_limit_reached =
+          max_read_buffer_size_.has_value() && buffer.length() >= max_read_buffer_size_.value();
+      if (callbacks_->shouldDrainReadBuffer() || read_limit_reached) {
         callbacks_->setTransportSocketIsReadable();
         break;
       }
@@ -93,11 +103,11 @@ void RawBufferSocket::onConnected() { callbacks_->raiseEvent(ConnectionEvent::Co
 TransportSocketPtr
 RawBufferSocketFactory::createTransportSocket(TransportSocketOptionsConstSharedPtr,
                                               Upstream::HostDescriptionConstSharedPtr) const {
-  return std::make_unique<RawBufferSocket>();
+  return std::make_unique<RawBufferSocket>(max_read_buffer_size_);
 }
 
 TransportSocketPtr RawBufferSocketFactory::createDownstreamTransportSocket() const {
-  return std::make_unique<RawBufferSocket>();
+  return std::make_unique<RawBufferSocket>(max_read_buffer_size_);
 }
 
 bool RawBufferSocketFactory::implementsSecureTransport() const { return false; }
