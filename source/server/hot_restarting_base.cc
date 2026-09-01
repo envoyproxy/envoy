@@ -43,6 +43,7 @@ sockaddr_un RpcStream::createDomainSocketAddress(uint64_t id, const std::string&
           fmt::format("{}_{}_{}", socket_path, role, base_id_ + id), socket_mode, nullptr),
       std::unique_ptr<Network::Address::PipeInstance>);
   safeMemcpy(&address, &(addr->getSockAddr()));
+  fchmod(domain_socket_, socket_mode);
 
   return address;
 }
@@ -67,9 +68,10 @@ void RpcStream::bindDomainSocket(uint64_t id, const std::string& role,
     throw EnvoyException(msg);
   }
 
-  // Apply the intended mode to the socket's filesystem node now that bind() has created
-  // it. (The previous fchmod() on the socket descriptor happened before bind(), so it was
-  // a no-op on Linux.)
+  // The fchmod() in createDomainSocketAddress() is the race-free way to set the mode:
+  // on Linux, bind() propagates the socket inode's mode to the filesystem node. Apply
+  // the mode to the node directly as well, so the mode is still set on platforms where
+  // fchmod() on a socket descriptor has no effect.
   if (::chmod(address.sun_path, socket_mode) != 0) {
     ENVOY_LOG_MISC(debug, "Failed to set mode {} on hot restart socket {}: errno = {}.",
                    socket_mode, address.sun_path, errno);
