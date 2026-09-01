@@ -137,7 +137,7 @@ bool MessageStreamer::next() {
 
   Frame& frame = stack_.top();
   if (frame.elements_ != nullptr) {
-    nextElement(frame);
+    emitNextElement(frame);
     return true;
   }
 
@@ -146,18 +146,18 @@ bool MessageStreamer::next() {
     return !stack_.empty();
   }
 
-  startField(frame);
+  emitNextField(frame);
   return true;
 }
 
-void MessageStreamer::nextElement(Frame& frame) {
+void MessageStreamer::emitNextElement(Frame& frame) {
   const Protobuf::Reflection& reflection = *frame.message_.GetReflection();
-  const Field& field = *frame.fields_[frame.next_field_];
+  const Field& field = *frame.elements_field_;
 
   if (frame.next_element_ >= reflection.FieldSize(frame.message_, &field)) {
     frame.elements_.reset();
+    frame.elements_field_ = nullptr;
     frame.next_element_ = 0;
-    ++frame.next_field_;
     return;
   }
 
@@ -170,15 +170,14 @@ void MessageStreamer::nextElement(Frame& frame) {
   }
 }
 
-void MessageStreamer::startField(Frame& frame) {
-  const Field& field = *frame.fields_[frame.next_field_];
+void MessageStreamer::emitNextField(Frame& frame) {
+  const Field& field = *frame.fields_[frame.next_field_++];
 
   frame.field_is_sensitive_ =
       options_.redact_sensitive_fields &&
       (frame.ancestor_is_sensitive_ || MessageUtil::isSensitiveField(field));
   // A cleared field is unset, so it drops out of the output instead of printing a default.
   if (frame.field_is_sensitive_ && redactionClears(field)) {
-    ++frame.next_field_;
     return;
   }
 
@@ -187,13 +186,14 @@ void MessageStreamer::startField(Frame& frame) {
   // https://protobuf.dev/programming-guides/proto3/#backwards
   if (field.is_map()) {
     frame.elements_ = frame.map_->addMap();
+    frame.elements_field_ = &field;
     return;
   }
   if (field.is_repeated()) {
     frame.elements_ = frame.map_->addArray();
+    frame.elements_field_ = &field;
     return;
   }
-  ++frame.next_field_;
   emitValue(frame.message_, field, std::nullopt, *frame.map_, frame.field_is_sensitive_);
 }
 
@@ -214,7 +214,7 @@ void MessageStreamer::emitRedactedValue(const Protobuf::Message& message, const 
                                                       : RedactedText);
     return;
   }
-  // Only a map value or a wrapper reaches here, startField drops anything else it clears.
+  // Only a map value or a wrapper reaches here, `emitNextField` drops anything else it clears.
   const ProtobufTypes::MessagePtr cleared(message.New());
   emitValue(*cleared, field, std::nullopt, level, false);
 }

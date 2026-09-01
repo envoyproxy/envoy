@@ -58,25 +58,33 @@ private:
     const Protobuf::Message& message_;
     // The set fields of `message_`, in field number order.
     std::vector<const Protobuf::FieldDescriptor*> fields_;
+    // The next field of `fields_` to start.
     uint32_t next_field_{0};
-    // Which element of the current repeated field or map comes next.
+    // The next element of the open repeated field or map to emit.
     int next_element_{0};
     // The object the frame emits its fields into.
     BufferStreamer::MapPtr map_;
     // An array or a map, holding the elements of the repeated field being emitted.
     BufferStreamer::LevelPtr elements_;
+    // The field `elements_` holds, non-null exactly while `elements_` is open.
+    const Protobuf::FieldDescriptor* elements_field_{nullptr};
     // Non-null when the frame owns `message_`.
     ProtobufTypes::MessagePtr owned_;
     // Set when the field this frame was reached through is sensitive, so all of it is.
     bool ancestor_is_sensitive_{false};
-    // Whether fields_[next_field_] is sensitive, held so its elements can read it back.
+    // Whether the field last started is sensitive, held so its elements can read it back.
     bool field_is_sensitive_{false};
   };
 
-  void nextElement(Frame& frame);
+  // Emits the next element of the open repeated field or map, closing it once elements run out.
+  // A message emitted piece wise, such as an ordinary nested message or an unpacked Any, pushes a
+  // frame onto `stack_`.
+  void emitNextElement(Frame& frame);
 
-  // Starts the next field, opening a level for it when it is repeated or a map.
-  void startField(Frame& frame);
+  // Starts the next field and emits a scalar or opens `elements_` for `emitNextElement` to fill.
+  // A message emitted piece wise, such as an ordinary nested message or an unpacked Any, pushes a
+  // frame onto `stack_`.
+  void emitNextField(Frame& frame);
 
   // Emits `message` in `level` under `@type` if `type_url` is not empty.
   // A message with a special representation goes under `value`, anything else creates a new frame,
