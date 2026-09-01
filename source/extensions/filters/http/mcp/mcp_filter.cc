@@ -316,7 +316,7 @@ bool McpFilter::needsBody() const {
   const std::string name_path = parser_config.getNameAttributePath(header_method_);
 
   for (const auto& rule : parser_config.getFieldsForMethod(header_method_)) {
-    if (rule.path != name_path) {
+    if (rule.path != "method" && rule.path != name_path) {
       return true;
     }
   }
