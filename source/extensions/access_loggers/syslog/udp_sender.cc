@@ -42,15 +42,10 @@ void UdpDatagramWriter::resetFileEvents(SocketState& state) {
 
 UdpDatagramWriter::SocketState&
 UdpDatagramWriter::stateFor(const Network::Address::Instance& destination) {
-  switch (destination.type()) {
-  case Network::Address::Type::Ip:
-    return destination.ip()->version() == Network::Address::IpVersion::v4 ? ipv4_ : ipv6_;
-  case Network::Address::Type::Pipe:
+  if (destination.type() == Network::Address::Type::Pipe) {
     return pipe_;
-  case Network::Address::Type::EnvoyInternal:
-    PANIC("Envoy internal address unexpectedly passed to Syslog UDP writer");
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  return destination.ip()->version() == Network::Address::IpVersion::v4 ? ipv4_ : ipv6_;
 }
 
 void UdpDatagramWriter::initialize(Network::Address::InstanceConstSharedPtr destination) {

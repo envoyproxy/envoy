@@ -47,7 +47,7 @@ message SyslogAccessLogConfig {
     RFC5424 = 1;
   }
 
-  // Syslog facility used to calculate the message priority.
+  // Syslog facility used to calculate the message priority. Defaults to ``LOCAL7``.
   enum Facility {
     FACILITY_LOCAL7 = 0;
     FACILITY_KERN = 1;
@@ -75,7 +75,7 @@ message SyslogAccessLogConfig {
     FACILITY_LOCAL6 = 23;
   }
 
-  // Syslog severity used to calculate the message priority.
+  // Syslog severity used to calculate the message priority. Defaults to ``INFO``.
   enum Severity {
     INFO = 0;
     EMERG = 1;
@@ -106,10 +106,10 @@ message SyslogAccessLogConfig {
     Cluster cluster = 9;
   }
 
-  // Facility placed in the message priority. Defaults to ``LOCAL7``.
+  // Facility placed in the PRI header. Defaults to ``LOCAL7``.
   Facility facility = 2 [(validate.rules).enum = {defined_only: true}];
 
-  // Severity placed in the message priority. Defaults to ``INFO``.
+  // Severity placed in the PRI header. Defaults to ``INFO``.
   Severity severity = 3 [(validate.rules).enum = {defined_only: true}];
 
   // Application tag associated with the syslog record. For RFC3164, this value is emitted as

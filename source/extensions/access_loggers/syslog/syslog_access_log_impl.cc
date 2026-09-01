@@ -17,79 +17,55 @@ namespace {
 
 constexpr absl::string_view DefaultAppName = "envoy";
 constexpr absl::string_view SyslogStatsPrefix = "access_logs.syslog.";
-constexpr uint32_t ProtoEnumCodeOffset = 1;
-constexpr uint32_t Local7FacilityCode = 23;
-constexpr uint32_t InfoSeverityCode = 6;
-constexpr uint32_t DebugSeverityCode = 7;
-constexpr uint32_t SeveritiesPerFacility = 8;
 
-uint32_t facilityCode(const SyslogAccessLogConfig::Facility facility) {
-  return facility == SyslogAccessLogConfig::FACILITY_LOCAL7
-             ? Local7FacilityCode
-             : static_cast<uint32_t>(facility) - ProtoEnumCodeOffset;
-}
-
-uint32_t severityCode(const SyslogAccessLogConfig::Severity severity) {
-  switch (severity) {
-  case SyslogAccessLogConfig::INFO:
-    return InfoSeverityCode;
-  case SyslogAccessLogConfig::DEBUG:
-    return DebugSeverityCode;
-  default:
-    return static_cast<uint32_t>(severity) - ProtoEnumCodeOffset;
+// Proto 0 is the Envoy default (LOCAL7 / INFO). Remaining enumerators are RFC
+// 5424 codes + 1 so they stay non-zero. DEBUG is already RFC 7, so it is not
+// shifted.
+uint32_t rfcPriority(SyslogAccessLogConfig::Facility facility_enum,
+                     SyslogAccessLogConfig::Severity severity_enum) {
+  uint32_t facility = static_cast<uint32_t>(facility_enum);
+  if (facility_enum == SyslogAccessLogConfig::FACILITY_LOCAL7) {
+    facility = 23;
+  } else {
+    --facility;
   }
+
+  uint32_t severity = static_cast<uint32_t>(severity_enum);
+  if (severity_enum == SyslogAccessLogConfig::INFO) {
+    severity = 6;
+  } else if (severity_enum != SyslogAccessLogConfig::DEBUG) {
+    --severity;
+  }
+  return facility * 8 + severity;
 }
 
 Formatter::FormatterPtr makeFormatter(const SyslogAccessLogConfig& config,
                                       Formatter::FormatterConstSharedPtr body_formatter) {
-  const std::string priority = absl::StrCat(
-      "<",
-      facilityCode(config.facility()) * SeveritiesPerFacility + severityCode(config.severity()),
-      ">");
+  const std::string priority =
+      absl::StrCat("<", rfcPriority(config.facility(), config.severity()), ">");
   const std::string hostname =
       config.no_hostname() ? "" : Formatter::SubstitutionFormatUtils::getHostname().value_or("");
   const std::string app_name = config.tag().empty() ? std::string(DefaultAppName) : config.tag();
 
-  switch (config.syslog_format()) {
-  case SyslogAccessLogConfig::RFC3164:
-    return std::make_unique<Rfc3164Formatter>(std::move(body_formatter), priority, hostname,
-                                              app_name);
-  case SyslogAccessLogConfig::RFC5424: {
+  if (config.syslog_format() == SyslogAccessLogConfig::RFC5424) {
     const std::string msg_id =
         config.msg_id().empty() ? std::string(DefaultRfc5424MessageId) : config.msg_id();
     return std::make_unique<Rfc5424Formatter>(std::move(body_formatter), priority, hostname,
                                               app_name, msg_id);
   }
-  default:
-    PANIC_DUE_TO_CORRUPT_ENUM;
-  }
+  return std::make_unique<Rfc3164Formatter>(std::move(body_formatter), priority, hostname,
+                                            app_name);
 }
 
 SenderPtr makeSender(const SyslogAccessLogConfig& config,
                      Network::Address::InstanceConstSharedPtr destination,
                      Event::Dispatcher& dispatcher, Upstream::ClusterManager& cluster_manager,
                      SyslogAccessLogStats& stats) {
-  switch (config.destination_case()) {
-  case SyslogAccessLogConfig::kServer:
-    switch (config.server().address_case()) {
-    case envoy::config::core::v3::Address::kPipe:
-      return std::make_unique<StaticUdpSender>(dispatcher, std::move(destination), stats);
-    case envoy::config::core::v3::Address::kSocketAddress:
-      switch (config.server().socket_address().protocol()) {
-      case envoy::config::core::v3::SocketAddress::UDP:
-        return std::make_unique<StaticUdpSender>(dispatcher, std::move(destination), stats);
-      default:
-        throw EnvoyException("syslog server socket addresses must use UDP");
-      }
-    default:
-      throw EnvoyException("invalid syslog server address type");
-    }
-  case SyslogAccessLogConfig::kCluster:
-    return std::make_unique<ClusterUdpSender>(dispatcher, cluster_manager, config.cluster().name(),
-                                              stats);
-  default:
-    throw EnvoyException("syslog destination is not configured");
+  if (config.has_server()) {
+    return std::make_unique<StaticUdpSender>(dispatcher, std::move(destination), stats);
   }
+  return std::make_unique<ClusterUdpSender>(dispatcher, cluster_manager, config.cluster().name(),
+                                            stats);
 }
 
 std::string statsPrefix(absl::string_view stat_prefix) {

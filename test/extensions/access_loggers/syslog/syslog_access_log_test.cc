@@ -30,6 +30,15 @@ namespace Syslog {
 namespace {
 
 using SyslogAccessLogConfig = envoy::extensions::access_loggers::syslog::v3::SyslogAccessLogConfig;
+
+// rfcPriority() assumes this proto numbering.
+static_assert(SyslogAccessLogConfig::FACILITY_LOCAL7 == 0);
+static_assert(SyslogAccessLogConfig::FACILITY_KERN == 1);
+static_assert(SyslogAccessLogConfig::FACILITY_LOCAL6 == 23);
+static_assert(SyslogAccessLogConfig::INFO == 0);
+static_assert(SyslogAccessLogConfig::EMERG == 1);
+static_assert(SyslogAccessLogConfig::DEBUG == 7);
+
 using testing::MatchesRegex;
 using testing::Return;
 using testing::StartsWith;
@@ -196,16 +205,34 @@ TEST_F(SyslogAccessLogTest, PayloadFieldsChangeReceivedDatagram) {
   const std::vector<Case> cases = {
       {"defaults", [](SyslogAccessLogConfig&) {},
        [&](const std::string& datagram) { EXPECT_EQ(rfc3164_default, datagram); }},
-      {"facility",
+      {"facility=USER",
        [](SyslogAccessLogConfig& config) {
          config.set_facility(SyslogAccessLogConfig::FACILITY_USER);
        },
        [](const std::string& datagram) { EXPECT_EQ("<14>Aug 19 14:20:54 envoy: test", datagram); }},
-      {"severity",
+      {"facility=KERN",
+       [](SyslogAccessLogConfig& config) {
+         config.set_facility(SyslogAccessLogConfig::FACILITY_KERN);
+       },
+       [](const std::string& datagram) { EXPECT_EQ("<6>Aug 19 14:20:54 envoy: test", datagram); }},
+      {"facility=LOCAL7",
+       [](SyslogAccessLogConfig& config) {
+         config.set_facility(SyslogAccessLogConfig::FACILITY_LOCAL7);
+       },
+       [&](const std::string& datagram) { EXPECT_EQ(rfc3164_default, datagram); }},
+      {"severity=DEBUG",
        [](SyslogAccessLogConfig& config) { config.set_severity(SyslogAccessLogConfig::DEBUG); },
        [](const std::string& datagram) {
          EXPECT_EQ("<191>Aug 19 14:20:54 envoy: test", datagram);
        }},
+      {"severity=EMERG",
+       [](SyslogAccessLogConfig& config) { config.set_severity(SyslogAccessLogConfig::EMERG); },
+       [](const std::string& datagram) {
+         EXPECT_EQ("<184>Aug 19 14:20:54 envoy: test", datagram);
+       }},
+      {"severity=INFO",
+       [](SyslogAccessLogConfig& config) { config.set_severity(SyslogAccessLogConfig::INFO); },
+       [&](const std::string& datagram) { EXPECT_EQ(rfc3164_default, datagram); }},
       {"tag", [](SyslogAccessLogConfig& config) { config.set_tag("edge"); },
        [](const std::string& datagram) { EXPECT_EQ("<190>Aug 19 14:20:54 edge: test", datagram); }},
       {"no_hostname=false", [](SyslogAccessLogConfig& config) { config.set_no_hostname(false); },
