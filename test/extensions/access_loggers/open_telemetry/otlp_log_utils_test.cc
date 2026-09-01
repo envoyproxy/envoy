@@ -639,9 +639,9 @@ TEST(OtlpLogUtilsTest, InitOtlpMessageRootAttributePrecedenceAndDeduplication) {
   kv3->mutable_value()->set_string_value("custom_val");
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  ON_CALL(context.local_info_, zoneName()).WillByDefault(ReturnRef(zone_name));
-  ON_CALL(context.local_info_, clusterName()).WillByDefault(ReturnRef(cluster_name));
-  ON_CALL(context.local_info_, nodeName()).WillByDefault(ReturnRef(node_name));
+  ON_CALL(context.local_info_, zoneName()).WillByDefault(ReturnRef(kTestZone));
+  ON_CALL(context.local_info_, clusterName()).WillByDefault(ReturnRef(kTestCluster));
+  ON_CALL(context.local_info_, nodeName()).WillByDefault(ReturnRef(kTestNode));
 
   MockResourceProvider mock_resource_provider;
   Extensions::Tracers::OpenTelemetry::Resource detected_resource;
@@ -663,13 +663,13 @@ TEST(OtlpLogUtilsTest, InitOtlpMessageRootAttributePrecedenceAndDeduplication) {
   EXPECT_EQ("overridden_log", resource.attributes(0).value().string_value());
 
   EXPECT_EQ("zone_name", resource.attributes(1).key());
-  EXPECT_EQ(zone_name, resource.attributes(1).value().string_value());
+  EXPECT_EQ(kTestZone, resource.attributes(1).value().string_value());
 
   EXPECT_EQ("cluster_name", resource.attributes(2).key());
   EXPECT_EQ("detected_cluster", resource.attributes(2).value().string_value());
 
   EXPECT_EQ("node_name", resource.attributes(3).key());
-  EXPECT_EQ(node_name, resource.attributes(3).value().string_value());
+  EXPECT_EQ(kTestNode, resource.attributes(3).value().string_value());
 
   EXPECT_EQ("detector_key", resource.attributes(4).key());
   EXPECT_EQ("overridden_detector_val", resource.attributes(4).value().string_value());
