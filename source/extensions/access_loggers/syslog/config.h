@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/access_log/access_log_config.h"
-#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/extensions/access_loggers/syslog/v3/syslog.pb.h"
 
 #include "absl/status/status.h"
@@ -11,7 +10,6 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Syslog {
 
-absl::Status validateServerAddress(const envoy::config::core::v3::Address& server);
 absl::Status validateSyslogConfig(
     const envoy::extensions::access_loggers::syslog::v3::SyslogAccessLogConfig& config);
 

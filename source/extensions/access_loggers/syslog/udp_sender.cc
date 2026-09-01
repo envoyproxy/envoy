@@ -40,8 +40,7 @@ UdpDatagramWriter::stateFor(const Network::Address::Instance& destination) {
   return destination.ip()->version() == Network::Address::IpVersion::v4 ? ipv4_ : ipv6_;
 }
 
-void UdpDatagramWriter::ensureInitialized(
-    Network::Address::InstanceConstSharedPtr destination) {
+void UdpDatagramWriter::ensureInitialized(Network::Address::InstanceConstSharedPtr destination) {
   RELEASE_ASSERT(destination != nullptr, "Syslog UDP destination must not be null");
   SocketState& state = stateFor(*destination);
   if (state.socket_ != nullptr) {
@@ -68,10 +67,9 @@ void UdpDatagramWriter::write(absl::string_view record,
   SocketState& state = stateFor(*destination);
 
   if (state.writer_->isWriteBlocked()) {
-    ENVOY_LOG_PERIODIC_MISC(
-        warn, std::chrono::seconds(10),
-        "Syslog writer for destination '{}' is blocked; dropping messages",
-        destination->asString());
+    ENVOY_LOG_PERIODIC_MISC(warn, std::chrono::seconds(10),
+                            "Syslog writer for destination '{}' is blocked; dropping messages",
+                            destination->asString());
     return;
   }
 
@@ -87,10 +85,9 @@ void UdpDatagramWriter::write(absl::string_view record,
   if (result.ok()) {
     stats_.sent(result.return_value_);
   } else {
-    ENVOY_LOG_PERIODIC_MISC(
-        warn, std::chrono::seconds(10),
-        "Syslog write to destination '{}' failed: {}; dropping messages", destination->asString(),
-        result.err_->getErrorDetails());
+    ENVOY_LOG_PERIODIC_MISC(warn, std::chrono::seconds(10),
+                            "Syslog write to destination '{}' failed: {}; dropping messages",
+                            destination->asString(), result.err_->getErrorDetails());
   }
 }
 
@@ -110,8 +107,7 @@ void ClusterUdpSender::send(absl::string_view record) {
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(cluster_name_);
   if (cluster == nullptr) {
     ENVOY_LOG_PERIODIC_MISC(warn, std::chrono::seconds(10),
-                            "Syslog cluster '{}' is unavailable; dropping messages",
-                            cluster_name_);
+                            "Syslog cluster '{}' is unavailable; dropping messages", cluster_name_);
     return;
   }
   Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
@@ -123,9 +119,9 @@ void ClusterUdpSender::send(absl::string_view record) {
     return;
   }
   if (host->address()->type() != Network::Address::Type::Ip) {
-    ENVOY_LOG_PERIODIC_MISC(
-        warn, std::chrono::seconds(10),
-        "Syslog cluster '{}' selected a non-IP host address; dropping messages", cluster_name_);
+    ENVOY_LOG_PERIODIC_MISC(warn, std::chrono::seconds(10),
+                            "Syslog cluster '{}' selected a non-IP host address; dropping messages",
+                            cluster_name_);
     return;
   }
   writer_.write(record, host->address());

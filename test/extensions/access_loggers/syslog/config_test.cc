@@ -2,7 +2,6 @@
 
 #include "envoy/access_log/access_log_config.h"
 #include "envoy/common/exception.h"
-#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/extensions/access_loggers/syslog/v3/syslog.pb.h"
 #include "envoy/registry/registry.h"
 
@@ -25,12 +24,9 @@ namespace {
 using SyslogAccessLogConfig = envoy::extensions::access_loggers::syslog::v3::SyslogAccessLogConfig;
 using testing::Return;
 
-constexpr absl::string_view UdpServerConfigYaml = R"EOF(
-server:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 514
-    protocol: UDP
+constexpr absl::string_view PipeConfigYaml = R"EOF(
+pipe:
+  path: /tmp/syslog.sock
 no_hostname: true
 stat_prefix: test
 log_format:
@@ -39,8 +35,7 @@ log_format:
 )EOF";
 
 constexpr absl::string_view UdpClusterConfigYaml = R"EOF(
-cluster:
-  name: syslog
+cluster: syslog
 no_hostname: true
 stat_prefix: test
 log_format:
@@ -77,62 +72,21 @@ TEST_F(SyslogConfigTest, FactoryRegistersNameAndEmptyConfig) {
                          "envoy.access_loggers.syslog"));
 }
 
-TEST_F(SyslogConfigTest, RejectsInvalidServerAddresses) {
-  envoy::config::core::v3::Address address;
-  EXPECT_EQ("syslog server address must be configured", validateServerAddress(address).message());
-
-  address.mutable_envoy_internal_address()->set_server_listener_name("listener");
-  EXPECT_EQ("syslog server does not support Envoy internal addresses",
-            validateServerAddress(address).message());
-
-  address.mutable_socket_address()->set_address("127.0.0.1");
-  EXPECT_EQ("syslog server socket addresses must use UDP",
-            validateServerAddress(address).message());
-  EXPECT_EQ(absl::StatusCode::kInvalidArgument, validateServerAddress(address).code());
-
-  address.mutable_socket_address()->set_protocol(
-      static_cast<envoy::config::core::v3::SocketAddress::Protocol>(100));
-  EXPECT_EQ("invalid syslog server protocol value: 100", validateServerAddress(address).message());
-
-  address.mutable_socket_address()->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
-  EXPECT_EQ("syslog server port must be configured", validateServerAddress(address).message());
-
-  address.mutable_socket_address()->set_port_value(0);
-  EXPECT_EQ("syslog server port must not be zero", validateServerAddress(address).message());
-
-  address.mutable_socket_address()->set_named_port("syslog");
-  EXPECT_EQ("syslog server port must be a numeric port value",
-            validateServerAddress(address).message());
-
-  address.mutable_pipe()->set_path("/tmp/syslog.sock");
+TEST_F(SyslogConfigTest, ValidatesPipe) {
+  auto config = loadConfig(PipeConfigYaml);
 #ifdef WIN32
   EXPECT_EQ("syslog Unix domain sockets are not supported on Windows",
-            validateServerAddress(address).message());
+            validateSyslogConfig(config).message());
 #else
-  EXPECT_TRUE(validateServerAddress(address).ok());
-  address.mutable_pipe()->clear_path();
+  EXPECT_TRUE(validateSyslogConfig(config).ok());
+  config.mutable_pipe()->clear_path();
   EXPECT_EQ("syslog Unix domain socket path must not be empty",
-            validateServerAddress(address).message());
-#endif
-}
-
-TEST_F(SyslogConfigTest, RejectsNetworkNamespaceOutsideLinux) {
-  envoy::config::core::v3::Address address;
-  auto* socket_address = address.mutable_socket_address();
-  socket_address->set_address("127.0.0.1");
-  socket_address->set_port_value(514);
-  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
-  socket_address->set_network_namespace_filepath("/var/run/netns/syslog");
-#ifdef __linux__
-  EXPECT_TRUE(validateServerAddress(address).ok());
-#else
-  EXPECT_EQ("syslog network namespace is only supported on Linux",
-            validateServerAddress(address).message());
+            validateSyslogConfig(config).message());
 #endif
 }
 
 TEST_F(SyslogConfigTest, RejectsEmptyStatPrefix) {
-  auto config = loadConfig(UdpServerConfigYaml);
+  auto config = loadConfig(UdpClusterConfigYaml);
   config.clear_stat_prefix();
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
 
@@ -142,29 +96,29 @@ TEST_F(SyslogConfigTest, RejectsEmptyStatPrefix) {
 
 TEST_F(SyslogConfigTest, RejectsInvalidFieldConstraints) {
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-  auto config = loadConfig(UdpServerConfigYaml);
+  auto config = loadConfig(UdpClusterConfigYaml);
   config.set_max_syslog_msg_bytes(479);
   EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
                ProtoValidationException);
 
-  config = loadConfig(UdpServerConfigYaml);
+  config = loadConfig(UdpClusterConfigYaml);
   config.set_max_syslog_msg_bytes(65508);
   EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
                ProtoValidationException);
 
-  config = loadConfig(UdpServerConfigYaml);
+  config = loadConfig(UdpClusterConfigYaml);
   config.set_tag(std::string(33, 'a'));
   EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
                ProtoValidationException);
 
-  config = loadConfig(UdpServerConfigYaml);
+  config = loadConfig(UdpClusterConfigYaml);
   config.set_msg_id("has space");
   EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
                ProtoValidationException);
 }
 
 TEST_F(SyslogConfigTest, ValidatesHostnameRequirement) {
-  auto config = loadConfig(UdpServerConfigYaml);
+  auto config = loadConfig(UdpClusterConfigYaml);
   config.set_no_hostname(false);
   testing::NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
@@ -181,20 +135,9 @@ TEST_F(SyslogConfigTest, ValidatesHostnameRequirement) {
             validateSyslogConfig(config).message());
 }
 
-TEST_F(SyslogConfigTest, RejectsTcpServerAddresses) {
-  auto server_config = loadConfig(UdpServerConfigYaml);
-  server_config.mutable_server()->mutable_socket_address()->set_protocol(
-      envoy::config::core::v3::SocketAddress::TCP);
-  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> server_context;
-
-  EXPECT_THROW_WITH_MESSAGE(
-      SyslogAccessLogFactory().createAccessLogInstance(server_config, nullptr, server_context),
-      EnvoyException, "syslog server socket addresses must use UDP");
-}
-
 TEST_F(SyslogConfigTest, FactoryRejectsUnknownCluster) {
   auto config = loadConfig(UdpClusterConfigYaml);
-  config.mutable_cluster()->set_name("unknown");
+  config.set_cluster("unknown");
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   EXPECT_CALL(context.server_context_.cluster_manager_, checkActiveStaticCluster("unknown"))
       .WillOnce(Return(absl::InvalidArgumentError("unknown cluster")));

@@ -23,7 +23,6 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/syslog/v3:pkg_cc_proto",
     ],
 )
@@ -44,6 +43,7 @@ envoy_extension_cc_test(
         "//source/extensions/access_loggers/syslog:syslog_access_log_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",

@@ -22,19 +22,31 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Access log content is configured with Envoy's access log format.
 // Envoy does not retry failed sends or retransmit lost syslog messages.
 //
-// Example UDP configuration:
+// Example UDP cluster configuration:
 //
 // .. validated-code-block:: yaml
 //   :type-name: envoy.extensions.access_loggers.syslog.v3.SyslogAccessLogConfig
 //
-//   server:
-//     socket_address:
-//       address: 127.0.0.1
-//       port_value: 514
-//       protocol: UDP
+//   cluster: syslog
 //   facility: FACILITY_LOCAL7
 //   severity: INFO
 //   tag: envoy
+//   stat_prefix: syslog
+//   log_format:
+//     text_format_source:
+//       inline_string: '[%START_TIME%] "%REQ(:METHOD)% %REQ(:PATH)%" %RESPONSE_CODE%'
+//
+// Example Unix domain socket configuration:
+//
+// .. validated-code-block:: yaml
+//   :type-name: envoy.extensions.access_loggers.syslog.v3.SyslogAccessLogConfig
+//
+//   pipe:
+//     path: /var/run/syslog.sock
+//   facility: FACILITY_LOCAL7
+//   severity: INFO
+//   tag: envoy
+//   stat_prefix: syslog
 //   log_format:
 //     text_format_source:
 //       inline_string: '[%START_TIME%] "%REQ(:METHOD)% %REQ(:PATH)%" %RESPONSE_CODE%'
@@ -87,23 +99,16 @@ message SyslogAccessLogConfig {
     DEBUG = 7;
   }
 
-  // An Envoy cluster that receives syslog messages over UDP. Cluster host addresses
-  // must be IP addresses; Unix domain sockets are not selected through a cluster.
-  message Cluster {
-    // Name of the Envoy cluster used for service discovery and load balancing.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
-  }
-
   oneof destination {
     option (validate.required) = true;
 
-    // Static address. Socket addresses must use UDP and specify a numeric port value.
-    // Unix domain sockets are also supported.
-    config.core.v3.Address server = 1;
+    // Unix domain socket destination. This is not supported on Windows.
+    config.core.v3.Pipe pipe = 1;
 
-    // Envoy cluster used for UDP service discovery and load balancing. This can reference a
-    // ``STRICT_DNS`` cluster to dynamically resolve and round-robin across DNS addresses.
-    Cluster cluster = 9;
+    // Name of the active, statically configured Envoy cluster used for UDP service discovery and
+    // load balancing. Cluster host addresses must be IP addresses. The cluster discovery type can
+    // be ``STRICT_DNS`` to dynamically resolve DNS addresses.
+    string cluster = 9 [(validate.rules).string = {min_len: 1}];
   }
 
   // Facility placed in the PRI header. Defaults to ``LOCAL7``.

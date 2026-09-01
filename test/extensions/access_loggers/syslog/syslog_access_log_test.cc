@@ -14,6 +14,7 @@
 
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -38,16 +39,13 @@ static_assert(SyslogAccessLogConfig::EMERG == 1);
 static_assert(SyslogAccessLogConfig::DEBUG == 7);
 
 using testing::MatchesRegex;
+using testing::Return;
 using testing::StartsWith;
 
 constexpr int64_t TestTimestampSeconds = 1787149254;
 
-constexpr absl::string_view UdpServerConfigYaml = R"EOF(
-server:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 514
-    protocol: UDP
+constexpr absl::string_view UdpClusterConfigYaml = R"EOF(
+cluster: syslog
 no_hostname: true
 stat_prefix: test
 log_format:
@@ -91,19 +89,21 @@ protected:
         request_headers_{{":method", "GET"}, {":path", "/bar"}} {
     EXPECT_EQ(0, receiver_.bind(bind_address_).return_value_);
     context_.server_context_.thread_local_.setDispatcher(dispatcher_.get());
+    auto& cluster_manager = context_.server_context_.cluster_manager_;
+    cluster_manager.initializeClusters({"syslog"}, {});
+    cluster_manager.initializeThreadLocalClusters({"syslog"});
+    host_ = std::make_shared<testing::NiceMock<Upstream::MockHost>>();
+    ON_CALL(*host_, address())
+        .WillByDefault(Return(receiver_.connectionInfoProvider().localAddress()));
+    ON_CALL(cluster_manager.thread_local_cluster_.lb_, chooseHost(nullptr))
+        .WillByDefault([host = host_](Upstream::LoadBalancerContext*) {
+          return Upstream::HostSelectionResponse{host};
+        });
     stream_info_.setResponseCode(200);
     stream_info_.ts_.setSystemTime(std::chrono::system_clock::from_time_t(TestTimestampSeconds));
   }
 
-  uint32_t receiverPort() const {
-    return receiver_.connectionInfoProvider().localAddress()->ip()->port();
-  }
-
-  SyslogAccessLogConfig serverConfig() {
-    auto config = loadConfig(UdpServerConfigYaml);
-    config.mutable_server()->mutable_socket_address()->set_port_value(receiverPort());
-    return config;
-  }
+  SyslogAccessLogConfig clusterConfig() { return loadConfig(UdpClusterConfigYaml); }
 
   AccessLog::InstanceSharedPtr createLogger(const SyslogAccessLogConfig& proto_config) {
     envoy::config::accesslog::v3::AccessLog config;
@@ -161,6 +161,7 @@ protected:
   Network::Address::InstanceConstSharedPtr bind_address_;
   Network::SocketImpl receiver_;
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
+  std::shared_ptr<testing::NiceMock<Upstream::MockHost>> host_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
@@ -255,7 +256,7 @@ TEST_F(SyslogAccessLogTest, PayloadFieldsChangeReceivedDatagram) {
 
   for (const auto& test_case : cases) {
     SCOPED_TRACE(test_case.field);
-    auto config = serverConfig();
+    auto config = clusterConfig();
     test_case.mutate(config);
     const AccessLog::InstanceSharedPtr access_log = createLogger(config);
     ASSERT_NE(nullptr, access_log);
@@ -264,7 +265,7 @@ TEST_F(SyslogAccessLogTest, PayloadFieldsChangeReceivedDatagram) {
 }
 
 TEST_F(SyslogAccessLogTest, MaxSyslogMsgBytesTruncatesUdpPayload) {
-  const auto config = serverConfig();
+  const auto config = clusterConfig();
   const std::string header =
       Rfc3164HeaderFormatter(config.facility(), config.severity(), config.no_hostname(),
                              config.tag())
@@ -272,7 +273,7 @@ TEST_F(SyslogAccessLogTest, MaxSyslogMsgBytesTruncatesUdpPayload) {
   const size_t header_size = header.size();
 
   const auto emit_with_limit = [&](uint32_t max_bytes, size_t body_size) {
-    auto config = serverConfig();
+    auto config = clusterConfig();
     if (max_bytes != 0) {
       config.set_max_syslog_msg_bytes(max_bytes);
     }
@@ -324,7 +325,7 @@ TEST_F(SyslogAccessLogTest, MaxSyslogMsgBytesTruncatesUdpPayload) {
 }
 
 TEST_F(SyslogAccessLogTest, StatPrefixChangesEmittedStats) {
-  auto config = serverConfig();
+  auto config = clusterConfig();
   config.set_stat_prefix("audit");
   const AccessLog::InstanceSharedPtr access_log = createLogger(config);
   ASSERT_NE(nullptr, access_log);
@@ -332,6 +333,16 @@ TEST_F(SyslogAccessLogTest, StatPrefixChangesEmittedStats) {
   EXPECT_EQ(nullptr, TestUtility::findCounter(context_.server_context_.store_,
                                               "access_logs.syslog.test.send"));
 }
+
+#ifndef WIN32
+TEST_F(SyslogAccessLogTest, CreatesPipeDestination) {
+  auto config = clusterConfig();
+  config.clear_cluster();
+  config.mutable_pipe()->set_path(absl::StrCat("/tmp/", TestUtility::uniqueFilename()));
+
+  EXPECT_NE(nullptr, createLogger(config));
+}
+#endif
 
 } // namespace
 } // namespace Syslog

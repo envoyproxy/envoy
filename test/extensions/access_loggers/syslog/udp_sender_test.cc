@@ -224,8 +224,7 @@ TEST_F(ClusterUdpSenderTest, SendsToIpv4AndIpv6Hosts) {
   ASSERT_TRUE(result.ok());
   EXPECT_EQ("v6-message", absl::string_view(data, result.return_value_));
   EXPECT_EQ(2, counterValue(store_, "send"));
-  EXPECT_EQ(sizeof("v4-message") + sizeof("v6-message") - 2,
-            counterValue(store_, "bytes_sent"));
+  EXPECT_EQ(sizeof("v4-message") + sizeof("v6-message") - 2, counterValue(store_, "bytes_sent"));
 }
 
 TEST_F(ClusterUdpSenderTest, SelectsHostForEveryRecord) {

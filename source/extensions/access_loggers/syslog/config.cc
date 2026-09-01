@@ -1,6 +1,7 @@
 #include "source/extensions/access_loggers/syslog/config.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/extensions/access_loggers/syslog/v3/syslog.pb.h"
 #include "envoy/extensions/access_loggers/syslog/v3/syslog.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -16,58 +17,15 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Syslog {
 
-absl::Status validateServerAddress(const envoy::config::core::v3::Address& server) {
-  switch (server.address_case()) {
-  case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
-    switch (server.socket_address().protocol()) {
-    case envoy::config::core::v3::SocketAddress::UDP:
-      break;
-    case envoy::config::core::v3::SocketAddress::TCP:
-      return absl::InvalidArgumentError("syslog server socket addresses must use UDP");
-    default:
-      return absl::InvalidArgumentError(
-          fmt::format("invalid syslog server protocol value: {}",
-                      static_cast<int>(server.socket_address().protocol())));
-    }
-    if (server.socket_address().port_specifier_case() ==
-        envoy::config::core::v3::SocketAddress::PortSpecifierCase::PORT_SPECIFIER_NOT_SET) {
-      return absl::InvalidArgumentError("syslog server port must be configured");
-    }
-    if (server.socket_address().has_named_port()) {
-      return absl::InvalidArgumentError("syslog server port must be a numeric port value");
-    }
-    if (server.socket_address().has_port_value() && server.socket_address().port_value() == 0) {
-      return absl::InvalidArgumentError("syslog server port must not be zero");
-    }
-#if !defined(__linux__)
-    if (!server.socket_address().network_namespace_filepath().empty()) {
-      return absl::InvalidArgumentError("syslog network namespace is only supported on Linux");
-    }
-#endif
-    return absl::OkStatus();
-  case envoy::config::core::v3::Address::AddressCase::kPipe:
+absl::Status validateSyslogConfig(const SyslogAccessLogConfig& config) {
+  if (config.has_pipe()) {
 #ifdef WIN32
     return absl::InvalidArgumentError("syslog Unix domain sockets are not supported on Windows");
 #else
-    if (server.pipe().path().empty()) {
+    if (config.pipe().path().empty()) {
       return absl::InvalidArgumentError("syslog Unix domain socket path must not be empty");
     }
-    return absl::OkStatus();
 #endif
-  case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
-    return absl::InvalidArgumentError("syslog server does not support Envoy internal addresses");
-  case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
-    return absl::InvalidArgumentError("syslog server address must be configured");
-  }
-  return absl::InvalidArgumentError("syslog server address type is unsupported");
-}
-
-absl::Status validateSyslogConfig(const SyslogAccessLogConfig& config) {
-  if (config.has_server()) {
-    const absl::Status address_status = validateServerAddress(config.server());
-    if (!address_status.ok()) {
-      return address_status;
-    }
   }
 
   if (!config.no_hostname()) {
@@ -94,23 +52,22 @@ AccessLog::InstanceSharedPtr SyslogAccessLogFactory::createAccessLogInstance(
                             Formatter::FormatterPtr);
   Network::Address::InstanceConstSharedPtr destination;
   auto& server_context = context.serverFactoryContext();
-  if (proto_config.has_server()) {
-    destination =
-        THROW_OR_RETURN_VALUE(Network::Address::resolveProtoAddress(proto_config.server()),
-                              Network::Address::InstanceConstSharedPtr);
+  if (proto_config.has_pipe()) {
+    envoy::config::core::v3::Address address;
+    *address.mutable_pipe() = proto_config.pipe();
+    destination = THROW_OR_RETURN_VALUE(Network::Address::resolveProtoAddress(address),
+                                        Network::Address::InstanceConstSharedPtr);
   } else {
     const absl::Status status =
-        server_context.clusterManager().checkActiveStaticCluster(proto_config.cluster().name());
+        server_context.clusterManager().checkActiveStaticCluster(proto_config.cluster());
     if (!status.ok()) {
       throw EnvoyException(
           fmt::format("syslog cluster '{}' must refer to an active static cluster: {}",
-                      proto_config.cluster().name(), status.message()));
+                      proto_config.cluster(), status.message()));
     }
-    const auto cluster =
-        server_context.clusterManager().getActiveCluster(proto_config.cluster().name());
+    const auto cluster = server_context.clusterManager().getActiveCluster(proto_config.cluster());
     if (!cluster.has_value()) {
-      throw EnvoyException(
-          fmt::format("cluster '{}' is not active", proto_config.cluster().name()));
+      throw EnvoyException(fmt::format("cluster '{}' is not active", proto_config.cluster()));
     }
   }
   auto shared_config = std::make_shared<SyslogAccessLogConfig>(proto_config);

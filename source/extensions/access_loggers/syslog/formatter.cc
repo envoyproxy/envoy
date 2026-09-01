@@ -85,8 +85,7 @@ void Rfc3164HeaderFormatter::formatTo(std::string& output, SystemTime timestamp)
     absl::StrAppendFormat(&output, "<%d>%s %s: ", priority_, formatted_timestamp, tag_);
     return;
   }
-  absl::StrAppendFormat(&output, "<%d>%s %s %s: ", priority_, formatted_timestamp, hostname_,
-                        tag_);
+  absl::StrAppendFormat(&output, "<%d>%s %s %s: ", priority_, formatted_timestamp, hostname_, tag_);
 }
 
 Rfc5424HeaderFormatter::Rfc5424HeaderFormatter(SyslogAccessLogConfig::Facility facility,
@@ -95,10 +94,9 @@ Rfc5424HeaderFormatter::Rfc5424HeaderFormatter(SyslogAccessLogConfig::Facility f
                                                absl::string_view msg_id)
     : facility_(facilityCode(facility)), severity_(severityCode(severity)),
       priority_(pri(facility_, severity_)),
-      hostname_(omit_hostname
-                    ? std::string(Rfc5424NilValue)
-                    : Formatter::SubstitutionFormatUtils::getHostname().value_or(
-                          std::string(Rfc5424NilValue))),
+      hostname_(omit_hostname ? std::string(Rfc5424NilValue)
+                              : Formatter::SubstitutionFormatUtils::getHostname().value_or(
+                                    std::string(Rfc5424NilValue))),
       app_name_(tag.empty() ? std::string(DefaultAppName) : std::string(tag)),
       proc_id_(processId()),
       msg_id_(msg_id.empty() ? std::string(DefaultRfc5424MessageId) : std::string(msg_id)) {}
@@ -117,8 +115,7 @@ void Rfc5424HeaderFormatter::formatTo(std::string& output, SystemTime timestamp)
 
 Rfc3164Formatter::Rfc3164Formatter(Envoy::Formatter::FormatterConstSharedPtr body_formatter,
                                    Rfc3164HeaderFormatter header_formatter)
-    : body_formatter_(std::move(body_formatter)),
-      header_formatter_(std::move(header_formatter)) {}
+    : body_formatter_(std::move(body_formatter)), header_formatter_(std::move(header_formatter)) {}
 
 std::string Rfc3164Formatter::format(const Envoy::Formatter::Context& context,
                                      const StreamInfo::StreamInfo& stream_info) const {
@@ -135,8 +132,7 @@ void Rfc3164Formatter::formatTo(std::string& output, const Envoy::Formatter::Con
 
 Rfc5424Formatter::Rfc5424Formatter(Envoy::Formatter::FormatterConstSharedPtr body_formatter,
                                    Rfc5424HeaderFormatter header_formatter)
-    : body_formatter_(std::move(body_formatter)),
-      header_formatter_(std::move(header_formatter)) {}
+    : body_formatter_(std::move(body_formatter)), header_formatter_(std::move(header_formatter)) {}
 
 std::string Rfc5424Formatter::format(const Envoy::Formatter::Context& context,
                                      const StreamInfo::StreamInfo& stream_info) const {
