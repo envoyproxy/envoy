@@ -638,11 +638,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "vpp-{version}",
         urls = ["https://github.com/FDio/vpp/archive/{version}.tar.gz"],
     ),
-    dlb = dict(
-        version = "8.8.0",
-        sha256 = "564534254ef32bfed56e0a464c53fca0907e446b30929c253210e2c3d6de58b9",
-        urls = ["https://downloadmirror.intel.com/819078/dlb_linux_src_release_8.8.0.txz"],
-    ),
     libpfm = dict(
         version = "4.11.0",
         sha256 = "bd49c66c1854f9a5f347725c298fce39d7ac2644b2dfc3237e67d91c9c0d7823",
