@@ -9,14 +9,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
-COMMON_ENV = {
-    "ZSTDLIB": "$$EXT_BUILD_ROOT/external/zstd~/lib",
-    "QAT_INCLUDE_PATH": "$$EXT_BUILD_ROOT/external/qatlib~/include/qat",
-    "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
-}
-
-COMMON_CFLAGS = "-I$$EXT_BUILD_ROOT/external/numactl~"
-
 envoy_cc_library(
     name = "compressor_lib",
     srcs = ["qatzstd_compressor_impl.cc"],

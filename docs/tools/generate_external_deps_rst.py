@@ -134,11 +134,7 @@ def main():
         project_name = v['project_name']
         project_url = v['project_url']
         name = rst_link(project_name, project_url)
-        try:
-            version = rst_link(render_version(v['version']), get_version_url(v))
-        except:
-            print(v)
-            raise
+        version = rst_link(render_version(v['version']), get_version_url(v))
         release_date = v['release_date']
         license = v.get('license', '')
         if license:

@@ -21,6 +21,8 @@ def use_cpp_toolchain():
 
 # end:github_only
 
+PROTO_TOOLCHAIN_TYPE = Label("@protobuf//bazel/private:proto_toolchain_type")
+
 # Generic support code #########################################################
 
 # begin:github_only
@@ -210,7 +212,7 @@ def _compile_protos(ctx, generator, proto_info, proto_sources):
         ),
         tools = [tool],
         outputs = srcs + hdrs,
-        executable = get_proto_compiler(ctx),
+        executable = get_proto_compiler(ctx, PROTO_TOOLCHAIN_TYPE),
         arguments = [args],
         progress_message = "Generating descriptor protos for :" + ctx.label.name,
         mnemonic = "GenDescriptorProtos",
@@ -333,7 +335,7 @@ cc_proto_descriptor_library_aspect = aspect(
     provides = _get_cc_proto_descriptor_library_aspect_provides(),
     attr_aspects = ["deps"],
     fragments = ["cpp"],
-    toolchains = use_cpp_toolchain() + use_proto_toolchain(),
+    toolchains = use_cpp_toolchain() + use_proto_toolchain(PROTO_TOOLCHAIN_TYPE),
 )
 
 cc_proto_descriptor_library = rule(
