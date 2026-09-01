@@ -21,10 +21,6 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace OpenTelemetry {
 
-namespace {
-using opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest;
-} // namespace
-
 HttpAccessLoggerImpl::HttpAccessLoggerImpl(
     Upstream::ClusterManager& cluster_manager,
     const envoy::config::core::v3::HttpService& http_service,

@@ -54,23 +54,26 @@ message OpenTelemetryAccessLogConfig {
 
   // If specified, Envoy will not generate built-in resource labels
   // like ``log_name``, ``zone_name``, ``cluster_name``, ``node_name``.
+  //
+  // Built-in labels have the lowest precedence and can be overridden by matching keys in
+  // :ref:`resource_detectors <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.resource_detectors>`
+  // or :ref:`resource_attributes <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.resource_attributes>`.
   bool disable_builtin_labels = 5;
 
   // OpenTelemetry `Resource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/logs/v1/logs.proto#L51>`_
   // attributes are filled with Envoy node info.
   // Example: ``resource_attributes { values { key: "region" value { string_value: "cn-north-7" } } }``.
   //
-  // If both ``resource_detectors`` and ``resource_attributes`` are specified, attributes from
-  // ``resource_detectors`` are populated first, followed by attributes configured in ``resource_attributes``.
+  // Attributes configured here take highest precedence (``resource_attributes`` > ``resource_detectors`` > built-in labels)
+  // and will override any matching keys.
   opentelemetry.proto.common.v1.KeyValueList resource_attributes = 4;
 
   // An ordered list of resource detectors to detect OpenTelemetry resource information such as
   // attributes and schema URL.
   //
-  // Attributes detected by ``resource_detectors`` will be added to the resource attributes.
-  // If both ``resource_detectors`` and ``resource_attributes`` are specified, the attributes from
-  // ``resource_detectors`` are added first, and any attributes configured in ``resource_attributes``
-  // are appended afterwards.
+  // Attributes detected here override built-in labels with matching keys, but are overridden by
+  // :ref:`resource_attributes <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.resource_attributes>`
+  // (precedence: ``resource_attributes`` > ``resource_detectors`` > built-in labels).
   // [#extension-category: envoy.tracers.opentelemetry.resource_detectors]
   repeated config.core.v3.TypedExtensionConfig resource_detectors = 15;
 

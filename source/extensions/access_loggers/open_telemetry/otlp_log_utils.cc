@@ -194,32 +194,50 @@ opentelemetry::proto::logs::v1::ScopeLogs* initOtlpMessageRoot(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
     Server::Configuration::ServerFactoryContext& context,
-    const Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider) {
+    OptRef<const Extensions::Tracers::OpenTelemetry::ResourceProvider> resource_provider) {
   auto* resource_logs = message.add_resource_logs();
   auto* root = resource_logs->add_scope_logs();
   auto* resource = resource_logs->mutable_resource();
+
+  std::vector<opentelemetry::proto::common::v1::KeyValue> attributes;
+  absl::flat_hash_map<std::string, size_t> key_to_index;
+
+  auto add_or_update_attribute = [&](opentelemetry::proto::common::v1::KeyValue kv) {
+    auto it = key_to_index.find(kv.key());
+    if (it != key_to_index.end()) {
+      attributes[it->second] = std::move(kv);
+    } else {
+      key_to_index.emplace(kv.key(), attributes.size());
+      attributes.push_back(std::move(kv));
+    }
+  };
+
   if (!config.disable_builtin_labels()) {
-    *resource->add_attributes() = getStringKeyValue("log_name", getLogName(config));
-    *resource->add_attributes() = getStringKeyValue("zone_name", context.localInfo().zoneName());
-    *resource->add_attributes() =
-        getStringKeyValue("cluster_name", context.localInfo().clusterName());
-    *resource->add_attributes() = getStringKeyValue("node_name", context.localInfo().nodeName());
+    add_or_update_attribute(getStringKeyValue("log_name", getLogName(config)));
+    add_or_update_attribute(getStringKeyValue("zone_name", context.localInfo().zoneName()));
+    add_or_update_attribute(getStringKeyValue("cluster_name", context.localInfo().clusterName()));
+    add_or_update_attribute(getStringKeyValue("node_name", context.localInfo().nodeName()));
   }
   if (!config.resource_detectors().empty()) {
     Extensions::Tracers::OpenTelemetry::ResourceProviderOptions options;
     options.set_service_name_resource_attribute = false;
     options.set_telemetry_sdk_resource_attributes = false;
+    Extensions::Tracers::OpenTelemetry::ResourceProviderImpl default_provider;
+    const auto& provider = resource_provider.value_or(default_provider);
     Extensions::Tracers::OpenTelemetry::Resource detected_resource =
-        resource_provider.getResource(config.resource_detectors(), context, "", options);
+        provider.getResource(config.resource_detectors(), context, "", options);
     if (!detected_resource.schema_url_.empty()) {
       resource_logs->set_schema_url(detected_resource.schema_url_);
     }
     for (const auto& [key, value] : detected_resource.attributes_) {
-      *resource->add_attributes() = getStringKeyValue(key, value);
+      add_or_update_attribute(getStringKeyValue(key, value));
     }
   }
   for (const auto& pair : config.resource_attributes().values()) {
-    *resource->add_attributes() = pair;
+    add_or_update_attribute(pair);
+  }
+  for (auto& kv : attributes) {
+    *resource->add_attributes() = std::move(kv);
   }
   return root;
 }

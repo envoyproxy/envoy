@@ -613,6 +613,71 @@ TEST(OtlpLogUtilsTest, InitOtlpMessageRootWithResourceDetectorsAndResourceAttrib
   EXPECT_TRUE(TestUtility::protoEqual(message.resource_logs(0).resource(), expected_resource));
 }
 
+// Verifies that conflicting attribute keys are properly overridden without duplicates.
+// Precedence: resource_attributes > resource_detectors > built-in labels.
+TEST(OtlpLogUtilsTest, InitOtlpMessageRootAttributePrecedenceAndDeduplication) {
+  opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_log_name("test_log");
+
+  auto* detector = config.add_resource_detectors();
+  detector->set_name("mock_detector");
+
+  // Overrides built-in log_name.
+  auto* kv1 = config.mutable_resource_attributes()->add_values();
+  kv1->set_key("log_name");
+  kv1->mutable_value()->set_string_value("overridden_log");
+
+  // Overrides detector attribute.
+  auto* kv2 = config.mutable_resource_attributes()->add_values();
+  kv2->set_key("detector_key");
+  kv2->mutable_value()->set_string_value("overridden_detector_val");
+
+  // New custom attribute.
+  auto* kv3 = config.mutable_resource_attributes()->add_values();
+  kv3->set_key("custom_key");
+  kv3->mutable_value()->set_string_value("custom_val");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.local_info_, zoneName()).WillByDefault(ReturnRef(zone_name));
+  ON_CALL(context.local_info_, clusterName()).WillByDefault(ReturnRef(cluster_name));
+  ON_CALL(context.local_info_, nodeName()).WillByDefault(ReturnRef(node_name));
+
+  MockResourceProvider mock_resource_provider;
+  Extensions::Tracers::OpenTelemetry::Resource detected_resource;
+  // Overrides built-in cluster_name.
+  detected_resource.attributes_["cluster_name"] = "detected_cluster";
+  detected_resource.attributes_["detector_key"] = "detected_val";
+
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, _)).WillOnce(Return(detected_resource));
+
+  auto* root = initOtlpMessageRoot(message, config, context, mock_resource_provider);
+
+  ASSERT_NE(nullptr, root);
+  ASSERT_EQ(1, message.resource_logs_size());
+
+  const auto& resource = message.resource_logs(0).resource();
+  ASSERT_EQ(6, resource.attributes_size());
+
+  EXPECT_EQ("log_name", resource.attributes(0).key());
+  EXPECT_EQ("overridden_log", resource.attributes(0).value().string_value());
+
+  EXPECT_EQ("zone_name", resource.attributes(1).key());
+  EXPECT_EQ(zone_name, resource.attributes(1).value().string_value());
+
+  EXPECT_EQ("cluster_name", resource.attributes(2).key());
+  EXPECT_EQ("detected_cluster", resource.attributes(2).value().string_value());
+
+  EXPECT_EQ("node_name", resource.attributes(3).key());
+  EXPECT_EQ(node_name, resource.attributes(3).value().string_value());
+
+  EXPECT_EQ("detector_key", resource.attributes(4).key());
+  EXPECT_EQ("overridden_detector_val", resource.attributes(4).value().string_value());
+
+  EXPECT_EQ("custom_key", resource.attributes(5).key());
+  EXPECT_EQ("custom_val", resource.attributes(5).value().string_value());
+}
+
 } // namespace
 } // namespace OpenTelemetry
 } // namespace AccessLoggers

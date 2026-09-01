@@ -145,7 +145,7 @@ TEST_F(OpenTelemetryAccessLogConfigTest, ValidResourceDetectorOk) {
   detector->set_name("envoy.tracers.opentelemetry.resource_detectors.environment");
   envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
       EnvironmentResourceDetectorConfig env_config;
-  detector->mutable_typed_config()->PackFrom(env_config);
+  std::ignore = detector->mutable_typed_config()->PackFrom(env_config);
   TestUtility::jsonConvert(access_log_config_, *message_);
 
   ::Envoy::AccessLog::InstanceSharedPtr instance =

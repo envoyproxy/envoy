@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["otlp_log_utils.cc"],
     hdrs = ["otlp_log_utils.h"],
     deps = [
+        "//envoy/common:optref_lib",
         "//envoy/formatter:http_formatter_context_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/local_info:local_info_interface",

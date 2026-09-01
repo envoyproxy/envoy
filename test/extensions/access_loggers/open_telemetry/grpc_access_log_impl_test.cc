@@ -589,7 +589,7 @@ TEST_F(GrpcAccessLoggerResourceDetectorsTest, ResourceDetectorsPopulated) {
   detector->set_name("envoy.tracers.opentelemetry.resource_detectors.environment");
   envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
       EnvironmentResourceDetectorConfig env_config;
-  detector->mutable_typed_config()->PackFrom(env_config);
+  std::ignore = detector->mutable_typed_config()->PackFrom(env_config);
 
   TestEnvironment::setEnvVar("OTEL_RESOURCE_ATTRIBUTES", "service.name=my-service", 1);
 
