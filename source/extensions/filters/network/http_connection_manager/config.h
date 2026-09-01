@@ -299,13 +299,16 @@ private:
 
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   Server::Configuration::FactoryContext& context_;
+  const std::string stats_prefix_;
+  // The 'http.<stat_prefix>.' scope in which this connection manager and its HTTP filters create
+  // their stats.
+  const Stats::ScopeSharedPtr http_scope_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
   AccessLog::InstanceSharedPtrVector access_logs_;
   bool flush_access_log_on_new_request_;
   std::optional<std::chrono::milliseconds> access_log_flush_interval_;
   bool flush_log_on_tunnel_successfully_established_{false};
-  const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;

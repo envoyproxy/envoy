@@ -1811,6 +1811,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     # The symbol table cluster memory tests take a while to run specially under tsan.
     deps = [
+        ":http_integration_lib",
         ":integration_lib",
         "//source/common/memory:stats_lib",
         "//source/common/runtime:runtime_features_lib",
