@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
 #include "source/common/coroutine/leaf_awaitable.h"
 #include "source/common/coroutine/status_macros.h"
 
@@ -18,6 +19,19 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 
 namespace {
+
+absl::StatusOr<std::string> dumpJson(const nlohmann::json& node) noexcept {
+  TRY_NEEDS_AUDIT { return node.dump(); }
+  END_TRY
+  CATCH(const nlohmann::json::exception& e, {
+    return absl::InvalidArgumentError(absl::StrCat("JSON serialization error: ", e.what()));
+  })
+  CATCH(const std::exception& e, {
+    return absl::InvalidArgumentError(absl::StrCat("JSON serialization error: ", e.what()));
+  })
+  CATCH(..., { return absl::InvalidArgumentError("unknown error during JSON serialization"); })
+  return absl::InternalError("unexpected flow in dumpJson");
+}
 
 enum class SerializationMode {
   Counting,
@@ -104,11 +118,7 @@ private:
 
   Coroutine::Task<absl::Status> serializeExternalRef(const nlohmann::json& node,
                                                      nlohmann::json& new_node) {
-    auto ref_or = JsonWithExtBuf::externalRef(node);
-    if (!ref_or.ok()) {
-      co_return ref_or.status();
-    }
-    const auto& ref = *ref_or;
+    ASSIGN_OR_CO_RETURN(const JsonWithExtBuf::ExternalRef ref, JsonWithExtBuf::externalRef(node));
     if (mode_ == SerializationMode::Emit) {
       if (buffer_manager_ == nullptr) {
         co_return absl::InternalError("buffer_manager is null for ExternalRef node");
@@ -159,11 +169,13 @@ private:
     case nlohmann::json::value_t::number_integer:
     case nlohmann::json::value_t::number_unsigned:
     case nlohmann::json::value_t::number_float:
-    case nlohmann::json::value_t::string:
-      small_buf_.add(node.dump());
+    case nlohmann::json::value_t::string: {
+      ASSIGN_OR_CO_RETURN(const std::string dumped, dumpJson(node));
+      small_buf_.add(dumped);
       new_node = node;
       CO_RETURN_IF_ERROR(co_await maybeFlushBuffer());
       break;
+    }
     case nlohmann::json::value_t::array: {
       new_node = nlohmann::json::array();
       small_buf_.add("[");
@@ -190,7 +202,8 @@ private:
           small_buf_.add(",");
         }
         first = false;
-        small_buf_.add(nlohmann::json(it.key()).dump());
+        ASSIGN_OR_CO_RETURN(const std::string dumped_key, dumpJson(nlohmann::json(it.key())));
+        small_buf_.add(dumped_key);
         small_buf_.add(":");
         nlohmann::json child;
         CO_RETURN_IF_ERROR(co_await serializeNode(it.value(), child));
@@ -200,11 +213,13 @@ private:
       CO_RETURN_IF_ERROR(co_await maybeFlushBuffer());
       break;
     }
-    case nlohmann::json::value_t::binary:
-      small_buf_.add(node.dump());
+    case nlohmann::json::value_t::binary: {
+      ASSIGN_OR_CO_RETURN(const std::string dumped, dumpJson(node));
+      small_buf_.add(dumped);
       new_node = node;
       CO_RETURN_IF_ERROR(co_await maybeFlushBuffer());
       break;
+    }
     case nlohmann::json::value_t::discarded:
       co_return absl::InvalidArgumentError("cannot serialize discarded JSON node");
     }

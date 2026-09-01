@@ -263,6 +263,37 @@ TEST_F(SerializerTest, SpecialCharactersEscaping) {
             "value\nwith\tspecial \"quotes\" and /slashes/ and \\backslashes\\");
 }
 
+TEST_F(SerializerTest, InvalidUtf8StringReturnsError) {
+  JsonWithExtBuf doc;
+  std::string invalid_utf8 = "invalid \xff\xff byte";
+  doc.setJson(nlohmann::json{
+      {"invalid_str", invalid_utf8},
+  });
+
+  auto result_or = runSerialize(doc, &buffer_manager_);
+  EXPECT_FALSE(result_or.ok());
+  EXPECT_THAT(result_or.status(), HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(result_or.status().message(), testing::HasSubstr("JSON serialization error"));
+
+  auto offset_or = runCalculateOffsets(doc);
+  EXPECT_FALSE(offset_or.ok());
+  EXPECT_THAT(offset_or.status(), HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(offset_or.status().message(), testing::HasSubstr("JSON serialization error"));
+}
+
+TEST_F(SerializerTest, InvalidUtf8KeyReturnsError) {
+  JsonWithExtBuf doc;
+  std::string invalid_utf8_key = "invalid \xff\xff key";
+  nlohmann::json j = nlohmann::json::object();
+  j[invalid_utf8_key] = "value";
+  doc.setJson(std::move(j));
+
+  auto result_or = runSerialize(doc, &buffer_manager_);
+  EXPECT_FALSE(result_or.ok());
+  EXPECT_THAT(result_or.status(), HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(result_or.status().message(), testing::HasSubstr("JSON serialization error"));
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

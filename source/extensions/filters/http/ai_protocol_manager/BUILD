@@ -181,6 +181,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/common:thread_lib",
         "//source/common/coroutine:leaf_awaitable_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
