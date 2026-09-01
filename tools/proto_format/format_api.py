@@ -239,7 +239,10 @@ def format_api(mode, outfile, printed, build_file):
             tar.extractall(printed_dir)
 
         for label in data["proto_targets"]:
-            _label = label[len('@@envoy_api//'):].replace(':', '/')
+            try:
+                _label = label.split('//', 1)[1].replace(':', '/')
+            except IndexError:
+                raise ValueError(f"Unexpected label format (no '//'): {label}") from None
             source = printed_dir.joinpath(f"{_label}.proto")
             target = dst_dir.joinpath(_label)
             target.parent.mkdir(exist_ok=True, parents=True)

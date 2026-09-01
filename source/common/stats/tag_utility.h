@@ -77,8 +77,8 @@ private:
   // TODO(snowp): This isn't really "tag extracted", but we'll use this for the sake of consistency
   // until we can change the naming convention throughout.
   StatName tag_extracted_name_;
-  SymbolTable::StoragePtr prefix_storage_;
-  SymbolTable::StoragePtr full_name_storage_;
+  StatNameJoiner prefix_joiner_;
+  StatNameJoiner full_name_joiner_;
   StatName name_with_tags_;
 
   // Set only by the legacy constructor: a (non-owning) span of the caller-provided tags. The
@@ -90,9 +90,6 @@ private:
   // element's own (name) tags, owned (copied) by this joiner. effectiveTags() returns a span over
   // this when it is non-empty.
   StatNameTagVec effective_tags_;
-
-  SymbolTable::StoragePtr joinNameAndTags(StatName tagged_prefix, StatName name,
-                                          StatNameTagSpan name_tags, SymbolTable& symbol_table);
 };
 
 bool isTagNameValid(absl::string_view name);

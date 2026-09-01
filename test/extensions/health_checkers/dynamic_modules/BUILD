@@ -4,6 +4,7 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
     "envoy_extension_cc_test",
 )
 
@@ -11,7 +12,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_extension_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
@@ -37,7 +38,7 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_extension_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "health_checker_test",
     srcs = ["health_checker_test.cc"],
     data = [

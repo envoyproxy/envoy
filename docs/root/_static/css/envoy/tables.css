@@ -1,0 +1,66 @@
+/* Tables — hairline rows, no zebra, mono column heads. */
+
+.envoy-content-main .rst-content .wy-table-responsive {
+  margin: 24px 0;
+  overflow-x: auto;
+}
+
+.envoy-content-main .rst-content table.docutils,
+.envoy-content-main .rst-content .wy-table-responsive table {
+  border: 0;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  width: 100%;
+}
+
+.envoy-content-main .rst-content table.docutils td,
+.envoy-content-main .rst-content table.docutils th,
+.envoy-content-main .rst-content .wy-table-responsive table td,
+.envoy-content-main .rst-content .wy-table-responsive table th {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--envoy-rule);
+  color: var(--envoy-ink-body);
+  line-height: 1.6;
+  padding: 11px 16px 11px 0;
+  vertical-align: top;
+  white-space: normal;
+}
+
+html.writer-html5 .envoy-content-main .rst-content table.docutils th,
+html.writer-html4 .envoy-content-main .rst-content table.docutils th,
+.envoy-content-main .rst-content table.docutils th,
+.envoy-content-main .rst-content .wy-table-responsive table th {
+  border: 0;
+  border-bottom: 1px solid var(--envoy-rule-strong);
+  color: var(--envoy-ink-muted);
+  font-family: var(--envoy-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.envoy-content-main .rst-content table.docutils th p,
+.envoy-content-main .rst-content .wy-table-responsive table th p,
+.envoy-content-main .rst-content table.docutils td p,
+.envoy-content-main .rst-content .wy-table-responsive table td p {
+  margin: 0 0 8px;
+}
+
+.envoy-content-main .rst-content table.docutils td p:last-child,
+.envoy-content-main .rst-content .wy-table-responsive table td p:last-child,
+.envoy-content-main .rst-content table.docutils th p:last-child,
+.envoy-content-main .rst-content .wy-table-responsive table th p:last-child {
+  margin-bottom: 0;
+}
+
+.envoy-content-main .rst-content table.docutils tbody tr:nth-child(odd) td,
+.envoy-content-main .rst-content table.docutils tbody tr:nth-child(even) td {
+  background: transparent;
+}
+
+.envoy-content-main .rst-content table.docutils div.line-block {
+  margin-bottom: 0;
+}

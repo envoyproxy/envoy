@@ -136,6 +136,7 @@ go_proto_library(
 ZIPKINAPI_BUILD_CONTENT = """
 
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_go//proto:def.bzl", "go_proto_library")
 
 api_cc_py_proto_library(
@@ -155,6 +156,15 @@ go_proto_library(
 alias(
     name = "zipkin-api",
     actual = ":zipkin_cc_proto",
+    visibility = ["//visibility:public"],
+)
+
+proto_library(
+    name = "zipkin_proto",
+    srcs = [
+        "zipkin-jsonv2.proto",
+        "zipkin.proto",
+    ],
     visibility = ["//visibility:public"],
 )
 """
