@@ -82,7 +82,7 @@ X25519MLKEM768 is **not** included in the default ECDH curves. To opt in, explic
 
 .. literalinclude:: _include/ssl-pqc.yaml
    :language: yaml
-   :lines: 1-11
+   :caption: :download:`ssl-pqc.yaml <_include/ssl-pqc.yaml>`
 
 Placing X25519MLKEM768 first gives it the highest priority. Peers that do not support
 ML-KEM will gracefully fall back to X25519 or P-256 via standard TLS group negotiation.
@@ -95,34 +95,11 @@ The same configuration pattern applies to upstream (client) connections using
    X25519MLKEM768 is only available in non-FIPS builds of BoringSSL. FIPS builds do not
    support ML-KEM.
 
-``ClientHello`` size considerations
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Performance considerations
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-X25519MLKEM768 adds approximately 1.1 KB to the TLS ``ClientHello`` due to the ML-KEM public
-key material. For TCP/TLS this is generally not a problem, as analysis by BoringSSL
-maintainers has shown that the larger ``ClientHello`` does not cause issues with standard TLS
-infrastructure.
-
-For ``QUIC``, however, the larger ``ClientHello`` can push initial server flights beyond the
-`3x amplification limit <https://www.rfc-editor.org/rfc/rfc9000.html#section-8.1>`_
-enforced before address validation completes. This may cause handshake failures or force an
-extra round trip, negating ``QUIC``'s 1-RTT advantage. Use X25519MLKEM768 over ``QUIC`` only if
-your deployment can tolerate this (e.g., because Retry tokens or ``NEW_TOKEN`` frames are
-already in use).
-
-Regulatory context
-^^^^^^^^^^^^^^^^^^
-
-Several regulatory bodies recommend or require migration to post-quantum cryptography:
-
-* **ANSSI** (France) recommends a hybrid post-quantum migration by 2027.
-* **US Executive Order 14028** and the subsequent **National Security Memorandum on
-  Promoting United States Leadership in Quantum Computing While Mitigating Risks to
-  Vulnerable Cryptographic Systems** (NSM-10) direct federal agencies to inventory
-  cryptographic systems and begin transitioning to post-quantum algorithms.
-
-Enabling X25519MLKEM768 via explicit ``ecdh_curves`` configuration allows operators to begin
-this transition today without waiting for a default change.
+X25519MLKEM768 adds approximately 1 KB to the TLS ``ClientHello`` and ``ServerHello``. This may increase
+the number of packets sent in each direction of the handshake which may affect performance.
 
 .. _arch_overview_ssl_enabling_verification:
 
