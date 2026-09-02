@@ -25,6 +25,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
     "passthrough" => Some(Box::new(PassthroughHttpFilterConfig {})),
+    "local_reply_response_headers" => Some(Box::new(LocalReplyResponseHeadersConfig {})),
     "header_callbacks" => Some(Box::new(HeadersHttpFilterConfig {
       headers_to_add: String::from_utf8(config.to_owned()).unwrap(),
     })),
@@ -478,6 +479,30 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ConfigStreamFilter {
       envoy_filter.send_response(503, &[("x-config-stream", b"pending")], None, None);
     }
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+}
+
+// Only records that its response-headers callback ran. Used to check that the
+// callback still fires when the response is a local reply the module did not
+// send, such as a `direct_response` route.
+struct LocalReplyResponseHeadersConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for LocalReplyResponseHeadersConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(LocalReplyResponseHeadersFilter {})
+  }
+}
+
+struct LocalReplyResponseHeadersFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LocalReplyResponseHeadersFilter {
+  fn on_response_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    envoy_filter.set_response_header("on-response-headers", b"called");
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
 
