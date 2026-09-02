@@ -102,9 +102,8 @@ private:
                         bool ancestor_is_sensitive);
 
   // Emits the redacted form of `field`'s value, a replacement for text and the type's default for
-  // anything else. Messages are handled by walking them, not redacting as whole. Leaf values that
-  // are redacted are handled directly here. Messages with hierarchy (repeated fields and maps) are
-  // recursed fully, and the redactions occur only at leaves.
+  // anything else. Each field of a message, element of a repeated field and entry of a map is
+  // redacted as it is walked here, or dropped in emitNextField when redacting it means clearing it.
   void emitRedactedValue(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
                          BufferStreamer::Level& level);
 
