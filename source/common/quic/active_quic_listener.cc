@@ -112,7 +112,7 @@ ActiveQuicListener::ActiveQuicListener(
   if (quic_packet_writer_factory != nullptr) {
     QuicPacketWriterPtr quic_writer = quic_packet_writer_factory->createQuicPacketWriter(
         listen_socket_.ioHandle(), listener_config.listenerScope(), dispatcher,
-        std::move(on_can_write_cb));
+        std::move(on_can_write_cb), worker_index);
     if (quic_writer != nullptr) {
       quic_packet_writer_ = quic_writer.get();
       quic_dispatcher_->InitializeWithWriter(quic_writer.release());
