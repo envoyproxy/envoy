@@ -41,15 +41,13 @@ void InternalListenerExtension::onServerInitialized(Server::Instance&) {
   tls_registry_->tls_slot_ =
       ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>::makeUnique(
           server_context_.threadLocal());
+  // Constructing the thread local registry publishes it to ``InternalClientConnectionFactory``.
+  // Note that the per silo ``ConnectionHandler`` will add internal listeners into the per silo
+  // registry.
   tls_registry_->tls_slot_->set([](Event::Dispatcher&) {
     return std::make_shared<Bootstrap::InternalListener::ThreadLocalRegistryImpl>();
   });
 
-  // Now the thread local registry is available. This thread local object is published to
-  // ``InternalClientConnectionFactory``.
-  // Note that the per silo ``ConnectionHandler`` will add internal listeners into the per silo
-  // registry.
-  InternalClientConnectionFactory::registry_tls_slot_ = tls_registry_->tls_slot_.get();
   InternalClientConnectionFactory::buffer_size_ = buffer_size_;
 }
 
