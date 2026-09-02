@@ -834,7 +834,7 @@
   "moduleExtensions": {
     "//bazel:extensions.bzl%envoy_build_config_ext": {
       "general": {
-        "bzlTransitiveDigest": "gNDeto+9ipXPXXQzRcb5gf/4ciVq4S+Tb6/i+4ydriY=",
+        "bzlTransitiveDigest": "dw/Tdy/iUC4F36IXsG1YO2qMasHYK+5Bl8C0qJyELJI=",
         "usagesDigest": "MLWuM137EhOdY1+qM/X+w9CfebbWM2X9iYFKV4d9YnA=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -940,7 +940,7 @@
     },
     "//bazel:extensions.bzl%envoy_repo_extension": {
       "general": {
-        "bzlTransitiveDigest": "gNDeto+9ipXPXXQzRcb5gf/4ciVq4S+Tb6/i+4ydriY=",
+        "bzlTransitiveDigest": "dw/Tdy/iUC4F36IXsG1YO2qMasHYK+5Bl8C0qJyELJI=",
         "usagesDigest": "ev3JwF8T3t1Lzq4LDmr0bcVYncB0jj3HOaH1Ax9SG60=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -992,7 +992,7 @@
     },
     "//bazel:extensions.bzl%envoy_toolchains_extension": {
       "general": {
-        "bzlTransitiveDigest": "gNDeto+9ipXPXXQzRcb5gf/4ciVq4S+Tb6/i+4ydriY=",
+        "bzlTransitiveDigest": "dw/Tdy/iUC4F36IXsG1YO2qMasHYK+5Bl8C0qJyELJI=",
         "usagesDigest": "b/0RV7ukcWBwz6aM5tK8DEVFn5uk77wUWSuVYT/DDjo=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -1005,132 +1005,6 @@
                 "amd64": "@envoy//bazel/platforms/rbe:linux_x64",
                 "aarch64": "@envoy//bazel/platforms/rbe:linux_arm64"
               }
-            }
-          }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "",
-            "bazel_skylib",
-            "bazel_skylib+"
-          ],
-          [
-            "",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "",
-            "cu",
-            "+wasm_cargo+cu"
-          ],
-          [
-            "",
-            "envoy",
-            ""
-          ],
-          [
-            "",
-            "envoy_toolshed",
-            "envoy_toolshed+"
-          ],
-          [
-            "",
-            "rules_rust",
-            "rules_rust+"
-          ],
-          [
-            "rules_rust+",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
-      }
-    },
-    "//bazel:extensions.bzl%legacy_workspace_compat_extension": {
-      "general": {
-        "bzlTransitiveDigest": "gNDeto+9ipXPXXQzRcb5gf/4ciVq4S+Tb6/i+4ydriY=",
-        "usagesDigest": "Ra9Ncy8JFCABVoQofm+rcdO26p8yHz+me9pI1D4dqvg=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
-        "generatedRepoSpecs": {
-          "liburing_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "liburing"
-            }
-          },
-          "elfutils_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "elfutils"
-            }
-          },
-          "libbpf_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "libbpf"
-            }
-          },
-          "icu_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "icu"
-            }
-          },
-          "libsxg_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "libsxg"
-            }
-          },
-          "wamr_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "wamr"
-            }
-          },
-          "libmaxminddb_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "libmaxminddb"
-            }
-          },
-          "jemalloc_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "jemalloc"
-            }
-          },
-          "lz4_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "lz4"
-            }
-          },
-          "librdkafka_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "librdkafka"
-            }
-          },
-          "colm_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "colm"
-            }
-          },
-          "ragel_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "ragel"
-            }
-          },
-          "nghttp2_workspace": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_legacy_workspace_repo",
-            "attributes": {
-              "dep": "nghttp2"
             }
           }
         },
