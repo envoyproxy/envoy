@@ -69,18 +69,5 @@ verifyQuicClientCertChain(const std::vector<absl::string_view>& certs,
   return quic::QUIC_SUCCESS;
 }
 
-quic::QuicAsyncStatus EnvoyQuicServerFailClosedProofVerifier::VerifyCertChain(
-    const std::string& /*hostname*/, const uint16_t /*port*/,
-    const std::vector<absl::string_view>& /*certs*/, const std::string& /*ocsp_response*/,
-    const std::string& /*cert_sct*/, const quic::ProofVerifyContext* /*context*/,
-    std::string* error_details, std::unique_ptr<quic::ProofVerifyDetails>* details,
-    uint8_t* /*out_alert*/, std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) {
-  ASSERT(error_details != nullptr);
-  ASSERT(details != nullptr);
-  *error_details = "QUIC client certificate validation is not available for this crypto stream";
-  *details = std::make_unique<CertVerifyResult>(false);
-  return quic::QUIC_FAILURE;
-}
-
 } // namespace Quic
 } // namespace Envoy

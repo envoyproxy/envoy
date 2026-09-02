@@ -121,20 +121,6 @@ TEST_F(EnvoyQuicDownstreamCertVerifierTest, TrustedCertificateAccepted) {
   EXPECT_TRUE(error_details.empty());
 }
 
-// The fail-closed safety-net verifier rejects any client certificate, so a non-Envoy crypto stream
-// cannot accept one without validation.
-TEST_F(EnvoyQuicDownstreamCertVerifierTest, FailClosedVerifierRejects) {
-  EnvoyQuicServerFailClosedProofVerifier verifier;
-  std::string error_details;
-  std::unique_ptr<quic::ProofVerifyDetails> details;
-  std::vector<absl::string_view> certs;
-  EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier.VerifyCertChain("hostname", 443, certs, "", "", nullptr, &error_details,
-                                     &details, nullptr, nullptr));
-  ASSERT_NE(details, nullptr);
-  EXPECT_FALSE(static_cast<CertVerifyResult&>(*details).isValid());
-}
-
 // `CertVerifyResult::Clone` preserves the validity bit so `quiche's` internal copies carry the same
 // decision.
 TEST_F(EnvoyQuicDownstreamCertVerifierTest, CertVerifyResultClone) {

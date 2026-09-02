@@ -21,7 +21,6 @@
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
-#include "source/common/quic/envoy_quic_downstream_cert_verifier.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -72,11 +71,7 @@ ActiveQuicListener::ActiveQuicListener(
       quic::QuicRandom::GetInstance(),
       proof_source_factory.createQuicProofSource(
           listen_socket_, listener_config.filterChainManager(), stats_, dispatcher.timeSource()),
-      quic::KeyExchangeSource::Default(),
-      // Fail-closed safety net. The default crypto stream validates client certificates in
-      // `EnvoyTlsServerHandshaker`. This verifier is reached only if a custom crypto stream leaves
-      // validation to the shared verifier, in which case the certificate is rejected.
-      std::make_unique<EnvoyQuicServerFailClosedProofVerifier>());
+      quic::KeyExchangeSource::Default());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
                                    quic::QuicCryptoServerConfig::ConfigOptions());

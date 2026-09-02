@@ -187,7 +187,6 @@ envoy_cc_library(
     hdrs = envoy_select_enable_http3(["envoy_quic_downstream_cert_verifier.h"]),
     external_deps = ["ssl"],
     deps = envoy_select_enable_http3([
-        ":envoy_quic_proof_verifier_base_lib",
         ":envoy_quic_proof_verifier_lib",
         ":envoy_quic_utils_lib",
         "//source/common/common:assert_lib",
@@ -523,7 +522,6 @@ envoy_cc_library(
         ":envoy_quic_packet_writer_lib",
         ":envoy_quic_proof_source_factory_interface",
         ":envoy_quic_proof_source_lib",
-        ":envoy_quic_downstream_cert_verifier_lib",
         ":envoy_quic_server_preferred_address_config_factory_interface",
         ":envoy_quic_utils_lib",
         ":quic_packet_writer_interface",
