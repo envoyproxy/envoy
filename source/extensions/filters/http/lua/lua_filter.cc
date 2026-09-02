@@ -877,6 +877,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
     : cluster_manager_(cluster_manager),
       clear_route_cache_(
           proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
+      filter_context_(proto_config.filter_context()),
       stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
       lua_stats_scope_(
           scope.createScope(proto_config.stat_prefix().empty()
@@ -916,7 +917,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
     Server::Configuration::ServerFactoryContext& context, absl::Status& creation_status)
-    : disabled_(config.disabled()), name_(config.name()), filter_context_(config.filter_context()) {
+    : disabled_(config.disabled()), name_(config.name()),
+      has_filter_context_(config.has_filter_context()), filter_context_(config.filter_context()) {
   if (disabled_ || !name_.empty()) {
     return; // Filter is disabled or explicit script name is provided.
   }

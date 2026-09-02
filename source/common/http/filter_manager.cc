@@ -234,11 +234,11 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(
       // frame) or that empty the frame without calling addData (e.g. a compressor buffering
       // internally) do not match and are handled by the existing path. See
       // https://github.com/envoyproxy/envoy/issues/46841.
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.filter_manager_forward_added_data_on_continue") &&
-          parent_.state_.filter_added_data_in_data_callback_ &&
+      if (parent_.state_.filter_added_data_in_data_callback_ &&
           provided_data_nonempty_before_callback && provided_data.length() == 0 && bufferedData() &&
-          bufferedData().get() != &provided_data && bufferedData()->length() > 0) {
+          bufferedData().get() != &provided_data && bufferedData()->length() > 0 &&
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.filter_manager_forward_added_data_on_continue")) {
         provided_data.move(*bufferedData());
       }
     }
@@ -1070,7 +1070,7 @@ void DownstreamFilterManager::sendLocalReply(
   }
 
   streamInfo().setResponseCodeDetails(details);
-  StreamFilterBase::LocalReplyData data{code, grpc_status, details, false};
+  StreamFilterBase::LocalReplyData data{code, grpc_status, details, false, body};
   onLocalReply(data);
   if (data.reset_imminent_) {
     ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. onLocalReply requested reset.", *this,

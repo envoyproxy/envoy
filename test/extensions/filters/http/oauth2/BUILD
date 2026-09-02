@@ -97,6 +97,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.oauth2"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/common:base64_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/stream_info:stream_id_provider_lib",
         "//source/extensions/filters/http/oauth2:config",

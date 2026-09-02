@@ -1,6 +1,7 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/extensions/filters/network/generic_proxy/access_log.h"
 
+#include "test/common/formatter/formatter_test_utility.h"
 #include "test/extensions/filters/network/generic_proxy/fake_codec.h"
 #include "test/mocks/stream_info/mocks.h"
 
@@ -17,20 +18,25 @@ TEST(GenericStatusCodeFormatterProviderTest, GenericStatusCodeFormatterProviderT
   GenericStatusCodeFormatterProvider formatter;
   StreamInfo::MockStreamInfo stream_info;
 
-  EXPECT_EQ(formatter.format(Formatter::Context().setExtension(context), stream_info),
+  EXPECT_EQ(Envoy::Formatter::formatForTest(formatter, Formatter::Context().setExtension(context),
+                                            stream_info),
             std::nullopt);
-  EXPECT_TRUE(formatter.formatValue(Formatter::Context().setExtension(context), stream_info)
+  EXPECT_TRUE(Envoy::Formatter::formatValueForTest(
+                  formatter, Formatter::Context().setExtension(context), stream_info)
                   .has_null_value());
 
   FakeStreamCodecFactory::FakeResponse response;
   response.status_ = {1234, false};
   context.response_ = &response;
 
-  EXPECT_EQ(formatter.format(Formatter::Context().setExtension(context), stream_info).value(),
+  EXPECT_EQ(Envoy::Formatter::formatForTest(formatter, Formatter::Context().setExtension(context),
+                                            stream_info)
+                .value(),
             "1234");
-  EXPECT_EQ(
-      formatter.formatValue(Formatter::Context().setExtension(context), stream_info).number_value(),
-      1234.0);
+  EXPECT_EQ(Envoy::Formatter::formatValueForTest(
+                formatter, Formatter::Context().setExtension(context), stream_info)
+                .number_value(),
+            1234.0);
 }
 
 TEST(StringValueFormatterProviderTest, StringValueFormatterProviderTest) {
@@ -38,33 +44,40 @@ TEST(StringValueFormatterProviderTest, StringValueFormatterProviderTest) {
 
     FormatterContextExtension context;
     StringValueFormatterProvider formatter(
-        [](const Formatter::Context& context,
-           const StreamInfo::StreamInfo&) -> std::optional<std::string> {
+        [](const Formatter::Context& context) -> std::optional<absl::string_view> {
           CHECK_DATA_OR_RETURN(context, request_, std::nullopt);
-          return std::string(checked_data->request_->path());
+          return checked_data->request_->path();
         },
         9);
     StreamInfo::MockStreamInfo stream_info;
 
-    EXPECT_EQ(formatter.format(Formatter::Context().setExtension(context), stream_info),
+    EXPECT_EQ(Envoy::Formatter::formatForTest(formatter, Formatter::Context().setExtension(context),
+                                              stream_info),
               std::nullopt);
-    EXPECT_TRUE(formatter.formatValue(Formatter::Context().setExtension(context), stream_info)
+    EXPECT_TRUE(Envoy::Formatter::formatValueForTest(
+                    formatter, Formatter::Context().setExtension(context), stream_info)
                     .has_null_value());
 
     FakeStreamCodecFactory::FakeRequest request;
     request.path_ = "ANYTHING";
     context.request_ = &request;
 
-    EXPECT_EQ(formatter.format(Formatter::Context().setExtension(context), stream_info).value(),
+    EXPECT_EQ(Envoy::Formatter::formatForTest(formatter, Formatter::Context().setExtension(context),
+                                              stream_info)
+                  .value(),
               "ANYTHING");
-    EXPECT_EQ(formatter.formatValue(Formatter::Context().setExtension(context), stream_info)
+    EXPECT_EQ(Envoy::Formatter::formatValueForTest(
+                  formatter, Formatter::Context().setExtension(context), stream_info)
                   .string_value(),
               "ANYTHING");
 
     request.path_ = "ANYTHING_LONGER_THAN_9";
-    EXPECT_EQ(formatter.format(Formatter::Context().setExtension(context), stream_info).value(),
+    EXPECT_EQ(Envoy::Formatter::formatForTest(formatter, Formatter::Context().setExtension(context),
+                                              stream_info)
+                  .value(),
               "ANYTHING_");
-    EXPECT_EQ(formatter.formatValue(Formatter::Context().setExtension(context), stream_info)
+    EXPECT_EQ(Envoy::Formatter::formatValueForTest(
+                  formatter, Formatter::Context().setExtension(context), stream_info)
                   .string_value(),
               "ANYTHING_");
   }

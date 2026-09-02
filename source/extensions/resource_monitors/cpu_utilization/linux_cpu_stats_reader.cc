@@ -163,19 +163,17 @@ absl::StatusOr<double> LinuxCpuStatsReader::getUtilization() {
   return utilization;
 }
 
-LinuxContainerCpuStatsReader::ContainerStatsReaderPtr
+absl::StatusOr<LinuxContainerCpuStatsReader::ContainerStatsReaderPtr>
 LinuxContainerCpuStatsReader::create(Filesystem::Instance& fs, TimeSource& time_source) {
-  // Check if host supports cgroup v2
   if (CpuPaths::isV2(fs)) {
     return std::make_unique<CgroupV2CpuStatsReader>(fs, time_source);
   }
 
-  // Check if host supports cgroup v1
   if (CpuPaths::isV1(fs)) {
     return std::make_unique<CgroupV1CpuStatsReader>(fs, time_source);
   }
 
-  throw EnvoyException(std::string(NoSupportedCGroupMessage));
+  return absl::InvalidArgumentError(std::string(NoSupportedCGroupMessage));
 }
 
 CgroupV1CpuStatsReader::CgroupV1CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)

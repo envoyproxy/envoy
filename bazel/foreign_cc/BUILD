@@ -1,14 +1,35 @@
+load("@base_pip3//:requirements.bzl", "requirement")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 load("@rules_foreign_cc//foreign_cc:make.bzl", "make")
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cmake", "envoy_package")
+load(
+    "//contrib:all_contrib_extensions.bzl",
+    "envoy_contrib_linux_aarch64_constraints",
+    "envoy_contrib_linux_x86_64_constraints",
+)
 
 licenses(["notice"])  # Apache 2
 
 exports_files(["icu_data_filter.json"])
 
 envoy_package()
+
+QAT_COMMON_CFLAGS = "-I$$EXT_BUILD_ROOT/external/numactl"
+
+QAT_COMMON_ENV = {
+    "ZSTDLIB": "$$EXT_BUILD_ROOT/external/zstd/lib",
+    "QAT_INCLUDE_PATH": "$$EXT_BUILD_DEPS/qatlib/include/qat",
+    "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
+}
+
+QATZIP_COMMON_ENV = {
+    "LDFLAGS": " ".join([
+        "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
+        "-L$$EXT_BUILD_ROOT/$(BINDIR)/external/envoy/bazel/external/lib",
+    ]),
+}
 
 # Global flag to enable parallel builds for all foreign_cc targets
 # When enabled, all foreign_cc (or related) builds will use whatever cores available.
@@ -545,4 +566,342 @@ cc_library(
         "//conditions:default": [],
     }),
     alwayslink = 1,
+)
+
+envoy_cmake(
+    name = "vpp_build",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
+    build_data = [requirement("ply")],
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "VPP_EXTERNAL_PROJECT": "ON",
+        "BUILD_SHARED_LIBS": "OFF",
+        "CMAKE_ENABLE_EXPORTS": "OFF",
+    },
+    copts = [
+        "-Wno-unused-variable",
+        "-Wno-error=array-bounds",
+    ],
+    default_cache_entries = {},
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
+    lib_source = "@vpp-vcl//:all",
+    linkopts = ["-Wno-unused-variable"],
+    out_static_libs = [
+        "libvppcom.a",
+        "libvppinfra.a",
+        "libsvm.a",
+    ],
+    postfix_script = """
+        mkdir -p $$INSTALLDIR/lib/external $$INSTALLDIR/include/external \
+        && find . -name "*.a" | xargs -I{} cp -a {} $$INSTALLDIR/lib/ \
+        && find . -name "*.h" ! -name config.h | xargs -I{} cp -a {} $$INSTALLDIR/include
+    """,
+    tags = [
+        "cpu:16",
+        "skip_on_windows",
+    ],
+    targets = [
+        "vppcom",
+    ],
+    working_directory = "src",
+)
+
+cc_library(
+    name = "vpp_vcl",
+    hdrs = ["external/vppcom.h"],
+    additional_linker_inputs = [
+        "external/libsvm.a",
+        "external/libvppcom.a",
+        "external/libvppinfra.a",
+    ],
+    defines = ["VPP_VCL"],
+    includes = ["external/"],
+    linkopts = [
+        "-Wl,--start-group",
+        "$(location external/libsvm.a)",
+        "$(location external/libvppcom.a)",
+        "$(location external/libvppinfra.a)",
+        "-Wl,--end-group",
+    ],
+    tags = ["skip_on_windows"],
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "vpp_build_files",
+    outs = [
+        "external/libsvm.a",
+        "external/libvppcom.a",
+        "external/libvppinfra.a",
+        "external/vppcom.h",
+    ],
+    cmd = """
+        find . -name "*.a" | grep -v copy_build | xargs -I{} cp -a {} $(RULEDIR)/external \
+        && find . -name "vppcom.h" | grep -v copy_build | xargs -I{} cp -a {} $(RULEDIR)/external
+    """,
+    tools = [":vpp_build"],
+)
+
+configure_make(
+    name = "qatlib",
+    autogen = True,
+    configure_in_place = True,
+    configure_options = [
+        "--disable-fast-crc-in-assembler",
+        "--disable-systemd",
+        "--with-pic",
+        "--disable-shared",
+        "--enable-static",
+        "--enable-samples=no",
+    ],
+    # Include the numa_archive genrule output so that libnuma.a is available
+    # for the linker to find with -lnuma.
+    data = ["//bazel/external:numa_archive"],
+    # Point to the directory containing the libnuma.a archive created by the
+    # numa_archive genrule. The cc_library doesn't produce a file that can be
+    # found with -lnuma, so we need to use the genrule output.
+    env = {
+        "LDFLAGS": " ".join([
+            "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
+            "-L$$EXT_BUILD_ROOT/$(BINDIR)/external/envoy/bazel/external/lib",
+        ]),
+    },
+    lib_source = "@qatlib//:all",
+    out_static_libs = [
+        "libqat.a",
+        "libusdm.a",
+    ],
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    visibility = ["//visibility:public"],
+    # Use crypto label_flag to select the SSL library.
+    deps = [
+        "//bazel:crypto",
+        "@numactl//:numa",
+    ],
+    alwayslink = True,
+)
+
+configure_make(
+    name = "qatzip",
+    autogen = True,
+    configure_in_place = True,
+    configure_options = [
+        "--enable-static",
+        "--disable-shared",
+    ],
+    # Include the numa_archive genrule output so that libnuma.a is available
+    # for the linker to find with -lnuma. Include zlib_ng_archive when building
+    # with zlib-ng so that libz.a is available for the configure script.
+    data = [
+        "//bazel/external:numa_archive",
+        "//bazel/external:zlib_archive",
+    ],
+    # Point to the directory containing the libnuma.a and libz.a archives.
+    # The cc_library targets don't produce files that can be found with -lnuma
+    # or -lz, so we need to use the genrule outputs.
+    env = select({
+        "//bazel:clang_build": QATZIP_COMMON_ENV | {
+            "CFLAGS": "-Wno-error=newline-eof -Wno-error=strict-prototypes -Wno-error=unused-but-set-variable",
+        },
+        "//conditions:default": QATZIP_COMMON_ENV,
+    }),
+    lib_source = "@qatzip//:all",
+    out_static_libs = [
+        "libqatzip.a",
+    ],
+    tags = ["skip_on_windows"],
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//bazel/foreign_cc:lz4",
+        "//bazel:zlib",
+        # Use crypto label_flag to select the SSL library.
+        "//bazel:crypto",
+        ":qatlib",
+        "@numactl//:numa",
+    ],
+    alwayslink = False,
+)
+
+make(
+    name = "qat-zstd",
+    build_data = ["@qat-zstd//:all"],
+    # Include the numa_archive genrule output so that libnuma.a is available
+    # for the linker to find with -lnuma.
+    data = ["//bazel/external:numa_archive"],
+    env = select({
+        "//bazel:clang_build": QAT_COMMON_ENV | {
+            "CFLAGS": QAT_COMMON_CFLAGS + " -Wno-error=unused-parameter -Wno-error=unused-command-line-argument",
+        },
+        "//conditions:default": QAT_COMMON_ENV | {
+            "CFLAGS": QAT_COMMON_CFLAGS,
+        },
+    }),
+    includes = [],
+    lib_source = "@qat-zstd//:all",
+    out_static_libs = ["libqatseqprod.a"],
+    tags = ["skip_on_windows"],
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    targets = [
+        "install",
+    ],
+    deps = [
+        ":qatlib",
+        "@zstd",
+        # numactl headers are needed for compilation
+        "@numactl//:numa",
+    ],
+)
+
+envoy_cmake(
+    name = "hyperscan",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
+    build_data = ["@boost//:header"],
+    cache_entries = {
+        "Boost_NO_BOOST_CMAKE": "on",
+        "BOOST_ROOT": "$$EXT_BUILD_ROOT/external/boost",
+        "BUILD_AVX512": "on",
+        "BUILD_AVX512VBMI": "on",
+        "BUILD_EXAMPLES": "off",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "FAT_RUNTIME": "on",
+        "RAGEL": "$$EXT_BUILD_DEPS/ragel/bin/ragel",
+        "PYTHON_EXECUTABLE": "$(PYTHON3)",
+    },
+    default_cache_entries = {},
+    env = select({
+        # When using non-hermetic LLVM toolchain the paths to objcopy and nm will point
+        # to the host objcopy and nm, so there is no need to prefix those with the path
+        # to the directory with external dependencies.
+        "@envoy_repo//:use_local_llvm": {
+            "NM": "$(NM)",
+            "OBJCOPY": "$(OBJCOPY)",
+        },
+        "//conditions:default": {
+            "NM": "$$EXT_BUILD_ROOT/$(NM)",
+            "OBJCOPY": "$$EXT_BUILD_ROOT/$(OBJCOPY)",
+        },
+    }),
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_xlarge",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
+    lib_source = "@hyperscan//:all",
+    out_static_libs = ["libhs.a"],
+    tags = ["skip_on_windows"],
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    toolchains = ["@rules_python//python:current_py_toolchain"],
+    deps = [
+        "//bazel/foreign_cc:ragel",
+    ],
+)
+
+envoy_cmake(
+    name = "vectorscan",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
+    build_data = ["@boost//:header"],
+    cache_entries = {
+        "Boost_NO_BOOST_CMAKE": "on",
+        "BOOST_ROOT": "$$EXT_BUILD_ROOT/external/boost",
+        #        "BUILD_SVE2_BITPERM": "on",
+        #        "BUILD_SVE2": "on",
+        #        "BUILD_SVE": "on",
+        "BUILD_EXAMPLES": "off",
+        "BUILD_SHARED_LIBS": "off",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "FAT_RUNTIME": "off",
+        "SQLITE_SKIP_CHECK": "on",
+        "RAGEL": "$$EXT_BUILD_DEPS/ragel/bin/ragel",
+    },
+    default_cache_entries = {},
+    exec_properties = select({
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
+    lib_source = "@vectorscan//:all",
+    out_static_libs = ["libhs.a"],
+    tags = ["skip_on_windows"],
+    target_compatible_with = envoy_contrib_linux_aarch64_constraints(),
+    deps = [
+        "//bazel/foreign_cc:ragel",
+    ],
+)
+
+envoy_cmake(
+    name = "ipp-crypto",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
+    cache_entries = {
+        "BORINGSSL": "on",
+        "DYNAMIC_LIB": "off",
+        "MB_STANDALONE": "on",
+        "Python_EXECUTABLE": "$$EXT_BUILD_ROOT/$(PYTHON3)",
+    } | select({
+        # FIPS builds use libcrypto.a/libssl.a
+        "//bazel:using_fips_ssl": {
+            "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto.a",
+        },
+        # Non-FIPS builds use libcrypto_internal.a/libssl_internal.a
+        "//conditions:default": {
+            "OPENSSL_CRYPTO_LIBRARY": "$$EXT_BUILD_DEPS/lib/libcrypto_internal.a",
+        },
+    }),
+    defines = [
+        "OPENSSL_USE_STATIC_LIBS=TRUE",
+    ],
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
+    lib_source = "@ipp-crypto//:all",
+    out_static_libs = ["libcrypto_mb.a"],
+    tags = ["skip_on_windows"],
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
+    toolchains = ["@rules_python//python:current_py_toolchain"],
+    working_directory = "sources/ippcp/crypto_mb",
+    # Use ssl label_flag to select the SSL library.
+    deps = ["//bazel:ssl"],
 )

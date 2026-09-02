@@ -418,7 +418,7 @@ private:
       processing_request_modifier_factory_cb_;
   const std::function<std::unique_ptr<OnProcessingResponse>()> on_processing_response_factory_cb_;
 
-  ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
+  ThreadLocal::SlotSharedPtr thread_local_stream_manager_slot_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
       route_cache_action_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;

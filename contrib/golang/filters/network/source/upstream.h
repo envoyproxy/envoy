@@ -84,7 +84,7 @@ private:
   static DispatcherStore& dispatcherStore() { MUTABLE_CONSTRUCT_ON_FIRST_USE(DispatcherStore); }
 
   struct SlotPtrContainer {
-    ThreadLocal::SlotPtr slot_{nullptr};
+    ThreadLocal::SlotSharedPtr slot_{nullptr};
   };
   static SlotPtrContainer& slotPtrContainer() { MUTABLE_CONSTRUCT_ON_FIRST_USE(SlotPtrContainer); }
 

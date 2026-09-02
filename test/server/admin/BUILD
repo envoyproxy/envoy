@@ -70,6 +70,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -137,6 +138,7 @@ envoy_cc_test(
     deps = [
         ":stats_render_test_base",
         "//source/server/admin:admin_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

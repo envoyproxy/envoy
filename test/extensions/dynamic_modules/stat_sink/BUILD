@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_dyn_module_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -74,7 +75,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -86,6 +87,7 @@ envoy_cc_test(
         "GODEBUG": "cgocheck=0",
     },
     deps = [
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/stat_sinks/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",
         "//test/integration:http_integration_lib",

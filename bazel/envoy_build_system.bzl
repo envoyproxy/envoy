@@ -55,6 +55,8 @@ load(
     ":envoy_test.bzl",
     _envoy_benchmark_test = "envoy_benchmark_test",
     _envoy_cc_benchmark_binary = "envoy_cc_benchmark_binary",
+    _envoy_cc_benchmark_dyn_module_binary = "envoy_cc_benchmark_dyn_module_binary",
+    _envoy_cc_dyn_module_test = "envoy_cc_dyn_module_test",
     _envoy_cc_fuzz_test = "envoy_cc_fuzz_test",
     _envoy_cc_mock = "envoy_cc_mock",
     _envoy_cc_test = "envoy_cc_test",
@@ -257,12 +259,14 @@ envoy_proto_library = _envoy_proto_library
 envoy_pch_library = _envoy_pch_library
 
 # Test wrappers (from envoy_test.bzl)
+envoy_cc_dyn_module_test = _envoy_cc_dyn_module_test
 envoy_cc_fuzz_test = _envoy_cc_fuzz_test
 envoy_cc_mock = _envoy_cc_mock
 envoy_cc_test = _envoy_cc_test
 envoy_cc_test_binary = _envoy_cc_test_binary
 envoy_cc_test_library = _envoy_cc_test_library
 envoy_cc_benchmark_binary = _envoy_cc_benchmark_binary
+envoy_cc_benchmark_dyn_module_binary = _envoy_cc_benchmark_dyn_module_binary
 envoy_benchmark_test = _envoy_benchmark_test
 envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary

@@ -48,6 +48,8 @@ a different point:
 * ``get_cluster_host_count`` reports whether a cluster is routable from the current worker and
   returns host counts at a priority level. It uses ``getThreadLocalCluster()``, so it can return
   false even when the cluster is configured but not yet warmed on the worker.
+* Custom counters, gauges and histograms can be defined during configuration and recorded during
+  selection, and are emitted under the ``metrics_namespace`` prefix of ``DynamicModuleConfig``.
 
 Configuration
 -------------

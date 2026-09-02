@@ -4,14 +4,14 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
-    "envoy_extension_cc_test",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_extension_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "cluster_specifier_test",
     srcs = ["cluster_specifier_test.cc"],
     data = [
@@ -34,13 +34,14 @@ envoy_extension_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/router/cluster_specifiers/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
 
-envoy_extension_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
