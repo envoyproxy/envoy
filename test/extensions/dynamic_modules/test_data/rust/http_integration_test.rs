@@ -1781,10 +1781,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ReentrantStreamCompleteFilter {
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // Defer the response so it is completed from inside a callback rather than inline here.
+    // commit() posts to the worker dispatcher even when called from the worker thread.
     let scheduler = envoy_filter.new_scheduler();
-    _ = std::thread::spawn(move || {
-      scheduler.commit(1);
-    });
+    scheduler.commit(1);
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 
