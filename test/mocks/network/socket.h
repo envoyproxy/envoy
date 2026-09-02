@@ -30,6 +30,7 @@ public:
   MOCK_METHOD(Socket::Type, socketType, (), (const, override));
   MOCK_METHOD(Address::Type, addressType, (), (const, override));
   MOCK_METHOD(std::optional<Address::IpVersion>, ipVersion, (), (const, override));
+  MOCK_METHOD(void, setAbortiveClose, (), (override));
   MOCK_METHOD(void, close, (), (override));
   MOCK_METHOD(bool, isOpen, (), (const, override));
   MOCK_METHOD(const OptionsSharedPtr&, options, (), (const, override));

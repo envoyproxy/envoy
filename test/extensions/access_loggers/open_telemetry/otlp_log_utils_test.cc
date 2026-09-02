@@ -32,6 +32,15 @@ public:
                                 const StreamInfo::StreamInfo&) const override {
       return ValueUtil::stringValue("fake_value");
     }
+    bool formatTo(std::string& sink, const Formatter::Context&,
+                  const StreamInfo::StreamInfo&) const override {
+      sink.append("fake_value");
+      return true;
+    }
+    void formatValueTo(Formatter::ValueSink& sink, const Formatter::Context&,
+                       const StreamInfo::StreamInfo&) const override {
+      sink.addString("fake_value");
+    }
   };
 
   absl::StatusOr<Formatter::FormatterProviderPtr>

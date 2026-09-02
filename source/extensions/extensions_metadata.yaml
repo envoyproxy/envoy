@@ -2041,6 +2041,13 @@ envoy.matching.inputs.dynamic_module_data_input:
   status: alpha
   type_urls:
   - envoy.extensions.matching.http.dynamic_modules.v3.HttpDynamicModuleMatchInput
+envoy.matching.inputs.dynamic_module_string_data_input:
+  categories:
+  - envoy.matching.http.input
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.http.dynamic_modules.v3.DynamicModuleDataInput
 envoy.matching.inputs.destination_ip:
   categories:
   - envoy.matching.http.input

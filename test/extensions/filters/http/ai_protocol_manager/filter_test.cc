@@ -104,6 +104,15 @@ public:
     ASSERT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
   }
 
+  Http::FilterHeadersStatus decodeHeadersUnconfigured(Http::TestRequestHeaderMapImpl headers,
+                                                      bool expect_engage) {
+    createFilter(/*parse_unconfigured_routes=*/true);
+    if (expect_engage) {
+      replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+    }
+    return filter_->decodeHeaders(headers, /*end_stream=*/false);
+  }
+
   // Attaches a per-route config declaring the route an AI endpoint with a
   // request payload for the filter to hold.
   void setRouteConfig() {
@@ -1448,6 +1457,109 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsEmptyBody) {
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(injected_.length(), 0);
+}
+
+// The one shape best effort can hold: the whole request arrives before a response
+// is wanted, so pinning the headers cannot stall it.
+TEST_F(AiProtocolManagerFilterTest, BestEffortEngagesOnJsonContentType) {
+  EXPECT_EQ(decodeHeadersUnconfigured(
+                Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                               {":path", "/v1/chat"},
+                                               {"content-type", "application/json"}},
+                /*expect_engage=*/true),
+            Http::FilterHeadersStatus::StopIteration);
+}
+
+// Media type parameters are not part of the type, and the type is case-insensitive.
+TEST_F(AiProtocolManagerFilterTest, BestEffortEngagesOnJsonContentTypeWithParameters) {
+  EXPECT_EQ(decodeHeadersUnconfigured(
+                Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                               {":path", "/v1/chat"},
+                                               {"content-type", "Application/JSON; charset=utf-8"}},
+                /*expect_engage=*/true),
+            Http::FilterHeadersStatus::StopIteration);
+}
+
+// A "+json" structured suffix names a JSON payload just as "application/json" does.
+TEST_F(AiProtocolManagerFilterTest, BestEffortEngagesOnJsonStructuredSuffix) {
+  EXPECT_EQ(decodeHeadersUnconfigured(
+                Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                               {":path", "/v1/chat"},
+                                               {"content-type", "application/vnd.openai+json"}},
+                /*expect_engage=*/true),
+            Http::FilterHeadersStatus::StopIteration);
+}
+
+// The stall this gate exists for. The content type carries a JSON suffix, so
+// only the protocol check catches it.
+TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsGrpcRequest) {
+  EXPECT_EQ(decodeHeadersUnconfigured(
+                Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                               {":path", "/Chat/Complete"},
+                                               {"content-type", "application/grpc+json"}},
+                /*expect_engage=*/false),
+            Http::FilterHeadersStatus::Continue);
+}
+
+// Connect's streaming framing carries a JSON suffix too. (Unary Connect sends
+// plain "application/json" and stays eligible.)
+TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsConnectStreamingRequest) {
+  EXPECT_EQ(decodeHeadersUnconfigured(
+                Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                               {":path", "/Chat/Complete"},
+                                               {"content-type", "application/connect+json"}},
+                /*expect_engage=*/false),
+            Http::FilterHeadersStatus::Continue);
+}
+
+// An upgraded connection is full-duplex whatever content type it carries.
+TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsUpgrade) {
+  EXPECT_EQ(decodeHeadersUnconfigured(
+                Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                               {":path", "/ws"},
+                                               {"content-type", "application/json"},
+                                               {"connection", "keep-alive, Upgrade"},
+                                               {"upgrade", "websocket"}},
+                /*expect_engage=*/false),
+            Http::FilterHeadersStatus::Continue);
+}
+
+// So is a CONNECT tunnel, extended or not.
+TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsConnect) {
+  EXPECT_EQ(decodeHeadersUnconfigured(
+                Http::TestRequestHeaderMapImpl{
+                    {":method", "CONNECT"}, {":path", "/"}, {"content-type", "application/json"}},
+                /*expect_engage=*/false),
+            Http::FilterHeadersStatus::Continue);
+}
+
+// A body the parser could make nothing of is not worth holding the headers for.
+TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsNonJsonContentType) {
+  EXPECT_EQ(decodeHeadersUnconfigured(
+                Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                               {":path", "/upload"},
+                                               {"content-type", "application/octet-stream"}},
+                /*expect_engage=*/false),
+            Http::FilterHeadersStatus::Continue);
+}
+
+// An absent content type says nothing about the payload, so best effort declines it.
+TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsMissingContentType) {
+  EXPECT_EQ(decodeHeadersUnconfigured(
+                Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/upload"}},
+                /*expect_engage=*/false),
+            Http::FilterHeadersStatus::Continue);
+}
+
+// The gate belongs to best effort alone; a declared endpoint is managed whatever
+// the content type says.
+TEST_F(AiProtocolManagerFilterTest, DeclaredEndpointIgnoresGate) {
+  setRouteConfig();
+  replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/chat/completions"}, {"content-type", "text/plain"}};
+  EXPECT_EQ(filter_->decodeHeaders(headers, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
 }
 
 // A declared endpoint is strict regardless of the filter-level

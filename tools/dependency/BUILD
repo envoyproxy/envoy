@@ -38,6 +38,7 @@ json_merge(
     filter = """
     .[0]
     | del(.librdkafka)
+    | del(.["antlr4-cpp-runtime"])
     """,
     visibility = ["//visibility:public"],
 )
@@ -131,6 +132,8 @@ envoy_dependency_reachability(
         "cu__*",
         "envoy_rust_crate_*",
         "envoy_api",
+        "sysroot_linux_*",
+        "v8_python_*",
     ],
     roots = ["//source/exe:main_common_with_all_extensions_lib"],
 )

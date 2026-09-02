@@ -74,8 +74,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/cel-spec/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.9",
-        sha256 = "5d8207675350daeeaedde48de9d42640afc400240f19688f741216c859faa6b8",
+        version = "0.4.11",
+        sha256 = "3f309b077c8e04232796b203fcf6e3c18c0cc29e580834fa5d8ecc12f1c99728",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),

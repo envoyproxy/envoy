@@ -278,6 +278,8 @@ TEST_P(TcpProxyTest, DrainCloseIgnoredWhenFlagDisabled) {
 }
 
 TEST_P(TcpProxyTest, DrainCloseAfterDownstreamRead) {
+  // This test covers the legacy path where drain-close is decided by polling the DrainDecision.
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto config = defaultConfig();
   config.mutable_check_drain_close()->set_value(true);
   setup(1, config);
@@ -296,6 +298,8 @@ TEST_P(TcpProxyTest, DrainCloseAfterDownstreamRead) {
 }
 
 TEST_P(TcpProxyTest, DrainCloseUsesInboundOnlyScopeForInboundListeners) {
+  // This test covers the legacy path where drain-close is decided by polling the DrainDecision.
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto config = defaultConfig();
   config.mutable_check_drain_close()->set_value(true);
   EXPECT_CALL(factory_context_.listener_info_, direction())
@@ -316,6 +320,8 @@ TEST_P(TcpProxyTest, DrainCloseUsesInboundOnlyScopeForInboundListeners) {
 }
 
 TEST_P(TcpProxyTest, DrainCloseAfterDownstreamWrite) {
+  // This test covers the legacy path where drain-close is decided by polling the DrainDecision.
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto config = defaultConfig();
   config.mutable_check_drain_close()->set_value(true);
   setup(1, config);
@@ -330,6 +336,98 @@ TEST_P(TcpProxyTest, DrainCloseAfterDownstreamWrite) {
               close(Network::ConnectionCloseType::FlushWrite,
                     StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
   upstream_callbacks_->onUpstreamData(buffer, false);
+}
+
+// Equivalent of DrainCloseAfterDownstreamRead using the connection-level drain path: the connection
+// is notified via onDrain() (Immediate strategy) and the drain-close decision is derived from that
+// event instead of polling the DrainDecision (which must not be consulted).
+TEST_P(TcpProxyTest, DrainCloseAfterDownstreamReadViaConnectionDrain) {
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  setup(1, config);
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+}
+
+// Equivalent of DrainCloseAfterDownstreamWrite using the connection-level drain path.
+TEST_P(TcpProxyTest, DrainCloseAfterDownstreamWriteViaConnectionDrain) {
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  setup(1, config);
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&buffer), false));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+}
+
+// A failing health check (/healthcheck/fail) drain-closes a DEFAULT-drain-type listener's
+// connections even though no drain sequence has been started and thus no onDrain() notification was
+// delivered. This is polled rather than pushed precisely because /healthcheck/ok reverses it.
+TEST_P(TcpProxyTest, DrainCloseOnHealthCheckFailure) {
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  setup(1, config);
+
+  // The DrainDecision must not be consulted, and no drain notification is delivered.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
+  ON_CALL(factory_context_.server_factory_context_, healthCheckFailed())
+      .WillByDefault(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose));
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+}
+
+// A MODIFY_ONLY-drain-type listener ignores the health check state, matching
+// Server::DrainManagerImpl::drainClose(). The drain type is read from the listener that accepted
+// the connection, so setting it on the connection is what flips the behavior.
+TEST_P(TcpProxyTest, HealthCheckFailureIgnoredForModifyOnlyListener) {
+  auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+  ON_CALL(*listener_info, drainType())
+      .WillByDefault(Return(envoy::config::listener::v3::Listener::MODIFY_ONLY));
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setListenerInfo(
+      listener_info);
+
+  auto config = defaultConfig();
+  config.mutable_check_drain_close()->set_value(true);
+  setup(1, config);
+
+  // MODIFY_ONLY suppresses the connection-level decision, and the DrainDecision is not polled.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
+  ON_CALL(factory_context_.server_factory_context_, healthCheckFailed())
+      .WillByDefault(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
 }
 
 // Test with an explicitly configured upstream.
