@@ -94,6 +94,8 @@ areas:
     title: ratelimit
   rbac:
     title: rbac
+  rds:
+    title: rds
   redis_proxy:
     title: redis_proxy
   resource_monitors:
@@ -122,6 +124,8 @@ areas:
     title: tls
   tracing:
     title: tracing
+  vhds:
+    title: vhds
   wasm:
     title: wasm
   watchdog:

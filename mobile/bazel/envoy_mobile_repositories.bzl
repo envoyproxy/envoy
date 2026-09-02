@@ -109,7 +109,10 @@ def kotlin_repos():
         sha256 = "507e38c8d95c7efa4f3b1c0595a8e8f139c885cb41a76cab7e20e4e67ae87731",
         strip_prefix = "rules_proto_grpc-4.1.1",
         urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/archive/4.1.1.tar.gz"],
-        repo_mapping = {"@com_google_protobuf": "@protobuf"},
+        repo_mapping = {
+            "@com_google_protobuf": "@protobuf",
+            "@io_bazel_rules_go": "@rules_go",
+        },
     )
 
     http_file(
@@ -150,7 +153,10 @@ def android_repos():
         urls = ["https://github.com/bazelbuild/rules_android/releases/download/v0.7.2/rules_android-v0.7.2.tar.gz"],
         sha256 = "0da7198c7c8bac7e11e08dca3c434617b8593075858716595672e9aeefbef2a7",
         strip_prefix = "rules_android-0.7.2",
-        repo_mapping = {"@com_google_protobuf": "@protobuf"},
+        repo_mapping = {
+            "@com_google_protobuf": "@protobuf",
+            "@io_bazel_rules_go": "@rules_go",
+        },
     )
     http_archive(
         name = "rules_android_ndk",

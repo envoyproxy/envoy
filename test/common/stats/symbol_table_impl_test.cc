@@ -1,4 +1,5 @@
 #include <string>
+#include <type_traits>
 
 #include "source/common/common/macros.h"
 #include "source/common/common/mutex_tracer_impl.h"
@@ -618,6 +619,87 @@ TEST_F(StatNameTest, Join3ThirdEmpty) {
 TEST_F(StatNameTest, JoinAllEmpty) {
   SymbolTable::StoragePtr joined = table_.join({makeStat(""), makeStat(""), makeStat("")});
   EXPECT_EQ("", table_.toString(StatName(joined.get())));
+}
+
+// StatNameJoiner must produce exactly what join() produces, whether or not it elides.
+TEST_F(StatNameTest, JoinerMatchesJoin) {
+  const std::vector<StatNameVec> cases = {
+      {makeStat("a.b"), makeStat("c.d")},
+      {makeStat(""), makeStat("c.d")},
+      {makeStat("a.b"), makeStat("")},
+      {makeStat(""), makeStat("")},
+      {makeStat("a.b"), makeStat("c.d"), makeStat("e.f")},
+      {makeStat(""), makeStat("c.d"), makeStat("")},
+      {makeStat(""), makeStat(""), makeStat("")},
+  };
+  for (const StatNameVec& names : cases) {
+    SymbolTable::StoragePtr joined = table_.join(names);
+    StatNameJoiner joiner(names, table_);
+    EXPECT_EQ(table_.toString(StatName(joined.get())), table_.toString(joiner.statName()));
+    EXPECT_EQ(StatName(joined.get()), joiner.statName());
+  }
+}
+
+// A join with at most one non-empty name references that name rather than copying it.
+TEST_F(StatNameTest, JoinerElidesNoOpJoin) {
+  StatName name = makeStat("a.b");
+  StatNameJoiner joiner({StatName(), name}, table_);
+  EXPECT_EQ(name.dataIncludingSize(), joiner.statName().dataIncludingSize());
+
+  StatNameJoiner joiner_both({name, makeStat("c.d")}, table_);
+  EXPECT_NE(name.dataIncludingSize(), joiner_both.statName().dataIncludingSize());
+  EXPECT_EQ("a.b.c.d", table_.toString(joiner_both.statName()));
+}
+
+// join() replaces any previously joined value, including dropping storage when the new join
+// is elided.
+TEST_F(StatNameTest, JoinerRejoin) {
+  StatNameJoiner joiner;
+  EXPECT_TRUE(joiner.statName().empty());
+
+  joiner.join({makeStat("a.b"), makeStat("c.d")}, table_);
+  EXPECT_EQ("a.b.c.d", table_.toString(joiner.statName()));
+
+  joiner.join({StatName(), makeStat("e.f")}, table_);
+  EXPECT_EQ("e.f", table_.toString(joiner.statName()));
+
+  joiner.join({makeStat("g.h"), makeStat("i.j")}, table_);
+  EXPECT_EQ("g.h.i.j", table_.toString(joiner.statName()));
+}
+
+// Moving a joiner transfers ownership of the joined bytes; the moved-to statName() stays valid
+// because the storage lives on the heap, not inside the joiner.
+TEST_F(StatNameTest, JoinerMove) {
+  StatNameJoiner joiner({makeStat("a.b"), makeStat("c.d")}, table_);
+  const uint8_t* joined_bytes = joiner.statName().dataIncludingSize();
+
+  StatNameJoiner moved(std::move(joiner));
+  EXPECT_EQ("a.b.c.d", table_.toString(moved.statName()));
+  EXPECT_EQ(joined_bytes, moved.statName().dataIncludingSize());
+
+  StatNameJoiner assigned;
+  assigned = std::move(moved);
+  EXPECT_EQ("a.b.c.d", table_.toString(assigned.statName()));
+  EXPECT_EQ(joined_bytes, assigned.statName().dataIncludingSize());
+}
+
+// An elided joiner references a caller name; moving it must carry that reference over.
+TEST_F(StatNameTest, JoinerMoveElided) {
+  StatName name = makeStat("a.b");
+  StatNameJoiner joiner({StatName(), name}, table_);
+  StatNameJoiner moved(std::move(joiner));
+  EXPECT_EQ(name.dataIncludingSize(), moved.statName().dataIncludingSize());
+  EXPECT_EQ("a.b", table_.toString(moved.statName()));
+}
+
+// TagStatNameJoiner is stored in containers by callers, so it must remain movable.
+TEST_F(StatNameTest, TagStatNameJoinerMovable) {
+  static_assert(std::is_move_constructible_v<TagUtility::TagStatNameJoiner>);
+  std::vector<TagUtility::TagStatNameJoiner> joiners;
+  joiners.emplace_back(makeStat("prefix"), makeStat("name"), std::nullopt, table_);
+  joiners.emplace_back(StatName(), makeStat("name"), std::nullopt, table_);
+  EXPECT_EQ("prefix.name", table_.toString(joiners[0].nameWithTags()));
+  EXPECT_EQ("name", table_.toString(joiners[1].nameWithTags()));
 }
 
 // Validates that we don't get tsan or other errors when concurrently creating

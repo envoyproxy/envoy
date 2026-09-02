@@ -21,7 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.mcp]
 
 // This filter will inspect and get attributes from MCP traffic.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Mcp {
   // Traffic handling mode for non-MCP traffic.
   enum TrafficMode {
@@ -56,6 +56,20 @@ message Mcp {
 
     // Store request attributes in both dynamic metadata and filter state.
     DYNAMIC_METADATA_AND_FILTER_STATE = 3;
+  }
+
+  // Source used to obtain MCP request attributes.
+  enum AttributeSource {
+    // Parse attributes from the request body and ignore MCP attribute headers.
+    BODY = 0;
+
+    // Use MCP attribute headers and verify that values parsed from the body agree.
+    VERIFY = 1;
+
+    // Trust MCP attribute headers for ``method`` and the method-specific
+    // identifier carried by ``Mcp-Name`` (``params.name``, ``params.uri``, or
+    // ``params.taskId``), and avoid parsing the body when nothing else requires it.
+    HEADERS = 2;
   }
 
   message TraceContextPropagationConfig {
@@ -120,6 +134,12 @@ message Mcp {
   // nesting level. RFC 8259 Section 4 states that names within an object SHOULD be
   // unique. Defaults to false (last-key-wins / last-win).
   google.protobuf.BoolValue reject_duplicate_keys = 8;
+
+  // Controls whether MCP request attributes are obtained from the request body
+  // or from MCP request headers. Header-based extraction is limited to ``method``
+  // and the method-specific identifier carried by ``Mcp-Name``; other configured
+  // extraction rules still require body parsing.
+  AttributeSource attribute_source = 9 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Parser configuration with method-specific rules.

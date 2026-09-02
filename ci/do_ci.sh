@@ -336,9 +336,19 @@ function build_openssl_presubmit() {
             .bazelrc|.bazelversion|WORKSPACE|WORKSPACE.bazel|MODULE.bazel|MODULE.bazel.lock|bazel/*)
                 global_config_changed=true
                 ;;
-            # BUILD/.bzl changes affect the whole package.
+            # BUILD/.bzl changes affect the whole package. A root-level one
+            # (dirname ".") would yield the invalid pattern "//./..."; treat it
+            # as global build config instead. Only add the package pattern if it
+            # actually contains targets -- a .bzl in a non-package dir would
+            # otherwise make the rdeps set() query fail.
             *BUILD|*BUILD.bazel|*.bzl)
-                changed_labels+=("//$(dirname "$file")/...")
+                local dir
+                dir="$(dirname "$file")"
+                if [[ "$dir" == "." ]]; then
+                    global_config_changed=true
+                elif bazel query "${BAZEL_QUERY_OPTIONS[@]}" "//${dir}/..." >/dev/null 2>&1; then
+                    changed_labels+=("//${dir}/...")
+                fi
                 ;;
             # Tolerate files Bazel doesn't know about (docs, unwired sources).
             *)
@@ -565,7 +575,7 @@ case $CI_TARGET in
                 test "${BAZEL_BUILD_OPTIONS[@]}" \
                 --config=compile-time-options \
                 --define tcmalloc=gperftools \
-                --define wasm=wamr \
+                --@proxy-wasm-cpp-host//bazel:engine=wamr \
                 -c fastbuild \
                 "${TEST_TARGETS[@]}"
         fi
@@ -576,7 +586,7 @@ case $CI_TARGET in
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
-            --define wasm=wasmtime \
+            --@proxy-wasm-cpp-host//bazel:engine=wasmtime \
             --define admin_functionality=disabled \
             --@envoy//bazel:jemalloc=True \
             -c fastbuild \
@@ -587,7 +597,7 @@ case $CI_TARGET in
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
             --define tcmalloc=gperftools \
-            --define wasm=wasmtime \
+            --@proxy-wasm-cpp-host//bazel:engine=wasmtime \
             -c opt \
             @envoy//test/common/common:assert_test \
             @envoy//test/server:server_test
@@ -596,7 +606,7 @@ case $CI_TARGET in
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
             --define tcmalloc=gperftools \
-            --define wasm=wasmtime \
+            --@proxy-wasm-cpp-host//bazel:engine=wasmtime \
             -c opt \
             @envoy//test/common/common:assert_test \
             --define log_fast_debug_assert_in_release=enabled \
@@ -605,7 +615,7 @@ case $CI_TARGET in
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
             --define tcmalloc=gperftools \
-            --define wasm=wasmtime \
+            --@proxy-wasm-cpp-host//bazel:engine=wasmtime \
             --define enable_logging=disabled \
             -c fastbuild \
             @envoy//source/exe:envoy-static

@@ -15,6 +15,7 @@ package(default_visibility = [
     "//test/extensions/formatter/dynamic_modules:__pkg__",
     "//test/extensions/health_checkers/dynamic_modules:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
+    "//test/extensions/matching/http/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/network/dns_resolver/hickory:__pkg__",
     "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
@@ -209,6 +210,18 @@ test_program(name = "matcher_missing_match")
 test_program(name = "matcher_missing_config_destroy")
 
 test_program(name = "matcher_check_headers")
+
+test_program(name = "matcher_string_input_echo")
+
+test_program(name = "matcher_string_input_config_new_fail")
+
+test_program(name = "matcher_string_input_missing_config_new")
+
+test_program(name = "matcher_string_input_missing_config_destroy")
+
+test_program(name = "matcher_string_input_missing_get")
+
+test_program(name = "matcher_lifecycle_counter")
 
 test_program(name = "cert_validator_no_op")
 

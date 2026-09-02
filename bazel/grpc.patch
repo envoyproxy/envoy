@@ -222,18 +222,29 @@ index 922bb83..beb8765 100644
        return TSI_INTERNAL_ERROR;
      }
 diff --git a/third_party/BUILD b/third_party/BUILD
-index ff2dcae..7cf8b3f 100644
 --- a/third_party/BUILD
 +++ b/third_party/BUILD
-@@ -32,25 +32,19 @@ config_setting(
+@@ -30,27 +30,31 @@
+     flag_values = {":grpc_use_openssl": "true"},
+ )
  
++label_flag(
++    name = "ssl_lib",
++    build_setting_default = "@envoy//bazel:ssl",
++)
++
++label_flag(
++    name = "crypto_lib",
++    build_setting_default = "@envoy//bazel:crypto",
++)
++
  alias(
      name = "libssl",
 -    actual = select({
 -        ":grpc_use_openssl_setting": "@openssl//:ssl",
 -        "//conditions:default": "@boringssl//:ssl",
 -    }),
-+    actual = "@envoy//bazel:ssl",
++    actual = ":ssl_lib",
      tags = ["manual"],
  )
  
@@ -243,7 +254,7 @@ index ff2dcae..7cf8b3f 100644
 -        ":grpc_use_openssl_setting": "@openssl//:crypto",
 -        "//conditions:default": "@boringssl//:crypto",
 -    }),
-+    actual = "@envoy//bazel:crypto",
++    actual = ":crypto_lib",
      tags = ["manual"],
  )
  
@@ -254,7 +265,7 @@ index ff2dcae..7cf8b3f 100644
      tags = ["manual"],
  )
  
-@@ -81,7 +75,7 @@ alias(
+@@ -81,7 +85,7 @@
  
  alias(
      name = "cares",

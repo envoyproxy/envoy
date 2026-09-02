@@ -186,6 +186,7 @@ envoy_cc_library(
     deps = [
         ":hot_restarting_base",
         "//envoy/network:parent_drained_callback_registrar_interface",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:stat_merger_lib",
     ],
 )
@@ -197,6 +198,7 @@ envoy_cc_library(
     deps = [
         ":hot_restarting_base",
         "//envoy/network:connection_handler_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/common:hash_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:stat_merger_lib",
@@ -391,7 +393,7 @@ envoy_cc_library(
     name = "server_base_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cgroup_cpu_util_lib",
         ":configuration_lib",
@@ -493,6 +495,7 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
+        "//envoy/network:drain_decision_interface",
         "//envoy/network:exception_interface",
         "//envoy/server:configuration_interface",
         "//envoy/server:guarddog_interface",

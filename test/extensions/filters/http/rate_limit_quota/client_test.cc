@@ -113,8 +113,9 @@ protected:
     mock_stream_client->expectClientCreationWithFactory();
     absl::Status creation_status = absl::OkStatus();
     global_client_ = std::make_unique<GlobalRateLimitClientImpl>(
-        mock_stream_client->config_with_hash_key_, mock_stream_client->context_, mock_domain_,
-        reporting_interval_, *buckets_tls_, *mock_stream_client->dispatcher_, creation_status);
+        mock_stream_client->config_with_hash_key_,
+        mock_stream_client->context_.server_factory_context_, mock_domain_, reporting_interval_,
+        *buckets_tls_, *mock_stream_client->dispatcher_, creation_status);
     ASSERT_TRUE(creation_status.ok());
     // Set callbacks to handle asynchronous timing.
     auto callbacks = std::make_unique<GlobalClientCallbacks>();

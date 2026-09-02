@@ -411,6 +411,12 @@ public:
    * Create a particular http filter factory implementation. If the implementation is unable to
    * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
    * callback should always be initialized.
+   *
+   * NOTE: this method is deprecated and will be removed once all the in-tree and out-of-tree
+   * extensions are migrated. Extensions should extend
+   * Extensions::HttpFilters::Common::UnifiedFactoryBase and implement
+   * createHttpFilterFactoryFromProto instead.
+   *
    * @param config supplies the general Protobuf message to be marshaled into a filter-specific
    * configuration.
    * @param stat_prefix prefix for stat logging
@@ -418,9 +424,15 @@ public:
    * @return  absl::StatusOr<Http::FilterFactoryCb> the factory creation function or an error if
    * creation fails.
    */
+  [[deprecated("Use createHttpFilterFactoryFromProto instead")]]
   virtual absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
-                               Server::Configuration::FactoryContext& context) PURE;
+                               Server::Configuration::FactoryContext& context) {
+    // Delegate to createHttpFilterFactoryFromProto so that extensions that only implement the
+    // unified entry point keep working when this legacy entry point is called.
+    auto extra_context = ExtraFactoryContext::create(context, stat_prefix);
+    return createHttpFilterFactoryFromProto(config, context.serverFactoryContext(), extra_context);
+  }
 
   /**
    * Create a particular http filter factory implementation. If the implementation is unable to
@@ -474,15 +486,27 @@ public:
    * Create a particular http filter factory implementation. If the implementation is unable to
    * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
    * callback should always be initialized.
+   *
+   * NOTE: this method is deprecated and will be removed once all the in-tree and out-of-tree
+   * extensions are migrated. Extensions should extend
+   * Extensions::HttpFilters::Common::UnifiedFactoryBase and implement
+   * createHttpFilterFactoryFromProto instead.
+   *
    * @param config supplies the general Protobuf message to be marshaled into a filter-specific
    * configuration.
    * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
    * @return Http::FilterFactoryCb the factory creation function.
    */
+  [[deprecated("Use createHttpFilterFactoryFromProto instead")]]
   virtual absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
-                               Server::Configuration::UpstreamFactoryContext& context) PURE;
+                               Server::Configuration::UpstreamFactoryContext& context) {
+    // Delegate to createHttpFilterFactoryFromProto so that extensions that only implement the
+    // unified entry point keep working when this legacy entry point is called.
+    auto extra_context = ExtraFactoryContext::create(context, stat_prefix);
+    return createHttpFilterFactoryFromProto(config, context.serverFactoryContext(), extra_context);
+  }
 
   /**
    * Create a particular http filter factory implementation. If the implementation is unable to
@@ -506,6 +530,34 @@ public:
         "createHttpFilterFactoryFromProto is not implemented for this filter");
   }
 };
+
+/**
+ * Create an HTTP filter factory from the given filter config factory. Unified filters are created
+ * by the new createHttpFilterFactoryFromProto entry point while legacy filters keep using
+ * createFilterFactoryFromProto. This should be used by all the callers that create HTTP filters
+ * from the registered factories.
+ *
+ * @param factory the HTTP filter config factory. Either NamedHttpFilterConfigFactory or
+ * UpstreamHttpFilterConfigFactory.
+ * @param config supplies the general Protobuf message to be marshaled into a filter-specific
+ * configuration.
+ * @param stat_prefix prefix for stat logging.
+ * @param context supplies the filter's context. Either FactoryContext or UpstreamFactoryContext
+ * based on the factory type.
+ * @return absl::StatusOr<Http::FilterFactoryCb> the factory creation function or an error if
+ * creation fails.
+ */
+template <class FactoryType, class ContextType>
+absl::StatusOr<Http::FilterFactoryCb>
+createHttpFilterFactory(FactoryType& factory, const Protobuf::Message& config,
+                        const std::string& stat_prefix, ContextType& context) {
+  if (factory.isUnifiedFilter()) {
+    auto extra_context = ExtraFactoryContext::create(context, stat_prefix);
+    return factory.createHttpFilterFactoryFromProto(config, context.serverFactoryContext(),
+                                                    extra_context);
+  }
+  return factory.createFilterFactoryFromProto(config, stat_prefix, context);
+}
 
 } // namespace Configuration
 } // namespace Server

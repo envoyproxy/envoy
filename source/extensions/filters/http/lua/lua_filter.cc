@@ -831,6 +831,20 @@ int StreamHandleWrapperBase::luaBase64Escape(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapperBase::luaBase64Decode(lua_State* state) {
+  absl::string_view input = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  std::string output;
+  if (!absl::Base64Unescape(input, &output)) {
+    // Returning nil rather than raising keeps a malformed value recoverable by the script, which
+    // is the common case when the input came from a header or an upstream response body.
+    lua_pushnil(state);
+    return 1;
+  }
+  lua_pushlstring(state, output.data(), output.size());
+
+  return 1;
+}
+
 int StreamHandleWrapperBase::luaTimestamp(lua_State* state) {
   auto now = time_source_.systemTime().time_since_epoch();
 
@@ -898,6 +912,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
     : cluster_manager_(cluster_manager),
       clear_route_cache_(
           proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
+      filter_context_(proto_config.filter_context()),
       stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
       lua_stats_scope_(
           scope.createScope(proto_config.stat_prefix().empty()
@@ -937,7 +952,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
     Server::Configuration::ServerFactoryContext& context, absl::Status& creation_status)
-    : disabled_(config.disabled()), name_(config.name()), filter_context_(config.filter_context()) {
+    : disabled_(config.disabled()), name_(config.name()),
+      has_filter_context_(config.has_filter_context()), filter_context_(config.filter_context()) {
   if (disabled_ || !name_.empty()) {
     return; // Filter is disabled or explicit script name is provided.
   }

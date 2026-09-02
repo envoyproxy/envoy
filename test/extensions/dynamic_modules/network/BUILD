@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_dyn_module_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -18,7 +19,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:network_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/network/dynamic_modules:config",
@@ -39,7 +40,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/filters/network/dynamic_modules:config",
@@ -58,7 +59,7 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
@@ -74,7 +75,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -84,7 +85,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:network_integration_test",
     ],
     env = {"GODEBUG": "cgocheck=0"},
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",

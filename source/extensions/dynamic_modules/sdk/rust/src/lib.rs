@@ -24,6 +24,7 @@ pub mod http;
 pub mod listener;
 pub mod load_balancer;
 pub mod matcher;
+pub mod matcher_data_input;
 pub mod network;
 pub mod stats_sink;
 pub mod tracer;
@@ -1265,7 +1266,11 @@ macro_rules! declare_formatter_init_functions {
 /// implementations. The `config` is the raw bytes from the `specifier_config` field. Returning
 /// `None` causes Envoy to reject the cluster specifier configuration.
 pub type NewClusterSpecifierConfigFunction =
-  fn(name: &str, config: &[u8]) -> Option<Box<dyn cluster_specifier::ClusterSpecifierConfig>>;
+  fn(
+    name: &str,
+    config: &[u8],
+    metrics: std::sync::Arc<dyn cluster_specifier::EnvoyClusterSpecifierMetrics>,
+  ) -> Option<Box<dyn cluster_specifier::ClusterSpecifierConfig>>;
 
 /// The global factory function for cluster specifiers. This is set via the `cluster_specifier:` arm
 /// of [`declare_all_init_functions!`] (or the [`declare_cluster_specifier_init_functions!`] shim)
@@ -1291,6 +1296,7 @@ pub static NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION: OnceLock<NewClusterSpecifierCo
 /// fn new_cluster_specifier_config(
 ///   _name: &str,
 ///   _config: &[u8],
+///   _metrics: std::sync::Arc<dyn EnvoyClusterSpecifierMetrics>,
 /// ) -> Option<Box<dyn ClusterSpecifierConfig>> {
 ///   Some(Box::new(MyClusterSpecifierConfig {}))
 /// }
@@ -1509,8 +1515,8 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 ///     envoy_cluster.pre_init_complete();
 ///   }
 ///
-///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-///     Box::new(MyClusterLb {})
+///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+///     Some(Box::new(MyClusterLb {}))
 ///   }
 /// }
 ///
