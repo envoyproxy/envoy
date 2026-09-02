@@ -8,6 +8,17 @@ bazel_skylib:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/bazel-skylib/blob/{version}/LICENSE"
 
+cel-spec:
+  project_name: "CEL"
+  project_desc: "Common Expression Language -- specification and binary representation"
+  project_url: "https://github.com/google/cel-spec"
+  apparent_name: dev_cel
+  release_date: "2025-11-10"
+  use_category:
+  - api
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/cel-spec/blob/v{version}/LICENSE"
+
 com_github_chrusty_protoc_gen_jsonschema:
   project_name: "protoc-gen-jsonschema"
   project_desc: "Protobuf to JSON-Schema compiler"
@@ -17,16 +28,6 @@ com_github_chrusty_protoc_gen_jsonschema:
   - build
   license: "Apache-2.0"
   license_url: "https://github.com/norbjd/protoc-gen-jsonschema/blob/{version}/LICENSE"
-
-dev_cel:
-  project_name: "CEL"
-  project_desc: "Common Expression Language -- specification and binary representation"
-  project_url: "https://github.com/google/cel-spec"
-  release_date: "2025-11-10"
-  use_category:
-  - api
-  license: "Apache-2.0"
-  license_url: "https://github.com/google/cel-spec/blob/v{version}/LICENSE"
 
 envoy_toolshed:
   project_name: "envoy_toolshed"
