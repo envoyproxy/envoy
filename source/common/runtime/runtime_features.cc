@@ -108,6 +108,7 @@ RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
 // drain sequence and notifies the connections of the covered listeners that a drain has begun,
 // instead of only stopping the listeners, and accepts `skip_exit` to drain without stopping them.
 RUNTIME_GUARD(envoy_reloadable_features_non_graceful_drain_notifies_connections);
+RUNTIME_GUARD(envoy_reloadable_features_oauth2_client_retries_respect_user_retry_on);
 // OAuth2 filter cookie decryption: when true (the default), decrypt() accepts legacy CBC
 // ciphertexts via the legacy AES-256-CBC fallback. When false, only "gcm."-prefixed ciphertexts
 // decrypt; legacy CBC cookies are rejected and the affected users are redirected to the OAuth
