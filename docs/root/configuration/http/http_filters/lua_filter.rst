@@ -805,33 +805,30 @@ Response handle API
 
 The response handle passed to ``envoy_on_response`` supports all of the same methods as the
 :ref:`request handle <config_http_filters_lua_request_handle_api>`, with two exceptions:
-``respond()`` is not available on the response handle, and ``downstreamRequestHeaders()``
-(documented below) is available **only** on the response handle.
+``respond()`` is not available on the response handle, and ``requestHeaders()`` (documented below)
+is available **only** on the response handle.
 
-``downstreamRequestHeaders()``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``requestHeaders()``
+^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
-  local request_headers = handle:downstreamRequestHeaders()
+  local request_headers = handle:requestHeaders()
 
-Returns the original downstream request headers during response processing. This method is only
-available on the response handle passed to ``envoy_on_response``; it is not present on the request
-handle.
+Returns the request headers for the stream, so that response-path logic can read values the
+request carried. This method is only available on the response handle passed to
+``envoy_on_response``; on the request handle, ``headers()`` already returns the request headers.
 
-The returned handle is **read-only**: it supports ``get()``, ``getAtIndex()``, ``getNumValues()``
-and iteration with ``pairs()``, and the mutating methods (``add()``, ``remove()``, ``replace()``,
-``setHttp1ReasonPhrase()``) are not defined on it at all. Calling one fails the way calling any
-undefined method does. The request headers have already been sent upstream by this point, so
-modifying them could not affect the request.
+The returned handle is a full :ref:`header object <config_http_filters_lua_header_wrapper>` and
+may be modified. Note that the request has already been sent upstream by this point, so a write
+does not change what the upstream saw — it is visible only to access logging, tracing, and any
+later filter that reads the request headers on the encode path.
 
 Returns ``nil`` if request headers are not available. This occurs when the response is generated
-before the downstream request headers have been fully received — for example, when Envoy produces
-an early error response due to a request header timeout, a stream idle timeout that fires before
-headers arrive, or an immediate protocol-level rejection (e.g. ``400 Bad Request``) triggered
-during header parsing.
-
-Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
+before the request headers have been fully received — for example, when Envoy produces an early
+error response due to a request header timeout, a stream idle timeout that fires before headers
+arrive, or an immediate protocol-level rejection (e.g. ``400 Bad Request``) triggered during
+header parsing.
 
 .. _config_http_filters_lua_header_wrapper:
 

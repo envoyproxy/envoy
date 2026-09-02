@@ -218,7 +218,6 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<Filters::Common::Lua::SslConnectionWrapper>();
   lua_state_.registerType<Filters::Common::Lua::ParsedX509NameWrapper>();
   lua_state_.registerType<HeaderMapWrapper>();
-  lua_state_.registerType<ReadOnlyHeaderMapWrapper>();
   lua_state_.registerType<HeaderMapIterator>();
   lua_state_.registerType<StreamInfoWrapper>();
   lua_state_.registerType<DynamicMetadataMapWrapper>();
@@ -579,24 +578,24 @@ int StreamHandleWrapperBase::luaHeaders(lua_State* state) {
   return 1;
 }
 
-int ResponseStreamHandleWrapper::luaDownstreamRequestHeaders(lua_State* state) {
+int ResponseStreamHandleWrapper::luaRequestHeaders(lua_State* state) {
   ASSERT(state_ == State::Running);
 
-  if (downstream_request_headers_wrapper_.get() != nullptr) {
-    downstream_request_headers_wrapper_.pushStack();
+  if (request_headers_wrapper_.get() != nullptr) {
+    request_headers_wrapper_.pushStack();
     return 1;
   }
 
-  Http::RequestHeaderMapOptRef request_headers = callbacks_.downstreamRequestHeaders();
+  Http::RequestHeaderMapOptRef request_headers = callbacks_.requestHeaders();
   if (!request_headers.has_value()) {
     return 0;
   }
 
-  // Read-only because the request headers have already gone upstream, so a write here could not
-  // affect the request. ReadOnlyHeaderMapWrapper enforces that by not exposing the mutators at
-  // all, rather than exposing them and refusing.
-  downstream_request_headers_wrapper_.reset(
-      ReadOnlyHeaderMapWrapper::create(state, request_headers.value().get()), true);
+  // Always modifiable. The request headers stay on the stream for the whole encode path, so a
+  // write reaches access logging and tracing; unlike the response headers there is no point at
+  // which they are continued on and the window closes.
+  request_headers_wrapper_.reset(
+      HeaderMapWrapper::create(state, request_headers.value().get(), [] { return true; }), true);
   return 1;
 }
 

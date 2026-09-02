@@ -950,12 +950,12 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
   EXPECT_EQ(2, stats_store_.counter("test.lua.executions").value());
 }
 
-// downstreamRequestHeaders() returns the original request headers when called from
+// requestHeaders() returns the original request headers when called from
 // envoy_on_response.
 TEST_F(LuaHttpFilterTest, RequestHeadersInResponse) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
-      local req_headers = response_handle:downstreamRequestHeaders()
+      local req_headers = response_handle:requestHeaders()
       response_handle:logTrace(req_headers:get(":path"))
       response_handle:logTrace(req_headers:get("x-custom"))
     end
@@ -976,14 +976,14 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponse) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
-// downstreamRequestHeaders() called twice returns the same cached wrapper without re-invoking the
+// requestHeaders() called twice returns the same cached wrapper without re-invoking the
 // underlying C++ requestHeaders() accessor. The Times(1) constraint is the load-bearing assertion:
 // if caching breaks, a second call to requestHeaders() triggers a gmock over-call failure.
 TEST_F(LuaHttpFilterTest, RequestHeadersInResponseCached) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
-      local h1 = response_handle:downstreamRequestHeaders()
-      local h2 = response_handle:downstreamRequestHeaders()
+      local h1 = response_handle:requestHeaders()
+      local h2 = response_handle:requestHeaders()
       response_handle:logTrace(h1:get(":path"))
       response_handle:logTrace(h2:get(":method"))
     end
@@ -1006,11 +1006,11 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseCached) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
-// downstreamRequestHeaders() returns nil when no request headers are available.
+// requestHeaders() returns nil when no request headers are available.
 TEST_F(LuaHttpFilterTest, RequestHeadersInResponseNil) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
-      local req_headers = response_handle:downstreamRequestHeaders()
+      local req_headers = response_handle:requestHeaders()
       if req_headers == nil then
         response_handle:logTrace("no request headers")
       end
@@ -1032,31 +1032,16 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseNil) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
-// downstreamRequestHeaders() returns a read-only wrapper, and read-only here means the mutating
-// methods are absent from the type rather than present and refusing. Asserted by introspection,
-// because absence is the actual claim: a wrapper that carried these and rejected them would still
-// report them as present to a script that looks, and would only tell the truth by failing a live
-// request.
-TEST_F(LuaHttpFilterTest, RequestHeadersInResponseHasNoMutators) {
+// The returned handle is writable. The request is already upstream by this point, so a write is
+// only visible to access logging, tracing and later encode-path filters -- but it must actually
+// reach the underlying map, which is what this asserts.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseMutable) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
-      local req_headers = response_handle:downstreamRequestHeaders()
-      local absent = 0
-      for _, name in ipairs({"add", "remove", "replace", "setHttp1ReasonPhrase"}) do
-        if req_headers[name] == nil then
-          absent = absent + 1
-        end
-      end
-      response_handle:headers():add("x-absent", absent)
-      -- The mutable response headers keep all four, so this is the wrapper's doing and not a
-      -- change to how methods are registered.
-      local present = 0
-      for _, name in ipairs({"add", "remove", "replace", "setHttp1ReasonPhrase"}) do
-        if response_handle:headers()[name] ~= nil then
-          present = present + 1
-        end
-      end
-      response_handle:headers():add("x-present", present)
+      local req_headers = response_handle:requestHeaders()
+      req_headers:add("x-added", "added")
+      req_headers:replace("x-replaced", "new")
+      req_headers:remove("x-removed")
     end
   )EOF"};
 
@@ -1066,48 +1051,25 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseHasNoMutators) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
+  Http::TestRequestHeaderMapImpl downstream_headers{
+      {":path", "/"}, {"x-replaced", "old"}, {"x-removed", "gone"}};
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(encoder_callbacks_, requestHeaders())
-      .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{downstream_headers}));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 
-  EXPECT_EQ("4", response_headers.get_("x-absent"));
-  EXPECT_EQ("4", response_headers.get_("x-present"));
+  EXPECT_EQ("added", downstream_headers.get_("x-added"));
+  EXPECT_EQ("new", downstream_headers.get_("x-replaced"));
+  EXPECT_TRUE(downstream_headers.get(Http::LowerCaseString("x-removed")).empty());
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
-// And calling one anyway fails the way a misspelled method does, rather than with a message that
-// would suggest writing request headers is possible at some other point in the stream.
-TEST_F(LuaHttpFilterTest, RequestHeadersInResponseMutationRaises) {
-  const std::string SCRIPT{R"EOF(
-    function envoy_on_response(response_handle)
-      local req_headers = response_handle:downstreamRequestHeaders()
-      req_headers:add("x-should-fail", "value")
-    end
-  )EOF"};
-
-  InSequence s;
-  setup(SCRIPT);
-
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_CALL(encoder_callbacks_, requestHeaders())
-      .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
-  EXPECT_LOG_CONTAINS("error", "attempt to call", {
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
-  });
-  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
-}
-
-// The read methods are all present on the read-only wrapper, sharing one implementation with the
-// mutable one. Asserted together with the absence above so a change that dropped a reader by
-// accident cannot pass as "still read-only".
+// The read methods all work on the returned handle, including the multi-value forms, which the
+// single get() in the tests above would not catch.
 TEST_F(LuaHttpFilterTest, RequestHeadersInResponseReadMethods) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
-      local req_headers = response_handle:downstreamRequestHeaders()
+      local req_headers = response_handle:requestHeaders()
       response_handle:headers():add("x-got", req_headers:get("x-dup"))
       response_handle:headers():add("x-at-index", req_headers:getAtIndex("x-dup", 1))
       response_handle:headers():add("x-num", req_headers:getNumValues("x-dup"))
@@ -1138,12 +1100,12 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseReadMethods) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
-// downstreamRequestHeaders() is not in the request handle API at all, so Lua raises a nil-method
-// error rather than a custom error message.
-TEST_F(LuaHttpFilterTest, DownstreamRequestHeadersNotAvailableInRequest) {
+// requestHeaders() is not in the request handle API at all -- headers() is already the request
+// headers there -- so Lua raises a nil-method error rather than a custom error message.
+TEST_F(LuaHttpFilterTest, RequestHeadersNotAvailableInRequestHandle) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      local req_headers = request_handle:downstreamRequestHeaders()
+      local req_headers = request_handle:requestHeaders()
     end
   )EOF"};
 
@@ -1151,20 +1113,20 @@ TEST_F(LuaHttpFilterTest, DownstreamRequestHeadersNotAvailableInRequest) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/test"}};
-  EXPECT_LOG_CONTAINS("error", "attempt to call method 'downstreamRequestHeaders' (a nil value)", {
+  EXPECT_LOG_CONTAINS("error", "attempt to call method 'requestHeaders' (a nil value)", {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   });
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
 }
 
-// downstreamRequestHeaders() called after a coroutine yield (body() suspends the script until the
+// requestHeaders() called after a coroutine yield (body() suspends the script until the
 // full body arrives) still returns the correct wrapper. The cache is cleared by onMarkDead() on
 // yield, so requestHeaders() is called exactly once when the script resumes and accesses headers.
 TEST_F(LuaHttpFilterTest, RequestHeadersInResponseAfterYield) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
       response_handle:body()
-      local req_headers = response_handle:downstreamRequestHeaders()
+      local req_headers = response_handle:requestHeaders()
       response_handle:logTrace(req_headers:get(":path"))
     end
   )EOF"};
@@ -1190,12 +1152,12 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseAfterYield) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
-// downstreamRequestHeaders() works correctly when the response has a body (encodeHeaders does not
+// requestHeaders() works correctly when the response has a body (encodeHeaders does not
 // have end_stream=true). The script runs after headers and accesses request headers normally.
 TEST_F(LuaHttpFilterTest, RequestHeadersInResponseWithBody) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
-      local req_headers = response_handle:downstreamRequestHeaders()
+      local req_headers = response_handle:requestHeaders()
       response_handle:logTrace(req_headers:get(":path"))
     end
   )EOF"};

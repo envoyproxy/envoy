@@ -172,23 +172,23 @@ TEST_F(LuaHeaderMapWrapperTest, ModifiableMethods) {
 
   setup(SCRIPT);
   auto should_fail_remove_wrapper = createWrapperRef(headers, []() { return false; });
-  EXPECT_THAT(start("shouldFailRemove"),
-              StatusHelpers::HasStatusMessage("[string \"...\"]:9: headers cannot be modified "
-                                              "after they have been continued to the next filter"));
+  EXPECT_THAT(
+      start("shouldFailRemove"),
+      StatusHelpers::HasStatusMessage("[string \"...\"]:9: header map can no longer be modified"));
   should_fail_remove_wrapper.reset();
 
   setup(SCRIPT);
   auto should_fail_add_wrapper = createWrapperRef(headers, []() { return false; });
-  EXPECT_THAT(start("shouldFailAdd"),
-              StatusHelpers::HasStatusMessage("[string \"...\"]:13: headers cannot be modified "
-                                              "after they have been continued to the next filter"));
+  EXPECT_THAT(
+      start("shouldFailAdd"),
+      StatusHelpers::HasStatusMessage("[string \"...\"]:13: header map can no longer be modified"));
   should_fail_add_wrapper.reset();
 
   setup(SCRIPT);
   auto should_fail_replace_wrapper = createWrapperRef(headers, []() { return false; });
-  EXPECT_THAT(start("shouldFailReplace"),
-              StatusHelpers::HasStatusMessage("[string \"...\"]:17: headers cannot be modified "
-                                              "after they have been continued to the next filter"));
+  EXPECT_THAT(
+      start("shouldFailReplace"),
+      StatusHelpers::HasStatusMessage("[string \"...\"]:17: header map can no longer be modified"));
   should_fail_replace_wrapper.reset();
 }
 

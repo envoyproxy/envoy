@@ -154,10 +154,10 @@ public:
   virtual Stats::Scope& statsScope() PURE;
 
   /**
-   * @return Http::RequestHeaderMapOptRef the downstream request headers for this stream, if
-   * present. Only meaningful on the response path.
+   * @return Http::RequestHeaderMapOptRef the request headers for this stream, if present. Only
+   * meaningful on the response path.
    */
-  virtual Http::RequestHeaderMapOptRef downstreamRequestHeaders() PURE;
+  virtual Http::RequestHeaderMapOptRef requestHeaders() PURE;
 };
 
 class Filter;
@@ -561,7 +561,7 @@ public:
 
   static ExportedFunctions exportedFunctions() {
     return {{"headers", static_luaHeaders},
-            {"downstreamRequestHeaders", static_luaDownstreamRequestHeaders},
+            {"requestHeaders", static_luaRequestHeaders},
             {"body", static_luaBody},
             {"bodyChunks", static_luaBodyChunks},
             {"trailers", static_luaTrailers},
@@ -586,25 +586,22 @@ public:
 
 private:
   /**
-   * @return a read-only handle to the downstream request headers, or nil if not available.
-   * Reachable only from envoy_on_response: it is declared here rather than on the shared base,
-   * so the request handle has no such method at all.
-   * Note: the underlying C++ type is non-const, but mutation is blocked at the Lua wrapper level
-   * because modifying request headers after they have been forwarded upstream has no effect.
+   * @return a handle to the request headers, or nil if not available. Reachable only from
+   * envoy_on_response: it is declared here rather than on the shared base, so the request handle
+   * has no such method at all -- there, headers() already returns the request headers.
+   * The handle is writable; the request is long gone upstream by this point, so a write is only
+   * visible to access logging and tracing.
    */
-  int luaDownstreamRequestHeaders(lua_State* state);
+  int luaRequestHeaders(lua_State* state);
 
   void onMarkDead() override {
     StreamHandleLeaf<ResponseStreamHandleWrapper>::onMarkDead();
-    downstream_request_headers_wrapper_.reset();
+    request_headers_wrapper_.reset();
   }
 
-  // Read-only by type: ReadOnlyHeaderMapWrapper has no mutating methods in its metatable,
-  // so a script that tries to write these headers fails on a missing method rather than on
-  // a refusal at call time.
-  Filters::Common::Lua::LuaDeathRef<ReadOnlyHeaderMapWrapper> downstream_request_headers_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> request_headers_wrapper_;
 
-  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaDownstreamRequestHeaders)
+  FORWARD_LUA_FUNCTION(ResponseStreamHandleWrapper, luaRequestHeaders)
 };
 
 /**
@@ -788,7 +785,7 @@ private:
     // Only meaningful on the response path. The method exists on FilterCallbacks so the
     // response handle can reach it uniformly; the request handle exports no Lua method that
     // reaches this code path.
-    Http::RequestHeaderMapOptRef downstreamRequestHeaders() override { return {}; }
+    Http::RequestHeaderMapOptRef requestHeaders() override { return {}; }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -823,9 +820,7 @@ private:
       return callbacks_->filterConfigName();
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
-    Http::RequestHeaderMapOptRef downstreamRequestHeaders() override {
-      return callbacks_->requestHeaders();
-    }
+    Http::RequestHeaderMapOptRef requestHeaders() override { return callbacks_->requestHeaders(); }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};
