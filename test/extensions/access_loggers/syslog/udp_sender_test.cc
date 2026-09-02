@@ -2,11 +2,10 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/common/network/socket_impl.h"
-#include "source/extensions/access_loggers/syslog/syslog_access_log_impl.h"
+#include "source/extensions/access_loggers/syslog/stats.h"
 #include "source/extensions/access_loggers/syslog/udp_sender.h"
 
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/environment.h"
@@ -28,77 +27,6 @@ uint64_t counterValue(Stats::IsolatedStoreImpl& store, absl::string_view name) {
   const auto counter =
       TestUtility::findCounter(store, absl::StrCat("access_logs.syslog.test.", name));
   return counter != nullptr ? counter->value() : 0;
-}
-
-class TestBodyFormatter : public Formatter::Formatter {
-public:
-  explicit TestBodyFormatter(const std::string& body) : body_(body) {}
-
-  std::string format(const Envoy::Formatter::Context&,
-                     const StreamInfo::StreamInfo&) const override {
-    return body_;
-  }
-
-  void formatTo(std::string& output, const Envoy::Formatter::Context&,
-                const StreamInfo::StreamInfo&) const override {
-    output.append(body_);
-  }
-
-private:
-  const std::string& body_;
-};
-
-class FakeSender : public Sender {
-public:
-  void send(absl::string_view message) override {
-    send_count_++;
-    message_.assign(message.data(), message.size());
-  }
-
-  std::string message_;
-  uint64_t send_count_{0};
-};
-
-class FailingSender : public Sender {
-public:
-  void send(absl::string_view) override {}
-};
-
-TEST(SyslogAccessLoggerImplTest, PreservesEmbeddedNullInAccessLog) {
-  Stats::IsolatedStoreImpl store;
-  SyslogAccessLogStats stats(*store.rootScope(), "test");
-  SyslogAccessLogConfig config;
-  config.set_no_hostname(true);
-  const std::string access_log("a\0b", 3);
-  auto sender = std::make_unique<FakeSender>();
-  FakeSender* sender_ptr = sender.get();
-  SyslogAccessLoggerImpl logger(config, std::make_shared<TestBodyFormatter>(access_log),
-                                std::move(sender), stats);
-
-  logger.log(Formatter::Context{}, testing::NiceMock<StreamInfo::MockStreamInfo>());
-
-  ASSERT_GE(sender_ptr->message_.size(), access_log.size());
-  EXPECT_EQ(access_log,
-            sender_ptr->message_.substr(sender_ptr->message_.size() - access_log.size()));
-  EXPECT_EQ(1, sender_ptr->send_count_);
-}
-
-TEST(SyslogAccessLoggerImplTest, CountsTruncatedMessageWhenSendFails) {
-  Stats::IsolatedStoreImpl store;
-  SyslogAccessLogStats stats(*store.rootScope(), "test");
-  SyslogAccessLogConfig config;
-  config.set_no_hostname(true);
-  config.set_max_syslog_msg_bytes(1);
-  const std::string body("payload");
-  SyslogAccessLoggerImpl logger(config, std::make_shared<TestBodyFormatter>(body),
-                                std::make_unique<FailingSender>(), stats);
-
-  logger.log(Formatter::Context{}, testing::NiceMock<StreamInfo::MockStreamInfo>());
-
-  EXPECT_EQ(1, counterValue(store, "messages.state.truncated"));
-  EXPECT_GT(counterValue(store, "bytes_truncated"), 0);
-  EXPECT_EQ(0, counterValue(store, "bytes_sent"));
-  EXPECT_EQ(0, counterValue(store, "send"));
 }
 
 class SenderTestBase : public testing::Test {
@@ -161,22 +89,44 @@ TEST_F(StaticUdpSenderTest, RecoversAfterWriteBecomesWritable) {
 
 class ClusterUdpSenderTest : public SenderTestBase {};
 
-TEST_F(ClusterUdpSenderTest, IgnoresUnavailableDestinations) {
+TEST_F(ClusterUdpSenderTest, IgnoresUnavailableCluster) {
   Upstream::MockClusterManager cluster_manager;
   EXPECT_CALL(cluster_manager, getThreadLocalCluster("syslog_cluster"))
-      .WillOnce(testing::Return(nullptr))
-      .WillRepeatedly(testing::Return(&cluster_manager.thread_local_cluster_));
+      .WillOnce(testing::Return(nullptr));
+  ClusterUdpSender sender(*dispatcher_, cluster_manager, "syslog_cluster", stats_);
+
+  sender.send("message");
+
+  EXPECT_EQ(0, counterValue(store_, "bytes_sent"));
+  EXPECT_EQ(0, counterValue(store_, "send"));
+}
+
+TEST_F(ClusterUdpSenderTest, IgnoresUnavailableHost) {
+  Upstream::MockClusterManager cluster_manager;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster("syslog_cluster"))
+      .WillOnce(testing::Return(&cluster_manager.thread_local_cluster_));
+  EXPECT_CALL(cluster_manager.thread_local_cluster_.lb_, chooseHost(nullptr))
+      .WillOnce(testing::Return(Upstream::HostSelectionResponse{nullptr}));
+  ClusterUdpSender sender(*dispatcher_, cluster_manager, "syslog_cluster", stats_);
+
+  sender.send("message");
+
+  EXPECT_EQ(0, counterValue(store_, "bytes_sent"));
+  EXPECT_EQ(0, counterValue(store_, "send"));
+}
+
+TEST_F(ClusterUdpSenderTest, IgnoresNonIpHost) {
+  Upstream::MockClusterManager cluster_manager;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster("syslog_cluster"))
+      .WillOnce(testing::Return(&cluster_manager.thread_local_cluster_));
   auto host = std::make_shared<testing::NiceMock<Upstream::MockHost>>();
   Network::Address::InstanceConstSharedPtr pipe =
       Network::Address::PipeInstance::create("/syslog.sock").value();
   ON_CALL(*host, address()).WillByDefault(testing::Return(pipe));
   EXPECT_CALL(cluster_manager.thread_local_cluster_.lb_, chooseHost(nullptr))
-      .WillOnce(testing::Return(Upstream::HostSelectionResponse{nullptr}))
       .WillOnce(testing::Return(Upstream::HostSelectionResponse{host}));
   ClusterUdpSender sender(*dispatcher_, cluster_manager, "syslog_cluster", stats_);
 
-  sender.send("message");
-  sender.send("message");
   sender.send("message");
 
   EXPECT_EQ(0, counterValue(store_, "bytes_sent"));

@@ -94,6 +94,24 @@ TEST_F(SyslogConfigTest, RejectsEmptyStatPrefix) {
                ProtoValidationException);
 }
 
+TEST_F(SyslogConfigTest, RejectsMissingDestination) {
+  auto config = loadConfig(UdpClusterConfigYaml);
+  config.clear_cluster();
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+
+  EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
+               ProtoValidationException);
+}
+
+TEST_F(SyslogConfigTest, RejectsEmptyCluster) {
+  auto config = loadConfig(UdpClusterConfigYaml);
+  config.set_cluster("");
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+
+  EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
+               ProtoValidationException);
+}
+
 TEST_F(SyslogConfigTest, RejectsInvalidFieldConstraints) {
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   auto config = loadConfig(UdpClusterConfigYaml);
