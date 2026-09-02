@@ -24,8 +24,8 @@ namespace {
 using SyslogAccessLogConfig = envoy::extensions::access_loggers::syslog::v3::SyslogAccessLogConfig;
 using testing::Return;
 
-constexpr absl::string_view PipeConfigYaml = R"EOF(
-pipe:
+constexpr absl::string_view UnixSocketConfigYaml = R"EOF(
+unix_socket:
   path: /tmp/syslog.sock
 omit_hostname: true
 stat_prefix: test
@@ -72,18 +72,45 @@ TEST_F(SyslogConfigTest, FactoryRegistersNameAndEmptyConfig) {
                          "envoy.access_loggers.syslog"));
 }
 
-TEST_F(SyslogConfigTest, ValidatesPipe) {
-  auto config = loadConfig(PipeConfigYaml);
+TEST_F(SyslogConfigTest, ValidatesUnixSocket) {
+  auto config = loadConfig(UnixSocketConfigYaml);
 #ifdef WIN32
   EXPECT_EQ("syslog Unix domain sockets are not supported on Windows",
             validateSyslogConfig(config).message());
 #else
   EXPECT_TRUE(validateSyslogConfig(config).ok());
-  config.mutable_pipe()->clear_path();
+  config.mutable_unix_socket()->clear_path();
   EXPECT_EQ("syslog Unix domain socket path must not be empty",
             validateSyslogConfig(config).message());
 #endif
 }
+
+TEST_F(SyslogConfigTest, UnixSocketTakesPrecedenceOverCluster) {
+  auto config = loadConfig(UnixSocketConfigYaml);
+  config.mutable_unix_socket()->clear_path();
+  config.set_cluster_name("syslog");
+#ifdef WIN32
+  EXPECT_EQ("syslog Unix domain sockets are not supported on Windows",
+            validateSyslogConfig(config).message());
+#else
+  EXPECT_EQ("syslog Unix domain socket path must not be empty",
+            validateSyslogConfig(config).message());
+#endif
+}
+
+#ifndef WIN32
+TEST_F(SyslogConfigTest, FactoryIgnoresClusterWhenUnixSocketIsConfigured) {
+  auto config = loadConfig(UnixSocketConfigYaml);
+  config.set_cluster_name("syslog");
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  EXPECT_CALL(context.server_context_.cluster_manager_, checkActiveStaticCluster(testing::_))
+      .Times(0);
+  EXPECT_CALL(context.server_context_.cluster_manager_, getActiveCluster(testing::_)).Times(0);
+
+  EXPECT_NE(nullptr,
+            SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context).get());
+}
+#endif
 
 TEST_F(SyslogConfigTest, RejectsEmptyStatPrefix) {
   auto config = loadConfig(UdpClusterConfigYaml);
@@ -99,17 +126,9 @@ TEST_F(SyslogConfigTest, RejectsMissingDestination) {
   config.clear_cluster_name();
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
 
-  EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
-               ProtoValidationException);
-}
-
-TEST_F(SyslogConfigTest, RejectsEmptyCluster) {
-  auto config = loadConfig(UdpClusterConfigYaml);
-  config.set_cluster_name("");
-  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-
-  EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
-               ProtoValidationException);
+  EXPECT_THROW_WITH_MESSAGE(
+      SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context), EnvoyException,
+      "at least one of 'unix_socket' or 'cluster_name' must be configured");
 }
 
 TEST_F(SyslogConfigTest, RejectsInvalidFieldConstraints) {

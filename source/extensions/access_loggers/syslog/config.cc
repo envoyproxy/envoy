@@ -18,11 +18,16 @@ namespace AccessLoggers {
 namespace Syslog {
 
 absl::Status validateSyslogConfig(const SyslogAccessLogConfig& config) {
-  if (config.has_pipe()) {
+  if (!config.has_unix_socket() && config.cluster_name().empty()) {
+    return absl::InvalidArgumentError(
+        "at least one of 'unix_socket' or 'cluster_name' must be configured");
+  }
+
+  if (config.has_unix_socket()) {
 #ifdef WIN32
     return absl::InvalidArgumentError("syslog Unix domain sockets are not supported on Windows");
 #else
-    if (config.pipe().path().empty()) {
+    if (config.unix_socket().path().empty()) {
       return absl::InvalidArgumentError("syslog Unix domain socket path must not be empty");
     }
 #endif
@@ -52,9 +57,9 @@ AccessLog::InstanceSharedPtr SyslogAccessLogFactory::createAccessLogInstance(
                             Formatter::FormatterPtr);
   Network::Address::InstanceConstSharedPtr destination;
   auto& server_context = context.serverFactoryContext();
-  if (proto_config.has_pipe()) {
+  if (proto_config.has_unix_socket()) {
     envoy::config::core::v3::Address address;
-    *address.mutable_pipe() = proto_config.pipe();
+    *address.mutable_pipe() = proto_config.unix_socket();
     destination = THROW_OR_RETURN_VALUE(Network::Address::resolveProtoAddress(address),
                                         Network::Address::InstanceConstSharedPtr);
   } else {

@@ -128,9 +128,9 @@ public:
 #endif
   }
 
-  SyslogAccessLogConfig makePipeConfig(absl::string_view path) {
+  SyslogAccessLogConfig makeUnixSocketConfig(absl::string_view path) {
     auto config = makeBaseConfig();
-    config.mutable_pipe()->set_path(std::string(path));
+    config.mutable_unix_socket()->set_path(std::string(path));
     return config;
   }
 #endif
@@ -152,7 +152,7 @@ TEST_P(SyslogAccessLogIntegrationTest, ClusterDestination) {
 }
 
 #ifndef WIN32
-TEST_P(SyslogAccessLogIntegrationTest, PipeDestination) {
+TEST_P(SyslogAccessLogIntegrationTest, UnixSocketDestination) {
   if (GetParam() != Network::Address::IpVersion::v4) {
     GTEST_SKIP();
   }
@@ -162,7 +162,7 @@ TEST_P(SyslogAccessLogIntegrationTest, PipeDestination) {
                                     Network::SocketCreationOptions{});
   ASSERT_EQ(0, unix_receiver.bind(destination).return_value_);
 
-  initializeWithSyslog(makePipeConfig(destination->asString()));
+  initializeWithSyslog(makeUnixSocketConfig(destination->asString()));
   sendRequest();
   expectLoggedPayload(unix_receiver);
 }
@@ -174,7 +174,7 @@ TEST_P(SyslogAccessLogIntegrationTest, LoggingFailureDoesNotFailRequest) {
 
   // Nothing is bound to this socket, so the datagram send fails.
   const auto destination = unixDestination();
-  initializeWithSyslog(makePipeConfig(destination->asString()));
+  initializeWithSyslog(makeUnixSocketConfig(destination->asString()));
   sendRequest();
 
   test_server_->waitForCounter("access_logs.syslog.test.messages.state.full", Eq(1));

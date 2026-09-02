@@ -43,7 +43,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // .. validated-code-block:: yaml
 //   :type-name: envoy.extensions.access_loggers.syslog.v3.SyslogAccessLogConfig
 //
-//   pipe:
+//   unix_socket:
 //     path: /var/run/syslog.sock
 //   facility: FACILITY_LOCAL7
 //   severity: INFO
@@ -101,16 +101,18 @@ message SyslogAccessLogConfig {
     DEBUG = 7;
   }
 
-  oneof destination {
-    option (validate.required) = true;
+  // Syslog Unix domain socket path. This is not supported on Windows.
+  //
+  // At least one destination field MUST be configured.
+  // Destination precedence (from highest to lowest priority):
+  //
+  // 1. If ``unix_socket`` is set, it is used.
+  // 2. If ``cluster_name`` is set but ``unix_socket`` is not, ``cluster_name`` is used.
+  config.core.v3.Pipe unix_socket = 1;
 
-    // Unix domain socket destination. This is not supported on Windows.
-    config.core.v3.Pipe pipe = 1;
-
-    // Name of the cluster used to send syslog messages. The cluster must be defined in
-    // ``static_resources`` and cannot be added through CDS.
-    string cluster_name = 9 [(validate.rules).string = {min_len: 1}];
-  }
+  // Name of the cluster used to send syslog messages. The cluster must be defined in
+  // ``static_resources`` and cannot be added through CDS.
+  string cluster_name = 9 [(validate.rules).string = {min_len: 1 ignore_empty: true}];
 
   // Facility placed in the PRI header. Defaults to ``LOCAL7``.
   Facility facility = 2 [(validate.rules).enum = {defined_only: true}];

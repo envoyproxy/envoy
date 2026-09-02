@@ -53,7 +53,7 @@ SyslogAccessLog::SyslogAccessLog(AccessLog::FilterPtr&& filter, Formatter::Forma
   tls_slot_->set([config = config_, formatter = formatter_, destination = destination_,
                   &cluster_manager, stats = &stats_](Event::Dispatcher& dispatcher) {
     SenderPtr sender;
-    if (config->has_pipe()) {
+    if (config->has_unix_socket()) {
       sender = std::make_unique<StaticUdpSender>(dispatcher, destination, *stats);
     } else {
       sender = std::make_unique<ClusterUdpSender>(dispatcher, cluster_manager,
