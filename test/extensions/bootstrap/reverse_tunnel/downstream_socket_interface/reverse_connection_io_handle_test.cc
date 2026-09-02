@@ -3567,6 +3567,44 @@ TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsStopsReplacementDialOnListe
   EXPECT_EQ(getHostConnectionInfo(host).connection_keys.count(connection_key), 0);
 }
 
+// Listener stop must shut down in-flight handshake wrappers on the worker. close() is expected
+// once, from RCConnectionWrapper::shutdown() (not a second time from resetFileEvents()).
+TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsShutsDownHandshakeWrappers) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  auto mock_connection = setupMockConnection();
+  EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(42));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto wrapper = std::make_unique<RCConnectionWrapper>(*io_handle_, std::move(mock_connection),
+                                                       mock_host, "test-cluster");
+  addWrapperToHostMap(wrapper.get(), "192.168.1.1");
+  pushConnectionWrapper(std::move(wrapper));
+  ASSERT_EQ(getConnectionWrappers().size(), 1);
+
+  const size_t deferred_before = dispatcher_.to_delete_.size();
+  io_handle_->resetFileEvents();
+
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_TRUE(getConnWrapperToHostMap().empty());
+  // shutdown() deferred-deletes the connection; resetFileEvents() deferred-deletes the wrapper.
+  EXPECT_EQ(dispatcher_.to_delete_.size(), deferred_before + 2);
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions
