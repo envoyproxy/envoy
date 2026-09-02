@@ -77,9 +77,9 @@ message RequestParsingLimits {
   // ordinary metadata (model names, roles, tool names) inline while
   // conversation content goes to the buffer.
   //
-  // Set it above the longest identifier the configured providers issue: a
-  // ``model`` name over the threshold offloads, and ``model`` is
-  // non-offloadable, so such a payload is rejected with a 400.
+  // Keep it above the longest ``model`` name in use. Values over the threshold
+  // are offloaded, and on a declared AI endpoint the payload schema requires
+  // ``model`` inline, so an offloaded one is rejected with a 400.
   google.protobuf.UInt32Value inline_string_threshold_bytes = 1
       [(validate.rules).uint32 = {lte: 1048576 gte: 64}];
 }
