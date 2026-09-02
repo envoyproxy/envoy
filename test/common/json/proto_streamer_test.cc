@@ -154,6 +154,17 @@ TEST(MessageStreamerTest, Anys) {
   expectSameJson(message);
 }
 
+TEST(MessageStreamerTest, AnyOfWellKnownType) {
+  TestMessage message;
+  Protobuf::Duration duration;
+  duration.set_seconds(3);
+  std::ignore = message.mutable_any()->PackFrom(duration);
+  Protobuf::Struct structured;
+  (*structured.mutable_fields())["key"].set_string_value("value");
+  std::ignore = message.add_repeated_any()->PackFrom(structured);
+  expectSameJson(message);
+}
+
 TEST(MessageStreamerTest, AnyOfUnknownType) {
   TestMessage message;
   message.mutable_any()->set_type_url("type.googleapis.com/test.common.json.NotLinkedIn");
