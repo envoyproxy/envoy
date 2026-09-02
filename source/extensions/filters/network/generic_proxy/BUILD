@@ -30,6 +30,8 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/formatter:substitution_formatter_lib",
+        "//source/common/network:drain_close_util_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:tracer_config_lib",

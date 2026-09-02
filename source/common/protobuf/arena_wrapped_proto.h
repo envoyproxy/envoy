@@ -24,8 +24,9 @@ public:
   // Constructor: Creates the arena and allocates the proto on it.
   // Perfect forwards any arguments to the ProtoT constructor.
   // Enabled only if ProtoT is not abstract.
-  template <typename U = ProtoT, typename... Args,
-            typename = std::enable_if_t<!std::is_abstract_v<U>>>
+  template <
+      typename U = ProtoT, typename... Args,
+      typename = std::enable_if_t<!std::is_abstract_v<U> && std::is_constructible_v<U, Args...>>>
   explicit ArenaWrappedProto(Args&&... args)
       : arena_(std::make_unique<google::protobuf::Arena>()),
         proto_(google::protobuf::Arena::Create<ProtoT>(arena_.get(), std::forward<Args>(args)...)) {
@@ -33,7 +34,8 @@ public:
 
   // Default constructor for abstract types: Initializes to nullptr.
   // Enabled only if ProtoT is abstract.
-  template <typename T = ProtoT, typename = std::enable_if_t<std::is_abstract_v<T>>>
+  template <typename T = ProtoT,
+            typename = std::enable_if_t<std::is_abstract_v<T> || !std::is_constructible_v<T>>>
   ArenaWrappedProto() : arena_(nullptr), proto_(nullptr) {}
 
   // Disallow copy (copying the arena is not supported/safe).
@@ -83,7 +85,7 @@ public:
     if (heap_proto) {
       arena_ = std::make_unique<google::protobuf::Arena>();
       ProtoT* new_proto = nullptr;
-      if constexpr (std::is_abstract_v<OtherProtoT>) {
+      if constexpr (std::is_abstract_v<OtherProtoT> || !std::is_constructible_v<OtherProtoT>) {
         new_proto = static_cast<ProtoT*>(heap_proto->New(arena_.get()));
         new_proto->CopyFrom(*heap_proto);
       } else {

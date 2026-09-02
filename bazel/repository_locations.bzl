@@ -13,12 +13,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazel-contrib/bazel_features/releases/download/v{version}/bazel_features-v{version}.tar.gz"],
         strip_prefix = "bazel_features-{version}",
     ),
-    bazel_gazelle = dict(
+    gazelle = dict(
         version = "0.47.0",
         sha256 = "675114d8b433d0a9f54d81171833be96ebc4113115664b791e6f204d58e93446",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
     ),
-    build_bazel_rules_apple = dict(
+    rules_apple = dict(
         version = "3.20.1",
         sha256 = "73ad768dfe824c736d0a8a81521867b1fb7a822acda2ed265897c03de6ae6767",
         urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
@@ -30,8 +30,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.6",
-        sha256 = "4c949b54da816e83673028faf28831206f0ef3a28fc4eb95cc01a5275d85cfe6",
+        version = "0.4.10",
+        sha256 = "9c0dce46c0caaf33434e21428dda7f5ad2b73011e69a5619af867c4901e7ec85",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -181,7 +181,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "jemalloc-{version}",
         urls = ["https://github.com/jemalloc/jemalloc/releases/download/{version}/jemalloc-{version}.tar.bz2"],
     ),
-    com_github_grpc_grpc = dict(
+    grpc = dict(
         version = "1.83.0",
         sha256 = "90d453393a9d41215df546103b10b33b9566df79cdf6f49dc67f6c4d044d090d",
         strip_prefix = "grpc-{version}",
@@ -393,7 +393,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "googletest-{version}",
         urls = ["https://github.com/google/googletest/releases/download/v{version}/googletest-{version}.tar.gz"],
     ),
-    com_google_protobuf = dict(
+    protobuf = dict(
         version = "35.1",
         # When upgrading the protobuf library, please re-run
         # test/common/json:gen_excluded_unicodes to recompute the ranges
@@ -433,7 +433,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "ocp-diag-core-{version}/apis/c++",
         urls = ["https://github.com/opencomputeproject/ocp-diag-core/archive/{version}.zip"],
     ),
-    io_bazel_rules_go = dict(
+    rules_go = dict(
         version = "0.61.1",
         sha256 = "763f4a3f6b03469fdb00a77a333dd0b5546d3ee1fa29db373128c08fee73e0e8",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
@@ -537,8 +537,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "90a1e2218164586d4dc711bb9639a313d95de9df",
-        sha256 = "42336ae13c29d687ad9458e230bc56cc7e36f5ffc02ee78541929e6e165c8c90",
+        version = "5c9cc6b37f55a97071077a6190bf4f0bc7a09c1f",
+        sha256 = "da1f77ceff9ffdf65fdc4ff7fc63ba475e83015ed77fdb02d7fbc0118207d0ba",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -578,7 +578,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "kafka-{version}/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/{version}.zip"],
     ),
-    confluentinc_librdkafka = dict(
+    librdkafka = dict(
         version = "2.6.0",
         sha256 = "abe0212ecd3e7ed3c4818a4f2baf7bf916e845e902bb15ae48834ca2d36ac745",
         strip_prefix = "librdkafka-{version}",
@@ -637,11 +637,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "5624c4a4407285d9f269d0041ed4fc8d5fa3664abc22850069236b026f97d3f2",
         strip_prefix = "vpp-{version}",
         urls = ["https://github.com/FDio/vpp/archive/{version}.tar.gz"],
-    ),
-    dlb = dict(
-        version = "8.8.0",
-        sha256 = "564534254ef32bfed56e0a464c53fca0907e446b30929c253210e2c3d6de58b9",
-        urls = ["https://downloadmirror.intel.com/819078/dlb_linux_src_release_8.8.0.txz"],
     ),
     libpfm = dict(
         version = "4.11.0",

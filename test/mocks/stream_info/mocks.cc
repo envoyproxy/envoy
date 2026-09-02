@@ -187,6 +187,10 @@ MockStreamInfo::MockStreamInfo()
 
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
+  ON_CALL(*this, setDynamicMetadata(_, _))
+      .WillByDefault(Invoke([this](const std::string& name, const Protobuf::Struct& value) {
+        (*dynamicMetadata().mutable_filter_metadata())[name].MergeFrom(value);
+      }));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
   ON_CALL(Const(*this), filterState()).WillByDefault(Invoke([this]() -> const FilterState& {
     return *filter_state_;

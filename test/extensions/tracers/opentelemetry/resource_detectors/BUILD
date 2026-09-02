@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "resource_provider_test",
     srcs = ["resource_provider_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/version:version_lib",

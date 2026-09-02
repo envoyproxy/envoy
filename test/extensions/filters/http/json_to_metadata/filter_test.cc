@@ -10,6 +10,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -20,28 +21,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JsonToMetadata {
 
-MATCHER_P(MapEq, rhs, "") {
-  const Protobuf::Struct& obj = arg;
-  EXPECT_TRUE(!rhs.empty());
-  for (auto const& entry : rhs) {
-    EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
-  }
-  return true;
-}
-
-MATCHER_P2(MapEqType, rhs, getter, "") {
-  const Protobuf::Struct& obj = arg;
-  EXPECT_TRUE(!rhs.empty());
-  for (auto const& entry : rhs) {
-    EXPECT_EQ(getter(obj.fields().at(entry.first)), entry.second);
-  }
-  return true;
-}
-
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 
 class FilterTest : public testing::Test {
 public:
@@ -164,14 +148,15 @@ TEST_F(FilterTest, BasicStringMatch) {
           {"role":"assistant","content":"content D"},
           {"role":"user","content":"content E"}],
         "stream":true})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "1.0.0"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "1.0.0")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -192,10 +177,11 @@ TEST_F(FilterTest, BasicResponseStringMatch) {
           {"role":"assistant","content":"content D"},
           {"role":"user","content":"content E"}],
         "stream":true})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "1.0.0"}};
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "1.0.0")))));
   testResponseWithBody(response_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
@@ -207,16 +193,13 @@ TEST_F(FilterTest, BasicResponseStringMatch) {
 TEST_F(FilterTest, BasicBoolMatch) {
   initializeFilter(config_yaml_);
   const std::string request_body = R"delimiter({"version":true})delimiter";
-  std::map<std::string, bool> expected = {{"version", true}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_,
-              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
-                                   return value.bool_value();
-                                 })));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                               IsStructBool("version", true)))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -228,16 +211,13 @@ TEST_F(FilterTest, BasicBoolMatch) {
 TEST_F(FilterTest, BasicIntegerMatch) {
   initializeFilter(config_yaml_);
   const std::string request_body = R"delimiter({"version":1})delimiter";
-  std::map<std::string, double> expected = {{"version", 1.0}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_,
-              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
-                                   return value.number_value();
-                                 })));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                               IsStructNumber("version", 1.0)))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -249,16 +229,13 @@ TEST_F(FilterTest, BasicIntegerMatch) {
 TEST_F(FilterTest, BasicDoubleMatch) {
   initializeFilter(config_yaml_);
   const std::string request_body = R"delimiter({"version":1.0})delimiter";
-  std::map<std::string, double> expected = {{"version", 1.0}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_,
-              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
-                                   return value.number_value();
-                                 })));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                               IsStructNumber("version", 1.0)))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -278,13 +255,14 @@ request_rules:
       key: version
 )EOF");
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version")))));
   testRequestWithBody(request_body, false, Http::FilterDataStatus::StopIterationAndBuffer);
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -310,13 +288,14 @@ response_rules:
       key: version
 )EOF");
   const std::string response_body = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(response_headers_, false));
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version")))));
   testResponseWithBody(response_body, false, Http::FilterDataStatus::StopIterationAndBuffer);
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -343,13 +322,14 @@ request_rules:
       type: STRING
 )EOF");
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -370,16 +350,13 @@ request_rules:
       type: NUMBER
 )EOF");
   const std::string request_body = R"delimiter({"version":"123"})delimiter";
-  std::map<std::string, double> expected = {{"version", 123.0}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_,
-              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
-                                   return value.number_value();
-                                 })));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                               IsStructNumber("version", 123.0)))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -404,16 +381,13 @@ request_rules:
       value: 404
 )EOF");
   const std::string request_body = R"delimiter({"version":"invalid"})delimiter";
-  std::map<std::string, double> expected = {{"version", 404}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_,
-              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
-                                   return value.number_value();
-                                 })));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                               IsStructNumber("version", 404)))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -434,13 +408,14 @@ request_rules:
       type: STRING
 )EOF");
   const std::string request_body = R"delimiter({"version":220.0})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "220.000000"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "220.000000")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -461,16 +436,13 @@ request_rules:
       type: NUMBER
 )EOF");
   const std::string request_body = R"delimiter({"version":220.0})delimiter";
-  std::map<std::string, double> expected = {{"version", 220.0}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_,
-              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
-                                   return value.number_value();
-                                 })));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                               IsStructNumber("version", 220.0)))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -491,13 +463,13 @@ request_rules:
       type: STRING
 )EOF");
   const std::string request_body = R"delimiter({"version":220})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "220"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                               IsStructString("version", "220")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -518,16 +490,13 @@ request_rules:
       type: NUMBER
 )EOF");
   const std::string request_body = R"delimiter({"version":220})delimiter";
-  std::map<std::string, double> expected = {{"version", 220.0}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_,
-              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
-                                   return value.number_value();
-                                 })));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                               IsStructNumber("version", 220.0)))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -548,13 +517,13 @@ request_rules:
       type: STRING
 )EOF");
   const std::string request_body = R"delimiter({"version":true})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "1"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                               IsStructString("version", "1")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -575,16 +544,13 @@ request_rules:
       type: NUMBER
 )EOF");
   const std::string request_body = R"delimiter({"version":true})delimiter";
-  std::map<std::string, double> expected = {{"version", 1}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_,
-              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
-                                   return value.number_value();
-                                 })));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                               IsStructNumber("version", 1)))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -605,13 +571,14 @@ request_rules:
       value: "present"
 )EOF");
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "present"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "present")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -662,14 +629,14 @@ request_rules:
       key: version
 )EOF");
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_,
-              setDynamicMetadata(HttpFilterNames::get().JsonToMetadata, MapEq(expected)));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(HttpFilterNames::get().JsonToMetadata,
+                                               HasStructFields(UnorderedElementsAre(
+                                                   IsStructString("version", "good version")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -693,13 +660,14 @@ TEST_F(FilterTest, DecodeTwoDataStreams) {
           {"role":"assistant","content":"content D"},
           {"role":"user","content":"content E"}],
         "stream":true})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "1.0.0"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "1.0.0")))));
   testRequestWithBody(request_body1, false, Http::FilterDataStatus::StopIterationAndBuffer);
   testRequestWithBody(request_body2);
 
@@ -724,13 +692,14 @@ TEST_F(FilterTest, EncodeTwoDataStreams) {
           {"role":"assistant","content":"content D"},
           {"role":"user","content":"content E"}],
         "stream":true})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "1.0.0"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(response_headers_, false));
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "1.0.0")))));
   testResponseWithBody(response_body1, false, Http::FilterDataStatus::StopIterationAndBuffer);
   testResponseWithBody(response_body2);
 
@@ -757,13 +726,13 @@ request_rules:
           "bar":"value"
           }
         })delimiter";
-  const std::map<std::string, std::string> expected = {{"baz", "value"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                               IsStructString("baz", "value")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -890,13 +859,13 @@ request_rules:
       R"delimiter(
         {"foo": "James, James, Morrison, Morrison, weather-beaten, off-key"})delimiter";
 
-  const std::map<std::string, std::string> expected = {{"version", "missing"}};
-
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "missing")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -911,9 +880,10 @@ TEST_F(FilterTest, NoRequestContentType) {
   Http::TestRequestHeaderMapImpl mismatched_incoming_headers{{":path", "/ping"},
                                                              {":method", "GET"}};
 
-  const std::map<std::string, std::string> expected = {{"version", "error"}};
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "error")))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(mismatched_incoming_headers, false));
   testRequestWithBody("{}");
@@ -930,9 +900,10 @@ TEST_F(FilterTest, MismatchedRequestContentType) {
   Http::TestRequestHeaderMapImpl mismatched_incoming_headers{
       {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/not-a-json"}};
 
-  const std::map<std::string, std::string> expected = {{"version", "error"}};
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "error")))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(mismatched_incoming_headers, false));
   testRequestWithBody("Peter picked a peck of pickled peppers");
@@ -1006,12 +977,13 @@ TEST_F(FilterTest, InvalidJsonPayload) {
         {"role":"assistant","content":"content D"},
         {"role":"user","content":"content E"}],
       "stream":true)delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "error"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "error")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
@@ -1023,12 +995,13 @@ TEST_F(FilterTest, InvalidJsonPayload) {
 TEST_F(FilterTest, OnMissingQuotedString) {
   initializeFilter(config_yaml_);
   const std::string request_body = R"delimiter("")delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "unknown"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "unknown")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1041,12 +1014,13 @@ TEST_F(FilterTest, OnMissingQuotedJsonObject) {
   initializeFilter(config_yaml_);
   const std::string request_body =
       R"delimiter("{\"model\": \"gpt-3.5-turbo\",\"temperature\": 0.2,\"stream\": false}")delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "unknown"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "unknown")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1058,12 +1032,13 @@ TEST_F(FilterTest, OnMissingQuotedJsonObject) {
 TEST_F(FilterTest, OnMissingPureNumber) {
   initializeFilter(config_yaml_);
   const std::string request_body = R"delimiter(5566)delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "unknown"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "unknown")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1078,12 +1053,13 @@ TEST_F(FilterTest, InvalidJsonForAdditionalPrefixSuffix) {
   // missing right-most curly brace
   const std::string request_body =
       R"delimiter(data: {"id":"ID","object":"chat.completion.chunk","created":1686100940,"version":"1.0.0-0301"}\n\ndata: [DONE]\n\n)delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "error"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "error")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
@@ -1142,11 +1118,12 @@ request_rules:
   const std::string request_body =
       absl::StrCat(R"delimiter({"version":")delimiter", value, R"delimiter("})delimiter");
 
-  const std::map<std::string, std::string> expected = {{"version", "unknown"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "unknown")))));
   Buffer::OwnedImpl buffer(request_body);
   testRequestWithBody(request_body);
 
@@ -1176,11 +1153,12 @@ request_rules:
   const std::string request_body =
       absl::StrCat(R"delimiter({"version":")delimiter", value, R"delimiter("})delimiter");
 
-  const std::map<std::string, std::string> expected = {{"version", "unknown"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "unknown")))));
   Buffer::OwnedImpl buffer(request_body);
   testRequestWithBody(request_body);
 
@@ -1201,11 +1179,12 @@ TEST_F(FilterTest, MissingMetadataKeyAndFallbackValue) {
           {"role":"assistant","content":"content D"},
           {"role":"user","content":"content E"}],
         "stream":true})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "unknown"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "unknown")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1293,14 +1272,15 @@ request_rules:
 )EOF");
   const std::string request_body =
       R"delimiter({"version":"good version", "id":"beautiful id"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"},
-                                                       {"id", "beautiful id"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version"),
+                                                 IsStructString("id", "beautiful id")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1326,14 +1306,17 @@ request_rules:
 )EOF");
   const std::string request_body =
       R"delimiter({"version":"good version", "id":"beautiful id"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("another.namespace", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version")))));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("another.namespace",
+                                               HasStructFields(UnorderedElementsAre(
+                                                   IsStructString("version", "good version")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1369,14 +1352,16 @@ request_rules:
       "baz":"qux"
     }
   })delimiter";
-  const std::map<std::string, std::string> expected = {
-      {"version", "good version"}, {"foo", "bar"}, {"baz", "qux"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb",
+                                 HasStructFields(UnorderedElementsAre(
+                                     IsStructString("version", "good version"),
+                                     IsStructString("foo", "bar"), IsStructString("baz", "qux")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1398,7 +1383,6 @@ request_rules:
   - "application/better-json"
 )EOF");
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"}};
 
   Http::TestRequestHeaderMapImpl matched_incoming_headers{
       {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/better-json"}};
@@ -1406,7 +1390,9 @@ request_rules:
             filter_->decodeHeaders(matched_incoming_headers, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1428,7 +1414,6 @@ response_rules:
   - "application/better-json"
 )EOF");
   const std::string response_body = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"}};
 
   Http::TestResponseHeaderMapImpl matched_incoming_headers{
       {":path", "/ping"}, {"Content-Type", "application/better-json"}};
@@ -1436,7 +1421,9 @@ response_rules:
             filter_->encodeHeaders(matched_incoming_headers, false));
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version")))));
   testResponseWithBody(response_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
@@ -1461,9 +1448,10 @@ request_rules:
   allow_content_types:
   - "application/non-json"
 )EOF");
-  const std::map<std::string, std::string> expected = {{"version", "error"}};
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "error")))));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers_, false));
 
@@ -1491,9 +1479,10 @@ response_rules:
   allow_content_types:
   - "application/non-json"
 )EOF");
-  const std::map<std::string, std::string> expected = {{"version", "error"}};
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "error")))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   testResponseWithBody("{}");
@@ -1516,14 +1505,15 @@ request_rules:
   allow_empty_content_type: true
 )EOF");
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"}};
 
   Http::TestRequestHeaderMapImpl matched_incoming_headers{{":path", "/ping"}, {":method", "GET"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(matched_incoming_headers, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1544,14 +1534,15 @@ response_rules:
   allow_empty_content_type: true
 )EOF");
   const std::string response_body = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"}};
 
   Http::TestResponseHeaderMapImpl matched_incoming_headers{{":path", "/ping"}, {":method", "GET"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(matched_incoming_headers, false));
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version")))));
   testResponseWithBody(response_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
@@ -1626,7 +1617,6 @@ request_rules:
     regex: "application/.*"
 )EOF");
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"}};
 
   Http::TestRequestHeaderMapImpl matched_incoming_headers{
       {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/better-json"}};
@@ -1634,7 +1624,9 @@ request_rules:
             filter_->decodeHeaders(matched_incoming_headers, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1657,7 +1649,6 @@ request_rules:
     regex: "(?:text|application)/.*"
 )EOF");
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"}};
 
   Http::TestRequestHeaderMapImpl matched_incoming_headers{
       {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/better-json"}};
@@ -1665,7 +1656,9 @@ request_rules:
             filter_->decodeHeaders(matched_incoming_headers, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1694,7 +1687,6 @@ request_rules:
     regex: "application/.*"
 )EOF");
   const std::string request_body = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "good version"}};
 
   Http::TestRequestHeaderMapImpl matched_incoming_headers{
       {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/better-json"}};
@@ -1702,7 +1694,9 @@ request_rules:
             filter_->decodeHeaders(matched_incoming_headers, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1731,7 +1725,6 @@ request_rules:
     regex: "application/.*"
 )EOF");
   const std::string request_body_json = R"delimiter({"version":"good version"})delimiter";
-  const std::map<std::string, std::string> expected_json = {{"version", "good version"}};
 
   Http::TestRequestHeaderMapImpl matched_incoming_headers_json{
       {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/json"}};
@@ -1739,7 +1732,9 @@ request_rules:
             filter_->decodeHeaders(matched_incoming_headers_json, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected_json)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "good version")))));
   testRequestWithBody(request_body_json);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1767,9 +1762,10 @@ request_rules:
     google_re2: {}
     regex: "application/.*"
 )EOF");
-  const std::map<std::string, std::string> expected = {{"version", "error"}};
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "error")))));
 
   Http::TestRequestHeaderMapImpl nomatch_incoming_headers{
       {":path", "/ping"}, {":method", "POST"}, {"Content-Type", "image/png"}};
@@ -1803,9 +1799,10 @@ response_rules:
     google_re2: {}
     regex: "application/.*"
 )EOF");
-  const std::map<std::string, std::string> expected = {{"version", "error"}};
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "error")))));
 
   Http::TestResponseHeaderMapImpl nomatch_incoming_headers{{":path", "/ping"}, {":method", "GET"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
@@ -1825,7 +1822,6 @@ TEST_F(FilterTest, PerRouteOverride) {
   initializeFilter("{}");
 
   const std::string request_body = R"delimiter({"version":"2.0.0"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "2.0.0"}};
 
   // Setup per route config
   const std::string per_route_config_yaml = R"EOF(
@@ -1847,7 +1843,9 @@ request_rules:
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "2.0.0")))));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -1888,11 +1886,12 @@ request_rules:
 
   // Subsequent operations should use cached config without additional lookups
   const std::string request_body = R"delimiter({"version":"2.0.0"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "2.0.0"}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "2.0.0")))));
   testRequestWithBody(request_body);
 }
 
@@ -1902,7 +1901,6 @@ TEST_F(FilterTest, PerRouteOverrideResponse) {
   initializeFilter("{}");
 
   const std::string response_body = R"delimiter({"version":"3.0.0"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "3.0.0"}};
 
   // Setup per route config with response rules
   const std::string per_route_config_yaml = R"EOF(
@@ -1923,7 +1921,9 @@ response_rules:
             filter_->encodeHeaders(response_headers_, false));
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "3.0.0")))));
   testResponseWithBody(response_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
@@ -1956,7 +1956,6 @@ response_rules:
 )EOF";
 
   const std::string response_body = R"delimiter({"version":"3.0.0"})delimiter";
-  const std::map<std::string, std::string> expected = {{"version", "3.0.0"}};
 
   std::shared_ptr<FilterConfig> per_route_config = createConfig(per_route_config_yaml, true);
   EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
@@ -1966,7 +1965,9 @@ response_rules:
             filter_->encodeHeaders(response_headers_, false));
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", HasStructFields(UnorderedElementsAre(
+                                                 IsStructString("version", "3.0.0")))));
   testResponseWithBody(response_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);

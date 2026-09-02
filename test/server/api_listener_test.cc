@@ -483,7 +483,7 @@ api_listener:
 
   // No-op and trivial accessors.
   EXPECT_TRUE(connection.initializeReadFilters());
-  connection.onDrain();
+  connection.onDrain(Network::ConnectionDrainEvent{});
   connection.close(Network::ConnectionCloseType::NoFlush);
   connection.close(Network::ConnectionCloseType::NoFlush, "details");
   EXPECT_EQ(StreamInfo::DetectedCloseType::Normal, connection.detectedCloseType());

@@ -103,7 +103,7 @@ ActiveQuicListener::ActiveQuicListener(
       *connection_id_generator_, debug_visitor_factory,
       enable_session_idle_list ? std::make_unique<Http::SessionIdleList>(dispatcher) : nullptr);
 
-  absl::AnyInvocable<void() &&> on_can_write_cb = [&]() { quic_dispatcher_->OnCanWrite(); };
+  absl::AnyInvocable<void()> on_can_write_cb = [&]() { quic_dispatcher_->OnCanWrite(); };
 
   // Create quic_packet_writer
   QuicPacketWriterFactory* quic_packet_writer_factory =
@@ -113,8 +113,12 @@ ActiveQuicListener::ActiveQuicListener(
     QuicPacketWriterPtr quic_writer = quic_packet_writer_factory->createQuicPacketWriter(
         listen_socket_.ioHandle(), listener_config.listenerScope(), dispatcher,
         std::move(on_can_write_cb));
-    quic_packet_writer_ = quic_writer.get();
-    quic_dispatcher_->InitializeWithWriter(quic_writer.release());
+    if (quic_writer != nullptr) {
+      quic_packet_writer_ = quic_writer.get();
+      quic_dispatcher_->InitializeWithWriter(quic_writer.release());
+    } else {
+      IS_ENVOY_BUG("quic_packet_writer_factory failed to create quic_writer");
+    }
   } else {
     // TODO(panting): This fallback is a temporary migration bridge. We must keep this
     // logic because there is currently no QUIC GSO batch factory implemented to create
@@ -291,14 +295,13 @@ void ActiveQuicListener::onFilterChainDraining(
 }
 
 void ActiveQuicListener::onFilterChainDrainStart(
-    const std::list<const Network::FilterChain*>& /*draining_filter_chains*/) {
-  // TODO: notify QUIC connections in the given filter chains that draining has begun
-  // (e.g. via HTTP/3 GOAWAY) without closing them.
+    const std::list<const Network::FilterChain*>& draining_filter_chains,
+    Network::ConnectionDrainEvent drain_event) {
+  quic_dispatcher_->drainConnectionsWithFilterChains(draining_filter_chains, drain_event);
 }
 
-void ActiveQuicListener::onListenerDrainStart() {
-  // TODO: notify all QUIC connections on this listener that draining has begun without
-  // closing them.
+void ActiveQuicListener::onListenerDrainStart(Network::ConnectionDrainEvent drain_event) {
+  quic_dispatcher_->drainAllConnections(drain_event);
 }
 
 void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain) {

@@ -1739,6 +1739,20 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) GetGenericSecret(id any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGenericSecret", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).GetGenericSecret), id)
 }
 
+// GetLogLevel mocks base method.
+func (m *MockHttpFilterConfigHandle) GetLogLevel() shared.LogLevel {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLogLevel")
+	ret0, _ := ret[0].(shared.LogLevel)
+	return ret0
+}
+
+// GetLogLevel indicates an expected call of GetLogLevel.
+func (mr *MockHttpFilterConfigHandleMockRecorder) GetLogLevel() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogLevel", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).GetLogLevel))
+}
+
 // GetScheduler mocks base method.
 func (m *MockHttpFilterConfigHandle) GetScheduler() shared.Scheduler {
 	m.ctrl.T.Helper()
@@ -1804,6 +1818,20 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) IncrementGaugeValue(id, value 
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{id, value}, tagsValues...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementGaugeValue", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).IncrementGaugeValue), varargs...)
+}
+
+// IsLogLevelEnabled mocks base method.
+func (m *MockHttpFilterConfigHandle) IsLogLevelEnabled(level shared.LogLevel) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsLogLevelEnabled", level)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsLogLevelEnabled indicates an expected call of IsLogLevelEnabled.
+func (mr *MockHttpFilterConfigHandleMockRecorder) IsLogLevelEnabled(level any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsLogLevelEnabled", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).IsLogLevelEnabled), level)
 }
 
 // Log mocks base method.

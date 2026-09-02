@@ -55,6 +55,8 @@ load(
     ":envoy_test.bzl",
     _envoy_benchmark_test = "envoy_benchmark_test",
     _envoy_cc_benchmark_binary = "envoy_cc_benchmark_binary",
+    _envoy_cc_benchmark_dyn_module_binary = "envoy_cc_benchmark_dyn_module_binary",
+    _envoy_cc_dyn_module_test = "envoy_cc_dyn_module_test",
     _envoy_cc_fuzz_test = "envoy_cc_fuzz_test",
     _envoy_cc_mock = "envoy_cc_mock",
     _envoy_cc_test = "envoy_cc_test",
@@ -177,18 +179,18 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
     include_paths = [".", native.package_name()]
 
     if "api_httpbody_protos" in external_deps:
-        srcs.append("@com_google_googleapis//google/api:httpbody.proto")
-        include_paths.append("external/com_google_googleapis")
+        srcs.append("@googleapis//google/api:httpbody.proto")
+        include_paths.append("external/googleapis")
 
     if "http_api_protos" in external_deps:
-        srcs.append("@com_google_googleapis//google/api:annotations.proto")
-        srcs.append("@com_google_googleapis//google/api:http.proto")
-        include_paths.append("external/com_google_googleapis")
+        srcs.append("@googleapis//google/api:annotations.proto")
+        srcs.append("@googleapis//google/api:http.proto")
+        include_paths.append("external/googleapis")
 
     if "well_known_protos" in external_deps:
-        srcs.append("@com_google_protobuf//:well_known_type_protos")
-        srcs.append("@com_google_protobuf//:descriptor_proto_srcs")
-        include_paths.append("external/com_google_protobuf/src")
+        srcs.append("@protobuf//:well_known_type_protos")
+        srcs.append("@protobuf//:descriptor_proto_srcs")
+        include_paths.append("external/protobuf/src")
 
     options = ["--include_imports"]
     options.extend(["-I" + include_path for include_path in include_paths])
@@ -257,12 +259,14 @@ envoy_proto_library = _envoy_proto_library
 envoy_pch_library = _envoy_pch_library
 
 # Test wrappers (from envoy_test.bzl)
+envoy_cc_dyn_module_test = _envoy_cc_dyn_module_test
 envoy_cc_fuzz_test = _envoy_cc_fuzz_test
 envoy_cc_mock = _envoy_cc_mock
 envoy_cc_test = _envoy_cc_test
 envoy_cc_test_binary = _envoy_cc_test_binary
 envoy_cc_test_library = _envoy_cc_test_library
 envoy_cc_benchmark_binary = _envoy_cc_benchmark_binary
+envoy_cc_benchmark_dyn_module_binary = _envoy_cc_benchmark_dyn_module_binary
 envoy_benchmark_test = _envoy_benchmark_test
 envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary

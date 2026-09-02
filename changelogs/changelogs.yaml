@@ -94,6 +94,8 @@ areas:
     title: ratelimit
   rbac:
     title: rbac
+  rds:
+    title: rds
   redis_proxy:
     title: redis_proxy
   resource_monitors:
@@ -102,6 +104,8 @@ areas:
     title: reverse_tunnel
   router:
     title: router
+  sds:
+    title: sds
   set_metadata_filter:
     title: set_metadata_filter
   sockets:
@@ -120,6 +124,8 @@ areas:
     title: tls
   tracing:
     title: tracing
+  vhds:
+    title: vhds
   wasm:
     title: wasm
   watchdog:
