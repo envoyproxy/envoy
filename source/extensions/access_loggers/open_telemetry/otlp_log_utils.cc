@@ -198,17 +198,17 @@ opentelemetry::proto::logs::v1::ScopeLogs* initOtlpMessageRoot(
   auto* resource_logs = message.add_resource_logs();
   auto* root = resource_logs->add_scope_logs();
   auto* resource = resource_logs->mutable_resource();
+  auto* attributes = resource->mutable_attributes();
 
-  std::vector<opentelemetry::proto::common::v1::KeyValue> attributes;
-  absl::flat_hash_map<std::string, size_t> key_to_index;
+  absl::flat_hash_map<std::string, int> key_to_index;
 
   auto add_or_update_attribute = [&](opentelemetry::proto::common::v1::KeyValue kv) {
     auto it = key_to_index.find(kv.key());
     if (it != key_to_index.end()) {
-      attributes[it->second] = std::move(kv);
+      *attributes->Mutable(it->second) = std::move(kv);
     } else {
-      key_to_index.emplace(kv.key(), attributes.size());
-      attributes.push_back(std::move(kv));
+      key_to_index.emplace(kv.key(), attributes->size());
+      *attributes->Add() = std::move(kv);
     }
   };
 
@@ -235,9 +235,6 @@ opentelemetry::proto::logs::v1::ScopeLogs* initOtlpMessageRoot(
   }
   for (const auto& pair : config.resource_attributes().values()) {
     add_or_update_attribute(pair);
-  }
-  for (auto& kv : attributes) {
-    *resource->add_attributes() = std::move(kv);
   }
   return root;
 }
