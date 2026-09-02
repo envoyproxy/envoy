@@ -73,6 +73,7 @@
     "https://bcr.bazel.build/modules/aspect_tools_telemetry/0.2.8/MODULE.bazel": "aa975a83e72bcaac62ee61ab12b788ea324a1d05c4aab28aadb202f647881679",
     "https://bcr.bazel.build/modules/aspect_tools_telemetry/0.2.8/source.json": "786cbc49377fb6bf4859aec5b1c61f8fc26b08e9fdb929e2dde2e1e2a406bd24",
     "https://bcr.bazel.build/modules/aws-c-auth-testdata/0.10.4.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/bazel-compdb/0.0.0-20220906-4086479.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/bazel_features/0.1.0/MODULE.bazel": "47011d645b0f949f42ee67f2e8775188a9cf4a0a1528aa2fa4952f2fd00906fd",
     "https://bcr.bazel.build/modules/bazel_features/1.1.0/MODULE.bazel": "cfd42ff3b815a5f39554d97182657f8c4b9719568eb7fded2b9135f084bf760b",
     "https://bcr.bazel.build/modules/bazel_features/1.1.1/MODULE.bazel": "27b8c79ef57efe08efccbd9dd6ef70d61b4798320b8d3c134fd571f78963dbcd",
@@ -689,6 +690,8 @@
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/ff91f339eaf3429e804da6d1260aaa433213322e/bazel_registry.json": "51bd3a0b193753e419c5d3db38e92fbcb9f7f97fd992ef2e24a0addd7274b37a",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/ff91f339eaf3429e804da6d1260aaa433213322e/modules/aws-c-auth-testdata/0.10.4.envoy/MODULE.bazel": "ed40f4181373fb0e277d5511db521f5a77f5558141b5697499a9b22fa1dc96c4",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/ff91f339eaf3429e804da6d1260aaa433213322e/modules/aws-c-auth-testdata/0.10.4.envoy/source.json": "20b0d19dc5c1e83f57c1cbc7e54ab0131291cc2220b374b0d222e44a6a0d914e",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/ff91f339eaf3429e804da6d1260aaa433213322e/modules/bazel-compdb/0.0.0-20220906-4086479.envoy/MODULE.bazel": "8ea7d294e0ea35bdcfddb8c3597eaa2967a4fa18b0e975ddef9374cd0e926d92",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/ff91f339eaf3429e804da6d1260aaa433213322e/modules/bazel-compdb/0.0.0-20220906-4086479.envoy/source.json": "586e9896baf303341171326f8721091d0b9748386e2383c9b60b351d30b60550",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/ff91f339eaf3429e804da6d1260aaa433213322e/modules/boost.headers/1.89.0.envoy/MODULE.bazel": "c7205963786fdbe14f5a384ff5a3a04da66ed0cecfee3d3cedecf5be173dcb66",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/ff91f339eaf3429e804da6d1260aaa433213322e/modules/boost.headers/1.89.0.envoy/source.json": "86bf1391aea9cd0515c98b1881a630fbe63fa171265e40cf5a77be7c0d680abb",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/ff91f339eaf3429e804da6d1260aaa433213322e/modules/boringssl-fips/0.20260413.0.envoy/MODULE.bazel": "4d526964d1b5ec561c0c7d9f92802272fc0eb7d2f1aa3ec6d6e72cc289db2f49",
@@ -886,7 +889,7 @@
     },
     "//bazel:extensions.bzl%envoy_module_graph_extension": {
       "general": {
-        "bzlTransitiveDigest": "gNDeto+9ipXPXXQzRcb5gf/4ciVq4S+Tb6/i+4ydriY=",
+        "bzlTransitiveDigest": "dw/Tdy/iUC4F36IXsG1YO2qMasHYK+5Bl8C0qJyELJI=",
         "usagesDigest": "QEMWbIKM//Mp+xCyiZ6VMSO5cBWwkmyOj5c0RVLU65c=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
