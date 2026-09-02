@@ -13,6 +13,7 @@
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/transport_sockets/alts/alts_proxy.h"
 #include "source/extensions/transport_sockets/alts/alts_tsi_handshaker.h"
 #include "source/extensions/transport_sockets/alts/tsi_handshaker.h"

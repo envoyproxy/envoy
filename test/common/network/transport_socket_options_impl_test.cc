@@ -230,7 +230,7 @@ TEST_F(TransportSocketOptionsImplTest, Http11ProxyInfoInvalidEncodingsAreRejecte
       Http11ProxyInfoFilterState::key());
   ASSERT_NE(nullptr, factory);
 
-  auto expectRejected = [&](<absl::string_view bytes>) {
+  auto expectRejected = [&](absl::string_view bytes) {
     SCOPED_TRACE(std::string(bytes));
     EXPECT_EQ(nullptr, factory->createFromBytes(bytes));
   };

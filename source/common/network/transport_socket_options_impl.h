@@ -130,7 +130,7 @@ public:
                                      : std::make_shared<TransportSocketOptionsImpl>()) {}
 
   // Network::TransportSocketOptions
-  // Stored as std::optional<std::string> to safely return a const lvalue reference.
+  // Stored as std::optional<std::string> to safely return a const reference.
   const std::optional<std::string>& serverNameOverride() const override { return server_name_; }
   const std::vector<std::string>& verifySubjectAltNameListOverride() const override {
     return inner_options_->verifySubjectAltNameListOverride();
