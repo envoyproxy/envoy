@@ -82,8 +82,8 @@ jobs:
             git -C mobile-docs push origin master
       timeout-minutes: 20
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
-      uploads: |
-        docs: ${{ github.workspace }}/mobile/generated/docs
+      upload-name: docs
+      upload-path: mobile/generated/docs
 
   request:
     secrets:

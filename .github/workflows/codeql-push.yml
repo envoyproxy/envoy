@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-22.04
     if: github.repository == 'envoyproxy/envoy'
     steps:
-    - uses: envoyproxy/toolshed/actions/bind-mounts@ee731502ff969e02e361f8c74e9a0a21cbae9e37  # actions-v0.4.24
+    - uses: envoyproxy/toolshed/actions/bind-mounts@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
       with:
         mounts: |
           - src: /mnt/workspace
@@ -61,7 +61,7 @@ jobs:
 
     - name: Free disk space
       if: env.CPP_CHANGED == 'true'
-      uses: envoyproxy/toolshed/actions/diskspace@ee731502ff969e02e361f8c74e9a0a21cbae9e37  # actions-v0.4.24
+      uses: envoyproxy/toolshed/actions/diskspace@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
       with:
         to_remove: |
           /usr/local/.ghcup
