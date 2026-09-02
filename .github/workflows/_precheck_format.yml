@@ -46,17 +46,16 @@ jobs:
       rbe: true
       target: ${{ matrix.target }}
       trusted: ${{ inputs.trusted }}
-      upload-name: ${{ matrix.upload-name }}
-      upload-path: ${{ matrix.upload-path }}
+      uploads: ${{ matrix.uploads }}
     strategy:
       fail-fast: false
       matrix:
         include:
         - target: format
-          upload-name: fix_format.diff
-          upload-path: /home/runner/work/_temp/container/fix_format.diff
+          uploads: |
+            fix_format.diff: /home/runner/work/_temp/container/fix_format.diff
           diskpace-hack-paths: |
             /opt/hostedtoolcache
         - target: format-api
-          upload-name: fix_proto_format.diff
-          upload-path: /home/runner/work/_temp/container/fix_proto_format.diff
+          uploads: |
+            fix_proto_format.diff: /home/runner/work/_temp/container/fix_proto_format.diff

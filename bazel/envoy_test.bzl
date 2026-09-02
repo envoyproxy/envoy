@@ -14,7 +14,6 @@ load(
     "envoy_exported_symbols_input",
     "envoy_external_dep_path",
     "envoy_linkstatic",
-    "envoy_select_exported_symbols",
     "envoy_select_force_libcpp",
     "envoy_stdlib_deps",
     "tcmalloc_external_dep",
@@ -63,6 +62,24 @@ def _envoy_cc_test_infrastructure_library(
         **kargs
     )
 
+def _envoy_test_default_exported_symbols():
+    return select({
+        "@envoy//bazel:linux": [
+            "-Wl,--dynamic-list=$(location @envoy//bazel:exported_symbols.txt)",
+        ],
+        "@envoy//bazel:apple": [
+            "-Wl,-exported_symbols_list,$(location @envoy//bazel:exported_symbols_apple.txt)",
+        ],
+        "//conditions:default": [],
+    })
+
+# Select the given values if exporting is enabled in the current build.
+def envoy_test_select_exported_symbols(xs):
+    return select({
+        "@envoy//bazel:enable_exported_symbols": xs,
+        "//conditions:default": [],
+    })
+
 # Compute the test linkopts based on various options.
 def _envoy_test_linkopts():
     return select({
@@ -76,7 +93,7 @@ def _envoy_test_linkopts():
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
         "//conditions:default": ["-pthread", "-lrt", "-ldl"],
-    }) + envoy_select_force_libcpp([], ["-lstdc++fs", "-latomic"]) + envoy_dbg_linkopts() + envoy_select_exported_symbols(["-Wl,-E"])
+    }) + envoy_select_force_libcpp([], ["-lstdc++fs", "-latomic"]) + envoy_dbg_linkopts() + envoy_test_select_exported_symbols(["-Wl,-E"])
 
 # Envoy C++ fuzz test targets. These are not included in coverage runs.
 def envoy_cc_fuzz_test(
@@ -215,6 +232,16 @@ def envoy_cc_test(
         exec_properties = exec_properties,
     )
 
+# Envoy C++ test targets loading dynamic modules should be specified with this macro.
+def envoy_cc_dyn_module_test(
+        name,
+        **kargs):
+    envoy_cc_test(
+        name,
+        linkopts = _envoy_test_default_exported_symbols(),
+        **kargs
+    )
+
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
 # with this function.
 def envoy_cc_test_library(
@@ -260,13 +287,14 @@ def envoy_cc_test_binary(
         name,
         tags = [],
         deps = [],
+        linkopts = [],
         stamp = 0,
         linkstatic = True,
         **kargs):
     envoy_cc_binary(
         name,
         testonly = 1,
-        linkopts = _envoy_test_linkopts(),
+        linkopts = _envoy_test_linkopts() + linkopts,
         tags = tags + ["compilation_db_dep"],
         deps = deps + [
             "@envoy//test/test_common:test_version_linkstamp",
@@ -287,6 +315,21 @@ def envoy_cc_benchmark_binary(
         name,
         deps = deps + [repository + "//test/benchmark:main"],
         repository = repository,
+        **kargs
+    )
+
+# Envoy benchmark binaries loading dynamic modules should be specified with this function. bazel run
+# these targets to measure performance.
+def envoy_cc_benchmark_dyn_module_binary(
+        name,
+        deps = [],
+        repository = "",
+        **kargs):
+    envoy_cc_test_binary(
+        name,
+        deps = deps + [repository + "//test/benchmark:main"],
+        repository = repository,
+        linkopts = _envoy_test_default_exported_symbols(),
         **kargs
     )
 

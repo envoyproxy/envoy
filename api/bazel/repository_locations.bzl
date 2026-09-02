@@ -5,7 +5,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "37cdfbc6faefea94f7b37760a305c98c08981116c2bc9e821e3b423221fad8c8",
         urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz"],
     ),
-    com_envoyproxy_protoc_gen_validate = dict(
+    protoc_gen_validate = dict(
         sha256 = "20da84f8efe8f53c10cbde79d2cdd1e63365b0ae1ad9de22af56aa1a49d59330",
         version = "1.3.3",
         urls = ["https://github.com/bufbuild/protoc-gen-validate/archive/refs/tags/v{version}.zip"],
@@ -30,7 +30,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "zipkin-api-{version}",
         urls = ["https://github.com/openzipkin/zipkin-api/archive/{version}.tar.gz"],
     ),
-    com_google_googleapis = dict(
+    googleapis = dict(
         # TODO(dio): Consider writing a Starlark macro for importing Google API proto.
         version = "fd52b5754b2b268bc3a22a10f29844f206abb327",
         sha256 = "97fc354dddfd3ea03e7bf2ad74129291ed6fad7ff39d3bd8daec738a3672eb8a",
@@ -74,8 +74,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/cel-spec/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.0",
-        sha256 = "ea2a092208c3032d1440162a34ed1656f377c5592dff59d6bdfac68c7e8c3e56",
+        version = "0.4.11",
+        sha256 = "3f309b077c8e04232796b203fcf6e3c18c0cc29e580834fa5d8ecc12f1c99728",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),

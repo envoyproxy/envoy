@@ -360,18 +360,18 @@ void MultiConnectionBaseImpl::removeConnectionCallbacks(ConnectionCallbacks& cb)
   IS_ENVOY_BUG("Failed to remove connection callbacks");
 }
 
-void MultiConnectionBaseImpl::onDrain() {
+void MultiConnectionBaseImpl::onDrain(ConnectionDrainEvent drain_event) {
   if (connect_finished_) {
-    connections_[0]->onDrain();
+    connections_[0]->onDrain(drain_event);
     return;
   }
-  // Notify all deferred callbacks directly since no underlying connection has been
-  // chosen yet.
-  for (auto* cb : post_connect_state_.connection_callbacks_) {
-    if (cb != nullptr) {
-      cb->onDrain();
-    }
+  // No underlying connection has been chosen yet, so there is nothing to drain and no connection
+  // to notify on behalf of. Retain the event and hand it to the chosen connection once the connect
+  // finishes.
+  if (drain_event_.has_value()) {
+    return;
   }
+  drain_event_ = drain_event;
 }
 
 void MultiConnectionBaseImpl::close(ConnectionCloseType type, absl::string_view details) {
@@ -621,6 +621,12 @@ void MultiConnectionBaseImpl::setUpFinalConnection(ConnectionEvent event,
     if (cb) {
       connections_[0]->addConnectionCallbacks(*cb);
     }
+  }
+
+  // Hand the retained drain event to the chosen connection last, once every deferred callback has
+  // been added to it and the rest of the post-connect state has been applied.
+  if (drain_event_.has_value()) {
+    connections_[0]->onDrain(*drain_event_);
   }
 }
 

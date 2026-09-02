@@ -10,22 +10,9 @@ namespace HttpFilters {
 namespace HeaderMutation {
 
 absl::StatusOr<Http::FilterFactoryCb>
-HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
-    const ProtoConfig& config, const std::string&, DualInfo,
-    Server::Configuration::ServerFactoryContext& context) {
-  absl::Status creation_status = absl::OkStatus();
-  auto filter_config = std::make_shared<HeaderMutationConfig>(config, context, creation_status);
-  RETURN_IF_NOT_OK_REF(creation_status);
-
-  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<HeaderMutation>(filter_config));
-  };
-}
-
-absl::StatusOr<Http::FilterFactoryCb>
 HeaderMutationFactoryConfig::createHttpFilterFactoryFromProtoTyped(
-    const ProtoConfig& config, const std::string&,
-    Server::Configuration::ServerFactoryContext& context) {
+    const ProtoConfig& config, Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
   absl::Status creation_status = absl::OkStatus();
   auto filter_config = std::make_shared<HeaderMutationConfig>(config, context, creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);

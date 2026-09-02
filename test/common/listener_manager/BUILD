@@ -25,7 +25,7 @@ envoy_cc_test(
         "internal_listener.yaml",
         "internal_listener_missing_bootstrap.yaml",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -75,7 +75,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 5,
     deps = [
         ":listener_manager_impl_test_lib",
@@ -121,10 +121,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
     srcs = envoy_select_enable_http3(["listener_manager_impl_quic_only_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         ":listener_manager_impl_test_lib",
         "//source/common/formatter:formatter_extension_lib",
+        "//source/common/quic:quic_packet_writer_interface",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/matching/network/common:inputs_lib",
@@ -135,6 +136,7 @@ envoy_cc_test(
         "//test/integration/filters:test_listener_filter_lib",
         "//test/integration/filters:test_network_filter_lib",
         "//test/server:utility_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
@@ -145,7 +147,7 @@ envoy_cc_test(
     name = "filter_chain_manager_impl_test",
     srcs = ["filter_chain_manager_impl_test.cc"],
     data = ["//test/common/tls/test_data:certs"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
@@ -164,6 +166,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:listener_component_factory_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/server:utility_lib",
         "//test/test_common:environment_lib",
@@ -180,7 +183,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/listener_manager:lds_api_lib",
         "//source/common/protobuf:utility_lib",
@@ -199,10 +202,31 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "fcds_api_test",
+    srcs = ["fcds_api_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/listener_manager:filter_chain_manager_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:listener_component_factory_mocks",
+        "//test/mocks/server:listener_manager_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_benchmark_binary(
     name = "filter_chain_benchmark_test",
     srcs = ["filter_chain_benchmark_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//test/test_common:environment_lib",

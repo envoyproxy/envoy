@@ -224,6 +224,20 @@ multiple compressor filters enabled only for requests or responses. For instance
     :lines: 25-64
     :caption: :download:`compressor-filter-request-response.yaml <_include/compressor-filter-request-response.yaml>`
 
+Upstream HTTP Filter Support
+----------------------------
+
+The compressor filter can also be configured as an upstream HTTP filter.
+This is useful, for example, to compress requests before they are sent to the upstream service.
+
+An example configuration of the filter as an upstream HTTP filter for OTLP request compression may look like the following:
+
+.. literalinclude:: /_configs/repo/envoy-otel-http.yaml
+    :language: yaml
+    :start-after: OTLP request compression
+    :end-before: httpbingo
+    :caption: :download:`envoy-otel-http.yaml </_configs/repo/envoy-otel-http.yaml>`
+
 .. _compressor-statistics:
 
 Statistics

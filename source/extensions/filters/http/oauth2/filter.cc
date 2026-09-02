@@ -681,6 +681,9 @@ FilterConfig::FilterConfig(
               proto_config.private_key_jwt_config().signing_algorithm())),
       jwt_assertion_lifetime_(std::chrono::seconds(PROTOBUF_GET_SECONDS_OR_DEFAULT(
           proto_config.private_key_jwt_config(), assertion_lifetime, 60))),
+      jwt_assertion_audience_(proto_config.private_key_jwt_config().assertion_audience().empty()
+                                  ? proto_config.token_endpoint().uri()
+                                  : proto_config.private_key_jwt_config().assertion_audience()),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
@@ -779,8 +782,16 @@ FilterConfig::FilterConfig(
   }
 
   if (proto_config.has_retry_policy()) {
-    auto retry_policy = Http::Utility::convertCoreToRouteRetryPolicy(
-        proto_config.retry_policy(), "5xx,gateway-error,connect-failure,reset");
+    // convertCoreToRouteRetryPolicy()'s retry_on argument is an override, not a fallback: a
+    // non-empty value replaces the configured retry_on outright, so "" is what lets the user's
+    // value through. With the guard off, the override restores the legacy hardcoded conditions.
+    const std::string retry_on_override =
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.oauth2_client_retries_respect_user_retry_on")
+            ? ""
+            : "5xx,gateway-error,connect-failure,reset";
+    auto retry_policy = Http::Utility::convertCoreToRouteRetryPolicy(proto_config.retry_policy(),
+                                                                     retry_on_override);
     // Use the null validation visitor for the backward compatibility. The proto should already
     // been validated during the config load.
     auto parsed_policy_or_error = Router::RetryPolicyImpl::create(
@@ -1020,8 +1031,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // Check if we can update the access token via a refresh token.
     if (config_->useRefreshToken() && validator_->canUpdateTokenByRefreshToken()) {
 
-      ENVOY_STREAM_LOG(debug, "Trying to update the access token using the refresh token",
-                       *decoder_callbacks_);
+      ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                              "Trying to update the access token using the refresh token");
 
       // try to update access token by refresh token
       auto client_credential = getClientCredential();
@@ -1052,7 +1063,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
           "Unauthorized, and redirecting to OAuth server is not allowed: {}", path_str));
       return Http::FilterHeadersStatus::StopIteration;
     } else {
-      ENVOY_STREAM_LOG(debug, "redirecting to OAuth server: {}", *decoder_callbacks_, path_str);
+      ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                              "redirecting to OAuth server: {}", path_str);
       redirectToOAuthServer(headers);
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -1117,8 +1129,9 @@ absl::StatusOr<std::string> OAuth2Filter::getClientCredential() {
   }
 
   auto assertion_result = ClientAssertion::create(
-      config_->clientId(), config_->tokenEndpointUrl(), config_->clientSecret(),
-      config_->jwtSigningAlgorithm(), config_->jwtAssertionLifetime(), time_source_, random_);
+      config_->clientId(), config_->jwtAssertionAudience(), config_->privateKey(),
+      config_->jwtSigningAlgorithm(), config_->jwtAssertionLifetime(), time_source_, random_,
+      config_->keyId());
   if (!assertion_result.ok()) {
     return assertion_result.status();
   }
@@ -1148,10 +1161,12 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     if (config_->forwardIdToken() && !validator_->idToken().empty()) {
       forwardIdToken(headers, validator_->idToken());
     }
-    ENVOY_STREAM_LOG(debug, "skipping oauth flow due to valid hmac cookie", *decoder_callbacks_);
+    ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                            "skipping oauth flow due to valid hmac cookie");
     return true;
   }
-  ENVOY_STREAM_LOG(debug, "can not skip oauth flow", *decoder_callbacks_);
+  ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "can not skip oauth flow");
   return false;
 }
 
@@ -1225,9 +1240,9 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
                               !Http::HeaderUtility::headerValueIsValid(decrypt_result.plaintext);
 
   if (decrypt_failed) {
-    ENVOY_STREAM_LOG(error, "failed to decrypt token: {}, error: {}", *decoder_callbacks_,
-                     encrypted_token,
-                     decrypt_result.error.value_or("plaintext is not a valid header value"));
+    ENVOY_TAGGED_STREAM_LOG(error, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                            "failed to decrypt token: {}, error: {}", encrypted_token,
+                            decrypt_result.error.value_or("plaintext is not a valid header value"));
     // There are two cases:
     // 1. The token is a legacy unencrypted token.
     // In this case, we return the token as-is to allow the request to proceed.
@@ -1504,16 +1519,16 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
         const auto expiration_epoch = expiration_from_jwt - now;
         return std::to_string(expiration_epoch.count());
       } else {
-        ENVOY_STREAM_LOG(debug,
-                         "The expiration time in the refresh token is less than the current time",
-                         *decoder_callbacks_);
+        ENVOY_TAGGED_STREAM_LOG(
+            debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+            "The expiration time in the refresh token is less than the current time");
         return "0";
       }
     }
-    ENVOY_STREAM_LOG(debug,
-                     "The refresh token is not a JWT or exp claim is omitted. The lifetime of the "
-                     "refresh token will be taken from filter configuration",
-                     *decoder_callbacks_);
+    ENVOY_TAGGED_STREAM_LOG(
+        debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+        "The refresh token is not a JWT or exp claim is omitted. The lifetime of the "
+        "refresh token will be taken from filter configuration");
     const std::chrono::seconds default_refresh_token_expires_in =
         config_->defaultRefreshTokenExpiresIn();
     return std::to_string(default_refresh_token_expires_in.count());
@@ -1539,16 +1554,16 @@ std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
         const auto expiration_epoch = expiration_from_jwt - now;
         return std::to_string(expiration_epoch.count());
       } else {
-        ENVOY_STREAM_LOG(debug, "The expiration time in the id token is less than the current time",
-                         *decoder_callbacks_);
+        ENVOY_TAGGED_STREAM_LOG(
+            debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+            "The expiration time in the id token is less than the current time");
         return "0";
       }
     }
-    ENVOY_STREAM_LOG(debug,
-                     "The id token is not a JWT or exp claim is omitted, even though it is "
-                     "required by the OpenID Connect 1.0 specification. "
-                     "The lifetime of the id token will be aligned with the access token",
-                     *decoder_callbacks_);
+    ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                            "The id token is not a JWT or exp claim is omitted, even though it is "
+                            "required by the OpenID Connect 1.0 specification. "
+                            "The lifetime of the id token will be aligned with the access token");
     return std::to_string(expires_in.count());
   }
   return std::to_string(expires_in.count());
@@ -1764,8 +1779,8 @@ void OAuth2Filter::addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers
 }
 
 void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
-  ENVOY_STREAM_LOG(warn, "Responding with 401 Unauthorized. Cause: {}", *decoder_callbacks_,
-                   details);
+  ENVOY_TAGGED_STREAM_LOG(warn, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "Responding with 401 Unauthorized. Cause: {}", details);
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(
       Http::Code::Unauthorized, UnauthorizedBodyMessage,
@@ -1781,8 +1796,8 @@ void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
 }
 
 void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
-  ENVOY_STREAM_LOG(warn, "Responding with 503 Service Unavailable. Cause: {}", *decoder_callbacks_,
-                   details);
+  ENVOY_TAGGED_STREAM_LOG(warn, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "Responding with 503 Service Unavailable. Cause: {}", details);
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, ServiceUnavailableBodyMessage,
                                      nullptr, std::nullopt, details);
@@ -1815,8 +1830,9 @@ void OAuth2Filter::continueWithFailedOAuth(const std::string& reason,
   config_->stats().oauth_allow_failed_passthrough_.inc();
   const std::string log_details =
       extra_details.empty() ? reason : absl::StrCat(reason, ": ", extra_details);
-  ENVOY_STREAM_LOG(debug, "allow_failed_matcher matched, continuing as unauthorized: {}",
-                   *decoder_callbacks_, log_details);
+  ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "allow_failed_matcher matched, continuing as unauthorized: {}",
+                          log_details);
 }
 
 Http::FilterHeadersStatus OAuth2Filter::handleOAuthFailure(const std::string& reason,

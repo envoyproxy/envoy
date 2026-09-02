@@ -28,7 +28,7 @@ fi
 
 find_date_line () {
     local dep_ln date_match_ln
-    # Find the line number of the dep's top-level YAML key (e.g. "bazel_gazelle:").
+    # Find the line number of the dep's top-level YAML key (e.g. "gazelle:").
     dep_ln="$(grep -n "^${DEP}:$" "$DEPS_YAML" | head -n1 | cut -d: -f1)"
     if [[ -z "$dep_ln" ]]; then
         echo "ERROR: Could not find dep block '${DEP}:' in ${DEPS_YAML}" >&2

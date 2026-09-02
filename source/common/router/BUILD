@@ -50,6 +50,7 @@ envoy_cc_library(
         ":weighted_cluster_specifier_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/init:manager_interface",
         "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/router:router_interface",
         "//envoy/runtime:runtime_interface",
@@ -113,8 +114,10 @@ envoy_cc_library(
     srcs = ["per_filter_config.cc"],
     hdrs = ["per_filter_config.h"],
     deps = [
+        "//envoy/init:manager_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/server:filter_config_interface",
+        "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/status:statusor",
@@ -186,6 +189,7 @@ envoy_cc_library(
     hdrs = ["route_config_update_receiver_impl.h"],
     deps = [
         ":config_lib",
+        ":vhds_lib",
         "//envoy/router:rds_interface",
         "//envoy/router:route_config_update_info_interface",
         "//envoy/server:factory_context_interface",
@@ -204,11 +208,9 @@ envoy_cc_library(
     hdrs = ["vhds.h"],
     deps = [
         ":config_lib",
-        ":route_config_update_impl_lib",
         "//envoy/config:subscription_interface",
         "//envoy/http:codes_interface",
         "//envoy/local_info:local_info_interface",
-        "//envoy/router:rds_interface",
         "//envoy/router:route_config_provider_manager_interface",
         "//envoy/router:route_config_update_info_interface",
         "//envoy/singleton:instance_interface",

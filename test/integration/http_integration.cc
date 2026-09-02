@@ -511,6 +511,8 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
     RELEASE_ASSERT(result, result.message());
     result = fake_upstream_connection_->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection_->waitForNoPost();
+    RELEASE_ASSERT(result, result.message());
     fake_upstream_connection_.reset();
   }
   if (codec_client_) {
@@ -1420,6 +1422,12 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
         hcm.mutable_max_request_headers_kb()->set_value(max_size);
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
+        // Disable route timeout to prevent 504 on slow CI (#44416).
+        auto* route = hcm.mutable_route_config()
+                          ->mutable_virtual_hosts(0)
+                          ->mutable_routes(0)
+                          ->mutable_route();
+        route->mutable_timeout()->set_seconds(0);
       });
   setMaxRequestHeadersKb(max_size);
   setMaxRequestHeadersCount(max_count);

@@ -1,0 +1,294 @@
+/* Code blocks.
+
+   Readability is the point of this file:
+
+   * 13.5px on a 1.75 line — the docs are read at arm's length, and YAML
+     indentation needs the leading to stay legible.
+   * ligatures off, so `->`, `!=` and `--` are the characters you typed.
+   * two-space tabs, matching the YAML the samples are written in.
+   * no wrapping — a long `typed_config` URL scrolls rather than reflowing
+     into a shape that no longer looks like the file it came from.
+   * a header rail that names the file and the lexer, instead of a slab that
+     starts with no context.
+   * the code surface follows the theme rather than being a permanent dark
+     block punched down a white page.
+
+   Colour: four roles, and only four. Keys, strings, numbers and comments take
+   a hue; values, keywords, types and punctuation stay in ink. That is what
+   keeps a forty-line listener config from becoming a rainbow while still
+   letting you find `port_value` without reading — the blue keys give the block
+   a left edge you can follow down six levels of nesting. */
+
+.envoy-content-main .rst-content div[class*="highlight-"],
+.envoy-content-main .rst-content .literal-block-wrapper {
+  background: var(--envoy-code-bg);
+  border: 1px solid var(--envoy-rule);
+  border-radius: 6px;
+  margin: 24px 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.envoy-content-main .rst-content .literal-block-wrapper div[class*="highlight-"] {
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+}
+
+/* --- header rail --------------------------------------------------------- */
+
+.envoy-code-head {
+  align-items: center;
+  background: var(--envoy-surface);
+  border-bottom: 1px solid var(--envoy-rule);
+  color: var(--envoy-ink-body);
+  display: flex;
+  font-family: var(--envoy-font-mono);
+  font-size: 11.5px;
+  gap: 10px;
+  line-height: 1.5;
+  min-height: 34px;
+  padding: 6px 44px 6px 12px;
+}
+
+.envoy-code-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.envoy-code-lang {
+  color: var(--envoy-ink-muted);
+  flex: none;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  margin-left: auto;
+  text-transform: uppercase;
+}
+
+/* the caption is re-rendered inside the header rail */
+.envoy-content-main .rst-content .code-block-caption {
+  display: none;
+}
+
+/* --- the block itself ---------------------------------------------------- */
+
+.envoy-content-main .rst-content .highlight {
+  background: var(--envoy-code-bg);
+  border: 0;
+  margin: 0;
+  position: static;
+}
+
+.envoy-content-main .rst-content .highlight pre,
+.envoy-content-main .rst-content pre.literal-block {
+  background: var(--envoy-code-bg);
+  border: 0;
+  color: var(--envoy-code-text);
+  font-family: var(--envoy-font-mono);
+  font-size: 13.5px;
+  font-variant-ligatures: none;
+  line-height: 1.75;
+  margin: 0;
+  overflow-x: auto;
+  padding: 14px 16px;
+  tab-size: 2;
+  white-space: pre;
+  word-break: normal;
+}
+
+/* a visible scrollbar, so a horizontally clipped line announces itself */
+.envoy-content-main .rst-content .highlight pre {
+  scrollbar-color: var(--envoy-rule-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.envoy-content-main .rst-content .highlight pre::-webkit-scrollbar {
+  height: 10px;
+}
+
+.envoy-content-main .rst-content .highlight pre::-webkit-scrollbar-thumb {
+  background: var(--envoy-rule-strong);
+  border-radius: 5px;
+}
+
+/* one neutral selection colour, so every token stays legible while selected */
+.envoy-content-main .rst-content .highlight pre ::selection,
+.envoy-content-main .rst-content .highlight pre::selection {
+  background: var(--envoy-surface-2);
+}
+
+.envoy-content-main .rst-content .highlight .hll {
+  background: var(--envoy-code-mark);
+  display: block;
+}
+
+.envoy-content-main .rst-content .highlight .linenos,
+.envoy-content-main .rst-content .highlight .lineno,
+.envoy-content-main .rst-content .highlight .gl {
+  color: var(--envoy-ink-muted);
+  opacity: 0.7;
+  user-select: none;
+}
+
+/* --- tokens --------------------------------------------------------------
+
+   Pygments emits a single global style, so the colours are re-declared here
+   from custom properties. One theme switch then repaints every block, which
+   `pygments_style` alone cannot do. */
+
+/* values and plain names — the bulk of a config file, left in ink */
+.envoy-content-main .rst-content .highlight .n,
+.envoy-content-main .rst-content .highlight .nx,
+.envoy-content-main .rst-content .highlight .py,
+.envoy-content-main .rst-content .highlight .nl,
+.envoy-content-main .rst-content .highlight .ni,
+.envoy-content-main .rst-content .highlight .l,
+.envoy-content-main .rst-content .highlight .w {
+  color: var(--envoy-code-text);
+}
+
+/* ROLE 1 — keys and attributes. The spine of a YAML or JSON block. */
+.envoy-content-main .rst-content .highlight .nt,
+.envoy-content-main .rst-content .highlight .na,
+.envoy-content-main .rst-content .highlight .nf,
+.envoy-content-main .rst-content .highlight .fm {
+  color: var(--envoy-code-key);
+  font-weight: 500;
+}
+
+/* keywords, types and classes stay in ink — colouring them too would put a
+   hue on nearly every token in C++ and Lua samples */
+.envoy-content-main .rst-content .highlight .k,
+.envoy-content-main .rst-content .highlight .kd,
+.envoy-content-main .rst-content .highlight .kn,
+.envoy-content-main .rst-content .highlight .kp,
+.envoy-content-main .rst-content .highlight .kr,
+.envoy-content-main .rst-content .highlight .kt,
+.envoy-content-main .rst-content .highlight .nc,
+.envoy-content-main .rst-content .highlight .nn,
+.envoy-content-main .rst-content .highlight .ne,
+.envoy-content-main .rst-content .highlight .nd,
+.envoy-content-main .rst-content .highlight .nv,
+.envoy-content-main .rst-content .highlight .vc,
+.envoy-content-main .rst-content .highlight .vg,
+.envoy-content-main .rst-content .highlight .vi,
+.envoy-content-main .rst-content .highlight .ow {
+  color: var(--envoy-code-ink);
+}
+
+.envoy-content-main .rst-content .highlight .s,
+.envoy-content-main .rst-content .highlight .sa,
+.envoy-content-main .rst-content .highlight .sb,
+.envoy-content-main .rst-content .highlight .sc,
+.envoy-content-main .rst-content .highlight .dl,
+.envoy-content-main .rst-content .highlight .sd,
+.envoy-content-main .rst-content .highlight .s1,
+.envoy-content-main .rst-content .highlight .s2,
+.envoy-content-main .rst-content .highlight .se,
+.envoy-content-main .rst-content .highlight .sh,
+.envoy-content-main .rst-content .highlight .si,
+.envoy-content-main .rst-content .highlight .sr,
+.envoy-content-main .rst-content .highlight .ss,
+.envoy-content-main .rst-content .highlight .sx {
+  color: var(--envoy-code-string);
+}
+/* ROLE 2 — strings, above. ROLE 3 — numbers and constants, below. */
+
+.envoy-content-main .rst-content .highlight .m,
+.envoy-content-main .rst-content .highlight .mb,
+.envoy-content-main .rst-content .highlight .mf,
+.envoy-content-main .rst-content .highlight .mh,
+.envoy-content-main .rst-content .highlight .mi,
+.envoy-content-main .rst-content .highlight .mo,
+.envoy-content-main .rst-content .highlight .il,
+.envoy-content-main .rst-content .highlight .kc,
+.envoy-content-main .rst-content .highlight .no,
+.envoy-content-main .rst-content .highlight .bp {
+  color: var(--envoy-code-number);
+}
+
+.envoy-content-main .rst-content .highlight .c,
+.envoy-content-main .rst-content .highlight .c1,
+.envoy-content-main .rst-content .highlight .cm,
+.envoy-content-main .rst-content .highlight .cp,
+.envoy-content-main .rst-content .highlight .cpf,
+.envoy-content-main .rst-content .highlight .ch,
+.envoy-content-main .rst-content .highlight .cs {
+  /* ROLE 4 — comments */
+  color: var(--envoy-code-comment);
+  font-style: italic;
+}
+
+/* Tango, the style protodoc inherits, sets punctuation bold; at 13.5px that
+   makes every colon and brace heavier than the value beside it. */
+.envoy-content-main .rst-content .highlight .o,
+.envoy-content-main .rst-content .highlight .p {
+  color: var(--envoy-code-punct);
+  font-weight: 400;
+}
+
+/* console prompts are not part of what you copy */
+.envoy-content-main .rst-content .highlight .gp {
+  color: var(--envoy-code-punct);
+  user-select: none;
+}
+
+.envoy-content-main .rst-content .highlight .go {
+  color: var(--envoy-code-output);
+}
+
+.envoy-content-main .rst-content .highlight .err,
+.envoy-content-main .rst-content .highlight .gd,
+.envoy-content-main .rst-content .highlight .gr,
+.envoy-content-main .rst-content .highlight .gt {
+  background: none;
+  border: 0;
+  color: var(--envoy-code-error);
+}
+
+.envoy-content-main .rst-content .highlight .gi {
+  color: var(--envoy-code-added);
+}
+
+.envoy-content-main .rst-content .highlight .ge {
+  font-style: italic;
+}
+
+.envoy-content-main .rst-content .highlight .gs {
+  font-weight: 600;
+}
+
+/* JSON and YAML samples are frequently lexed loosely upstream; an unexpected
+   token is not an error the reader can act on, so do not paint it red. */
+.highlight-json .highlight .err,
+.highlight-yaml .highlight .err {
+  color: var(--envoy-code-text);
+}
+
+/* --- copy button --------------------------------------------------------- */
+
+.envoy-content-main .rst-content button.copybtn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--envoy-ink-muted);
+  opacity: 1;
+  padding: 3px;
+  right: 8px;
+  top: 7px;
+  transition: none;
+}
+
+.envoy-content-main .rst-content button.copybtn img,
+.envoy-content-main .rst-content button.copybtn svg {
+  height: 15px;
+  width: 15px;
+}
+
+.envoy-content-main .rst-content button.copybtn:hover,
+.envoy-content-main .rst-content button.copybtn:focus-visible {
+  background: var(--envoy-surface-2);
+  border-color: var(--envoy-rule-strong);
+  color: var(--envoy-ink);
+}
