@@ -181,6 +181,8 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
