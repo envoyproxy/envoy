@@ -108,13 +108,13 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
   if (!is_connect) {
     // Scheme must start with alpha and be non-empty.
     auto it = url.begin();
-    if (!std::isalpha(*it)) {
+    if (!absl::ascii_isalpha(*it)) {
       return false;
     }
     ++it;
     // Scheme started with an alpha character and the rest of it is alpha, digit, '+', '-' or '.'.
     const auto is_scheme_suffix = [](char c) {
-      return std::isalpha(c) || std::isdigit(c) || c == '+' || c == '-' || c == '.';
+      return absl::ascii_isalpha(c) || absl::ascii_isdigit(c) || c == '+' || c == '-' || c == '.';
     };
     it = std::find_if_not(it, url.end(), is_scheme_suffix);
     url.remove_prefix(it - url.begin());
@@ -133,7 +133,7 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
   const absl::string_view path_query = url.substr(path_query_begin - url.begin());
 
   const auto valid_host_char = [](char c) {
-    return std::isalnum(c) || c == '!' || c == '$' || c == '%' || c == '&' || c == '\'' ||
+    return absl::ascii_isalnum(c) || c == '!' || c == '$' || c == '%' || c == '&' || c == '\'' ||
            c == '(' || c == ')' || c == '*' || c == '+' || c == ',' || c == '-' || c == '.' ||
            c == ':' || c == ';' || c == '=' || c == '@' || c == '[' || c == ']' || c == '_' ||
            c == '~';
