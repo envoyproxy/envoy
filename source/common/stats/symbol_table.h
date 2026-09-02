@@ -97,6 +97,36 @@ public:
   using StoragePtr = std::unique_ptr<Storage>;
 
   /**
+   * Storage for a stat-name assembled on the fly, e.g. by inlineJoin(). The bytes are held
+   * inline unless they don't fit, in which case they spill onto the heap, so the common case
+   * of a short name costs no allocation.
+   *
+   * The bytes live in this object, so statName() must not outlive it, and a StatName fetched
+   * before a move does not refer to the moved-to object's bytes; call statName() again after
+   * a move.
+   */
+  struct InlineStorage {
+    /**
+     * @return the assembled name, or an empty name if nothing has been assembled yet.
+     */
+    inline StatName statName() const;
+
+  private:
+    // The bytes are assembled only by the SymbolTable, e.g. by inlineJoin(); everyone else
+    // reads the result through statName().
+    friend class SymbolTable;
+    friend class StatNameJoiner;
+
+    // Names longer than this spill into a heap allocation. This covers the names Envoy
+    // assembles on hot paths, whose tokens are typically one byte each, while keeping the
+    // object small enough to be a cheap stack temporary.
+    static constexpr size_t InlineCapacity = 24;
+
+    uint8_t inline_[InlineCapacity] = {0};
+    StoragePtr heap_ = nullptr;
+  };
+
+  /**
    * Intermediate representation for a stat-name. This helps store multiple
    * names in a single packed allocation. First we encode each desired name,
    * then sum their sizes for the single packed allocation. This is used to
@@ -214,6 +244,20 @@ public:
       return std::make_pair(number, encoding - start);
     }
 
+    // A small struct to hold the encoded bytes of a number and the size of the encoding.
+    struct EncodedNumber {
+      uint8_t bytes[15]; // 15 bytes is enough to encode a uint64_t in this scheme.
+      uint8_t size = 0;
+    };
+
+    /**
+     * Encodes a number into a fixed-size array of bytes.
+     *
+     * @param number the number to encode.
+     * @return EncodedNumber containing the encoded bytes and their size.
+     */
+    static EncodedNumber encodeNumber(uint64_t number);
+
     // Masks used for variable-length encoding of arbitrary-sized integers into a
     // uint8-array. The integers are typically small, so we try to store them in as
     // few bytes as possible. The bottom 7 bits hold values, and the top bit is used
@@ -305,6 +349,34 @@ public:
    * @return Storage allocated for the joined name.
    */
   StoragePtr join(absl::Span<const StatName> stat_names) const;
+
+  /**
+   * Joins two or more StatNames into a buffer held by the returned object, which is normally
+   * inline, so that no heap allocation is needed for the common case of a short joined name.
+   * The joined bytes are identical to those produced by join().
+   *
+   * This is for joins whose result is consumed locally -- looking up or creating a stat in a
+   * scope, say -- where the storage never needs to be stored or handed to anyone else:
+   *
+   *   scope.counterFromStatName(symbol_table.inlineJoin({prefix, name}).statName()).inc();
+   *
+   * Use StatNameJoiner when the joined bytes must outlive the joining expression, or join() when
+   * their ownership must be transferred.
+   *
+   * As with join(), this does not bump reference counts on the referenced Symbols, so the
+   * result is only valid for the lifetime of the joined StatNames.
+   *
+   * @param stat_names the names to join.
+   * @return storage holding the joined name.
+   */
+  InlineStorage inlineJoin(absl::Span<const StatName> stat_names) const;
+
+  /**
+   * As above, but assembles the joined name directly into caller-provided storage, avoiding the
+   * copy that assigning the returned storage into a longer-lived object would cost. Any previous
+   * contents of storage are replaced.
+   */
+  void inlineJoin(absl::Span<const StatName> stat_names, InlineStorage& storage) const;
 
   /**
    * Populates a StatNameList from a list of encodings. This is not done at
@@ -742,6 +814,19 @@ private:
   const uint8_t* size_and_data_;
 };
 
+StatName SymbolTable::InlineStorage::statName() const {
+  // A zero first byte means a zero-length name, which is what unassembled storage holds and
+  // also what an assembled empty name encodes; StatName() has those same bytes, so the two
+  // cases need not be told apart.
+  if (heap_ != nullptr) {
+    return StatName(heap_.get());
+  }
+  if (inline_[0] != 0) {
+    return StatName(inline_);
+  }
+  return {};
+}
+
 StatName StatNameStorageBase::statName() const { return StatName(bytes_.get()); }
 
 /**
@@ -786,8 +871,8 @@ private:
  * storage is allocated and statName() references the caller's name directly. Callers must
  * therefore keep the joined names valid for the lifetime of this object.
  *
- * Movable but not copyable: the joined bytes live on the heap, so a move transfers ownership
- * without invalidating statName(). Copying would mean duplicating that storage.
+ * NOTE: Not copyable or movable. This is mainly be designed to be used to generate temporary
+ * stat name and should be stack-only.
  */
 class StatNameJoiner {
 public:
@@ -795,20 +880,11 @@ public:
   StatNameJoiner(absl::Span<const StatName> stat_names, const SymbolTable& symbol_table) {
     join(stat_names, symbol_table);
   }
-  StatNameJoiner(StatNameJoiner&& other) noexcept
-      : storage_(std::move(other.storage_)), stat_name_(other.stat_name_) {
-    other.stat_name_ = StatName();
-  }
-  StatNameJoiner& operator=(StatNameJoiner&& other) noexcept {
-    if (this != &other) {
-      storage_ = std::move(other.storage_);
-      stat_name_ = other.stat_name_;
-      other.stat_name_ = StatName();
-    }
-    return *this;
-  }
+  // Not copyable or movable.
   StatNameJoiner(const StatNameJoiner&) = delete;
   StatNameJoiner& operator=(const StatNameJoiner&) = delete;
+  StatNameJoiner(StatNameJoiner&&) = delete;
+  StatNameJoiner& operator=(StatNameJoiner&&) = delete;
 
   /**
    * Joins stat_names, replacing any previously joined value. stat_names is consumed here and never
@@ -819,7 +895,7 @@ public:
   StatName statName() const { return stat_name_; }
 
 private:
-  SymbolTable::StoragePtr storage_;
+  SymbolTable::InlineStorage storage_;
   StatName stat_name_;
 };
 
