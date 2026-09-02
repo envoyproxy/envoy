@@ -1068,6 +1068,10 @@ void DownstreamFilterManager::sendLocalReply(
   if (filter_manager_callbacks_.isHalfCloseEnabled()) {
     state_.decoder_filter_chain_aborted_ = true;
   }
+  // For early error handling, do a best-effort attempt to create a filter chain
+  // to ensure access logging. If the filter chain already exists this will be
+  // a no-op.
+  createDownstreamFilterChain();
 
   streamInfo().setResponseCodeDetails(details);
   StreamFilterBase::LocalReplyData data{code, grpc_status, details, false, body};
@@ -1134,10 +1138,6 @@ void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
     const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ENVOY_STREAM_LOG(debug, "Preparing local reply with details {}", *this, details);
   ASSERT(!filter_manager_callbacks_.responseHeaders().has_value());
-  // For early error handling, do a best-effort attempt to create a filter chain
-  // to ensure access logging. If the filter chain already exists this will be
-  // a no-op.
-  createDownstreamFilterChain();
 
   if (prepared_local_reply_) {
     return;
@@ -1186,10 +1186,6 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
     const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(!filter_manager_callbacks_.responseHeaders().has_value());
-  // For early error handling, do a best-effort attempt to create a filter chain
-  // to ensure access logging. If the filter chain already exists this will be
-  // a no-op.
-  createDownstreamFilterChain();
 
   Utility::sendLocalReply(
       state_.destroyed_,
