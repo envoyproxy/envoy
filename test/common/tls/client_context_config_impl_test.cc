@@ -954,9 +954,7 @@ TEST_F(ClientContextConfigImplTest, ExplicitX25519Mlkem768Curve) {
   EXPECT_EQ(cfg->ecdhCurves(), "X25519MLKEM768:X25519:P-256");
   // Verify the SSL context can be created successfully with X25519MLKEM768.
   auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
-  if (!FIPS_mode()) {
-    EXPECT_TRUE(context_or_error.status().ok());
-  }
+  EXPECT_TRUE(context_or_error.status().ok());
 }
 
 } // namespace Tls
