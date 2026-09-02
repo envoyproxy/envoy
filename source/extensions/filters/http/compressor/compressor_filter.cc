@@ -43,10 +43,6 @@ bool isWeakEtag(absl::string_view value) {
   return value.length() >= 2 && (value[0] == 'w' || value[0] == 'W') && value[1] == '/';
 }
 
-std::string normalizeContentTypeValue(absl::string_view value) {
-  return std::string(StringUtil::trim(StringUtil::cropRight(value, ";")));
-}
-
 // Default minimum length of an upstream response that allows compression.
 const uint64_t DefaultMinimumContentLength = 30;
 
@@ -114,19 +110,6 @@ CompressorFilterConfig::DirectionConfig::contentTypeMatcherList(
   const bool has_matchers = !matchers.empty();
   const bool has_legacy_types = !content_types.empty();
 
-  // If both are empty, use default content types as exact matchers
-  if (!has_matchers && !has_legacy_types) {
-    const auto& default_content_encodings = defaultContentEncoding();
-    list.reserve(default_content_encodings.size());
-    for (const auto& type : default_content_encodings) {
-      envoy::type::matcher::v3::StringMatcher matcher;
-      matcher.set_exact(type);
-      matcher.set_ignore_case(true);
-      list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
-    }
-    return list;
-  }
-
   // If both are set, log a warning and let the new content_type_matcher take precedence
   if (has_matchers && has_legacy_types) {
     ENVOY_LOG_MISC(warn, "Both content_type and content_type_matcher are specified. "
@@ -140,10 +123,23 @@ CompressorFilterConfig::DirectionConfig::contentTypeMatcherList(
       list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
     }
   }
+
   // Fall back to legacy content_type strings converted into exact matchers
   else if (has_legacy_types) {
     list.reserve(content_types.size());
     for (const auto& type : content_types) {
+      envoy::type::matcher::v3::StringMatcher matcher;
+      matcher.set_exact(type);
+      matcher.set_ignore_case(true);
+      list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
+    }
+  }
+
+  // If both are empty, use default content types as exact matchers
+  else {
+    const auto& default_content_encodings = defaultContentEncoding();
+    list.reserve(default_content_encodings.size());
+    for (const auto& type : default_content_encodings) {
       envoy::type::matcher::v3::StringMatcher matcher;
       matcher.set_exact(type);
       matcher.set_ignore_case(true);
@@ -558,12 +554,6 @@ std::unique_ptr<CompressorFilter::EncodingDecision>
 CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   using EncPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
   std::vector<EncPair> pairs;
-  std::string content_type_value;
-
-  const Http::HeaderEntry* content_type = headers.ContentType();
-  if (content_type != nullptr) {
-    content_type_value = normalizeContentTypeValue(content_type->value().getStringView());
-  }
 
   // Find all compressors enabled for the filter chain.
   std::map<std::string, CompressorInChain> allowed_compressors;
@@ -583,8 +573,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
     // "gzip;q=1,deflate;q=.5". The corresponding response content type is "application/javascript".
     // If "gzip" is not excluded from the decision process then it will take precedence over
     // "deflate" and the resulting response won't be compressed at all.
-    if (!content_type_value.empty() &&
-        !filter_config->responseDirectionConfig().isContentTypeAllowed(content_type_value)) {
+    if (!filter_config->responseDirectionConfig().isContentTypeAllowed(headers)) {
       continue;
     }
 
@@ -758,20 +747,18 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
 bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
     const Http::RequestOrResponseHeaderMap& headers) const {
 
+  // Default content types are normally always populated, but return true if empty.
+  if (content_type_matchers_.empty()) {
+    return true;
+  }
+
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type == nullptr) {
     return true;
   }
 
-  return isContentTypeAllowed(normalizeContentTypeValue(content_type->value().getStringView()));
-}
-
-bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(absl::string_view value) const {
-
-  // Default content types are normally always populated, but return true if empty.
-  if (content_type_matchers_.empty()) {
-    return true;
-  }
+  const absl::string_view value =
+      StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
 
   // Check content_type_matcher list if populated
   for (const auto& matcher : content_type_matchers_) {
