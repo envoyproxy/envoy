@@ -4,7 +4,6 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
-#include "source/common/network/utility.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
@@ -25,19 +24,12 @@ class SyslogAccessLogIntegrationTest : public testing::TestWithParam<Network::Ad
                                        public HttpIntegrationTest {
 public:
   SyslogAccessLogIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()),
-        bind_address_(Network::Utility::getAddressWithPort(
-            *Network::Test::getCanonicalLoopbackAddress(GetParam()), 0)),
-        receiver_(Network::Socket::Type::Datagram, bind_address_, nullptr,
-                  Network::SocketCreationOptions{}) {
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()), receiver_(GetParam()) {
     skip_tag_extraction_rule_check_ = true;
     autonomous_upstream_ = true;
-    EXPECT_EQ(0, receiver_.bind(bind_address_).return_value_);
   }
 
-  uint32_t syslogPort() const {
-    return receiver_.connectionInfoProvider().localAddress()->ip()->port();
-  }
+  uint32_t syslogPort() { return receiver_.localAddress()->ip()->port(); }
 
   std::string loopbackAddress() const {
     return Network::Test::getLoopbackAddressString(GetParam());
@@ -111,9 +103,15 @@ public:
     return buffer;
   }
 
-  std::string expectLoggedPayload(Network::SocketImpl& socket) {
+  static std::string receiveDatagram(Network::Test::UdpSyncPeer& peer) {
+    Network::UdpRecvData datagram;
+    peer.recv(datagram);
+    return datagram.buffer_->toString();
+  }
+
+  template <class Receiver> std::string expectLoggedPayload(Receiver& receiver) {
     test_server_->waitForCounter("access_logs.syslog.test.send", Eq(1));
-    std::string datagram = receiveDatagram(socket);
+    std::string datagram = receiveDatagram(receiver);
     EXPECT_THAT(datagram, HasSubstr("GET /syslog 200"));
     return datagram;
   }
@@ -137,8 +135,7 @@ public:
   }
 #endif
 
-  Network::Address::InstanceConstSharedPtr bind_address_;
-  Network::SocketImpl receiver_;
+  Network::Test::UdpSyncPeer receiver_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SyslogAccessLogIntegrationTest,
