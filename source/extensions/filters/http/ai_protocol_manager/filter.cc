@@ -260,9 +260,6 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
         }
       }
     }
-    // The payload parsed, and passed its schema where the declared API has one.
-    // A declared API without a registered schema counts here too: the document
-    // is what later filters work from, whether or not it was schema-checked.
     config_->stats().request_parsed_.inc();
   }
   return true;
