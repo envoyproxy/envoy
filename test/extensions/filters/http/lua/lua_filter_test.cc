@@ -3557,6 +3557,51 @@ TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
   });
 }
 
+TEST_F(LuaHttpFilterTest, LuaFilterBase64Decode) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:base64Decode("Zm9vYmFy"))
+
+      -- Round trips with base64Escape.
+      request_handle:logTrace(request_handle:base64Decode(request_handle:base64Escape("round trip")))
+
+      -- Binary data survives, including embedded NULs: Lua strings are length counted, so the
+      -- length is the observable property rather than the content.
+      local nuls = request_handle:base64Decode("AGEA")
+      request_handle:logTrace("nul length " .. #nuls)
+
+      -- The empty string is valid base64 and decodes to the empty string, not nil.
+      local empty = request_handle:base64Decode("")
+      request_handle:logTrace("empty is nil: " .. tostring(empty == nil) .. " length " .. #empty)
+    end
+
+    function envoy_on_response(response_handle)
+      -- Invalid base64 yields nil rather than raising.
+      response_handle:logTrace("bad chars: " .. tostring(response_handle:base64Decode("!!!!")))
+      response_handle:logTrace("bad length: " .. tostring(response_handle:base64Decode("a")))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"trace", "foobar"},
+                                  {"trace", "round trip"},
+                                  {"trace", "nul length 3"},
+                                  {"trace", "empty is nil: false length 0"}}),
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->decodeHeaders(request_headers, true)));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"trace", "bad chars: nil"}, {"trace", "bad length: nil"}}),
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->encodeHeaders(response_headers, true)));
+}
+
 TEST_F(LuaHttpFilterTest, Timestamp_ReturnsFormatSet) {
   const std::string SCRIPT{R"EOF(
       function envoy_on_request(request_handle)
