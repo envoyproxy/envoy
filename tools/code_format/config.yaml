@@ -332,6 +332,7 @@ paths:
     - test/tools/router_check/router_check.cc
     - source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.cc
     - test/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper_test.cc
+    - test/extensions/router/cluster_specifiers/dynamic_modules/cluster_specifier_test.cc
 
   # Files in these paths can use std::regex
   std_regex:
