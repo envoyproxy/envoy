@@ -77,7 +77,7 @@ public:
 
   SyslogAccessLogConfig makeBaseConfig() {
     SyslogAccessLogConfig config;
-    config.set_no_hostname(true);
+    config.set_omit_hostname(true);
     config.set_stat_prefix("test");
     config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%REQ(:METHOD)% %REQ(:PATH)% %RESPONSE_CODE%");

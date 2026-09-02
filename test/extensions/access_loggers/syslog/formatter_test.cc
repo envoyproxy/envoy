@@ -28,16 +28,16 @@ Formatter::FormatterConstSharedPtr makeBodyFormatter(absl::string_view body) {
 
 SyslogAccessLogConfig baseConfig() {
   SyslogAccessLogConfig config;
-  config.set_no_hostname(true);
+  config.set_omit_hostname(true);
   return config;
 }
 
 Rfc3164HeaderFormatter makeRfc3164HeaderFormatter(const SyslogAccessLogConfig& config) {
-  return {config.facility(), config.severity(), config.no_hostname(), config.tag()};
+  return {config.facility(), config.severity(), config.omit_hostname(), config.tag()};
 }
 
 Rfc5424HeaderFormatter makeRfc5424HeaderFormatter(const SyslogAccessLogConfig& config) {
-  return {config.facility(), config.severity(), config.no_hostname(), config.tag(),
+  return {config.facility(), config.severity(), config.omit_hostname(), config.tag(),
           config.msg_id()};
 }
 

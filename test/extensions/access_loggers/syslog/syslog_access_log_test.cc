@@ -82,7 +82,7 @@ struct LoggerTestContext {
 
 SyslogAccessLogConfig baseConfig() {
   SyslogAccessLogConfig config;
-  config.set_no_hostname(true);
+  config.set_omit_hostname(true);
   return config;
 }
 

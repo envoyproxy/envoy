@@ -123,7 +123,7 @@ message SyslogAccessLogConfig {
 
   // When true, the syslog header omits the local hostname. RFC5424 messages use the RFC-defined
   // NILVALUE (``-``) in the ``HOSTNAME`` field instead.
-  bool no_hostname = 5;
+  bool omit_hostname = 5;
 
   // Access log :ref:`format <config_access_log_format>`. This is the syslog message payload.
   config.core.v3.SubstitutionFormatString log_format = 6

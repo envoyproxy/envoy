@@ -28,11 +28,11 @@ absl::Status validateSyslogConfig(const SyslogAccessLogConfig& config) {
 #endif
   }
 
-  if (!config.no_hostname()) {
+  if (!config.omit_hostname()) {
     const auto hostname = Formatter::SubstitutionFormatUtils::getHostname();
     if (!hostname.has_value() || hostname->empty()) {
       return absl::InvalidArgumentError(
-          "syslog local hostname is unavailable; set no_hostname to true to omit it");
+          "syslog local hostname is unavailable; set omit_hostname to true to omit it");
     }
   }
 

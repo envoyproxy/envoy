@@ -17,12 +17,12 @@ SyslogAccessLoggerImpl::SyslogAccessLoggerImpl(const SyslogAccessLogConfig& conf
   if (config.syslog_format() == SyslogAccessLogConfig::RFC5424) {
     formatter_ = std::make_unique<Rfc5424Formatter>(
         std::move(body_formatter),
-        Rfc5424HeaderFormatter(config.facility(), config.severity(), config.no_hostname(),
+        Rfc5424HeaderFormatter(config.facility(), config.severity(), config.omit_hostname(),
                                config.tag(), config.msg_id()));
   } else {
     formatter_ = std::make_unique<Rfc3164Formatter>(
         std::move(body_formatter), Rfc3164HeaderFormatter(config.facility(), config.severity(),
-                                                          config.no_hostname(), config.tag()));
+                                                          config.omit_hostname(), config.tag()));
   }
 }
 

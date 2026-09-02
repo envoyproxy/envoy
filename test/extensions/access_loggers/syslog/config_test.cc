@@ -27,7 +27,7 @@ using testing::Return;
 constexpr absl::string_view PipeConfigYaml = R"EOF(
 pipe:
   path: /tmp/syslog.sock
-no_hostname: true
+omit_hostname: true
 stat_prefix: test
 log_format:
   text_format_source:
@@ -36,7 +36,7 @@ log_format:
 
 constexpr absl::string_view UdpClusterConfigYaml = R"EOF(
 cluster: syslog
-no_hostname: true
+omit_hostname: true
 stat_prefix: test
 log_format:
   text_format_source:
@@ -137,7 +137,7 @@ TEST_F(SyslogConfigTest, RejectsInvalidFieldConstraints) {
 
 TEST_F(SyslogConfigTest, ValidatesHostnameRequirement) {
   auto config = loadConfig(UdpClusterConfigYaml);
-  config.set_no_hostname(false);
+  config.set_omit_hostname(false);
   testing::NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
@@ -145,11 +145,11 @@ TEST_F(SyslogConfigTest, ValidatesHostnameRequirement) {
   EXPECT_TRUE(validateSyslogConfig(config).ok());
 
   expectGethostname(os_sys_calls, "", -1);
-  EXPECT_EQ("syslog local hostname is unavailable; set no_hostname to true to omit it",
+  EXPECT_EQ("syslog local hostname is unavailable; set omit_hostname to true to omit it",
             validateSyslogConfig(config).message());
 
   expectGethostname(os_sys_calls, "", 0);
-  EXPECT_EQ("syslog local hostname is unavailable; set no_hostname to true to omit it",
+  EXPECT_EQ("syslog local hostname is unavailable; set omit_hostname to true to omit it",
             validateSyslogConfig(config).message());
 }
 
