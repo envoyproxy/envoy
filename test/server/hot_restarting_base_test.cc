@@ -79,10 +79,6 @@ TEST_F(HotRestartingBaseTest, SendMsgRetrySucceedsEventually) {
   EXPECT_TRUE(retried);
 }
 
-} // namespace
-} // namespace Server
-} // namespace Envoy
-
 // A length prefix within sizeof(uint64_t) of UINT64_MAX would wrap the buffer size
 // computation to a tiny value. The datagram must be dropped gracefully (no crash, no
 // undersized allocation) — see #45872.
@@ -126,3 +122,7 @@ TEST_F(HotRestartingBaseTest, OversizedLengthPrefixDroppedThenNormalMessageParse
 
   close(fds[1]);
 }
+
+} // namespace
+} // namespace Server
+} // namespace Envoy

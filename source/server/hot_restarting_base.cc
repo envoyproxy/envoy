@@ -68,10 +68,10 @@ void RpcStream::bindDomainSocket(uint64_t id, const std::string& role,
     throw EnvoyException(msg);
   }
 
-  // The fchmod() in createDomainSocketAddress() is the race-free way to set the mode:
+  // The `fchmod()` in `createDomainSocketAddress()` is the race-free way to set the mode:
   // on Linux, bind() propagates the socket inode's mode to the filesystem node. Apply
   // the mode to the node directly as well, so the mode is still set on platforms where
-  // fchmod() on a socket descriptor has no effect.
+  // `fchmod()` on a socket descriptor has no effect.
   if (::chmod(address.sun_path, socket_mode) != 0) {
     ENVOY_LOG_MISC(debug, "Failed to set mode {} on hot restart socket {}: errno = {}.",
                    socket_mode, address.sun_path, errno);
@@ -261,7 +261,7 @@ std::unique_ptr<HotRestartMessage> RpcStream::receiveHotRestartMessage(Blocking 
       // hot restart message: drop it and reset state (see #45872).
       if (expected_proto_length_.value() >
           std::numeric_limits<uint64_t>::max() - sizeof(uint64_t)) {
-        ENVOY_LOG_MISC(debug, "Hot restart IPC: dropping datagram with invalid length ({}).",
+        ENVOY_LOG_MISC(warn, "Hot restart IPC: dropping datagram with invalid length ({}).",
                        expected_proto_length_.value());
         recv_buf_.resize(0);
         cur_msg_recvd_bytes_ = 0;
