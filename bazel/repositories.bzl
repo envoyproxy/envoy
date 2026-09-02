@@ -322,6 +322,7 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
             "proto_library": ["@protobuf//bazel:proto_library.bzl", ""],
         },
     )
+    envoy_mod_graph_stub(name = "envoy_mod_graph")
 
 def _boringssl():
     external_http_archive(
@@ -1166,3 +1167,15 @@ cc_library(
 )
 """,
     )
+
+def _envoy_mod_graph_stub_impl(repository_ctx):
+    repository_ctx.file(
+        "BUILD.bazel",
+        "exports_files([\"deps.json\"], visibility = [\"//visibility:public\"])\n",
+    )
+    repository_ctx.file("deps.json", "{}")
+
+envoy_mod_graph_stub = repository_rule(
+    implementation = _envoy_mod_graph_stub_impl,
+    doc = "WORKSPACE-mode placeholder for @envoy_mod_graph (real one is provided by the bzlmod extension).",
+)
