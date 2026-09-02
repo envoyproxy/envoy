@@ -1155,7 +1155,7 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(injected_.toString(), payload);
   EXPECT_TRUE(injected_end_stream_);
-  EXPECT_EQ(counterValue("request_payload_parsed"), 1);
+  EXPECT_EQ(counterValue("request_parsed"), 1);
   EXPECT_EQ(counterValue("request_parse_error"), 0);
   EXPECT_EQ(counterValue("request_schema_invalid"), 0);
 }
@@ -1177,7 +1177,7 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJson) {
   // two 400s are counted apart because they mean different things to operate on.
   EXPECT_EQ(counterValue("request_parse_error"), 1);
   EXPECT_EQ(counterValue("request_schema_invalid"), 0);
-  EXPECT_EQ(counterValue("request_payload_parsed"), 0);
+  EXPECT_EQ(counterValue("request_parsed"), 0);
 }
 
 // Where Envoy and the backend could otherwise read the same body differently.
@@ -1226,7 +1226,7 @@ TEST_F(AiProtocolManagerFilterTest, EmptyBodyOnDeclaredEndpointIsPassedThrough) 
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(injected_.length(), 0);
   // No payload arrived, so there is no document and nothing to count parsed.
-  EXPECT_EQ(counterValue("request_payload_parsed"), 0);
+  EXPECT_EQ(counterValue("request_parsed"), 0);
   EXPECT_EQ(counterValue("request_parse_error"), 0);
 }
 
@@ -1285,7 +1285,7 @@ TEST_F(AiProtocolManagerFilterTest, RejectsPayloadFailingSchemaValidation) {
   // Well-formed JSON that the declared API rejects: schema drift, not garbage.
   EXPECT_EQ(counterValue("request_schema_invalid"), 1);
   EXPECT_EQ(counterValue("request_parse_error"), 0);
-  EXPECT_EQ(counterValue("request_payload_parsed"), 0);
+  EXPECT_EQ(counterValue("request_parsed"), 0);
 }
 
 // Unknown fields are permitted and pass through untouched.
@@ -1372,8 +1372,8 @@ TEST_F(AiProtocolManagerFilterTest, PassesThroughUndeclaredRoute) {
   EXPECT_EQ(inject_calls_, 0);
   EXPECT_EQ(local_reply_calls_, 0);
   // A stream the filter never engages on touches none of the request counters.
-  EXPECT_EQ(counterValue("request_payload_parsed"), 0);
-  EXPECT_EQ(counterValue("request_unparsed_passthrough"), 0);
+  EXPECT_EQ(counterValue("request_parsed"), 0);
+  EXPECT_EQ(counterValue("request_passthrough"), 0);
 }
 
 // Nor does it subscribe to watermarks or claim any replay machinery.
@@ -1427,8 +1427,8 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingAcceptsValidPayload) {
   EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4"})");
   // An unconfigured route has no schema to check, but the document is still
   // there for later filters, so it counts as parsed.
-  EXPECT_EQ(counterValue("request_payload_parsed"), 1);
-  EXPECT_EQ(counterValue("request_unparsed_passthrough"), 0);
+  EXPECT_EQ(counterValue("request_parsed"), 1);
+  EXPECT_EQ(counterValue("request_passthrough"), 0);
 }
 
 // Best effort means exactly that: a payload that does not parse is forwarded
@@ -1445,9 +1445,9 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsMalformedPayload) {
   EXPECT_EQ(injected_.toString(), R"({"model" "gpt-4"})");
   EXPECT_TRUE(injected_end_stream_);
   // Forwarded, not failed -- so it is counted apart from the rejecting paths.
-  EXPECT_EQ(counterValue("request_unparsed_passthrough"), 1);
+  EXPECT_EQ(counterValue("request_passthrough"), 1);
   EXPECT_EQ(counterValue("request_parse_error"), 0);
-  EXPECT_EQ(counterValue("request_payload_parsed"), 0);
+  EXPECT_EQ(counterValue("request_parsed"), 0);
 }
 
 // A payload abandoned mid-upload is still offloaded and replayed in full.

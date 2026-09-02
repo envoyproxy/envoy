@@ -100,7 +100,7 @@ TEST_F(DecoderFilterChainBridgeTest, UnrecoverableErrorSendsLocalReply) {
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _,
                                          "ai_protocol_manager_external_buffer_error"));
   bridge_.onUnrecoverableError();
-  EXPECT_EQ(stats_.external_buffer_error_.value(), 1);
+  EXPECT_EQ(stats_.request_external_buffer_error_.value(), 1);
 }
 
 // EncoderFilterChainBridge maps the bridge surface onto StreamEncoderFilterCallbacks
@@ -173,7 +173,7 @@ TEST_F(EncoderFilterChainBridgeTest, UnrecoverableErrorSendsLocalReply) {
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _,
                                                  "ai_protocol_manager_external_buffer_error"));
   bridge_.onUnrecoverableError();
-  EXPECT_EQ(stats_.external_buffer_error_.value(), 1);
+  EXPECT_EQ(stats_.response_external_buffer_error_.value(), 1);
 }
 
 } // namespace

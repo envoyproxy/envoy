@@ -22,7 +22,7 @@ void DecoderFilterChainBridge::unregisterReplayWatermarks() {
 }
 
 void DecoderFilterChainBridge::onUnrecoverableError() {
-  stats_.external_buffer_error_.inc();
+  stats_.request_external_buffer_error_.inc();
   callbacks_.sendLocalReply(Http::Code::InternalServerError, "AI protocol buffer error", nullptr,
                             std::nullopt, "ai_protocol_manager_external_buffer_error");
 }
@@ -42,7 +42,7 @@ void EncoderFilterChainBridge::unregisterReplayWatermarks() {
 }
 
 void EncoderFilterChainBridge::onUnrecoverableError() {
-  stats_.external_buffer_error_.inc();
+  stats_.response_external_buffer_error_.inc();
   // On the response path the headers (and possibly some body) may already be in
   // flight. sendLocalReply handles this best-effort: if the response has not
   // started it generates a local reply, otherwise it either ships the reply
