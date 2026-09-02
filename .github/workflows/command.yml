@@ -28,7 +28,7 @@ jobs:
          && github.actor != 'dependabot[bot]'
       }}
     steps:
-    - uses: envoyproxy/toolshed/actions/github/command@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/github/command@ee731502ff969e02e361f8c74e9a0a21cbae9e37  # actions-v0.4.24
       name: Parse command from comment
       id: command
       with:
@@ -37,14 +37,14 @@ jobs:
           ^/(retest)
 
     # /retest
-    - uses: envoyproxy/toolshed/actions/appauth@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/appauth@ee731502ff969e02e361f8c74e9a0a21cbae9e37  # actions-v0.4.24
       if: ${{ steps.command.outputs.command == 'retest' }}
       id: appauth-retest
       name: Appauth (retest)
       with:
         key: ${{ secrets.ENVOY_CI_APP_KEY }}
         app_id: ${{ secrets.ENVOY_CI_APP_ID }}
-    - uses: envoyproxy/toolshed/actions/retest@4a6a2986abd53c8a2d1077de4165fae369c5bc41  # actions-v0.4.23
+    - uses: envoyproxy/toolshed/actions/retest@ee731502ff969e02e361f8c74e9a0a21cbae9e37  # actions-v0.4.24
       if: ${{ steps.command.outputs.command == 'retest' }}
       name: Retest
       with:
