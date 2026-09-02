@@ -69,23 +69,17 @@ message RequestHandling {
 // Per-stream limits for request payload parsing.
 message RequestParsingLimits {
   // Maximum size, in bytes, of a decoded string value kept inline in the
-  // parsed document. A value larger than this is left in the external buffer
-  // and recorded as a reference to its bytes, so a large prompt costs one
-  // small node instead of a per-stream copy. Object keys are always inline
-  // and unaffected.
+  // parsed document; a larger value stays in the external buffer and is
+  // referenced by offset. Object keys are always inline.
   //
-  // Defaults to 1KiB, sized so that ordinary metadata (model names, roles,
-  // tool names) stays inline and directly usable while conversation content
-  // goes to the buffer. Raising it buys inline access to larger values at the
-  // cost of per-stream memory.
+  // This is the deployment-wide default, applied when a declared API's payload
+  // schema does not pin its own threshold. Defaults to 1KiB, which keeps
+  // ordinary metadata (model names, roles, tool names) inline while
+  // conversation content goes to the buffer.
   //
-  // Lowering it is bounded at 64 bytes, which clears every string a payload
-  // schema fixes in size — the ``role`` and ``type`` enumerations are the
-  // longest at 9 bytes. Provider-determined identifiers have no such bound: a
-  // ``model`` name longer than the configured threshold offloads, and
-  // ``model`` is declared non-offloadable, so such a payload fails validation
-  // with a 400 on a declared AI endpoint. Deployments that lower this should
-  // set it above the longest identifier their providers issue.
+  // Set it above the longest identifier the configured providers issue: a
+  // ``model`` name over the threshold offloads, and ``model`` is
+  // non-offloadable, so such a payload is rejected with a 400.
   google.protobuf.UInt32Value inline_string_threshold_bytes = 1
       [(validate.rules).uint32 = {lte: 1048576 gte: 64}];
 }

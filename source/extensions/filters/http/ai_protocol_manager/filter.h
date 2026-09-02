@@ -222,6 +222,10 @@ private:
   // what makes a parse failure fatal.
   bool isAiEndpoint() const { return route_has_request_; }
 
+  // The inline-string threshold for this stream: the route's payload schema
+  // when it pins one, otherwise the filter's configured default.
+  uint32_t inlineStringThresholdBytes() const;
+
   // Publish the accumulated token usage as dynamic metadata and account stats.
   // Called exactly once, at response end of stream (data or trailers).
   void finalizeResponseHandling();

@@ -53,7 +53,8 @@ per-stream memory. What counts as oversized is
 :ref:`inline_string_threshold_bytes
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestParsingLimits.inline_string_threshold_bytes>`,
 1KiB by default -- large enough that ordinary metadata stays inline and small
-enough that conversation content does not.
+enough that conversation content does not. A declared API whose payload schema
+pins its own threshold uses that instead.
 
 Upon stream completion, the parsed document is validated against the payload
 schema of the route's declared :ref:`wire API

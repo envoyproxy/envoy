@@ -197,7 +197,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   }
 
   JsonWithExtBufParser::Config parser_config;
-  parser_config.inline_string_threshold_bytes = config_->inlineStringThresholdBytes();
+  parser_config.inline_string_threshold_bytes = inlineStringThresholdBytes();
   request_parser_ = std::make_unique<JsonWithExtBufParser>(parser_config);
   // Built here, not at setDecoderFilterCallbacks(), so a pass-through stream pays
   // for none of it: constructing it subscribes to upstream watermarks and claims
@@ -211,6 +211,24 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // for an empty/trailer-only body, when the manager continues iteration).
   ENVOY_LOG(trace, "ai_protocol_manager: holding headers until payload is offloaded");
   return Http::FilterHeadersStatus::StopIteration;
+}
+
+uint32_t AiProtocolManagerFilter::inlineStringThresholdBytes() const {
+  // The filter's configured value is the default. A declared endpoint's payload
+  // schema may pin its own, because what has to stay inline for the payload to
+  // validate is a property of the wire API, not of the deployment.
+  if (isAiEndpoint()) {
+    if (const PayloadSchema* payload_schema =
+            AdapterRegistry::get(route_request_protocol_).schema();
+        payload_schema != nullptr) {
+      if (const std::optional<uint32_t> pinned =
+              payload_schema->requestInlineStringThresholdBytes();
+          pinned.has_value()) {
+        return *pinned;
+      }
+    }
+  }
+  return config_->inlineStringThresholdBytes();
 }
 
 bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_stream) {
