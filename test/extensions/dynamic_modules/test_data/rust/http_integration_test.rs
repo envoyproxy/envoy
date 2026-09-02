@@ -129,13 +129,16 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       let scheduler = envoy_filter_config.new_scheduler();
 
       // Spawn a thread to simulate async work.
-      std::thread::spawn(move || {
+      let thread_handle = std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(100));
         // Schedule an event with ID 1.
         scheduler.commit(1);
       });
 
-      Some(Box::new(ConfigSchedulerConfig { shared_status }))
+      Some(Box::new(ConfigSchedulerConfig {
+        shared_status,
+        thread_handle: std::sync::Mutex::new(Some(thread_handle)),
+      }))
     },
     "http_config_callout" => {
       let cluster_name = String::from_utf8(config.to_owned()).unwrap();
@@ -340,6 +343,22 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UseSelfAfterTeardownFilter {
 
 struct ConfigSchedulerConfig {
   shared_status: Arc<AtomicBool>,
+  thread_handle: std::sync::Mutex<Option<std::thread::JoinHandle<()>>>,
+}
+
+impl ConfigSchedulerConfig {
+  fn join_thread(&self) {
+    let thread_handle = self.thread_handle.lock().unwrap().take();
+    if let Some(thread_handle) = thread_handle {
+      thread_handle.join().expect("Failed to join thread");
+    }
+  }
+}
+
+impl Drop for ConfigSchedulerConfig {
+  fn drop(&mut self) {
+    self.join_thread();
+  }
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ConfigSchedulerConfig {
@@ -351,6 +370,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ConfigSchedulerConfig {
 
   fn on_scheduled(&self, event_id: u64) {
     if event_id == 1 {
+      // Ensure that observing the scheduled result also means that no module code is still
+      // executing on the thread that submitted it.
+      self.join_thread();
       self.shared_status.store(true, Ordering::SeqCst);
     }
   }
@@ -1316,12 +1338,28 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FakeExternalCachingFilterCo
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(FakeExternalCachingFilter {
       rx: RefCell::new(None),
+      thread_handles: RefCell::new(vec![]),
     })
   }
 }
 
 struct FakeExternalCachingFilter {
   rx: RefCell<Option<std::sync::mpsc::Receiver<String>>>,
+  thread_handles: RefCell<Vec<std::thread::JoinHandle<()>>>,
+}
+
+impl FakeExternalCachingFilter {
+  fn join_threads(&self) {
+    for thread_handle in self.thread_handles.borrow_mut().drain(..) {
+      thread_handle.join().expect("Failed to join thread");
+    }
+  }
+}
+
+impl Drop for FakeExternalCachingFilter {
+  fn drop(&mut self) {
+    self.join_threads();
+  }
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
@@ -1346,7 +1384,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
     // you would typically use a thread pool or an async runtime to handle
     // the asynchronous I/O or computation.
     let scheduler = envoy_filter.new_scheduler();
-    _ = std::thread::spawn(move || {
+    let thread_handle = std::thread::spawn(move || {
       // Simulate some processing to check if the cache key exists.
       let cache_hit = if cache_key == "existing" {
         // Do some processing to get the cached response body in real world.
@@ -1360,12 +1398,16 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
       // We use the event_id pased to the commit method to indicate if the cache key was found.
       scheduler.commit(cache_hit);
     });
+    self.thread_handles.borrow_mut().push(thread_handle);
     // Return StopIteration to indicate that we will continue the processing
     // once the scheduled event is completed.
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 
   fn on_scheduled(&self, envoy_filter: &mut EHF, event_id: u64) {
+    // The event can run as soon as commit() posts it, before the submitting thread has exited.
+    // Join before continuing the stream so completion cannot race dynamic-module unloading.
+    self.join_threads();
     match event_id {
       // Event from the on_request_headers when the cache key was not found.
       0 => {
@@ -1394,9 +1436,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
     let scheduler = envoy_filter.new_scheduler();
-    _ = std::thread::spawn(move || {
+    let thread_handle = std::thread::spawn(move || {
       scheduler.commit(2);
     });
+    self.thread_handles.borrow_mut().push(thread_handle);
 
     // Return StopIteration to indicate that we will continue the processing
     // once the scheduled event is completed.
