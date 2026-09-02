@@ -18,7 +18,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the ``envoy.access_loggers.syslog`` access logger.
 // Sends access logs over syslog. Currently supports UDP and Unix domain sockets.
-// The syslog protocol standard defaults to RFC3164 and also supports RFC5424.
+// The syslog protocol standard defaults to
+// `RFC 3164 <https://www.rfc-editor.org/rfc/rfc3164.html>`_ and also supports
+// `RFC 5424 <https://www.rfc-editor.org/rfc/rfc5424.html>`_.
 // Access log content is configured with Envoy's access log format.
 // Envoy does not retry failed sends or retransmit lost syslog messages.
 //
