@@ -17,11 +17,11 @@ class MessageStreamer {
 public:
   struct Options {
     // Whether to emit a leading @type naming the message.
-    bool emit_type_url = false;
+    bool emit_type_url_ = false;
 
     // Whether the keys are the proto field names or the lowerCamelCase ProtoJSON defaults to.
     // https://protobuf.dev/programming-guides/json/#field-names
-    bool preserve_proto_field_names = false;
+    bool preserve_proto_field_names_ = false;
 
     // Whether the fields the API marks sensitive are emitted, or replaced the way
     // MessageUtil::redact replaces them. Redacted, a sensitive field emits:
@@ -34,7 +34,7 @@ public:
     //   map<string, uint32> ports           "ports": {"http": 0}
     //   google.protobuf.Int64Value ttl      "ttl": "0"
     //   google.protobuf.StringValue name    "name": "[redacted]"
-    bool redact_sensitive_fields = false;
+    bool redact_sensitive_fields_ = false;
   };
 
   // Emits `message` as an object opened in `level`, which must be expecting a value.

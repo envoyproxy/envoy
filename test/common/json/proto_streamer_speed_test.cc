@@ -119,9 +119,9 @@ uint64_t streamMessage(const Protobuf::Message& message) {
     BufferStreamer streamer(buffer);
     BufferStreamer::ArrayPtr array = streamer.makeRootArray();
     MessageStreamer message_streamer(message, *array,
-                                     {.emit_type_url = true,
-                                      .preserve_proto_field_names = true,
-                                      .redact_sensitive_fields = true});
+                                     {.emit_type_url_ = true,
+                                      .preserve_proto_field_names_ = true,
+                                      .redact_sensitive_fields_ = true});
     while (message_streamer.next()) {
       bytes += buffer.length();
       buffer.drain(buffer.length());

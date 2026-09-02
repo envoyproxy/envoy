@@ -100,7 +100,7 @@ MessageStreamer::MessageStreamer(const Protobuf::Message& message, BufferStreame
                                  Options options)
     : options_(options) {
   const std::string name =
-      options_.emit_type_url
+      options_.emit_type_url_
           ? TypeUtil::descriptorFullNameToTypeUrl(message.GetDescriptor()->full_name())
           : "";
   emitNamedMessage(message, level, name, false);
@@ -177,14 +177,14 @@ void MessageStreamer::emitNextField(Frame& frame) {
   const Field& field = *frame.fields_[frame.next_field_++];
 
   frame.field_is_sensitive_ =
-      options_.redact_sensitive_fields &&
+      options_.redact_sensitive_fields_ &&
       (frame.ancestor_is_sensitive_ || MessageUtil::isSensitiveField(field));
   // A cleared field is unset, so it drops out of the output instead of printing a default.
   if (frame.field_is_sensitive_ && redactionClears(field)) {
     return;
   }
 
-  frame.map_->addKey(options_.preserve_proto_field_names ? field.name() : field.json_name());
+  frame.map_->addKey(options_.preserve_proto_field_names_ ? field.name() : field.json_name());
   // is_map implies is_repeated, so handle it first.
   // https://protobuf.dev/programming-guides/proto3/#backwards
   if (field.is_map()) {
@@ -300,7 +300,7 @@ void MessageStreamer::emitMessage(const Protobuf::Message& message, BufferStream
   case Protobuf::Descriptor::WELLKNOWNTYPE_UNSPECIFIED:
     // A TypedStruct has to be reified before it can be redacted, see redactOpaque in
     // source/common/protobuf/utility.cc. The copy comes back redacted, so nothing below it is.
-    if (options_.redact_sensitive_fields && isTypedStruct(descriptor)) {
+    if (options_.redact_sensitive_fields_ && isTypedStruct(descriptor)) {
       pushOwnedFrame(redactedCopy(message, is_sensitive), level, false);
       return;
     }

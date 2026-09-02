@@ -18,7 +18,7 @@ using ::test::common::json::TestNested;
 
 std::pair<std::string, uint32_t> stream(const Protobuf::Message& message,
                                         MessageStreamer::Options options = {
-                                            .preserve_proto_field_names = true}) {
+                                            .preserve_proto_field_names_ = true}) {
   std::string emitted;
   uint32_t pieces = 0;
   Buffer::OwnedImpl buffer;
@@ -128,7 +128,7 @@ TEST(MessageStreamerTest, LowerCamelCaseKeys) {
   std::string printed;
   ASSERT_TRUE(Protobuf::util::MessageToJsonString(message, &printed, options).ok());
   EXPECT_EQ(absl::StrCat("[", printed, "]"),
-            stream(message, {.preserve_proto_field_names = false}).first);
+            stream(message, {.preserve_proto_field_names_ = false}).first);
 }
 
 TEST(MessageStreamerTest, DurationsAndTimestamps) {
@@ -214,9 +214,9 @@ TEST(MessageStreamerTest, NonFiniteNumbers) {
 void expectSameRedactedJson(const envoy::test::Sensitive& message) {
   envoy::test::Sensitive redacted = message;
   MessageUtil::redact(redacted);
-  EXPECT_EQ(
-      printedInArray(redacted),
-      stream(message, {.preserve_proto_field_names = true, .redact_sensitive_fields = true}).first)
+  EXPECT_EQ(printedInArray(redacted),
+            stream(message, {.preserve_proto_field_names_ = true, .redact_sensitive_fields_ = true})
+                .first)
       << message.DebugString();
 }
 
@@ -307,7 +307,7 @@ TEST(MessageStreamerTest, DestroyedMidStream) {
   {
     BufferStreamer streamer(buffer);
     BufferStreamer::ArrayPtr array = streamer.makeRootArray();
-    MessageStreamer message_streamer(message, *array, {.preserve_proto_field_names = true});
+    MessageStreamer message_streamer(message, *array, {.preserve_proto_field_names_ = true});
     ASSERT_TRUE(message_streamer.next());
     ASSERT_TRUE(message_streamer.next());
   }
