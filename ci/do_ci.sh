@@ -930,6 +930,11 @@ case $CI_TARGET in
         bazel info "${BAZEL_BUILD_OPTIONS[@]}"
         ;;
 
+    lockfiles|lockfiles.regenerate)
+        # TODO(phlax): Add other lockfiles here and a check path
+        bazel mod --enable_bzlmod --noenable_workspace deps --lockfile_mode=update
+        ;;
+
     msan)
         setup_clang_toolchain
         echo "bazel MSAN debug build with tests"

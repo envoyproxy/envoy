@@ -110,6 +110,19 @@ def filter_output(tarinfo):
             tarinfo.name.lstrip("./")) else tarinfo)
 
 
+# These have metadata to satisfy workspace
+EXCLUDED_DEPS = (
+    "antlr4-cpp-runtime",
+    "buildtools",
+    "com_github_chrusty_protoc_gen_jsonschema",
+    "fips_cmake_linux_aarch64",
+    "fips_cmake_linux_x86_64",
+    "fips_go_linux_amd64",
+    "fips_go_linux_arm64",
+    "fips_ninja",
+    "rules_ruby")
+
+
 def main():
     repository_locations = json.loads(pathlib.Path(sys.argv[1]).read_text())
     output_filename = sys.argv[2]
@@ -122,7 +135,7 @@ def main():
     use_categories = defaultdict(lambda: defaultdict(list))
     # Bin rendered dependencies into per-use category lists.
     for k, v in repository_locations.items():
-        if k == "antlr4-cpp-runtime" and not v.get("version"):
+        if k in EXCLUDED_DEPS:
             continue
         cpe = v.get('cpe', '')
         if cpe == 'N/A':
@@ -131,6 +144,8 @@ def main():
             cpe = rst_link(cpe, nist_cpe_url(cpe))
         if not v.get("project_name"):
             raise Exception(f"Missing project_name: {k} {v}")
+        if not v.get("version"):
+            raise Exception(f"Missing version info: {k} {v}")
         project_name = v['project_name']
         project_url = v['project_url']
         name = rst_link(project_name, project_url)
