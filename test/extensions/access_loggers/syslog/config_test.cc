@@ -35,7 +35,7 @@ log_format:
 )EOF";
 
 constexpr absl::string_view UdpClusterConfigYaml = R"EOF(
-cluster: syslog
+cluster_name: syslog
 omit_hostname: true
 stat_prefix: test
 log_format:
@@ -96,7 +96,7 @@ TEST_F(SyslogConfigTest, RejectsEmptyStatPrefix) {
 
 TEST_F(SyslogConfigTest, RejectsMissingDestination) {
   auto config = loadConfig(UdpClusterConfigYaml);
-  config.clear_cluster();
+  config.clear_cluster_name();
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
 
   EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
@@ -105,7 +105,7 @@ TEST_F(SyslogConfigTest, RejectsMissingDestination) {
 
 TEST_F(SyslogConfigTest, RejectsEmptyCluster) {
   auto config = loadConfig(UdpClusterConfigYaml);
-  config.set_cluster("");
+  config.set_cluster_name("");
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
 
   EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
@@ -155,7 +155,7 @@ TEST_F(SyslogConfigTest, ValidatesHostnameRequirement) {
 
 TEST_F(SyslogConfigTest, FactoryRejectsUnknownCluster) {
   auto config = loadConfig(UdpClusterConfigYaml);
-  config.set_cluster("unknown");
+  config.set_cluster_name("unknown");
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   EXPECT_CALL(context.server_context_.cluster_manager_, checkActiveStaticCluster("unknown"))
       .WillOnce(Return(absl::InvalidArgumentError("unknown cluster")));

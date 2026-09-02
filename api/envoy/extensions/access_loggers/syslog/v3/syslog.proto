@@ -29,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // .. validated-code-block:: yaml
 //   :type-name: envoy.extensions.access_loggers.syslog.v3.SyslogAccessLogConfig
 //
-//   cluster: syslog
+//   cluster_name: syslog
 //   facility: FACILITY_LOCAL7
 //   severity: INFO
 //   tag: envoy
@@ -107,10 +107,9 @@ message SyslogAccessLogConfig {
     // Unix domain socket destination. This is not supported on Windows.
     config.core.v3.Pipe pipe = 1;
 
-    // Name of the active, statically configured Envoy cluster used for UDP service discovery and
-    // load balancing. Cluster host addresses must be IP addresses. The cluster discovery type can
-    // be ``STRICT_DNS`` to dynamically resolve DNS addresses.
-    string cluster = 9 [(validate.rules).string = {min_len: 1}];
+    // Name of the cluster used to send syslog messages. The cluster must be defined in
+    // ``static_resources`` and cannot be added through CDS.
+    string cluster_name = 9 [(validate.rules).string = {min_len: 1}];
   }
 
   // Facility placed in the PRI header. Defaults to ``LOCAL7``.

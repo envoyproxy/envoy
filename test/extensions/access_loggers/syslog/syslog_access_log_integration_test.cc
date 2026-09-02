@@ -78,7 +78,7 @@ public:
 
   SyslogAccessLogConfig makeClusterConfig() {
     auto config = makeBaseConfig();
-    config.set_cluster("syslog");
+    config.set_cluster_name("syslog");
     return config;
   }
 

@@ -56,8 +56,8 @@ SyslogAccessLog::SyslogAccessLog(AccessLog::FilterPtr&& filter, Formatter::Forma
     if (config->has_pipe()) {
       sender = std::make_unique<StaticUdpSender>(dispatcher, destination, *stats);
     } else {
-      sender = std::make_unique<ClusterUdpSender>(dispatcher, cluster_manager, config->cluster(),
-                                                  *stats);
+      sender = std::make_unique<ClusterUdpSender>(dispatcher, cluster_manager,
+                                                  config->cluster_name(), *stats);
     }
     return std::make_shared<ThreadLocalLogger>(
         std::make_shared<SyslogAccessLoggerImpl>(*config, formatter, std::move(sender), *stats));
