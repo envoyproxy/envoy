@@ -80,6 +80,7 @@ RUNTIME_GUARD(envoy_reloadable_features_happy_eyeballs_sort_non_ip_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_header_mutation_url_encode_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_health_check_after_cluster_warming);
 RUNTIME_GUARD(envoy_reloadable_features_hide_transport_failure_reason_in_response_body);
+RUNTIME_GUARD(envoy_reloadable_features_hot_restart_propagate_stat_tags);
 RUNTIME_GUARD(envoy_reloadable_features_http1_allow_query_method);
 RUNTIME_GUARD(envoy_reloadable_features_http1_close_connection_on_zombie_stream_complete);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
@@ -107,6 +108,7 @@ RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
 // drain sequence and notifies the connections of the covered listeners that a drain has begun,
 // instead of only stopping the listeners, and accepts `skip_exit` to drain without stopping them.
 RUNTIME_GUARD(envoy_reloadable_features_non_graceful_drain_notifies_connections);
+RUNTIME_GUARD(envoy_reloadable_features_oauth2_client_retries_respect_user_retry_on);
 // OAuth2 filter cookie decryption: when true (the default), decrypt() accepts legacy CBC
 // ciphertexts via the legacy AES-256-CBC fallback. When false, only "gcm."-prefixed ciphertexts
 // decrypt; legacy CBC cookies are rejected and the affected users are redirected to the OAuth

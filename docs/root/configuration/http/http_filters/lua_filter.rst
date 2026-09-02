@@ -693,6 +693,37 @@ which means the signature is verified; otherwise, the second element will store 
 
 Encodes the input string as base64. This can be useful for escaping binary data.
 
+.. _config_http_filters_lua_stream_handle_api_base64_decode:
+
+``base64Decode()``
+^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local decoded = handle:base64Decode("aW5wdXQgc3RyaW5n")
+
+Decodes a base64 encoded string, the inverse of :ref:`base64Escape()
+<config_http_filters_lua_stream_handle_api_base64_escape>`. Returns ``nil`` if the input is not
+valid base64, so a value taken from a header or an upstream body can be checked rather than
+having to be trusted:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local claim = request_handle:headers():get("x-encoded-claim")
+    if claim ~= nil then
+      local decoded = request_handle:base64Decode(claim)
+      if decoded == nil then
+        request_handle:respond({[":status"] = "400"}, "malformed claim")
+        return
+      end
+      request_handle:headers():add("x-decoded-claim", decoded)
+    end
+  end
+
+The decoded value may contain NUL bytes, since base64 carries arbitrary binary data; Lua strings
+are length-counted, so this is preserved.
+
 ``timestamp()``
 ^^^^^^^^^^^^^^^
 

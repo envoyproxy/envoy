@@ -1263,12 +1263,10 @@ void ReverseConnectionIOHandle::onConnectionDone(
     updateConnectionState(host_address, cluster_name, connection_key,
                           ReverseConnectionState::Failed);
 
-    // Safely close connection if still valid.
-    if (connection) {
-      if (connection->getSocket()) {
-        connection->getSocket()->ioHandle().resetFileEvents();
-      }
-      connection->close(Network::ConnectionCloseType::NoFlush);
+    // decodeHeaders() runs inside Http1::dispatch(); do not close() here.
+    // The wrapper is deferred-deleted; shutdown() closes the connection afterwards.
+    if (closed && connection && connection->getSocket()) {
+      connection->getSocket()->ioHandle().resetFileEvents();
     }
 
     trackConnectionFailure(host_address, cluster_name, retry_after);

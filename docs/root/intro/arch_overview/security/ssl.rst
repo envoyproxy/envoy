@@ -65,6 +65,42 @@ and/or an `accredited CMVP laboratory <https://csrc.nist.gov/projects/testing-la
 Please note that the FIPS-compliant build is based on an older version of BoringSSL than
 the non-FIPS build, and it doesn't support the most recent QUIC APIs.
 
+.. _arch_overview_ssl_pqc:
+
+Post-Quantum Cryptography (PQC)
+-------------------------------
+
+Envoy's BoringSSL backend supports post-quantum key exchange via **X25519MLKEM768**, a hybrid
+key exchange that combines the classical X25519 elliptic-curve Diffie-Hellman with the ML-KEM
+768 (formerly CRYSTALS-Kyber) post-quantum key encapsulation mechanism. This provides
+protection against "harvest now, decrypt later" attacks by quantum computers while maintaining
+compatibility with existing infrastructure through the hybrid construction.
+
+X25519MLKEM768 is **not** included in the default ECDH curves. To opt in, explicitly set the
+``ecdh_curves`` field in the
+:ref:`TlsParameters <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsParameters>`:
+
+.. literalinclude:: _include/ssl-pqc.yaml
+   :language: yaml
+   :caption: :download:`ssl-pqc.yaml <_include/ssl-pqc.yaml>`
+
+Placing X25519MLKEM768 first gives it the highest priority. Peers that do not support
+ML-KEM will gracefully fall back to X25519 or P-256 via standard TLS group negotiation.
+
+The same configuration pattern applies to upstream (client) connections using
+:ref:`UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.
+
+.. note::
+
+   X25519MLKEM768 is only available in non-FIPS builds of BoringSSL. FIPS builds do not
+   support ML-KEM.
+
+Performance considerations
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+X25519MLKEM768 adds approximately 1 KB to the TLS ``ClientHello`` and ``ServerHello``. This may increase
+the number of packets sent in each direction of the handshake which may affect performance.
+
 .. _arch_overview_ssl_enabling_verification:
 
 Enabling certificate verification

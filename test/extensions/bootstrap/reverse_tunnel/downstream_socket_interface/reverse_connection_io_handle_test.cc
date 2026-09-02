@@ -324,6 +324,9 @@ protected:
   std::unique_ptr<NiceMock<Network::MockClientConnection>> getDeletableConn() {
     auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
     EXPECT_CALL(*mock_connection, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+    // shutdown() calls getSocket() before close(); the mock has no default for a reference return.
+    static Network::ConnectionSocketPtr empty_socket;
+    EXPECT_CALL(*mock_connection, getSocket()).WillRepeatedly(ReturnRef(empty_socket));
 
     return mock_connection;
   }

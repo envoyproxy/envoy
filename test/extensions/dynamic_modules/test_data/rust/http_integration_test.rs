@@ -25,6 +25,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
     "passthrough" => Some(Box::new(PassthroughHttpFilterConfig {})),
+    "local_reply_response_headers" => Some(Box::new(LocalReplyResponseHeadersConfig {})),
     "header_callbacks" => Some(Box::new(HeadersHttpFilterConfig {
       headers_to_add: String::from_utf8(config.to_owned()).unwrap(),
     })),
@@ -180,7 +181,11 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       dropped_filters: Arc::new(AtomicUsize::new(0)),
     })),
     "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig {})),
-    "log_level" => Some(Box::new(LogLevelFilterConfig {})),
+    "log_level" => Some(Box::new(LogLevelFilterConfig {
+      config_log_level: get_log_level() as u32,
+      config_info_enabled: is_log_enabled(envoy_dynamic_module_type_log_level::Info),
+      config_error_enabled: is_log_enabled(envoy_dynamic_module_type_log_level::Error),
+    })),
     _ => panic!("Unknown filter name: {name}"),
   }
 }
@@ -477,6 +482,30 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ConfigStreamFilter {
   }
 }
 
+// Only records that its response-headers callback ran. Used to check that the
+// callback still fires when the response is a local reply the module did not
+// send, such as a `direct_response` route.
+struct LocalReplyResponseHeadersConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for LocalReplyResponseHeadersConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(LocalReplyResponseHeadersFilter {})
+  }
+}
+
+struct LocalReplyResponseHeadersFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LocalReplyResponseHeadersFilter {
+  fn on_response_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    envoy_filter.set_response_header("on-response-headers", b"called");
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+}
+
 struct PassthroughHttpFilterConfig {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for PassthroughHttpFilterConfig {
@@ -532,15 +561,27 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
   }
 }
 
-struct LogLevelFilterConfig {}
+struct LogLevelFilterConfig {
+  config_log_level: u32,
+  config_info_enabled: bool,
+  config_error_enabled: bool,
+}
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for LogLevelFilterConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(LogLevelFilter {})
+    Box::new(LogLevelFilter {
+      config_log_level: self.config_log_level,
+      config_info_enabled: self.config_info_enabled,
+      config_error_enabled: self.config_error_enabled,
+    })
   }
 }
 
-struct LogLevelFilter {}
+struct LogLevelFilter {
+  config_log_level: u32,
+  config_info_enabled: bool,
+  config_error_enabled: bool,
+}
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LogLevelFilter {
   fn on_response_headers(
@@ -548,12 +589,23 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for LogLevelFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    // tests http filter handle
     let level = (get_log_level() as u32).to_string();
     envoy_filter.set_response_header("x-log-level", level.as_bytes());
     let info_enabled = is_log_enabled(envoy_dynamic_module_type_log_level::Info).to_string();
     envoy_filter.set_response_header("x-log-info-enabled", info_enabled.as_bytes());
     let error_enabled = is_log_enabled(envoy_dynamic_module_type_log_level::Error).to_string();
     envoy_filter.set_response_header("x-log-error-enabled", error_enabled.as_bytes());
+    // tests filter config handle
+    let config_level = self.config_log_level.to_string();
+    envoy_filter.set_response_header("x-config-log-level", config_level.as_bytes());
+    let config_info_enabled = self.config_info_enabled.to_string();
+    envoy_filter.set_response_header("x-config-log-info-enabled", config_info_enabled.as_bytes());
+    let config_error_enabled = self.config_error_enabled.to_string();
+    envoy_filter.set_response_header(
+      "x-config-log-error-enabled",
+      config_error_enabled.as_bytes(),
+    );
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }

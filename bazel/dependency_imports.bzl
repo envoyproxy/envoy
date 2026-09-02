@@ -289,12 +289,10 @@ def crates_repositories(cargo_bazel_lockfile):
         name = "envoy_rust_crate_index",
         annotations = {
             # rules_rust re-roots CC/CXX/LD into the execroot for build scripts, but its
-            # inherited CFLAGS/CXXFLAGS leave the toolchain's execroot-relative
-            # `-imacros external/llvm_toolchain/redacted_dates.h` path untouched. Run
-            # ring's build.rs from the execroot so the existing toolchain path resolves
-            # without changing redaction semantics or compile command lines.
+            # inherited CFLAGS/CXXFLAGS leave the toolchain's execroot-relative paths
+            # (`-Bexternal/...`, `-resource-dir external/...`) untouched. Run ring's
+            # build.rs from the execroot so those paths resolve.
             "ring": [crate.annotation(
-                build_script_data = ["@llvm_toolchain//:redacted_dates.h"],
                 build_script_rundir = ".",
             )],
         },

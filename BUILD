@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 exports_files([
     "VERSION.txt",
     "API_VERSION.txt",
+    "MODULE.bazel.lock",
     ".clang-format",
     "pytest.ini",
     ".coveragerc",
