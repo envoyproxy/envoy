@@ -67,6 +67,8 @@ constexpr absl::string_view BODY_TOO_LARGE = "mcp_body_too_large";
 // HTTP header names
 constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
 constexpr absl::string_view MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version";
+constexpr absl::string_view MCP_METHOD_HEADER = "mcp-method";
+constexpr absl::string_view MCP_NAME_HEADER = "mcp-name";
 
 // Method names
 namespace Methods {
