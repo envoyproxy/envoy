@@ -58,8 +58,8 @@ jobs:
       container-output: |
         "bazel-bin/test/performance/test_binary_size": test_binary_size/${{ matrix.target }}
       target: ${{ matrix.target }}
-      uploads: |
-        ${{ matrix.target }}: /tmp/container-output/test_binary_size
+      upload-name: ${{ matrix.target }}
+      upload-path: /tmp/container-output/test_binary_size
       timeout-minutes: 90
     strategy:
       matrix:

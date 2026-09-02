@@ -57,8 +57,8 @@ jobs:
       runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
       timeout-minutes: 120
       trusted: ${{ inputs.trusted }}
-      uploads: |
-        release.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/bin/
+      upload-name: release.${{ inputs.arch }}
+      upload-path: container/envoy/${{ inputs.arch }}/bin/
 
   docker:
     secrets:
@@ -87,8 +87,8 @@ jobs:
         export ENVOY_DOCKER_SAVE_IMAGE=true
         export ENVOY_OCI_DIR=build_images
       trusted: ${{ inputs.trusted }}
-      uploads: |
-        oci.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/build_images
+      upload-name: oci.${{ inputs.arch }}
+      upload-path: container/envoy/${{ inputs.arch }}/build_images
       runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
 
   distribution:
@@ -122,5 +122,5 @@ jobs:
       request: ${{ inputs.request }}
       runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
       trusted: ${{ inputs.trusted }}
-      uploads: |
-        packages.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}
+      upload-name: packages.${{ inputs.arch }}
+      upload-path: container/envoy/${{ inputs.arch }}
