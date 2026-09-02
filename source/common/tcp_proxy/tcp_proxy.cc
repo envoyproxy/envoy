@@ -30,6 +30,7 @@
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/request_id_extension_impl.h"
 #include "source/common/network/application_protocol.h"
+#include "source/common/network/drain_close_util.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -224,6 +225,7 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
       upstream_drain_manager_slot_(context.serverFactoryContext().threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
       random_generator_(context.serverFactoryContext().api().randomGenerator()),
+      server_factory_context_(context.serverFactoryContext()),
       regex_engine_(context.serverFactoryContext().regexEngine()),
       drain_decision_(context.drainDecision()),
       drain_close_scope_(context.direction() == envoy::config::core::v3::TrafficDirection::INBOUND
@@ -344,6 +346,8 @@ UpstreamDrainManager& Config::drainManager() {
 Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
     : tracing_config_(Tracing::EgressConfig::get()), config_(config),
       cluster_manager_(cluster_manager), downstream_callbacks_(*this),
+      use_connection_event_drain_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")),
       upstream_callbacks_(new UpstreamCallbacks(this)),
       upstream_decoder_filter_callbacks_(HttpStreamDecoderFilterCallbacks(this)) {
   ASSERT(config != nullptr);
@@ -433,6 +437,9 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   read_callbacks_ = &callbacks;
   ENVOY_CONN_LOG(debug, "new tcp proxy session", read_callbacks_->connection());
 
+  // Captured once here rather than plumbed through the filter factory: the drain type belongs to
+  // the listener that accepted this connection, and is reachable from the connection itself.
+  drain_type_ = Network::listenerDrainType(read_callbacks_->connection());
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   read_callbacks_->connection().enableHalfClose(true);
 
@@ -1289,8 +1296,13 @@ void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
 void Filter::maybeCloseDownstreamForDrainClose() {
   if (!config_->checkDrainClose() || downstream_closed_ ||
-      read_callbacks_->connection().state() != Network::Connection::State::Open ||
-      !config_->drainDecision().drainClose(config_->drainCloseScope())) {
+      read_callbacks_->connection().state() != Network::Connection::State::Open) {
+    return;
+  }
+
+  // Note that the drain decision is only evaluated once it is known to be needed, since it
+  // consumes a random number on every call.
+  if (!shouldDrainClose()) {
     return;
   }
 
@@ -1298,6 +1310,15 @@ void Filter::maybeCloseDownstreamForDrainClose() {
   config_->stats().downstream_cx_drain_close_.inc();
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite,
                                       StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose);
+}
+
+bool Filter::shouldDrainClose() {
+  if (!use_connection_event_drain_) {
+    return config_->drainDecision().drainClose(config_->drainCloseScope());
+  }
+
+  return Network::shouldDrainClose(config_->serverFactoryContext(), drain_type_,
+                                   connection_drain_event_);
 }
 
 void Filter::onUpstreamEvent(Network::ConnectionEvent event) {

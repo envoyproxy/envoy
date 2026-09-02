@@ -35,6 +35,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -43,8 +44,15 @@
 #include "gtest/gtest.h"
 #include "ocpdiag/core/testing/status_matchers.h"
 
+using testing::_;
 using testing::Contains;
-using testing::Key;
+using testing::Eq;
+using testing::Gt;
+using testing::HasSubstr;
+using testing::IsSupersetOf;
+using testing::MatchesRegex;
+using testing::Pair;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -3927,7 +3935,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveDynamicMetadata) {
 
   auto response = sendDownstreamRequest(std::nullopt);
 
-  testSendDyanmicMetadata();
+  testSendDynamicMetadata();
 
   handleUpstreamRequest();
 
@@ -3958,7 +3966,7 @@ TEST_P(ExtProcIntegrationTest, SendAndReceiveTypedDynamicMetadata) {
 
   auto response = sendDownstreamRequest(std::nullopt);
 
-  testSendTypedDyanmicMetadata();
+  testSendTypedDynamicMetadata();
 
   handleUpstreamRequest();
 
@@ -4009,11 +4017,11 @@ TEST_P(ExtProcIntegrationTest, SendClusterMetadata) {
   const auto& received_metadata = request_headers_msg.metadata_context();
 
   const auto& filter_metadata = received_metadata.filter_metadata();
-  EXPECT_EQ(filter_metadata.at("cluster_ns_untyped").fields().at("some_string").string_value(),
-            "some_value");
+  EXPECT_THAT(filter_metadata.at("cluster_ns_untyped").fields(),
+              Contains(IsStructString("some_string", "some_value")));
 
   const auto& typed_filter_metadata = received_metadata.typed_filter_metadata();
-  EXPECT_THAT(typed_filter_metadata, Contains(Key("cluster_ns_typed")));
+  EXPECT_THAT(typed_filter_metadata, Contains(Pair("cluster_ns_typed", _)));
 
   processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
@@ -4061,20 +4069,15 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
         EXPECT_TRUE(req.has_request_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
-        EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
-        EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
-        EXPECT_EQ(proto_struct.fields().at("request.size").number_value(), 0);
-        EXPECT_EQ(proto_struct.fields().at("connection.mtls").bool_value(), false);
-        EXPECT_TRUE(proto_struct.fields().at("connection.id").has_number_value());
+        EXPECT_THAT(proto_struct.fields(),
+                    UnorderedElementsAre(
+                        IsStructString("request.path", "/"),
+                        IsStructString("request.method", "GET"),
+                        IsStructString("request.scheme", "http"), IsStructNumber("request.size", 0),
+                        IsStructBool("connection.mtls", false), IsStructNumber("connection.id", _),
+                        IsStructBool("connection.peer_certificate_valid", false)));
         // connection.peer_certificate is not present without TLS
-        EXPECT_FALSE(proto_struct.fields().contains("connection.peer_certificate"));
-        // connection.peer_certificate_valid is present and false without TLS (like connection.mtls)
-        EXPECT_EQ(proto_struct.fields().at("connection.peer_certificate_valid").bool_value(),
-                  false);
-        // Make sure we did not include the attribute which was not yet available.
-        EXPECT_EQ(proto_struct.fields().size(), 7);
-        EXPECT_FALSE(proto_struct.fields().contains("response.code"));
+        // response.code should not be present.
 
         // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
         EXPECT_TRUE(req.request_headers().attributes().empty());
@@ -4093,12 +4096,12 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
         EXPECT_TRUE(req.has_response_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_EQ(proto_struct.fields().at("response.code").number_value(), 200);
-        EXPECT_EQ(proto_struct.fields().at("response.code_details").string_value(),
-                  StreamInfo::ResponseCodeDetails::get().ViaUpstream);
-
-        // Make sure we didn't include request attributes in the response-path processing request.
-        EXPECT_FALSE(proto_struct.fields().contains("request.method"));
+        EXPECT_THAT(proto_struct.fields(),
+                    UnorderedElementsAre(
+                        IsStructNumber("response.code", 200),
+                        IsStructString("response.code_details",
+                                       StreamInfo::ResponseCodeDetails::get().ViaUpstream)));
+        // request attributes should not be present in the response-path processing request.
 
         // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
         EXPECT_TRUE(req.response_headers().attributes().empty());
@@ -4147,24 +4150,26 @@ TEST_P(ExtProcIntegrationTest, RequestAttributesInResponseOnlyProcessing) {
   upstream_request_->encodeData("body", /*end_stream=*/true);
 
   // Handle response headers message.
-  processGenericMessage(
-      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
-        // Add something to the response so the message isn't seen as spurious
-        envoy::service::ext_proc::v3::HeadersResponse headers_resp;
-        *(resp.mutable_response_headers()) = headers_resp;
+  processGenericMessage(*grpc_upstreams_[0], true,
+                        [](const ProcessingRequest& req, ProcessingResponse& resp) {
+                          // Add something to the response so the message isn't seen as spurious
+                          envoy::service::ext_proc::v3::HeadersResponse headers_resp;
+                          *(resp.mutable_response_headers()) = headers_resp;
 
-        EXPECT_TRUE(req.has_response_headers());
-        EXPECT_EQ(req.attributes().size(), 1);
-        auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_EQ(proto_struct.fields().at("request.path").string_value(), "/");
-        EXPECT_EQ(proto_struct.fields().at("request.method").string_value(), "GET");
-        EXPECT_EQ(proto_struct.fields().at("request.scheme").string_value(), "http");
-        EXPECT_EQ(proto_struct.fields().at("request.size").number_value(), 0);
+                          EXPECT_TRUE(req.has_response_headers());
+                          EXPECT_EQ(req.attributes().size(), 1);
+                          auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+                          EXPECT_THAT(proto_struct.fields(),
+                                      UnorderedElementsAre(IsStructString("request.path", "/"),
+                                                           IsStructString("request.method", "GET"),
+                                                           IsStructString("request.scheme", "http"),
+                                                           IsStructNumber("request.size", 0)));
 
-        // Make sure we are not including any data in the deprecated HttpHeaders.attributes.
-        EXPECT_TRUE(req.response_headers().attributes().empty());
-        return true;
-      });
+                          // Make sure we are not including any data in the deprecated
+                          // HttpHeaders.attributes.
+                          EXPECT_TRUE(req.response_headers().attributes().empty());
+                          return true;
+                        });
 
   verifyDownstreamResponse(*response, 200);
 }
@@ -4192,29 +4197,28 @@ TEST_P(ExtProcIntegrationTest, RequestAttributeVirtualHostMetadataIsTextProto) {
   processGenericMessage(
       *grpc_upstreams_[0], true,
       [](const ProcessingRequest& req, ProcessingResponse& resp) -> bool {
-        // Send a valid request-headers response for this request-headers processing step.
+        // Send a valid request-headers response for this request-headers
+        // processing step.
         resp.mutable_request_headers();
 
         EXPECT_TRUE(req.has_request_headers());
-        EXPECT_EQ(req.attributes().size(), 1);
-        const auto& proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_THAT(proto_struct.fields(), Contains(Key("xds.virtual_host_metadata")));
-        const auto& metadata_textproto =
-            proto_struct.fields().at("xds.virtual_host_metadata").string_value();
+        EXPECT_THAT(req.attributes(),
+                    UnorderedElementsAre(IsStructField(
+                        "envoy.filters.http.ext_proc",
+                        UnorderedElementsAre(IsStructString("xds.virtual_host_metadata", _)))));
+        const auto& metadata_textproto = req.attributes()
+                                             .at("envoy.filters.http.ext_proc")
+                                             .fields()
+                                             .at("xds.virtual_host_metadata")
+                                             .string_value();
         envoy::config::core::v3::Metadata parsed_metadata;
         const bool parsed =
             Protobuf::TextFormat::ParseFromString(metadata_textproto, &parsed_metadata);
         EXPECT_TRUE(parsed);
-        EXPECT_THAT(parsed_metadata.filter_metadata(), Contains(Key("someKey")));
-        EXPECT_EQ(parsed_metadata.filter_metadata()
-                      .at("someKey")
-                      .fields()
-                      .at("apiIdentifier")
-                      .string_value(),
-                  "test-api");
-        EXPECT_EQ(
-            parsed_metadata.filter_metadata().at("someKey").fields().at("extHost").string_value(),
-            "test-host");
+        EXPECT_THAT(parsed_metadata.filter_metadata(),
+                    Contains(IsStructField(
+                        "someKey", UnorderedElementsAre(IsStructString("apiIdentifier", "test-api"),
+                                                        IsStructString("extHost", "test-host")))));
         return true;
       });
 
@@ -4253,10 +4257,9 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
         EXPECT_TRUE(req.has_request_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_EQ(proto_struct.fields().at("remapped.method").string_value(), "POST");
-        EXPECT_EQ(proto_struct.fields().at("foo.path").string_value(), "/");
-        // Make sure we did not include anything else
-        EXPECT_EQ(proto_struct.fields().size(), 2);
+        EXPECT_THAT(proto_struct.fields(),
+                    UnorderedElementsAre(IsStructString("remapped.method", "POST"),
+                                         IsStructString("foo.path", "/")));
         return true;
       });
 
@@ -4283,10 +4286,9 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
                           EXPECT_TRUE(req.has_response_headers());
                           EXPECT_EQ(req.attributes().size(), 1);
                           auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-                          EXPECT_EQ(proto_struct.fields().at("remapped.code").number_value(), 200);
-                          EXPECT_GT(proto_struct.fields().at("user.port").number_value(), 0);
-                          // Make sure we did not include anything else, such as request attributes
-                          EXPECT_EQ(proto_struct.fields().size(), 2);
+                          EXPECT_THAT(proto_struct.fields(),
+                                      UnorderedElementsAre(IsStructNumber("remapped.code", 200),
+                                                           IsStructNumber("user.port", Gt(0))));
                           return true;
                         });
 
@@ -4342,9 +4344,8 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilderOverrides) {
         EXPECT_TRUE(req.has_request_headers());
         EXPECT_EQ(req.attributes().size(), 1);
         auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
-        EXPECT_EQ(proto_struct.fields().at("remapped.method").string_value(), "POST");
-        // Make sure we did not include anything else
-        EXPECT_EQ(proto_struct.fields().size(), 1);
+        EXPECT_THAT(proto_struct.fields(),
+                    UnorderedElementsAre(IsStructString("remapped.method", "POST")));
         return true;
       });
 
@@ -5214,7 +5215,7 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
     auto field_value = json_log->getString(field_name);
     EXPECT_OK(field_value) << "Field " << field_name << " should be accessible";
     if (field_value.ok()) {
-      EXPECT_THAT(*field_value, testing::MatchesRegex("[0-9]+"))
+      EXPECT_THAT(*field_value, MatchesRegex("[0-9]+"))
           << "Field " << field_name << " should be numeric, got: " << *field_value;
     }
   };
@@ -5248,15 +5249,14 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   // Test non-existent field handling (coverage for getField fallback).
   // When a field doesn't exist, it's not included in the JSON output at all.
   auto non_existent = json_log->getString("field_non_existent");
-  EXPECT_THAT(non_existent,
-              HasStatusMessage(testing::HasSubstr("key 'field_non_existent' missing")));
+  EXPECT_THAT(non_existent, HasStatusMessage(HasSubstr("key 'field_non_existent' missing")));
 
   // Bytes are only populated for Envoy gRPC, not Google gRPC.
   auto bytes_sent = json_log->getString("field_bytes_sent");
   auto bytes_received = json_log->getString("field_bytes_received");
   if (IsEnvoyGrpc()) {
-    EXPECT_THAT(*bytes_sent, testing::Not(testing::Eq("0")));
-    EXPECT_THAT(*bytes_received, testing::Not(testing::Eq("0")));
+    EXPECT_THAT(*bytes_sent, Not(Eq("0")));
+    EXPECT_THAT(*bytes_received, Not(Eq("0")));
   } else {
     EXPECT_EQ(*bytes_sent, "0");
     EXPECT_EQ(*bytes_received, "0");
@@ -5359,10 +5359,10 @@ TEST_P(ExtProcIntegrationTest, AccessLogExtProcInCompositeFilter) {
 
   const std::string log_content = waitForAccessLog(tunnel_access_log_path_);
   EXPECT_FALSE(log_content.empty());
-  EXPECT_THAT(log_content, testing::HasSubstr("request_header_call_status"));
-  EXPECT_THAT(log_content, testing::HasSubstr("request_header_latency_us"));
-  EXPECT_THAT(log_content, testing::HasSubstr("response_header_call_status"));
-  EXPECT_THAT(log_content, testing::HasSubstr("response_header_latency_us"));
+  EXPECT_THAT(log_content, HasSubstr("request_header_call_status"));
+  EXPECT_THAT(log_content, HasSubstr("request_header_latency_us"));
+  EXPECT_THAT(log_content, HasSubstr("response_header_call_status"));
+  EXPECT_THAT(log_content, HasSubstr("response_header_latency_us"));
 }
 
 TEST_P(ExtProcIntegrationTest, ExtProcLoggingFailedOpen) {

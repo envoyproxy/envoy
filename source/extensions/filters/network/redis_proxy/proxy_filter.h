@@ -13,6 +13,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/event/real_time_system.h"
+#include "source/common/network/drain_close_util.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
@@ -55,9 +56,11 @@ public:
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
       Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
       Api::Api& api, TimeSource& time_source,
-      Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
+      Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
+      Server::Configuration::ServerFactoryContext& server_context);
 
   const Network::DrainDecision& drain_decision_;
+  Server::Configuration::ServerFactoryContext& server_context_;
   Runtime::Loader& runtime_;
   const std::string stat_prefix_;
   const std::string redis_drain_close_runtime_key_{"redis.drain_close_enabled"};
@@ -108,6 +111,13 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+  // Only records the event; the drain-close decision is made in onResponse() once there are no
+  // pending requests.
+  void onDrain(Network::ConnectionDrainEvent drain_event) override {
+    if (!connection_drain_event_.has_value()) {
+      connection_drain_event_ = drain_event;
+    }
+  }
 
   // Common::Redis::DecoderCallbacks
   void onRespValue(Common::Redis::RespValuePtr&& value) override;
@@ -200,11 +210,22 @@ private:
   // guarded against reentrant calls because a resumed AUTH can resolve synchronously (gRPC send()
   // may fail inline) and re-enter this method from within processRespValue.
   void resumeAuthHeldRequests();
+  // Returns true if the connection should be drain-closed.
+  bool shouldDrainClose();
 
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;
   CommandSplitter::Instance& splitter_;
   ProxyFilterConfigSharedPtr config_;
+  // Set when the connection is notified of a drain sequence via onDrain().
+  std::optional<Network::ConnectionDrainEvent> connection_drain_event_;
+  // The drain type of the listener owning this connection, used to decide whether
+  // /healthcheck/fail should drain-close it.
+  envoy::config::listener::v3::Listener::DrainType drain_type_{
+      envoy::config::listener::v3::Listener::DEFAULT};
+  // Latched when the filter is created so it is not re-read on every response. See
+  // shouldDrainClose().
+  const bool use_connection_event_drain_ = false;
   Buffer::OwnedImpl encoder_buffer_;
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;

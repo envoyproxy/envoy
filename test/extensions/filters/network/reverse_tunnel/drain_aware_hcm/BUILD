@@ -17,13 +17,15 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/network/reverse_tunnel/drain_aware_hcm:drain_aware_config",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -33,7 +35,7 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",

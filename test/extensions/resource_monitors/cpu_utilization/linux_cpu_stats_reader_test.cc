@@ -518,8 +518,9 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV2ReaderWhenV2FilesExist) {
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillOnce(Return(true));
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective")).WillOnce(Return(true));
 
-  auto reader = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
-  EXPECT_NE(reader, nullptr);
+  auto reader_or_error = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+  EXPECT_TRUE(reader_or_error.ok());
+  EXPECT_NE(reader_or_error.value(), nullptr);
 }
 
 TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV1ReaderWhenOnlyV1FilesExist) {
@@ -545,11 +546,12 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV1ReaderWhenOnlyV1FilesExis
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).WillOnce(Return(true));
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuacct/cpuacct.usage")).WillOnce(Return(true));
 
-  auto reader = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
-  EXPECT_NE(reader, nullptr);
+  auto reader_or_error = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+  EXPECT_TRUE(reader_or_error.ok());
+  EXPECT_NE(reader_or_error.value(), nullptr);
 }
 
-TEST(LinuxContainerCpuStatsReaderFactoryTest, ThrowsWhenNoCgroupFilesExist) {
+TEST(LinuxContainerCpuStatsReaderFactoryTest, ReturnsErrorWhenNoCgroupFilesExist) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::MockDispatcher dispatcher;
   Server::MockOptions options;
@@ -574,8 +576,9 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, ThrowsWhenNoCgroupFilesExist) {
       .Times(testing::AtMost(1))
       .WillRepeatedly(Return(false));
 
-  EXPECT_THROW(LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource()),
-               EnvoyException);
+  auto result = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(std::string(result.status().message()), ::testing::Eq(NoSupportedCGroupMessage));
 }
 
 // =============================================================================

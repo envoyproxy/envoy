@@ -15,6 +15,17 @@ Protobuf::Value TestFormatter::formatValue(const Context& context,
   return ValueUtil::stringValue(format(context, stream_info).value());
 }
 
+bool TestFormatter::formatTo(std::string& sink, const Context& context,
+                             const StreamInfo::StreamInfo& stream_info) const {
+  sink.append(format(context, stream_info).value());
+  return true;
+}
+
+void TestFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                  const StreamInfo::StreamInfo& stream_info) const {
+  sink.addString(format(context, stream_info).value());
+}
+
 absl::StatusOr<FormatterProviderPtr> TestCommandParser::parse(absl::string_view command,
                                                               absl::string_view,
                                                               std::optional<size_t>) const {
@@ -50,6 +61,17 @@ std::optional<std::string> AdditionalFormatter::format(const Context&,
 Protobuf::Value AdditionalFormatter::formatValue(const Context& context,
                                                  const StreamInfo::StreamInfo& stream_info) const {
   return ValueUtil::stringValue(format(context, stream_info).value());
+}
+
+bool AdditionalFormatter::formatTo(std::string& sink, const Context& context,
+                                   const StreamInfo::StreamInfo& stream_info) const {
+  sink.append(format(context, stream_info).value());
+  return true;
+}
+
+void AdditionalFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                        const StreamInfo::StreamInfo& stream_info) const {
+  sink.addString(format(context, stream_info).value());
 }
 
 absl::StatusOr<FormatterProviderPtr> AdditionalCommandParser::parse(absl::string_view command,

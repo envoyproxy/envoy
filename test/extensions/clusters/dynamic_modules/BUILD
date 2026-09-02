@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
+    "envoy_cc_dyn_module_test",
     "envoy_package",
 )
 
@@ -8,7 +8,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     data = [
@@ -18,7 +18,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:cluster_run_on_all_workers",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/http:message_lib",
@@ -27,6 +27,11 @@ envoy_cc_test(
         "//source/extensions/clusters/dynamic_modules:cluster_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
+        "//source/extensions/load_balancing_policies/least_request:config",
+        "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/load_balancing_policies/random:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/common/upstream:utility_lib",
         "//test/extensions/dynamic_modules:util",
@@ -47,7 +52,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -56,7 +61,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:cluster_filter_state_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/clusters/dynamic_modules:cluster",

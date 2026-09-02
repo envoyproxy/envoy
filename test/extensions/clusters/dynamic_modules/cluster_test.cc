@@ -24,6 +24,7 @@
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
@@ -37,7 +38,14 @@ namespace DynamicModules {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
+using ::testing::_;
+using ::testing::An;
+using ::testing::Contains;
+using ::testing::HasSubstr;
+using ::testing::IsSupersetOf;
 using ::testing::Not;
+using ::testing::Return;
+using ::testing::UnorderedElementsAre;
 
 // Test peer class to access private members of DynamicModuleCluster.
 // This must be outside the anonymous namespace to match the friend declaration.
@@ -80,9 +88,6 @@ public:
     lb.hosts_removed_ = removed;
   }
 };
-
-using ::testing::_;
-using ::testing::Return;
 
 namespace {
 
@@ -207,8 +212,52 @@ TEST_F(DynamicModuleClusterTest, CreationWithClusterConfig) {
   EXPECT_NE(nullptr, result->second);
 }
 
-// Test that a non-CLUSTER_PROVIDED lb_policy is rejected.
-TEST_F(DynamicModuleClusterTest, InvalidLbPolicy) {
+// Test that CLUSTER_PROVIDED lb_policy returns a non-null thread-aware LB.
+TEST_F(DynamicModuleClusterTest, ClusterProvidedLbPolicy) {
+  const std::string yaml = R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: test
+)EOF";
+
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // CLUSTER_PROVIDED should return a non-null thread-aware LB (module LB).
+  EXPECT_NE(nullptr, result->second);
+}
+
+// Test that LEAST_REQUEST lb_policy is accepted and returns nullptr thread-aware LB.
+TEST_F(DynamicModuleClusterTest, LeastRequestLbPolicy) {
+  const std::string yaml = R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: LEAST_REQUEST
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: test
+)EOF";
+
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // Native LB policies should return nullptr thread-aware LB.
+  EXPECT_EQ(nullptr, result->second);
+}
+
+// Test that ROUND_ROBIN lb_policy is accepted and returns nullptr thread-aware LB.
+TEST_F(DynamicModuleClusterTest, RoundRobinLbPolicy) {
   const std::string yaml = R"EOF(
 name: test_cluster
 connect_timeout: 0.25s
@@ -223,13 +272,82 @@ cluster_type:
 )EOF";
 
   auto result = createCluster(yaml);
-  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("CLUSTER_PROVIDED")));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // Native LB policies should return nullptr thread-aware LB.
+  EXPECT_EQ(nullptr, result->second);
+}
+
+// Test that RANDOM lb_policy is accepted and returns nullptr thread-aware LB.
+TEST_F(DynamicModuleClusterTest, RandomLbPolicy) {
+  const std::string yaml = R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: RANDOM
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: test
+)EOF";
+
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // Native LB policies should return nullptr thread-aware LB.
+  EXPECT_EQ(nullptr, result->second);
+}
+
+// Test that RING_HASH lb_policy is accepted and returns nullptr thread-aware LB.
+TEST_F(DynamicModuleClusterTest, RingHashLbPolicy) {
+  const std::string yaml = R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: RING_HASH
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: test
+)EOF";
+
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // Native LB policies should return nullptr thread-aware LB.
+  EXPECT_EQ(nullptr, result->second);
+}
+
+// Test that MAGLEV lb_policy is accepted and returns nullptr thread-aware LB.
+TEST_F(DynamicModuleClusterTest, MaglevLbPolicy) {
+  const std::string yaml = R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: MAGLEV
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: test
+)EOF";
+
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  EXPECT_NE(nullptr, result->first);
+  // Native LB policies should return nullptr thread-aware LB.
+  EXPECT_EQ(nullptr, result->second);
 }
 
 // Test that a missing module fails gracefully.
 TEST_F(DynamicModuleClusterTest, MissingModule) {
   auto result = createCluster(makeYamlConfig("nonexistent_module"));
-  ASSERT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to load dynamic module")));
+  ASSERT_THAT(result, HasStatusMessage(HasSubstr("Failed to load dynamic module")));
 
   EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "module_load_error", "test"));
 }
@@ -237,8 +355,8 @@ TEST_F(DynamicModuleClusterTest, MissingModule) {
 // Test that on_cluster_config_new returning nullptr fails.
 TEST_F(DynamicModuleClusterTest, ConfigNewFail) {
   auto result = createCluster(makeYamlConfig("cluster_config_new_fail"));
-  ASSERT_THAT(result, HasStatusMessage(
-                          testing::HasSubstr("Failed to create in-module cluster configuration")));
+  ASSERT_THAT(result,
+              HasStatusMessage(HasSubstr("Failed to create in-module cluster configuration")));
 
   // The module loads fine but its config creation fails, counted as config_init_error.
   EXPECT_EQ(1U, failureCounter(server_context_.serverScope(), "config_init_error", "test"));
@@ -248,8 +366,7 @@ TEST_F(DynamicModuleClusterTest, ConfigNewFail) {
 // Test that on_cluster_new returning nullptr fails.
 TEST_F(DynamicModuleClusterTest, ClusterNewFail) {
   auto result = createCluster(makeYamlConfig("cluster_new_fail"));
-  ASSERT_THAT(result,
-              HasStatusMessage(testing::HasSubstr("Failed to create in-module cluster instance")));
+  ASSERT_THAT(result, HasStatusMessage(HasSubstr("Failed to create in-module cluster instance")));
 }
 
 // The cluster_config Any cannot be unpacked. This is parsed before the module is loaded, so it is
@@ -1137,8 +1254,7 @@ TEST_F(DynamicModuleClusterTest, LbHostInformationWithMetadataAndLocality) {
 TEST_F(DynamicModuleClusterTest, MissingClusterSymbol) {
   // The "no_op" module exports on_program_init but not cluster symbols.
   auto result = createCluster(makeYamlConfig("no_op"));
-  ASSERT_THAT(result,
-              HasStatusMessage(testing::HasSubstr("envoy_dynamic_module_on_cluster_config_new")));
+  ASSERT_THAT(result, HasStatusMessage(HasSubstr("envoy_dynamic_module_on_cluster_config_new")));
 }
 
 // Test that creating a cluster with BytesValue config type works.
@@ -1591,7 +1707,7 @@ TEST_F(DynamicModuleClusterTest, ServerInitializedCallback) {
   Server::ServerLifecycleNotifier::StageCallback captured_cb;
   EXPECT_CALL(server_context_.lifecycle_notifier_,
               registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
-                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+                               An<Server::ServerLifecycleNotifier::StageCallback>()))
       .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_cb), testing::Return(nullptr)));
 
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
@@ -1619,10 +1735,9 @@ TEST_F(DynamicModuleClusterTest, DrainStartedCallback) {
 TEST_F(DynamicModuleClusterTest, ShutdownCallbackWithCompletion) {
   // Capture the shutdown callback registered during cluster construction.
   Server::ServerLifecycleNotifier::StageCallbackWithCompletion captured_shutdown_cb;
-  EXPECT_CALL(
-      server_context_.lifecycle_notifier_,
-      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                               An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
       .WillOnce(
           testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
 
@@ -1639,10 +1754,9 @@ TEST_F(DynamicModuleClusterTest, ShutdownCallbackWithCompletion) {
 TEST_F(DynamicModuleClusterTest, ShutdownCallbackAfterClusterDestroy) {
   // Capture the shutdown callback registered during cluster construction.
   Server::ServerLifecycleNotifier::StageCallbackWithCompletion captured_shutdown_cb;
-  EXPECT_CALL(
-      server_context_.lifecycle_notifier_,
-      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                               An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
       .WillOnce(
           testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
 
@@ -1671,14 +1785,13 @@ TEST_F(DynamicModuleClusterTest, AllLifecycleCallbacksRegistered) {
 
   EXPECT_CALL(server_context_.lifecycle_notifier_,
               registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
-                               testing::An<Server::ServerLifecycleNotifier::StageCallback>()))
+                               An<Server::ServerLifecycleNotifier::StageCallback>()))
       .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_init_cb), testing::Return(nullptr)));
   EXPECT_CALL(server_context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
       .WillOnce(testing::DoAll(testing::SaveArg<1>(&captured_drain_cb), testing::Return(nullptr)));
-  EXPECT_CALL(
-      server_context_.lifecycle_notifier_,
-      registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-                       testing::An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+  EXPECT_CALL(server_context_.lifecycle_notifier_,
+              registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                               An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
       .WillOnce(
           testing::DoAll(testing::SaveArg<1>(&captured_shutdown_cb), testing::Return(nullptr)));
 
@@ -2872,7 +2985,7 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataNumber) {
   EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
       context_ptr, ns_buf, key_buf, 42.0));
   const auto& fields = stream_info.metadata_.filter_metadata().at(ns).fields();
-  EXPECT_EQ(42.0, fields.at(key).number_value());
+  EXPECT_THAT(fields, Contains(IsStructNumber(key, 42.0)));
 }
 
 // Test set_dynamic_metadata_string with nullptr context returns false.
@@ -2921,7 +3034,7 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataString) {
   EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
       context_ptr, ns_buf, key_buf, value_buf));
   const auto& fields = stream_info.metadata_.filter_metadata().at(ns).fields();
-  EXPECT_EQ("test_value", fields.at(key).string_value());
+  EXPECT_THAT(fields, Contains(IsStructString(key, "test_value")));
 }
 
 // =================================================================================================
@@ -3475,8 +3588,8 @@ TEST_F(DynamicModuleClusterTest, AddHostsWithLocalityAndMetadata) {
   const auto& filter_metadata = hosts[0]->metadata()->filter_metadata();
   auto it = filter_metadata.find("envoy.lb");
   ASSERT_NE(it, filter_metadata.end());
-  EXPECT_EQ("42", it->second.fields().at("shard").string_value());
-  EXPECT_EQ("my-service", it->second.fields().at("service").string_value());
+  EXPECT_THAT(it->second.fields(), UnorderedElementsAre(IsStructString("shard", "42"),
+                                                        IsStructString("service", "my-service")));
 }
 
 // Test adding hosts with locality via the ABI callback.

@@ -9,8 +9,8 @@ Overview
 The :ref:`DynamicModuleClusterSpecifier <envoy_v3_api_msg_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier>`
 configuration specifies a cluster specifier backed by a :ref:`dynamic module <arch_overview_dynamic_modules>`.
 The module selects the upstream cluster for a request and may replace the timeout, idle timeout,
-priority, request body buffer limit, cluster not found response code, retry policy, metadata match
-criteria and request mirroring policies of the matched route.
+priority, request body buffer limit, cluster not found response code, hash policy, retry policy,
+metadata match criteria and request mirroring policies of the matched route.
 
 The module is invoked while the route is being resolved, so its selection is visible to the router
 without clearing the route cache. It is invoked again whenever a filter calls
@@ -40,8 +40,16 @@ a different point:
 * The idle timeout and the request body buffer limit are read while the route is resolved, and the
   timeout, the retry policy and the request mirroring policies are read before the first upstream
   attempt, so only the first selection applies to them.
+* The hash policy is read during host selection on every upstream attempt, so a later selection
+  replaces it. A cluster-level hash policy and a load-balancer-level hash policy, when configured,
+  take precedence over the route-level policy the module selects.
 * The cluster not found response code is read only when the selected cluster does not exist, which
   ends the request, so the selection that named the missing cluster is the one that applies.
+* ``get_cluster_host_count`` reports whether a cluster is routable from the current worker and
+  returns host counts at a priority level. It uses ``getThreadLocalCluster()``, so it can return
+  false even when the cluster is configured but not yet warmed on the worker.
+* Custom counters, gauges and histograms can be defined during configuration and recorded during
+  selection, and are emitted under the ``metrics_namespace`` prefix of ``DynamicModuleConfig``.
 
 Configuration
 -------------

@@ -1,0 +1,159 @@
+/* Generated proto reference pages.
+
+   A page like listener.proto carries dozens of symbols, and by default message,
+   enum and service render as identical headings — same weight, same spacing —
+   so a 300-symbol page reads as one undifferentiated run.
+
+   A 3px rail now runs the full height of each symbol's section, hued by kind,
+   with a small label where it starts. The rail is the fast cue and the label is
+   the reliable one, so nothing depends on the hue alone. The outline in the
+   right column repeats the hue as a dot, which turns it into a legend for the
+   page rather than a flat list of names.
+
+   The markup these rules need is added by _static/js/envoy/proto.js. */
+
+.envoy-content-main .rst-content .envoy-proto-symbol {
+  border-left: 3px solid var(--envoy-kind-message);
+  margin: 34px 0;
+  padding-left: 20px;
+}
+
+.envoy-content-main .rst-content .envoy-proto-symbol.envoy-kind-enum {
+  border-left-color: var(--envoy-kind-enum);
+}
+
+.envoy-content-main .rst-content .envoy-proto-symbol.envoy-kind-service {
+  border-left-color: var(--envoy-kind-service);
+}
+
+/* nested symbols sit inside their parent already; a second rail would stack */
+.envoy-content-main .rst-content .envoy-proto-symbol .envoy-proto-symbol {
+  border-left-width: 2px;
+  margin-left: 0;
+}
+
+/* --- kind label ---------------------------------------------------------- */
+
+/* An inverted chip rather than coloured text: on a page of forty symbols the
+   label is the thing you scan for, and it has to hold its own against the
+   17px mono name directly underneath it. */
+.envoy-proto-kind {
+  background: var(--envoy-kind-message);
+  border-radius: 3px;
+  color: var(--envoy-ground);
+  display: inline-block;
+  font-family: var(--envoy-font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  margin-bottom: 9px;
+  padding: 2px 7px;
+  text-transform: uppercase;
+}
+
+.envoy-kind-enum > .envoy-proto-kind {
+  background: var(--envoy-kind-enum);
+}
+
+.envoy-kind-service > .envoy-proto-kind {
+  background: var(--envoy-kind-service);
+}
+
+/* --- symbol heading ------------------------------------------------------
+
+   Every symbol on the page repeats the same package, so it drops to muted ink
+   and the identifying tail keeps full contrast. The name is set in mono
+   because it is an identifier, not prose. */
+
+.envoy-content-main .rst-content .envoy-proto-symbol > h1,
+.envoy-content-main .rst-content .envoy-proto-symbol > h2,
+.envoy-content-main .rst-content .envoy-proto-symbol > h3,
+.envoy-content-main .rst-content .envoy-proto-symbol > h4,
+.envoy-content-main .rst-content .envoy-proto-symbol > h5 {
+  font-family: var(--envoy-font-mono);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  margin: 0 0 10px;
+  overflow-wrap: anywhere;
+}
+
+.envoy-proto-package {
+  color: var(--envoy-ink-muted);
+  font-weight: 400;
+}
+
+/* the anchor cannot hang in the margin next to a rail */
+.envoy-content-main .rst-content .envoy-proto-symbol > h1 > a.headerlink,
+.envoy-content-main .rst-content .envoy-proto-symbol > h2 > a.headerlink,
+.envoy-content-main .rst-content .envoy-proto-symbol > h3 > a.headerlink,
+.envoy-content-main .rst-content .envoy-proto-symbol > h4 > a.headerlink,
+.envoy-content-main .rst-content .envoy-proto-symbol > h5 > a.headerlink {
+  left: auto;
+  margin-left: 0.5em;
+  position: static;
+}
+
+/* --- fields --------------------------------------------------------------
+
+   protodoc emits fields as a definition list. The dt carries the field name
+   and the dd opens with the type and an optional (REQUIRED) marker. */
+
+.envoy-content-main .rst-content .envoy-proto-symbol dl > dt {
+  border-left: 0;
+  font-size: 13.5px;
+  margin-top: 18px;
+  padding-left: 0;
+}
+
+.envoy-content-main .rst-content .envoy-proto-symbol dl > dd {
+  border-left: 1px solid var(--envoy-rule);
+  padding: 4px 0 2px 14px;
+}
+
+/* protodoc emits this as *REQUIRED* inside the field's type parenthetical; it
+   is marked in place rather than moved, so the generated prose is untouched. */
+em.envoy-proto-required {
+  border: 1px solid var(--envoy-critical);
+  border-radius: 2px;
+  color: var(--envoy-critical);
+  display: inline-block;
+  font-family: var(--envoy-font-mono);
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  line-height: 15px;
+  padding: 0 4px;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+/* --- outline dots --------------------------------------------------------
+
+   The page TOC repeats each symbol's kind, so the outline and the page agree
+   at a glance. */
+
+.envoy-toc-dot {
+  background: var(--envoy-kind-message);
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+  height: 6px;
+  margin-right: 8px;
+  width: 6px;
+}
+
+.envoy-toc-dot.envoy-kind-enum {
+  background: var(--envoy-kind-enum);
+}
+
+.envoy-toc-dot.envoy-kind-service {
+  background: var(--envoy-kind-service);
+}
+
+.envoy-page-toc.envoy-symbol-toc a {
+  align-items: baseline;
+  display: flex;
+}

@@ -14,6 +14,7 @@
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection_handler.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/socket.h"
@@ -284,6 +285,20 @@ public:
    */
   virtual void stopListeners(StopListenersType stop_listeners_type,
                              const Network::ExtraShutdownListenerOptions& options) PURE;
+
+  /**
+   * Notify the connections of active listeners that a server-wide drain sequence has begun, so that
+   * connection-level drain logic (Network::Connection::onDrain()) can react. Only listeners whose
+   * traffic direction is covered by the drain direction are notified: an InboundOnly drain notifies
+   * only inbound listeners, while an All drain notifies every listener. Does not stop listeners or
+   * close connections.
+   * @param direction the direction of the server drain.
+   * @param drain_event the drain sequence to notify the connections of. The caller supplies it so
+   *        that every connection covered by one drain shares a single, consistent timeline, and so
+   *        that a caller which drains on terms of its own.
+   */
+  virtual void onServerDrainStart(Network::DrainDirection direction,
+                                  Network::ConnectionDrainEvent drain_event) PURE;
 
   /**
    * Stop all threaded workers from running. When this routine returns all worker threads will

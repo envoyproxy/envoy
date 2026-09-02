@@ -565,7 +565,7 @@ case $CI_TARGET in
                 test "${BAZEL_BUILD_OPTIONS[@]}" \
                 --config=compile-time-options \
                 --define tcmalloc=gperftools \
-                --define wasm=wamr \
+                --@proxy-wasm-cpp-host//bazel:engine=wamr \
                 -c fastbuild \
                 "${TEST_TARGETS[@]}"
         fi
@@ -576,7 +576,7 @@ case $CI_TARGET in
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
-            --define wasm=wasmtime \
+            --@proxy-wasm-cpp-host//bazel:engine=wasmtime \
             --define admin_functionality=disabled \
             --@envoy//bazel:jemalloc=True \
             -c fastbuild \
@@ -587,7 +587,7 @@ case $CI_TARGET in
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
             --define tcmalloc=gperftools \
-            --define wasm=wasmtime \
+            --@proxy-wasm-cpp-host//bazel:engine=wasmtime \
             -c opt \
             @envoy//test/common/common:assert_test \
             @envoy//test/server:server_test
@@ -596,7 +596,7 @@ case $CI_TARGET in
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
             --define tcmalloc=gperftools \
-            --define wasm=wasmtime \
+            --@proxy-wasm-cpp-host//bazel:engine=wasmtime \
             -c opt \
             @envoy//test/common/common:assert_test \
             --define log_fast_debug_assert_in_release=enabled \
@@ -605,7 +605,7 @@ case $CI_TARGET in
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
             --define tcmalloc=gperftools \
-            --define wasm=wasmtime \
+            --@proxy-wasm-cpp-host//bazel:engine=wasmtime \
             --define enable_logging=disabled \
             -c fastbuild \
             @envoy//source/exe:envoy-static

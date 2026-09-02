@@ -903,12 +903,22 @@ DynamicModuleClusterFactory::createClusterWithConfig(
     const envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context) {
 
-  // Validate that CLUSTER_PROVIDED LB policy is used.
-  if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+  // CLUSTER_PROVIDED uses the module's load balancer; the native policies use Envoy's factory
+  // load balancer, with the module supplying only host discovery.
+  const auto policy = cluster.lb_policy();
+  const bool is_module_lb = (policy == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+  const bool is_native_lb = (policy == envoy::config::cluster::v3::Cluster::LEAST_REQUEST ||
+                             policy == envoy::config::cluster::v3::Cluster::ROUND_ROBIN ||
+                             policy == envoy::config::cluster::v3::Cluster::RANDOM ||
+                             policy == envoy::config::cluster::v3::Cluster::RING_HASH ||
+                             policy == envoy::config::cluster::v3::Cluster::MAGLEV);
+
+  if (!is_module_lb && !is_native_lb) {
     return absl::InvalidArgumentError(
         fmt::format("cluster: LB policy {} is not valid for cluster type "
-                    "'envoy.clusters.dynamic_modules'. Only 'CLUSTER_PROVIDED' is allowed.",
-                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy())));
+                    "'envoy.clusters.dynamic_modules'. Supported policies are CLUSTER_PROVIDED, "
+                    "LEAST_REQUEST, ROUND_ROBIN, RANDOM, RING_HASH, and MAGLEV.",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(policy)));
   }
 
   Server::Configuration::ServerFactoryContext& server_context = context.serverFactoryContext();
@@ -952,9 +962,13 @@ DynamicModuleClusterFactory::createClusterWithConfig(
       cluster, std::move(config_or_error.value()), context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
 
-  // Create the thread-aware load balancer.
-  auto handle = std::make_shared<DynamicModuleClusterHandle>(new_cluster);
-  auto lb = std::make_unique<DynamicModuleThreadAwareLoadBalancer>(handle);
+  // Create the thread-aware load balancer only if the module provides LB (CLUSTER_PROVIDED).
+  // For native LB policies, return nullptr so the cluster manager builds the native factory LB.
+  Upstream::ThreadAwareLoadBalancerPtr lb;
+  if (cluster.lb_policy() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+    auto handle = std::make_shared<DynamicModuleClusterHandle>(new_cluster);
+    lb = std::make_unique<DynamicModuleThreadAwareLoadBalancer>(handle);
+  }
 
   return std::make_pair(std::move(new_cluster), std::move(lb));
 }

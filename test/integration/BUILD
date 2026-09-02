@@ -31,7 +31,7 @@ envoy_cc_test_library(
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     deps = [
         ":http_integration_lib",
         "//source/common/common:matchers_lib",
@@ -54,12 +54,30 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "allocate_conn_pool_integration_test",
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//conditions:default": ["allocate_conn_pool_integration_test.cc"],
+    }),
+    deps = [
+        ":http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:quic_client_factory_lib",
+        "//source/extensions/upstreams/http:config",
+    ]),
+)
+
+envoy_cc_test(
     name = "ads_integration_test",
     size = "large",
     srcs = envoy_select_admin_functionality(
         ["ads_integration_test.cc"],
     ),
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     tags = [
         "cpu:3",
     ],
@@ -86,7 +104,7 @@ envoy_cc_test_library(
     hdrs = [
         "xdstp_config_sources_integration.h",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     deps = [
         ":ads_integration_lib",
         ":http_integration_lib",
@@ -109,7 +127,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "xdstp_config_sources_integration_test",
     srcs = ["xdstp_config_sources_integration_test.cc"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     tags = [
         "cpu:3",
     ],
@@ -134,7 +152,7 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "ads_xdstp_config_sources_integration_lib",
     hdrs = ["ads_xdstp_config_sources_integration.h"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     tags = [
         "cpu:3",
     ],
@@ -158,7 +176,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "ads_xdstp_config_sources_integration_test",
     srcs = ["ads_xdstp_config_sources_integration_test.cc"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     tags = [
         "cpu:3",
     ],
@@ -171,7 +189,7 @@ envoy_cc_test(
     name = "alpn_integration_test",
     size = "large",
     srcs = ["alpn_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 2,
     tags = [
         "cpu:3",
@@ -183,7 +201,7 @@ envoy_cc_test(
     name = "api_listener_integration_test",
     size = "large",
     srcs = ["api_listener_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -223,7 +241,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -247,7 +265,7 @@ envoy_cc_test(
     name = "eds_integration_test",
     size = "large",
     srcs = ["eds_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -271,7 +289,7 @@ envoy_cc_test(
     name = "leds_integration_test",
     size = "large",
     srcs = ["leds_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -298,7 +316,7 @@ envoy_cc_test(
     srcs = [
         "filter_manager_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -333,7 +351,7 @@ envoy_cc_test(
     srcs = [
         "upstream_access_log_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -356,7 +374,7 @@ envoy_cc_test(
     name = "cluster_filter_integration_test",
     size = "large",
     srcs = ["cluster_filter_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -376,7 +394,7 @@ envoy_cc_test(
     name = "custom_cluster_integration_test",
     size = "large",
     srcs = ["custom_cluster_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -398,12 +416,13 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
     deps = [
         ":vhds_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -447,12 +466,15 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "drain_close_integration_test.cc",
     ]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
     deps = [
         ":http_protocol_integration_lib",
+        "//envoy/network:drain_decision_interface",
+        "//envoy/server:instance_interface",
+        "//envoy/server:listener_manager_interface",
         "//test/test_common:utility_lib",
     ],
 )
@@ -462,7 +484,7 @@ exports_files(["test_utility.sh"])
 envoy_cc_test_binary(
     name = "hotrestart_main",
     srcs = ["hotrestart_main.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":common_extensions_lib",
         "//source/common/http:rds_lib",
@@ -484,7 +506,7 @@ envoy_cc_test_binary(
     name = "hotrestart_small_main",
     srcs = ["hotrestart_main.cc"],
     linkstatic = envoy_select_linkstatic(),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":common_extensions_lib",
         "//source/exe:main_common_lib",
@@ -524,7 +546,7 @@ envoy_sh_test(
         "test_utility.sh",
         "//test/config/integration:server_config_files",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
 )
 
@@ -537,7 +559,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -556,7 +578,7 @@ envoy_cc_test(
     srcs = [
         "header_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -583,7 +605,7 @@ envoy_cc_test(
     name = "http_service_headers_integration_test",
     size = "large",
     srcs = ["http_service_headers_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -603,7 +625,7 @@ envoy_cc_test(
     name = "http_conn_pool_integration_test",
     size = "large",
     srcs = ["http_conn_pool_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -618,7 +640,7 @@ envoy_cc_test(
     name = "circuit_breakers_integration_test",
     size = "large",
     srcs = ["circuit_breakers_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -637,7 +659,7 @@ envoy_cc_test(
     srcs = [
         "http2_flood_integration_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     shard_count = 6,
     tags = [
         "cpu:3",
@@ -666,7 +688,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_integration_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     shard_count = 10,
     tags = [
         "cpu:3",
@@ -708,7 +730,7 @@ envoy_cc_test(
     name = "shadow_policy_integration_test",
     size = "large",
     srcs = ["shadow_policy_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -735,7 +757,7 @@ envoy_cc_test(
     name = "cluster_http_protocol_options_integration_test",
     size = "large",
     srcs = ["cluster_http_protocol_options_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -757,7 +779,7 @@ envoy_cc_test(
     name = "upstream_http_filter_integration_test",
     size = "large",
     srcs = ["upstream_http_filter_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -783,7 +805,7 @@ envoy_cc_test(
     name = "upstream_network_filter_integration_test",
     size = "large",
     srcs = ["upstream_network_filter_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -803,7 +825,7 @@ envoy_cc_test(
     srcs = [
         "buffer_accounting_integration_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     tags = [
         "cpu:3",
     ],
@@ -845,7 +867,7 @@ envoy_cc_test(
     srcs = [
         "http_subset_lb_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -871,7 +893,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -894,7 +916,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -925,7 +947,7 @@ envoy_cc_test(
     srcs = [
         "header_casing_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -942,7 +964,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "http_typed_per_filter_config_test.cc",
     ]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_integration_lib",
         "//test/integration/filters:set_route_filter_lib",
@@ -964,7 +986,7 @@ envoy_cc_test(
     srcs = [
         "http_timeout_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -981,7 +1003,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "filter_integration_test.cc",
     ]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 8,
     tags = [
         "cpu:3",
@@ -1024,7 +1046,7 @@ envoy_cc_test_library(
     name = "protocol_integration_test_lib",
     srcs = ["protocol_integration_test.cc"],
     hdrs = ["protocol_integration_test.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -1066,7 +1088,7 @@ envoy_cc_test(
     srcs = [
         "instantiate_protocol_integration_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 16,
@@ -1094,7 +1116,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "multi_envoy_test.cc",
     ]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_protocol_integration_lib",
     ],
@@ -1108,7 +1130,7 @@ envoy_cc_test(
         "//conditions:default": ["quic_upstream_client_cert_integration_test.cc"],
     }),
     data = ["//test/config/integration/certs"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -1127,7 +1149,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_upstream_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -1164,7 +1186,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(
         ["integration_admin_test.cc"],
     ),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -1217,7 +1239,7 @@ envoy_cc_test_library(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":async_round_robin_lb",
         ":integration_lib_light",
@@ -1273,7 +1295,7 @@ envoy_cc_test_library(
     hdrs = [
         "http_protocol_integration.h",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_integration_lib",
         "//test/common/upstream:utility_lib",
@@ -1286,7 +1308,7 @@ envoy_cc_test(
     name = "idle_timeout_integration_test",
     size = "large",
     srcs = ["idle_timeout_integration_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 8,
@@ -1359,7 +1381,7 @@ envoy_cc_test_library(
     hdrs = [
         "fake_upstream.h",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":utility_lib",
         "//envoy/api:api_interface",
@@ -1441,13 +1463,16 @@ envoy_cc_test_library(
     hdrs = [
         "base_integration_test.h",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":async_round_robin_lb",
         ":autonomous_upstream_lib",
         ":fake_upstream_lib",
         ":integration_tcp_client_lib",
         ":utility_lib",
+        "//envoy/network:drain_decision_interface",
+        "//envoy/server:instance_interface",
+        "//envoy/server:listener_manager_interface",
         "//source/common/common:thread_lib",
         "//source/common/config:api_version_lib",
         "//source/common/tls:context_config_lib",
@@ -1467,6 +1492,7 @@ envoy_cc_test_library(
         "//test/test_common:resources_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -1489,7 +1515,7 @@ envoy_cc_test_library(
     hdrs = [
         "autonomous_upstream.h",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":fake_upstream_lib",
     ],
@@ -1508,7 +1534,7 @@ envoy_cc_test_library(
         "utility.h",
     ],
     data = ["//test/common/runtime:filesystem_test_data"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":server_stats_interface",
         ":tcp_dump",
@@ -1671,7 +1697,7 @@ envoy_cc_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 2,
     tags = [
         "cpu:3",
@@ -1710,7 +1736,7 @@ envoy_cc_test(
     srcs = [
         "redirect_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 2,
     tags = [
         "cpu:3",
@@ -1730,7 +1756,7 @@ envoy_cc_test(
     name = "regex_engine_integration_test",
     size = "large",
     srcs = ["regex_engine_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":integration_lib",
         "//source/common/common:regex_lib",
@@ -1767,7 +1793,7 @@ envoy_cc_test(
     name = "socket_interface_integration_test",
     size = "large",
     srcs = ["socket_interface_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_integration_lib",
         "//source/common/network:socket_interface_lib",
@@ -1782,7 +1808,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     # The symbol table cluster memory tests take a while to run specially under tsan.
     deps = [
         ":integration_lib",
@@ -1830,7 +1856,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -1859,7 +1885,7 @@ envoy_cc_test(
     size = "large",
     srcs = ["header_prefix_integration_test.cc"],
     coverage = False,
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -1904,7 +1930,7 @@ envoy_cc_test(
     name = "overload_integration_test",
     size = "large",
     srcs = ["overload_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 8,
     tags = [
         "cpu:3",
@@ -1928,7 +1954,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "rtds_integration_test.cc",
     ]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -1952,7 +1978,7 @@ envoy_cc_test(
     name = "extension_discovery_integration_test",
     size = "large",
     srcs = envoy_select_enable_http3(["extension_discovery_integration_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_integration_lib",
         "//source/extensions/filters/http/match_delegate:config",
@@ -1978,7 +2004,7 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_integration_lib",
         "//source/common/tls:client_ssl_socket_lib",
@@ -1996,7 +2022,7 @@ envoy_cc_test(
     name = "listener_extension_discovery_integration_test",
     size = "large",
     srcs = envoy_select_enable_http3(["listener_extension_discovery_integration_test.cc"]),
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     deps = [
         ":http_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -2013,7 +2039,7 @@ envoy_cc_test(
     name = "network_extension_discovery_integration_test",
     size = "large",
     srcs = ["network_extension_discovery_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -2044,7 +2070,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_integration_lib",
         "//source/common/event:dispatcher_includes",
@@ -2071,7 +2097,7 @@ envoy_cc_test(
         "sds_dynamic_key_rotation_setup.sh",
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 4,
     # TODO(envoyproxy/windows-dev): The key rotation in SdsDynamicKeyRotationIntegrationTest via
     # TestEnvironment::renameFile() fails on Windows. The renameFile() implementation does not
@@ -2116,7 +2142,7 @@ envoy_cc_test(
     srcs = [
         "sds_generic_secret_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -2157,7 +2183,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -2200,7 +2226,7 @@ envoy_cc_test(
     srcs = [
         "tcp_proxy_many_connections_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -2232,7 +2258,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     shard_count = 30,
     tags = [
         "cpu:3",
@@ -2264,7 +2290,7 @@ envoy_cc_test_library(
     hdrs = [
         "tcp_tunneling_integration.h",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_integration_lib",
     ],
@@ -2279,7 +2305,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -2303,7 +2329,7 @@ envoy_cc_test(
     srcs = [
         "tcp_conn_pool_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -2324,7 +2350,7 @@ envoy_cc_test(
     srcs = [
         "tcp_async_client_integration_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     deps = [
         ":integration_lib",
         "//test/integration/filters:test_network_async_tcp_filter_lib",
@@ -2361,7 +2387,7 @@ envoy_cc_test(
     name = "tracked_watermark_buffer_test",
     size = "large",
     srcs = ["tracked_watermark_buffer_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":tracked_watermark_buffer_lib",
         "//test/mocks/http:stream_reset_handler_mock",
@@ -2380,7 +2406,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "uds_integration_test.cc",
     ]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_integration_lib",
         "//source/common/event:dispatcher_includes",
@@ -2401,7 +2427,7 @@ envoy_cc_test(
         ["dynamic_validation_integration_test.cc"],
     ),
     data = ["//test/config/integration:server_xds_files"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -2425,7 +2451,7 @@ envoy_cc_test(
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     tags = [
         "cpu:3",
     ],
@@ -2466,7 +2492,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -2499,7 +2525,7 @@ envoy_cc_test_library(
     name = "h1_fuzz_lib",
     srcs = ["h1_fuzz.cc"],
     hdrs = ["h1_fuzz.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = H1_FUZZ_LIB_DEPS,
 )
 
@@ -2508,7 +2534,7 @@ envoy_cc_test_library(
     srcs = ["h1_fuzz.cc"],
     hdrs = ["h1_fuzz.h"],
     copts = ["-DPERSISTENT_FUZZER"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = H1_FUZZ_LIB_DEPS,
 )
 
@@ -2516,7 +2542,7 @@ envoy_cc_fuzz_test(
     name = "h1_capture_fuzz_test",
     srcs = ["h1_capture_fuzz_test.cc"],
     corpus = "h1_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [":h1_fuzz_lib"],
 )
 
@@ -2525,7 +2551,7 @@ envoy_cc_fuzz_test(
     srcs = ["h1_capture_fuzz_test.cc"],
     copts = ["-DPERSISTENT_FUZZER"],
     corpus = "h1_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [":h1_fuzz_persistent_lib"],
 )
 
@@ -2533,7 +2559,7 @@ envoy_cc_fuzz_test(
     name = "h1_capture_direct_response_fuzz_test",
     srcs = ["h1_capture_direct_response_fuzz_test.cc"],
     corpus = "h1_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":h1_fuzz_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -2545,7 +2571,7 @@ envoy_cc_fuzz_test(
     srcs = ["h1_capture_direct_response_fuzz_test.cc"],
     copts = ["-DPERSISTENT_FUZZER"],
     corpus = "h1_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":h1_fuzz_persistent_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -2569,7 +2595,7 @@ envoy_cc_test_library(
     name = "h2_fuzz_lib",
     srcs = ["h2_fuzz.cc"],
     hdrs = ["h2_fuzz.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = H2_FUZZ_LIB_DEPS,
 )
 
@@ -2578,7 +2604,7 @@ envoy_cc_test_library(
     srcs = ["h2_fuzz.cc"],
     hdrs = ["h2_fuzz.h"],
     copts = ["-DPERSISTENT_FUZZER"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = H2_FUZZ_LIB_DEPS,
 )
 
@@ -2586,7 +2612,7 @@ envoy_cc_fuzz_test(
     name = "h2_capture_fuzz_test",
     srcs = ["h2_capture_fuzz_test.cc"],
     corpus = "h2_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [":h2_fuzz_lib"],
 )
 
@@ -2595,7 +2621,7 @@ envoy_cc_fuzz_test(
     srcs = ["h2_capture_fuzz_test.cc"],
     copts = ["-DPERSISTENT_FUZZER"],
     corpus = "h2_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [":h2_fuzz_persistent_lib"],
 )
 
@@ -2603,7 +2629,7 @@ envoy_cc_fuzz_test(
     name = "h2_capture_direct_response_fuzz_test",
     srcs = ["h2_capture_direct_response_fuzz_test.cc"],
     corpus = "h2_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":h2_fuzz_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -2615,7 +2641,7 @@ envoy_cc_fuzz_test(
     srcs = ["h2_capture_direct_response_fuzz_test.cc"],
     copts = ["-DPERSISTENT_FUZZER"],
     corpus = "h2_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":h2_fuzz_persistent_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -2640,7 +2666,7 @@ envoy_cc_test(
     srcs = [
         "scoped_rds_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -2670,7 +2696,7 @@ envoy_cc_test(
     srcs = [
         "listener_lds_integration_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     tags = [
         "cpu:3",
     ],
@@ -2706,7 +2732,7 @@ envoy_cc_test(
     srcs = [
         "listener_fcds_integration_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     tags = [
         "cpu:3",
     ],
@@ -2735,7 +2761,7 @@ envoy_cc_test(
     name = "cx_limit_integration_test",
     size = "large",
     srcs = ["cx_limit_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -2754,7 +2780,7 @@ envoy_cc_test(
     name = "direct_response_integration_test",
     size = "large",
     srcs = ["direct_response_integration_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     tags = [
         "cpu:2",
     ],
@@ -2769,7 +2795,7 @@ envoy_cc_test(
     srcs = [
         "local_reply_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:2",
     ],
@@ -2786,7 +2812,7 @@ envoy_cc_test(
     srcs = [
         "command_formatter_extension_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -2802,7 +2828,7 @@ envoy_cc_test(
     name = "health_check_integration_test",
     size = "large",
     srcs = ["health_check_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -2822,7 +2848,7 @@ envoy_cc_test(
     srcs = [
         "cluster_upstream_extension_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -2849,7 +2875,7 @@ envoy_cc_test(
         "//conditions:default": ["quic_protocol_integration_test.cc"],
     }),
     data = ["//test/config/integration/certs"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     shard_count = 16,
     tags = [
         "cpu:4",
@@ -2916,7 +2942,7 @@ envoy_cc_test(
         "//conditions:default": ["quic_http_integration_test.cc"],
     }),
     data = ["//test/config/integration/certs"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     # TODO(envoyproxy/windows-dev): Diagnose failure shown only on clang-cl build, see:
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     # TODO(envoyproxy/windows-dev): Diagnose timeout, why opt build test under Windows GCP RBE
@@ -2944,7 +2970,7 @@ envoy_cc_test(
         "//conditions:default": ["web_transport_integration_test.cc"],
     }),
     data = ["//test/config/integration/certs"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//test/test_common:status_utility_lib",
         ":http_integration_lib",
@@ -2967,7 +2993,7 @@ envoy_cc_test(
     srcs = [
         "original_ip_detection_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -2985,7 +3011,7 @@ envoy_cc_test(
     srcs = [
         "access_log_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -3001,7 +3027,7 @@ envoy_cc_test(
     name = "weighted_cluster_integration_test",
     size = "large",
     srcs = ["weighted_cluster_integration_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     tags = [
         "cpu:3",
     ],
@@ -3043,7 +3069,7 @@ envoy_cc_test(
     srcs = [
         "typed_metadata_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -3065,7 +3091,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -3090,7 +3116,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "xds_delegate_extension_integration_test.cc",
     ]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -3116,7 +3142,7 @@ envoy_cc_test(
     name = "xds_config_tracker_integration_test",
     size = "large",
     srcs = ["xds_config_tracker_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
@@ -3147,7 +3173,7 @@ envoy_cc_test(
     srcs = [
         "default_header_validator_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 8,
     tags = [
         "cpu:3",
