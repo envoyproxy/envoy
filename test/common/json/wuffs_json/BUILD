@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -23,5 +24,22 @@ envoy_cc_test(
     deps = [
         "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
         "//test/test_common:status_utility_lib",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "wuffs_json_cursor_fuzz_test",
+    srcs = ["wuffs_json_cursor_fuzz_test.cc"],
+    corpus = "wuffs_json_cursor_corpus",
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/json/wuffs_json:parser_config_lib",
+        "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
     ],
 )
