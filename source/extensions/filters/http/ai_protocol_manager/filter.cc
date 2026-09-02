@@ -59,10 +59,6 @@ bool isJsonContentType(absl::string_view content_type) {
 // wants a response. A full-duplex stream -- gRPC or Connect streaming, an
 // upgrade, CONNECT -- may instead wait on a response the held upstream cannot
 // produce, and stall until it times out.
-//
-// Content type alone misses those: gRPC and Connect spell their streaming
-// framing with a JSON suffix, and an upgrade or CONNECT can carry plain
-// "application/json". So the protocol is checked first.
 bool canHoldRequest(const Http::RequestHeaderMap& headers) {
   if (Grpc::Common::isGrpcRequestHeaders(headers) ||
       Grpc::Common::isConnectStreamingRequestHeaders(headers)) {
@@ -199,9 +195,9 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     }
   }
 
-  // A declared AI endpoint is parsed strictly. Any other route is parsed only
-  // if the filter opted into parsing unconfigured routes, and only for a request
-  // that can be held to end of stream without stalling it (canHoldRequest).
+  // A declared AI endpoint is parsed strictly. Any other route is parsed only if
+  // the filter opted into parsing unconfigured routes, and only for a request
+  // that can be held to end of stream without stalling it.
   // TODO(penguingao): on a best-effort parse failure, release the held headers
   // and buffered body immediately and pass the remainder through unbuffered,
   // rather than buffering to end-of-stream.

@@ -104,11 +104,6 @@ public:
     ASSERT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
   }
 
-  // decodeHeaders() with these headers, on a filter that parses unconfigured
-  // routes and a route that declared nothing -- the exact combination
-  // canHoldRequest() gates. The SchedulableCallback is created only when the
-  // stream is expected to engage, since a gated one builds no BufferManager and
-  // would leave the mock's expectation unsatisfied.
   Http::FilterHeadersStatus decodeHeadersUnconfigured(Http::TestRequestHeaderMapImpl headers,
                                                       bool expect_engage) {
     createFilter(/*parse_unconfigured_routes=*/true);
@@ -1464,8 +1459,8 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsEmptyBody) {
   EXPECT_EQ(injected_.length(), 0);
 }
 
-// A JSON upload is the one shape best effort can hold: the client sends the whole
-// request before it wants a response, so pinning the headers cannot stall it.
+// The one shape best effort can hold: the whole request arrives before a response
+// is wanted, so pinning the headers cannot stall it.
 TEST_F(AiProtocolManagerFilterTest, BestEffortEngagesOnJsonContentType) {
   EXPECT_EQ(decodeHeadersUnconfigured(
                 Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1495,10 +1490,8 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortEngagesOnJsonStructuredSuffix) {
             Http::FilterHeadersStatus::StopIteration);
 }
 
-// The stall this gate exists for: a gRPC client- or bidi-streaming request may
-// not send end_stream until it has seen a response, so holding its headers would
-// deadlock it. Its content type is JSON-suffixed, so only the protocol check
-// catches this one.
+// The stall this gate exists for. The content type carries a JSON suffix, so
+// only the protocol check catches it.
 TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsGrpcRequest) {
   EXPECT_EQ(decodeHeadersUnconfigured(
                 Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1508,9 +1501,8 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsGrpcRequest) {
             Http::FilterHeadersStatus::Continue);
 }
 
-// Connect spells its streaming framing with a JSON suffix too, and bidi streaming
-// over it stalls the same way. (Unary Connect sends plain "application/json" and
-// stays eligible.)
+// Connect's streaming framing carries a JSON suffix too. (Unary Connect sends
+// plain "application/json" and stays eligible.)
 TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsConnectStreamingRequest) {
   EXPECT_EQ(decodeHeadersUnconfigured(
                 Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1520,8 +1512,7 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsConnectStreamingRequest) {
             Http::FilterHeadersStatus::Continue);
 }
 
-// An upgraded connection is full-duplex from the first byte, whatever content
-// type the request carries.
+// An upgraded connection is full-duplex whatever content type it carries.
 TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsUpgrade) {
   EXPECT_EQ(decodeHeadersUnconfigured(
                 Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -1542,8 +1533,7 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsConnect) {
             Http::FilterHeadersStatus::Continue);
 }
 
-// A body the parser could make nothing of is not worth a store round-trip, let
-// alone holding the headers for one.
+// A body the parser could make nothing of is not worth holding the headers for.
 TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsNonJsonContentType) {
   EXPECT_EQ(decodeHeadersUnconfigured(
                 Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1561,8 +1551,8 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortSkipsMissingContentType) {
             Http::FilterHeadersStatus::Continue);
 }
 
-// The gate belongs to best effort alone. A declared AI endpoint is the operator's
-// explicit choice, so its payload is managed whatever the content type says.
+// The gate belongs to best effort alone; a declared endpoint is managed whatever
+// the content type says.
 TEST_F(AiProtocolManagerFilterTest, DeclaredEndpointIgnoresGate) {
   setRouteConfig();
   replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
