@@ -272,7 +272,10 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
     _rules_ruby()
     external_http_archive("flatbuffers")
     external_http_archive("bazel_features")
-    external_http_archive("bazel_compdb")
+    external_http_archive(
+        name = "bazel-compdb",
+        location_name = "bazel_compdb",
+    )
     external_http_archive("envoy_toolshed")
 
     _libmaxminddb()
