@@ -18,5 +18,5 @@ To get started using IntelliJ with Envoy Mobile:
 Known issues
 ------------
 
-1. IntelliJ is unable to find the appropriate `ANDROID_HOME` and `ANDROID_NDK_HOME` which is the reason we need to hard code it :tree:`locally <cdf8353b126590ef9369883ca9eba85613c81bdc/WORKSPACE#L94-L96>`
+1. IntelliJ is unable to find the Android SDK/NDK when using hermetic toolchains. The SDK and NDK are fetched automatically by Bazel; no ``ANDROID_HOME`` or ``ANDROID_NDK_HOME`` environment variables need to be set.
 2. Ongoing issues related to the `Bazel plugin <https://github.com/bazelbuild/intellij/issues/529>`_ so we'll update :tree:`.bazelrc <57fb4d405d11c89f028b10e6e00c7b5aa3d8ddd2/.bazelrc#L4>` to set `--incompatible_depset_is_not_iterable`

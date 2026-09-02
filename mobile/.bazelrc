@@ -4,11 +4,20 @@
 # Envoy Mobile Bazel build/test options.
 try-import ../.bazelrc
 
+common --enable_bzlmod
+common --noenable_workspace
+common --@envoy//bazel:enable_bzlmod=True
+
+
 #############################################################################
 # global
 #############################################################################
 
 common --repo_env=ANDROID_HOME
+
+# Android SDK/NDK licence acceptance (replaces sdkmanager --licenses)
+common --repo_env=ACCEPTED_ANDROID_SDK_LICENSE_VERSION=30
+common --repo_env=ACCEPTED_ANDROID_NDK_LICENSE_VERSION=r29
 
 # Common flags for all builds
 build --define=hot_restart=disabled
@@ -53,6 +62,9 @@ build --@protoc-gen-validate//bazel:template-flavor=nop
 
 # Instrument Envoy Mobile's C++ code for coverage
 coverage --instrumentation_filter="//library/common[/:]"
+
+build --@quiche//:mobile_quiche_bug_tracker_impl_lib=@envoy//source/common/quic/platform:quiche_logging_impl_lib
+
 
 #############################################################################
 # os
