@@ -238,7 +238,7 @@ def _assign_from(command, assignees):
         lines.append(
             "In future, please do this without the `@`, like `/assign-from " +
             " ".join(team_names_without_at) +
-            "`, so as to not subscribe the group to the PR",
+            "`, unless you wish to subscribe the group to the PR",
         )
     if lines:
         github.issue_create_comment("\n".join(lines))
