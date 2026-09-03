@@ -44,6 +44,7 @@ jobs:
         ERROR
         error:
         Error:
+        FAILED in
       rbe: true
       target: ${{ matrix.target }}
       trusted: ${{ inputs.trusted }}
