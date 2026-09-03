@@ -138,10 +138,15 @@ diff --git a/bazel/BUILD b/bazel/BUILD
  )
  
  config_setting(
-@@ -77,4 +124,16 @@ v8_lib_no_pointer_compression(
+@@ -77,4 +124,21 @@ v8_lib_no_pointer_compression(
      library = "@v8//:wee8",
  )
  
++label_flag(
++    name = "crypto_lib",
++    build_setting_default = "@envoy//bazel:crypto",
++)
++
 +# Source of the V8/wee8 engine library, selectable by the consuming (root)
 +# module. Defaults to building wee8 from @v8 source (with pointer compression
 +# disabled). A consumer can point this at a prebuilt drop-in, e.g.
