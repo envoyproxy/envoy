@@ -55,6 +55,10 @@ public:
     return transport_socket_match_metadata_;
   }
 
+  using HealthFlagGet = std::function<bool(const Host&, Host::HealthFlag)>;
+  using HealthFlagSet = std::function<void(Host&, Host::HealthFlag)>;
+  using HealthFlagClear = std::function<void(Host&, Host::HealthFlag)>;
+
 protected:
   class ActiveHealthCheckSession : public Event::DeferredDeletable {
   public:
@@ -98,7 +102,8 @@ protected:
 
   HealthCheckerImplBase(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger,
+                        Stats::Scope& stats_scope, HealthFlagCallbacks health_flag_callbacks = {});
   ~HealthCheckerImplBase() override;
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
@@ -116,6 +121,9 @@ protected:
   Random::RandomGenerator& random_;
   const bool reuse_connection_;
   HealthCheckEventLoggerPtr event_logger_;
+  HealthFlagGet health_flag_get_;
+  HealthFlagSet health_flag_set_;
+  HealthFlagClear health_flag_clear_;
 
 private:
   struct HealthCheckHostMonitorImpl : public HealthCheckHostMonitor {
