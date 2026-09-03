@@ -4,6 +4,7 @@
 
 #include "source/common/network/drain_close_util.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -125,6 +126,25 @@ TEST_F(DrainCloseUtilTest, StartTimeInTheFutureDoesNotUnderflow) {
                                    Server::DrainStrategy::Gradual};
   setRandom(0);
   EXPECT_FALSE(shouldDrainClose(context_, Default, event));
+}
+
+// A connection that was accepted by a listener reports that listener's drain type.
+TEST_F(DrainCloseUtilTest, ListenerDrainTypeFromConnection) {
+  NiceMock<MockConnection> connection;
+  auto listener_info = std::make_shared<NiceMock<MockListenerInfo>>();
+  ON_CALL(*listener_info, drainType()).WillByDefault(Return(ModifyOnly));
+  connection.stream_info_.downstream_connection_info_provider_->setListenerInfo(listener_info);
+
+  EXPECT_EQ(ModifyOnly, listenerDrainType(connection));
+}
+
+// A connection that was not accepted by a network listener (an API listener connection, for
+// example) has no listener info and falls back to the DEFAULT drain type.
+TEST_F(DrainCloseUtilTest, ListenerDrainTypeWithoutListenerInfo) {
+  NiceMock<MockConnection> connection;
+  ASSERT_FALSE(connection.connectionInfoProvider().listenerInfo().has_value());
+
+  EXPECT_EQ(Default, listenerDrainType(connection));
 }
 
 } // namespace

@@ -41,6 +41,7 @@ jobs:
         ERROR
         error:
         Error:
+        FAILED in
       rbe: true
       target: ${{ matrix.target }}
       timeout-minutes: 30

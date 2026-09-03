@@ -1,12 +1,48 @@
 module(
     name = "envoy_mobile",
-    version = "1.37.0-dev",
+    version = "1.40.0-dev",
 )
 
-# Core Envoy dependencies - inherited from parent module
-bazel_dep(name = "envoy", version = "1.37.0-dev")
-bazel_dep(name = "envoy_api", version = "1.37.0-dev")
-bazel_dep(name = "envoy_build_config", version = "1.37.0-dev")
+bazel_dep(name = "abseil-cpp", version = "20260107.1")
+bazel_dep(name = "aspect_bazel_lib", version = "2.22.0")
+bazel_dep(name = "bazel_skylib", version = "1.9.0")
+bazel_dep(name = "protoc-gen-validate", version = "1.3.0.envoy")
+bazel_dep(name = "envoy", version = "1.40.0-dev")
+bazel_dep(name = "envoy_api", version = "1.40.0-dev.20260903.16b0d47.envoy")
+bazel_dep(name = "envoy_build_config", version = "1.40.0-dev")
+bazel_dep(name = "envoy_toolshed", version = "0.4.10.envoy")
+bazel_dep(name = "gazelle", version = "0.47.0")
+bazel_dep(name = "google_bazel_common", version = "0.0.1")
+bazel_dep(name = "googleapis", version = "0.0.0-20251003-2193a2bf")
+bazel_dep(name = "googletest", version = "1.17.0.bcr.2")
+bazel_dep(name = "googleurl", version = "0.0.0-221103-dd4080f.envoy")
+bazel_dep(name = "grpc", version = "1.83.0.envoy")
+bazel_dep(name = "librdkafka", version = "2.6.0.envoy")
+bazel_dep(name = "openssl", version = "3.5.7.envoy")
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "protobuf", version = "35.1.bcr.envoy")
+bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
+bazel_dep(name = "pybind11_bazel", version = "2.13.6")
+bazel_dep(name = "quiche", version = "0.0.0-260824-0140828.envoy")
+bazel_dep(name = "re2", version = "2025-08-12.bcr.1")
+bazel_dep(name = "rules_android", version = "0.7.2")
+bazel_dep(name = "rules_android_ndk", version = "0.1.5")
+bazel_dep(name = "hermetic-android-toolchains", version = "0.0.0-20260807-c6a9f20.envoy", dev_dependency = True)
+bazel_dep(name = "rules_apple", version = "3.20.1.envoy")
+bazel_dep(name = "rules_robolectric", version = "4.16")
+bazel_dep(name = "rules_cc", version = "0.2.22")
+bazel_dep(name = "rules_detekt", version = "0.8.1.2")
+bazel_dep(name = "rules_java", version = "9.3.0")
+bazel_dep(name = "rules_jvm_external", version = "6.10")
+bazel_dep(name = "rules_kotlin", version = "2.3.20")
+bazel_dep(name = "rules_python", version = "2.2.0")
+bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
+bazel_dep(name = "rules_shell", version = "0.8.0")
+bazel_dep(name = "rules_swift", version = "3.1.2", repo_name = "build_bazel_rules_swift")
+bazel_dep(name = "rules_xcodeproj", version = "2.4.0", repo_name = "com_github_buildbuddy_io_rules_xcodeproj")
+bazel_dep(name = "toolchains_llvm", version = "1.8.0.envoy")
+bazel_dep(name = "zlib-ng", version = "2.3.2.envoy")
+bazel_dep(name = "zstd", version = "1.5.7")
 
 local_path_override(
     module_name = "envoy",
@@ -23,8 +59,105 @@ local_path_override(
     path = "envoy_build_config",
 )
 
-pip.parse(
-    hub_name = "pypi",
-    python_version = PYTHON_VERSION,
-    requirements_lock = "//:requirements.txt",
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    python_version = "3.12",
+    is_default = True,
 )
+use_repo(python, "python_3_12")
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "mobile_pip3",
+    python_version = "3.12",
+    requirements_lock = "//tools/python:requirements.txt",
+)
+use_repo(pip, "mobile_pip3")
+
+envoy_repo_ext = use_extension("@envoy//bazel:extensions.bzl", "envoy_repo_extension")
+use_repo(envoy_repo_ext, "envoy_repo")
+
+envoy_build_config_ext = use_extension("@envoy//bazel:extensions.bzl", "envoy_build_config_ext")
+override_repo(envoy_build_config_ext, envoy_build_config = "envoy_build_config")
+
+mobile_platforms_ext = use_extension("//bazel:extensions.bzl", "envoy_mobile_platforms_extension")
+use_repo(mobile_platforms_ext, "mobile_clang_platform")
+
+llvm_toolchain_alias_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_toolchain_alias_extension")
+use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")
+
+remote_android_extensions = use_extension(
+    "@bazel_tools//tools/android:android_extensions.bzl",
+    "remote_android_tools_extensions",
+)
+use_repo(remote_android_extensions, "android_gmaven_r8", "android_tools")
+
+android = use_extension("@hermetic-android-toolchains//:extensions.bzl", "android", dev_dependency = True)
+android.sdk(
+    version = "30",
+    build_tools_version = "35.0.0",
+)
+android.ndk(
+    api_level = 23,
+    version = "r29",
+)
+use_repo(android, "androidndk", "androidsdk")
+
+# Make @rules_android's @androidsdk labels resolve to the hermetic SDK.
+rules_android_sdk = use_extension("@rules_android//rules/android_sdk_repository:rule.bzl", "android_sdk_repository_extension", dev_dependency = True)
+override_repo(rules_android_sdk, "androidsdk")
+
+# Make @rules_android_ndk's @androidndk labels resolve to the hermetic NDK.
+rules_android_ndk = use_extension("@rules_android_ndk//:extension.bzl", "android_ndk_repository_extension", dev_dependency = True)
+override_repo(rules_android_ndk, "androidndk")
+
+register_toolchains("@androidndk//:all", "@androidsdk//:all", dev_dependency = True)
+
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+maven.install(
+    name = "maven",
+    artifacts = [
+        "com.google.code.findbugs:jsr305:3.0.2",
+        "androidx.annotation:annotation:1.5.0",
+        "com.google.protobuf:protobuf-java:4.35.1",
+        "com.google.protobuf:protobuf-javalite:4.35.1",
+        "org.jetbrains:annotations:23.0.0",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.23",
+        "org.jetbrains.kotlin:kotlin-stdlib-common:1.9.23",
+        "org.jetbrains.kotlin:kotlin-stdlib:1.9.23",
+        "androidx.recyclerview:recyclerview:1.1.0",
+        "androidx.core:core:1.3.2",
+        "org.jetbrains.dokka:dokka-cli:1.5.31",
+        "org.jetbrains.dokka:javadoc-plugin:1.5.31",
+        "com.google.truth:truth:1.4.4",
+        "junit:junit:4.13.2",
+        "org.mockito:mockito-inline:5.2.0",
+        "org.mockito:mockito-core:5.14.2",
+        "com.squareup.okhttp3:okhttp:4.12.0",
+        "com.squareup.okhttp3:mockwebserver:4.12.0",
+        "io.netty:netty-all:4.1.115.Final",
+        "androidx.test:core:1.5.0",
+        "androidx.test:rules:1.5.0",
+        "androidx.test:runner:1.5.0",
+        "androidx.test:monitor:1.5.0",
+        "androidx.test.ext:junit:1.1.5",
+        "org.robolectric:robolectric:4.16",
+        "org.hamcrest:hamcrest:3.0",
+    ],
+    version_conflict_policy = "pinned",
+    repositories = [
+        "https://repo1.maven.org/maven2",
+        "https://maven.google.com",
+    ],
+)
+use_repo(maven, "maven")
+maven.artifact(
+    name = "rules_android_maven",
+    group = "com.google.protobuf",
+    artifact = "protobuf-java",
+    version = "4.35.1",
+    force_version = True,
+)
+
+extra_sources = use_extension("//bazel:extensions.bzl", "envoy_mobile_extra_sources_extension")
+use_repo(extra_sources, "envoy_mobile_extra_swift_sources", "envoy_mobile_extra_jni_deps")

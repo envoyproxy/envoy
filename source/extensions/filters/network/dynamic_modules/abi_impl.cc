@@ -1141,6 +1141,16 @@ uint64_t envoy_dynamic_module_callback_network_filter_get_upstream_connection_id
 // StartTLS Support Callbacks
 // -----------------------------------------------------------------------------
 
+bool envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (filter->readCallbacks() == nullptr) {
+    return false;
+  }
+
+  return filter->readCallbacks()->connection().startSecureTransport();
+}
+
 bool envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);

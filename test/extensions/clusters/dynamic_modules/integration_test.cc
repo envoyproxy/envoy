@@ -510,6 +510,71 @@ TEST_P(DynamicModuleClusterDynamicMetadataIntegrationTest, SetsDynamicMetadataDu
   EXPECT_EQ("1234 test_value", log);
 }
 
+// =============================================================================
+// Native LB test: cluster with LEAST_REQUEST policy (native LB, not module LB).
+// =============================================================================
+
+class DynamicModuleClusterNativeLbIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterNativeLbIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithNativeLb() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      // Use LEAST_REQUEST policy instead of CLUSTER_PROVIDED to test native LB.
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::LEAST_REQUEST);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig dec_config;
+      dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
+      dec_config.set_cluster_name("native_lb_test");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      std::ignore = dec_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore = cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(dec_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterNativeLbIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// A native lb_policy makes Envoy build its factory load balancer instead of the module's. The
+// request routes to the upstream, and the module's choose_host must not run: the module provides
+// a load balancer, but native_lb_requests stays 0 because Envoy never calls into it.
+TEST_P(DynamicModuleClusterNativeLbIntegrationTest, NativeLbWithLeastRequestPolicy) {
+  initializeWithNativeLb();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Native LB selected the host; the module's choose_host was never called, so its
+  // native_lb_requests counter is unincremented (absent or 0).
+  auto choose_host = test_server_->counter("dynamicmodulescustom.native_lb_requests");
+  EXPECT_TRUE(choose_host == nullptr || choose_host->value() == 0);
+}
+
 } // namespace DynamicModules
 } // namespace Clusters
 } // namespace Extensions

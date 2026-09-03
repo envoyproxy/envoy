@@ -100,6 +100,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/network:drain_close_util_lib",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",

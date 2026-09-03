@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
-    "envoy_cc_benchmark_binary",
+    "envoy_cc_benchmark_dyn_module_binary",
     "envoy_package",
 )
 
@@ -25,7 +25,7 @@ HICKORY_ABI_IMPL_DEPS = [
     "//source/extensions/upstreams/http/dynamic_modules:abi_impl",
 ]
 
-envoy_cc_benchmark_binary(
+envoy_cc_benchmark_dyn_module_binary(
     name = "dns_resolver_benchmark",
     srcs = ["dns_resolver_benchmark.cc"],
     rbe_pool = "linux_x64_small",

@@ -76,6 +76,7 @@ on:
           ERROR
           error:
           Error:
+          FAILED in
       notice-match:
         type: string
         default: |

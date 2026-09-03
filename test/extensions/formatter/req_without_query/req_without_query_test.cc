@@ -1,5 +1,7 @@
 #include "source/common/formatter/substitution_format_string.h"
+#include "source/extensions/formatter/req_without_query/req_without_query.h"
 
+#include "test/common/formatter/formatter_test_utility.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/status_utility.h"
@@ -157,6 +159,69 @@ TEST_F(ReqWithoutQueryTest, TestFormatJson) {
       *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   const std::string actual = formatter->format(formatter_context_, stream_info_);
   EXPECT_TRUE(TestUtility::jsonStringEqual(actual, expected));
+}
+
+// Drives the provider directly so that format()/formatValue() and their sink-based counterparts
+// are checked against each other. The line formatters above only exercise the sink-based paths.
+TEST_F(ReqWithoutQueryTest, TestProviderFormatMatchesFormatTo) {
+  ReqWithoutQueryCommandParser parser;
+
+  // The main header is used and the query string is stripped.
+  {
+    auto provider = *parser.parse("REQ_WITHOUT_QUERY", ":PATH", std::nullopt);
+    ASSERT_NE(nullptr, provider);
+    EXPECT_EQ("/request/path",
+              Envoy::Formatter::formatForTest(*provider, formatter_context_, stream_info_));
+    EXPECT_EQ("/request/path",
+              Envoy::Formatter::formatValueForTest(*provider, formatter_context_, stream_info_)
+                  .string_value());
+  }
+
+  // The alternative header is used when the main one is absent.
+  {
+    auto provider = *parser.parse("REQ_WITHOUT_QUERY", "X-NON-EXISTING-HEADER?:PATH", std::nullopt);
+    ASSERT_NE(nullptr, provider);
+    EXPECT_EQ("/request/path",
+              Envoy::Formatter::formatForTest(*provider, formatter_context_, stream_info_));
+    EXPECT_EQ("/request/path",
+              Envoy::Formatter::formatValueForTest(*provider, formatter_context_, stream_info_)
+                  .string_value());
+  }
+
+  // The value is truncated to the configured max length.
+  {
+    auto provider = *parser.parse("REQ_WITHOUT_QUERY", ":PATH", 5);
+    ASSERT_NE(nullptr, provider);
+    EXPECT_EQ("/requ",
+              Envoy::Formatter::formatForTest(*provider, formatter_context_, stream_info_));
+    EXPECT_EQ("/requ",
+              Envoy::Formatter::formatValueForTest(*provider, formatter_context_, stream_info_)
+                  .string_value());
+  }
+
+  // A missing header is reported as no value at all.
+  {
+    auto provider = *parser.parse("REQ_WITHOUT_QUERY", "does-not-exist", std::nullopt);
+    ASSERT_NE(nullptr, provider);
+    EXPECT_EQ(std::nullopt,
+              Envoy::Formatter::formatForTest(*provider, formatter_context_, stream_info_));
+    EXPECT_TRUE(Envoy::Formatter::formatValueForTest(*provider, formatter_context_, stream_info_)
+                    .has_null_value());
+  }
+
+  // No request headers at all is also reported as no value.
+  {
+    auto provider = *parser.parse("REQ_WITHOUT_QUERY", ":PATH", std::nullopt);
+    ASSERT_NE(nullptr, provider);
+    Envoy::Formatter::Context empty_context;
+    EXPECT_EQ(std::nullopt,
+              Envoy::Formatter::formatForTest(*provider, empty_context, stream_info_));
+    EXPECT_TRUE(Envoy::Formatter::formatValueForTest(*provider, empty_context, stream_info_)
+                    .has_null_value());
+  }
+
+  // A command the parser does not own yields no provider.
+  EXPECT_EQ(nullptr, *parser.parse("NOT_REQ_WITHOUT_QUERY", "", std::nullopt));
 }
 
 TEST_F(ReqWithoutQueryTest, TestParserNotRecognizingCommand) {

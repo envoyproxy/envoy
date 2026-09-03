@@ -92,6 +92,8 @@ struct ReverseConnectionSocketConfig {
       additional_headers;       // Additional headers for the handshake request.
   bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
   std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
+  // How often to re-check each host and dial missing tunnels.
+  uint64_t maintain_interval_ms{ReverseConnectionUtility::kDefaultMaintainIntervalMs};
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -185,7 +187,10 @@ public:
    */
   Api::IoCallUint64Result close() override;
 
-  /** Stop reverse-connection maintenance on listener teardown. */
+  /**
+   * Stop reverse-connection maintenance on listener teardown. On the owning worker this also
+   * shuts down in-flight handshake wrappers and deferred-deletes them.
+   */
   void resetFileEvents() override;
 
   /**
@@ -474,6 +479,12 @@ private:
    * @param host the address of the host to remove
    */
   void removeStaleHostAndCloseConnections(const std::string& host);
+
+  /**
+   * Drop a wrapper from tracking and deferred-delete it on the worker dispatcher.
+   * @param wrapper the handshake wrapper to remove
+   */
+  void removeAndDeferredDeleteWrapper(RCConnectionWrapper* wrapper);
 
   /**
    * Per-host connection tracking for better management.
