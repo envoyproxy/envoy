@@ -135,7 +135,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(
     Protocols, CacheIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getJustOneProtocolTestParams()),
+    testing::ValuesIn(HttpProtocolIntegrationTest::getHttp1OnlyProtocolTestParams()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(CacheIntegrationTest, MissInsertHit) {

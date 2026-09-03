@@ -65,7 +65,7 @@ public:
   // This is the recommended choice for HTTP filter integration tests that do not interact
   // directly with HTTP protocols or IP versions. It tests HTTP/1 over IPv4 when available,
   // falling back to IPv6 when IPv4 is unavailable.
-  static std::vector<HttpProtocolTestParams> getJustOneProtocolTestParams() {
+  static std::vector<HttpProtocolTestParams> getHttp1OnlyProtocolTestParams() {
     const auto params = getProtocolTestParams({Http::CodecType::HTTP1}, {Http::CodecType::HTTP1});
     return {params.front()};
   }
