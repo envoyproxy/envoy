@@ -3,6 +3,7 @@ load("@emsdk//:deps.bzl", emsdk_deps = "deps")
 load("@envoy_toolshed//compile:libcxx_libs.bzl", "setup_libcxx_libs")
 load("@envoy_toolshed//compile:llvm_minimal.bzl", "llvm_toolchain_alias", "setup_llvm_minimal")
 load("@envoy_toolshed//sysroot:sysroot.bzl", "setup_sysroots")
+load("@envoy_toolshed//v8:wee8_prebuilt.bzl", "setup_wee8_prebuilt")
 load("@protobuf//bazel/private/oss:proto_bazel_features.bzl", "proto_bazel_features")
 load("@proxy-wasm-cpp-host//bazel/cargo/wasmtime/remote:crates.bzl", wasmtime_crate_repositories = "crate_repositories")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
@@ -39,6 +40,10 @@ def envoy_dependencies_extra(
             minimal_macos_arm64 = "@llvm_minimal_macos_arm64//:BUILD.bazel",
         )
     setup_sysroots(glibc_version = glibc_version)
+
+    # Prebuilt wee8 (@wee8_prebuilt_*), selected via the //bazel:v8_engine flag.
+    setup_wee8_prebuilt()
+
     emsdk_deps()
     wasm_examples_crate_repositories()
     wasmtime_crate_repositories()
