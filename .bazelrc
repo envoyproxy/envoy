@@ -190,6 +190,10 @@ common:clang --config=clang-common
 common:clang --config=libc++
 common:clang --host_platform=@clang_platform
 common:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+# macOS: use native host platform (clang_platform maps to Linux only).
+# Prevents resolution of Linux host binaries (e.g. jq) on macOS.
+# https://github.com/envoyproxy/envoy/issues/46716
+build:macos --host_platform=@envoy//bazel/toolchains:macos_clang_platform
 
 # Clang installed to non-standard location (ie not /opt/llvm/)
 common:clang-local --config=clang-common
