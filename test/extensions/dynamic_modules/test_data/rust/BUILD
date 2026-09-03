@@ -50,6 +50,8 @@ test_program(name = "bootstrap_init_target_test")
 
 test_program(name = "bootstrap_timer_test")
 
+test_program(name = "bootstrap_signed_callout_test")
+
 test_program(name = "bootstrap_file_watcher_test")
 
 test_program(name = "bootstrap_admin_handler_test")
