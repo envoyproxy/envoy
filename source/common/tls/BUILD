@@ -185,6 +185,8 @@ envoy_cc_library(
         ":cert_compression_lib",
         ":stats_lib",
         ":utility_lib",
+        "//envoy/singleton:instance_interface",
+        "//envoy/singleton:manager_interface",
         "//envoy/ssl:context_config_interface",
         "//envoy/ssl:context_interface",
         "//envoy/ssl:context_manager_interface",
