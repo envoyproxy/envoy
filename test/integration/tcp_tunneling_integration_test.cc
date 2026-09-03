@@ -503,6 +503,11 @@ TEST_P(ConnectTerminationIntegrationTest, IgnoreH11HostField) {
 }
 
 TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataRejectedWithOverride) {
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    GTEST_SKIP() << "HTTP/3 does not enforce strict ordering between header and data frames at the "
+                    "transport/processing levels, making early connect data checks "
+                    "non-deterministic.";
+  }
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
