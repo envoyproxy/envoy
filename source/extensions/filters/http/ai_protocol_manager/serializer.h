@@ -33,9 +33,15 @@ private:
 
 class Serializer {
 public:
+  struct SerializedOffsets {
+    JsonWithExtBuf doc;
+    uint64_t total_size{0};
+  };
+
   // Dry-run calculation: computes new byte offsets for all ExternalRef nodes in doc as they
-  // will appear in the serialized output stream, returning a new JsonWithExtBuf instance.
-  static Coroutine::Task<absl::StatusOr<JsonWithExtBuf>>
+  // will appear in the serialized output stream, returning a new JsonWithExtBuf instance and
+  // the total serialized byte length.
+  static Coroutine::Task<absl::StatusOr<SerializedOffsets>>
   calculateSerializedOffsets(const JsonWithExtBuf& doc);
 
   // Streaming serialization: replays JSON tokens and offloaded buffer slices directly through

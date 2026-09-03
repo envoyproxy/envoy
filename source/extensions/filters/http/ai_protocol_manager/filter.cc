@@ -349,11 +349,10 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
 
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
-    request_headers_->removeContentLength();
     std::vector<AiFilterPtr> filters;
     filter_manager_ = std::make_unique<FilterManager>(
         std::move(filters), std::move(request_json_), decode_manager_.get(),
-        decoder_callbacks_->dispatcher(), decoder_callbacks_->streamInfo(),
+        decoder_callbacks_->dispatcher(), decoder_callbacks_->streamInfo(), request_headers_,
         [this](Http::Code code, std::string details) {
           ENVOY_LOG(debug, "ai_protocol_manager: rejecting request via local reply: {} {}",
                     static_cast<uint32_t>(code), details);

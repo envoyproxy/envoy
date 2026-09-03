@@ -297,6 +297,7 @@ TEST_F(FilterManagerTest, FilterLocalReply) {
 
   FilterManager manager(
       std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      /*request_headers=*/nullptr,
       [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
         local_reply_code = code;
         local_reply_details = std::move(details);
@@ -328,6 +329,7 @@ TEST_F(FilterManagerTest, FilterErrorTriggersLocalReply) {
 
   FilterManager manager(
       std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      /*request_headers=*/nullptr,
       [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
         local_reply_code = code;
         local_reply_details = std::move(details);
@@ -343,7 +345,7 @@ TEST_F(FilterManagerTest, FilterErrorTriggersLocalReply) {
   drain();
   EXPECT_TRUE(completed);
   EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kInternal));
-  EXPECT_EQ(local_reply_code, Http::Code::BadRequest);
+  EXPECT_EQ(local_reply_code, Http::Code::BadGateway);
   EXPECT_EQ(local_reply_details, "intentional filter error");
 }
 
@@ -441,6 +443,7 @@ TEST_F(FilterManagerTest, SynchronousFilterLocalReplyStopsSubsequentFilterLaunch
 
   FilterManager manager(
       std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+      /*request_headers=*/nullptr,
       [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
         local_reply_code = code;
         local_reply_details = std::move(details);
@@ -630,6 +633,59 @@ TEST_F(FilterManagerTest, FilterNullPropagationFails) {
         EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kInvalidArgument));
       },
       "cannot propagate null AiRequestPtr");
+}
+
+TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeaders) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/chat/completions"}, {"content-length", "1000"}};
+
+  std::vector<AiFilterPtr> filters;
+  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
+                        stream_info_, &headers);
+
+  absl::Status status;
+  bool completed = false;
+  manager.start([&status, &completed](absl::Status s) {
+    status = std::move(s);
+    completed = true;
+  });
+
+  drain();
+  EXPECT_TRUE(completed);
+  ASSERT_OK(status);
+
+  std::string output = bridge_raw_->injected_.toString();
+  EXPECT_EQ(headers.getContentLengthValue(), absl::StrCat(output.size()));
+}
+
+TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeadersAfterMutation) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-3.5"}});
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/chat/completions"}};
+
+  std::vector<AiFilterPtr> filters;
+  filters.push_back(std::make_unique<TestMutationFilter>("gpt-4-turbo-extra-long"));
+
+  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
+                        stream_info_, &headers);
+
+  absl::Status status;
+  bool completed = false;
+  manager.start([&status, &completed](absl::Status s) {
+    status = std::move(s);
+    completed = true;
+  });
+
+  drain();
+  EXPECT_TRUE(completed);
+  ASSERT_OK(status);
+
+  std::string output = bridge_raw_->injected_.toString();
+  EXPECT_EQ(headers.getContentLengthValue(), absl::StrCat(output.size()));
 }
 
 } // namespace

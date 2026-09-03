@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/logger.h"
@@ -26,7 +27,9 @@ public:
 
   FilterManager(std::vector<AiFilterPtr> filters, JsonWithExtBuf payload_index,
                 BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
-                StreamInfo::StreamInfo& stream_info, LocalReplyFn local_reply_fn = nullptr);
+                StreamInfo::StreamInfo& stream_info,
+                Http::RequestHeaderMap* request_headers = nullptr,
+                LocalReplyFn local_reply_fn = nullptr);
   ~FilterManager();
 
   // Launches the filter chain. Invokes `on_complete` with the final completion status.
@@ -38,8 +41,8 @@ public:
   //    are cancelled, `local_reply_fn` is called with the HTTP code and details string, and
   //    `on_complete` is invoked with `absl::CancelledError`.
   // 3. FilterManager internal error: when an `AiFilter` returns a non-OK status or an internal
-  //    error occurs, all coroutines are cancelled, `local_reply_fn` is called with a 400 Bad
-  //    Request local reply, and `on_complete` is invoked with that error status.
+  //    error occurs, all coroutines are cancelled, `local_reply_fn` is called with a 502 Bad
+  //    Gateway local reply, and `on_complete` is invoked with that error status.
   // 4. Cancellation: when `cancel()` is called, all coroutines are cancelled and neither
   //    `local_reply_fn` nor `on_complete` is invoked.
   void start(absl::AnyInvocable<void(absl::Status)> on_complete);

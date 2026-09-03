@@ -88,6 +88,8 @@ public:
     co_return co_await flushBuffer();
   }
 
+  uint64_t totalBytes() const { return byte_counter_; }
+
 private:
   static constexpr size_t kMaxSmallBufferSize = 4096;
 
@@ -106,6 +108,11 @@ private:
         if (buffer_manager_ == nullptr) {
           co_return absl::InternalError("buffer_manager is null during flushBuffer");
         }
+        // TODO(penguingao): if the replay becomes too fragmented between
+        // external buffer and reserialization, we could change the interface to
+        // BufferManager take hint from the serializer's potential next replay
+        // ranges, this way, it can then internally coalescing reads to save
+        // I/O.
         CO_RETURN_IF_ERROR(co_await ReplayAwaitable(*buffer_manager_, small_buf_));
         break;
       case SerializationMode::Counting:
@@ -235,7 +242,7 @@ private:
 
 } // namespace
 
-Coroutine::Task<absl::StatusOr<JsonWithExtBuf>>
+Coroutine::Task<absl::StatusOr<Serializer::SerializedOffsets>>
 Serializer::calculateSerializedOffsets(const JsonWithExtBuf& doc) {
   SerializerImpl impl(nullptr, SerializationMode::Counting);
   nlohmann::json new_json;
@@ -243,7 +250,7 @@ Serializer::calculateSerializedOffsets(const JsonWithExtBuf& doc) {
 
   JsonWithExtBuf new_doc;
   new_doc.setJson(std::move(new_json));
-  co_return new_doc;
+  co_return SerializedOffsets{std::move(new_doc), impl.totalBytes()};
 }
 
 Coroutine::Task<absl::StatusOr<JsonWithExtBuf>>

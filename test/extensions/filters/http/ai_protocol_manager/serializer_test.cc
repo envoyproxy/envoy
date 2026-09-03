@@ -59,14 +59,14 @@ public:
     return final_result;
   }
 
-  absl::StatusOr<JsonWithExtBuf> runCalculateOffsets(const JsonWithExtBuf& doc) {
+  absl::StatusOr<Serializer::SerializedOffsets> runCalculateOffsets(const JsonWithExtBuf& doc) {
     auto executor = std::make_shared<Coroutine::DispatcherExecutor>(*dispatcher_);
-    absl::StatusOr<JsonWithExtBuf> final_result;
+    absl::StatusOr<Serializer::SerializedOffsets> final_result;
     bool completed = false;
 
     auto handle = Coroutine::launch(
         Serializer::calculateSerializedOffsets(doc), executor,
-        [&completed, &final_result](absl::StatusOr<JsonWithExtBuf> result) {
+        [&completed, &final_result](absl::StatusOr<Serializer::SerializedOffsets> result) {
           final_result = std::move(result);
           completed = true;
         },
@@ -107,6 +107,7 @@ TEST_F(SerializerTest, PureJsonSerialization) {
 
   auto offset_doc_or = runCalculateOffsets(doc);
   ASSERT_OK(offset_doc_or);
+  EXPECT_EQ(offset_doc_or->total_size, output.size());
 }
 
 TEST_F(SerializerTest, ExternalRefSerializationAndOffsetRecalculation) {
@@ -132,7 +133,8 @@ TEST_F(SerializerTest, ExternalRefSerializationAndOffsetRecalculation) {
 
   auto offset_doc_or = runCalculateOffsets(doc);
   ASSERT_OK(offset_doc_or);
-  const auto& new_json = offset_doc_or->json();
+  EXPECT_EQ(offset_doc_or->total_size, output.size());
+  const auto& new_json = offset_doc_or->doc.json();
   ASSERT_TRUE(JsonWithExtBuf::isExternalRef(new_json["prompt"]));
   auto ref = *JsonWithExtBuf::externalRef(new_json["prompt"]);
   EXPECT_EQ(ref.length, secret.size());
@@ -219,7 +221,8 @@ TEST_F(SerializerTest, NestedStructureWithMultipleRefs) {
 
   auto offset_doc_or = runCalculateOffsets(doc);
   ASSERT_OK(offset_doc_or);
-  const auto& new_json = offset_doc_or->json();
+  EXPECT_EQ(offset_doc_or->total_size, output.size());
+  const auto& new_json = offset_doc_or->doc.json();
   auto ref1 = *JsonWithExtBuf::externalRef(new_json["messages"][0]["content"]);
   auto ref2 = *JsonWithExtBuf::externalRef(new_json["messages"][1]["content"]);
 

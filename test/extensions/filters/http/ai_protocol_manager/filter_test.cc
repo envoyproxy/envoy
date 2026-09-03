@@ -1155,24 +1155,27 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
   EXPECT_TRUE(injected_end_stream_);
 }
 
-// Content-Length header is removed when the filter manager serializes the payload.
-TEST_F(AiProtocolManagerFilterTest, RemovesContentLengthOnReplay) {
+// Content-Length header is set to the recalculated length when the filter manager serializes the
+// payload.
+TEST_F(AiProtocolManagerFilterTest, SetsContentLengthOnReplay) {
   setRouteConfig();
   replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
   request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                     {":path", "/chat/completions"},
                                                     {"content-type", "application/json"},
-                                                    {"content-length", "61"}};
+                                                    {"content-length", "999"}};
   ASSERT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
-  EXPECT_NE(request_headers_.ContentLength(), nullptr);
+  EXPECT_EQ(request_headers_.getContentLengthValue(), "999");
 
-  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  const std::string payload = R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})";
+  Buffer::OwnedImpl body(payload);
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(request_headers_.ContentLength(), nullptr);
+  EXPECT_NE(request_headers_.ContentLength(), nullptr);
+  EXPECT_EQ(request_headers_.getContentLengthValue(), absl::StrCat(injected_.length()));
 }
 
 // Malformed JSON is answered with a 400 and never reaches the upstream.

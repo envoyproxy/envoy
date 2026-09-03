@@ -206,6 +206,7 @@ envoy_cc_library(
         ":json_with_ext_buf_lib",
         ":serializer_lib",
         "//envoy/http:codes_interface",
+        "//envoy/http:header_map_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",

@@ -65,7 +65,12 @@ void BufferManager::endStream() {
 
 void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback done) {
   // One replay at a time: the caller chains sub-ranges from the done callback.
-  ASSERT(!replay_cancelled_ && !replaying_ && !replay_requested_);
+  if (replay_cancelled_ || replaying_ || replay_requested_) {
+    IS_ENVOY_BUG("replay is in progress, or has been cancelled. currently only one pending replay "
+                 "is supported. and if cancelReplay is called, no more replay is allowed.");
+    done();
+    return;
+  }
   replay_source_ = ReplaySource::ExternalBuffer;
   replay_offset_ = offset;
   replay_end_ = offset + length;

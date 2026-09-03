@@ -25,8 +25,10 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
   };
 
   AsyncState(size_t num_filters, BufferManager* buffer_manager, StreamInfo::StreamInfo& stream_info,
+             Http::RequestHeaderMap* request_headers,
              std::shared_ptr<Coroutine::DispatcherExecutor> executor, LocalReplyFn local_reply_fn)
-      : buffer_manager_(buffer_manager), stream_info_(stream_info), executor_(std::move(executor)),
+      : buffer_manager_(buffer_manager), stream_info_(stream_info),
+        request_headers_(request_headers), executor_(std::move(executor)),
         local_reply_fn_(std::move(local_reply_fn)) {
     // num_filters + 1 stages: 0..N-1 are filters, N is the sink.
     for (size_t i = 0; i <= num_filters; ++i) {
@@ -74,15 +76,23 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
     ASSERT(final_req_ != nullptr);
 
     ASSIGN_OR_CO_RETURN(
-        auto new_doc, co_await Serializer::calculateSerializedOffsets(final_req_->request_index()));
+        Serializer::SerializedOffsets serialized_offsets,
+        co_await Serializer::calculateSerializedOffsets(final_req_->request_index()));
 
     if (stream_info_.filterState() != nullptr) {
       stream_info_.filterState()->setData(
           APMRequestPayloadIndex::kFilterStateKey,
-          std::make_shared<APMRequestPayloadIndex>(std::move(new_doc)),
+          std::make_shared<APMRequestPayloadIndex>(std::move(serialized_offsets.doc)),
           StreamInfo::FilterState::LifeSpan::Request);
     }
 
+    if (request_headers_ != nullptr) {
+      request_headers_->setContentLength(serialized_offsets.total_size);
+    }
+
+    // TODO(penguingao): condition the serialization on config. If we want to
+    // normalize the json payload / protocol or the payload is modified, we
+    // re-serialize, if not, we just pass through the oroginal body.
     ASSIGN_OR_CO_RETURN(
         std::ignore, co_await Serializer::serialize(final_req_->request_index(), buffer_manager_));
 
@@ -144,7 +154,7 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
     on_complete_ = nullptr;
 
     if (reply_fn != nullptr) {
-      reply_fn(Http::Code::BadRequest, std::string(status.message()));
+      reply_fn(Http::Code::BadGateway, std::string(status.message()));
     }
     if (on_complete != nullptr) {
       on_complete(std::move(status));
@@ -187,6 +197,7 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
 
   BufferManager* buffer_manager_{nullptr};
   StreamInfo::StreamInfo& stream_info_;
+  Http::RequestHeaderMap* request_headers_{nullptr};
   std::shared_ptr<Coroutine::DispatcherExecutor> executor_;
   LocalReplyFn local_reply_fn_;
   absl::AnyInvocable<void(absl::Status)> on_complete_;
@@ -198,11 +209,13 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
 
 FilterManager::FilterManager(std::vector<AiFilterPtr> filters, JsonWithExtBuf payload_index,
                              BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
-                             StreamInfo::StreamInfo& stream_info, LocalReplyFn local_reply_fn)
+                             StreamInfo::StreamInfo& stream_info,
+                             Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn)
     : filters_(std::move(filters)), payload_index_(std::move(payload_index)),
       executor_(std::make_shared<Coroutine::DispatcherExecutor>(dispatcher)),
       async_state_(std::make_shared<AsyncState>(filters_.size(), buffer_manager, stream_info,
-                                                executor_, std::move(local_reply_fn))) {}
+                                                request_headers, executor_,
+                                                std::move(local_reply_fn))) {}
 
 FilterManager::~FilterManager() { cancel(); }
 
