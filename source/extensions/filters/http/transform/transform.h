@@ -62,8 +62,14 @@ public:
                                     const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const Formatter::Context& context,
                               const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const Formatter::Context& context,
+                const StreamInfo::StreamInfo&) const override;
+  void formatValueTo(Formatter::ValueSink& sink, const Formatter::Context& context,
+                     const StreamInfo::StreamInfo&) const override;
 
 private:
+  OptRef<const Protobuf::Value> getBodyValue(const Formatter::Context& context) const;
+
   const std::vector<std::string> path_;
   const bool request_body_{};
 };

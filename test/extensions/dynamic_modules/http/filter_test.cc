@@ -18,9 +18,15 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+
+using testing::_;
+using testing::ElementsAre;
+using testing::HasSubstr;
+using testing::NotNull;
 
 namespace Envoy {
 namespace Extensions {
@@ -119,7 +125,7 @@ TEST_P(DynamicModuleHttpLanguageTests, ConfigInitializationFailure) {
       "config_init_failure", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
       *stats_store.createScope(""), context);
   EXPECT_THAT(filter_config_or_status,
-              HasStatusMessage(testing::HasSubstr("Failed to initialize dynamic module")));
+              HasStatusMessage(HasSubstr("Failed to initialize dynamic module")));
 }
 
 // Creating an SDS subscription reaches for the dispatcher's time source, so the simulated time
@@ -500,23 +506,17 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   auto ns_list = metadata.filter_metadata().find("ns_list");
   // Verify number list.
   auto list_key = ns_list->second.fields().find("list_key");
-  ASSERT_TRUE(list_key->second.has_list_value());
-  ASSERT_EQ(list_key->second.list_value().values_size(), 3);
-  EXPECT_EQ(list_key->second.list_value().values(0).number_value(), 1.0);
-  EXPECT_EQ(list_key->second.list_value().values(1).number_value(), 2.0);
-  EXPECT_EQ(list_key->second.list_value().values(2).number_value(), 3.0);
+  EXPECT_THAT(list_key->second,
+              IsStructValueList(ElementsAre(IsStructValueNumber(1.0), IsStructValueNumber(2.0),
+                                            IsStructValueNumber(3.0))));
   // Verify string list.
   auto str_list_key = ns_list->second.fields().find("str_list_key");
-  ASSERT_TRUE(str_list_key->second.has_list_value());
-  ASSERT_EQ(str_list_key->second.list_value().values_size(), 2);
-  EXPECT_EQ(str_list_key->second.list_value().values(0).string_value(), "hello");
-  EXPECT_EQ(str_list_key->second.list_value().values(1).string_value(), "world");
+  EXPECT_THAT(str_list_key->second, IsStructValueList(ElementsAre(IsStructValueString("hello"),
+                                                                  IsStructValueString("world"))));
   // Verify bool list.
   auto bool_list_key = ns_list->second.fields().find("bool_list_key");
-  ASSERT_TRUE(bool_list_key->second.has_list_value());
-  ASSERT_EQ(bool_list_key->second.list_value().values_size(), 2);
-  EXPECT_EQ(bool_list_key->second.list_value().values(0).bool_value(), true);
-  EXPECT_EQ(bool_list_key->second.list_value().values(1).bool_value(), false);
+  EXPECT_THAT(bool_list_key->second,
+              IsStructValueList(ElementsAre(IsStructValueBool(true), IsStructValueBool(false))));
 
   filter->onDestroy();
 }
@@ -708,7 +708,7 @@ TEST_P(DynamicModuleHttpLanguageTests, RecreateStream) {
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   filter->setDecoderFilterCallbacks(callbacks);
-  EXPECT_CALL(callbacks, recreateStream(testing::NotNull()))
+  EXPECT_CALL(callbacks, recreateStream(NotNull()))
       .WillOnce(testing::Invoke([](const Http::ResponseHeaderMap* headers) {
         EXPECT_EQ(headers->getStatusValue(), "302");
         const auto location = headers->get(Http::LowerCaseString("location"));
@@ -849,7 +849,7 @@ TEST_P(DynamicModuleHttpLanguageTests, SpanCallbacks) {
   EXPECT_CALL(callbacks, activeSpan()).WillRepeatedly(testing::ReturnRef(span));
   EXPECT_CALL(span, setTag("key", "value"));
   EXPECT_CALL(span, setOperation("operation"));
-  EXPECT_CALL(span, log(testing::_, "event"));
+  EXPECT_CALL(span, log(_, "event"));
   EXPECT_CALL(span, setSampled(true));
   // The disable_local_decision SDK wrapper is Rust-only, so scope this expectation to the rust
   // parameterization like the other language guards in the dynamic_modules integration tests.
@@ -860,8 +860,7 @@ TEST_P(DynamicModuleHttpLanguageTests, SpanCallbacks) {
   EXPECT_CALL(span, setBaggage("key", "value"));
   EXPECT_CALL(span, getTraceId()).WillOnce(testing::Return("trace-id"));
   EXPECT_CALL(span, getSpanId()).WillOnce(testing::Return("span-id"));
-  EXPECT_CALL(span, spawnChild_(testing::_, "child", testing::_))
-      .WillOnce(testing::Return(child_span));
+  EXPECT_CALL(span, spawnChild_(_, "child", _)).WillOnce(testing::Return(child_span));
   EXPECT_CALL(*child_span, setTag("child-key", "child-value"));
   EXPECT_CALL(*child_span, finishSpan());
   Http::TestRequestHeaderMapImpl request_headers{{}};
@@ -907,7 +906,7 @@ TEST_P(DynamicModuleHttpLanguageTests, ClusterCallbacks) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   std::string cluster_name = "fake_cluster";
   EXPECT_CALL(*callbacks.cluster_info_, name()).WillRepeatedly(testing::ReturnRef(cluster_name));
-  EXPECT_CALL(callbacks, setUpstreamOverrideHost(testing::_))
+  EXPECT_CALL(callbacks, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([](Upstream::LoadBalancerContext::OverrideHost override_host) {
         EXPECT_EQ(override_host.host, "127.0.0.1:1");
         EXPECT_FALSE(override_host.strict);

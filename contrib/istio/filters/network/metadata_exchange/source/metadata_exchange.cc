@@ -328,7 +328,7 @@ void MetadataExchangeFilter::setMetadataNotFoundFilterState() {
         if (metadata_object) {
           ENVOY_LOG(debug, "Metadata found for upstream peer address {}",
                     upstream_peer->asString());
-          updatePeer(metadata_object.value(), FilterDirection::Upstream);
+          updatePeer(*metadata_object, FilterDirection::Upstream);
         }
       }
 
@@ -350,7 +350,7 @@ void MetadataExchangeFilter::setMetadataNotFoundFilterState() {
     const auto metadata_object = config_->metadata_provider_->GetMetadata(peer_address);
     if (metadata_object) {
       ENVOY_LOG(trace, "Metadata found for peer address {}", peer_address->asString());
-      updatePeer(metadata_object.value());
+      updatePeer(*metadata_object);
       config_->stats().metadata_added_.inc();
       return;
     } else {

@@ -97,6 +97,10 @@ public:
     filter_config_->stat_creation_frozen_ = false;
 
     ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
+    ON_CALL(callbacks_, filterState())
+        .WillByDefault(testing::Invoke([this]() -> StreamInfo::FilterState& {
+          return *callbacks_.stream_info_.filterState();
+        }));
 
     filter_ = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
     filter_->onAccept(callbacks_);
@@ -105,6 +109,12 @@ public:
   void TearDown() override { filter_.reset(); }
 
   void* filterPtr() { return static_cast<void*>(filter_.get()); }
+
+  void expectDynamicMetadata(envoy::config::core::v3::Metadata& metadata) {
+    EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+    EXPECT_CALL(callbacks_.stream_info_, dynamicMetadata())
+        .WillRepeatedly(testing::ReturnRef(metadata));
+  }
 
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -1415,7 +1425,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketIoError) {
 // =============================================================================
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadata) {
-  EXPECT_CALL(callbacks_, setDynamicMetadata(std::string("test_ns"), testing::_));
+  EXPECT_CALL(callbacks_.stream_info_, setDynamicMetadata(std::string("test_ns"), testing::_));
 
   char ns[] = "test_ns";
   char key[] = "my_key";
@@ -1798,7 +1808,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataSuccess) {
       ->operator[]("key1")
       .set_string_value("value1");
 
-  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  expectDynamicMetadata(metadata);
 
   char ns[] = "test_ns";
   char key[] = "key1";
@@ -1816,7 +1826,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataSuccess) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNamespaceNotFound) {
   envoy::config::core::v3::Metadata metadata;
-  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  expectDynamicMetadata(metadata);
 
   char ns[] = "missing_ns";
   char key[] = "key1";
@@ -1839,7 +1849,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataKeyNotFound
       ->operator[]("key1")
       .set_string_value("value1");
 
-  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  expectDynamicMetadata(metadata);
 
   char ns[] = "test_ns";
   char key[] = "missing_key";
@@ -1882,7 +1892,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataSucces
   envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
   envoy_dynamic_module_type_module_buffer value_buf = {value, 6};
 
-  EXPECT_CALL(callbacks_, setDynamicMetadata(testing::_, testing::_));
+  EXPECT_CALL(callbacks_.stream_info_, setDynamicMetadata(testing::_, testing::_));
 
   envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
                                                                             key_buf, value_buf);
@@ -1911,9 +1921,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCa
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetAndGetDynamicMetadataNumber) {
   envoy::config::core::v3::Metadata metadata;
-  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
-  EXPECT_CALL(callbacks_, setDynamicMetadata(std::string("test_ns"), testing::_))
-      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())["test_ns"]));
+  expectDynamicMetadata(metadata);
+  EXPECT_CALL(callbacks_.stream_info_, setDynamicMetadata(std::string("test_ns"), testing::_));
 
   char ns[] = "test_ns";
   char key[] = "num_key";
@@ -1934,9 +1943,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetAndGetDynamicMetadataNumbe
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNumberOverwrite) {
   envoy::config::core::v3::Metadata metadata;
-  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
-  EXPECT_CALL(callbacks_, setDynamicMetadata(std::string("test_ns"), testing::_))
-      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())["test_ns"]));
+  expectDynamicMetadata(metadata);
+  EXPECT_CALL(callbacks_.stream_info_, setDynamicMetadata(std::string("test_ns"), testing::_))
+      .Times(2);
 
   char ns[] = "test_ns";
   char key[] = "num_key";
@@ -1965,9 +1974,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNumberOverw
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNumberZero) {
   envoy::config::core::v3::Metadata metadata;
-  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
-  EXPECT_CALL(callbacks_, setDynamicMetadata(std::string("test_ns"), testing::_))
-      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())["test_ns"]));
+  expectDynamicMetadata(metadata);
+  EXPECT_CALL(callbacks_.stream_info_, setDynamicMetadata(std::string("test_ns"), testing::_));
 
   char ns[] = "test_ns";
   char key[] = "zero_key";
@@ -1986,7 +1994,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNumberZero)
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNumberNamespaceNotFound) {
   envoy::config::core::v3::Metadata metadata;
-  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  expectDynamicMetadata(metadata);
 
   char ns[] = "missing_ns";
   char key[] = "key1";
@@ -2006,7 +2014,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNumberKeyNo
       ->operator[]("other_key")
       .set_number_value(123.0);
 
-  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  expectDynamicMetadata(metadata);
 
   char ns[] = "test_ns";
   char key[] = "missing_key";
@@ -2026,7 +2034,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNumberWrong
       ->operator[]("key1")
       .set_string_value("not_a_number");
 
-  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  expectDynamicMetadata(metadata);
 
   char ns[] = "test_ns";
   char key[] = "key1";
@@ -2094,7 +2102,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataStringWrong
       ->operator[]("key1")
       .set_number_value(123.0);
 
-  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  expectDynamicMetadata(metadata);
 
   char ns[] = "test_ns";
   char key[] = "key1";

@@ -1530,7 +1530,6 @@ envoy_dynamic_module_on_http_filter_local_reply(
   if (plugin_handle == nullptr) {
     return envoy_dynamic_module_type_on_http_filter_local_reply_status_Continue;
   }
-  plugin_handle->local_reply_sent_ = true;
   return static_cast<envoy_dynamic_module_type_on_http_filter_local_reply_status>(
       plugin_handle->plugin_->onLocalReply(
           response_code,

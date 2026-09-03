@@ -139,13 +139,13 @@ EXTERNAL_DEPS_MAP = {
     # Abseil
     "abseil_strings": "@abseil-cpp//absl/strings",
     # gRPC transcoding
-    "grpc_transcoding": "@grpc_httpjson_transcoding//src:transcoding",
-    "path_matcher": "@grpc_httpjson_transcoding//src:path_matcher",
+    "grpc_transcoding": "@grpc-httpjson-transcoding//src:transcoding",
+    "path_matcher": "@grpc-httpjson-transcoding//src:path_matcher",
     # Google APIs
     "api_httpbody_protos": "@googleapis//google/api:httpbody_cc_proto",
     "http_api_protos": "@googleapis//google/api:annotations_cc_proto",
     # nghttp2
-    "nghttp2": "@envoy//bazel/foreign_cc:nghttp2",
+    "nghttp2": "@envoy//bazel/deps:nghttp2",
     # gRPC
     "grpc": "@grpc//:grpc++",
     "grpc_health_proto": "@grpc//src/proto/grpc/health/v1:health_cc_proto",
@@ -198,7 +198,7 @@ def tcmalloc_external_dep(repository):
             _repo("//bazel:debug_tcmalloc"),
             _repo("//bazel:gperftools_tcmalloc"),
         ): _repo("//bazel/external:gperftools"),
-        (_repo("//bazel:jemalloc_enabled"),): _repo("//bazel/foreign_cc:jemalloc"),
+        (_repo("//bazel:jemalloc_enabled"),): _repo("//bazel/deps:jemalloc"),
         "//conditions:default": _repo("//bazel:tcmalloc_lib"),
     })
 

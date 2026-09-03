@@ -498,6 +498,24 @@ TEST_P(IntegrationAdminTest, AdminPrometheusProtobufFormat) {
   codec_client_->close();
 }
 
+// Validates that /healthcheck/fail does not drain-close admin connections.
+TEST_P(IntegrationAdminTest, AdminNotDrainClosedOnHealthCheckFail) {
+  initialize();
+
+  BufferingStreamDecoderPtr response;
+  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/fail", response));
+
+  // The server is now health check failed. A subsequent admin request must not be drain-closed.
+  EXPECT_EQ("200", request("admin", "GET", "/server_info", response));
+  EXPECT_NE("close", response->headers().getConnectionValue());
+
+  // The header check above only covers HTTP/1; the counter covers both protocols.
+  const Stats::CounterSharedPtr drain_close =
+      test_server_->counter("http.admin.downstream_cx_drain_close");
+  ASSERT_NE(nullptr, drain_close);
+  EXPECT_EQ(0, drain_close->value());
+}
+
 // Validates that the "inboundonly" drains inbound listeners.
 TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -697,6 +715,28 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
 #endif
 
   EXPECT_EQ("200", request("admin", "POST", "/cpuprofiler?enable=n", response));
+}
+
+TEST_P(IntegrationAdminTest, AdminStatsHtmlXss) {
+  setUpstreamCount(2);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    *cluster =
+        ConfigHelper::buildStaticCluster("cluster_<script>alert(1)</script>", 0, "127.0.0.1");
+  });
+  initialize();
+
+  BufferingStreamDecoderPtr response;
+#ifdef ENVOY_ADMIN_HTML
+  EXPECT_EQ("200", request("admin", "GET", "/stats?format=html", response));
+  EXPECT_EQ("text/html; charset=UTF-8", contentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("cluster_&lt;script&gt;alert(1)&lt;/script&gt;"));
+  EXPECT_THAT(response->body(), Not(HasSubstr("cluster_<script>alert(1)</script>")));
+#else
+  EXPECT_EQ("400", request("admin", "GET", "/stats?format=html", response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("HTML output was disabled"));
+#endif
 }
 
 class IntegrationAdminIpv4Ipv6Test : public testing::Test, public HttpIntegrationTest {

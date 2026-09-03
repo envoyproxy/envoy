@@ -48,7 +48,7 @@ private:
                const StreamInfo::StreamInfo& stream_info) override;
 
   DynamicModuleAccessLogConfigSharedPtr config_;
-  ThreadLocal::SlotPtr tls_slot_;
+  ThreadLocal::SlotSharedPtr tls_slot_;
 };
 
 } // namespace DynamicModules

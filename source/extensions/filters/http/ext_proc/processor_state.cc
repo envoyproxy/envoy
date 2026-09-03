@@ -4,6 +4,8 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
@@ -112,7 +114,10 @@ bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
 
 // Process the data being buffered in STREAMED or FULL_DUPLEX_STREAMED mode.
 void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
-  if (hasBufferedData()) {
+  if (hasBufferedData() ||
+      // This is to avoid send an empty body chunk which is created by filter manager
+      // after end_of_stream is already sent to the ext_proc server.
+      (bufferedData() && end_stream && !eosSentToServerWithBody())) {
     Buffer::OwnedImpl buffered_chunk;
     modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
     ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
@@ -259,6 +264,9 @@ absl::Status ProcessorState::handleHeaderContinue() {
   } else if (body_mode_ == ProcessingMode::STREAMED ||
              body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
     sendBufferedDataInStreamedMode(false);
+    if (body_mode_ == ProcessingMode::STREAMED) {
+      continueIfNecessary();
+    }
     return absl::OkStatus();
   } else if (body_mode_ == ProcessingMode::BUFFERED_PARTIAL) {
     return handleBufferedPartialMode();

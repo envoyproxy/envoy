@@ -20,7 +20,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.network.set_filter_state"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/network/echo:config",

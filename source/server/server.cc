@@ -160,6 +160,16 @@ void InstanceBase::drainListeners(OptRef<const Network::ExtraShutdownListenerOpt
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
                                    options.has_value() ? *options
                                                        : Network::ExtraShutdownListenerOptions{});
+  // Notify the connections of every listener that draining has begun, so connection-level drain
+  // logic can react. Server-wide drains notify from their entry
+  // point rather than from DrainManagerImpl, whose per-listener children must not fan out. The
+  // start time and strategy are captured once here so every notified connection shares a single,
+  // consistent drain timeline.
+  listener_manager_->onServerDrainStart(
+      Network::DrainDirection::All,
+      Network::ConnectionDrainEvent{api().timeSource().monotonicTime(),
+                                    InstanceBase::options().drainStrategy()});
+
   drain_manager_->startDrainSequence(Network::DrainDirection::All, [] {});
 }
 
@@ -401,24 +411,12 @@ void InstanceUtil::raiseFileLimits() {
   if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.raise_file_limits")) {
     return;
   }
-  struct rlimit rlim;
-  if (const auto result = Api::OsSysCallsSingleton::get().getrlimit(RLIMIT_NOFILE, &rlim);
+  if (const auto result = Api::OsSysCallsSingleton::get().raiseFileLimits();
       result.return_value_ != 0) {
-    ENVOY_LOG(warn, "Failed to read file descriptor limit, error {}.", errorDetails(result.errno_));
-    return;
-  }
-  const auto old = rlim.rlim_cur;
-  if (old == rlim.rlim_max) {
-    return;
-  }
-  rlim.rlim_cur = rlim.rlim_max;
-  if (const auto result = Api::OsSysCallsSingleton::get().setrlimit(RLIMIT_NOFILE, &rlim);
-      result.return_value_ != 0) {
-    ENVOY_LOG(warn, "Failed to raise file descriptor limit to maximum, error {}.",
+    ENVOY_LOG(warn, "Failed to raise file descriptor limit, error {}.",
               errorDetails(result.errno_));
     return;
   }
-  ENVOY_LOG(info, "Raised file descriptor limits from {} to {}.", old, rlim.rlim_max);
 }
 
 void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_address,

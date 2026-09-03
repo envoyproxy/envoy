@@ -32,6 +32,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -350,6 +351,67 @@ TEST_F(ClientContextConfigImplTest, MultipleTlsCertificates) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   EXPECT_EQ(ClientContextConfigImpl::create(tls_context, factory_context_).status().message(),
             "Multiple TLS certificates are not supported for client contexts");
+}
+
+TEST_F(ClientContextConfigImplTest, MultipleTlsCertificatesWhenCustomTlsCertSelectorIsUsed) {
+  class TestUpstreamTlsCertificateSelectorFactory
+      : public Ssl::UpstreamTlsCertificateSelectorFactory {
+  public:
+    Ssl::UpstreamTlsCertificateSelectorPtr
+    createUpstreamTlsCertificateSelector(Ssl::TlsCertificateSelectorContext&) override {
+      return nullptr;
+    }
+
+    absl::Status onConfigUpdate() override { return absl::OkStatus(); }
+  };
+
+  class TestUpstreamTlsCertificateSelectorConfigFactory
+      : public Ssl::UpstreamTlsCertificateSelectorConfigFactory {
+  public:
+    absl::StatusOr<Ssl::UpstreamTlsCertificateSelectorFactoryPtr>
+    createUpstreamTlsCertificateSelectorFactory(const Protobuf::Message&,
+                                                Server::Configuration::GenericFactoryContext&,
+                                                const Ssl::ClientContextConfig&) override {
+      return std::make_unique<TestUpstreamTlsCertificateSelectorFactory>();
+    }
+
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return std::make_unique<Protobuf::StringValue>();
+    }
+
+    std::string name() const override { return "test-tls-context-provider"; }
+  };
+
+  TestUpstreamTlsCertificateSelectorConfigFactory provider_factory;
+  Registry::InjectFactory<Ssl::UpstreamTlsCertificateSelectorConfigFactory> registered_factory(
+      provider_factory);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  tls_context.mutable_max_session_keys()->set_value(0);
+  const std::string custom_tls_certificate_selector_yaml = R"EOF(
+  name: test-tls-context-provider
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+  )EOF";
+  TestUtility::loadFromYaml(
+      TestEnvironment::substitute(custom_tls_certificate_selector_yaml),
+      *tls_context.mutable_common_tls_context()->mutable_custom_tls_certificate_selector());
+
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Stats::IsolatedStoreImpl store;
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_OK(context_or);
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
 // Validate context config does not support handling both static TLS certificate and dynamic TLS
@@ -870,6 +932,29 @@ TEST_F(ClientContextConfigImplTest, TestLoadCorruptPkcs12) {
   auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
   EXPECT_EQ(manager_.createSslClientContext(*store_.rootScope(), *cfg).status().message(),
             "Failed to load pkcs12 from <inline>");
+}
+
+// Verify that X25519MLKEM768 can be explicitly configured as an ECDH curve
+// and that the resulting SSL context initializes successfully (non-FIPS only).
+// This proves PQC key exchange works via explicit opt-in configuration even
+// though it is not part of the default curve list.
+TEST_F(ClientContextConfigImplTest, ExplicitX25519Mlkem768Curve) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      ecdh_curves:
+      - X25519MLKEM768
+      - X25519
+      - P-256
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  EXPECT_EQ(cfg->ecdhCurves(), "X25519MLKEM768:X25519:P-256");
+  // Verify the SSL context can be created successfully with X25519MLKEM768.
+  auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
+  EXPECT_TRUE(context_or_error.status().ok());
 }
 
 } // namespace Tls

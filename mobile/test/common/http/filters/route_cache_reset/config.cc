@@ -7,9 +7,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RouteCacheReset {
 
-Http::FilterFactoryCb RouteCacheResetFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+RouteCacheResetFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoymobile::extensions::filters::http::route_cache_reset::RouteCacheReset&,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
 
   return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<RouteCacheResetFilter>());

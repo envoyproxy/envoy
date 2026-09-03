@@ -47,6 +47,7 @@ public:
     ASSERT(false, "not supported");
     return INVALID_SOCKET;
   }
+  void setAbortiveClose() override;
   Api::IoCallUint64Result close() override;
   bool isOpen() const override;
   bool wasConnected() const override;
@@ -56,6 +57,7 @@ public:
                                std::optional<uint64_t> max_length_opt) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override;
+  Api::IoCallUint64Result send(const void* buffer, size_t length) override;
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Network::Address::Ip* self_ip,
                                   const Network::Address::Instance& peer_address) override;
@@ -94,7 +96,6 @@ public:
   std::optional<std::chrono::milliseconds> lastRoundTripTime() override { return std::nullopt; }
   std::optional<uint64_t> congestionWindowInBytes() const override { return std::nullopt; }
   std::optional<std::string> interfaceName() override { return std::nullopt; }
-  bool wasPeerFullyClosed() const override { return peer_fully_closed_; }
 
   void setWatermarks(uint32_t watermark) { pending_received_data_.setWatermarks(watermark); }
   void onBelowLowWatermark() {
@@ -113,6 +114,11 @@ public:
     receive_data_end_stream_ = true;
     setNewDataAvailable();
   }
+  void setRst() override {
+    receive_data_reset_ = true;
+    receive_data_end_stream_ = true;
+    setNewDataAvailable();
+  }
   void setNewDataAvailable() override {
     ENVOY_LOG(trace, "{} on socket {}", __FUNCTION__, static_cast<void*>(this));
     if (user_file_event_) {
@@ -122,11 +128,7 @@ public:
           (receive_data_end_stream_ ? Event::FileReadyType::Closed : 0));
     }
   }
-  void onPeerDestroy() override {
-    peer_handle_ = nullptr;
-    sent_eof_ = true;
-    peer_fully_closed_ = true;
-  }
+  void onPeerDestroy() override;
   void onPeerBufferLowWatermark() override {
     if (user_file_event_) {
       user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
@@ -177,6 +179,12 @@ private:
   // True if pending_received_data_ is not addable. Note that pending_received_data_ may have
   // pending data to drain.
   bool receive_data_end_stream_{false};
+  bool receive_data_reset_{false};
+  // Set by onPeerDestroy() when the peer fully closed (close(), not shutdown(WR)). Reads drain
+  // pending data first, then report ECONNRESET where they would report EOF. This is how a full
+  // peer close is distinguished from a write half-close, which real sockets cannot signal on the
+  // read side.
+  bool receive_data_reset_after_drain_{false};
 
   // The buffer owned by this socket. This buffer is populated by the write operations of the peer
   // socket and drained by read operations of this socket.
@@ -189,9 +197,9 @@ private:
   // Indicates whether this handle has sent EOF to the peer by calling setEof().
   bool sent_eof_{false};
 
-  // True after peer's close() (not shutdown(WR)). Lets half-close-enabled connections
-  // distinguish a full peer disconnect from a graceful half-close.
-  bool peer_fully_closed_{false};
+  // Set by setAbortiveClose() to indicate that a subsequent close() operation should propagate an
+  // RST (rather than a FIN).
+  bool rst_requested_{false};
 
   // Shared state between peer handles.
   PassthroughStateSharedPtr passthrough_state_{nullptr};

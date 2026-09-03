@@ -69,7 +69,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["mcp_router_integration_test.cc"],
     extension_names = ["envoy.filters.http.mcp_router"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/clusters/mcp_multicluster:cluster",
         "//source/extensions/filters/http/mcp:config",

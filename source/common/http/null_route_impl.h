@@ -49,6 +49,7 @@ struct NullCommonConfig : public Router::CommonConfig {
   const Envoy::Config::TypedMetadata& typedMetadata() const override {
     return Router::DefaultRouteMetadataPack::get().typed_metadata_;
   }
+  bool ignorePathParametersInPathMatching() const override { return false; }
 
   static const std::vector<LowerCaseString> internal_only_headers_;
 };

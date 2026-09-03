@@ -1,5 +1,6 @@
 #include "contrib/mysql_proxy/filters/network/source/mysql_config.h"
 
+#include <format>
 #include <string>
 
 #include "envoy/registry/registry.h"
@@ -26,7 +27,7 @@ NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoType
 
   ASSERT(!proto_config.stat_prefix().empty());
 
-  const std::string stat_prefix = fmt::format("mysql.{}", proto_config.stat_prefix());
+  const std::string stat_prefix = std::format("mysql.{}", proto_config.stat_prefix());
 
   MySQLFilterConfigSharedPtr filter_config(std::make_shared<MySQLFilterConfig>(
       stat_prefix, context.scope(), proto_config.downstream_ssl()));

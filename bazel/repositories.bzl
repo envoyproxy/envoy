@@ -1,6 +1,7 @@
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load("@googleapis//:repository_rules.bzl", "switched_rules_by_language")
+load(":envoy_build_config.bzl", "default_envoy_build_config")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy.router.cluster_specifier_plugin.lua"]
@@ -14,6 +15,10 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.datadog",
+    # Requires POSIX signal handling.
+    "envoy.watchdog.backtrace_action",
+    # Only implemented for Linux.
+    "envoy.resource_monitors.cpu_utilization",
     # Extensions that require CEL.
     "envoy.access_loggers.extension_filters.cel",
     "envoy.rate_limit_descriptors.expr",
@@ -31,6 +36,8 @@ WINDOWS_SKIP_TARGETS = [
     # RBAC extensions have a link dependency on CEL.
     "envoy.filters.http.rbac",
     "envoy.filters.network.rbac",
+    # TODO(yanavlasov): See if objcopy issue can be resolved
+    "envoy.network.dns_resolver.hickory",
     "envoy.rbac.matchers.upstream_ip_port",
 ]
 
@@ -61,27 +68,17 @@ def external_http_archive(name, **kwargs):
         **kwargs
     )
 
-def _default_envoy_build_config_impl(ctx):
-    ctx.file("WORKSPACE", "")
-    ctx.file("BUILD.bazel", "")
-    ctx.symlink(ctx.attr.config, "extensions_build_config.bzl")
-
-default_envoy_build_config = repository_rule(
-    implementation = _default_envoy_build_config_impl,
-    attrs = {
-        "config": attr.label(default = "@envoy//source/extensions:extensions_build_config.bzl"),
-    },
-)
-
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     external_http_archive(
-        name = "grpc_httpjson_transcoding",
+        name = "grpc-httpjson-transcoding",
+        location_name = "grpc_httpjson_transcoding",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc_httpjson_transcoding.patch"],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
             "@com_google_googleapis": "@googleapis",
+            "@com_google_protobuf": "@protobuf",
             "@com_google_protoconverter": "@proto-converter",
         },
     )
@@ -97,7 +94,10 @@ def _cc_deps():
             "rm src/google/protobuf/util/converter/port_def.inc",
             "rm src/google/protobuf/util/converter/port_undef.inc",
         ],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
     external_http_archive(
         "proto-field-extraction",
@@ -105,8 +105,10 @@ def _cc_deps():
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:proto-field-extraction-protobuf-v35.patch"],
         repo_mapping = {
+            "@grpc_httpjson_transcoding": "@grpc-httpjson-transcoding",
             "@com_google_absl": "@abseil-cpp",
             "@com_google_googleapis": "@googleapis",
+            "@com_google_protobuf": "@protobuf",
             "@ocp": "@ocp-diag-core",
         },
     )
@@ -119,6 +121,7 @@ def _cc_deps():
             "@com_google_absl": "@abseil-cpp",
             "@ocp": "@ocp-diag-core",
             "@com_google_googleapis": "@googleapis",
+            "@com_google_protobuf": "@protobuf",
             "@com_google_protoconverter": "@proto-converter",
             "@com_google_protofieldextraction": "@proto-field-extraction",
         },
@@ -129,21 +132,39 @@ def _cc_deps():
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
             "@com_google_googletest": "@googletest",
+            "@com_google_protobuf": "@protobuf",
         },
     )
 
 def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
-    if "io_bazel_rules_go" not in skip_targets:
-        external_http_archive(name = "io_bazel_rules_go")
-        external_http_archive("bazel_gazelle")
+    if "io_bazel_rules_go" not in skip_targets and "rules_go" not in skip_targets:
+        external_http_archive(
+            name = "rules_go",
+            patch_args = ["-p1"],
+            patches = ["@envoy//bazel:rules_go.patch"],
+            repo_mapping = {
+                "@com_google_protobuf": "@protobuf",
+                "@io_bazel_rules_go": "@rules_go",
+            },
+        )
+        external_http_archive(
+            name = "gazelle",
+            patch_args = ["-p1"],
+            patches = ["@envoy//bazel:gazelle.patch"],
+            repo_mapping = {
+                "@com_google_protobuf": "@protobuf",
+                "@io_bazel_rules_go": "@rules_go",
+            },
+        )
 
 def _rust_deps():
     external_http_archive(
         "rules_rust",
         patch_args = ["-p0"],
         patches = ["@envoy//bazel:rules_rust.patch"],
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
 def envoy_dependencies(skip_targets = [], bzlmod = False):
@@ -156,16 +177,22 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
         default_envoy_build_config(name = "envoy_build_config")
 
     # Setup Bazel shell rules
-    external_http_archive(name = "rules_shell")
+    external_http_archive(
+        name = "rules_shell",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
+    )
 
     # Setup Bazel C++ rules
-    external_http_archive("rules_cc")
+    external_http_archive(
+        name = "rules_cc",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
+    )
 
     # Setup external Bazel rules
     _foreign_cc_dependencies()
 
     # BoringSSL:
-    # - BoringSSL FIPS from @boringssl_fips//:ssl,
+    # - BoringSSL FIPS from @boringssl-fips//:ssl,
     # - non-FIPS BoringSSL from @boringssl//:ssl.
     # SSL/crypto dependencies are resolved via EXTERNAL_DEPS_MAP in envoy_internal.bzl
     _boringssl()
@@ -226,7 +253,6 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
     _io_opentelemetry_api_cpp()
     _colm()
     _ragel()
-    _dlb()
     _zlib_ng()
     _boost()
     _brotli()
@@ -236,21 +262,34 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
     _proxy_wasm_cpp_host()
     _emsdk()
     _rules_fuzzing()
-    external_http_archive("proxy_wasm_rust_sdk")
+    external_http_archive(
+        name = "proxy-wasm-rust-sdk",
+        location_name = "proxy_wasm_rust_sdk",
+        repo_mapping = {"@proxy_wasm_rust_sdk": "@proxy-wasm-rust-sdk"},
+    )
     _cel_cpp()
     _perfetto()
     _rules_ruby()
     external_http_archive("flatbuffers")
     external_http_archive("bazel_features")
-    external_http_archive("bazel_compdb")
+    external_http_archive(
+        name = "bazel-compdb",
+        location_name = "bazel_compdb",
+    )
     external_http_archive("envoy_toolshed")
 
     _libmaxminddb()
     _thrift()
     _wuffs()
 
-    external_http_archive("rules_license")
-    external_http_archive("rules_pkg")
+    external_http_archive(
+        name = "rules_license",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
+    )
+    external_http_archive(
+        name = "rules_pkg",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
+    )
     external_http_archive("shellcheck")
 
     external_http_archive(
@@ -282,8 +321,11 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
             "py_proto_library": ["@grpc//bazel:python_rules.bzl", ""],
             "py_grpc_library": ["@grpc//bazel:python_rules.bzl", ""],
             "cc_grpc_library": ["@grpc//bazel:cc_grpc_library.bzl", ""],
+            "cc_proto_library": ["@protobuf//bazel:cc_proto_library.bzl", ""],
+            "proto_library": ["@protobuf//bazel:proto_library.bzl", ""],
         },
     )
+    envoy_mod_graph_stub(name = "envoy_mod_graph")
 
 def _boringssl():
     external_http_archive(
@@ -296,7 +338,7 @@ def _boringssl():
 
 def _boringssl_fips():
     external_http_archive(
-        name = "boringssl_fips",
+        name = "boringssl-fips",
         location_name = "boringssl",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
     )
@@ -369,6 +411,10 @@ def _com_github_bazel_buildtools():
     #  cf: https://github.com/bazelbuild/buildtools/issues/367
     external_http_archive(
         name = "buildtools",
+        repo_mapping = {
+            "@com_google_protobuf": "@protobuf",
+            "@io_bazel_rules_go": "@rules_go",
+        },
     )
 
 def _c_ares():
@@ -415,7 +461,10 @@ def _spdlog():
 def _benchmark():
     external_http_archive(
         name = "benchmark",
-        repo_mapping = {"@com_google_googletest": "@googletest"},
+        repo_mapping = {
+            "@com_google_googletest": "@googletest",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
     external_http_archive(
         name = "libpfm",
@@ -427,6 +476,7 @@ def _libprotobuf_mutator():
         name = "libprotobuf-mutator",
         location_name = "libprotobuf_mutator",
         build_file = "@envoy//bazel/external:libprotobuf_mutator.BUILD",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
 def _libsxg():
@@ -545,7 +595,7 @@ filegroup(
         "boost/**/*.hpp",
         "boost/**/*.ipp",
     ]),
-    visibility = ["@envoy//contrib/hyperscan/matching/input_matchers/source:__pkg__"],
+    visibility = ["@envoy//bazel/foreign_cc:__pkg__"],
 )
 """,
     )
@@ -576,8 +626,10 @@ def _cel_cpp():
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
             "@com_google_cel_spec": "@cel-spec",
+            "@com_google_protobuf": "@protobuf",
             "@com_github_google_flatbuffers": "@flatbuffers",
             "@com_googlesource_code_re2": "@re2",
+            "@io_bazel_rules_go": "@rules_go",
         },
     )
 
@@ -585,7 +637,11 @@ def _cel_cpp():
     external_http_archive(
         "cel-spec",
         location_name = "cel_spec",
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+            "@io_bazel_rules_go": "@rules_go",
+        },
     )
 
     # cel-cpp references ``@antlr4-cpp-runtime//:antlr4-cpp-runtime`` but it internally
@@ -603,7 +659,10 @@ alias(
     actual = "@antlr4_runtimes//:cpp",
 )
 """,
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
 
 def _perfetto():
@@ -668,7 +727,10 @@ def _io_opentelemetry_api_cpp():
     external_http_archive(
         name = "opentelemetry-cpp",
         location_name = "opentelemetry_cpp",
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
 
 def _dd_trace_cpp():
@@ -683,11 +745,20 @@ def _cpp2sky():
         name = "cpp2sky",
         patches = ["@envoy//bazel:com_github_skyapm_cpp2sky.patch"],
         patch_args = ["-p1"],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+            "@skywalking_data_collect_protocol": "@skywalking-data-collect-protocol",
+        },
     )
     external_http_archive(
-        name = "skywalking_data_collect_protocol",
-        repo_mapping = {"@com_github_grpc_grpc": "@grpc"},
+        name = "skywalking-data-collect-protocol",
+        location_name = "skywalking_data_collect_protocol",
+        repo_mapping = {
+            "@com_github_grpc_grpc": "@grpc",
+            "@com_google_protobuf": "@protobuf",
+            "@skywalking_data_collect_protocol": "@skywalking-data-collect-protocol",
+        },
     )
 
 def _nlohmann_json():
@@ -714,7 +785,10 @@ def _googletest():
         "googletest",
         patches = ["@envoy//bazel:googletest.patch"],
         patch_args = ["-p1"],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
 
 # TODO(jmarantz): replace the use of bind and external_deps with just
@@ -734,6 +808,7 @@ def _com_google_protobuf():
         name = "rules_python",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:rules_python.patch"],
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
     external_http_archive(
         name = "rules_java",
@@ -741,17 +816,23 @@ def _com_google_protobuf():
         patches = [
             "@envoy//bazel:rules_java.patch",
         ],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
 
     external_http_archive(
-        "com_google_protobuf",
+        name = "protobuf",
         patches = [
             "@envoy//bazel:protobuf.patch",
             "@envoy//bazel:protobuf_prebuilt_tool_integrity.patch",
         ],
         patch_args = ["-p1"],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
 
 def _v8():
@@ -810,10 +891,15 @@ def _quiche():
     external_http_archive(
         name = "quiche",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:quiche.patch"],
+        patches = [
+            "@envoy//bazel/external:oghttp2_trailer_fix.patch",
+        ],
         patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
 
 def _googleurl():
@@ -830,8 +916,10 @@ def _grpc():
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
         repo_mapping = {
+            "@build_bazel_rules_apple": "@rules_apple",
             "@com_google_absl": "@abseil-cpp",
             "@com_google_googleapis": "@googleapis",
+            "@com_google_protobuf": "@protobuf",
             "@com_github_cncf_xds": "@xds",
             "@com_github_grpc_grpc": "@grpc",
             "@com_googlesource_code_re2": "@re2",
@@ -839,12 +927,15 @@ def _grpc():
         },
     )
     external_http_archive(
-        "build_bazel_rules_apple",
+        "rules_apple",
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:rules_apple.patch",
             "@envoy//bazel:rules_apple_py.patch",
         ],
+        repo_mapping = {
+            "@com_google_protobuf": "@protobuf",
+        },
     )
 
 def _rules_proto_grpc():
@@ -852,7 +943,12 @@ def _rules_proto_grpc():
         name = "rules_proto_grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:rules_proto_grpc.patch"],
-        repo_mapping = {"@com_github_grpc_grpc": "@grpc"},
+        repo_mapping = {
+            "@com_github_grpc_grpc": "@grpc",
+            "@bazel_gazelle": "@gazelle",
+            "@com_google_protobuf": "@protobuf",
+            "@io_bazel_rules_go": "@rules_go",
+        },
     )
 
 def _re2():
@@ -860,23 +956,34 @@ def _re2():
 
 def _proxy_wasm_cpp_sdk():
     external_http_archive(
-        name = "proxy_wasm_cpp_sdk",
+        name = "proxy-wasm-cpp-sdk",
+        location_name = "proxy_wasm_cpp_sdk",
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:proxy_wasm_cpp_sdk.patch",
             "@envoy//bazel:proxy_wasm_cpp_sdk-protobuf-v35.patch",
         ],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+            "@proxy_wasm_cpp_sdk": "@proxy-wasm-cpp-sdk",
+        },
     )
 
 def _proxy_wasm_cpp_host():
     external_http_archive(
-        name = "proxy_wasm_cpp_host",
+        name = "proxy-wasm-cpp-host",
+        location_name = "proxy_wasm_cpp_host",
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:proxy_wasm_cpp_host.patch",
         ],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+            "@proxy_wasm_cpp_host": "@proxy-wasm-cpp-host",
+            "@proxy_wasm_cpp_sdk": "@proxy-wasm-cpp-sdk",
+        },
     )
 
 def _emsdk():
@@ -901,7 +1008,10 @@ def _tcmalloc():
         name = "tcmalloc",
         patches = ["@envoy//bazel:tcmalloc.patch"],
         patch_args = ["-p1"],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@protobuf",
+        },
     )
 
 def _gperftools():
@@ -928,32 +1038,21 @@ def _toolchains_llvm():
         patches = [
             "@envoy_toolshed//:patches/toolchains_llvm.patch",
         ],
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
 def _wasmtime():
     external_http_archive(
         name = "wasmtime",
-        build_file = "@proxy_wasm_cpp_host//:bazel/external/wasmtime.BUILD",
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        build_file = "@proxy-wasm-cpp-host//:bazel/external/wasmtime.BUILD",
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@proxy_wasm_cpp_host": "@proxy-wasm-cpp-host",
+        },
         patches = [
-            "@proxy_wasm_cpp_host//:bazel/external/prefixed_wasmtime.patch",
+            "@proxy-wasm-cpp-host//:bazel/external/prefixed_wasmtime.patch",
         ],
         patch_args = ["-p1"],
-    )
-
-def _dlb():
-    external_http_archive(
-        name = "dlb",
-        build_file_content = """
-filegroup(
-    name = "libdlb",
-    srcs = glob(["dlb/libdlb/*"]),
-    visibility = ["@envoy//contrib/dlb/source:__pkg__"],
-)
-""",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:dlb.patch"],
-        patch_cmds = ["cp dlb/driver/dlb2/uapi/linux/dlb2_user.h dlb/libdlb/"],
     )
 
 def _rules_fuzzing():
@@ -984,19 +1083,35 @@ filegroup(
 )
     """
     external_http_archive(
-        name = "kafka_source",
+        name = "kafka",
+        location_name = "kafka_source",
         build_file_content = KAFKASOURCE_BUILD_CONTENT,
     )
 
     # This archive provides Kafka C/CPP client used by mesh filter to communicate with upstream
     # Kafka clusters.
+    LIBRDKAFKA_BUILD_CONTENT = """
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+bool_flag(
+    name = "with_ssl",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+bool_flag(
+    name = "with_zlib",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+%s
+    """ % BUILD_ALL_CONTENT
     external_http_archive(
-        name = "confluentinc_librdkafka",
-        build_file_content = BUILD_ALL_CONTENT,
+        name = "librdkafka",
+        build_file_content = LIBRDKAFKA_BUILD_CONTENT,
         # (adam.kotwasinski) librdkafka bundles in cJSON, which is also bundled in by libvppinfra.
         # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.
         patches = ["@envoy//bazel/foreign_cc:librdkafka.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
 def _vpp_vcl():
@@ -1009,13 +1124,17 @@ def _vpp_vcl():
     )
 
 def _rules_ruby():
-    external_http_archive("rules_ruby")
+    external_http_archive(
+        name = "rules_ruby",
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
+    )
 
 def _foreign_cc_dependencies():
     external_http_archive(
         name = "rules_foreign_cc",
         patches = ["@envoy//bazel:rules_foreign_cc.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
 def _thrift():
@@ -1051,3 +1170,15 @@ cc_library(
 )
 """,
     )
+
+def _envoy_mod_graph_stub_impl(repository_ctx):
+    repository_ctx.file(
+        "BUILD.bazel",
+        "exports_files([\"deps.json\"], visibility = [\"//visibility:public\"])\n",
+    )
+    repository_ctx.file("deps.json", "{}")
+
+envoy_mod_graph_stub = repository_rule(
+    implementation = _envoy_mod_graph_stub_impl,
+    doc = "WORKSPACE-mode placeholder for @envoy_mod_graph (real one is provided by the bzlmod extension).",
+)

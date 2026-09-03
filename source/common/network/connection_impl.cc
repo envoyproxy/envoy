@@ -373,14 +373,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   connection_stats_.reset();
 
   if (abort_reset) {
-#if ENVOY_PLATFORM_ENABLE_SEND_RST
-    const bool ok = Network::Socket::applyOptions(
-        Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
-        envoy::config::core::v3::SocketOption::STATE_LISTENING);
-    if (!ok) {
-      ENVOY_LOG_EVERY_POW_2(error, "rst setting so_linger=0 failed on connection {}", id());
-    }
-#endif
+    socket_->setAbortiveClose();
   }
 
   // It is safe to call close() since there is an IO handle check.
@@ -822,20 +815,6 @@ void ConnectionImpl::onReadReady() {
   // If this connection doesn't have half-close semantics, translate end_stream into
   // a connection close.
   if ((!enable_half_close_ && result.end_stream_read_)) {
-    result.end_stream_read_ = false;
-    result.action_ = PostIoAction::Close;
-  }
-
-  // For a user-space io_handle (internal listener), an EOF read can mean either a graceful write
-  // half-close (peer shutdown(WR)) or a full peer close(). The transport read result flags the
-  // latter via remote_close_. A full close must become a remote close so tcp_proxy tunneling does
-  // not leave the connection half-open and leak the upstream CONNECT stream. This is a clean
-  // remote close, not an error, so the detected close type is left as the default (Normal). Real
-  // sockets never set remote_close_, so the branch is a no-op for them.
-  if (enable_half_close_ && result.end_stream_read_ && result.remote_close_ &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.internal_listener_peer_destroyed_propagation")) {
-    ENVOY_CONN_LOG(debug, "peer fully closed under half-close; treating as remote close", *this);
     result.end_stream_read_ = false;
     result.action_ = PostIoAction::Close;
   }
