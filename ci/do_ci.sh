@@ -932,7 +932,32 @@ case $CI_TARGET in
 
     lockfiles|lockfiles.regenerate)
         # TODO(phlax): Add other lockfiles here and a check path
-        bazel mod --enable_bzlmod --noenable_workspace deps --lockfile_mode=update
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+             --enable_bzlmod \
+             --noenable_workspace \
+             deps --lockfile_mode=update
+        pushd "$ENVOY_DOCS_PATH"
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+              --enable_bzlmod \
+              --noenable_workspace \
+              deps --lockfile_mode=update
+        popd
+        pushd "api/"
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+              --enable_bzlmod \
+              --noenable_workspace \
+              deps --lockfile_mode=update
+        popd
+        pushd "mobile/"
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+              --enable_bzlmod \
+              --noenable_workspace \
+              deps --lockfile_mode=update
+        popd
         ;;
 
     msan)
