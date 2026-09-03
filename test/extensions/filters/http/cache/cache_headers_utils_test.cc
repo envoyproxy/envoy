@@ -145,6 +145,20 @@ public:
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
           {true, true, false, false, Seconds(10), std::nullopt, std::nullopt}
         },
+        {
+          "no_date_header_uses_response_time",
+          /*response_headers=*/{},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime(),
+          /*expected_age=*/Seconds(0)
+        },
+        {
+          "no_date_header_only_resident_time_counts",
+          /*response_headers=*/{},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime() + Seconds(7),
+          /*expected_age=*/Seconds(7)
+        },
     );
     // clang-format on
   }

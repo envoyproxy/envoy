@@ -210,7 +210,13 @@ SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
 Seconds CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
                                         const SystemTime response_time, const SystemTime now) {
   // Age headers calculations follow: https://httpwg.org/specs/rfc7234.html#age.calculations
-  const SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
+  SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
+  if (date_value == SystemTime()) {
+    // RFC 9110 6.6.1: a recipient that receives a response without a Date
+    // header records the time it was received. Fall back to the response
+    // time so the entry is not immediately considered stale.
+    date_value = response_time;
+  }
 
   long age_value;
   const absl::string_view age_header = response_headers.getInlineValue(CacheCustomHeaders::age());
