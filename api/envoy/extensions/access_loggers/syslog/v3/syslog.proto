@@ -146,7 +146,7 @@ message SyslogAccessLogConfig {
   // lost datagrams. A value larger than the calculated limit can cause IP fragmentation; if any
   // fragment is lost, the entire syslog message is lost. Verify the network path before configuring
   // a larger value.
-  uint32 max_syslog_msg_bytes = 8
+  uint32 max_syslog_message_bytes = 8
       [(validate.rules).uint32 = {lte: 65507 gte: 480 ignore_empty: true}];
 
   // The syslog protocol standard. Defaults to RFC3164.

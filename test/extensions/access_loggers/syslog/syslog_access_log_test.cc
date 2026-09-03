@@ -131,7 +131,7 @@ TEST(SyslogAccessLoggerImplTest, EnforcesMaxMessageSize) {
   for (const auto& test_case : cases) {
     SCOPED_TRACE(test_case.name);
     auto config = baseConfig();
-    config.set_max_syslog_msg_bytes(test_case.configured_limit);
+    config.set_max_syslog_message_bytes(test_case.configured_limit);
     LoggerTestContext context(config, std::string(test_case.original_size - header.size(), 'x'));
 
     context.log();

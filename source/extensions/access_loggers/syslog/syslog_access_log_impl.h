@@ -40,12 +40,12 @@ public:
 
 private:
   // Avoid IP fragmentation for IPv4 and IPv6 when the path MTU is 1500 bytes.
-  static constexpr uint64_t DefaultMaxMessageSize = 1452;
+  static constexpr uint64_t DefaultMaxSyslogMessageBytes = 1452;
 
   SenderPtr sender_;
   SyslogAccessLogStats& stats_;
   Formatter::FormatterPtr formatter_;
-  const uint64_t max_message_size_ = DefaultMaxMessageSize;
+  const uint64_t max_syslog_message_bytes_ = DefaultMaxSyslogMessageBytes;
 };
 
 using SyslogAccessLoggerSharedPtr = std::shared_ptr<SyslogAccessLoggerImpl>;

@@ -12,8 +12,9 @@ SyslogAccessLoggerImpl::SyslogAccessLoggerImpl(const SyslogAccessLogConfig& conf
                                                Formatter::FormatterConstSharedPtr body_formatter,
                                                SenderPtr sender, SyslogAccessLogStats& stats)
     : sender_(std::move(sender)), stats_(stats),
-      max_message_size_(config.max_syslog_msg_bytes() == 0 ? DefaultMaxMessageSize
-                                                           : config.max_syslog_msg_bytes()) {
+      max_syslog_message_bytes_(config.max_syslog_message_bytes() == 0
+                                    ? DefaultMaxSyslogMessageBytes
+                                    : config.max_syslog_message_bytes()) {
   if (config.syslog_format() == SyslogAccessLogConfig::RFC5424) {
     formatter_ = std::make_unique<Rfc5424Formatter>(
         std::move(body_formatter),
@@ -32,9 +33,9 @@ void SyslogAccessLoggerImpl::log(const Formatter::Context& context,
   // size limit, so truncation happens after formatting is complete.
   std::string message = formatter_->format(context, stream_info);
   const uint64_t original_size = message.size();
-  const bool oversized = message.size() > max_message_size_;
+  const bool oversized = message.size() > max_syslog_message_bytes_;
   if (oversized) {
-    message.resize(max_message_size_);
+    message.resize(max_syslog_message_bytes_);
     stats_.truncated(original_size - message.size());
   } else {
     stats_.full();
