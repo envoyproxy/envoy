@@ -879,6 +879,52 @@ TEST_F(BufferManagerTest, CancelReplayPermanentlyPreventsFurtherReplay) {
   EXPECT_DEBUG_DEATH(manager_->replay(in_mem, [](absl::Status) {}), ".*");
 }
 
+// If in-memory replay is cancelled synchronously during injectData, draining stops immediately.
+TEST_F(BufferManagerTest, SynchronousCancelReplayStopsInMemoryDrainImmediately) {
+  Buffer::OwnedImpl body("initial");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  const std::string big_payload(200 * 1024, 'z'); // Multiple 64KB chunks
+  Buffer::OwnedImpl in_memory_data(big_payload);
+  bool in_mem_done = false;
+
+  bridge_->on_inject_ = [this]() { manager_->cancelReplay(); };
+
+  manager_->replay(in_memory_data, [&in_mem_done](absl::Status) { in_mem_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // Draining stopped after the first chunk was injected; no further chunks or done callback ran.
+  EXPECT_EQ(bridge_->inject_calls_, 1);
+  EXPECT_EQ(bridge_->injected_.length(), 64 * 1024);
+  EXPECT_FALSE(in_mem_done);
+}
+
+// If external buffer replay is cancelled synchronously during injectData, replay stops immediately.
+TEST_F(BufferManagerTest, SynchronousCancelReplayStopsExternalBufferReplayImmediately) {
+  const std::string big_payload(200 * 1024, 'z');
+  Buffer::OwnedImpl body(big_payload);
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  bool replay_done = false;
+  bridge_->on_inject_ = [this]() { manager_->cancelReplay(); };
+
+  manager_->replay(0, big_payload.size(), [&replay_done](absl::Status) { replay_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // Replay stopped after the first chunk was injected.
+  EXPECT_EQ(bridge_->inject_calls_, 1);
+  EXPECT_EQ(bridge_->injected_.length(), 64 * 1024);
+  EXPECT_FALSE(replay_done);
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -24,6 +26,9 @@ public:
   void injectData(Buffer::Instance& data) override {
     injected_.add(data);
     ++inject_calls_;
+    if (on_inject_ != nullptr) {
+      on_inject_();
+    }
     // Simulate downstream back-pressure arising mid-replay: when configured, raise
     // the replay high watermark right after the Nth injected chunk, as a real
     // chain would when its write buffer fills.
@@ -47,6 +52,7 @@ public:
   int resume_source_calls_{0};
   int error_calls_{0};
   int raise_replay_watermark_at_inject_{0}; // 0 = never.
+  std::function<void()> on_inject_;
 };
 
 } // namespace AiProtocolManager

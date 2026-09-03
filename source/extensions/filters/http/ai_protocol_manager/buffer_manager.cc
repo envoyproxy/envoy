@@ -226,7 +226,7 @@ void BufferManager::maybeDrainInMemoryReplay() {
     Buffer::OwnedImpl chunk;
     chunk.move(replay_in_memory_data_, to_inject);
     bridge_->injectData(chunk);
-    if (destroyed_) {
+    if (destroyed_ || !replaying_) {
       return;
     }
   }
@@ -345,7 +345,7 @@ void BufferManager::onReadComplete(ExternalBufferStatus status, Buffer::Instance
   // callback into a torn-down stream) or reading another chunk from the released
   // buffer -- and it is what keeps maybeReadNextChunk()'s ASSERT(!destroyed_) valid.
   bridge_->injectData(*data);
-  if (destroyed_) {
+  if (destroyed_ || !replaying_) {
     return;
   }
   if (replay_offset_ >= replay_end_) {
