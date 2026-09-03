@@ -350,6 +350,9 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
     std::vector<AiFilterPtr> filters;
+    // TODO(penguingao): Avoid always passing downstream StreamInfo when constructing
+    // FilterManager; when AI Protocol Manager is placed in an upstream filter chain, it should
+    // behave differently.
     filter_manager_ = std::make_unique<FilterManager>(
         std::move(filters), std::move(request_json_), decode_manager_.get(),
         decoder_callbacks_->dispatcher(), decoder_callbacks_->streamInfo(), request_headers_,
