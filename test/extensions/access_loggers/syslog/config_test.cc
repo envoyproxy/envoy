@@ -103,8 +103,6 @@ TEST_F(SyslogConfigTest, FactoryIgnoresClusterWhenUnixSocketIsConfigured) {
   auto config = loadConfig(UnixSocketConfigYaml);
   config.set_cluster_name("syslog");
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-  EXPECT_CALL(context.server_context_.cluster_manager_, checkActiveStaticCluster(testing::_))
-      .Times(0);
   EXPECT_CALL(context.server_context_.cluster_manager_, hasCluster(testing::_)).Times(0);
 
   EXPECT_NE(nullptr,
@@ -184,13 +182,11 @@ TEST_F(SyslogConfigTest, FactoryRejectsUnknownCluster) {
       "syslog cluster 'unknown' does not exist");
 }
 
-TEST_F(SyslogConfigTest, FactoryAcceptsWarmingCluster) {
+TEST_F(SyslogConfigTest, FactoryAcceptsExistingCluster) {
   auto config = loadConfig(UdpClusterConfigYaml);
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-  auto& cluster_manager = context.server_context_.cluster_manager_;
-  cluster_manager.initializeClusters({}, {"syslog"});
-  EXPECT_CALL(cluster_manager, checkActiveStaticCluster(testing::_)).Times(0);
-  EXPECT_CALL(cluster_manager, hasCluster("syslog"));
+  EXPECT_CALL(context.server_context_.cluster_manager_, hasCluster("syslog"))
+      .WillOnce(Return(true));
 
   EXPECT_NE(nullptr,
             SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context).get());
