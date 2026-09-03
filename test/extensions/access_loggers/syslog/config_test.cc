@@ -51,7 +51,7 @@ SyslogAccessLogConfig loadConfig(absl::string_view yaml) {
 
 class SyslogConfigTest : public testing::Test {};
 
-TEST_F(SyslogConfigTest, FactoryRegistersNameAndEmptyConfig) {
+TEST_F(SyslogConfigTest, FactoryRegistrationAndEmptyConfig) {
   SyslogAccessLogFactory factory;
 
   EXPECT_EQ("envoy.access_loggers.syslog", factory.name());
@@ -60,7 +60,7 @@ TEST_F(SyslogConfigTest, FactoryRegistersNameAndEmptyConfig) {
                          "envoy.access_loggers.syslog"));
 }
 
-TEST_F(SyslogConfigTest, ValidatesUnixSocket) {
+TEST_F(SyslogConfigTest, UnixSocketValidation) {
   auto config = loadConfig(UnixSocketConfigYaml);
 #ifdef WIN32
   EXPECT_EQ("syslog Unix domain sockets are not supported on Windows",
@@ -73,7 +73,7 @@ TEST_F(SyslogConfigTest, ValidatesUnixSocket) {
 #endif
 }
 
-TEST_F(SyslogConfigTest, RejectsInvalidUnixSocketWithoutFallingBackToCluster) {
+TEST_F(SyslogConfigTest, InvalidUnixSocketWithClusterName) {
   auto config = loadConfig(UnixSocketConfigYaml);
   config.mutable_unix_socket()->clear_path();
   config.set_cluster_name("syslog");
@@ -98,7 +98,7 @@ TEST_F(SyslogConfigTest, IgnoresClusterNameIfUnixSocketUsed) {
 }
 #endif
 
-TEST_F(SyslogConfigTest, RejectsEmptyStatPrefix) {
+TEST_F(SyslogConfigTest, EmptyStatPrefix) {
   auto config = loadConfig(UdpClusterConfigYaml);
   config.clear_stat_prefix();
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
@@ -107,9 +107,11 @@ TEST_F(SyslogConfigTest, RejectsEmptyStatPrefix) {
                ProtoValidationException);
 }
 
-TEST_F(SyslogConfigTest, RejectsMissingDestination) {
+TEST_F(SyslogConfigTest, MissingUnixSocketAndClusterName) {
   auto config = loadConfig(UdpClusterConfigYaml);
+  config.clear_unix_socket();
   config.clear_cluster_name();
+  ASSERT_TRUE(!config.has_unix_socket() && config.cluster_name().empty());
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -117,7 +119,7 @@ TEST_F(SyslogConfigTest, RejectsMissingDestination) {
       "at least one of 'unix_socket' or 'cluster_name' must be configured");
 }
 
-TEST_F(SyslogConfigTest, RejectsInvalidFieldConstraints) {
+TEST_F(SyslogConfigTest, InvalidTagAndMsgId) {
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   auto config = loadConfig(UdpClusterConfigYaml);
   config.set_tag(std::string(33, 'a'));
@@ -130,7 +132,7 @@ TEST_F(SyslogConfigTest, RejectsInvalidFieldConstraints) {
                ProtoValidationException);
 }
 
-TEST_F(SyslogConfigTest, ValidatesHostnameRequirement) {
+TEST_F(SyslogConfigTest, HostnameValidation) {
   auto config = loadConfig(UdpClusterConfigYaml);
   config.set_omit_hostname(false);
   testing::NiceMock<Api::MockOsSysCalls> os_sys_calls;
@@ -155,7 +157,7 @@ TEST_F(SyslogConfigTest, ValidatesHostnameRequirement) {
             validateSyslogConfig(config).message());
 }
 
-TEST_F(SyslogConfigTest, FactoryRejectsUnknownCluster) {
+TEST_F(SyslogConfigTest, NotExistingClusterName) {
   auto config = loadConfig(UdpClusterConfigYaml);
   config.set_cluster_name("unknown");
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
@@ -167,7 +169,7 @@ TEST_F(SyslogConfigTest, FactoryRejectsUnknownCluster) {
       "syslog cluster 'unknown' does not exist");
 }
 
-TEST_F(SyslogConfigTest, FactoryAcceptsExistingCluster) {
+TEST_F(SyslogConfigTest, ExistingClusterName) {
   auto config = loadConfig(UdpClusterConfigYaml);
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   EXPECT_CALL(context.server_context_.cluster_manager_, hasCluster("syslog"))
