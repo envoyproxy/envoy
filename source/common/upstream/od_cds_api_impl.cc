@@ -1,13 +1,37 @@
 #include "source/common/upstream/od_cds_api_impl.h"
 
+#include <optional>
+#include <string>
+
+#include "envoy/upstream/upstream.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/grpc/common.h"
 
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Upstream {
+namespace {
+
+// Reads a cluster's live active-stream and cumulative-request counts. Returns nullopt if the
+// cluster is no longer an active cluster in the manager.
+std::optional<OdCdsClusterIdleTimeout::ClusterActivityStats>
+sampleClusterActivity(const ClusterManager& cm, absl::string_view cluster_name) {
+  const OptRef<const Cluster> cluster = cm.getActiveCluster(cluster_name);
+  if (!cluster.has_value()) {
+    return std::nullopt;
+  }
+  const ClusterInfoConstSharedPtr info = cluster->info();
+  return OdCdsClusterIdleTimeout::ClusterActivityStats{
+      .active_rq = info->trafficStats()->upstream_rq_active_.value(),
+      .total_rq = info->trafficStats()->upstream_rq_total_.value(),
+  };
+}
+
+} // namespace
 
 absl::StatusOr<OdCdsApiSharedPtr>
 OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
@@ -15,11 +39,13 @@ OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
                      Config::XdsManager& xds_manager, ClusterManager& cm,
                      MissingClusterNotifier& notifier, Stats::Scope& scope,
                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                     Server::Configuration::ServerFactoryContext&) {
+                     Server::Configuration::ServerFactoryContext& server_factory_context,
+                     std::chrono::milliseconds cluster_idle_timeout) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret =
-      OdCdsApiSharedPtr(new OdCdsApiImpl(odcds_config, odcds_resources_locator, xds_manager, cm,
-                                         notifier, scope, validation_visitor, creation_status));
+  auto ret = OdCdsApiSharedPtr(
+      new OdCdsApiImpl(odcds_config, odcds_resources_locator, xds_manager, cm, notifier, scope,
+                       validation_visitor, server_factory_context.mainThreadDispatcher(),
+                       server_factory_context.timeSource(), cluster_idle_timeout, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -29,10 +55,21 @@ OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_co
                            Config::XdsManager& xds_manager, ClusterManager& cm,
                            MissingClusterNotifier& notifier, Stats::Scope& scope,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
+                           Event::Dispatcher& main_thread_dispatcher, TimeSource& time_source,
+                           std::chrono::milliseconds cluster_idle_timeout,
                            absl::Status& creation_status)
     : helper_(cm, xds_manager, "odcds"), notifier_(notifier),
       scope_(scope.createScope("cluster_manager.odcds.")),
-      resource_type_helper_(validation_visitor, "name") {
+      resource_type_helper_(validation_visitor, "name"),
+      cluster_idle_timeout_(cluster_idle_timeout),
+      cluster_idle_reaper_(
+          main_thread_dispatcher, time_source,
+          [&cm](absl::string_view cluster_name) { return sampleClusterActivity(cm, cluster_name); },
+          [this, &cm](absl::string_view cluster_name) {
+            cm.removeCluster(cluster_name);
+            subscribed_clusters_.erase(cluster_name);
+            subscription_->updateResourceInterest(subscribed_clusters_);
+          }) {
   // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
   // class for CDS and ODCDS.
   const auto resource_name = resource_type_helper_.getResourceName();
@@ -64,6 +101,17 @@ OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
                              const std::string& system_version_info) {
   auto [_, exception_msgs] =
       helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
+  // Track/refresh the idle TTL for delivered clusters, and drop tracking for any the
+  // server removed. This runs regardless of exception_msgs: a cluster that failed to
+  // apply simply won't be an active cluster, so the reaper will stop tracking it on the
+  // next sweep.
+  for (const auto& resource : added_resources) {
+    cluster_idle_reaper_.onClusterDiscovered(resource.get().name(), cluster_idle_timeout_);
+  }
+  for (const auto& resource_name : removed_resources) {
+    cluster_idle_reaper_.onClusterRemoved(resource_name);
+    subscribed_clusters_.erase(resource_name);
+  }
   sendAwaiting();
   status_ = StartStatus::InitialFetchDone;
   // According to the XDS specification, the server can send a reply with names in the
@@ -102,6 +150,7 @@ void OdCdsApiImpl::sendAwaiting() {
 }
 
 void OdCdsApiImpl::updateOnDemand(std::string cluster_name) {
+  subscribed_clusters_.insert(cluster_name);
   switch (status_) {
   case StartStatus::NotStarted:
     ENVOY_LOG(trace, "odcds: starting a subscription with cluster name {}", cluster_name);
@@ -132,20 +181,32 @@ class XdstpOdCdsApiImpl::XdstpOdcdsSubscriptionsManager : public Singleton::Inst
 public:
   XdstpOdcdsSubscriptionsManager(Config::XdsManager& xds_manager, ClusterManager& cm,
                                  MissingClusterNotifier& notifier, Stats::Scope& scope,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor)
+                                 ProtobufMessage::ValidationVisitor& validation_visitor,
+                                 Event::Dispatcher& main_thread_dispatcher, TimeSource& time_source)
       : xds_manager_(xds_manager), helper_(cm, xds_manager, "odcds-xdstp"), notifier_(notifier),
         scope_(scope.createScope("cluster_manager.odcds.")),
-        validation_visitor_(validation_visitor) {}
+        validation_visitor_(validation_visitor),
+        cluster_idle_reaper_(
+            main_thread_dispatcher, time_source,
+            [&cm](absl::string_view resource_name) {
+              return sampleClusterActivity(cm, resource_name);
+            },
+            [this, &cm](absl::string_view resource_name) {
+              cm.removeCluster(resource_name);
+              subscriptions_.erase(resource_name);
+            }) {}
 
   absl::Status onResourceUpdate(absl::string_view resource_name,
                                 const Config::DecodedResourceRef& resource,
-                                const std::string& system_version_info) {
+                                const std::string& system_version_info,
+                                std::chrono::milliseconds cluster_idle_timeout) {
     auto [_, exception_msgs] = helper_.onConfigUpdate({resource}, {}, system_version_info);
     if (!exception_msgs.empty()) {
       return absl::InvalidArgumentError(fmt::format("Error adding/updating cluster {} - {}",
                                                     resource_name,
                                                     absl::StrJoin(exception_msgs, ", ")));
     }
+    cluster_idle_reaper_.onClusterDiscovered(resource_name, cluster_idle_timeout);
     return absl::OkStatus();
   }
 
@@ -158,6 +219,7 @@ public:
         helper_.onConfigUpdate({}, removed_resource_list, system_version_info);
     // Removal of a cluster should not result in an error.
     ASSERT(exception_msgs.empty());
+    cluster_idle_reaper_.onClusterRemoved(resource_name);
     notifier_.notifyMissingCluster(resource_name);
     return absl::OkStatus();
   }
@@ -170,7 +232,8 @@ public:
     notifier_.notifyMissingCluster(resource_name);
   }
 
-  void addSubscription(absl::string_view resource_name, bool old_ads) {
+  void addSubscription(absl::string_view resource_name, bool old_ads,
+                       std::chrono::milliseconds cluster_idle_timeout) {
     if (subscriptions_.contains(resource_name)) {
       ENVOY_LOG(debug, "ODCDS-manager: resource {} is already subscribed to, skipping",
                 resource_name);
@@ -178,8 +241,8 @@ public:
     }
     ENVOY_LOG(trace, "ODCDS-manager: adding a subscription for resource {}", resource_name);
     // Subscribe using the xds-manager.
-    auto subscription =
-        std::make_unique<PerSubscriptionData>(*this, resource_name, validation_visitor_);
+    auto subscription = std::make_unique<PerSubscriptionData>(
+        *this, resource_name, validation_visitor_, cluster_idle_timeout);
     absl::Status status = subscription->initializeSubscription(old_ads);
     if (status.ok()) {
       subscriptions_.emplace(std::string(resource_name), std::move(subscription));
@@ -200,9 +263,11 @@ private:
   class PerSubscriptionData : public Config::SubscriptionCallbacks {
   public:
     PerSubscriptionData(XdstpOdcdsSubscriptionsManager& parent, absl::string_view resource_name,
-                        ProtobufMessage::ValidationVisitor& validation_visitor)
+                        ProtobufMessage::ValidationVisitor& validation_visitor,
+                        std::chrono::milliseconds cluster_idle_timeout)
         : parent_(parent), resource_name_(resource_name),
-          resource_type_helper_(validation_visitor, "name") {}
+          resource_type_helper_(validation_visitor, "name"),
+          cluster_idle_timeout_(cluster_idle_timeout) {}
 
     absl::Status initializeSubscription(bool old_ads) {
       const auto resource_type = resource_type_helper_.getResourceName();
@@ -247,7 +312,8 @@ private:
       }
       // A single cluster update.
       ENVOY_LOG(trace, "ODCDS-manager: updating a single resource: {}", resource_name_);
-      return parent_.onResourceUpdate(resource_name_, resources[0], version_info);
+      return parent_.onResourceUpdate(resource_name_, resources[0], version_info,
+                                      cluster_idle_timeout_);
     }
     absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
@@ -262,7 +328,8 @@ private:
       }
       // A single cluster update.
       ENVOY_LOG(trace, "ODCDS-manager: updating a single resource: {}", resource_name_);
-      return parent_.onResourceUpdate(resource_name_, added_resources[0], system_version_info);
+      return parent_.onResourceUpdate(resource_name_, added_resources[0], system_version_info,
+                                      cluster_idle_timeout_);
     }
     void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                               const EnvoyException* e) override {
@@ -285,6 +352,8 @@ private:
     // subscriptions_ map key.
     const std::string resource_name_;
     const Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
+    // Idle timeout for this cluster, from the filter that requested the subscription.
+    const std::chrono::milliseconds cluster_idle_timeout_;
     Config::SubscriptionPtr subscription_;
     bool resource_was_updated_{false};
   };
@@ -295,6 +364,7 @@ private:
   MissingClusterNotifier& notifier_;
   Stats::ScopeSharedPtr scope_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  OdCdsClusterIdleTimeout cluster_idle_reaper_;
   // Maps a resource name to its subscription data.
   absl::flat_hash_map<std::string, PerSubscriptionDataPtr> subscriptions_;
 };
@@ -307,14 +377,15 @@ XdstpOdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& config_so
                           OptRef<xds::core::v3::ResourceLocator>, Config::XdsManager& xds_manager,
                           ClusterManager& cm, MissingClusterNotifier& notifier, Stats::Scope& scope,
                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                          Server::Configuration::ServerFactoryContext& server_factory_context) {
+                          Server::Configuration::ServerFactoryContext& server_factory_context,
+                          std::chrono::milliseconds cluster_idle_timeout) {
   absl::Status creation_status = absl::OkStatus();
   // TODO(adisuissa): convert the config_source to optional.
   const bool old_ads = config_source.config_source_specifier_case() ==
                        envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds;
-  auto ret = OdCdsApiSharedPtr(new XdstpOdCdsApiImpl(xds_manager, cm, notifier, scope,
-                                                     server_factory_context, old_ads,
-                                                     validation_visitor, creation_status));
+  auto ret = OdCdsApiSharedPtr(
+      new XdstpOdCdsApiImpl(xds_manager, cm, notifier, scope, server_factory_context, old_ads,
+                            validation_visitor, cluster_idle_timeout, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -324,8 +395,9 @@ XdstpOdCdsApiImpl::XdstpOdCdsApiImpl(Config::XdsManager& xds_manager, ClusterMan
                                      Server::Configuration::ServerFactoryContext& server_context,
                                      bool old_ads,
                                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                                     std::chrono::milliseconds cluster_idle_timeout,
                                      absl::Status& creation_status)
-    : old_ads_(old_ads) {
+    : cluster_idle_timeout_(cluster_idle_timeout), old_ads_(old_ads) {
   // Create a singleton xdstp-based od-cds handler. This will be accessed by
   // the main thread and used by all the filters that need to access od-cds
   // over xdstp-based config sources.
@@ -345,14 +417,15 @@ XdstpOdCdsApiImpl::subscriptionsManager(Server::Configuration::ServerFactoryCont
                                         ProtobufMessage::ValidationVisitor& validation_visitor) {
   return server_context.singletonManager().getTyped<XdstpOdcdsSubscriptionsManager>(
       SINGLETON_MANAGER_REGISTERED_NAME(xdstp_odcds_subscriptions_manager),
-      [&xds_manager, &cm, &notifier, &scope, &validation_visitor] {
-        return std::make_shared<XdstpOdcdsSubscriptionsManager>(xds_manager, cm, notifier, scope,
-                                                                validation_visitor);
+      [&xds_manager, &cm, &notifier, &scope, &validation_visitor, &server_context] {
+        return std::make_shared<XdstpOdcdsSubscriptionsManager>(
+            xds_manager, cm, notifier, scope, validation_visitor,
+            server_context.mainThreadDispatcher(), server_context.timeSource());
       });
 }
 
 void XdstpOdCdsApiImpl::updateOnDemand(std::string cluster_name) {
-  subscriptions_manager_->addSubscription(cluster_name, old_ads_);
+  subscriptions_manager_->addSubscription(cluster_name, old_ads_, cluster_idle_timeout_);
 }
 } // namespace Upstream
 } // namespace Envoy
