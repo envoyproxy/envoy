@@ -19,8 +19,6 @@ final class KeyValueStoreTests: XCTestCase {
   }
 
   func testKeyValueStore() {
-    // swiftlint:disable:next line_length
-    let kvStoreType = "type.googleapis.com/envoymobile.extensions.filters.http.test_kv_store.TestKeyValueStore"
     let readExpectation = self.expectation(description: "Read called on key-value store")
     // Called multiple times for validation in test filter.
     readExpectation.assertForOverFulfill = false
@@ -56,8 +54,8 @@ final class KeyValueStoreTests: XCTestCase {
       )
       .addNativeFilter(
         name: "envoy.filters.http.test_kv_store",
-        // swiftlint:disable:next line_length
-        typedConfig: "[\(kvStoreType)]{ kv_store_name: 'envoy.key_value.platform_test', test_key: 'foo', test_value: 'bar'}"
+        typedConfigData: makeTestKeyValueStoreAnyProto(
+          kvStoreName: "envoy.key_value.platform_test", testKey: "foo", testValue: "bar")
       )
       .addRuntimeGuard("test_feature_false", true)
       .build()

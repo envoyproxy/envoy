@@ -81,7 +81,6 @@ build:linux --incompatible_strict_action_env=true
 # https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
 build:ios --define=manual_stamp=manual_stamp
 build:ios --test_timeout=390,750,1500,5700
-build:ios --define=envoy_full_protos=enabled
 
 # Default flags for builds targeting Android
 build:android --define=logger=android
