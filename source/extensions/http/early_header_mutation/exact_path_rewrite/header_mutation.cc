@@ -69,9 +69,6 @@ absl::Status ExactPathRewrite::addHostRules(const ProtoHostRules& host_rules) {
     if (!isWildcardDomain(domain)) {
       exact_host_rules_.emplace(configured_domain, path_rewrites);
     } else if (domain == "*") {
-      if (default_host_rules_.has_value()) {
-        return absl::InvalidArgumentError("Only one '*' domain is permitted");
-      }
       default_host_rules_ = path_rewrites;
     } else if (wildcard == 0 && domain.find('*', 1) == absl::string_view::npos) {
       suffix_host_rules_[domain.size() - 1].emplace(std::string(domain.substr(1)), path_rewrites);

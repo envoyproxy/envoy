@@ -106,6 +106,92 @@ hosts:
 )EOF");
   EXPECT_EQ(ExactPathRewrite::create(query_path).status().code(),
             absl::StatusCode::kInvalidArgument);
+
+  const auto query_replacement = makeConfig(R"EOF(
+host_header: ":authority"
+hosts:
+- domains: ["api.example.com"]
+  rules:
+  - exact_path: /api
+    replacement_path: /api/?query
+)EOF");
+  EXPECT_EQ(ExactPathRewrite::create(query_replacement).status().code(),
+            absl::StatusCode::kInvalidArgument);
+
+  const auto duplicate_domain = makeConfig(R"EOF(
+host_header: ":authority"
+hosts:
+- domains: ["api.example.com"]
+  rules: []
+- domains: ["api.example.com"]
+  rules: []
+)EOF");
+  EXPECT_EQ(ExactPathRewrite::create(duplicate_domain).status().code(),
+            absl::StatusCode::kInvalidArgument);
+
+  const auto invalid_wildcard = makeConfig(R"EOF(
+host_header: ":authority"
+hosts:
+- domains: ["a*b.example.com"]
+  rules: []
+)EOF");
+  EXPECT_EQ(ExactPathRewrite::create(invalid_wildcard).status().code(),
+            absl::StatusCode::kInvalidArgument);
+}
+
+TEST(ExactPathRewriteTest, SupportsPrefixWildcardDomain) {
+  const auto config = makeConfig(R"EOF(
+host_header: ":authority"
+hosts:
+- domains: ["api.*"]
+  rules:
+  - exact_path: /v1
+    replacement_path: /v1/
+)EOF");
+  auto mutation = ExactPathRewrite::create(config).value();
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  auto headers = makeHeaders("api.example.com", "/v1");
+  mutation->mutate(headers, stream_info);
+  EXPECT_EQ("/v1/", headers.getPathValue());
+
+  auto unmatched = makeHeaders("other.example.com", "/v1");
+  mutation->mutate(unmatched, stream_info);
+  EXPECT_EQ("/v1", unmatched.getPathValue());
+}
+
+TEST(ExactPathRewriteTest, LeavesPathUnchangedWhenHostHeaderMissing) {
+  const auto config = makeConfig(R"EOF(
+host_header: "x-custom-host"
+hosts:
+- domains: ["api.example.com"]
+  rules:
+  - exact_path: /v1
+    replacement_path: /v1/
+)EOF");
+  auto mutation = ExactPathRewrite::create(config).value();
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  auto headers = makeHeaders("api.example.com", "/v1");
+  EXPECT_TRUE(mutation->mutate(headers, stream_info));
+  EXPECT_EQ("/v1", headers.getPathValue());
+}
+
+TEST(ExactPathRewriteTest, LeavesPathUnchangedWhenNoRuleMatchesHost) {
+  const auto config = makeConfig(R"EOF(
+host_header: ":authority"
+hosts:
+- domains: ["api.example.com"]
+  rules:
+  - exact_path: /v1
+    replacement_path: /v1/
+)EOF");
+  auto mutation = ExactPathRewrite::create(config).value();
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  auto headers = makeHeaders("other.example.com", "/v1");
+  EXPECT_TRUE(mutation->mutate(headers, stream_info));
+  EXPECT_EQ("/v1", headers.getPathValue());
 }
 
 } // namespace
