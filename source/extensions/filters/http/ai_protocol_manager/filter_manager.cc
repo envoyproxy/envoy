@@ -92,7 +92,7 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
 
     // TODO(penguingao): condition the serialization on config. If we want to
     // normalize the json payload / protocol or the payload is modified, we
-    // re-serialize, if not, we just pass through the oroginal body.
+    // re-serialize, if not, we just passthrough the original body.
     ASSIGN_OR_CO_RETURN(
         std::ignore, co_await Serializer::serialize(final_req_->request_index(), buffer_manager_));
 

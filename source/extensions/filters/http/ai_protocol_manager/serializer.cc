@@ -109,7 +109,7 @@ private:
           co_return absl::InternalError("buffer_manager is null during flushBuffer");
         }
         // TODO(penguingao): if the replay becomes too fragmented between
-        // external buffer and reserialization, we could change the interface to
+        // external buffer and re-serialization, we could change the interface to
         // BufferManager take hint from the serializer's potential next replay
         // ranges, this way, it can then internally coalescing reads to save
         // I/O.
