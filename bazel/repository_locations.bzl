@@ -30,8 +30,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.4.10",
-        sha256 = "9c0dce46c0caaf33434e21428dda7f5ad2b73011e69a5619af867c4901e7ec85",
+        version = "0.4.11",
+        sha256 = "3f309b077c8e04232796b203fcf6e3c18c0cc29e580834fa5d8ecc12f1c99728",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -638,11 +638,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "vpp-{version}",
         urls = ["https://github.com/FDio/vpp/archive/{version}.tar.gz"],
     ),
-    dlb = dict(
-        version = "8.8.0",
-        sha256 = "564534254ef32bfed56e0a464c53fca0907e446b30929c253210e2c3d6de58b9",
-        urls = ["https://downloadmirror.intel.com/819078/dlb_linux_src_release_8.8.0.txz"],
-    ),
     libpfm = dict(
         version = "4.11.0",
         sha256 = "bd49c66c1854f9a5f347725c298fce39d7ac2644b2dfc3237e67d91c9c0d7823",
@@ -667,8 +662,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/apache/thrift/archive/refs/tags/v{version}.tar.gz"],
     ),
     toolchains_llvm = dict(
-        version = "1.8.0",
-        sha256 = "3b05826f256040f91c24dcaad673eb1c91e4cc93f4043d0205f2512327640205",
+        version = "1.9.0",
+        sha256 = "779b3280571647034931c7f9ce8ef3836bfc55d00d23e7dad5370151e1f7149e",
         strip_prefix = "toolchains_llvm-v{version}",
         urls = ["https://github.com/bazel-contrib/toolchains_llvm/releases/download/v{version}/toolchains_llvm-v{version}.tar.gz"],
     ),

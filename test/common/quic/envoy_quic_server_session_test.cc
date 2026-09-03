@@ -10,7 +10,9 @@
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/quic/server_codec_impl.h"
+#include "source/common/tls/cert_validator/san_matcher.h"
 #include "source/server/configuration_impl.h"
 
 #include "test/common/quic/test_proof_source.h"
@@ -20,11 +22,14 @@
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/overload_manager.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/global.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -259,6 +264,27 @@ public:
     return envoy_quic_session_.GetOrCreateStream(stream_id);
   }
 
+  // Builds a QUIC downstream transport socket factory from `yaml` and registers it as the session's
+  // matched filter chain so `GetSSLConfig` observes a real transport socket factory.
+  void setupMtlsFilterChainPosition(const std::string& yaml) {
+    ON_CALL(transport_socket_factory_context_.server_context_, api())
+        .WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(transport_socket_factory_context_.server_context_, threadLocal())
+        .WillByDefault(testing::ReturnRef(transport_thread_local_));
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), proto_config);
+    mtls_transport_socket_factory_ =
+        THROW_OR_RETURN_VALUE(quic_transport_socket_config_factory_.createTransportSocketFactory(
+                                  proto_config, transport_socket_factory_context_, {}),
+                              Network::DownstreamTransportSocketFactoryPtr);
+    ON_CALL(mtls_filter_chain_, transportSocketFactory())
+        .WillByDefault(testing::ReturnRef(*mtls_transport_socket_factory_));
+    auto& connections = mtls_connection_map_[&mtls_filter_chain_];
+    connections.push_back(envoy_quic_session_);
+    envoy_quic_session_.storeConnectionMapPosition(mtls_connection_map_, mtls_filter_chain_,
+                                                   connections.begin());
+  }
+
   void TearDown() override {
     if (quic_connection_->connected()) {
       EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, _));
@@ -291,6 +317,15 @@ protected:
   EnvoyQuicTestCryptoServerStreamFactory crypto_stream_factory_;
   QuicConnectionStats connection_stats_;
   testing::NiceMock<Envoy::Http::MockSessionIdleList> session_idle_list_;
+  // mTLS `GetSSLConfig` fixtures. Declared before `envoy_quic_session_` so the connection map and
+  // filter chain outlive it and stay valid when the session unregisters itself on close.
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
+  NiceMock<ThreadLocal::MockInstance> transport_thread_local_;
+  QuicServerTransportSocketConfigFactory quic_transport_socket_config_factory_;
+  Network::DownstreamTransportSocketFactoryPtr mtls_transport_socket_factory_;
+  NiceMock<Network::MockFilterChain> mtls_filter_chain_;
+  FilterChainToConnectionMap mtls_connection_map_;
   TestEnvoyQuicServerSession envoy_quic_session_;
   quic::QuicCompressedCertsCache compressed_certs_cache_{100};
   std::shared_ptr<Network::MockReadFilter> read_filter_;
@@ -1199,6 +1234,31 @@ TEST_F(EnvoyQuicServerSessionTest, SslConnectionInfoDumbImplmention) {
   EXPECT_FALSE(envoy_quic_session_.ssl()->validFromPeerCertificate().has_value());
   EXPECT_FALSE(envoy_quic_session_.ssl()->expirationPeerCertificate().has_value());
 
+  // With no client certificate presented, every peer certificate accessor returns empty and the
+  // local certificate accessors are always empty for QUIC.
+  const auto ssl_info = envoy_quic_session_.ssl();
+  EXPECT_TRUE(ssl_info->sha256PeerCertificateDigest().empty());
+  EXPECT_TRUE(ssl_info->sha1PeerCertificateDigest().empty());
+  EXPECT_TRUE(ssl_info->sha256PeerCertificateChainDigests().empty());
+  EXPECT_TRUE(ssl_info->sha1PeerCertificateChainDigests().empty());
+  EXPECT_TRUE(ssl_info->serialNumberPeerCertificate().empty());
+  EXPECT_TRUE(ssl_info->serialNumbersPeerCertificates().empty());
+  EXPECT_TRUE(ssl_info->issuerPeerCertificate().empty());
+  EXPECT_TRUE(ssl_info->subjectPeerCertificate().empty());
+  EXPECT_FALSE(ssl_info->parsedSubjectPeerCertificate().has_value());
+  EXPECT_TRUE(ssl_info->pemEncodedPeerCertificate().empty());
+  EXPECT_TRUE(ssl_info->pemEncodedPeerCertificateChain().empty());
+  EXPECT_TRUE(ssl_info->urlEncodedPemEncodedPeerCertificate().empty());
+  EXPECT_TRUE(ssl_info->uriSanPeerCertificate().empty());
+  EXPECT_TRUE(ssl_info->ipSansPeerCertificate().empty());
+  EXPECT_TRUE(ssl_info->emailSansPeerCertificate().empty());
+  EXPECT_TRUE(ssl_info->othernameSansPeerCertificate().empty());
+  EXPECT_TRUE(ssl_info->oidsPeerCertificate().empty());
+  EXPECT_TRUE(ssl_info->subjectLocalCertificate().empty());
+  EXPECT_TRUE(ssl_info->uriSanLocalCertificate().empty());
+  Extensions::TransportSockets::Tls::DnsExactStringSanMatcher san_matcher("example.com");
+  EXPECT_FALSE(ssl_info->peerCertificateSanMatches(san_matcher));
+
   // Call overridden methods and assert they match underlying crypto stream.
   auto* crypto_stream = envoy_quic_session_.GetCryptoStream();
   ASSERT(crypto_stream != nullptr);
@@ -1362,6 +1422,50 @@ TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigDefault) {
   ASSERT_TRUE(config.early_data_enabled.has_value());
   EXPECT_TRUE(*config.early_data_enabled);
   EXPECT_FALSE(config.disable_ticket_support);
+}
+
+// `GetSSLConfig` requests a client certificate and disables 0-RTT when the matched filter chain
+// requires client authentication, because replayable early data would bypass validation.
+TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigClientCertRequiredDisablesEarlyData) {
+  installReadFilter();
+  setupMtlsFilterChainPosition(R"EOF(
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+
+  quic::QuicSSLConfig config = envoy_quic_session_.GetSSLConfig();
+  EXPECT_EQ(config.client_cert_mode, quic::ClientCertMode::kRequire);
+  ASSERT_TRUE(config.early_data_enabled.has_value());
+  EXPECT_FALSE(*config.early_data_enabled);
+}
+
+// `GetSSLConfig` leaves client authentication and 0-RTT untouched when the matched chain does not
+// require a client certificate.
+TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigClientCertNotRequired) {
+  installReadFilter();
+  setupMtlsFilterChainPosition(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF");
+
+  quic::QuicSSLConfig config = envoy_quic_session_.GetSSLConfig();
+  EXPECT_EQ(config.client_cert_mode, quic::ClientCertMode::kNone);
+  ASSERT_TRUE(config.early_data_enabled.has_value());
+  EXPECT_TRUE(*config.early_data_enabled);
 }
 
 TEST_F(EnvoyQuicServerSessionTest, SessionIdleCallbacksIdempotency) {

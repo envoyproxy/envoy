@@ -4,6 +4,8 @@
 #include <limits>
 
 #include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
@@ -47,6 +49,16 @@ Envoy::Stats::StatNameTagVector buildTagsForClusterSpecifierMetric(
     tags.push_back(Envoy::Stats::StatNameTag(label_names[i], label_value));
   }
   return tags;
+}
+
+// Returns a mutable handle to the route metadata value the module is setting, creating the
+// namespace and key when they are absent.
+Protobuf::Value& mutableRouteMetadataValue(ClusterSpecifierContext* context,
+                                           envoy_dynamic_module_type_module_buffer ns,
+                                           envoy_dynamic_module_type_module_buffer key) {
+  return Envoy::Config::Metadata::mutableMetadataValue(context->selection.route_metadata,
+                                                       std::string(ns.ptr, ns.length),
+                                                       std::string(key.ptr, key.length));
 }
 
 } // namespace
@@ -240,6 +252,67 @@ bool envoy_dynamic_module_callback_cluster_specifier_set_route_action_override(
   }
   context->selection.route_action_override = entry;
   return true;
+}
+
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value) {
+  mutableRouteMetadataValue(clusterSpecifierContext(context_envoy_ptr), ns, key)
+      .set_number_value(value);
+}
+
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value) {
+  mutableRouteMetadataValue(clusterSpecifierContext(context_envoy_ptr), ns, key)
+      .set_string_value(std::string(value.ptr, value.length));
+}
+
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value) {
+  mutableRouteMetadataValue(clusterSpecifierContext(context_envoy_ptr), ns, key)
+      .set_bool_value(value);
+}
+
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct) {
+  Protobuf::Struct metadata_value;
+  if (!metadata_value.ParseFromArray(serialized_struct.ptr,
+                                     static_cast<int>(serialized_struct.length))) {
+    ENVOY_LOG_EVERY_POW_2_TO_LOGGER(
+        Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), warn,
+        "dynamic module set route metadata with a buffer that does not parse as a "
+        "google.protobuf.Struct, so the call is ignored");
+    return;
+  }
+  auto* context = clusterSpecifierContext(context_envoy_ptr);
+  (*context->selection.route_metadata.mutable_filter_metadata())[std::string(ns.ptr, ns.length)]
+      .MergeFrom(metadata_value);
+}
+
+void envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any) {
+  Protobuf::Any typed_value;
+  if (!typed_value.ParseFromArray(serialized_any.ptr, static_cast<int>(serialized_any.length))) {
+    ENVOY_LOG_EVERY_POW_2_TO_LOGGER(
+        Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), warn,
+        "dynamic module set typed route metadata with a buffer that does not parse as a "
+        "google.protobuf.Any, so the call is ignored");
+    return;
+  }
+  auto* context = clusterSpecifierContext(context_envoy_ptr);
+  // Assign rather than merge so the whole Any is swapped at once. Merging an Any field by field
+  // could keep the type URL of one call with the value of another.
+  (*context->selection.route_metadata
+        .mutable_typed_filter_metadata())[std::string(ns.ptr, ns.length)] = typed_value;
 }
 
 envoy_dynamic_module_type_metrics_result

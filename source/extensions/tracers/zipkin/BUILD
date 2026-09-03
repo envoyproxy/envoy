@@ -1,3 +1,4 @@
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
@@ -10,6 +11,12 @@ licenses(["notice"])  # Apache 2
 # Trace driver for Zipkin (https://zipkin.io/).
 
 envoy_extension_package()
+
+cc_proto_library(
+    name = "zipkin_cc_proto",
+    tags = ["manual"],
+    deps = ["@zipkin-api//:zipkin_proto"],
+)
 
 envoy_cc_library(
     name = "zipkin_lib",
@@ -58,7 +65,10 @@ envoy_cc_library(
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@zipkin-api",
-    ],
+    ] + select({
+        "//bazel:bzlmod_mode": [":zipkin_cc_proto"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_extension(

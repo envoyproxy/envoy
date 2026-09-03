@@ -57,6 +57,12 @@ public:
 
   ~LinuxContainerCpuStatsReader() override = default;
 
+  /**
+   * Create the appropriate cgroup stats reader.
+   * @param fs Filesystem instance to use for file operations.
+   * @param time_source TimeSource for measuring elapsed time.
+   * @return Unique pointer to concrete LinuxContainerCpuStatsReader implementation.
+   */
   static absl::StatusOr<ContainerStatsReaderPtr> create(Filesystem::Instance& fs,
                                                         TimeSource& time_source);
 

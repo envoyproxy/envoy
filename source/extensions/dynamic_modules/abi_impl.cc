@@ -2982,6 +2982,45 @@ __attribute__((weak)) void envoy_dynamic_module_callback_cluster_specifier_set_t
       "context");
 }
 
+__attribute__((weak)) void
+envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, double) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, bool) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata: not "
+               "implemented in this context");
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
     envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr,
