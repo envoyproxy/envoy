@@ -214,10 +214,14 @@ TEST(MessageStreamerTest, NonFiniteNumbers) {
 void expectSameRedactedJson(const envoy::test::Sensitive& message) {
   envoy::test::Sensitive redacted = message;
   MessageUtil::redact(redacted);
-  EXPECT_EQ(printedInArray(redacted),
-            stream(message, {.preserve_proto_field_names_ = true, .redact_sensitive_fields_ = true})
-                .first)
-      << message.DebugString();
+
+  const std::string streamed =
+      stream(message, {.preserve_proto_field_names_ = true, .redact_sensitive_fields_ = true})
+          .first;
+  ASSERT_GE(streamed.size(), 2);
+  envoy::test::Sensitive parsed;
+  TestUtility::loadFromJson(streamed.substr(1, streamed.size() - 2), parsed);
+  EXPECT_TRUE(TestUtility::protoEqual(redacted, parsed)) << streamed;
 }
 
 TEST(MessageStreamerTest, Redacts) {

@@ -10,8 +10,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/base64.h"
 #include "source/common/config/api_version.h"
+#include "source/common/json/proto_streamer.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -477,6 +479,27 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
                                 "\" as a text protobuf (type envoy.config.bootstrap.v3.Bootstrap)");
 }
 
+void expectStreamedRedactionMatches(const Protobuf::Message& message,
+                                    const Protobuf::Message& redacted) {
+  Buffer::OwnedImpl buffer;
+  {
+    Json::BufferStreamer streamer(buffer);
+    // The streamer needs a level expecting a value, so the message lands inside an array.
+    Json::BufferStreamer::ArrayPtr array = streamer.makeRootArray();
+    Json::MessageStreamer message_streamer(message, *array,
+                                           {.preserve_proto_field_names_ = true,
+                                            .redact_sensitive_fields_ = true});
+    while (message_streamer.next()) {
+    }
+  }
+
+  const std::string streamed = buffer.toString();
+  ASSERT_GE(streamed.size(), 2);
+  const ProtobufTypes::MessagePtr parsed(redacted.New());
+  TestUtility::loadFromJson(streamed.substr(1, streamed.size() - 2), *parsed);
+  EXPECT_TRUE(TestUtility::protoEqual(redacted, *parsed)) << streamed;
+}
+
 // String fields annotated as sensitive should be converted to the string "[redacted]". String
 // fields that are neither annotated as sensitive nor contained in a sensitive message should be
 // left alone.
@@ -506,8 +529,10 @@ insensitive_repeated_string:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 // redactAll() redacts every field, annotated or not, as redact() does under a sensitive field.
@@ -563,8 +588,10 @@ insensitive_int_map:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 // Bytes fields annotated as sensitive should be converted to the ASCII / UTF-8 encoding of the
@@ -596,8 +623,10 @@ insensitive_repeated_bytes:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 // Ints annotated as sensitive should be cleared. Ints that are neither annotated as sensitive nor
@@ -625,8 +654,10 @@ insensitive_repeated_int:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 // Messages annotated as sensitive should have all their fields redacted recursively. Messages that
@@ -733,8 +764,10 @@ insensitive_repeated_message:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 // Messages packed into `Any` should be treated the same as normal messages.
@@ -888,8 +921,10 @@ insensitive_repeated_any:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 // Empty `Any` can be trivially redacted.
@@ -1086,8 +1121,10 @@ insensitive_repeated_typed_struct:
 )EOF",
                             expected);
 
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 template <typename T> class TypedStructUtilityTest : public ProtobufUtilityTest {};
@@ -1149,7 +1186,9 @@ insensitive_typed_struct:
 )EOF",
                             actual);
 
+  const envoy::test::Sensitive original = actual;
   EXPECT_NO_THROW(MessageUtil::redact(actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypeUrlTypedStruct) {
@@ -1214,8 +1253,10 @@ insensitive_typed_struct:
         sensitive_string: '[redacted]'
 )EOF",
                             expected);
+  const envoy::test::Sensitive original = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+  expectStreamedRedactionMatches(original, actual);
 }
 
 TEST_F(ProtobufUtilityTest, SanitizeUTF8) {
