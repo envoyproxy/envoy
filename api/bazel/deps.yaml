@@ -43,11 +43,7 @@ envoy_toolshed:
   - sysroot_linux_arm64
   - tsan_libs
   - msan_libs
-  # Prebuilt wee8 static-library repos defined by setup_wee8_prebuilt()
-  # (bazel/repositories_extra.bzl); the @envoy_toolshed//v8:wee8 alias selects
-  # the right one per platform. Kept in sync with bazel/deps.yaml because the
-  # merged metadata (bazel/BUILD:legacy_all_repository_locations) uses jq `*`,
-  # which replaces arrays with this (right-hand) operand's value.
+  # Prebuilt wee8 repos; must mirror bazel/deps.yaml (jq `*` merge replaces this array).
   - wee8_prebuilt_x86_64
   - wee8_prebuilt_x86_64_libstdcxx
   - wee8_prebuilt_aarch64

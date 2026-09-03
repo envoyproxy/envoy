@@ -92,22 +92,9 @@ build --define absl=1
 # Disable ICU linking for googleurl.
 build --@googleurl//build_config:system_icu=0
 
-# Source the V8/wee8 engine from the envoy_toolshed prebuilt static library
-# instead of building V8 from source (30-120min -> seconds). The label_flag is
-# defined in proxy-wasm-cpp-host (bazel/proxy_wasm_cpp_host.patch); its value is
-# resolved in the root repo mapping, so this works in WORKSPACE and bzlmod. The
-# @envoy_toolshed//v8:wee8 alias falls back to @v8//:wee8 on platforms without a
-# prebuilt.
+# Source wee8 from the envoy_toolshed prebuilt; fall back to source for gcc
+# (libstdc++ ABI) and sanitizers (need instrumented deps).
 build --@proxy-wasm-cpp-host//bazel:v8_engine=@envoy_toolshed//v8:wee8
-
-# The published prebuilt is a clang/libc++, non-instrumented x86_64 build, so it
-# is only ABI/runtime compatible with the default x86_64 clang/libc++ config.
-# Fall back to building wee8 from source where that assumption breaks:
-#   - gcc:       needs a libstdc++ (std::) ABI, not libc++ (std::__1::).
-#   - sanitizer: asan/msan/tsan need instrumented deps (asan/msan/tsan all
-#                expand to --config=sanitizer).
-# (aarch64 is selected by the alias but the current prebuilt is runtime-broken;
-# that is fixed toolshed-side since there is no .bazelrc config hook for cpu.)
 build:gcc --@proxy-wasm-cpp-host//bazel:v8_engine=@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression
 build:sanitizer --@proxy-wasm-cpp-host//bazel:v8_engine=@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression
 

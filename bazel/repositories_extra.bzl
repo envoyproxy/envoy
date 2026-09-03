@@ -41,10 +41,7 @@ def envoy_dependencies_extra(
         )
     setup_sysroots(glibc_version = glibc_version)
 
-    # Prebuilt wee8 static libraries (@wee8_prebuilt_*), injected into
-    # proxy-wasm-cpp-host's v8_lib via the //bazel:v8_engine label_flag (see
-    # .bazelrc). Falls back to building @v8//:wee8 from source on unsupported
-    # platforms.
+    # Prebuilt wee8 (@wee8_prebuilt_*), selected via the //bazel:v8_engine flag.
     setup_wee8_prebuilt()
 
     emsdk_deps()

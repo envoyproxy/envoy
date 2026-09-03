@@ -138,7 +138,7 @@ diff --git a/bazel/BUILD b/bazel/BUILD
  )
  
  config_setting(
-@@ -77,4 +124,21 @@ v8_lib_no_pointer_compression(
+@@ -77,4 +124,15 @@ v8_lib_no_pointer_compression(
      library = "@v8//:wee8",
  )
  
@@ -147,13 +147,7 @@ diff --git a/bazel/BUILD b/bazel/BUILD
 +    build_setting_default = "@envoy//bazel:crypto",
 +)
 +
-+# Source of the V8/wee8 engine library, selectable by the consuming (root)
-+# module. Defaults to building wee8 from @v8 source (with pointer compression
-+# disabled). A consumer can point this at a prebuilt drop-in, e.g.
-+#   --//bazel:v8_engine=@envoy_toolshed//v8:wee8
-+# The value is resolved in the root module's repo mapping, so this works in both
-+# WORKSPACE and bzlmod modes without patching this repo to reference a foreign
-+# repository directly.
++# v8/wee8 engine source; the root module can point this at a prebuilt drop-in.
 +label_flag(
 +    name = "v8_engine",
 +    build_setting_default = ":wee8_no_pointer_compression",
