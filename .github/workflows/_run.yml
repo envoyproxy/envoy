@@ -94,6 +94,9 @@ on:
           error:
           Error:
           FAILED in
+          FAILED.*\(\d+ ms\)
+          not meeting coverage
+          FAIL:
       fail-match:
         type: string
       import-gpg:

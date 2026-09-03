@@ -45,6 +45,9 @@ jobs:
         error:
         Error:
         FAILED in
+        FAILED.*\(\d+ ms\)
+        not meeting coverage
+        FAIL:
       rbe: true
       target: ${{ matrix.target }}
       trusted: ${{ inputs.trusted }}

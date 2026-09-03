@@ -41,6 +41,9 @@ jobs:
         error:
         Error:
         FAILED in
+        FAILED.*\(\d+ ms\)
+        not meeting coverage
+        FAIL:
       rbe: true
       request: ${{ inputs.request }}
       catch-errors: ${{ matrix.catch-errors || false }}

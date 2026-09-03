@@ -41,6 +41,9 @@ jobs:
         error:
         Error:
         FAILED in
+        FAILED.*\(\d+ ms\)
+        not meeting coverage
+        FAIL:
       request: ${{ inputs.request }}
       target: ${{ matrix.target }}
       timeout-minutes: 180

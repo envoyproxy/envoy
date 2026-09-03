@@ -44,6 +44,9 @@ jobs:
         Error:
         lower than limit
         FAILED in
+        FAILED.*\(\d+ ms\)
+        not meeting coverage
+        FAIL:
       rbe: true
       request: ${{ inputs.request }}
       runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}

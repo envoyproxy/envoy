@@ -49,6 +49,9 @@ jobs:
         error:
         Error:
         FAILED in
+        FAILED.*\(\d+ ms\)
+        not meeting coverage
+        FAIL:
       skip: ${{ matrix.skip != false && true || false }}
       steps-post: ${{ matrix.steps-post }}
       target: ${{ matrix.target }}
