@@ -76,12 +76,13 @@ template <typename Config> std::vector<McpBackendConfig> parseBackends(const Con
 McpRouterConfigImpl::McpRouterConfigImpl(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope,
-    Server::Configuration::ServerFactoryContext& context)
+    Server::Configuration::ServerFactoryContext& context, std::string session_signing_key)
     : backends_(parseBackends(proto_config)),
       default_backend_name_(backends_.size() == 1 ? backends_[0].name : ""),
       factory_context_(context), lazy_initialization_(proto_config.lazy_initialization()),
       session_identity_(parseSessionIdentity(proto_config)),
       metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
+      session_signing_key_(std::move(session_signing_key)),
       stats_(generateStats(stats_prefix, scope)) {}
 
 const McpBackendConfig* McpRouterConfigImpl::findBackend(const std::string& name) const {
