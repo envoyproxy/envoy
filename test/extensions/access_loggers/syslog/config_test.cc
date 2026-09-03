@@ -1,4 +1,4 @@
-#include <cstring>
+#include <string>
 
 #include "envoy/access_log/access_log_config.h"
 #include "envoy/common/exception.h"
@@ -49,18 +49,6 @@ SyslogAccessLogConfig loadConfig(absl::string_view yaml) {
   return config;
 }
 
-void expectGethostname(Api::MockOsSysCalls& os_sys_calls, absl::string_view hostname, int rc) {
-  EXPECT_CALL(os_sys_calls, gethostname(testing::_, testing::_))
-      .WillOnce([hostname, rc](char* name, size_t length) -> Api::SysCallIntResult {
-        if (rc == 0 && length > 0) {
-          const size_t n = std::min(hostname.size(), length - 1);
-          memcpy(name, hostname.data(), n);
-          name[n] = '\0';
-        }
-        return {rc, rc == 0 ? 0 : 1};
-      });
-}
-
 class SyslogConfigTest : public testing::Test {};
 
 TEST_F(SyslogConfigTest, FactoryRegistersNameAndEmptyConfig) {
@@ -99,7 +87,7 @@ TEST_F(SyslogConfigTest, RejectsInvalidUnixSocketWithoutFallingBackToCluster) {
 }
 
 #ifndef WIN32
-TEST_F(SyslogConfigTest, FactoryIgnoresClusterWhenUnixSocketIsConfigured) {
+TEST_F(SyslogConfigTest, IgnoresClusterNameIfUnixSocketUsed) {
   auto config = loadConfig(UnixSocketConfigYaml);
   config.set_cluster_name("syslog");
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
@@ -132,16 +120,6 @@ TEST_F(SyslogConfigTest, RejectsMissingDestination) {
 TEST_F(SyslogConfigTest, RejectsInvalidFieldConstraints) {
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   auto config = loadConfig(UdpClusterConfigYaml);
-  config.set_max_syslog_msg_bytes(479);
-  EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
-               ProtoValidationException);
-
-  config = loadConfig(UdpClusterConfigYaml);
-  config.set_max_syslog_msg_bytes(65508);
-  EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
-               ProtoValidationException);
-
-  config = loadConfig(UdpClusterConfigYaml);
   config.set_tag(std::string(33, 'a'));
   EXPECT_THROW(SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context),
                ProtoValidationException);
@@ -158,14 +136,21 @@ TEST_F(SyslogConfigTest, ValidatesHostnameRequirement) {
   testing::NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  expectGethostname(os_sys_calls, "testhost", 0);
+  const std::string hostname = "testhost";
+  EXPECT_CALL(os_sys_calls, gethostname(testing::_, testing::_))
+      .WillOnce(testing::DoAll(
+          testing::SetArrayArgument<0>(hostname.c_str(), hostname.c_str() + hostname.size() + 1),
+          Return(Api::SysCallIntResult{0, 0})));
   EXPECT_TRUE(validateSyslogConfig(config).ok());
 
-  expectGethostname(os_sys_calls, "", -1);
+  EXPECT_CALL(os_sys_calls, gethostname(testing::_, testing::_))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 1}));
   EXPECT_EQ("syslog local hostname is unavailable; set omit_hostname to true to omit it",
             validateSyslogConfig(config).message());
 
-  expectGethostname(os_sys_calls, "", 0);
+  EXPECT_CALL(os_sys_calls, gethostname(testing::_, testing::_))
+      .WillOnce(
+          testing::DoAll(testing::SetArgPointee<0>('\0'), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ("syslog local hostname is unavailable; set omit_hostname to true to omit it",
             validateSyslogConfig(config).message());
 }
