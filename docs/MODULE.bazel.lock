@@ -1500,8 +1500,8 @@
     },
     "@@envoy_toolshed+//compile:extensions.bzl%libcxx_extension": {
       "general": {
-        "bzlTransitiveDigest": "FhG/anxMUi+XzoPjRhG3rvXE0vQp+6FziJ1192x2pNg=",
-        "usagesDigest": "OlXxUx2+b7T82M7YN6zxHauMQoR1OUoR+Jl97tT11HY=",
+        "bzlTransitiveDigest": "x8brdUaqutwZNWU2C3GzA+Sd3OjgtdDV37agyDaPhi0=",
+        "usagesDigest": "KpydMUF67Thjj7dxFRyP1XfRypHyTi2PieulXg/q++8=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -1509,7 +1509,6 @@
           "llvm_libcxx_aarch64": {
             "repoRuleId": "@@envoy_toolshed+//compile:llvm_prebuilt.bzl%llvm_prebuilt",
             "attributes": {
-              "build_file_content": "\nfilegroup(\n    name = \"libcxx\",\n    srcs = [\n        \"lib/aarch64-unknown-linux-gnu/libc++.a\",\n        \"lib/aarch64-unknown-linux-gnu/libc++abi.a\",\n        \"lib/aarch64-unknown-linux-gnu/libunwind.a\",\n    ],\n    visibility = [\"//visibility:public\"],\n)\nfilegroup(\n    name = \"compiler_rt\",\n    srcs = glob([\"lib/clang/*/lib/aarch64-unknown-linux-gnu/libclang_rt.builtins.a\"]),\n    visibility = [\"//visibility:public\"],\n)\nfilegroup(\n    name = \"config_site\",\n    srcs = [\"include/aarch64-unknown-linux-gnu/c++/v1/__config_site\"],\n    visibility = [\"//visibility:public\"],\n)\n",
               "sha256": "805efad2bb91cb4967fa569e0881d10c0f69c04461cf671cccbae19f547acc34",
               "strip_prefix": "LLVM-22.1.8-Linux-ARM64/",
               "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-ARM64.tar.xz"
@@ -1518,7 +1517,6 @@
           "llvm_libcxx_x86_64": {
             "repoRuleId": "@@envoy_toolshed+//compile:llvm_prebuilt.bzl%llvm_prebuilt",
             "attributes": {
-              "build_file_content": "\nfilegroup(\n    name = \"libcxx\",\n    srcs = [\n        \"lib/x86_64-unknown-linux-gnu/libc++.a\",\n        \"lib/x86_64-unknown-linux-gnu/libc++abi.a\",\n        \"lib/x86_64-unknown-linux-gnu/libunwind.a\",\n    ],\n    visibility = [\"//visibility:public\"],\n)\nfilegroup(\n    name = \"compiler_rt\",\n    srcs = glob([\"lib/clang/*/lib/x86_64-unknown-linux-gnu/libclang_rt.builtins.a\"]),\n    visibility = [\"//visibility:public\"],\n)\nfilegroup(\n    name = \"config_site\",\n    srcs = [\"include/x86_64-unknown-linux-gnu/c++/v1/__config_site\"],\n    visibility = [\"//visibility:public\"],\n)\n",
               "sha256": "df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384",
               "strip_prefix": "LLVM-22.1.8-Linux-X64/",
               "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz"
@@ -1530,8 +1528,8 @@
     },
     "@@envoy_toolshed+//compile:extensions.bzl%libcxx_libs_extension": {
       "general": {
-        "bzlTransitiveDigest": "FhG/anxMUi+XzoPjRhG3rvXE0vQp+6FziJ1192x2pNg=",
-        "usagesDigest": "tp9JiCP/ZVTgZdTBT9qm208U6koMDG61xYCqp33vsz0=",
+        "bzlTransitiveDigest": "x8brdUaqutwZNWU2C3GzA+Sd3OjgtdDV37agyDaPhi0=",
+        "usagesDigest": "z47Defo42ymUqFSeAV/Zd/WotswORz2XQzadP9dIQ/I=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -1539,7 +1537,7 @@
           "libcxx_libs_aarch64": {
             "repoRuleId": "@@envoy_toolshed+//compile:libcxx_libs.bzl%libcxx_libs",
             "attributes": {
-              "version": "0.2.5",
+              "version": "0.2.14",
               "sha256": "b3bd8dfc1c250d5c2c36de174138ffef9754402b33e54abe9b5efb25982fa2f7",
               "arch": "aarch64"
             }
@@ -1547,7 +1545,7 @@
           "libcxx_libs_x86_64": {
             "repoRuleId": "@@envoy_toolshed+//compile:libcxx_libs.bzl%libcxx_libs",
             "attributes": {
-              "version": "0.2.5",
+              "version": "0.2.14",
               "sha256": "e40f39338ffe561dfa26541557c9e548fc7760db9d99f7b6c5de237b725482aa",
               "arch": "x86_64"
             }
@@ -1558,8 +1556,8 @@
     },
     "@@envoy_toolshed+//compile:extensions.bzl%llvm_minimal_build_extension": {
       "general": {
-        "bzlTransitiveDigest": "FhG/anxMUi+XzoPjRhG3rvXE0vQp+6FziJ1192x2pNg=",
-        "usagesDigest": "QGQ1Bdc7X9diFwOImFVtqXk1sa/bWbG7iTIquugTxQQ=",
+        "bzlTransitiveDigest": "x8brdUaqutwZNWU2C3GzA+Sd3OjgtdDV37agyDaPhi0=",
+        "usagesDigest": "jRuNylX+Wvm9FUqKjwwEVWdejsJARKKUNm6FKUUVu90=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -1677,8 +1675,8 @@
     },
     "@@envoy_toolshed+//compile:extensions.bzl%sanitizer_extension": {
       "general": {
-        "bzlTransitiveDigest": "FhG/anxMUi+XzoPjRhG3rvXE0vQp+6FziJ1192x2pNg=",
-        "usagesDigest": "w3/gkNSu9auZsvFouoeohxDv9XrFbmvAEKp1PBl4kXs=",
+        "bzlTransitiveDigest": "x8brdUaqutwZNWU2C3GzA+Sd3OjgtdDV37agyDaPhi0=",
+        "usagesDigest": "hakpQpF46t2OQfRzm/zoeJQF2gQG+W9JVF7J4xeiVFk=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -1686,15 +1684,15 @@
           "msan_libs": {
             "repoRuleId": "@@envoy_toolshed+//compile:sanitizer_libs.bzl%msan_libs",
             "attributes": {
-              "version": "0.2.5",
-              "sha256": "19412b5515af9c34ffc9fbda3a434218080b719de532419d61a296bbd2eab058"
+              "version": "0.2.14",
+              "sha256": "d0bb453af4fdb003f988ff84af9e6da57ff5da15f2f805c5d6c67bf0c1a54524"
             }
           },
           "tsan_libs": {
             "repoRuleId": "@@envoy_toolshed+//compile:sanitizer_libs.bzl%tsan_libs",
             "attributes": {
-              "version": "0.2.5",
-              "sha256": "2d136d0c63021b3280ec4b33a88c8381f2214a849a50ae557d7f5d9e9f9b93d0"
+              "version": "0.2.14",
+              "sha256": "5f46d7a716096261f0abda64722b17ca8e1e52789f5cb4ff01dcad58fbbc543b"
             }
           }
         },
@@ -1704,7 +1702,7 @@
     "@@envoy_toolshed+//coverage/grcov:extensions.bzl%grcov_extension": {
       "general": {
         "bzlTransitiveDigest": "CGj8VAT0hSEB4PQMagl3zFA7WRmHTk7Yol/Hful6gY8=",
-        "usagesDigest": "3ZHvDeBeU1gqYG+iTWgtcNx4p+Oo4dHin7Idnols2gM=",
+        "usagesDigest": "vKRLRKLTY5/jItKBUf9U/LlwpptIF7KnxaoBSXw/adU=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -1749,6 +1747,45 @@
               "arch": "arm64",
               "glibc_version": "2.31",
               "stdcc_version": "13"
+            }
+          }
+        },
+        "recordedRepoMappingEntries": []
+      }
+    },
+    "@@envoy_toolshed+//v8:extensions.bzl%wee8_prebuilt_extension": {
+      "general": {
+        "bzlTransitiveDigest": "gXMFfVg+qoio1QNyicAgzuZLG0526gxbQBOVTkMq3iM=",
+        "usagesDigest": "LXqYe3BMRezM0hzeqznG7SbZUDAE075hGgzFRZyQknA=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "wee8_prebuilt_x86_64": {
+            "repoRuleId": "@@envoy_toolshed+//v8:wee8_prebuilt.bzl%wee8_prebuilt",
+            "attributes": {
+              "version": "0.2.14",
+              "sha256": "fcb7842467db8412971b90b2ad6c602ba4834b3eaa44fe5a175ae22d4cc0c96c",
+              "arch": "x86_64",
+              "stdlib": "libcxx"
+            }
+          },
+          "wee8_prebuilt_x86_64_libstdcxx": {
+            "repoRuleId": "@@envoy_toolshed+//v8:wee8_prebuilt.bzl%wee8_prebuilt",
+            "attributes": {
+              "version": "0.2.14",
+              "sha256": "02248a38aeef1103a02dc2d65ef20249d42df7aed812f53f63482cee7babe82f",
+              "arch": "x86_64",
+              "stdlib": "libstdcxx"
+            }
+          },
+          "wee8_prebuilt_aarch64": {
+            "repoRuleId": "@@envoy_toolshed+//v8:wee8_prebuilt.bzl%wee8_prebuilt",
+            "attributes": {
+              "version": "0.2.14",
+              "sha256": "c1c842e38ade0149eedf6dcd928eb4290cc01be6ebe213f642b161e9f0bb1cdc",
+              "arch": "aarch64",
+              "stdlib": "libcxx"
             }
           }
         },
@@ -2014,7 +2051,7 @@
     "@@proxy-wasm-rust-sdk+//bazel:extensions.bzl%crates_deps": {
       "general": {
         "bzlTransitiveDigest": "NP2Cuz60hUfT5Zr2WSUowNjErTnl5kSWJnucMwRH7BU=",
-        "usagesDigest": "jOvezoXplvr4944WH4rI2+udl0UWtcJpcIBWCA48vcI=",
+        "usagesDigest": "DoeyjeHdit/bqF+1HIB6+05yHVIdzQU1NCYHuH53F8s=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
