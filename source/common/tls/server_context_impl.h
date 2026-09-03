@@ -23,7 +23,6 @@
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/context_manager_impl.h"
-#include "source/common/tls/default_tls_certificate_selector.h"
 #include "source/common/tls/ocsp/ocsp.h"
 #include "source/common/tls/stats.h"
 
