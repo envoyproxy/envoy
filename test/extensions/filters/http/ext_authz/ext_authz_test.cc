@@ -3988,7 +3988,7 @@ TEST_F(HttpFilterCacheTest, CacheHitOk) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
 
-  lookup_cb(std::move(cached_response));
+  lookup_cb(std::move(cached_response), nullptr);
 
   EXPECT_EQ(
       "yes",
@@ -4016,7 +4016,7 @@ TEST_F(HttpFilterCacheTest, CacheHitOkSync) {
             auto cached_response = std::make_shared<Filters::Common::ExtAuthz::Response>();
             cached_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
             cached_response->headers_to_add.push_back({"x-cached-header", "yes"});
-            cb(std::move(cached_response));
+            cb(std::move(cached_response), nullptr);
             return nullptr;
           }));
 
@@ -4065,7 +4065,7 @@ TEST_F(HttpFilterCacheTest, CacheHitDenied) {
   EXPECT_CALL(decoder_filter_callbacks_,
               sendLocalReply(Http::Code::Forbidden, "Access Denied by Cache", _, _, _));
 
-  lookup_cb(std::move(cached_response));
+  lookup_cb(std::move(cached_response), nullptr);
 
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
@@ -4091,7 +4091,7 @@ TEST_F(HttpFilterCacheTest, CacheHitDeniedSync) {
             cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Denied;
             cached_response->status_code = Http::Code::Forbidden;
             cached_response->body = "Access Denied by Cache";
-            cb(std::move(cached_response));
+            cb(std::move(cached_response), nullptr);
             return nullptr;
           }));
 
@@ -4137,7 +4137,7 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailOpen) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
 
-  lookup_cb(std::move(cached_response));
+  lookup_cb(std::move(cached_response), nullptr);
 
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
@@ -4166,7 +4166,7 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailOpenSync) {
                      AuthCacheSession::LookupCallback&& cb) -> AuthCacheSession::LookupRequest* {
             auto cached_response = std::make_shared<Filters::Common::ExtAuthz::Response>();
             cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
-            cb(std::move(cached_response));
+            cb(std::move(cached_response), nullptr);
             return nullptr;
           }));
 
@@ -4215,7 +4215,7 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailClosed) {
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _));
 
-  lookup_cb(std::move(cached_response));
+  lookup_cb(std::move(cached_response), nullptr);
 
   EXPECT_EQ(1U, config_->stats().error_.value());
   EXPECT_EQ(0U, config_->stats().failure_mode_allowed_.value());
@@ -4241,7 +4241,7 @@ TEST_F(HttpFilterCacheTest, CacheHitErrorFailClosedSync) {
             auto cached_response = std::make_shared<Filters::Common::ExtAuthz::Response>();
             cached_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
             cached_response->status_code = Http::Code::Forbidden;
-            cb(std::move(cached_response));
+            cb(std::move(cached_response), nullptr);
             return nullptr;
           }));
 
@@ -4286,7 +4286,55 @@ TEST_F(HttpFilterCacheTest, CacheMiss) {
                            const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                            const StreamInfo::StreamInfo&) { authz_cb = &cb; }));
 
-  lookup_cb(nullptr);
+  auto check_req = std::make_unique<envoy::service::auth::v3::CheckRequest>();
+  lookup_cb(nullptr, std::move(check_req));
+
+  auto authz_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  authz_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  EXPECT_CALL(*mock_cache_, insert(_));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  authz_cb->onComplete(std::move(authz_response));
+}
+
+TEST_F(HttpFilterCacheTest, CacheMissWithCheckRequest) {
+  initializeFilter();
+
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  prepareCheck();
+
+  AuthCacheSession::LookupCallback lookup_cb;
+  EXPECT_CALL(*mock_cache_, lookup(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::StreamDecoderFilterCallbacks&, const RequestAttributes& attributes,
+                     AuthCacheSession::LookupCallback&& cb) -> AuthCacheSession::LookupRequest* {
+            EXPECT_EQ(config_->maxRequestBytes(), attributes.config_.max_request_bytes_);
+            EXPECT_EQ(config_->packAsBytes(), attributes.config_.pack_as_bytes_);
+            EXPECT_EQ(config_->headersAsBytes(), attributes.config_.encode_raw_headers_);
+            lookup_cb = std::move(cb);
+            return nullptr;
+          }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Filters::Common::ExtAuthz::RequestCallbacks* authz_cb = nullptr;
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& cb,
+                           const envoy::service::auth::v3::CheckRequest& check_request,
+                           Tracing::Span&, const StreamInfo::StreamInfo&) {
+        authz_cb = &cb;
+        EXPECT_EQ("/custom-cache-key-path", check_request.attributes().request().http().path());
+      }));
+
+  auto check_req = std::make_unique<envoy::service::auth::v3::CheckRequest>();
+  check_req->mutable_attributes()->mutable_request()->mutable_http()->set_path(
+      "/custom-cache-key-path");
+  lookup_cb(nullptr, std::move(check_req));
 
   auto authz_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
   authz_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
@@ -4324,7 +4372,8 @@ TEST_F(HttpFilterCacheTest, CacheMissError) {
                            const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                            const StreamInfo::StreamInfo&) { authz_cb = &cb; }));
 
-  lookup_cb(nullptr);
+  auto check_req = std::make_unique<envoy::service::auth::v3::CheckRequest>();
+  lookup_cb(nullptr, std::move(check_req));
 
   auto authz_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
   authz_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -4363,7 +4412,8 @@ TEST_F(HttpFilterCacheTest, CacheMissRejected) {
                            const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                            const StreamInfo::StreamInfo&) { authz_cb = &cb; }));
 
-  lookup_cb(nullptr);
+  auto check_req = std::make_unique<envoy::service::auth::v3::CheckRequest>();
+  lookup_cb(nullptr, std::move(check_req));
 
   auto authz_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
   authz_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;

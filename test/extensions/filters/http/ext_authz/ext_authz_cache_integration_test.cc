@@ -72,12 +72,14 @@ class SimpleLookupRequest : public AuthCacheSession::LookupRequest {
 public:
   SimpleLookupRequest(Event::Dispatcher& dispatcher, AuthCacheSession::LookupCallback cb,
                       Filters::Common::ExtAuthz::ResponseSharedPtr response,
+                      AuthCacheSession::CheckRequestPtr check_request,
                       std::shared_ptr<SimpleInMemoryCacheStorage> storage, bool hold_lookup)
-      : cb_(std::move(cb)), response_(std::move(response)), storage_(std::move(storage)) {
+      : cb_(std::move(cb)), response_(std::move(response)),
+        check_request_(std::move(check_request)), storage_(std::move(storage)) {
     if (!hold_lookup) {
       timer_ = dispatcher.createTimer([this]() {
         if (!cancelled_) {
-          cb_(std::move(response_));
+          cb_(std::move(response_), std::move(check_request_));
         }
       });
       timer_->enableTimer(std::chrono::milliseconds(0));
@@ -104,6 +106,7 @@ public:
 private:
   AuthCacheSession::LookupCallback cb_;
   Filters::Common::ExtAuthz::ResponseSharedPtr response_;
+  AuthCacheSession::CheckRequestPtr check_request_;
   std::shared_ptr<SimpleInMemoryCacheStorage> storage_;
   Event::TimerPtr timer_;
   bool cancelled_{false};
@@ -125,14 +128,15 @@ public:
           hold = storage_->hold_lookup;
         }
         active_request_ = std::make_unique<SimpleLookupRequest>(
-            decoder_callbacks.dispatcher(), std::move(cb), nullptr, storage_, hold);
+            decoder_callbacks.dispatcher(), std::move(cb), nullptr, nullptr, storage_, hold);
         return active_request_.get();
       }
-      cb(nullptr);
+      cb(nullptr, nullptr);
       return nullptr;
     }
 
     Filters::Common::ExtAuthz::ResponseSharedPtr response = nullptr;
+    AuthCacheSession::CheckRequestPtr check_request = nullptr;
     bool hold = false;
     {
       absl::MutexLock lock(&storage_->mutex);
@@ -140,17 +144,25 @@ public:
       auto it = storage_->map.find(current_key_);
       if (it != storage_->map.end()) {
         response = it->second;
+      } else {
+        // Construct CheckRequest on cache miss with attributes relevant to the cache key.
+        check_request = std::make_unique<envoy::service::auth::v3::CheckRequest>();
+        auto* http_request = check_request->mutable_attributes()->mutable_request()->mutable_http();
+        http_request->set_path(current_key_);
+        http_request->set_method(std::string(attributes.headers_.getMethodValue()));
+        http_request->set_host(std::string(attributes.headers_.getHostValue()));
       }
       hold = storage_->hold_lookup;
     }
 
     if (async_lookup_) {
       active_request_ = std::make_unique<SimpleLookupRequest>(
-          decoder_callbacks.dispatcher(), std::move(cb), std::move(response), storage_, hold);
+          decoder_callbacks.dispatcher(), std::move(cb), std::move(response),
+          std::move(check_request), storage_, hold);
       return active_request_.get();
     }
 
-    cb(std::move(response));
+    cb(std::move(response), std::move(check_request));
     return nullptr;
   }
 

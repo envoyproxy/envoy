@@ -284,7 +284,8 @@ Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(
       server_context_->clusterManager(), client_config);
 }
 
-RequestAttributes Filter::collectAttributes(const Http::RequestHeaderMap& headers) {
+RequestAttributes Filter::collectAttributes(const Http::RequestHeaderMap& headers,
+                                            const CheckRequestConfig& check_config) {
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
   if ((config_->emitFilterStateStats() || config_->filterMetadata().has_value())) {
@@ -340,7 +341,7 @@ RequestAttributes Filter::collectAttributes(const Http::RequestHeaderMap& header
   }
 
   return {headers, std::move(context_extensions), std::move(metadata_context),
-          std::move(route_metadata_context)};
+          std::move(route_metadata_context), check_config};
 }
 
 void Filter::callAuthzService() {
@@ -404,7 +405,16 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     return;
   }
 
-  request_attributes_.emplace(collectAttributes(headers));
+  CheckRequestConfig check_config{
+      max_request_bytes_,
+      config_->packAsBytes(),
+      config_->headersAsBytes(),
+      config_->includePeerCertificate(),
+      config_->includeTLSSession(),
+      config_->destinationLabels(),
+      config_->allowedHeadersMatcher(),
+      config_->disallowedHeadersMatcher(),
+  };
 
   if (cache_session_ != nullptr) {
     ENVOY_STREAM_LOG(trace, "ext_authz filter performing cache lookup.", *decoder_callbacks_);
@@ -412,12 +422,14 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     initiating_cache_lookup_ = true;
     filter_return_ = FilterReturn::StopDecoding;
 
-    active_lookup_ =
-        cache_session_->lookup(*decoder_callbacks_, *request_attributes_,
-                               [this](Filters::Common::ExtAuthz::ResponseSharedPtr response) {
-                                 active_lookup_ = nullptr;
-                                 onCacheLookupComplete(std::move(response));
-                               });
+    const RequestAttributes attributes = collectAttributes(headers, check_config);
+    active_lookup_ = cache_session_->lookup(
+        *decoder_callbacks_, attributes,
+        [this](Filters::Common::ExtAuthz::ResponseSharedPtr response,
+               AuthCacheSession::CheckRequestPtr check_request) {
+          active_lookup_ = nullptr;
+          onCacheLookupComplete(std::move(response), std::move(check_request));
+        });
     if (state_ != State::CacheLookup) {
       ENVOY_BUG(
           active_lookup_ == nullptr,
@@ -428,21 +440,25 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     return;
   }
 
-  onCacheLookupComplete(nullptr);
+  RequestAttributes attributes = collectAttributes(headers, check_config);
+  Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
+      decoder_callbacks_, attributes.headers_, std::move(attributes.context_extensions_),
+      std::move(attributes.metadata_context_), std::move(attributes.route_metadata_context_),
+      check_request_, attributes.config_.max_request_bytes_, attributes.config_.pack_as_bytes_,
+      attributes.config_.encode_raw_headers_, attributes.config_.include_peer_certificate_,
+      attributes.config_.include_tls_session_, attributes.config_.destination_labels_,
+      attributes.config_.allowed_headers_matcher_, attributes.config_.disallowed_headers_matcher_);
+  callAuthzService();
 }
 
-void Filter::onCacheLookupComplete(Filters::Common::ExtAuthz::ResponseSharedPtr response) {
+void Filter::onCacheLookupComplete(Filters::Common::ExtAuthz::ResponseSharedPtr response,
+                                   AuthCacheSession::CheckRequestPtr check_request) {
   if (response == nullptr) {
     ENVOY_STREAM_LOG(trace, "ext_authz filter cache miss.", *decoder_callbacks_);
-    ASSERT(request_attributes_.has_value());
-    Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(
-        decoder_callbacks_, request_attributes_->headers_,
-        std::move(request_attributes_->context_extensions_),
-        std::move(request_attributes_->metadata_context_),
-        std::move(request_attributes_->route_metadata_context_), check_request_, max_request_bytes_,
-        config_->packAsBytes(), config_->headersAsBytes(), config_->includePeerCertificate(),
-        config_->includeTLSSession(), config_->destinationLabels(),
-        config_->allowedHeadersMatcher(), config_->disallowedHeadersMatcher());
+    ASSERT(check_request != nullptr);
+    if (check_request != nullptr) {
+      *check_request_ = std::move(*check_request);
+    }
     callAuthzService();
   } else {
     ENVOY_STREAM_LOG(trace, "ext_authz filter cache hit.", *decoder_callbacks_);

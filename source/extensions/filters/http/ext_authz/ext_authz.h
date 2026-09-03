@@ -540,9 +540,11 @@ private:
   std::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
-  RequestAttributes collectAttributes(const Http::RequestHeaderMap& headers);
+  RequestAttributes collectAttributes(const Http::RequestHeaderMap& headers,
+                                      const CheckRequestConfig& check_config);
   void callAuthzService();
-  void onCacheLookupComplete(Filters::Common::ExtAuthz::ResponseSharedPtr response);
+  void onCacheLookupComplete(Filters::Common::ExtAuthz::ResponseSharedPtr response,
+                             AuthCacheSession::CheckRequestPtr check_request);
   void continueDecoding();
   // In shadow mode, writes the authorization decision and response attributes into
   // FilterState and increments the appropriate shadow stat counter. Takes the response
@@ -607,9 +609,6 @@ private:
   bool buffer_data_{};
   bool skip_check_{false};
   ArenaWrappedProto<envoy::service::auth::v3::CheckRequest> check_request_;
-  // Cached request attributes collected during initiateCall(), used as authorization context
-  // inputs for cache lookups and CheckRequest construction.
-  std::optional<RequestAttributes> request_attributes_;
   // Cached consolidated per-route configuration merged across route specific filter configs,
   // used to override default authorization services and provide context extensions.
   std::optional<FilterConfigPerRoute> merged_per_route_config_;

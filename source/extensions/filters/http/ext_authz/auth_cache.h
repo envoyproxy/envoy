@@ -10,6 +10,7 @@
 #include "envoy/tracing/tracer.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
 namespace Envoy {
@@ -17,11 +18,23 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
+struct CheckRequestConfig {
+  uint32_t max_request_bytes_{0};
+  bool pack_as_bytes_{false};
+  bool encode_raw_headers_{false};
+  bool include_peer_certificate_{false};
+  bool include_tls_session_{false};
+  const Protobuf::Map<std::string, std::string>& destination_labels_;
+  const Filters::Common::ExtAuthz::MatcherSharedPtr& allowed_headers_matcher_;
+  const Filters::Common::ExtAuthz::MatcherSharedPtr& disallowed_headers_matcher_;
+};
+
 struct RequestAttributes {
   const Http::RequestHeaderMap& headers_;
   Protobuf::Map<std::string, std::string> context_extensions_;
   envoy::config::core::v3::Metadata metadata_context_;
   envoy::config::core::v3::Metadata route_metadata_context_;
+  const CheckRequestConfig& config_;
 };
 
 class AuthCacheSession {
@@ -34,12 +47,17 @@ public:
     virtual void cancel() PURE;
   };
 
-  using LookupCallback = std::function<void(Filters::Common::ExtAuthz::ResponseSharedPtr)>;
+  using CheckRequestPtr = std::unique_ptr<envoy::service::auth::v3::CheckRequest>;
+  using LookupCallback =
+      std::function<void(Filters::Common::ExtAuthz::ResponseSharedPtr, CheckRequestPtr)>;
 
   /**
    * Looks for a matching request/response pair in the cache.
    * Can be called at most 1 time per session.
-   * If lookup fails or misses, the callback should be invoked with nullptr.
+   * If lookup finds a cached response (cache hit), the callback should be invoked with the response
+   * and nullptr for check_request.
+   * If lookup misses (cache miss), the callback should be invoked with nullptr for response,
+   * and a constructed CheckRequest to be sent to the external authorization service.
    * Lifetimes of the arguments passed to it must last until cb or LookupRequest::cancel is called.
    * @param decoder_callbacks The stream decoder filter callbacks.
    * @param attributes The RequestAttributes containing authorization context.
@@ -68,7 +86,7 @@ public:
 
   /**
    * Creates a new cache session for a stream filter.
-   * 
+   *
    * Implementations need to be thread-safe.
    */
   virtual AuthCacheSessionPtr createSession() PURE;

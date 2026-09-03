@@ -20,6 +20,7 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/tracing:tracer_interface",
+        "//source/extensions/filters/common/ext_authz:check_request_utils_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
