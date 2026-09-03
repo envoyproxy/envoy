@@ -30,7 +30,7 @@ envoy_cc_benchmark_binary(
     srcs = ["dns_resolver_benchmark.cc"],
     rbe_pool = "linux_x64_small",
     tags = [
-        # FakeUdpDnsServer uses POSIX-only APIs (poll, fcntl, etc.).
+        # FakeUdpDnsServer uses POSIX-only headers (arpa/inet.h, netinet/in.h).
         "fails_on_clang_cl",
         # Hickory uses a Rust/Tokio runtime that is not instrumented for TSAN.
         "no_tsan",

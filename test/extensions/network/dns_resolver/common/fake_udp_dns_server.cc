@@ -1,63 +1,50 @@
 #include "test/extensions/network/dns_resolver/common/fake_udp_dns_server.h"
 
 #include <arpa/inet.h>
-#include <fcntl.h>
 #include <netinet/in.h>
-#include <poll.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
 #include <cstring>
 
+#include "envoy/buffer/buffer.h"
+#include "envoy/network/io_handle.h"
+
 #include "source/common/common/assert.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Network {
 namespace Test {
+namespace {
+// Maximum size of a DNS message over UDP without EDNS(0) (RFC 1035).
+static constexpr size_t kMaxDnsMessageSize = 512;
+} // namespace
 
-FakeUdpDnsServer::FakeUdpDnsServer(bool ipv6) {
-  const int family = ipv6 ? AF_INET6 : AF_INET;
-  fd_ = socket(family, SOCK_DGRAM, 0);
-  RELEASE_ASSERT(fd_ >= 0, "Failed to create UDP socket for FakeUdpDnsServer.");
+FakeUdpDnsServer::FakeUdpDnsServer(Event::Dispatcher& dispatcher, bool ipv6) {
+  const auto loopback =
+      ipv6 ? Utility::getIpv6LoopbackAddress() : Utility::getCanonicalIpv4LoopbackAddress();
+  socket_ = std::make_unique<UdpListenSocket>(loopback, /*options=*/nullptr,
+                                              /*bind_to_port=*/true);
 
-  // Set non-blocking.
-  const int flags = fcntl(fd_, F_GETFL, 0);
-  RELEASE_ASSERT(flags >= 0, "fcntl F_GETFL failed.");
-  RELEASE_ASSERT(fcntl(fd_, F_SETFL, flags | O_NONBLOCK) == 0, "fcntl F_SETFL failed.");
+  const Address::Instance& bound = *socket_->connectionInfoProvider().localAddress();
+  port_ = bound.ip()->port();
+  address_ = bound.ip()->addressAsString();
 
-  if (ipv6) {
-    struct sockaddr_in6 addr{};
-    addr.sin6_family = AF_INET6;
-    addr.sin6_addr = in6addr_loopback;
-    RELEASE_ASSERT(bind(fd_, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0,
-                   "Failed to bind IPv6 UDP socket.");
-
-    struct sockaddr_in6 bound{};
-    socklen_t len = sizeof(bound);
-    getsockname(fd_, reinterpret_cast<struct sockaddr*>(&bound), &len);
-    port_ = ntohs(bound.sin6_port);
-    address_ = "::1";
-  } else {
-    struct sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    RELEASE_ASSERT(bind(fd_, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0,
-                   "Failed to bind IPv4 UDP socket.");
-
-    struct sockaddr_in bound{};
-    socklen_t len = sizeof(bound);
-    getsockname(fd_, reinterpret_cast<struct sockaddr*>(&bound), &len);
-    port_ = ntohs(bound.sin_port);
-    address_ = "127.0.0.1";
-  }
+  socket_->ioHandle().initializeFileEvent(
+      dispatcher,
+      [this](uint32_t events) {
+        if (events & Event::FileReadyType::Read) {
+          onReadReady();
+        }
+        if (events & Event::FileReadyType::Write) {
+          tryFlushOutgoing();
+        }
+        return absl::OkStatus();
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 
-FakeUdpDnsServer::~FakeUdpDnsServer() {
-  stop();
-  if (fd_ >= 0) {
-    ::close(fd_);
-  }
-}
+FakeUdpDnsServer::~FakeUdpDnsServer() { socket_->ioHandle().resetFileEvents(); }
 
 void FakeUdpDnsServer::setDefaultAResponse(const std::string& ipv4_address, uint32_t ttl) {
   default_a_ = {ipv4_address, ttl, true};
@@ -67,45 +54,60 @@ void FakeUdpDnsServer::setDefaultAAAAResponse(const std::string& ipv6_address, u
   default_aaaa_ = {ipv6_address, ttl, true};
 }
 
-void FakeUdpDnsServer::start() {
-  RELEASE_ASSERT(!running_.load(), "FakeUdpDnsServer already running.");
-  running_.store(true);
-  thread_ = std::thread([this] { serve(); });
-}
+void FakeUdpDnsServer::onReadReady() {
+  IoHandle& io_handle = socket_->ioHandle();
+  const IoHandle::UdpSaveCmsgConfig save_cmsg_config;
+  uint32_t dropped_packets = 0;
+  uint8_t buf[kMaxDnsMessageSize];
 
-void FakeUdpDnsServer::stop() {
-  if (running_.exchange(false)) {
-    thread_.join();
+  // The event is edge triggered on most platforms, so keep reading until the
+  // socket queue is drained rather than handling a single query per event.
+  while (true) {
+    Buffer::RawSlice slice{buf, sizeof(buf)};
+    IoHandle::RecvMsgOutput output(/*num_packets_per_call=*/1, &dropped_packets);
+    const Api::IoCallUint64Result result =
+        io_handle.recvmsg(&slice, 1, port_, save_cmsg_config, output);
+    if (!result.ok()) {
+      // `Again` means the queue is empty. Any other error is not something a
+      // fake server can recover from, and the next event will retry anyway.
+      tryFlushOutgoing();
+      return;
+    }
+    if (result.return_value_ == 0) {
+      // Empty or truncated datagram; `recvmsg` consumed it, so keep draining.
+      continue;
+    }
+
+    queries_received_++;
+    auto response = buildResponse(buf, result.return_value_);
+
+    if (response.empty()) {
+      continue;
+    }
+
+    outgoing_.emplace_back(response, output.msg_[0].peer_address_);
+
+    // Try writing any outgoing messages to the socket.
+    tryFlushOutgoing();
   }
 }
 
-void FakeUdpDnsServer::serve() {
-  uint8_t buf[512];
-  struct sockaddr_storage client_addr{};
-  struct pollfd pfd{};
-  pfd.fd = fd_;
-  pfd.events = POLLIN;
+void FakeUdpDnsServer::tryFlushOutgoing() {
+  IoHandle& io_handle = socket_->ioHandle();
 
-  while (running_.load(std::memory_order_relaxed)) {
-    const int poll_ret = poll(&pfd, 1, /*timeout_ms=*/1);
-    if (poll_ret <= 0) {
-      continue;
+  while (!outgoing_.empty()) {
+    auto& next = outgoing_.front();
+
+    Buffer::RawSlice response_slice{next.first.data(), next.first.size()};
+    const Api::IoCallUint64Result send_result =
+        io_handle.sendmsg(&response_slice, 1, /*flags=*/0, /*self_ip=*/nullptr, *next.second);
+    if (send_result.wouldBlock()) {
+      return;
     }
 
-    socklen_t client_len = sizeof(client_addr);
-    const ssize_t n = recvfrom(fd_, buf, sizeof(buf), 0,
-                               reinterpret_cast<struct sockaddr*>(&client_addr), &client_len);
-    if (n <= 0) {
-      continue;
-    }
-
-    queries_received_.fetch_add(1, std::memory_order_relaxed);
-    const auto response = buildResponse(buf, static_cast<size_t>(n));
-    if (!response.empty()) {
-      sendto(fd_, response.data(), response.size(), 0,
-             reinterpret_cast<const struct sockaddr*>(&client_addr), client_len);
-      responses_sent_.fetch_add(1, std::memory_order_relaxed);
-    }
+    // Either the send succeeded or failed with an error we can't just retry on
+    // later. Either way remove the outgoing message from the queue.
+    outgoing_.pop_front();
   }
 }
 

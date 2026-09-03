@@ -1,26 +1,32 @@
 #pragma once
 
-#include <atomic>
 #include <cstdint>
 #include <string>
-#include <thread>
 #include <vector>
+
+#include "envoy/event/dispatcher.h"
+#include "envoy/network/socket.h"
 
 namespace Envoy {
 namespace Network {
 namespace Test {
 
-// Minimal threaded UDP DNS server for benchmarking and testing DNS resolvers.
+// Minimal UDP DNS server for benchmarking and testing DNS resolvers.
 // Responds to A/AAAA queries with configurable default addresses on loopback.
-// The server runs in a background thread and processes queries sequentially
-// via non-blocking I/O with poll().
+//
+// All of the server's I/O is driven by the dispatcher handed to the constructor:
+// queries are read and responses written from a read event, so the server only
+// makes progress while that dispatcher is running. Passing the same dispatcher
+// the resolver under test uses keeps both sides of the exchange on one event
+// loop and one thread.
 class FakeUdpDnsServer {
 public:
   static constexpr uint16_t kDnsTypeA = 1;
   static constexpr uint16_t kDnsTypeAAAA = 28;
 
-  // Binds a UDP socket to loopback on a random port. Use ipv6=true for [::1].
-  explicit FakeUdpDnsServer(bool ipv6 = false);
+  // Binds a UDP socket to loopback on a random port and starts listening for
+  // queries on `dispatcher`. Use ipv6=true for [::1].
+  explicit FakeUdpDnsServer(Event::Dispatcher& dispatcher, bool ipv6 = false);
   ~FakeUdpDnsServer();
 
   // Not copyable or movable.
@@ -33,23 +39,21 @@ public:
   // Set the default AAAA record returned for any AAAA query.
   void setDefaultAAAAResponse(const std::string& ipv6_address, uint32_t ttl = 300);
 
-  // Start/stop the server thread.
-  void start();
-  void stop();
-
   // Bound port (available immediately after construction).
   uint16_t port() const { return port_; }
 
   // Loopback address string matching the socket family.
   const std::string& address() const { return address_; }
 
-  // Counters (thread-safe, relaxed ordering).
-  uint64_t queriesReceived() const { return queries_received_.load(std::memory_order_relaxed); }
-  uint64_t responsesSent() const { return responses_sent_.load(std::memory_order_relaxed); }
+  // Counters. Updated on, and so only safe to read from, the dispatcher's thread.
+  uint64_t queriesReceived() const { return queries_received_; }
+  uint64_t responsesSent() const { return responses_sent_; }
 
 private:
-  // Background thread entry point.
-  void serve();
+  // Read event handler: answers every datagram queued on the socket.
+  void onReadReady();
+  // Write event handler: sends outgoing queued datagrams.
+  void tryFlushOutgoing();
 
   // Parse a DNS label-encoded name starting at offset. Advances offset past the name.
   static std::string parseDnsName(const uint8_t* data, size_t len, size_t& offset);
@@ -63,14 +67,13 @@ private:
     bool enabled{false};
   };
 
-  int fd_{-1};
+  SocketPtr socket_;
   uint16_t port_{0};
   std::string address_;
+  std::deque<std::pair<std::vector<uint8_t>, Address::InstanceConstSharedPtr>> outgoing_;
 
-  std::thread thread_;
-  std::atomic<bool> running_{false};
-  std::atomic<uint64_t> queries_received_{0};
-  std::atomic<uint64_t> responses_sent_{0};
+  uint64_t queries_received_{0};
+  uint64_t responses_sent_{0};
 
   DefaultRecord default_a_;
   DefaultRecord default_aaaa_;
