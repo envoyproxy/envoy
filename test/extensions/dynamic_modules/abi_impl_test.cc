@@ -1841,6 +1841,23 @@ WEAK_STUB(ClusterSpecifierSetRequestBodyBufferLimit,
 WEAK_STUB(ClusterSpecifierSetRouteActionOverride,
           envoy_dynamic_module_callback_cluster_specifier_set_route_action_override(nullptr,
                                                                                     {nullptr, 0}))
+WEAK_STUB(ClusterSpecifierSetRouteMetadataBool,
+          envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool(
+              nullptr, {nullptr, 0}, {nullptr, 0}, false))
+WEAK_STUB(ClusterSpecifierSetRouteMetadataNumber,
+          envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, 0))
+WEAK_STUB(ClusterSpecifierSetRouteMetadataString,
+          envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}))
+WEAK_STUB(ClusterSpecifierSetRouteMetadataStruct,
+          envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct(nullptr,
+                                                                                    {nullptr, 0},
+                                                                                    {nullptr, 0}))
+WEAK_STUB(ClusterSpecifierSetRouteTypedMetadata,
+          envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata(nullptr,
+                                                                                   {nullptr, 0},
+                                                                                   {nullptr, 0}))
 WEAK_STUB(ClusterSpecifierSetTimeout,
           envoy_dynamic_module_callback_cluster_specifier_set_timeout(nullptr, 0))
 WEAK_STUB(ClusterSpecifierConfigDefineCounter,
