@@ -59,6 +59,7 @@ envoy_cc_extension(
         "//source/common/common:logger_lib",
         "//source/common/formatter:stream_info_formatter_extension_lib",
         "//source/common/network:default_socket_interface_lib",
+        "//source/common/network:socket_interface_lib",
         "//source/common/network:socket_lib",
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",

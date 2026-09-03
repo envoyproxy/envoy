@@ -124,6 +124,11 @@ public:
   UpstreamSocketThreadLocal* getLocalRegistry() const;
 
   /**
+   * @return the thread-local socket manager for the upstream acceptor, or nullptr if unavailable.
+   */
+  static UpstreamSocketManager* getThreadLocalSocketManager();
+
+  /**
    * @return reference to the stat prefix string.
    */
   const std::string& statPrefix() const { return stat_prefix_; }

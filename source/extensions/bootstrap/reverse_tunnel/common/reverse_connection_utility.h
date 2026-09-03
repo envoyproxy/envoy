@@ -20,8 +20,6 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-class UpstreamSocketManager;
-
 class ReverseConnectionUtility : public Logger::Loggable<Logger::Id::connection> {
 public:
   static constexpr absl::string_view PING_MESSAGE = "RPING";
@@ -79,8 +77,6 @@ public:
   static std::pair<std::string, std::string> splitClusterScopedIdentifier(absl::string_view value);
 
   static void applySslQuietClose(Network::Connection& conn);
-
-  static UpstreamSocketManager* getThreadLocalSocketManager();
 
   /**
    * @param interval_ms the base interval in milliseconds.

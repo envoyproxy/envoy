@@ -174,8 +174,8 @@ bool ReverseTunnelFilterConfig::validateConnectionLimit(absl::string_view node_i
     return true;
   }
 
-  if (auto socket_manager =
-          Bootstrap::ReverseConnection::ReverseConnectionUtility::getThreadLocalSocketManager()) {
+  if (auto socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
+          getThreadLocalSocketManager()) {
     return socket_manager->canAcceptConnection(node_id, tenant_id);
   }
   ENVOY_LOG(warn,
@@ -463,8 +463,8 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
 
   // Get tenant isolation setting from socket manager (configured at bootstrap level).
   bool tenant_isolation_enabled = false;
-  if (auto* socket_manager =
-          Bootstrap::ReverseConnection::ReverseConnectionUtility::getThreadLocalSocketManager()) {
+  if (auto* socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
+          getThreadLocalSocketManager()) {
     tenant_isolation_enabled = socket_manager->tenantIsolationEnabled();
   }
 
@@ -644,7 +644,7 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   // Note: This is a global lookup that should be thread-safe but may return nullptr
   // if the socket interface isn't registered or we're in a test environment.
   auto* socket_manager =
-      Bootstrap::ReverseConnection::ReverseConnectionUtility::getThreadLocalSocketManager();
+      Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::getThreadLocalSocketManager();
   if (socket_manager == nullptr) {
     ENVOY_CONN_LOG(debug, "reverse_tunnel: socket manager not available, skipping socket reuse",
                    connection);

@@ -40,7 +40,7 @@ Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::close() {
   if (owned_socket_) {
     ENVOY_LOG(debug, "reverse_tunnel: releasing socket for cluster: {}", cluster_name_);
 
-    if (auto* socket_manager = ReverseConnectionUtility::getThreadLocalSocketManager()) {
+    if (auto* socket_manager = ReverseTunnelAcceptorExtension::getThreadLocalSocketManager()) {
       socket_manager->markSocketDead(fd_);
     }
 

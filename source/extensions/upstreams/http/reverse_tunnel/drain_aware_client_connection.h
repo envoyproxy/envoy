@@ -11,7 +11,7 @@
 #include "envoy/http/codec.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/drain_aware_http2_client_connection.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/drain_registry.h"
@@ -40,8 +40,8 @@ public:
   void onGoAway(Envoy::Http::GoAwayErrorCode error_code) override {
     ENVOY_LOG(debug, "reverse_tunnel upstream codec: observed peer GOAWAY (error_code={})",
               static_cast<int>(error_code));
-    if (auto* socket_manager =
-            Bootstrap::ReverseConnection::ReverseConnectionUtility::getThreadLocalSocketManager()) {
+    if (auto* socket_manager = Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension::
+            getThreadLocalSocketManager()) {
       socket_manager->onGoAway(fd_);
     }
     inner_.onGoAway(error_code);

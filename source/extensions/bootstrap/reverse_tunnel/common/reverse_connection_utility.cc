@@ -6,10 +6,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-#include "source/common/network/socket_interface.h"
 #include "source/common/tls/ssl_handshaker.h"
-#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
-#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 
 #include "absl/strings/str_cat.h"
 #include "openssl/ssl.h"
@@ -174,25 +171,6 @@ uint64_t ReverseConnectionUtility::diffMs(const Envoy::MonotonicTime& start,
   ASSERT(start <= end, "Invalid the start of the period must be before the end");
   auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
   return ms.count();
-}
-
-UpstreamSocketManager* ReverseConnectionUtility::getThreadLocalSocketManager() {
-  auto* base_interface =
-      Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
-  if (base_interface == nullptr) {
-    return nullptr;
-  }
-  const auto* acceptor =
-      dynamic_cast<const Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor*>(
-          base_interface);
-  if (acceptor == nullptr) {
-    return nullptr;
-  }
-  auto* tls_registry = acceptor->getLocalRegistry();
-  if (tls_registry == nullptr) {
-    return nullptr;
-  }
-  return tls_registry->socketManager();
 }
 
 } // namespace ReverseConnection

@@ -30,8 +30,6 @@ envoy_cc_extension(
     srcs = ["reverse_connection_utility.cc"],
     deps = [
         ":reverse_connection_utility_includes",
-        "//source/common/network:socket_interface_lib",
-        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_includes",
     ],
 )
 

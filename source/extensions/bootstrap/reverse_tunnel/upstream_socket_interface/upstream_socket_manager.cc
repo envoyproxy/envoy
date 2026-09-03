@@ -102,11 +102,15 @@ UpstreamSocketManager::pickLeastLoadedSocketManager(const std::string& node_id,
 
 void UpstreamSocketManager::onGoAway(int fd) {
   auto node_it = fd_to_node_map_.find(fd);
-  RELEASE_ASSERT(node_it != fd_to_node_map_.end(),
-                 fmt::format("fd {} not found in fd_to_node_map_", fd));
+  if (node_it == fd_to_node_map_.end()) {
+    ENVOY_LOG(warn, "reverse_tunnel: fd {} not found in fd_to_node_map_.", fd);
+    return;
+  }
   auto cluster_it = fd_to_cluster_map_.find(fd);
-  RELEASE_ASSERT(cluster_it != fd_to_cluster_map_.end(),
-                 fmt::format("fd {} not found in fd_to_cluster_map_", fd));
+  if (cluster_it == fd_to_cluster_map_.end()) {
+    ENVOY_LOG(warn, "reverse_tunnel: fd {} not found in fd_to_cluster_map_.", fd);
+    return;
+  }
 
   if (auto extension = getUpstreamExtension()) {
     extension->reportGoAway(node_it->second, cluster_it->second, fd);
