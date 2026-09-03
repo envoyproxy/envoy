@@ -1136,9 +1136,9 @@ envoy_cc_test(
     ],
     deps = envoy_select_enable_http3([
         ":http_protocol_integration_lib",
-        "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/tls:connection_info_impl_base_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ]),
 )
