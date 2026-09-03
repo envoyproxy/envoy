@@ -110,6 +110,12 @@ RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
 // drain sequence and notifies the connections of the covered listeners that a drain has begun,
 // instead of only stopping the listeners, and accepts `skip_exit` to drain without stopping them.
 RUNTIME_GUARD(envoy_reloadable_features_non_graceful_drain_notifies_connections);
+// When true, OAuth2 token cookies too large for a browser to store are split into several cookies.
+// A cookie that already fits is written exactly as before, so only sessions that were already
+// broken behave differently. Set this to false during a rolling upgrade if a client may reach an
+// instance that predates this change and so cannot rejoin the cookies. Rejoining and deleting
+// chunked cookies is always enabled, so the flag can be turned back off safely.
+RUNTIME_GUARD(envoy_reloadable_features_oauth2_chunk_large_token_cookies);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_client_retries_respect_user_retry_on);
 // OAuth2 filter cookie decryption: when true (the default), decrypt() accepts legacy CBC
 // ciphertexts via the legacy AES-256-CBC fallback. When false, only "gcm."-prefixed ciphertexts
