@@ -110,8 +110,8 @@ message SyslogAccessLogConfig {
   // 2. If ``cluster_name`` is set but ``unix_socket`` is not, ``cluster_name`` is used.
   config.core.v3.Pipe unix_socket = 1;
 
-  // Name of the cluster used to send syslog messages. The cluster must be defined in
-  // ``static_resources`` and cannot be added through CDS.
+  // Name of the cluster used to send syslog messages. The cluster must exist when the
+  // access logger is created.
   string cluster_name = 9 [(validate.rules).string = {min_len: 1 ignore_empty: true}];
 
   // Facility placed in the PRI header. Defaults to ``LOCAL7``.

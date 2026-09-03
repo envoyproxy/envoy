@@ -105,7 +105,7 @@ TEST_F(SyslogConfigTest, FactoryIgnoresClusterWhenUnixSocketIsConfigured) {
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   EXPECT_CALL(context.server_context_.cluster_manager_, checkActiveStaticCluster(testing::_))
       .Times(0);
-  EXPECT_CALL(context.server_context_.cluster_manager_, getActiveCluster(testing::_)).Times(0);
+  EXPECT_CALL(context.server_context_.cluster_manager_, hasCluster(testing::_)).Times(0);
 
   EXPECT_NE(nullptr,
             SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context).get());
@@ -176,23 +176,24 @@ TEST_F(SyslogConfigTest, FactoryRejectsUnknownCluster) {
   auto config = loadConfig(UdpClusterConfigYaml);
   config.set_cluster_name("unknown");
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-  EXPECT_CALL(context.server_context_.cluster_manager_, checkActiveStaticCluster("unknown"))
-      .WillOnce(Return(absl::InvalidArgumentError("unknown cluster")));
+  EXPECT_CALL(context.server_context_.cluster_manager_, hasCluster("unknown"))
+      .WillOnce(Return(false));
 
   EXPECT_THROW_WITH_MESSAGE(
       SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context), EnvoyException,
-      "syslog cluster 'unknown' must refer to an active static cluster: unknown cluster");
+      "syslog cluster 'unknown' does not exist");
 }
 
-TEST_F(SyslogConfigTest, FactoryRejectsInactiveCluster) {
+TEST_F(SyslogConfigTest, FactoryAcceptsWarmingCluster) {
   auto config = loadConfig(UdpClusterConfigYaml);
   testing::NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-  EXPECT_CALL(context.server_context_.cluster_manager_, checkActiveStaticCluster("syslog"))
-      .WillOnce(Return(absl::OkStatus()));
+  auto& cluster_manager = context.server_context_.cluster_manager_;
+  cluster_manager.initializeClusters({}, {"syslog"});
+  EXPECT_CALL(cluster_manager, checkActiveStaticCluster(testing::_)).Times(0);
+  EXPECT_CALL(cluster_manager, hasCluster("syslog"));
 
-  EXPECT_THROW_WITH_MESSAGE(
-      SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context), EnvoyException,
-      "cluster 'syslog' is not active");
+  EXPECT_NE(nullptr,
+            SyslogAccessLogFactory().createAccessLogInstance(config, nullptr, context).get());
 }
 
 } // namespace

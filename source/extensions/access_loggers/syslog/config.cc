@@ -62,19 +62,9 @@ AccessLog::InstanceSharedPtr SyslogAccessLogFactory::createAccessLogInstance(
     *address.mutable_pipe() = proto_config.unix_socket();
     destination = THROW_OR_RETURN_VALUE(Network::Address::resolveProtoAddress(address),
                                         Network::Address::InstanceConstSharedPtr);
-  } else {
-    const absl::Status status =
-        server_context.clusterManager().checkActiveStaticCluster(proto_config.cluster_name());
-    if (!status.ok()) {
-      throw EnvoyException(
-          fmt::format("syslog cluster '{}' must refer to an active static cluster: {}",
-                      proto_config.cluster_name(), status.message()));
-    }
-    const auto cluster =
-        server_context.clusterManager().getActiveCluster(proto_config.cluster_name());
-    if (!cluster.has_value()) {
-      throw EnvoyException(fmt::format("cluster '{}' is not active", proto_config.cluster_name()));
-    }
+  } else if (!server_context.clusterManager().hasCluster(proto_config.cluster_name())) {
+    throw EnvoyException(
+        fmt::format("syslog cluster '{}' does not exist", proto_config.cluster_name()));
   }
   auto shared_config = std::make_shared<SyslogAccessLogConfig>(proto_config);
 
