@@ -138,7 +138,7 @@ diff --git a/bazel/BUILD b/bazel/BUILD
  )
  
  config_setting(
-@@ -77,4 +124,15 @@ v8_lib_no_pointer_compression(
+@@ -77,4 +124,14 @@ v8_lib_no_pointer_compression(
      library = "@v8//:wee8",
  )
  
@@ -147,10 +147,9 @@ diff --git a/bazel/BUILD b/bazel/BUILD
 +    build_setting_default = "@envoy//bazel:crypto",
 +)
 +
-+# v8/wee8 engine source; the root module can point this at a prebuilt drop-in.
 +label_flag(
 +    name = "v8_engine",
-+    build_setting_default = ":wee8_no_pointer_compression",
++    build_setting_default = "@envoy//bazel:wee8_engine",
 +)
 +
  exports_files(["tsan_suppressions.txt"])

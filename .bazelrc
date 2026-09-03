@@ -92,12 +92,6 @@ build --define absl=1
 # Disable ICU linking for googleurl.
 build --@googleurl//build_config:system_icu=0
 
-# Source wee8 from the envoy_toolshed prebuilt; fall back to source for gcc
-# (libstdc++ ABI) and sanitizers (need instrumented deps).
-build --@proxy-wasm-cpp-host//bazel:v8_engine=@envoy_toolshed//v8:wee8
-build:gcc --@proxy-wasm-cpp-host//bazel:v8_engine=@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression
-build:sanitizer --@proxy-wasm-cpp-host//bazel:v8_engine=@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression
-
 # Test options
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 
