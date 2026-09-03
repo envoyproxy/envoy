@@ -2271,6 +2271,7 @@ envoy_cc_test(
         "//source/extensions/upstreams/http/tcp:config",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",
+        "//test/integration/filters:stop_in_headers_continue_in_data_filter_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/test_common:logging_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
