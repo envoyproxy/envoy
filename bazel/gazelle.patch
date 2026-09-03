@@ -1,0 +1,22 @@
+diff --git a/deps.bzl b/deps.bzl
+index 9724bae..2443df9 100644
+--- a/deps.bzl
++++ b/deps.bzl
+@@ -38,7 +38,16 @@ load(
+ )
+ 
+ # Re-export go_repository . Users should get it from this file.
+-go_repository = _go_repository
++#
++# Envoy: gazelle hardcodes @io_bazel_rules_go labels into the BUILD files it
++# generates for every go_repository. Since Envoy renames io_bazel_rules_go to
++# rules_go (see bazel/rules_go.patch), inject an equivalent repo_mapping
++# default here so transitive go_repository deps (e.g. those declared by
++# chrusty's protoc-gen-jsonschema deps.bzl) resolve correctly.
++def go_repository(name, **kwargs):
++    repo_mapping = dict(kwargs.pop("repo_mapping", {}))
++    repo_mapping.setdefault("@io_bazel_rules_go", "@rules_go")
++    _go_repository(name = name, repo_mapping = repo_mapping, **kwargs)
+ 
+ def gazelle_dependencies(
+         go_sdk = "",

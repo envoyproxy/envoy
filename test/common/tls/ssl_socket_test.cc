@@ -7558,6 +7558,37 @@ TEST_P(SslSocketTest, TestTransportSocketCallback) {
   EXPECT_EQ(ssl_socket->transportSocketCallbacks(), &callbacks);
 }
 
+TEST_P(SslSocketTest, AsyncCertSelectionCallbackWhenNotBlocked) {
+  // Make MockTransportSocketCallbacks.
+  Network::MockIoHandle io_handle;
+  NiceMock<Network::MockTransportSocketCallbacks> callbacks;
+  ON_CALL(callbacks, ioHandle()).WillByDefault(ReturnRef(io_handle));
+  NiceMock<Network::MockConnection> mock_connection;
+  ON_CALL(callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
+
+  // Make SslSocket.
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  ON_CALL(factory_context_.server_context_, localInfo()).WillByDefault(ReturnRef(local_info));
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  auto client_cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+
+  ContextManagerImpl manager(factory_context_.serverFactoryContext());
+  auto client_ssl_socket_factory = *ClientSslSocketFactory::create(
+      std::move(client_cfg), manager, *factory_context_.store_.rootScope());
+
+  Network::TransportSocketPtr transport_socket =
+      client_ssl_socket_factory->createTransportSocket(nullptr, nullptr);
+
+  SslSocket* ssl_socket = dynamic_cast<SslSocket*>(transport_socket.get());
+  ssl_socket->setTransportSocketCallbacks(callbacks);
+
+  // Call onAsynchronousCertificateSelectionComplete() when the handshake is NOT in
+  // HandshakeBlockedOnAsyncOperation state. This test prevents a regression where
+  // an ENVOY_BUG is thrown.
+  ssl_socket->onAsynchronousCertificateSelectionComplete();
+}
+
 class SslReadBufferLimitTest : public SslSocketTest {
 protected:
   void initialize() {

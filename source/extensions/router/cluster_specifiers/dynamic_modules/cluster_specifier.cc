@@ -6,11 +6,14 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/hash_policy.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/retry_policy_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,11 +48,17 @@ buildRouteActionOverride(const RouteActionOverrideProto& proto_override,
     RETURN_IF_NOT_OK_REF(policy_or_error.status());
     entry.shadow_policies.push_back(std::move(policy_or_error.value()));
   }
+  if (!proto_override.hash_policy().empty()) {
+    auto policy_or_error =
+        Http::HashPolicyImpl::create(proto_override.hash_policy(), context.regexEngine());
+    RETURN_IF_NOT_OK_REF(policy_or_error.status());
+    entry.hash_policy = std::move(policy_or_error.value());
+  }
   // Validate what was built rather than what was configured. A metadata_match without an envoy.lb
   // entry contributes nothing, so a populated looking configuration can still build an override
   // that replaces no property, which set_route_action_override would then accept as a decision.
   if (entry.retry_policy == nullptr && entry.metadata_match_criteria == nullptr &&
-      entry.shadow_policies.empty()) {
+      entry.shadow_policies.empty() && entry.hash_policy == nullptr) {
     return absl::InvalidArgumentError(
         "Route action override must replace at least one route action property");
   }
@@ -61,9 +70,12 @@ buildRouteActionOverride(const RouteActionOverrideProto& proto_override,
 DynamicModuleClusterSpecifierConfig::DynamicModuleClusterSpecifierConfig(
     absl::string_view specifier_name, absl::string_view specifier_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-    RouteActionOverrideMap route_action_overrides, Upstream::ClusterManager& cluster_manager)
-    : specifier_name_(specifier_name), specifier_config_(specifier_config),
-      dynamic_module_(std::move(dynamic_module)), cluster_manager_(cluster_manager),
+    RouteActionOverrideMap route_action_overrides, Upstream::ClusterManager& cluster_manager,
+    Stats::Scope& stats_scope, absl::string_view metrics_namespace)
+    : stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
+      stat_name_pool_(stats_scope_->symbolTable()), specifier_name_(specifier_name),
+      specifier_config_(specifier_config), dynamic_module_(std::move(dynamic_module)),
+      cluster_manager_(cluster_manager),
       route_action_overrides_(std::move(route_action_overrides)) {}
 
 DynamicModuleClusterSpecifierConfig::~DynamicModuleClusterSpecifierConfig() {
@@ -131,9 +143,22 @@ newDynamicModuleClusterSpecifierConfig(const DynamicModuleClusterSpecifierProto&
     route_action_overrides.emplace(name, std::move(entry_or_error.value()));
   }
 
+  const std::string metrics_namespace =
+      proto_config.dynamic_module_config().metrics_namespace().empty()
+          ? std::string(DefaultMetricsNamespace)
+          : proto_config.dynamic_module_config().metrics_namespace();
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+  }
+
   auto config = std::make_shared<DynamicModuleClusterSpecifierConfig>(
       proto_config.specifier_name(), specifier_config, std::move(dynamic_module),
-      std::move(route_action_overrides), context.clusterManager());
+      std::move(route_action_overrides), context.clusterManager(), context.serverScope(),
+      metrics_namespace);
   config->on_config_destroy_ = on_config_destroy.value();
   config->on_select_ = on_select.value();
 
@@ -148,6 +173,7 @@ newDynamicModuleClusterSpecifierConfig(const DynamicModuleClusterSpecifierProto&
     return absl::InvalidArgumentError(
         "Failed to initialize dynamic module cluster specifier config");
   }
+  config->stat_creation_frozen_.store(true, std::memory_order_release);
   return config;
 }
 
@@ -161,6 +187,36 @@ void DynamicModuleRouteEntry::refreshRouteCluster(const Http::RequestHeaderMap& 
   // The new selection replaces the previous one, so properties the module left unset on this call
   // fall back to the matched route.
   selection_ = std::move(context.selection);
+  // Layer the module metadata onto the matched route so both metadata accessors observe it. It is
+  // rebuilt from scratch here, so a decision that sets none drops what an earlier one set.
+  if (selection_.route_metadata.filter_metadata().empty() &&
+      selection_.route_metadata.typed_filter_metadata().empty()) {
+    active_metadata_pack_ = nullptr;
+  } else {
+    envoy::config::core::v3::Metadata merged = DelegatingRouteEntry::metadata();
+    // Merge per namespace so an entry replaces only its own key while the other keys of the matched
+    // route stay in effect. A top-level merge would replace the whole namespace instead.
+    for (const auto& [name, fields] : selection_.route_metadata.filter_metadata()) {
+      (*merged.mutable_filter_metadata())[name].MergeFrom(fields);
+    }
+    for (const auto& [name, typed] : selection_.route_metadata.typed_filter_metadata()) {
+      (*merged.mutable_typed_filter_metadata())[name] = typed;
+    }
+    // Building the pack runs the registered typed metadata factories, which can throw on
+    // module-supplied input, so fall back to the matched route rather than let it reach the worker.
+    TRY_NEEDS_AUDIT {
+      metadata_packs_.push_back(std::make_unique<Envoy::Router::RouteMetadataPack>(merged));
+      active_metadata_pack_ = metadata_packs_.back().get();
+    }
+    END_TRY
+    CATCH(const EnvoyException& e, {
+      ENVOY_LOG_EVERY_POW_2(warn,
+                            "dynamic module route metadata rejected by a typed metadata factory, "
+                            "using the matched route instead: {}",
+                            e.what());
+      active_metadata_pack_ = nullptr;
+    });
+  }
   ENVOY_LOG(debug, "dynamic module selected cluster '{}'", clusterName());
 }
 

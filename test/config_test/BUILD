@@ -2,7 +2,7 @@ load("@base_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
+    "envoy_cc_dyn_module_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -42,7 +42,7 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "config_test",
     size = "large",
     coverage = False,
@@ -63,7 +63,7 @@ envoy_cc_test_library(
     name = "config_test_lib",
     srcs = ["config_test.cc"],
     hdrs = ["config_test.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/protobuf:utility_lib",

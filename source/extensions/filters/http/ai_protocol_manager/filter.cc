@@ -7,6 +7,8 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -49,6 +51,23 @@ bool isJsonContentType(absl::string_view content_type) {
   const absl::string_view normalized = StringUtil::trim(StringUtil::cropRight(content_type, ";"));
   return absl::EqualsIgnoreCase(normalized, "application/json") ||
          absl::EndsWithIgnoreCase(normalized, "+json");
+}
+
+// Whether an unconfigured route's request can be held to end of stream.
+//
+// Holding the headers is only safe if the client finishes its request before it
+// wants a response. A full-duplex stream -- gRPC or Connect streaming, an
+// upgrade, CONNECT -- may instead wait on a response the held upstream cannot
+// produce, and stall until it times out.
+bool canHoldRequest(const Http::RequestHeaderMap& headers) {
+  if (Grpc::Common::isGrpcRequestHeaders(headers) ||
+      Grpc::Common::isConnectStreamingRequestHeaders(headers)) {
+    return false;
+  }
+  if (Http::Utility::isUpgrade(headers) || Http::HeaderUtility::isConnect(headers)) {
+    return false;
+  }
+  return isJsonContentType(headers.getContentTypeValue());
 }
 
 // Extraction requires an unencoded body: every entry and comma-separated
@@ -176,19 +195,13 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     }
   }
 
-  // A declared AI endpoint is parsed strictly. Any other route is parsed only
-  // if the filter opted into parsing unconfigured routes -- and only for JSON
-  // payloads: full-duplex protocols (gRPC streaming, upgrades) must not have
-  // their headers held to end of request, since the client may not finish the
-  // request until it sees a response the held upstream cannot produce.
+  // A declared AI endpoint is parsed strictly. Any other route is parsed only if
+  // the filter opted into parsing unconfigured routes, and only for a request
+  // that can be held to end of stream without stalling it.
   // TODO(penguingao): on a best-effort parse failure, release the held headers
   // and buffered body immediately and pass the remainder through unbuffered,
   // rather than buffering to end-of-stream.
-  if (!isAiEndpoint() &&
-      (!config_->parseUnconfiguredRoutes() || !isJsonContentType(headers.getContentTypeValue()))) {
-    // Nothing will look at this payload, so stay out of the way: offloading it
-    // would cost a store round-trip and withhold the headers meanwhile, for
-    // nothing. Decided once here; decode_manager_ being null carries it.
+  if (!isAiEndpoint() && (!config_->parseUnconfiguredRoutes() || !canHoldRequest(headers))) {
     ENVOY_LOG(trace, "ai_protocol_manager: route has no payload to inspect, passing through");
     return Http::FilterHeadersStatus::Continue;
   }

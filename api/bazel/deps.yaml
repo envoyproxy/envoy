@@ -8,23 +8,16 @@ bazel_skylib:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/bazel-skylib/blob/{version}/LICENSE"
 
-com_envoyproxy_protoc_gen_validate:
-  project_name: "protoc-gen-validate (PGV)"
-  project_desc: "protoc plugin to generate polyglot message validators"
-  project_url: "https://github.com/bufbuild/protoc-gen-validate"
-  release_date: "2026-02-18"
+cel-spec:
+  project_name: "CEL"
+  project_desc: "Common Expression Language -- specification and binary representation"
+  project_url: "https://github.com/google/cel-spec"
+  apparent_name: dev_cel
+  release_date: "2025-11-10"
   use_category:
   - api
-  implied_untracked_deps:
-  - com_github_iancoleman_strcase
-  - com_github_lyft_protoc_gen_star_v2
-  - com_github_spf13_afero
-  - org_golang_google_genproto
-  - org_golang_x_text
-  - org_golang_x_mod
-  - org_golang_x_sys
   license: "Apache-2.0"
-  license_url: "https://github.com/bufbuild/protoc-gen-validate/blob/v{version}/LICENSE"
+  license_url: "https://github.com/google/cel-spec/blob/v{version}/LICENSE"
 
 com_github_chrusty_protoc_gen_jsonschema:
   project_name: "protoc-gen-jsonschema"
@@ -36,21 +29,11 @@ com_github_chrusty_protoc_gen_jsonschema:
   license: "Apache-2.0"
   license_url: "https://github.com/norbjd/protoc-gen-jsonschema/blob/{version}/LICENSE"
 
-dev_cel:
-  project_name: "CEL"
-  project_desc: "Common Expression Language -- specification and binary representation"
-  project_url: "https://github.com/google/cel-spec"
-  release_date: "2025-11-10"
-  use_category:
-  - api
-  license: "Apache-2.0"
-  license_url: "https://github.com/google/cel-spec/blob/v{version}/LICENSE"
-
 envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-08-21"
+  release_date: "2026-09-02"
   use_category:
   - build
   - controlplane
@@ -67,32 +50,53 @@ googleapis:
   project_name: "Google APIs"
   project_desc: "Public interface definitions of Google APIs"
   project_url: "https://github.com/googleapis/googleapis"
+  apparent_name: com_google_googleapis
   release_date: "2024-09-16"
   use_category:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/googleapis/googleapis/blob/{version}/LICENSE"
 
-opentelemetry_proto:
+opentelemetry-proto:
   project_name: "OpenTelemetry Proto"
   project_desc: "Language Independent Interface Types For OpenTelemetry"
   project_url: "https://github.com/open-telemetry/opentelemetry-proto"
-  apparent_name: opentelemetry-proto
+  apparent_name: opentelemetry_proto
   release_date: "2026-07-21"
   use_category:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/open-telemetry/opentelemetry-proto/blob/v{version}/LICENSE"
 
-prometheus_metrics_model:
+prometheus-metrics-model:
   project_name: "Prometheus client model"
   project_desc: "Data model artifacts for Prometheus"
   project_url: "https://github.com/prometheus/client_model"
+  apparent_name: prometheus_metrics_model
   release_date: "2025-04-11"
   use_category:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/prometheus/client_model/blob/v{version}/LICENSE"
+
+protoc-gen-validate:
+  project_name: "protoc-gen-validate (PGV)"
+  project_desc: "protoc plugin to generate polyglot message validators"
+  project_url: "https://github.com/bufbuild/protoc-gen-validate"
+  apparent_name: com_envoyproxy_protoc_gen_validate
+  release_date: "2026-02-18"
+  use_category:
+  - api
+  implied_untracked_deps:
+  - com_github_iancoleman_strcase
+  - com_github_lyft_protoc_gen_star_v2
+  - com_github_spf13_afero
+  - org_golang_google_genproto
+  - org_golang_x_text
+  - org_golang_x_mod
+  - org_golang_x_sys
+  license: "Apache-2.0"
+  license_url: "https://github.com/bufbuild/protoc-gen-validate/blob/v{version}/LICENSE"
 
 rules_buf:
   project_name: "Bazel rules for Buf"
@@ -135,11 +139,11 @@ xds:
   license: "Apache-2.0"
   license_url: "https://github.com/cncf/xds/blob/{version}/LICENSE"
 
-zipkin_api:
+zipkin-api:
   project_name: "Zipkin API"
   project_desc: "Zipkin's language independent model and HTTP Api Definitions"
   project_url: "https://github.com/openzipkin/zipkin-api"
-  apparent_name: zipkin-api
+  apparent_name: zipkin_api
   release_date: "2020-11-22"
   use_category:
   - api

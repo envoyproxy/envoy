@@ -207,6 +207,22 @@ TEST_P(DynamicModuleClusterSpecifierIntegrationTest, SelectsCluster) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// The module defines metrics at configuration time and records them on each selection, so a
+// request that selects a cluster increments both the plain counter and the counter labeled with
+// the selected env.
+TEST_P(DynamicModuleClusterSpecifierIntegrationTest, RecordsSelectionMetrics) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(requestHeaders({{"env", "prod"}}));
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  test_server_->waitForCounter("dynamicmodulescustom.selections_total", testing::Ge(1));
+  test_server_->waitForCounter("dynamicmodulescustom.selections_by_env.env.prod", testing::Ge(1));
+}
+
 // Setting every property the module can select still routes the request.
 TEST_P(DynamicModuleClusterSpecifierIntegrationTest, SelectsClusterWithRouteActionOverride) {
   setupTest();
@@ -392,20 +408,54 @@ TEST_P(DynamicModuleClusterSpecifierIntegrationTest, NoOverrideDoesNotMirrorRequ
   EXPECT_EQ(0, test_server_->counter("cluster.mirror-cluster.upstream_rq_total")->value());
 }
 
+// The route metadata the module set is layered onto the matched route, so the METADATA(ROUTE)
+// formatter that a response header uses observes every metadata entry end to end.
+TEST_P(DynamicModuleClusterSpecifierIntegrationTest, ModuleRouteMetadataVisibleToFormatter) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        const auto add_header = [virtual_host](absl::string_view name, absl::string_view key) {
+          auto* header = virtual_host->add_response_headers_to_add()->mutable_header();
+          header->set_key(std::string(name));
+          header->set_value(absl::StrCat("%METADATA(ROUTE:envoy.test.route:", key, ")%"));
+        };
+        add_header("x-route-metadata-string", "string_key");
+        add_header("x-route-metadata-number", "number_key");
+        add_header("x-route-metadata-bool", "bool_key");
+        add_header("x-route-metadata-struct", "struct_key");
+      });
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response =
+      codec_client_->makeHeaderOnlyRequest(requestHeaders({{"env", "prod"},
+                                                           {"x-route-meta-string", "shard-a"},
+                                                           {"x-route-meta-number", "0.5"},
+                                                           {"x-route-meta-bool", "true"},
+                                                           {"x-route-meta-struct", "1"}}));
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  const auto header_value = [&response](absl::string_view name) -> std::string {
+    const auto values = response->headers().get(Http::LowerCaseString(name));
+    return values.empty() ? "" : std::string(values[0]->value().getStringView());
+  };
+  EXPECT_EQ("shard-a", header_value("x-route-metadata-string"));
+  EXPECT_EQ("0.5", header_value("x-route-metadata-number"));
+  EXPECT_EQ("true", header_value("x-route-metadata-bool"));
+  EXPECT_EQ("struct-val", header_value("x-route-metadata-struct"));
+}
+
 // Tests that drive the upstream response so that the properties the module selected are observable.
 class DynamicModuleClusterSpecifierUpstreamIntegrationTest
     : public DynamicModuleClusterSpecifierIntegrationTest {
 public:
   DynamicModuleClusterSpecifierUpstreamIntegrationTest() { autonomous_upstream_ = false; }
 
-  // Fails the pending upstream request and drops the connection, so that a retry arrives on a fresh
-  // connection rather than depending on how the pool reuses this one.
+  // Fails the pending upstream request by sending a 503.
   void failUpstreamRequest() {
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-    ASSERT_TRUE(fake_upstream_connection_->close());
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    fake_upstream_connection_.reset();
   }
 
   // Waits only for the upstream request headers, for the tests that leave the downstream request
@@ -437,7 +487,7 @@ TEST_P(DynamicModuleClusterSpecifierUpstreamIntegrationTest, OverrideRetriesRequ
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ(1, test_server_->counter("cluster.prod.upstream_rq_retry")->value());
+  test_server_->waitForCounter("cluster.prod.upstream_rq_retry", testing::Eq(1));
 }
 
 // A retry whose policy refreshes the cluster runs the module again, and the cluster it selects for

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <string>
 
+#include "envoy/common/platform.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/random_generator.h"
@@ -445,7 +447,7 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     // Found in idle pool — erase from list and clean up timers/events.
     ENVOY_LOG(debug, "reverse_tunnel: marking idle socket dead. node: {} cluster: {} fd: {}.",
               node_id, cluster_id, fd);
-    ::shutdown(fd, SHUT_RDWR);
+    ::shutdown(fd, ENVOY_SHUT_RDWR);
     accepted_reverse_connections_[node_id].erase(socket_it->second);
     fd_to_socket_it_map_.erase(socket_it);
 

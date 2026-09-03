@@ -24,6 +24,7 @@ envoy_cc_library(
     hdrs = ["connection.h"],
     deps = [
         ":address_interface",
+        ":drain_decision_interface",
         ":filter_interface",
         ":listen_socket_interface",
         "//envoy/buffer:buffer_interface",
@@ -120,6 +121,8 @@ envoy_cc_library(
     hdrs = ["drain_decision.h"],
     deps = [
         "//envoy/common:callback",
+        "//envoy/common:time_interface",
+        "//envoy/server:drain_strategy_interface",
         "@abseil-cpp//absl/base",
         "@abseil-cpp//absl/status",
     ],

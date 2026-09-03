@@ -18,6 +18,88 @@ licenses(["notice"])  # Apache 2
 
 package(default_visibility = ["//visibility:public"])
 
+# Platform-impl label_flags, allowing the impl libraries to be overridden
+# (e.g. via .bazelrc `--@quiche//:*_impl_lib=...`) without patching this file.
+label_flag(
+    name = "zlib",
+    build_setting_default = "@envoy//bazel:zlib",
+)
+
+label_flag(
+    name = "quic_base_impl_lib",
+    build_setting_default = "@envoy//source/common/quic/platform:quic_base_impl_lib",
+)
+
+label_flag(
+    name = "quiche_export_impl_lib",
+    build_setting_default = "@envoy//source/common/quic/platform:quiche_export_impl_lib",
+)
+
+label_flag(
+    name = "quiche_flags_impl_lib",
+    build_setting_default = "@envoy//source/common/quic/platform:quiche_flags_impl_lib",
+)
+
+label_flag(
+    name = "quiche_logging_impl_lib",
+    build_setting_default = "@envoy//source/common/quic/platform:quiche_logging_impl_lib",
+)
+
+label_flag(
+    name = "quiche_lower_case_string_impl_lib",
+    build_setting_default = "@envoy//source/common/quic/platform:quiche_lower_case_string_impl_lib",
+)
+
+label_flag(
+    name = "quiche_mem_slice_impl_lib",
+    build_setting_default = "@envoy//source/common/quic/platform:quiche_mem_slice_impl_lib",
+)
+
+label_flag(
+    name = "quiche_platform_iovec_impl_lib",
+    build_setting_default = "@envoy//source/common/quic/platform:quiche_platform_iovec_impl_lib",
+)
+
+label_flag(
+    name = "quiche_stack_trace_impl_lib",
+    build_setting_default = "@envoy//source/common/quic/platform:quiche_stack_trace_impl_lib",
+)
+
+label_flag(
+    name = "quiche_time_utils_impl_lib",
+    build_setting_default = "@envoy//source/common/quic/platform:quiche_time_utils_impl_lib",
+)
+
+label_flag(
+    name = "mobile_quiche_bug_tracker_impl_lib",
+    build_setting_default = "@envoy//source/common/quic/platform/mobile_impl:mobile_quiche_bug_tracker_impl_lib",
+)
+
+label_flag(
+    name = "quiche_expect_bug_impl_lib",
+    build_setting_default = "@envoy//test/common/quic/platform:quiche_expect_bug_impl_lib",
+)
+
+label_flag(
+    name = "quiche_test_impl_lib",
+    build_setting_default = "@envoy//test/common/quic/platform:quiche_test_impl_lib",
+)
+
+label_flag(
+    name = "quiche_test_helpers_impl_lib",
+    build_setting_default = "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
+)
+
+label_flag(
+    name = "quiche_test_output_impl_lib",
+    build_setting_default = "@envoy//test/common/quic/platform:quiche_test_output_impl_lib",
+)
+
+label_flag(
+    name = "quiche_thread_impl_lib",
+    build_setting_default = "@envoy//test/common/quic/platform:quiche_thread_impl_lib",
+)
+
 # QUICHE is Google's implementation of QUIC and related protocols. It is the
 # same code used in Chromium and Google's servers, but packaged in a form that
 # is intended to be easier to incorporate into third-party projects.
@@ -1308,6 +1390,7 @@ envoy_cc_library(
         ":quiche_common_callbacks",
         ":quiche_common_circular_deque_lib",
         ":quiche_common_platform",
+        "@abseil-cpp//absl/container:chunked_queue",
     ],
 )
 
@@ -1453,6 +1536,7 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
+        ":quic_base_impl_lib",
         ":quic_platform_bug_tracker",
         ":quic_platform_server_stats",
         ":quic_platform_stack_trace",
@@ -1462,7 +1546,6 @@ envoy_cc_library(
         ":quiche_common_platform_export",
         ":quiche_common_platform_server_stats",
         ":quiche_common_platform_testvalue",
-        "@envoy//source/common/quic/platform:quic_base_impl_lib",
     ],
 )
 
@@ -1579,7 +1662,7 @@ envoy_cc_test_library(
     deps = [
         ":quic_platform_base",
         ":quiche_common_platform_test",
-        "@envoy//test/common/quic/platform:quiche_test_impl_lib",
+        ":quiche_test_impl_lib",
     ],
 )
 
@@ -2341,7 +2424,7 @@ envoy_quic_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform",
         ":quiche_common_wire_serialization",
-        "@envoy//bazel:zlib",
+        ":zlib",
     ],
 )
 
@@ -2363,7 +2446,7 @@ envoy_quic_cc_library(
         ":quic_core_crypto_client_proof_source_lib",
         ":quic_core_crypto_crypto_handshake_lib",
         ":quiche_common_platform_client_stats",
-        "@envoy//bazel:zlib",
+        ":zlib",
     ],
 )
 
@@ -2384,7 +2467,7 @@ envoy_quic_cc_library(
         ":quic_core_proto_crypto_server_config_proto_header",
         ":quic_core_server_id_lib",
         ":quic_server_crypto_tls_handshake_lib",
-        "@envoy//bazel:zlib",
+        ":zlib",
     ],
 )
 
@@ -4558,7 +4641,7 @@ envoy_cc_library(
     deps = [
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_platform_iovec_impl_lib",
+        ":quiche_platform_iovec_impl_lib",
     ],
 )
 
@@ -4572,12 +4655,12 @@ envoy_cc_library(
         ":quiche_common_platform_export",
     ] + select({
         "@platforms//os:android": [
-            "@envoy//source/common/quic/platform/mobile_impl:mobile_quiche_bug_tracker_impl_lib",
+            ":mobile_quiche_bug_tracker_impl_lib",
         ],
         "@platforms//os:ios": [
-            "@envoy//source/common/quic/platform/mobile_impl:mobile_quiche_bug_tracker_impl_lib",
+            ":mobile_quiche_bug_tracker_impl_lib",
         ],
-        "//conditions:default": ["@envoy//source/common/quic/platform:quiche_logging_impl_lib"],
+        "//conditions:default": [":quiche_logging_impl_lib"],
     }),
 )
 
@@ -4596,7 +4679,7 @@ envoy_cc_library(
         "@platforms//os:ios": [
             ":quiche_common_mobile_quiche_logging_lib",
         ],
-        "//conditions:default": ["@envoy//source/common/quic/platform:quiche_logging_impl_lib"],
+        "//conditions:default": [":quiche_logging_impl_lib"],
     }),
 )
 
@@ -4640,7 +4723,7 @@ envoy_cc_test_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//test/common/quic/platform:quiche_thread_impl_lib",
+        ":quiche_thread_impl_lib",
     ],
 )
 
@@ -4652,7 +4735,7 @@ envoy_cc_test_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//test/common/quic/platform:quiche_test_output_impl_lib",
+        ":quiche_test_output_impl_lib",
     ],
 )
 
@@ -4664,7 +4747,7 @@ envoy_cc_test_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//test/common/quic/platform:quiche_expect_bug_impl_lib",
+        ":quiche_expect_bug_impl_lib",
     ],
 )
 
@@ -4707,7 +4790,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_export",
-        "@envoy//source/common/quic/platform:quiche_stack_trace_impl_lib",
+        ":quiche_stack_trace_impl_lib",
     ],
 )
 
@@ -4766,6 +4849,7 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
+        ":quic_base_impl_lib",
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_default_quiche_platform_impl_command_line_flags_impl_lib",
         ":quiche_common_platform_default_quiche_platform_impl_flag_utils_impl_lib",
@@ -4773,10 +4857,9 @@ envoy_cc_library(
         ":quiche_common_platform_default_quiche_platform_impl_testvalue_impl_lib",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
-        "@envoy//source/common/quic/platform:quic_base_impl_lib",
-        "@envoy//source/common/quic/platform:quiche_flags_impl_lib",
-        "@envoy//source/common/quic/platform:quiche_mem_slice_impl_lib",
-        "@envoy//source/common/quic/platform:quiche_time_utils_impl_lib",
+        ":quiche_flags_impl_lib",
+        ":quiche_mem_slice_impl_lib",
+        ":quiche_time_utils_impl_lib",
     ],
 )
 
@@ -4837,7 +4920,7 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
-        "@envoy//source/common/quic/platform:quiche_export_impl_lib",
+        ":quiche_export_impl_lib",
     ],
 )
 
@@ -4845,7 +4928,7 @@ envoy_cc_test_library(
     name = "quiche_common_platform_test",
     hdrs = ["quiche/common/platform/api/quiche_test.h"],
     repository = "@envoy",
-    deps = ["@envoy//test/common/quic/platform:quiche_test_impl_lib"],
+    deps = [":quiche_test_impl_lib"],
 )
 
 envoy_cc_library(
@@ -4870,9 +4953,9 @@ envoy_cc_test_library(
         ":quiche_common_platform_googleurl",
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_test",
+        ":quiche_test_helpers_impl_lib",
+        ":quiche_test_impl_lib",
         "@abseil-cpp//absl/status:status_matchers",
-        "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
-        "@envoy//test/common/quic/platform:quiche_test_impl_lib",
     ],
 )
 
@@ -5027,7 +5110,7 @@ envoy_cc_library(
     name = "quiche_common_platform_lower_case_string",
     hdrs = ["quiche/common/platform/api/quiche_lower_case_string.h"],
     repository = "@envoy",
-    deps = ["@envoy//source/common/quic/platform:quiche_lower_case_string_impl_lib"],
+    deps = [":quiche_lower_case_string_impl_lib"],
 )
 
 envoy_cc_library(
@@ -5174,7 +5257,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_balsa_balsa_frame_lib",
     srcs = ["quiche/balsa/balsa_frame.cc"],
-    hdrs = ["quiche/balsa/balsa_frame.h"],
+    hdrs = [
+        "quiche/balsa/balsa_frame.h",
+        "quiche/balsa/http_protocol_defects.h",
+    ],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [

@@ -19,7 +19,7 @@ envoy_cc_library(
         "listener_impl.h",
         "listener_manager_impl.h",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":active_raw_udp_listener_config",
         ":connection_handler_lib",
@@ -29,6 +29,7 @@ envoy_cc_library(
         "//envoy/access_log:access_log_interface",
         "//envoy/config:typed_metadata_interface",
         "//envoy/network:connection_interface",
+        "//envoy/network:drain_decision_interface",
         "//envoy/network:listener_interface",
         "//envoy/network:udp_packet_writer_factory_factory_interface",
         "//envoy/server:api_listener_interface",

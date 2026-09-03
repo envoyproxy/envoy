@@ -54,7 +54,7 @@ public:
 
   void setPressure(double pressure) { response_ = pressure; }
 
-  void setError() { response_ = EnvoyException("fake_error"); }
+  void setError() { response_ = absl::InternalError("fake_error"); }
 
   void setUpdateAsync(bool new_update_async) {
     callbacks_.reset();
@@ -84,13 +84,13 @@ private:
       usage.resource_pressure_ = absl::get<double>(response_);
       dispatcher_.post([&, usage]() { callbacks.onSuccess(usage); });
     } else {
-      EnvoyException& error = absl::get<EnvoyException>(response_);
+      absl::Status& error = absl::get<absl::Status>(response_);
       dispatcher_.post([&, error]() { callbacks.onFailure(error); });
     }
   }
 
   Event::Dispatcher& dispatcher_;
-  absl::variant<double, EnvoyException> response_;
+  absl::variant<double, absl::Status> response_;
   bool update_async_ = false;
   std::optional<std::reference_wrapper<ResourceUpdateCallbacks>> callbacks_;
 };
@@ -132,7 +132,7 @@ class FakeResourceMonitorFactory : public Server::Configuration::ResourceMonitor
 public:
   FakeResourceMonitorFactory(const std::string& name) : name_(name) {}
 
-  Server::ResourceMonitorPtr
+  absl::StatusOr<Server::ResourceMonitorPtr>
   createResourceMonitor(const Protobuf::Message&,
                         Server::Configuration::ResourceMonitorFactoryContext& context) override {
     auto monitor = std::make_unique<FakeResourceMonitor>(context.mainThreadDispatcher());
