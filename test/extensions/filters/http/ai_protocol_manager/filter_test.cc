@@ -1178,6 +1178,25 @@ TEST_F(AiProtocolManagerFilterTest, SetsContentLengthOnReplay) {
   EXPECT_EQ(request_headers_.getContentLengthValue(), absl::StrCat(injected_.length()));
 }
 
+// Content-Length header is not added if it was not previously present on request headers.
+TEST_F(AiProtocolManagerFilterTest, DoesNotSetContentLengthOnReplayWhenAbsent) {
+  setRouteConfig();
+  replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+  request_headers_ = Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/chat/completions"}, {"content-type", "application/json"}};
+  ASSERT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(request_headers_.ContentLength(), nullptr);
+
+  const std::string payload = R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(request_headers_.ContentLength(), nullptr);
+}
+
 // Malformed JSON is answered with a 400 and never reaches the upstream.
 TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJson) {
   setRouteConfig();

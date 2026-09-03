@@ -190,7 +190,11 @@ public:
   // (End-of-stream handling lives in the filter, not the manager, so the unit
   // tests just observe that the requested range was injected and done fired.)
   void replayAll() {
-    manager_->replay(0, manager_->length(), [this]() { replay_done_ = true; });
+    manager_->replay(0, manager_->length(), [this](absl::Status status) {
+      if (status.ok()) {
+        replay_done_ = true;
+      }
+    });
   }
 
   // Run all posted callbacks, including ones enqueued while draining.
@@ -381,9 +385,13 @@ TEST_F(BufferManagerTest, ReplaysSubRangesInSequence) {
 
   bool second_done = false;
   // Replay the first half, then chain the second half from its done callback.
-  manager_->replay(0, 5, [&]() {
+  manager_->replay(0, 5, [&](absl::Status status) {
+    ASSERT_OK(status);
     EXPECT_EQ(bridge_->injected_.toString(), "HELLO");
-    manager_->replay(5, 5, [&second_done]() { second_done = true; });
+    manager_->replay(5, 5, [&second_done](absl::Status status2) {
+      ASSERT_OK(status2);
+      second_done = true;
+    });
   });
 
   // First range was deferred (offload already durable).
@@ -428,7 +436,8 @@ TEST_F(BufferManagerTest, TerminalReplayDoneDetachesManagerSynchronously) {
   // The write is still in flight (posted) when replay() is requested, so replay
   // starts from the write completion during drain() and runs synchronously through
   // the in-memory store into this done callback.
-  manager_->replay(0, manager_->length(), [&]() {
+  manager_->replay(0, manager_->length(), [&](absl::Status status) {
+    ASSERT_OK(status);
     done_ran = true;
     injected = bridge_->injected_.toString();
     // Mirror the filter's teardown: detach on-stack, mid-read.
@@ -747,7 +756,10 @@ TEST_F(BufferManagerTest, ReplaysInMemoryDataVerbatim) {
 
   Buffer::OwnedImpl in_memory_data("{\"modified\":true}");
   bool in_mem_done = false;
-  manager_->replay(in_memory_data, [&in_mem_done]() { in_mem_done = true; });
+  manager_->replay(in_memory_data, [&in_mem_done](absl::Status status) {
+    ASSERT_OK(status);
+    in_mem_done = true;
+  });
 
   ASSERT_TRUE(replay_cb_->enabled());
   replay_cb_->invokeCallback();
@@ -769,7 +781,10 @@ TEST_F(BufferManagerTest, ReplaysInMemoryDataWithWatermarkBackpressure) {
   const std::string big_payload(200 * 1024, 'z'); // Multiple 64KB chunks
   Buffer::OwnedImpl in_memory_data(big_payload);
   bool in_mem_done = false;
-  manager_->replay(in_memory_data, [&in_mem_done]() { in_mem_done = true; });
+  manager_->replay(in_memory_data, [&in_mem_done](absl::Status status) {
+    ASSERT_OK(status);
+    in_mem_done = true;
+  });
 
   ASSERT_TRUE(replay_cb_->enabled());
   replay_cb_->invokeCallback();
@@ -820,7 +835,7 @@ TEST_F(BufferManagerTest, CancelReplayCancelsPendingExternalBufferReplay) {
 TEST_F(BufferManagerTest, CancelReplayCancelsPendingInMemoryReplay) {
   Buffer::OwnedImpl in_memory_data("{\"modified\":true}");
   bool in_mem_done = false;
-  manager_->replay(in_memory_data, [&in_mem_done]() { in_mem_done = true; });
+  manager_->replay(in_memory_data, [&in_mem_done](absl::Status) { in_mem_done = true; });
 
   ASSERT_TRUE(replay_cb_->enabled());
   manager_->cancelReplay();
@@ -836,7 +851,7 @@ TEST_F(BufferManagerTest, CancelReplayCancelsPendingInMemoryReplay) {
 TEST_F(BufferManagerTest, DestroyCancelsPendingInMemoryReplay) {
   Buffer::OwnedImpl in_memory_data("{\"modified\":true}");
   bool in_mem_done = false;
-  manager_->replay(in_memory_data, [&in_mem_done]() { in_mem_done = true; });
+  manager_->replay(in_memory_data, [&in_mem_done](absl::Status) { in_mem_done = true; });
 
   ASSERT_TRUE(replay_cb_->enabled());
   manager_->onDestroy();
@@ -857,10 +872,10 @@ TEST_F(BufferManagerTest, CancelReplayPermanentlyPreventsFurtherReplay) {
   manager_->cancelReplay();
 
   // Attempting to replay after cancelReplay triggers an assert in debug builds.
-  EXPECT_DEBUG_DEATH(manager_->replay(0, 5, []() {}), ".*");
+  EXPECT_DEBUG_DEATH(manager_->replay(0, 5, [](absl::Status) {}), ".*");
 
   Buffer::OwnedImpl in_mem("test");
-  EXPECT_DEBUG_DEATH(manager_->replay(in_mem, []() {}), ".*");
+  EXPECT_DEBUG_DEATH(manager_->replay(in_mem, [](absl::Status) {}), ".*");
 }
 
 } // namespace

@@ -62,9 +62,10 @@ protected:
   // avoid await_suspend as defense-in-depth without splitting state across tryImmediate.
   void onStart() override {
     if (is_in_memory_) {
-      buffer_manager_.replay(data_, [this]() { complete(absl::OkStatus()); });
+      buffer_manager_.replay(data_, [this](absl::Status status) { complete(std::move(status)); });
     } else {
-      buffer_manager_.replay(offset_, length_, [this]() { complete(absl::OkStatus()); });
+      buffer_manager_.replay(offset_, length_,
+                             [this](absl::Status status) { complete(std::move(status)); });
     }
   }
 

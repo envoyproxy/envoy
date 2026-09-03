@@ -68,7 +68,7 @@ void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback 
   if (replay_cancelled_ || replaying_ || replay_requested_) {
     IS_ENVOY_BUG("replay is in progress, or has been cancelled. currently only one pending replay "
                  "is supported. and if cancelReplay is called, no more replay is allowed.");
-    done();
+    done(absl::InternalError("replay is in progress, or has been cancelled"));
     return;
   }
   replay_source_ = ReplaySource::ExternalBuffer;
@@ -90,7 +90,13 @@ void BufferManager::replay(uint64_t offset, uint64_t length, ReplayDoneCallback 
 }
 
 void BufferManager::replay(Buffer::Instance& data, ReplayDoneCallback done) {
-  ASSERT(!replay_cancelled_ && !replaying_ && !replay_requested_);
+  // One replay at a time: the caller chains sub-ranges from the done callback.
+  if (replay_cancelled_ || replaying_ || replay_requested_) {
+    IS_ENVOY_BUG("replay is in progress, or has been cancelled. currently only one pending replay "
+                 "is supported. and if cancelReplay is called, no more replay is allowed.");
+    done(absl::InternalError("replay is in progress, or has been cancelled"));
+    return;
+  }
   replay_source_ = ReplaySource::InMemory;
   replay_in_memory_data_.move(data);
   replay_done_ = std::move(done);
@@ -362,7 +368,7 @@ void BufferManager::finishReplay() {
   ReplayDoneCallback done = std::move(replay_done_);
   replay_done_ = nullptr;
   if (done) {
-    done();
+    done(absl::OkStatus());
   }
 }
 

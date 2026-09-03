@@ -86,7 +86,7 @@ struct FilterManager::AsyncState : public std::enable_shared_from_this<FilterMan
           StreamInfo::FilterState::LifeSpan::Request);
     }
 
-    if (request_headers_ != nullptr) {
+    if (request_headers_ != nullptr && request_headers_->ContentLength() != nullptr) {
       request_headers_->setContentLength(serialized_offsets.total_size);
     }
 

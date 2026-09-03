@@ -13,6 +13,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
 
 #include "absl/functional/any_invocable.h"
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -20,9 +21,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// Invoked once a replay() range has been fully injected into the filter chain. The
+// Invoked once a replay() range has been fully injected into the filter chain (or on error). The
 // caller can start to stream further sub-ranges or to terminate the stream.
-using ReplayDoneCallback = absl::AnyInvocable<void()>;
+using ReplayDoneCallback = absl::AnyInvocable<void(absl::Status)>;
 
 // Replay-side flow-control sink. The BufferManager implements this so a
 // FilterChainBridge can forward the path-specific Envoy watermark callback

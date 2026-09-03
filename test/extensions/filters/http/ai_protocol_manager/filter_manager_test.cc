@@ -665,7 +665,8 @@ TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeadersAfterMutation) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-3.5"}});
 
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/chat/completions"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/chat/completions"}, {"content-length", "10"}};
 
   std::vector<AiFilterPtr> filters;
   filters.push_back(std::make_unique<TestMutationFilter>("gpt-4-turbo-extra-long"));
@@ -686,6 +687,30 @@ TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeadersAfterMutation) {
 
   std::string output = bridge_raw_->injected_.toString();
   EXPECT_EQ(headers.getContentLengthValue(), absl::StrCat(output.size()));
+}
+
+TEST_F(FilterManagerTest, DoesNotSetContentLengthWhenNotPreviouslyPresent) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/chat/completions"}};
+
+  std::vector<AiFilterPtr> filters;
+  FilterManager manager(std::move(filters), std::move(doc), &buffer_manager_, *dispatcher_,
+                        stream_info_, &headers);
+
+  absl::Status status;
+  bool completed = false;
+  manager.start([&status, &completed](absl::Status s) {
+    status = std::move(s);
+    completed = true;
+  });
+
+  drain();
+  EXPECT_TRUE(completed);
+  ASSERT_OK(status);
+
+  EXPECT_EQ(headers.ContentLength(), nullptr);
 }
 
 } // namespace

@@ -334,7 +334,16 @@ Http::FilterTrailersStatus AiProtocolManagerFilter::decodeTrailers(Http::Request
 
 void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
   decode_manager_->endStream();
-  auto on_complete = [this, has_trailers]() {
+  auto on_complete = [this, has_trailers](absl::Status status) {
+    if (!status.ok()) {
+      ENVOY_LOG(error, "ai_protocol_manager: replay failed: {}", status.message());
+      if (!payload_rejected_) {
+        payload_rejected_ = true;
+        decoder_callbacks_->sendLocalReply(Http::Code::BadGateway, status.message(), nullptr,
+                                           std::nullopt, "ai_protocol_manager_replay_error");
+      }
+      return;
+    }
     if (has_trailers) {
       // Body fully replayed; release the held trailers (they carry END_STREAM) so
       // they follow the body in order.
@@ -364,9 +373,7 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
                                              "ai_protocol_manager_filter_rejected");
         });
     filter_manager_->start([on_complete = std::move(on_complete)](absl::Status status) {
-      if (status.ok()) {
-        on_complete();
-      }
+      on_complete(std::move(status));
     });
   } else {
     decode_manager_->replay(0, decode_manager_->length(), std::move(on_complete));
