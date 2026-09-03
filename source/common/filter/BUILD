@@ -15,6 +15,7 @@ envoy_cc_library(
     deps = [
         "//envoy/config:subscription_interface",
         "//envoy/filter:config_provider_manager_interface",
+        "//envoy/server:filter_config_interface",
         "//envoy/singleton:instance_interface",
         "//envoy/stats:stats_macros",
         "//envoy/thread_local:thread_local_interface",

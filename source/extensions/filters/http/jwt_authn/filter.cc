@@ -55,6 +55,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   state_ = Calling;
   stopped_ = false;
 
+  // Sanitize before any bypass decision when the reloadable feature is enabled (default).
+  // Payload and claim headers are reserved for values this filter writes after verification;
+  // leaving client-supplied values in place on no-verifier paths (empty requires, per-route
+  // disabled, CORS preflight) would forward spoofed identity upstream.
+  config_->sanitizePayloadHeaders(headers);
+
   if (config_->bypassCorsPreflightRequest() && isCorsPreflightRequest(headers)) {
     // The CORS preflight doesn't include user credentials, bypass regardless of JWT requirements.
     // See http://www.w3.org/TR/cors/#cross-origin-request-with-preflight.

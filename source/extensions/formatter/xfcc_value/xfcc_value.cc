@@ -210,6 +210,26 @@ public:
     return result;
   }
 
+  bool formatTo(std::string& sink, const Envoy::Formatter::Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override {
+    const auto value = format(context, stream_info);
+    if (!value.has_value()) {
+      return false;
+    }
+    sink.append(*value);
+    return true;
+  }
+
+  void formatValueTo(Envoy::Formatter::ValueSink& sink, const Envoy::Formatter::Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override {
+    const auto value = format(context, stream_info);
+    if (!value.has_value()) {
+      // Keep the sink unmodified so the caller can decide how to handle the missing value.
+      return;
+    }
+    sink.addString(*value);
+  }
+
 private:
   Http::LowerCaseString key_;
 };

@@ -7558,6 +7558,37 @@ TEST_P(SslSocketTest, TestTransportSocketCallback) {
   EXPECT_EQ(ssl_socket->transportSocketCallbacks(), &callbacks);
 }
 
+TEST_P(SslSocketTest, AsyncCertSelectionCallbackWhenNotBlocked) {
+  // Make MockTransportSocketCallbacks.
+  Network::MockIoHandle io_handle;
+  NiceMock<Network::MockTransportSocketCallbacks> callbacks;
+  ON_CALL(callbacks, ioHandle()).WillByDefault(ReturnRef(io_handle));
+  NiceMock<Network::MockConnection> mock_connection;
+  ON_CALL(callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
+
+  // Make SslSocket.
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  ON_CALL(factory_context_.server_context_, localInfo()).WillByDefault(ReturnRef(local_info));
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  auto client_cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+
+  ContextManagerImpl manager(factory_context_.serverFactoryContext());
+  auto client_ssl_socket_factory = *ClientSslSocketFactory::create(
+      std::move(client_cfg), manager, *factory_context_.store_.rootScope());
+
+  Network::TransportSocketPtr transport_socket =
+      client_ssl_socket_factory->createTransportSocket(nullptr, nullptr);
+
+  SslSocket* ssl_socket = dynamic_cast<SslSocket*>(transport_socket.get());
+  ssl_socket->setTransportSocketCallbacks(callbacks);
+
+  // Call onAsynchronousCertificateSelectionComplete() when the handshake is NOT in
+  // HandshakeBlockedOnAsyncOperation state. This test prevents a regression where
+  // an ENVOY_BUG is thrown.
+  ssl_socket->onAsynchronousCertificateSelectionComplete();
+}
+
 class SslReadBufferLimitTest : public SslSocketTest {
 protected:
   void initialize() {
@@ -7692,7 +7723,16 @@ protected:
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     EXPECT_CALL(*read_filter_, onNewConnection());
-    EXPECT_CALL(*read_filter_, onData(_, _)).Times(testing::AnyNumber());
+    // The read buffer must be drained as it is delivered. Leaving it full keeps the server read
+    // buffer above its high watermark, which read disables the connection permanently: once
+    // read_disable_count_ is non-zero onReadReady() returns without calling doRead(), so the
+    // close below would never be observed and disconnect() would block forever.
+    EXPECT_CALL(*read_filter_, onData(_, _))
+        .Times(testing::AnyNumber())
+        .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+          data.drain(data.length());
+          return Network::FilterStatus::StopIteration;
+        }));
 
     std::string data_to_write(bytes_to_write, 'a');
     Buffer::OwnedImpl buffer_to_write(data_to_write);
@@ -7700,12 +7740,17 @@ protected:
     EXPECT_CALL(*client_write_buffer, move(_))
         .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                               Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove)));
+    // Two drains are expected: the first from the SSL write below, and the second from
+    // ConnectionImpl::closeSocket() in disconnect(). Only the first may exit the dispatcher.
+    // closeSocket() is reached synchronously from close(), so exiting on the second drain arms a
+    // loop exit while no loop is running, which then terminates disconnect()'s run before the
+    // server connection has observed the close.
     EXPECT_CALL(*client_write_buffer, drain(_))
-        .Times(2)
-        .WillRepeatedly(Invoke([&](uint64_t n) -> void {
+        .WillOnce(Invoke([&](uint64_t n) -> void {
           client_write_buffer->baseDrain(n);
           dispatcher_->exit();
-        }));
+        }))
+        .WillOnce(Invoke([&](uint64_t n) -> void { client_write_buffer->baseDrain(n); }));
     client_connection_->write(buffer_to_write, false);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_EQ(data_to_write, data_written);

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <format>
 #include <string>
 
 #include "envoy/network/connection.h"
@@ -40,7 +41,7 @@ ClientSslAuthConfig::ClientSslAuthConfig(
 
   if (!cm.clusters().hasCluster(remote_cluster_name_)) {
     throw EnvoyException(
-        fmt::format("unknown cluster '{}' in client ssl auth config", remote_cluster_name_));
+        std::format("unknown cluster '{}' in client ssl auth config", remote_cluster_name_));
   }
 
   AllowedPrincipalsSharedPtr empty(new AllowedPrincipals());
@@ -63,7 +64,7 @@ const AllowedPrincipals& ClientSslAuthConfig::allowedPrincipals() {
 }
 
 GlobalStats ClientSslAuthConfig::generateStats(Stats::Scope& scope, const std::string& prefix) {
-  std::string final_prefix = fmt::format("auth.clientssl.{}.", prefix);
+  std::string final_prefix = std::format("auth.clientssl.{}.", prefix);
   GlobalStats stats{ALL_CLIENT_SSL_AUTH_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                               POOL_GAUGE_PREFIX(scope, final_prefix))};
   return stats;

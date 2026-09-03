@@ -83,6 +83,8 @@ public:
       }
     }
   }
+  bool noTagExtraction() const override { return no_tag_extraction_; }
+  void markAsNoTagExtraction() override { no_tag_extraction_ = true; }
 
   TestUtil::TestSymbolTable symbol_table_; // Must outlive name_.
   MetricName name_;
@@ -120,6 +122,7 @@ private:
   std::string tag_extracted_name_;
   StatNamePool tag_pool_;
   std::unique_ptr<StatNameManagedStorage> tag_extracted_stat_name_;
+  bool no_tag_extraction_{false};
 };
 
 template <class BaseClass> class MockStatWithRefcount : public MockMetric<BaseClass> {
@@ -298,21 +301,23 @@ public:
   MockScope(StatName prefix, MockStore& store);
 
   ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name, TagStringViewSpan,
-                                           absl::string_view, bool evictable,
+                                           absl::string_view tagged_name, bool evictable,
                                            const ScopeStatsLimitSettings& limits,
                                            StatsMatcherSharedPtr) override {
     checkCreateScopeArgs(evictable, limits);
-    return ScopeSharedPtr(createScope_(std::string(base_name)));
+    return ScopeSharedPtr(createScope_(std::string(base_name), std::string(tagged_name)));
   }
-  ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan, StatName, bool evictable,
-                                     const ScopeStatsLimitSettings& limits,
+  ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan, StatName tagged_name,
+                                     bool evictable, const ScopeStatsLimitSettings& limits,
                                      StatsMatcherSharedPtr) override {
     checkCreateScopeArgs(evictable, limits);
-    return createScope_(symbolTable().toString(base_name));
+    return createScope_(symbolTable().toString(base_name),
+                        tagged_name.empty() ? std::string() : symbolTable().toString(tagged_name));
   }
 
   MOCK_METHOD(void, checkCreateScopeArgs, (bool, const ScopeStatsLimitSettings&));
-  MOCK_METHOD(ScopeSharedPtr, createScope_, (const std::string& name));
+  MOCK_METHOD(ScopeSharedPtr, createScope_,
+              (const std::string& base_name, const std::string& tagged_name));
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
   MOCK_METHOD(HistogramOptConstRef, findHistogram, (StatName), (const));

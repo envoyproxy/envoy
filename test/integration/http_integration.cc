@@ -511,6 +511,8 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
     RELEASE_ASSERT(result, result.message());
     result = fake_upstream_connection_->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection_->waitForNoPost();
+    RELEASE_ASSERT(result, result.message());
     fake_upstream_connection_.reset();
   }
   if (codec_client_) {

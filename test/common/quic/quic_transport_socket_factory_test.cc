@@ -170,7 +170,9 @@ enable_early_data:
       "QUIC early data is enabled but resumption is disabled. Early data requires resumption.");
 }
 
-TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthUnsupported) {
+// `require_client_certificate: true` with a trust anchor is accepted now that
+// QUIC mTLS is supported.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthSupported) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 downstream_tls_context:
   require_client_certificate: true
@@ -184,8 +186,131 @@ downstream_tls_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF");
-  EXPECT_THROW_WITH_MESSAGE(verifyQuicServerTransportSocketFactory(yaml, true), EnvoyException,
-                            "TLS Client Authentication is not supported over QUIC");
+  verifyQuicServerTransportSocketFactory(yaml, true);
+}
+
+// With the `quic_mtls_server_enabled` runtime guard disabled, a listener that requires a client
+// certificate is rejected to preserve the prior "not supported" behavior.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthRejectedWhenRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_mtls_server_enabled", "false"}});
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_THAT(
+      config_factory_.createTransportSocketFactory(proto_config, context_, {}).status().message(),
+      testing::HasSubstr("TLS Client Authentication is not supported over QUIC"));
+}
+
+// `requiresClientCertificate()` reflects the configured value, including the
+// default of `false` when the field is not set.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, RequiresClientCertificate) {
+  auto build = [&](const std::string& yaml) {
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+    return THROW_OR_RETURN_VALUE(
+        config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+        Network::DownstreamTransportSocketFactoryPtr);
+  };
+
+  auto factory_required = build(TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF"));
+  EXPECT_TRUE(static_cast<QuicServerTransportSocketFactory&>(*factory_required)
+                  .requiresClientCertificate());
+
+  auto factory_not_required = build(TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: false
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF"));
+  EXPECT_FALSE(static_cast<QuicServerTransportSocketFactory&>(*factory_not_required)
+                   .requiresClientCertificate());
+
+  auto factory_default = build(TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF"));
+  EXPECT_FALSE(
+      static_cast<QuicServerTransportSocketFactory&>(*factory_default).requiresClientCertificate());
+}
+
+// `require_client_certificate: true` without `validation_context.trusted_ca`
+// is rejected because the `SSL_CTX` would remain `SSL_VERIFY_NONE` and accept
+// any client certificate chain.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, RequireClientCertWithoutTrustedCa) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF");
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_THAT(
+      config_factory_.createTransportSocketFactory(proto_config, context_, {}).status().message(),
+      testing::HasSubstr("no validation_context.trusted_ca is configured"));
+}
+
+// `ACCEPT_UNTRUSTED` combined with `require_client_certificate: true` is
+// rejected because chain verification failures would be silently accepted.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, RequireClientCertWithAcceptUntrusted) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+      trust_chain_verification: ACCEPT_UNTRUSTED
+)EOF");
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_THAT(
+      config_factory_.createTransportSocketFactory(proto_config, context_, {}).status().message(),
+      testing::HasSubstr("trust_chain_verification is ACCEPT_UNTRUSTED"));
 }
 
 // QuicServerTransportSocketFactory implements DownstreamTransportSocketFactory

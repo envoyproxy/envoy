@@ -1,7 +1,8 @@
-load("@com_google_protobuf//bazel/private/oss/toolchains/prebuilt:protoc_toolchain.bzl", "prebuilt_protoc_repo")
-load("@com_google_protobuf//toolchain:platforms.bzl", "PROTOBUF_PLATFORMS")
 load("@envoy_repo//:compiler.bzl", "LLVM_LIB_DIR", "LLVM_PATH", "LLVM_VERSION_LOCAL", "USE_LIBSTDCPP", "USE_LOCAL_SYSROOT")
 load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
+load("@protobuf//bazel/private/oss/toolchains/prebuilt:protoc_toolchain.bzl", "prebuilt_protoc_repo")
+load("@protobuf//toolchain:platforms.bzl", "PROTOBUF_PLATFORMS")
+load("@rules_shell//shell:repositories.bzl", "rules_shell_dependencies", "rules_shell_toolchains")
 load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
 _LLVM_VERSION_HERMETIC = "22.1.8"
@@ -71,11 +72,6 @@ def envoy_toolchains():
         # NOTE: This MUST remain stable for Envoy CI to prevent redownload of the LLVM binaries due to
         #   mismatched OS data between cache/host/workers
         exec_os = None if LLVM_PATH else "linux",
-        extra_llvm_distributions = {
-            "LLVM-22.1.8-Linux-ARM64.tar.xz": "805efad2bb91cb4967fa569e0881d10c0f69c04461cf671cccbae19f547acc34",
-            "LLVM-22.1.8-Linux-X64.tar.xz": "df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384",
-            "LLVM-22.1.8-macOS-ARM64.tar.xz": "f260f4f7c0d430828a81ae8a3826a1d63fc0963ec2459489308cc23b1f7eab4f",
-        },
         cxx_cross_lib = {} if LLVM_PATH else {
             "linux-aarch64": "@libcxx_libs_aarch64",
             "linux-x86_64": "@libcxx_libs_x86_64",
@@ -101,4 +97,13 @@ def envoy_toolchains():
                 platform = platform,
             )
 
-    native.register_toolchains("@com_google_protobuf//bazel/private/oss/toolchains/prebuilt:all")
+    native.register_toolchains("@protobuf//bazel/private/oss/toolchains/prebuilt:all")
+    native.register_toolchains(
+        "@protobuf//bazel/private/oss/toolchains:cc_source_toolchain",
+        "@protobuf//bazel/private/oss/toolchains:python_source_toolchain",
+        "@protobuf//bazel/private/oss/toolchains:java_source_toolchain",
+        "@protobuf//bazel/private/oss/toolchains:javalite_source_toolchain",
+    )
+
+    rules_shell_dependencies()
+    rules_shell_toolchains()

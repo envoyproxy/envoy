@@ -363,6 +363,75 @@ TEST_F(PostgresFilterTest, QueryMessageMetadata) {
   ASSERT_THAT(filter_->getStats().statements_parsed_.value(), 1);
 }
 
+// Split Startup message must not leak partial bytes to the next filter.
+TEST_F(PostgresFilterTest, SplitStartupDoesNotLeak) {
+  Buffer::OwnedImpl startup;
+  createInitialPostgresRequest(startup);
+  const uint64_t total_len = startup.length();
+
+  // First segment: only the 4-byte length field.
+  data_.add(startup.linearize(4), 4);
+  ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+
+  // Nothing leaked to the next filter.
+  ASSERT_THAT(data_.length(), 0);
+  ASSERT_THAT(filter_->getStats().messages_frontend_.value(), 0);
+
+  // Second segment: the rest of the Startup message.
+  data_.add(static_cast<char*>(startup.linearize(total_len)) + 4, total_len - 4);
+  ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
+
+  ASSERT_THAT(static_cast<DecoderImpl*>(filter_->getDecoder())->state(),
+              DecoderImpl::State::InSyncState);
+}
+
+// Split SSLRequest must not leak partial bytes to the next filter.
+TEST_F(PostgresFilterTest, SplitSSLRequestDoesNotLeak) {
+  // First segment: only the 4-byte length field.
+  data_.writeBEInt<uint32_t>(8);
+  ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+
+  // Nothing leaked to the next filter.
+  ASSERT_THAT(data_.length(), 0);
+  ASSERT_THAT(filter_->getStats().messages_frontend_.value(), 0);
+
+  // Second segment: the SSL request code.
+  data_.writeBEInt<uint32_t>(80877103); // SSL code.
+  ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
+
+  ASSERT_THAT(filter_->getStats().messages_frontend_.value(), 1);
+}
+
+// Split Startup must not trigger upstream SSL negotiation until fully received.
+TEST_F(PostgresFilterTest, SplitStartupDelaysUpstreamSSLNegotiation) {
+  filter_->getConfig()->upstream_ssl_ =
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE;
+  EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+
+  Buffer::OwnedImpl startup;
+  createInitialPostgresRequest(startup);
+  const uint64_t total_len = startup.length();
+
+  // First segment: only the 4-byte length field.
+  data_.add(startup.linearize(4), 4);
+
+  // No SSLRequest must be sent upstream yet.
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, _)).Times(0);
+  ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+  ASSERT_THAT(data_.length(), 0);
+  testing::Mock::VerifyAndClearExpectations(&read_callbacks_);
+
+  // Second segment: the rest of the Startup message.
+  EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, _))
+      .WillOnce(Invoke([](Buffer::Instance& data, bool) {
+        ASSERT_EQ(8, data.length());
+        ASSERT_EQ(80877103, data.peekBEInt<uint32_t>(4)); // SSL code.
+      }));
+  data_.add(static_cast<char*>(startup.linearize(total_len)) + 4, total_len - 4);
+  ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+}
+
 // Test verifies that filter reacts to RequestSSL message.
 // It should reply with "S" message and OnData should return
 // Decoder::Stopped.

@@ -29,6 +29,8 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -179,7 +181,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 2);
 
   for (const auto& [stat_name, value] : stat_map) {
-    EXPECT_TRUE(stat_name.find("worker_0") != std::string::npos);
+    EXPECT_THAT(stat_name, HasSubstr("worker_0"));
   }
 
   extension_->updateConnectionStats("node1", "cluster1", true, false);

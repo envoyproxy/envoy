@@ -304,7 +304,7 @@ public:
    * @param stat_names the names to join.
    * @return Storage allocated for the joined name.
    */
-  StoragePtr join(const StatNameVec& stat_names) const;
+  StoragePtr join(absl::Span<const StatName> stat_names) const;
 
   /**
    * Populates a StatNameList from a list of encodings. This is not done at
@@ -777,6 +777,50 @@ public:
 
 private:
   SymbolTable& symbol_table_;
+};
+
+/**
+ * Joins a sequence of StatNames, owning any storage the join requires.
+ *
+ * When at most one of the names is non-empty the joined bytes are identical to that name, so no
+ * storage is allocated and statName() references the caller's name directly. Callers must
+ * therefore keep the joined names valid for the lifetime of this object.
+ *
+ * Movable but not copyable: the joined bytes live on the heap, so a move transfers ownership
+ * without invalidating statName(). Copying would mean duplicating that storage.
+ */
+class StatNameJoiner {
+public:
+  StatNameJoiner() = default;
+  StatNameJoiner(absl::Span<const StatName> stat_names, const SymbolTable& symbol_table) {
+    join(stat_names, symbol_table);
+  }
+  StatNameJoiner(StatNameJoiner&& other) noexcept
+      : storage_(std::move(other.storage_)), stat_name_(other.stat_name_) {
+    other.stat_name_ = StatName();
+  }
+  StatNameJoiner& operator=(StatNameJoiner&& other) noexcept {
+    if (this != &other) {
+      storage_ = std::move(other.storage_);
+      stat_name_ = other.stat_name_;
+      other.stat_name_ = StatName();
+    }
+    return *this;
+  }
+  StatNameJoiner(const StatNameJoiner&) = delete;
+  StatNameJoiner& operator=(const StatNameJoiner&) = delete;
+
+  /**
+   * Joins stat_names, replacing any previously joined value. stat_names is consumed here and never
+   * retained, so it is safe to pass a braced initializer list.
+   */
+  void join(absl::Span<const StatName> stat_names, const SymbolTable& symbol_table);
+
+  StatName statName() const { return stat_name_; }
+
+private:
+  SymbolTable::StoragePtr storage_;
+  StatName stat_name_;
 };
 
 /**
