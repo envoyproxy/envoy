@@ -44,6 +44,9 @@ envoy_extension_cc_test(
     srcs = ["open_telemetry_http_impl_test.cc"],
     extension_names = ["envoy.stat_sinks.open_telemetry"],
     deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/compression/gzip/decompressor:zlib_decompressor_impl_lib",
         "//source/extensions/stat_sinks/open_telemetry:open_telemetry_http_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
