@@ -31,8 +31,17 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
     Event::Dispatcher& dispatcher, Stats::Scope& scope,
+    Server::Configuration::ServerFactoryContext& context)
+    : GrpcAccessLoggerImpl(client, config, dispatcher, scope, context,
+                           ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{}) {}
+
+GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
+    const Grpc::RawAsyncClientSharedPtr& client,
+    const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
+        config,
+    Event::Dispatcher& dispatcher, Stats::Scope& scope,
     Server::Configuration::ServerFactoryContext& context,
-    OptRef<const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider> resource_provider)
+    const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider)
     : GrpcAccessLogger(
           config.common_config(), dispatcher, scope, std::nullopt,
           std::make_unique<Common::UnaryGrpcAccessLogClient<ExportLogsServiceRequest,

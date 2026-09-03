@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/optref.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 #include "envoy/formatter/http_formatter_context.h"
 #include "envoy/formatter/substitution_formatter.h"
@@ -117,7 +116,7 @@ opentelemetry::proto::logs::v1::ScopeLogs* initOtlpMessageRoot(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
     Server::Configuration::ServerFactoryContext& context,
-    OptRef<const Extensions::Tracers::OpenTelemetry::ResourceProvider> resource_provider = {});
+    const Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider);
 
 } // namespace OpenTelemetry
 } // namespace AccessLoggers

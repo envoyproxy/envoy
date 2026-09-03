@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
@@ -39,14 +38,22 @@ class GrpcAccessLoggerImpl
           Protobuf::Empty, opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
 public:
+  // Production constructor that delegates to the overload below with ResourceProviderImpl.
+  GrpcAccessLoggerImpl(
+      const Grpc::RawAsyncClientSharedPtr& client,
+      const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
+          config,
+      Event::Dispatcher& dispatcher, Stats::Scope& scope,
+      Server::Configuration::ServerFactoryContext& context);
+
+  // Constructor allowing injection of a custom ResourceProvider (e.g. for testing).
   GrpcAccessLoggerImpl(
       const Grpc::RawAsyncClientSharedPtr& client,
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
           config,
       Event::Dispatcher& dispatcher, Stats::Scope& scope,
       Server::Configuration::ServerFactoryContext& context,
-      OptRef<const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider>
-          resource_provider = {});
+      const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider);
 
 private:
   class OTelLogRequestCallbacks

@@ -462,7 +462,9 @@ TEST(OtlpLogUtilsTest, InitOtlpMessageRootWithBuiltinLabels) {
   ON_CALL(context.local_info_, clusterName()).WillByDefault(ReturnRef(kTestCluster));
   ON_CALL(context.local_info_, nodeName()).WillByDefault(ReturnRef(kTestNode));
 
-  auto* root = initOtlpMessageRoot(message, config, context);
+  auto* root =
+      initOtlpMessageRoot(message, config, context,
+                          ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{});
 
   ASSERT_NE(nullptr, root);
   ASSERT_EQ(1, message.resource_logs_size());
@@ -492,7 +494,9 @@ TEST(OtlpLogUtilsTest, InitOtlpMessageRootDisableBuiltinLabels) {
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  auto* root = initOtlpMessageRoot(message, config, context);
+  auto* root =
+      initOtlpMessageRoot(message, config, context,
+                          ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{});
 
   ASSERT_NE(nullptr, root);
   ASSERT_EQ(1, message.resource_logs_size());
@@ -512,7 +516,9 @@ TEST(OtlpLogUtilsTest, InitOtlpMessageRootWithResourceAttributes) {
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  auto* root = initOtlpMessageRoot(message, config, context);
+  auto* root =
+      initOtlpMessageRoot(message, config, context,
+                          ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{});
 
   ASSERT_NE(nullptr, root);
 

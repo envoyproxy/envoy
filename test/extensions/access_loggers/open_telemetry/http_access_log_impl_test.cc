@@ -52,8 +52,15 @@ public:
 
   void setupWithConfig(
       envoy::config::core::v3::HttpService http_service,
+      envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config) {
+    setupWithConfig(http_service, config,
+                    ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{});
+  }
+
+  void setupWithConfig(
+      envoy::config::core::v3::HttpService http_service,
       envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
-      OptRef<const Tracers::OpenTelemetry::ResourceProvider> resource_provider = {}) {
+      const Tracers::OpenTelemetry::ResourceProvider& resource_provider) {
     cluster_manager_.thread_local_cluster_.cluster_.info_->name_ = "my_o11y_backend";
     cluster_manager_.initializeThreadLocalClusters({"my_o11y_backend"});
     ON_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())

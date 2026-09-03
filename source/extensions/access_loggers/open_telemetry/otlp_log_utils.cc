@@ -194,7 +194,7 @@ opentelemetry::proto::logs::v1::ScopeLogs* initOtlpMessageRoot(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
     Server::Configuration::ServerFactoryContext& context,
-    OptRef<const Extensions::Tracers::OpenTelemetry::ResourceProvider> resource_provider) {
+    const Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider) {
   auto* resource_logs = message.add_resource_logs();
   auto* root = resource_logs->add_scope_logs();
   auto* resource = resource_logs->mutable_resource();
@@ -222,10 +222,8 @@ opentelemetry::proto::logs::v1::ScopeLogs* initOtlpMessageRoot(
     Extensions::Tracers::OpenTelemetry::ResourceProviderOptions options;
     options.set_service_name_resource_attribute = false;
     options.set_telemetry_sdk_resource_attributes = false;
-    Extensions::Tracers::OpenTelemetry::ResourceProviderImpl default_provider;
-    const auto& provider = resource_provider.value_or(default_provider);
     Extensions::Tracers::OpenTelemetry::Resource detected_resource =
-        provider.getResource(config.resource_detectors(), context, "", options);
+        resource_provider.getResource(config.resource_detectors(), context, "", options);
     if (!detected_resource.schema_url_.empty()) {
       resource_logs->set_schema_url(detected_resource.schema_url_);
     }

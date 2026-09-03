@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/common/optref.h"
 #include "envoy/config/core/v3/http_service.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
@@ -43,6 +42,16 @@ namespace OpenTelemetry {
 class HttpAccessLoggerImpl : public Logger::Loggable<Logger::Id::misc>,
                              public Http::AsyncClient::Callbacks {
 public:
+  // Production constructor that delegates to the overload below with ResourceProviderImpl.
+  HttpAccessLoggerImpl(
+      Upstream::ClusterManager& cluster_manager,
+      const envoy::config::core::v3::HttpService& http_service,
+      std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator,
+      const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
+          config,
+      Event::Dispatcher& dispatcher, Server::Configuration::ServerFactoryContext& server_context);
+
+  // Constructor allowing injection of a custom ResourceProvider (e.g. for testing).
   HttpAccessLoggerImpl(
       Upstream::ClusterManager& cluster_manager,
       const envoy::config::core::v3::HttpService& http_service,
@@ -50,8 +59,7 @@ public:
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
           config,
       Event::Dispatcher& dispatcher, Server::Configuration::ServerFactoryContext& server_context,
-      OptRef<const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider>
-          resource_provider = {});
+      const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider);
 
   using SharedPtr = std::shared_ptr<HttpAccessLoggerImpl>;
 
@@ -98,13 +106,20 @@ class HttpAccessLoggerCacheImpl : public Singleton::Instance,
 public:
   HttpAccessLoggerCacheImpl(Server::Configuration::ServerFactoryContext& server_context);
 
+  // Production method that delegates to the overload below with ResourceProviderImpl.
+  HttpAccessLoggerImpl::SharedPtr getOrCreateLogger(
+      const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
+          config,
+      const envoy::config::core::v3::HttpService& http_service,
+      std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator);
+
+  // Method allowing injection of a custom ResourceProvider (e.g. for testing).
   HttpAccessLoggerImpl::SharedPtr getOrCreateLogger(
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
           config,
       const envoy::config::core::v3::HttpService& http_service,
       std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator,
-      OptRef<const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider>
-          resource_provider = {});
+      const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider);
 
   std::shared_ptr<const Http::HttpServiceHeadersApplicator>
   getOrCreateApplicator(const envoy::config::core::v3::HttpService& http_service,

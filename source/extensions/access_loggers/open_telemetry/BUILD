@@ -14,7 +14,6 @@ envoy_cc_library(
     srcs = ["otlp_log_utils.cc"],
     hdrs = ["otlp_log_utils.h"],
     deps = [
-        "//envoy/common:optref_lib",
         "//envoy/formatter:http_formatter_context_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/local_info:local_info_interface",
@@ -47,7 +46,6 @@ envoy_cc_library(
     hdrs = ["grpc_access_log_impl.h"],
     deps = [
         ":otlp_log_utils_lib",
-        "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/local_info:local_info_interface",
@@ -96,7 +94,6 @@ envoy_cc_library(
         ":otlp_log_utils_lib",
         ":substitution_formatter_lib",
         "//envoy/access_log:access_log_interface",
-        "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/singleton:instance_interface",
