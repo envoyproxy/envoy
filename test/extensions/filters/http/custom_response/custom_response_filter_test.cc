@@ -71,10 +71,94 @@ TEST_F(CustomResponseFilterTest, LocalData) {
   ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
             ::Envoy::Http::FilterHeadersStatus::Continue);
+  // Default policy clears response_code_details (legacy behavior).
+  encoder_callbacks_.stream_info_.response_code_details_ = "csrf_origin_mismatch";
   EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(static_cast<::Envoy::Http::Code>(499), "not allowed", _, _, _));
+              sendLocalReply(static_cast<::Envoy::Http::Code>(499), "not allowed", _, _, ""));
   ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
       .WillByDefault(Return(&request_headers));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+TEST_F(CustomResponseFilterTest, ExistingLocalReplyBodyWithFormatter) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          body_format:
+            text_format_source:
+              inline_string: "%LOCAL_REPLY_BODY%"
+)EOF");
+  setupFilterAndCallback();
+
+  const ::Envoy::Http::StreamFilterBase::LocalReplyData local_reply_data{
+      ::Envoy::Http::Code::Unauthorized, std::nullopt, "details", false, "original body"};
+  EXPECT_EQ(filter_->onLocalReply(local_reply_data), ::Envoy::Http::LocalErrorStatus::Continue);
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::Unauthorized, "original body", _, _, _));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+TEST_F(CustomResponseFilterTest, ConfiguredBodyTakesPrecedenceOverExistingLocalReplyBody) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          body:
+            inline_string: "configured body"
+          body_format:
+            text_format_source:
+              inline_string: "[%LOCAL_REPLY_BODY%]"
+)EOF");
+  setupFilterAndCallback();
+
+  const ::Envoy::Http::StreamFilterBase::LocalReplyData local_reply_data{
+      ::Envoy::Http::Code::Unauthorized, std::nullopt, "details", false, "original body"};
+  EXPECT_EQ(filter_->onLocalReply(local_reply_data), ::Envoy::Http::LocalErrorStatus::Continue);
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::Unauthorized, "[configured body]", _, _, _));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+TEST_F(CustomResponseFilterTest, EmptyPolicyKeepsEmptyBody) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+)EOF");
+  setupFilterAndCallback();
+
+  const ::Envoy::Http::StreamFilterBase::LocalReplyData local_reply_data{
+      ::Envoy::Http::Code::Unauthorized, std::nullopt, "details", false, "original body"};
+  EXPECT_EQ(filter_->onLocalReply(local_reply_data), ::Envoy::Http::LocalErrorStatus::Continue);
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::Unauthorized, "", _, _, _));
   EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
             ::Envoy::Http::FilterHeadersStatus::StopIteration);
 }
@@ -117,6 +201,139 @@ TEST_F(CustomResponseFilterTest, MatchNotFound) {
             ::Envoy::Http::FilterHeadersStatus::Continue);
   EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
             ::Envoy::Http::FilterHeadersStatus::Continue);
+}
+
+// Matcher selecting a local response policy based on a request header value.
+constexpr absl::string_view kRequestHeaderMatchConfig = R"EOF(
+  custom_response_matcher:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: accept_header
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: accept
+            value_match:
+              exact: "application/json"
+        on_match:
+          action:
+            name: json_action
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+              status_code: 498
+              body:
+                inline_string: "json error"
+)EOF";
+
+// A custom response policy is selected when the request header matches.
+TEST_F(CustomResponseFilterTest, MatchRequestHeader) {
+  createConfig(kRequestHeaderMatchConfig);
+  setupFilterAndCallback();
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/json"}};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(static_cast<::Envoy::Http::Code>(498), "json error", _, _, _));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+// No custom response policy is selected when the request header does not match;
+// the original response is passed through unchanged.
+TEST_F(CustomResponseFilterTest, RequestHeaderDoesNotMatch) {
+  createConfig(kRequestHeaderMatchConfig);
+  setupFilterAndCallback();
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"accept", "text/html"}};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ("500", response_headers.getStatusValue());
+}
+
+// When request headers are not available (stream_info.getRequestHeaders() is nullptr), a matcher
+// that relies on a request header input must not match (and must not crash); the original response
+// is passed through unchanged.
+TEST_F(CustomResponseFilterTest, NoRequestHeaders) {
+  createConfig(kRequestHeaderMatchConfig);
+  setupFilterAndCallback();
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/json"}};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  // Deliberately do not set ON_CALL for getRequestHeaders(); the NiceMock default returns nullptr,
+  // exercising the request-headers-absent branch in FilterConfig::getPolicy.
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ("500", response_headers.getStatusValue());
+}
+
+// Matcher selecting a redirect policy based on a request header value.
+constexpr absl::string_view kRequestHeaderRedirectConfig = R"EOF(
+  custom_response_matcher:
+    matcher_list:
+      matchers:
+      - predicate:
+          single_predicate:
+            input:
+              name: accept_header
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: accept
+            value_match:
+              exact: "application/json"
+        on_match:
+          action:
+            name: redirect_action
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
+              status_code: 299
+              uri: "https://foo.example/gateway_error"
+)EOF";
+
+// A redirect policy is selected (recreating the stream) when the request header matches.
+TEST_F(CustomResponseFilterTest, MatchRequestHeaderRedirect) {
+  createConfig(kRequestHeaderRedirectConfig);
+  setupFilterAndCallback();
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/json"}};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+// The redirect policy is not selected (no stream recreation) when the request header does not
+// match; the original response is passed through unchanged.
+TEST_F(CustomResponseFilterTest, RequestHeaderRedirectNoMatch) {
+  createConfig(kRequestHeaderRedirectConfig);
+  setupFilterAndCallback();
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"accept", "text/html"}};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ("503", response_headers.getStatusValue());
 }
 
 TEST_F(CustomResponseFilterTest, DontChangeStatusCode) {
@@ -277,6 +494,116 @@ TEST_F(CustomResponseFilterTest, PathRewriteInvalid) {
             path_rewrite: "/new/%INVALID_COMMAND_WITH_NO_CLOSING"
 )EOF"),
                           EnvoyException, "Failed to create path_rewrite formatter");
+}
+
+TEST_F(CustomResponseFilterTest, PreserveResponseCodeDetails) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          status_code: 403
+          body:
+            inline_string: "forbidden"
+          preserve_response_code_details: true
+)EOF");
+  setupFilterAndCallback();
+
+  encoder_callbacks_.stream_info_.response_code_details_ = "csrf_origin_mismatch";
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(static_cast<::Envoy::Http::Code>(403), "forbidden",
+                                                 _, _, "csrf_origin_mismatch"));
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+TEST_F(CustomResponseFilterTest, PreserveResponseCodeDetailsWhenAbsent) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          status_code: 403
+          body:
+            inline_string: "forbidden"
+          preserve_response_code_details: true
+)EOF");
+  setupFilterAndCallback();
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(static_cast<::Envoy::Http::Code>(403), "forbidden", _, _, ""));
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+TEST_F(CustomResponseFilterTest, ExplicitResponseCodeDetails) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          status_code: 403
+          body:
+            inline_string: "forbidden"
+          response_code_details: "custom_error_page"
+)EOF");
+  setupFilterAndCallback();
+
+  encoder_callbacks_.stream_info_.response_code_details_ = "csrf_origin_mismatch";
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(static_cast<::Envoy::Http::Code>(403), "forbidden",
+                                                 _, _, "custom_error_page"));
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+TEST_F(CustomResponseFilterTest, UnsetResponseCodeDetailsActionClears) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          status_code: 403
+          body:
+            inline_string: "forbidden"
+)EOF");
+  setupFilterAndCallback();
+
+  encoder_callbacks_.stream_info_.response_code_details_ = "csrf_origin_mismatch";
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(static_cast<::Envoy::Http::Code>(403), "forbidden", _, _, ""));
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
 }
 
 } // namespace

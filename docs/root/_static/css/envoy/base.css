@@ -1,0 +1,111 @@
+/* Base — reset, page shell, and the RTD layout rules we take over. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+  scroll-padding-top: calc(var(--envoy-topbar-height) + 24px);
+}
+
+html[data-envoy-theme="dark"] {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-envoy-theme="light"]) {
+    color-scheme: dark;
+  }
+}
+
+body,
+body.wy-body-for-nav {
+  background: var(--envoy-ground);
+  color: var(--envoy-ink-body);
+  font-family: var(--envoy-font-sans);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* the focus ring is interaction, so it takes the accent like every link */
+:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--envoy-accent);
+  outline-offset: 2px;
+}
+
+.envoy-visually-hidden {
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.envoy-skip-link {
+  background: var(--envoy-ink);
+  color: var(--envoy-ground);
+  font-size: 14px;
+  font-weight: 600;
+  left: 0;
+  padding: 10px 16px;
+  position: fixed;
+  text-decoration: none;
+  top: -60px;
+  z-index: 1200;
+}
+
+.envoy-skip-link:focus {
+  color: var(--envoy-ground);
+  top: 0;
+}
+
+/* --- shell ---------------------------------------------------------------
+
+   sphinx_rtd_theme pins .wy-grid-for-nav to the viewport and scrolls the
+   content wrapper. We let the window scroll instead, so the page TOC can be
+   position: sticky and the topbar can be position: fixed.
+   ------------------------------------------------------------------------- */
+
+.wy-grid-for-nav {
+  height: auto;
+  position: static;
+}
+
+.wy-nav-top {
+  display: none;
+}
+
+.wy-nav-content-wrap {
+  background: var(--envoy-ground);
+  margin-left: var(--envoy-sidebar-width);
+  min-height: 100vh;
+  padding-top: var(--envoy-topbar-height);
+}
+
+.wy-nav-content {
+  background: var(--envoy-ground);
+  height: auto;
+  margin: 0;
+  max-width: none;
+  padding: 0;
+}
+
+/* the read-the-docs version flyout is not part of this build */
+.rst-versions {
+  display: none !important;
+}

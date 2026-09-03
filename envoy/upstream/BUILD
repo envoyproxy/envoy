@@ -65,6 +65,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "admin_endpoint_provider_interface",
+    hdrs = ["admin_endpoint_provider.h"],
+    deps = [
+        "//envoy/common:pure_lib",
+        "//envoy/network:address_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "host_description_interface",
     hdrs = ["host_description.h"],
     deps = [

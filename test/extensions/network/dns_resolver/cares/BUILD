@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "dns_impl_test",
     srcs = ["dns_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     # TODO(envoyproxy/windows-dev): Under winsock2 this is behaving unusually for windows, even as
     # 127.0.0.1 and ::1 are explicitly added to `c:\windows\system32\drivers\etc\hosts` ... see:
     # https://gist.github.com/wrowe/24fe5b93b58bb444bce7ecc134905395
@@ -34,6 +34,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -48,5 +49,6 @@ envoy_cc_test(
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/network/dns_resolver/cares:config",
         "//test/integration:http_integration_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )

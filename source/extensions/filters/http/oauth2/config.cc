@@ -127,20 +127,24 @@ createFilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Con
   auto secret_reader = std::make_shared<SDSSecretReader>(
       std::move(secret_provider_client_secret), std::move(secret_provider_hmac_secret),
       server_context.threadLocal(), server_context.api());
-  return std::make_shared<FilterConfig>(proto_config, server_context, secret_reader, scope,
-                                        stats_prefix);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<FilterConfig>(proto_config, server_context, secret_reader,
+                                                      scope, stats_prefix, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return filter_config;
 }
 } // namespace
 
-absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.serverFactoryContext();
-  auto& cluster_manager = context.serverFactoryContext().clusterManager();
+absl::StatusOr<Http::FilterFactoryCb>
+OAuth2Config::createFilterFactory(const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
+                                  const std::string& stats_prefix,
+                                  Server::Configuration::ServerFactoryContext& context,
+                                  Stats::Scope& scope, OptRef<Init::Manager> init_manager) {
+  auto& cluster_manager = context.clusterManager();
   FilterConfigSharedPtr config = nullptr;
   if (proto.has_config()) {
-    auto config_or_error = createFilterConfig(proto.config(), server_context, context.initManager(),
-                                              context.scope(), stats_prefix);
+    auto config_or_error =
+        createFilterConfig(proto.config(), context, init_manager, scope, stats_prefix);
     if (!config_or_error.ok()) {
       return config_or_error.status();
     }
@@ -161,17 +165,27 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
               return std::make_shared<OAuth2CookieValidator>(
                   time_source, active_config.cookieNames(), active_config.cookieDomain());
             },
-            context.serverFactoryContext().timeSource(),
-            context.serverFactoryContext().api().randomGenerator()));
+            context.timeSource(), context.api().randomGenerator()));
       };
 }
 
+absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  return createFilterFactory(proto, extra_context.stats_prefix, context,
+                             extra_context.scopeOr(context), extra_context.init_manager);
+}
+
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-OAuth2Config::createRouteSpecificFilterConfigTyped(
+OAuth2Config::createHttpFilterRouteConfigTyped(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute& proto,
-    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  // The init manager of the enclosing route configuration, if any, is used to warm up the SDS
+  // secrets that the route level configuration references.
   auto config_or_error =
-      createFilterConfig(proto.config(), context, std::nullopt, context.scope(), "");
+      createFilterConfig(proto.config(), context, extra_context.init_manager, context.scope(), "");
   if (!config_or_error.ok()) {
     return config_or_error.status();
   }

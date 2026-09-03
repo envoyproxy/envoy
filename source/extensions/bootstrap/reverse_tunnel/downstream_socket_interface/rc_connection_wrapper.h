@@ -100,6 +100,12 @@ public:
    */
   explicit SimpleConnReadFilter(void* parent) : parent_(parent) {}
 
+  /**
+   * Clear the back-pointer to the owning wrapper. Called from RCConnectionWrapper::shutdown()
+   * so a late onData() after teardown cannot dispatch into a destroyed / half-destroyed codec.
+   */
+  void clearParent() { parent_ = nullptr; }
+
   // Network::ReadFilter overrides
   Network::FilterStatus onData(Buffer::Instance& buffer, bool end_stream) override;
 
@@ -160,16 +166,19 @@ public:
    * @param src_tenant_id the tenant identifier
    * @param src_cluster_id the cluster identifier
    * @param src_node_id the node identifier
+   * @param initiation_time_ms epoch millis to advertise as the tunnel's initiation time; when
+   *        absent, the current system time is used.
    * @return the local address as string
    */
   std::string connect(const std::string& src_tenant_id, const std::string& src_cluster_id,
-                      const std::string& src_node_id);
+                      const std::string& src_node_id,
+                      std::optional<int64_t> initiation_time_ms = std::nullopt);
 
   /**
    * Release ownership of the connection.
    * @return the connection pointer (ownership transferred to caller)
    */
-  Network::ClientConnectionPtr releaseConnection() { return std::move(connection_); }
+  Network::ClientConnectionPtr releaseConnection();
 
   /**
    * Process HTTP response from upstream.
@@ -244,6 +253,7 @@ private:
   std::unique_ptr<Http::Http1::ClientConnectionImpl> http1_client_codec_;
   // Base interface pointer used to call dispatch via public API.
   Http::Connection* http1_parse_connection_{nullptr};
+  std::shared_ptr<SimpleConnReadFilter> read_filter_{std::make_shared<SimpleConnReadFilter>(this)};
 };
 
 } // namespace ReverseConnection

@@ -1,9 +1,15 @@
 #include "source/common/version/version.h"
 
+#include "test/test_common/struct_matchers.h"
+
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/crypto.h"
+
+using testing::Contains;
+using testing::HasSubstr;
+using testing::IsSupersetOf;
 
 namespace Envoy {
 
@@ -30,19 +36,20 @@ TEST(VersionTest, BuildVersion) {
                     fields.at(BuildVersionMetadataKeys::get().BuildLabel).string_value());
   }
   EXPECT_EQ(BUILD_VERSION_NUMBER, version_string);
-  EXPECT_EQ(VersionInfo::revision(),
-            fields.at(BuildVersionMetadataKeys::get().RevisionSHA).string_value());
-  EXPECT_EQ(VersionInfo::revisionStatus(),
-            fields.at(BuildVersionMetadataKeys::get().RevisionStatus).string_value());
-  EXPECT_EQ(VersionInfoTestPeer::buildType(),
-            fields.at(BuildVersionMetadataKeys::get().BuildType).string_value());
+  EXPECT_THAT(fields, IsSupersetOf(StructMatchers(
+                          IsStructString(BuildVersionMetadataKeys::get().RevisionSHA,
+                                         VersionInfo::revision()),
+                          IsStructString(BuildVersionMetadataKeys::get().RevisionStatus,
+                                         VersionInfo::revisionStatus()),
+                          IsStructString(BuildVersionMetadataKeys::get().BuildType,
+                                         VersionInfoTestPeer::buildType()))));
   if (FIPS_mode() == 1) {
     EXPECT_TRUE(VersionInfoTestPeer::sslFipsCompliant());
   } else {
     EXPECT_FALSE(VersionInfoTestPeer::sslFipsCompliant());
   }
-  EXPECT_EQ(VersionInfoTestPeer::sslVersion(),
-            fields.at(BuildVersionMetadataKeys::get().SslVersion).string_value());
+  EXPECT_THAT(fields, Contains(IsStructString(BuildVersionMetadataKeys::get().SslVersion,
+                                              VersionInfoTestPeer::sslVersion())));
 }
 
 TEST(VersionTest, MakeBuildVersionWithLabel) {
@@ -57,7 +64,8 @@ TEST(VersionTest, MakeBuildVersionWithLabel) {
   } else {
     EXPECT_FALSE(VersionInfoTestPeer::sslFipsCompliant());
   }
-  EXPECT_EQ("foo-bar", fields.at(BuildVersionMetadataKeys::get().BuildLabel).string_value());
+  EXPECT_THAT(fields,
+              Contains(IsStructString(BuildVersionMetadataKeys::get().BuildLabel, "foo-bar")));
 }
 
 TEST(VersionTest, MakeBuildVersionWithoutLabel) {
@@ -66,7 +74,7 @@ TEST(VersionTest, MakeBuildVersionWithoutLabel) {
   EXPECT_EQ(2, build_version.version().minor_number());
   EXPECT_EQ(3, build_version.version().patch());
   const auto& fields = build_version.metadata().fields();
-  EXPECT_EQ(fields.find(BuildVersionMetadataKeys::get().BuildLabel), fields.end());
+  EXPECT_FALSE(fields.contains(BuildVersionMetadataKeys::get().BuildLabel));
   // Other metadata should still be present
   EXPECT_GE(fields.size(), 1);
 }
@@ -77,14 +85,14 @@ TEST(VersionTest, MakeBadBuildVersion) {
   EXPECT_EQ(0, build_version.version().minor_number());
   EXPECT_EQ(0, build_version.version().patch());
   const auto& fields = build_version.metadata().fields();
-  EXPECT_EQ(fields.find(BuildVersionMetadataKeys::get().BuildLabel), fields.end());
+  EXPECT_FALSE(fields.contains(BuildVersionMetadataKeys::get().BuildLabel));
   // Other metadata should still be present
   EXPECT_GE(fields.size(), 1);
 }
 
 TEST(VersionTest, VersionSuffixDefault) {
   const std::string& version = VersionInfo::version();
-  EXPECT_THAT(version, testing::HasSubstr(std::string("/") + BUILD_VERSION_NUMBER + "/"));
+  EXPECT_THAT(version, HasSubstr(std::string("/") + BUILD_VERSION_NUMBER + "/"));
 }
 
 } // namespace Envoy

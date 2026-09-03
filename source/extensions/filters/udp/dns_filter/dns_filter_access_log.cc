@@ -37,6 +37,26 @@ public:
     return str.has_value() ? ValueUtil::stringValue(str.value()) : ValueUtil::nullValue();
   }
 
+  bool formatTo(std::string& sink, const Formatter::Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override {
+    const auto str = field_extractor_(context, stream_info);
+    if (!str.has_value()) {
+      return false;
+    }
+    sink.append(*str);
+    return true;
+  }
+
+  void formatValueTo(Formatter::ValueSink& sink, const Formatter::Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override {
+    const auto str = field_extractor_(context, stream_info);
+    if (!str.has_value()) {
+      // Keep the sink unmodified so the caller can decide how to handle the missing value.
+      return;
+    }
+    sink.addString(*str);
+  }
+
 private:
   const FieldExtractor field_extractor_;
 };
@@ -89,7 +109,7 @@ public:
     const auto& provider_table = providerFuncTable();
     const auto func_it = provider_table.find(std::string(command));
     if (func_it == provider_table.end()) {
-      return nullptr;
+      return absl::InvalidArgumentError(absl::StrCat("Invalid format substitution: ", command));
     }
     return func_it->second(command_arg, max_length);
   }

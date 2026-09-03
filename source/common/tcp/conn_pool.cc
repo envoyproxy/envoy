@@ -22,6 +22,12 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
       parent_.dispatcher(), parent_.socketOptions(), parent_.transportSocketOptions());
   real_host_description_ = data.host_description_;
   connection_ = std::move(data.connection_);
+  // The connection can be null if it could not be created, e.g. when binding to a configured
+  // network namespace fails. Leave this client in a half-constructed state; instantiateActiveClient
+  // checks for a null connection and discards it, surfacing a graceful connection failure.
+  if (connection_ == nullptr) {
+    return;
+  }
   connection_->addConnectionCallbacks(*this);
   read_filter_handle_ = std::make_shared<ConnReadFilter>(*this);
   connection_->addReadFilter(read_filter_handle_);
@@ -176,8 +182,14 @@ ConnPoolImpl::newPendingStream(Envoy::ConnectionPool::AttachContext& context,
 }
 
 Envoy::ConnectionPool::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
-  return std::make_unique<ActiveTcpClient>(*this, Envoy::ConnectionPool::ConnPoolImplBase::host(),
-                                           1, idle_timeout_);
+  auto client = std::make_unique<ActiveTcpClient>(
+      *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), 1, idle_timeout_);
+  // The underlying connection could not be created (e.g. network namespace binding failure).
+  // Return null so the pool surfaces this as a connection failure instead of using a broken client.
+  if (client->connection_ == nullptr) {
+    return nullptr;
+  }
+  return client;
 }
 
 void ConnPoolImpl::onPoolReady(Envoy::ConnectionPool::ActiveClient& client,

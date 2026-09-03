@@ -269,7 +269,7 @@ public:
   virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
 
   /**
-   * @return ProtobufMessage::ValidationVistior& validation visitor for configuration
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration
    *         messages.
    */
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;

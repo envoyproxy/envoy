@@ -2,7 +2,6 @@
 
 #include "envoy/common/time.h"
 #include "envoy/stats/histogram.h"
-#include "envoy/stats/stats.h"
 #include "envoy/stats/timespan.h"
 
 namespace Envoy {

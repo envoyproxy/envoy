@@ -154,5 +154,27 @@ Protobuf::Value CoalesceFormatter::formatValue(const Context& context,
   return SubstitutionFormatUtils::unspecifiedValue();
 }
 
+bool CoalesceFormatter::formatTo(std::string& sink, const Context& context,
+                                 const StreamInfo::StreamInfo& stream_info) const {
+  auto result = format(context, stream_info);
+  if (!result.has_value()) {
+    return false;
+  }
+  sink.append(result.value());
+  return true;
+}
+
+void CoalesceFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                      const StreamInfo::StreamInfo& stream_info) const {
+  auto result = formatValue(context, stream_info);
+  if (result.kind_case() == Protobuf::Value::KIND_NOT_SET ||
+      result.kind_case() == Protobuf::Value::kNullValue) {
+    // Keep the sink unmodified if no value is extracted and the caller can decide how to handle the
+    // missing value.
+    return;
+  }
+  sink.addValue(result);
+}
+
 } // namespace Formatter
 } // namespace Envoy

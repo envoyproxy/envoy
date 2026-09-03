@@ -16,7 +16,7 @@
 {{ msg.anchor | rst_anchor }}
 
 {{ msg.field_name }}
-  ({{ pretty_label_names[msg.field.label] }}{{ msg.comment }}{% if msg.field_annotations %}, {{ msg.field_annotations }}{% endif %}) {{ msg.formatted_leading_comment | indent(2)}}
+  ({% if not msg.is_map %}{{ pretty_label_names[msg.field.label] }}{% endif %}{{ msg.comment }}{% if msg.field_annotations %}, {{ msg.field_annotations }}{% endif %}) {{ msg.formatted_leading_comment | indent(2)}}
 {%- if msg.formatted_oneof_comment %}
   {{ msg.formatted_oneof_comment | indent(2) }}
 {%- endif %}

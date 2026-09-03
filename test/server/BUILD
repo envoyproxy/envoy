@@ -19,7 +19,7 @@ envoy_package()
 envoy_cc_test(
     name = "api_listener_test",
     srcs = ["api_listener_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":utility_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -39,7 +39,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "backtrace_test",
     srcs = ["backtrace_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["backtrace"],
     deps = [
         "//source/server:backtrace_lib",
@@ -53,7 +53,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
@@ -72,6 +72,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -82,7 +83,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "connection_handler_test",
     srcs = ["connection_handler_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
@@ -96,6 +97,7 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -106,7 +108,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "active_tcp_listener_test",
     srcs = ["active_tcp_listener_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
@@ -117,13 +119,14 @@ envoy_cc_test(
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
 envoy_cc_test(
     name = "active_udp_listener_test",
     srcs = ["active_udp_listener_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
@@ -138,7 +141,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "drain_manager_impl_test",
     srcs = ["drain_manager_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/server:drain_manager_lib",
         "//test/mocks/event:event_mocks",
@@ -150,11 +153,12 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_config_test",
     srcs = ["filter_config_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
@@ -169,7 +173,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "hot_restart_impl_test",
     srcs = envoy_select_hot_restart(["hot_restart_impl_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":hot_restart_udp_forwarding_test_helper",
         ":utility_lib",
@@ -185,7 +189,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hot_restarting_child_test",
     srcs = envoy_select_hot_restart(["hot_restarting_child_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":hot_restart_udp_forwarding_test_helper",
         ":utility_lib",
@@ -203,21 +207,26 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hot_restarting_parent_test",
     srcs = envoy_select_hot_restart(["hot_restarting_parent_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":utility_lib",
+        "//source/common/stats:allocator_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/stats:tag_producer_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restarting_child",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 
 envoy_cc_test(
     name = "hot_restarting_base_test",
     srcs = envoy_select_hot_restart(["hot_restarting_base_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/server:hot_restart_lib",
         "//source/server:hot_restarting_base",
@@ -231,7 +240,7 @@ envoy_cc_test(
     name = "guarddog_impl_test",
     size = "small",
     srcs = ["guarddog_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":guarddog_test_interlock",
         "//envoy/common:time_interface",
@@ -261,7 +270,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "options_impl_test",
     srcs = ["options_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/server:filter_config_interface",
@@ -286,7 +295,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cgroup_cpu_util_test",
     srcs = ["cgroup_cpu_util_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/filesystem:filesystem_lib",
         "//source/server:cgroup_cpu_util_lib",
@@ -313,7 +322,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "overload_manager_impl_test",
     srcs = ["overload_manager_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/stats:isolated_store_lib",
@@ -335,7 +344,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "null_overload_manager_test",
     srcs = ["null_overload_manager_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/server:null_overload_manager_lib",
         "//source/server:overload_manager_lib",
@@ -389,9 +398,13 @@ envoy_cc_test(
         ":server_test_data",
         ":static_validation_test_data",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:notification_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:allocator_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/clusters/dns:dns_cluster_lib",
@@ -410,6 +423,7 @@ envoy_cc_test(
         "//test/config:v2_link_hacks",
         "//test/integration:integration_lib",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/config:config_mocks",
         "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/server:bootstrap_extension_factory_mocks",
         "//test/mocks/server:fatal_action_factory_mocks",
@@ -422,6 +436,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
@@ -443,7 +458,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "worker_impl_test",
     srcs = ["worker_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
@@ -461,7 +476,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "server_stats_flush_benchmark",
     srcs = ["server_stats_flush_benchmark_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/stats:stats_interface",
         "//source/common/stats:thread_local_store_lib",
@@ -480,9 +495,10 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "utils_test",
     srcs = envoy_select_admin_functionality(["utils_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/server:utils_lib",
         "//test/mocks/server:options_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )

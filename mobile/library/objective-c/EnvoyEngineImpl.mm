@@ -416,12 +416,12 @@ static envoy_data ios_get_string(const void *context) {
 
   std::unique_ptr<Envoy::EnvoyLogger> native_logger = std::make_unique<Envoy::EnvoyLogger>();
   if (logger) {
-    native_logger->on_log_ = [logger = std::move(logger)](Envoy::Logger::Logger::Levels level,
+    native_logger->on_log_ = [logger = std::move(logger)](Envoy::Logger::Levels level,
                                                           const std::string &message) {
       // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool
       // block is necessary to act as a breaker for any Objective-C allocation that happens.
       @autoreleasepool {
-        logger(level, @(message.c_str()));
+        logger((long)level, @(message.c_str()));
       }
     };
   }
@@ -615,7 +615,7 @@ static envoy_data ios_get_string(const void *context) {
   NSString *message = [NSString stringWithFormat:@"%@;%@;%@", exception.name, exception.reason,
                                                  exception.callStackSymbols.description];
   ENVOY_LOG_EVENT_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::misc), error,
-                            "handled_cxx_exception", fmt::runtime([message UTF8String]));
+                            "handled_cxx_exception", "{}", [message UTF8String]);
 
   [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyHandledCXXException"
                                                     object:exception];

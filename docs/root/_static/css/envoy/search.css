@@ -1,0 +1,168 @@
+/* Search overlay — the one thing on the site that genuinely floats, so the
+   one place elevation is used. Results are grouped by area, because prose and
+   generated reference are different kinds of answer. */
+
+.envoy-search-dialog {
+  background: transparent;
+  border: 0;
+  max-height: none;
+  max-width: none;
+  padding: 0;
+}
+
+.envoy-search-dialog::backdrop {
+  background: var(--envoy-scrim);
+}
+
+.envoy-search-panel {
+  background: var(--envoy-ground);
+  border: 1px solid var(--envoy-rule-strong);
+  border-radius: 9px;
+  box-shadow: var(--envoy-shadow);
+  display: flex;
+  flex-direction: column;
+  left: 50%;
+  max-height: min(560px, calc(100vh - 96px));
+  overflow: hidden;
+  position: fixed;
+  top: 64px;
+  transform: translateX(-50%);
+  width: min(620px, calc(100vw - 32px));
+}
+
+.envoy-search-field {
+  align-items: center;
+  border-bottom: 1px solid var(--envoy-rule);
+  display: flex;
+  flex: none;
+  gap: 11px;
+  height: 50px;
+  padding: 0 16px;
+}
+
+.envoy-search-field input {
+  background: transparent;
+  border: 0;
+  caret-color: var(--envoy-accent);
+  color: var(--envoy-ink);
+  flex: 1;
+  font-size: 15px;
+  min-width: 0;
+  outline: 0;
+}
+
+.envoy-search-field input::placeholder {
+  color: var(--envoy-ink-muted);
+  opacity: 1;
+}
+
+.envoy-search-field kbd {
+  border: 1px solid var(--envoy-rule);
+  border-radius: 3px;
+  color: var(--envoy-ink-muted);
+  flex: none;
+  font-family: var(--envoy-font-mono);
+  font-size: 10px;
+  padding: 1px 6px;
+}
+
+.envoy-search-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0 6px;
+  scrollbar-width: thin;
+}
+
+.envoy-search-group {
+  color: var(--envoy-ink-muted);
+  font-family: var(--envoy-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  margin: 0;
+  padding: 10px 16px 6px;
+  text-transform: uppercase;
+}
+
+.envoy-search-hit {
+  align-items: center;
+  border-left: 2px solid transparent;
+  color: var(--envoy-ink);
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px;
+  text-decoration: none;
+}
+
+.envoy-search-hit:hover,
+.envoy-search-hit.is-active {
+  background: var(--envoy-surface);
+  border-left-color: var(--envoy-accent);
+}
+
+.envoy-search-hit-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A match is marked by the accent and weight, not by a highlighter fill.
+   Inside a mono symbol a weight-only highlight is invisible. */
+.envoy-search-hit-title mark {
+  background: transparent;
+  color: var(--envoy-accent);
+  font-weight: 600;
+}
+
+.envoy-search-hit-symbol {
+  font-family: var(--envoy-font-mono);
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+.envoy-search-hit-symbol .envoy-search-hit-package {
+  color: var(--envoy-ink-muted);
+}
+
+.envoy-search-hit-path {
+  color: var(--envoy-ink-muted);
+  flex: none;
+  font-family: var(--envoy-font-mono);
+  font-size: 10.5px;
+  margin-left: auto;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.envoy-search-empty {
+  color: var(--envoy-ink-muted);
+  font-size: 13.5px;
+  padding: 22px 16px;
+}
+
+.envoy-search-foot {
+  align-items: center;
+  background: var(--envoy-surface);
+  border-top: 1px solid var(--envoy-rule);
+  color: var(--envoy-ink-muted);
+  display: flex;
+  flex: none;
+  font-family: var(--envoy-font-mono);
+  font-size: 10.5px;
+  gap: 18px;
+  padding: 9px 16px;
+}
+
+.envoy-search-foot kbd {
+  border: 1px solid var(--envoy-rule-strong);
+  border-radius: 3px;
+  font-family: inherit;
+  margin-right: 5px;
+  padding: 0 4px;
+}
+
+.envoy-search-count {
+  margin-left: auto;
+}

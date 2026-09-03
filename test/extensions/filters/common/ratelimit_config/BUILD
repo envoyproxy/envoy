@@ -20,7 +20,7 @@ envoy_proto_library(
 envoy_cc_test(
     name = "ratelimit_config_test",
     srcs = ["ratelimit_config_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":ratelimit_config_test_proto_cc_proto",
         "//source/common/formatter:formatter_extension_lib",
@@ -33,6 +33,7 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

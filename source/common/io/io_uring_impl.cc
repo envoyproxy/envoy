@@ -103,7 +103,7 @@ private:
 };
 
 bool isIoUringSupported() {
-  struct io_uring_params p {};
+  struct io_uring_params p{};
   struct io_uring ring;
 
   bool is_supported = io_uring_queue_init_params(2, &ring, &p) == 0;
@@ -116,7 +116,7 @@ bool isIoUringSupported() {
 
 IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                          bool enable_multishot_receive, uint32_t multishot_buffer_size) {
-  struct io_uring_params p {};
+  struct io_uring_params p{};
 
   // Size the completion queue at twice the submission queue to reduce the chance of overflow.
   p.flags |= IORING_SETUP_CQSIZE;

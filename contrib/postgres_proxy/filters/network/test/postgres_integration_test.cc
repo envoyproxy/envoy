@@ -1,3 +1,5 @@
+#include <format>
+
 #include "source/common/network/connection_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/server_context_config_impl.h"
@@ -7,7 +9,9 @@
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
+#include "test/mocks/network/connection.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 
@@ -20,6 +24,7 @@
 #include "gtest/gtest.h"
 
 using testing::Eq;
+using testing::NiceMock;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -42,18 +47,20 @@ public:
 
   std::string postgresConfig(SSLConfig downstream_ssl_config, UpstreamSSLConfig upstream_ssl_config,
                              std::string additional_filters) {
-    std::string main_config = fmt::format(
-        fmt::runtime(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml-template"))),
-        Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
-        Network::Test::getLoopbackAddressString(GetParam()),
-        std::get<1>(upstream_ssl_config), // upstream SSL transport socket
-        Network::Test::getAnyAddressString(GetParam()),
-        std::get<0>(downstream_ssl_config),  // downstream SSL termination
-        std::get<0>(upstream_ssl_config),    // upstream_SSL option
-        std::get<2>(downstream_ssl_config),  // require downstream SSL
-        additional_filters,                  // additional filters to insert after postgres
-        std::get<1>(downstream_ssl_config)); // downstream SSL transport socket
+    std::string loopback_address = Network::Test::getLoopbackAddressString(GetParam());
+    std::string any_address = Network::Test::getAnyAddressString(GetParam());
+    std::string main_config = std::vformat(
+        TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+            "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml-template")),
+        std::make_format_args(
+            Platform::null_device_path, loopback_address, loopback_address,
+            std::get<1>(upstream_ssl_config), // upstream SSL transport socket
+            any_address,
+            std::get<0>(downstream_ssl_config),   // downstream SSL termination
+            std::get<0>(upstream_ssl_config),     // upstream_SSL option
+            std::get<2>(downstream_ssl_config),   // require downstream SSL
+            additional_filters,                   // additional filters to insert after postgres
+            std::get<1>(downstream_ssl_config))); // downstream SSL transport socket
 
     return main_config;
   }
@@ -134,7 +141,7 @@ public:
       : PostgresBaseIntegrationTest(
             std::make_tuple(
                 "terminate_ssl: true",
-                fmt::format(
+                std::format(
                     R"EOF(transport_socket:
         name: "starttls"
         typed_config:
@@ -538,7 +545,7 @@ public:
             // configure downstream SSL
             std::make_tuple(
                 "terminate_ssl: true",
-                fmt::format(
+                std::format(
                     R"EOF(transport_socket:
         name: "starttls"
         typed_config:

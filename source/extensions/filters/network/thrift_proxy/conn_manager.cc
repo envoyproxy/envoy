@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol.h"
 #include "source/extensions/filters/network/thrift_proxy/transport.h"
@@ -15,12 +16,23 @@ namespace ThriftProxy {
 ConnectionManager::ConnectionManager(const ConfigSharedPtr& config,
                                      Random::RandomGenerator& random_generator,
                                      TimeSource& time_source,
-                                     const Network::DrainDecision& drain_decision)
+                                     const Network::DrainDecision& drain_decision,
+                                     Server::Configuration::ServerFactoryContext& server_context)
     : config_(config), stats_(config_->stats()), transport_(config_->createTransport()),
       protocol_(config_->createProtocol()),
       decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)),
       random_generator_(random_generator), time_source_(time_source),
-      drain_decision_(drain_decision) {}
+      drain_decision_(drain_decision), server_context_(server_context),
+      use_connection_event_drain_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")) {}
+
+bool ConnectionManager::shouldDrainClose() {
+  if (!use_connection_event_drain_) {
+    return drain_decision_.drainClose(Network::DrainDirection::All);
+  }
+
+  return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_);
+}
 
 ConnectionManager::~ConnectionManager() = default;
 
@@ -189,6 +201,9 @@ void ConnectionManager::resetAllRpcs(bool local_reset) {
 void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
 
+  // Captured once here rather than plumbed through the filter factory: the drain type belongs to
+  // the listener that accepted this connection, and is reachable from the connection itself.
+  drain_type_ = Network::listenerDrainType(read_callbacks_->connection());
   read_callbacks_->connection().addConnectionCallbacks(*this);
   read_callbacks_->connection().enableHalfClose(true);
 }
@@ -353,7 +368,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   // should be set before the encodeFrame() call. It should be set at or after the messageBegin
   // call so that the header is added after all upstream headers passed, due to messageBegin
   // possibly not getting headers in transportBegin.
-  if (cm.drain_decision_.drainClose(Network::DrainDirection::All)) {
+  if (cm.shouldDrainClose()) {
     ENVOY_STREAM_LOG(debug, "propogate Drain header for drain close decision", parent_);
     // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
     // over)?

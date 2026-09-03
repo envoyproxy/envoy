@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -7,15 +8,19 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/bridge_status.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/hash/hash.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp" // IWYU pragma: keep
@@ -27,19 +32,32 @@ namespace McpJsonRestBridge {
 
 inline constexpr char FilterName[] = "envoy.filters.http.mcp_json_rest_bridge";
 
+struct EndpointKey {
+  std::string host;
+  std::string path;
+
+  bool operator==(const EndpointKey& other) const {
+    return host == other.host && path == other.path;
+  }
+
+  template <typename H> friend H AbslHashValue(H h, const EndpointKey& k) {
+    return H::combine(std::move(h), k.host, k.path);
+  }
+};
+
 /**
  * Configuration for the MCP JSON REST Bridge filter.
  */
 class McpJsonRestBridgeFilterConfig : public Logger::Loggable<Logger::Id::config> {
 public:
-  explicit McpJsonRestBridgeFilterConfig(
-      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
-          proto_config);
+  static absl::StatusOr<std::shared_ptr<McpJsonRestBridgeFilterConfig>>
+  create(const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+             proto_config);
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getHttpRule(absl::string_view tool_name) const;
+  getHttpRule(absl::string_view tool_name, absl::string_view host, absl::string_view path) const;
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getToolsListHttpRule() const;
+  getToolsListHttpRule(absl::string_view host, absl::string_view path) const;
 
   const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }
 
@@ -51,17 +69,24 @@ public:
     return proto_config_.request_storage_mode();
   }
 
-  // Returns the tool config to serve a local tools/list response, or nullopt when local serving is
-  // not configured.
-  OptRef<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig>
-  toolListLocalConfig() const {
-    if (proto_config_.tool_config().has_tool_list_local()) {
-      return proto_config_.tool_config();
-    }
-    return std::nullopt;
-  }
+  // Returns tools to serve a local tools/list response, filtered by host and path.
+  std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+  toolListLocalTools(absl::string_view host, absl::string_view path) const;
 
-  bool textContentStreamingEnabled(absl::string_view tool_name) const;
+  // Returns whether local serving of tools/list is configured for the matching endpoint.
+  bool toolListLocal(absl::string_view host, absl::string_view path) const;
+
+  // Returns whether there is a configured endpoint matching the host and path.
+  bool hasEndpoint(absl::string_view host, absl::string_view path) const;
+
+  bool textContentStreamingEnabled(absl::string_view tool_name, absl::string_view host,
+                                   absl::string_view path) const;
+
+  bool shouldStoreToDynamicMetadata() const {
+    return proto_config_.request_storage_mode() ==
+           envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge::
+               DYNAMIC_METADATA;
+  }
 
   bool traceContextExtraction() const { return proto_config_.has_trace_context_extraction(); }
 
@@ -69,55 +94,90 @@ public:
 
   const std::string& serverDescription() const { return proto_config_.server_info().description(); }
 
+  bool clearRouteCache() const { return clear_route_cache_; }
+
+  bool perRouteOnly() const { return proto_config_.per_route_only(); }
+
 private:
+  explicit McpJsonRestBridgeFilterConfig(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+          proto_config);
+
+  absl::Status initialize();
+
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
     bool text_content_streaming_enabled;
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig* tool_proto;
   };
-  absl::flat_hash_map<std::string, ToolEntry> tool_entries_;
+  struct EndpointConfig {
+    absl::flat_hash_map<std::string, ToolEntry> tool_entries;
+    std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+        tools;
+    std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+        tool_list_http_rule;
+    bool tool_list_local = false;
+  };
+  absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
   std::string fallback_protocol_version_;
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
+  bool clear_route_cache_;
 };
 
 class McpJsonRestBridgePerRouteConfig : public Router::RouteSpecificFilterConfig,
                                         public Logger::Loggable<Logger::Id::config> {
 public:
-  explicit McpJsonRestBridgePerRouteConfig(
+  static absl::StatusOr<std::shared_ptr<McpJsonRestBridgePerRouteConfig>> create(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
           proto_config);
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getHttpRule(absl::string_view tool_name) const;
+  getHttpRule(absl::string_view tool_name, absl::string_view host, absl::string_view path) const;
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
-  getToolsListHttpRule() const;
+  getToolsListHttpRule(absl::string_view host, absl::string_view path) const;
 
-  // Returns the first tool config with local tools/list serving configured, or nullopt when none
-  // is configured.
-  OptRef<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig>
-  toolListLocalConfig() const {
-    for (const auto& tool_config : proto_config_.tool_config()) {
-      if (tool_config.has_tool_list_local()) {
-        return tool_config;
-      }
-    }
-    return std::nullopt;
-  }
+  // Returns tools to serve a local tools/list response, filtered by host and path.
+  std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+  toolListLocalTools(absl::string_view host, absl::string_view path) const;
 
-  bool textContentStreamingEnabled(absl::string_view tool_name) const;
+  // Returns whether local serving of tools/list is configured for the matching endpoint.
+  bool toolListLocal(absl::string_view host, absl::string_view path) const;
+
+  // Returns whether there is a configured endpoint matching the host and path.
+  bool hasEndpoint(absl::string_view host, absl::string_view path) const;
+
+  bool textContentStreamingEnabled(absl::string_view tool_name, absl::string_view host,
+                                   absl::string_view path) const;
 
 private:
+  explicit McpJsonRestBridgePerRouteConfig(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+          proto_config);
+
+  absl::Status initialize();
+
   struct ToolEntry {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
     bool text_content_streaming_enabled;
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig* tool_proto;
   };
-  absl::flat_hash_map<std::string, ToolEntry> tool_entries_;
+  struct EndpointConfig {
+    absl::flat_hash_map<std::string, ToolEntry> tool_entries;
+    std::vector<const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>
+        tools;
+    std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+        tool_list_http_rule;
+    bool tool_list_local = false;
+  };
+  absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
       proto_config_;
 };
 
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
+using McpJsonRestBridgePerRouteConfigSharedPtr = std::shared_ptr<McpJsonRestBridgePerRouteConfig>;
 
 /**
  * MCP JSON REST Bridge proxy implementation.
@@ -145,8 +205,8 @@ private:
   // Serves a local tools/list response using tools' ToolsListSpecificConfig.
   void serveToolsListLocal(
       const nlohmann::json& json_rpc,
-      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
-          tool_config);
+      const std::vector<
+          const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>& tools);
 
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
@@ -155,9 +215,32 @@ private:
   void mapMcpToolToApiBackend(const nlohmann::json& json_rpc,
                               const McpJsonRestBridgePerRouteConfig* per_route_config);
 
-  // Sends MCP error response.
-  void sendErrorResponse(Http::Code response_code, absl::string_view response_code_details,
-                         absl::string_view response_body);
+  // Handles decoding errors: sets dynamic metadata and sends a local reply.
+  // IMPORTANT PROTOCOL RULE:
+  // 1. For JSON-RPC application/protocol errors (-32600, -32601, -32602), MUST use Http::Code::OK
+  //    (200). Many MCP SDK clients inspect HTTP status before JSON-RPC decoding and will fail with
+  //    a transport exception on non-200 responses, discarding the structured JSON-RPC error
+  //    code/message.
+  // 2. Only use non-200 HTTP codes (400, 401, 403, 405, 413) in the following cases:
+  //    - Transport-level or framing syntax failures (generated locally by this filter):
+  //      * 405 Method Not Allowed (non-POST request)
+  //      * 413 Payload Too Large (exceeding maxRequestBodySize)
+  //      * 400 Bad Request for malformed JSON syntax (-32700 parse error)
+  //    - Authorization errors preserved from upstream (401 Unauthorized, 403 Forbidden):
+  //      * 401 and 403 from upstream are preserved as non-200 HTTP responses as required by the MCP
+  //        authorization spec:
+  //        https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+  //      * Note on 400 Bad Request: Although the MCP authorization spec also includes HTTP 400 for
+  //        certain authorization errors, we assume authorization checks (e.g., OAuth token
+  //        validation) occur in filters before MCP transcoding. Therefore, any 400 error from the
+  //        REST backend is assumed to be an API error rather than an authorization error, so the
+  //        MCP transcoder transforms the REST 400 error into a standard JSON-RPC error (with HTTP
+  //        200 OK) and does not preserve it as an authorization error.
+  void sendErrorResponse(
+      Http::Code response_code, BridgeStatus status, absl::string_view response_body,
+      std::function<void(Http::ResponseHeaderMap&)> modify_headers = nullptr,
+      absl::string_view method = "", const nlohmann::json& params = nlohmann::json::object(),
+      Grpc::Status::GrpcStatus grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal);
 
   // Validates the "id" and "method" fields of a JSON-RPC request.
   // It sends local error response and return an error status if the validation
@@ -165,14 +248,17 @@ private:
   absl::Status validateJsonRpcIdAndMethod(const nlohmann::json& json_rpc);
 
   // Sets dynamic metadata for the filter based on the MCP request method and parameters.
-  void setDynamicMetadata(absl::string_view method, const nlohmann::json& json_rpc);
+  void setParsingMetadata(absl::string_view method, const nlohmann::json& params);
+  void setResponseMetadata(BridgeStatus status,
+                           std::optional<uint64_t> response_code = std::nullopt);
+  void setDynamicMetadata();
 
   // Builds streaming_json_prefix_ and streaming_json_suffix_ for the tools/call streaming path.
   void buildStreamingPrefixAndSuffix(bool is_error);
 
   enum class McpOperation {
     Unspecified = 0,
-    // Received the "/mcp" URL but has not parsed the request body yet.
+    // Received a configured MCP URL path but has not parsed the request body yet.
     Undecided = 1,
     // InitializeRequest in the init handshake flow.
     Initialization = 2,
@@ -190,6 +276,7 @@ private:
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   std::optional<nlohmann::json> session_id_;
   std::string server_name_;
+  std::string path_;
   Buffer::OwnedImpl request_body_;
   std::string request_body_str_;
   Buffer::OwnedImpl response_body_;
@@ -204,6 +291,12 @@ private:
   std::string streaming_json_prefix_;
   std::string streaming_json_suffix_;
   bool is_first_streaming_chunk_ = true;
+
+  BridgeStatus status_{BridgeStatus::Ok};
+  std::string mcp_method_;
+  Protobuf::Struct mcp_params_;
+  bool has_params_ = false;
+  std::optional<uint64_t> backend_response_code_;
 
   McpJsonRestBridgeFilterConfigSharedPtr config_;
 };

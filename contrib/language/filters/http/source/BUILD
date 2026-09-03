@@ -32,7 +32,7 @@ envoy_cc_library(
     hdrs = ["language_filter.h"],
     tags = ["skip_on_windows"],
     deps = [
-        "//bazel/foreign_cc:unicode_icu",
+        "//bazel/deps:unicode_icu",
         "//source/common/common:empty_string",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",

@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/header_mutation:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/filter_chain/v3:pkg_cc_proto",
     ],
@@ -31,7 +32,7 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.filter_chain"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
@@ -42,6 +43,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/filter_chain/v3:pkg_cc_proto",
     ],
@@ -52,7 +54,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["filter_chain_integration_test.cc"],
     extension_names = ["envoy.filters.http.filter_chain"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 4,
     deps = [
         "//source/common/http:header_map_lib",

@@ -7,11 +7,16 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 class DynamicModuleNetworkFilterFactoryTest : public testing::Test {
 public:
@@ -35,7 +40,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfig) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_TRUE(result.ok()) << result.status().message();
+  EXPECT_OK(result);
 
   // The happy path emits no load-failure counters.
   auto& server_scope = context_.server_factory_context_.serverScope();
@@ -51,7 +56,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithLocalFile) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_TRUE(result.ok()) << result.status().message();
+  EXPECT_OK(result);
 }
 
 // Remote module sources are not supported for network filters (no init manager is wired up).
@@ -65,7 +70,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, RemoteSourceRejected) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result, Not(IsOk()));
 }
 
 TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithFilterConfig) {
@@ -76,7 +81,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithFilterConfig) {
       config.mutable_filter_config()->PackFrom(ValueUtil::stringValue("test_config_value"));
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_TRUE(result.ok()) << result.status().message();
+  EXPECT_OK(result);
 }
 
 TEST_F(DynamicModuleNetworkFilterFactoryTest, InvalidModuleName) {
@@ -85,8 +90,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, InvalidModuleName) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to load dynamic module")));
 
   EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.serverScope(), "module_load_error",
                                "test_filter"));
@@ -99,8 +103,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, MissingNetworkFilterSymbols) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to create filter config"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to create filter config")));
 
   // The module loads fine but lacks the network filter ABI symbols, so the failure is counted as
   // config_init_error, not module_load_error.
@@ -116,8 +119,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ConfigInitializationFailure) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to create filter config"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to create filter config")));
 
   EXPECT_EQ(1U, failureCounter(context_.server_factory_context_.serverScope(), "config_init_error",
                                "test_filter"));
@@ -135,7 +137,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, MalformedFilterConfig) {
   any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result, Not(IsOk()));
 
   auto& server_scope = context_.server_factory_context_.serverScope();
   EXPECT_EQ(1U, failureCounter(server_scope, "config_init_error", "test_filter"));
@@ -170,7 +172,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithTerminalFilter) {
 
   // Terminal filter configuration should be accepted and create filter factory successfully.
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_TRUE(result.ok()) << result.status().message();
+  EXPECT_OK(result);
 
   // Verify the filter can still be added to filter manager.
   NiceMock<Network::MockFilterManager> filter_manager;
@@ -184,7 +186,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, FilterFactoryCallbackAddsFilter) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  ASSERT_TRUE(result.ok()) << result.status().message();
+  ASSERT_OK(result);
 
   // Test that the filter factory callback correctly adds a filter.
   NiceMock<Network::MockFilterManager> filter_manager;
@@ -199,7 +201,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, DoNotCloseOption) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_TRUE(result.ok()) << result.status().message();
+  EXPECT_OK(result);
 }
 
 TEST_F(DynamicModuleNetworkFilterFactoryTest, LoadGloballyOption) {
@@ -209,7 +211,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, LoadGloballyOption) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_TRUE(result.ok()) << result.status().message();
+  EXPECT_OK(result);
 }
 
 // Test that the legacy behavior registers the custom stat namespace when the runtime guard is
@@ -230,7 +232,7 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, LegacyBehaviorWithRuntimeGuard) {
   config.set_filter_name("test_filter");
 
   auto result = factory_.createFilterFactoryFromProto(config, context_);
-  EXPECT_TRUE(result.ok()) << result.status().message();
+  EXPECT_OK(result);
 
   // Verify the custom namespace was registered.
   EXPECT_TRUE(custom_stat_namespaces.registered("custom_namespace"));

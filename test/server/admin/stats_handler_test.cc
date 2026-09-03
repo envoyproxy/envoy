@@ -139,7 +139,26 @@ public:
   Configuration::MockStatsConfig stats_config_;
 };
 
-class AdminStatsTest : public StatsHandlerTest, public testing::Test {};
+class AdminStatsTest : public StatsHandlerTest, public testing::Test {
+protected:
+  void testInvertFilter(absl::string_view url, absl::string_view foo_match,
+                        absl::string_view bar_match) {
+    store_->counterFromString("cluster.foo.total").add(10);
+    store_->counterFromString("cluster.bar.total").add(20);
+
+    auto filtered = handlerStats(absl::StrCat(url, "&filter=foo"));
+    EXPECT_THAT(filtered.second, HasSubstr(foo_match));
+    EXPECT_THAT(filtered.second, Not(HasSubstr(bar_match)));
+
+    auto inverted = handlerStats(absl::StrCat(url, "&filter=foo&invert_filter"));
+    EXPECT_THAT(inverted.second, Not(HasSubstr(foo_match)));
+    EXPECT_THAT(inverted.second, HasSubstr(bar_match));
+
+    auto all = handlerStats(url);
+    EXPECT_THAT(all.second, HasSubstr(foo_match));
+    EXPECT_THAT(all.second, HasSubstr(bar_match));
+  }
+};
 
 TEST_F(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
@@ -1222,6 +1241,19 @@ TEST_F(AdminStatsTest, SortedHistograms) {
   }
 }
 
+TEST_F(AdminStatsTest, HandlerStatsInvertFilterText) {
+  testInvertFilter("/stats?format=text", "cluster.foo.total", "cluster.bar.total");
+}
+
+TEST_F(AdminStatsTest, HandlerStatsInvertFilterPrometheus) {
+  testInvertFilter("/stats?format=prometheus", "envoy_cluster_foo_total",
+                   "envoy_cluster_bar_total");
+}
+
+TEST_F(AdminStatsTest, HandlerStatsInvertFilterJson) {
+  testInvertFilter("/stats?format=json", "cluster.foo.total", "cluster.bar.total");
+}
+
 // Sets up a test using real threads to reproduce a race between deleting scopes
 // and iterating over them.
 class ThreadedTest : public testing::Test {
@@ -1388,22 +1420,24 @@ public:
     Stats::StatNameTagVector c1Tags{{makeStat("cluster"), makeStat("c1")}};
     Stats::StatNameTagVector c2Tags{{makeStat("cluster"), makeStat("c2")}};
 
-    Stats::Counter& c1 = store_->rootScope()->counterFromStatNameWithTags(
-        makeStat("cluster.upstream.cx.total"), c1Tags);
+    Stats::Counter& c1 = store_->rootScope()->counterFromTaggedName(
+        makeStat("cluster.upstream.cx.total"), Stats::StatNameTagSpan(c1Tags), {});
     c1.add(10);
-    Stats::Counter& c2 = store_->rootScope()->counterFromStatNameWithTags(
-        makeStat("cluster.upstream.cx.total"), c2Tags);
+    Stats::Counter& c2 = store_->rootScope()->counterFromTaggedName(
+        makeStat("cluster.upstream.cx.total"), Stats::StatNameTagSpan(c2Tags), {});
     c2.add(20);
 
-    Stats::Gauge& g1 = store_->rootScope()->gaugeFromStatNameWithTags(
-        makeStat("cluster.upstream.cx.active"), c1Tags, Stats::Gauge::ImportMode::Accumulate);
+    Stats::Gauge& g1 = store_->rootScope()->gaugeFromTaggedName(
+        makeStat("cluster.upstream.cx.active"), Stats::StatNameTagSpan(c1Tags), {},
+        Stats::Gauge::ImportMode::Accumulate);
     g1.set(11);
-    Stats::Gauge& g2 = store_->rootScope()->gaugeFromStatNameWithTags(
-        makeStat("cluster.upstream.cx.active"), c2Tags, Stats::Gauge::ImportMode::Accumulate);
+    Stats::Gauge& g2 = store_->rootScope()->gaugeFromTaggedName(
+        makeStat("cluster.upstream.cx.active"), Stats::StatNameTagSpan(c2Tags), {},
+        Stats::Gauge::ImportMode::Accumulate);
     g2.set(12);
 
-    Stats::TextReadout& t1 = store_->rootScope()->textReadoutFromStatNameWithTags(
-        makeStat("control_plane.identifier"), c1Tags);
+    Stats::TextReadout& t1 = store_->rootScope()->textReadoutFromTaggedName(
+        makeStat("control_plane.identifier"), Stats::StatNameTagSpan(c1Tags), {});
     t1.set("cp-1");
   }
 };

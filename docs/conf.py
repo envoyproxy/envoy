@@ -237,6 +237,7 @@ exclude_patterns = [
     '_venv',
     'Thumbs.db',
     '.DS_Store',
+    '**/._*',
 ]
 
 # The reST default role (used for this markup: `text`) to use for all
@@ -278,6 +279,11 @@ html_theme = 'sphinx_rtd_theme'
 html_theme_options = {
     'logo_only': True,
     'includehidden': False,
+    'collapse_navigation': True,
+    'sticky_navigation': True,
+    'navigation_depth': 4,
+    'titles_only': True,
+    'style_external_links': True,
 }
 
 # Add any paths that contain custom themes here, relative to this directory.
@@ -304,7 +310,43 @@ html_favicon = 'favicon.ico'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+# A published copy of the docs knows its own version, but not what has been
+# released since it was built, so the version list cannot be baked in here.
+# Whoever assembles the site can inject it by overriding `envoy_versions` with
+# a list of {'name': ..., 'url': ...}; until then the menu degrades to a single
+# link to the version index.
+html_context = {
+    'envoy_versions': [],
+    'envoy_versions_url': '/docs/',
+}
+
+# envoy.css carries the design tokens and must load first; the component
+# modules below are listed separately so each is a parallel <link> rather than
+# an @import waterfall. See docs/root/_static/css/envoy/.
 html_style = 'css/envoy.css'
+
+html_css_files = [
+    'css/envoy/base.css',
+    'css/envoy/topbar.css',
+    'css/envoy/sidebar.css',
+    'css/envoy/content.css',
+    'css/envoy/code.css',
+    'css/envoy/admonitions.css',
+    'css/envoy/tables.css',
+    'css/envoy/toc.css',
+    'css/envoy/proto.css',
+    'css/envoy/lists.css',
+    'css/envoy/search.css',
+    # loaded last so its overrides win without extra specificity
+    'css/envoy/responsive.css',
+]
+
+# envoy-theme.js is a classic script so the stored theme applies before the
+# first paint; everything else is a deferred module. See _static/js/envoy/.
+html_js_files = [
+    'js/envoy-theme.js',
+    ('js/envoy.js', {'type': 'module'}),
+]
 
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied

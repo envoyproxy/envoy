@@ -108,7 +108,8 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                      bool ignore_global_conn_limit)
-    : server_(server), listener_info_(std::make_shared<ListenerInfoImpl>()),
+    : server_(server), listener_info_(std::make_shared<ListenerInfoImpl>(
+                           envoy::config::listener::v3::Listener::MODIFY_ONLY)),
       factory_context_(server, listener_info_),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
@@ -225,8 +226,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                 "listeners. This behaviour and duration is configurable via server options "
                 "or CLI"},
                {ParamDescriptor::Type::Boolean, "skip_exit",
-                "When draining listeners, do not exit after the drain period. "
-                "This must be used with graceful"},
+                "When draining listeners, drain the connections but never stop the listeners. The "
+                "graceful parameter has no effect when this is set, since the drain period only "
+                "delays stopping the listeners"},
                {ParamDescriptor::Type::Boolean, "inboundonly",
                 "Drains all inbound listeners. traffic_direction field in "
                 "envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a "
@@ -245,6 +247,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                         "data size)"},
                        {ParamDescriptor::Type::String, "filter",
                         "Regular expression (Google re2) for filtering stats"},
+                       {ParamDescriptor::Type::Boolean, "invert_filter", "Invert the filter regex"},
                        {ParamDescriptor::Type::Enum,
                         "histogram_buckets",
                         "Histogram bucket display mode",
@@ -314,7 +317,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
       shared_from_this(), server_.drainManager(), server_.api().randomGenerator(),
       server_.httpContext(), server_.runtime(), server_.localInfo(), server_.clusterManager(),
       server_.nullOverloadManager(), server_.timeSource(),
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED)});
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, server_.serverFactoryContext())});
   return true;
 }
 

@@ -13,8 +13,9 @@ namespace ProcessRateLimit {
 
 class ProcessRateLimitFilterFactory : public AccessLog::ExtensionFilterFactory {
 public:
-  AccessLog::FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                                    Server::Configuration::GenericFactoryContext& context) override;
+  absl::StatusOr<AccessLog::FilterPtr>
+  createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
+               Server::Configuration::GenericFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override {
     return "envoy.access_loggers.extension_filters.process_ratelimit";

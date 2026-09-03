@@ -56,6 +56,13 @@ PolicySharedPtr FilterConfig::getPolicy(const ::Envoy::Http::ResponseHeaderMap& 
   }
 
   ::Envoy::Http::Matching::HttpMatchingDataImpl data(stream_info);
+  // Provide the original downstream request headers to the matcher so policies can be
+  // selected based on request header values (e.g. the `Accept` header), in addition to
+  // the response. Request headers may be absent (e.g. for some locally generated replies),
+  // in which case request-header inputs simply yield no data.
+  if (const auto* request_headers = stream_info.getRequestHeaders(); request_headers != nullptr) {
+    data.onRequestHeaders(*request_headers);
+  }
   data.onResponseHeaders(headers);
   auto match_result = Matcher::evaluateMatch<::Envoy::Http::HttpMatchingData>(*matcher_, data);
   if (!match_result.isMatch()) {

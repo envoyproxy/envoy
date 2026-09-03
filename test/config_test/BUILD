@@ -2,7 +2,7 @@ load("@base_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
+    "envoy_cc_dyn_module_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -42,7 +42,7 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "config_test",
     size = "large",
     coverage = False,
@@ -63,10 +63,11 @@ envoy_cc_test_library(
     name = "config_test_lib",
     srcs = ["config_test.cc"],
     hdrs = ["config_test.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:custom_stat_namespaces_lib",
         "//source/server:configuration_lib",
         "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",
@@ -76,6 +77,7 @@ envoy_cc_test_library(
         "//test/mocks/server:worker_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ] + select({
         "//bazel:enable_http3_on_windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),

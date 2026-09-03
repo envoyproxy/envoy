@@ -12,11 +12,14 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Contains;
 
 namespace Envoy {
 namespace Extensions {
@@ -231,7 +234,7 @@ thrift_filters:
   testConfig(config);
 
   EXPECT_EQ(1, factory.config_struct_.fields_size());
-  EXPECT_EQ("value", factory.config_struct_.fields().at("key").string_value());
+  EXPECT_THAT(factory.config_struct_.fields(), Contains(IsStructString("key", "value")));
   EXPECT_EQ("thrift.ingress.", factory.config_stat_prefix_);
 }
 
@@ -279,9 +282,8 @@ resources:
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
   const auto decoded_resources = TestUtility::decodeResources<
       envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>(response);
-  EXPECT_TRUE(context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
-                  ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
-                  .ok());
+  EXPECT_OK(context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                ->onConfigUpdate(decoded_resources.refvec_, response.version_info()));
   auto message_ptr = context_.server_factory_context_.admin_.config_tracker_
                          .config_tracker_callbacks_["trds_routes"](universal_name_matcher);
   const auto& dump =

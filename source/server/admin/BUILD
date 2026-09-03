@@ -243,6 +243,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )
@@ -341,10 +342,12 @@ envoy_cc_library(
         "//envoy/http:codes_interface",
         "//envoy/server:admin_interface",
         "//envoy/server:instance_interface",
+        "//envoy/upstream:admin_endpoint_provider_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/upstream:host_utility_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

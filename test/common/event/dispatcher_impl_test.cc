@@ -817,7 +817,9 @@ TEST_F(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
 
   // approximateMonotonicTime is increasing between event loop runs.
   dispatcher_->post([this]() {
-    { EXPECT_LT(time_, dispatcher_->approximateMonotonicTime()); }
+    {
+      EXPECT_LT(time_, dispatcher_->approximateMonotonicTime());
+    }
   });
 
   dispatcher_->run(Dispatcher::RunType::Block);
@@ -1523,6 +1525,33 @@ TEST_F(DispatcherConnectionTest, CreateEnvoyInternalConnectionWhenFactoryNotExis
           Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
           nullptr, nullptr),
       "");
+}
+
+TEST(EvwatchObserverTest, RegisterEvwatchObserver) {
+  class MockEvwatchObserver : public Evwatch::Observer {
+  public:
+    MOCK_METHOD(void, onPrepare,
+                (MonotonicTime prepare_time, std::optional<MonotonicTime::duration> timeout));
+    MOCK_METHOD(void, onCheck, (MonotonicTime check_time));
+    MOCK_METHOD(void, onClose, ());
+  };
+
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+
+  NiceMock<MockEvwatchObserver> observer;
+
+  EXPECT_CALL(observer, onPrepare(_, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(observer, onCheck(_)).Times(testing::AtLeast(1));
+  EXPECT_CALL(observer, onClose());
+
+  dispatcher->registerEvwatchObserver(observer);
+
+  auto cb = dispatcher->createSchedulableCallback([]() {});
+  cb->scheduleCallbackCurrentIteration();
+  dispatcher->run(Dispatcher::RunType::NonBlock);
+
+  dispatcher->unregisterEvwatchObserver(observer);
 }
 
 } // namespace

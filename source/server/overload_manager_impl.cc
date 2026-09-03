@@ -466,8 +466,14 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
           Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(resource);
       auto config =
           Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
-      auto monitor = factory.createResourceMonitor(*config, context);
-      result = resources_.try_emplace(name, name, std::move(monitor), *this, stats_scope).second;
+      auto monitor_or_error = factory.createResourceMonitor(*config, context);
+      if (!monitor_or_error.ok()) {
+        creation_status = monitor_or_error.status();
+        return;
+      }
+      result = resources_
+                   .try_emplace(name, name, std::move(monitor_or_error.value()), *this, stats_scope)
+                   .second;
     }
     if (!result) {
       creation_status =
@@ -533,7 +539,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       auto proactive_resource_it =
           OverloadProactiveResources::get().proactive_action_name_to_resource_.find(resource);
 
-      if (resources_.find(resource) == resources_.end() &&
+      if (!resources_.contains(resource) &&
           proactive_resource_it ==
               OverloadProactiveResources::get().proactive_action_name_to_resource_.end()) {
         creation_status = absl::InvalidArgumentError(
@@ -631,7 +637,7 @@ bool OverloadManagerImpl::registerForAction(const std::string& action,
   ASSERT(!started_);
   const auto symbol = action_symbol_table_.get(action);
 
-  if (actions_.find(symbol) == actions_.end()) {
+  if (!actions_.contains(symbol)) {
     ENVOY_LOG(debug, "No overload action is configured for {}.", action);
     return false;
   }
@@ -763,9 +769,9 @@ void OverloadManagerImpl::Resource::onSuccess(const ResourceUsage& usage) {
   pressure_gauge_.set(usage.resource_pressure_ * 100); // convert to percent
 }
 
-void OverloadManagerImpl::Resource::onFailure(const EnvoyException& error) {
+void OverloadManagerImpl::Resource::onFailure(const absl::Status& error) {
   pending_update_ = false;
-  ENVOY_LOG(info, "Failed to update resource {}: {}", name_, error.what());
+  ENVOY_LOG(info, "Failed to update resource {}: {}", name_, error.message());
   failed_updates_counter_.inc();
 }
 

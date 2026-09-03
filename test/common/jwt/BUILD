@@ -47,6 +47,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "struct_utils_test",
+    srcs = ["struct_utils_test.cc"],
+    deps = [
+        "//source/common/jwt:jwt_lib",
+        "//source/common/protobuf",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "simple_lru_cache_test",
     srcs = ["simple_lru_cache_test.cc"],
     deps = [

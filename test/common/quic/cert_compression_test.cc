@@ -24,11 +24,18 @@ TEST(CertCompressionZlibTest, DecompressBadData) {
 TEST(CertCompressionZlibTest, DecompressBadLength) {
   constexpr uint8_t the_data[] = {1, 2, 3, 4, 5, 6};
   constexpr size_t uncompressed_len = 6;
+
+  // The compression callback caches per SSL_CTX, so it requires a valid SSL whose
+  // context has the algorithm (and thus a cache) registered, as in production.
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  TlsCertCompression::registerZlib(ssl_ctx.get());
+  bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
+
   bssl::ScopedCBB compressed;
   ASSERT_EQ(1, CBB_init(compressed.get(), 0));
   ASSERT_EQ(
       TlsCertCompression::SUCCESS,
-      TlsCertCompression::compressZlib(nullptr, compressed.get(), the_data, uncompressed_len));
+      TlsCertCompression::compressZlib(ssl.get(), compressed.get(), the_data, uncompressed_len));
   const auto compressed_len = CBB_len(compressed.get());
   EXPECT_NE(0, compressed_len);
 

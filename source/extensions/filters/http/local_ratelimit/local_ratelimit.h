@@ -76,7 +76,7 @@ class FilterConfig : public Router::RouteSpecificFilterConfig,
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
                Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
-               const bool per_route = false);
+               absl::Status& creation_status, const bool per_route = false);
   ~FilterConfig() override {
     // Ensure that the LocalRateLimiterImpl instance will be destroyed on the thread where its inner
     // timer is created and running.
@@ -108,6 +108,7 @@ public:
   }
   bool rateLimitPerConnection() const { return rate_limit_per_connection_; }
   bool enableXRateLimitHeaders() const { return enable_x_rate_limit_headers_; }
+  bool enableRetryAfterHeader() const { return enable_retry_after_header_; }
   envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions virtualHostRateLimits() const {
     return vh_rate_limits_;
   }
@@ -164,6 +165,7 @@ private:
   const uint64_t stage_;
   const bool has_descriptors_;
   const bool enable_x_rate_limit_headers_;
+  const bool enable_retry_after_header_ = false;
   const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
   const std::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;

@@ -76,11 +76,41 @@ Protobuf::Value CELFormatter::formatValue(const Envoy::Formatter::Context& conte
   }
 }
 
+bool CELFormatter::formatTo(std::string& sink, const Envoy::Formatter::Context& context,
+                            const StreamInfo::StreamInfo& stream_info) const {
+  const std::optional<std::string> value = format(context, stream_info);
+  if (!value.has_value()) {
+    return false;
+  }
+  sink.append(*value);
+  return true;
+}
+
+void CELFormatter::formatValueTo(Envoy::Formatter::ValueSink& sink,
+                                 const Envoy::Formatter::Context& context,
+                                 const StreamInfo::StreamInfo& stream_info) const {
+  if (!typed_) {
+    // The untyped form is always a string.
+    const std::optional<std::string> value = format(context, stream_info);
+    if (!value.has_value()) {
+      return;
+    }
+    sink.addString(*value);
+    return;
+  }
+  // The typed form produces a genuine proto value, so hand it to the sink as one.
+  const Protobuf::Value value = formatValue(context, stream_info);
+  if (value.kind_case() == Protobuf::Value::kNullValue ||
+      value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+    return;
+  }
+  sink.addValue(value);
+}
+
 CELFormatterCommandParser::CELFormatterCommandParser(
-    const ::Envoy::LocalInfo::LocalInfo& local_info,
     Expr::BuilderInstanceSharedConstPtr expr_builder)
-    : configured_state_(ConfiguredState{local_info, std::move(expr_builder)}) {
-  ASSERT(configured_state_->expr_builder != nullptr);
+    : configured_expr_builder_(std::move(expr_builder)) {
+  ASSERT(configured_expr_builder_ != nullptr);
 }
 
 absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
@@ -90,26 +120,24 @@ CELFormatterCommandParser::parse(absl::string_view command, absl::string_view su
   if (command == "CEL" || command == "TYPED_CEL") {
     auto parse_status = google::api::expr::parser::Parse(subcommand);
     if (!parse_status.ok()) {
-      throw EnvoyException("Not able to parse expression: " + parse_status.status().ToString());
+      return absl::InvalidArgumentError(
+          absl::StrCat("Not able to parse expression: ", parse_status.status().ToString()));
     }
 
-    // Lazily resolve the active server context at CEL-command parse time: built-in command parsers
-    // are process-global, so they cannot capture server-owned CEL state.
-    if (!configured_state_.has_value()) {
-      Server::Configuration::ServerFactoryContext& context =
-          Server::Configuration::ServerFactoryContextInstance::get();
-      return std::make_unique<CELFormatter>(context.localInfo(), Expr::getBuilder(context),
-                                            parse_status.value().expr(), max_length,
-                                            command == "TYPED_CEL");
-    }
-    return std::make_unique<CELFormatter>(
-        configured_state_->local_info.get(), configured_state_->expr_builder,
-        parse_status.value().expr(), max_length, command == "TYPED_CEL");
+    // Built-in parsers are process-global and may outlive a server context; resolve the default
+    // builder per parse to avoid reusing it across server contexts.
+    Server::Configuration::ServerFactoryContext& context =
+        Server::Configuration::ServerFactoryContextInstance::get();
+    const auto expr_builder =
+        configured_expr_builder_ != nullptr ? configured_expr_builder_ : Expr::getBuilder(context);
+    return std::make_unique<CELFormatter>(context.localInfo(), expr_builder,
+                                          parse_status.value().expr(), max_length,
+                                          command == "TYPED_CEL");
   }
 
   return nullptr;
 #else
-  throw EnvoyException("CEL is not available for use in this environment.");
+  return absl::UnimplementedError("CEL is not available for use in this environment.");
 #endif
 }
 

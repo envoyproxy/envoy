@@ -2,10 +2,13 @@
 
 #include <functional>
 
+#include "envoy/common/logger.h"
+
 #include "source/common/common/logger.h"
 
 #include "absl/debugging/stacktrace.h"
 #include "absl/debugging/symbolize.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Assert {
@@ -31,12 +34,30 @@ public:
     stack_depth_ = absl::GetStackTrace(stack_trace_, kMaxStackDepth, /* skip_count = */ 1);
   }
 
+  static void setSingleLine(bool single_line) { single_line_ = single_line; }
+  static bool singleLine() { return single_line_; }
+
   /*
    * Logs each row of the captured stack into the envoy_bug log.
+   * When in single-line mode and a non-empty message is provided, the message
+   * is used as the preamble instead of the generic "stacktrace for envoy bug".
    */
-  void logStackTrace() {
-    ENVOY_LOG(error, "stacktrace for envoy bug");
+  void logStackTrace(absl::string_view message = {}) {
     char out[1024];
+    if (single_line_) {
+      std::string buf(message.empty() ? "stacktrace for envoy bug" : message);
+      for (int i = 0; i < stack_depth_; ++i) {
+        const bool success = absl::Symbolize(stack_trace_[i], out, sizeof(out));
+        if (success) {
+          fmt::format_to(std::back_inserter(buf), "\n#{} {} [{}]", i, out, stack_trace_[i]);
+        } else {
+          fmt::format_to(std::back_inserter(buf), "\n#{} UNKNOWN [{}]", i, stack_trace_[i]);
+        }
+      }
+      ENVOY_LOG(error, "{}", buf);
+      return;
+    }
+    ENVOY_LOG(error, "stacktrace for envoy bug");
     for (int i = 0; i < stack_depth_; ++i) {
       const bool success = absl::Symbolize(stack_trace_[i], out, sizeof(out));
       if (success) {
@@ -48,6 +69,7 @@ public:
   }
 
 private:
+  static inline bool single_line_ = false;
   static const int kMaxStackDepth = 16;
   void* stack_trace_[kMaxStackDepth];
   int stack_depth_{0};
@@ -275,12 +297,15 @@ void resetEnvoyBugCountersForTest();
     if (!(CONDITION) && Envoy::Assert::shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(          \
                             __FILE__ ":" TOSTRING(__LINE__))) {                                    \
       const std::string& details = (DETAILS);                                                      \
-      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,    \
-                          "envoy bug failure: {}.{}{}", CONDITION_STR,                             \
-                          details.empty() ? "" : " Details: ", details);                           \
+      const auto envoy_bug_msg = fmt::format("envoy bug failure: {}.{}{}", CONDITION_STR,          \
+                                             details.empty() ? "" : " Details: ", details);        \
+      if (!Envoy::Assert::EnvoyBugStackTrace::singleLine()) {                                      \
+        ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,  \
+                            "{}", envoy_bug_msg);                                                  \
+      }                                                                                            \
       Envoy::Assert::EnvoyBugStackTrace st;                                                        \
       st.capture();                                                                                \
-      st.logStackTrace();                                                                          \
+      st.logStackTrace(envoy_bug_msg);                                                             \
       ACTION;                                                                                      \
     }                                                                                              \
   } while (false)

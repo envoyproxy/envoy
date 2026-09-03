@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -156,6 +157,17 @@ public:
   virtual absl::Span<const std::string> pemEncodedPeerCertificateChain() const PURE;
 
   /**
+   * @return absl::Span<const std::string> the PEM-encoded representation of each certificate in the
+   *         validated peer certificate chain (the chain Envoy built and verified during certificate
+   *         validation), as individual strings ordered leaf-first. Returns {} if the peer
+   *         certificate was not validated or the validated chain is unavailable.
+   *
+   * @note Unlike pemEncodedPeerCertificateChain(), this is not the raw chain presented by the peer;
+   *       it reflects the path Envoy actually trusted, so it may differ in order and contents.
+   **/
+  virtual absl::Span<const std::string> pemEncodedValidatedPeerCertificateChain() const PURE;
+
+  /**
    * @return bool whether the provided matcher matches a SAN in the peer certificate.
    * @note This method takes a matcher, instead of returning the SANs, to avoid putting
    *       BoringSSL types into interfaces.
@@ -246,10 +258,11 @@ public:
   virtual uint16_t ciphersuiteId() const PURE;
 
   /**
-   * @return std::string the OpenSSL name for the set of ciphers used in the established TLS
-   *         connection. Returns "" if there is no current negotiated ciphersuite.
+   * @return absl::string_view the OpenSSL name for the set of ciphers used in the established TLS
+   *         connection. Returns "" if there is no current negotiated ciphersuite. The returned
+   *         view is valid for the lifetime of this object.
    **/
-  virtual std::string ciphersuiteString() const PURE;
+  virtual absl::string_view ciphersuiteString() const PURE;
 
   /**
    * @return uint16_t the OpenSSL id of the group that was used for the key agreement of the

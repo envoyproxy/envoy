@@ -24,7 +24,7 @@ public:
   DummyGeoipProviderFactory() : driver_(new MockDriver()) {}
   Geolocation::DriverSharedPtr
   createGeoipProviderDriver(const Protobuf::Message&, const std::string&,
-                            Server::Configuration::FactoryContext&) override {
+                            Server::Configuration::ServerFactoryContext&) override {
     return driver_;
   }
 

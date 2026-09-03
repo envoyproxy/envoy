@@ -1,7 +1,12 @@
+#include <cstdint>
+#include <numeric>
+#include <vector>
+
 #include "source/common/common/hex.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/ssl/ssl.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
@@ -9,6 +14,7 @@
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/strings/str_format.h"
@@ -35,14 +41,126 @@ namespace ListenerFilters {
 namespace TlsInspector {
 namespace {
 
+void append_u16(std::vector<uint8_t>& vec, uint16_t val) {
+  vec.push_back((val >> 8) & 0xFF);
+  vec.push_back(val & 0xFF);
+}
+
+// Helper to append a 24-bit value in network byte order
+void append_u24(std::vector<uint8_t>& vec, uint32_t val) {
+  vec.push_back((val >> 16) & 0xFF);
+  vec.push_back((val >> 8) & 0xFF);
+  vec.push_back(val & 0xFF);
+}
+
+std::vector<uint8_t> CreateClientHello(absl::string_view host_name, size_t padding_size = 0,
+                                       bool include_extensions = true,
+                                       uint16_t tls_version = 0x0303) {
+  std::vector<uint8_t> hello;
+
+  const bool has_sni = !host_name.empty();
+  const size_t host_name_len = host_name.length();
+  // SNI Extension Length Calculations
+  uint16_t sni_ext_total_len = 0;
+  uint16_t hnl = 0;
+  uint16_t snll = 0;
+  uint16_t sedl = 0;
+  if (has_sni) {
+    hnl = host_name_len;
+    snll = 1 + 2 + hnl;               // Name Type byte + Host Name Length field + Host Name data
+    sedl = 2 + snll;                  // Server Name List Length field + Server Name List data
+    sni_ext_total_len = 2 + 2 + sedl; // Ext Type field + Ext Length field + Ext Data
+  }
+
+  // Dummy Padding Extension Length Calculations
+  uint16_t dummy_ext_len = 0;
+  if (padding_size > 0) {
+    dummy_ext_len = 2 + 2 + padding_size; // Type + Length + Padding
+  }
+
+  const uint16_t el =
+      include_extensions ? (sni_ext_total_len + dummy_ext_len) : 0; // Total Extensions Length
+
+  // ClientHello Length Calculations
+  const size_t client_hello_core_len = 2    // Client Version
+                                       + 32 // Random
+                                       + 1  // Session ID Length
+                                       + 2  // Cipher Suites Length
+                                       + 2  // Cipher Suites
+                                       + 1  // Compression Methods Length
+                                       + 1; // Compression Methods
+  uint32_t hl = client_hello_core_len;
+  if (include_extensions && el > 0) {
+    hl += 2 + el; // Core + Extensions Length field + Extensions data
+  } else if (!include_extensions) {
+    // No extensions block at all.
+  }
+
+  // Record Length Calculation
+  const uint16_t rl = 4 + hl; // Handshake Header size + Handshake Data
+
+  // Record Header (5 bytes)
+  hello.push_back(0x16); // Content Type: Handshake
+  hello.push_back(0x03); // Version: TLS 1.0 (for the record layer)
+  hello.push_back(0x01);
+  append_u16(hello, rl); // Record Length
+
+  // Handshake Protocol: Client Hello (4 bytes for header)
+  hello.push_back(0x01); // Handshake Type: Client Hello
+  append_u24(hello, hl); // Handshake Length
+
+  // Client Hello Message (hl bytes)
+  // Client Version
+  hello.push_back((tls_version >> 8) & 0xFF);
+  hello.push_back(tls_version & 0xFF);
+  std::vector<uint8_t> random_bytes(32);
+  std::iota(random_bytes.begin(), random_bytes.end(), 1);
+  hello.insert(hello.end(), random_bytes.begin(), random_bytes.end());
+  hello.push_back(0x00); // Session ID Length: 0
+  append_u16(hello, 2);  // Cipher Suites Length: 2
+  hello.push_back(0xc0);
+  hello.push_back(0x2f);
+  hello.push_back(0x01); // Compression Methods Length: 1
+  hello.push_back(0x00); // Compression Method: null
+
+  if (include_extensions && el > 0) {
+    // Extensions (2 + el bytes)
+    append_u16(hello, el); // Extensions Length
+
+    if (has_sni) {
+      // Extension: server_name (sni_ext_total_len bytes)
+      append_u16(hello, 0x0000); // Type: server_name
+      append_u16(hello, sedl);   // Length of Extension Data
+      append_u16(hello, snll);   // Server Name List Length
+      hello.push_back(0x00);     // Name Type: host_name
+      append_u16(hello, hnl);    // Length of Host Name
+      // Host Name data
+      hello.insert(hello.end(), host_name.begin(), host_name.end());
+    }
+
+    // Dummy Padding Extension
+    if (padding_size > 0) {
+      append_u16(hello, 0xFFFF);       // Dummy Extension Type
+      append_u16(hello, padding_size); // Length of Dummy Extension Data
+      std::vector<uint8_t> padding(padding_size, 0xAA);
+      hello.insert(hello.end(), padding.begin(), padding.end());
+    }
+  }
+
+  return hello;
+}
+
 class TlsInspectorTest : public testing::TestWithParam<std::tuple<uint16_t, uint16_t>> {
 public:
   TlsInspectorTest()
       : cfg_(std::make_shared<Config>(
             *store_.rootScope(),
             envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector())),
-        io_handle_(Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, std::nullopt,
-                                                                            {})) {}
+        io_handle_(
+            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, std::nullopt, {})) {
+    // Do not try to close fake socket descriptor.
+    ON_CALL(os_sys_calls_, close(_)).WillByDefault(testing::Return(Api::SysCallIntResult{0, 0}));
+  }
 
   void init() {
     filter_ = std::make_unique<Filter>(cfg_);
@@ -97,6 +215,8 @@ public:
                const std::string& hash = {}, bool expect_alpn = true);
   void testJA4(const std::string& expected_ja4, const std::string& sni = "",
                const std::string& alpn = "");
+  void testJA4(testing::Matcher<absl::string_view> expected_ja4_matcher,
+               const std::string& sni = "", const std::string& alpn = "");
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
@@ -139,7 +259,7 @@ TEST_P(TlsInspectorTest, SniRegistered) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   // trigger the event to copy the client hello message into buffer
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
@@ -161,7 +281,7 @@ TEST_P(TlsInspectorTest, SniStatsNotDoubleCounted) {
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   // Verify stats are incremented exactly once.
@@ -182,7 +302,7 @@ TEST_P(TlsInspectorTest, AlpnRegistered) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   // trigger the event to copy the client hello message into buffer
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
 
   EXPECT_EQ(Network::FilterStatus::Continue, state);
@@ -243,7 +363,7 @@ TEST_P(TlsInspectorTest, MultipleReads) {
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   while (!got_continue) {
     // trigger the event to copy the client hello message into buffer
-    EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+    EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
     auto state = filter_->onData(*buffer_);
     if (state == Network::FilterStatus::Continue) {
       got_continue = true;
@@ -269,7 +389,7 @@ TEST_P(TlsInspectorTest, NoExtensions) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   // trigger the event to copy the client hello message into buffer
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
@@ -303,7 +423,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   filter_->onAccept(cb_);
   mockSysCallForPeek(client_hello, true);
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   Protobuf::Struct expected_metadata;
   auto& fields = *expected_metadata.mutable_fields();
@@ -345,7 +465,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBigTreatParsingErrorAsPlainText) {
   filter_->onAccept(cb_);
   mockSysCallForPeek(client_hello, true);
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
@@ -370,7 +490,7 @@ TEST_P(TlsInspectorTest, ConnectionFingerprint) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   // trigger the event to copy the client hello message into buffer
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
 }
@@ -386,7 +506,8 @@ void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_serve
   if (hash.empty()) {
     uint8_t buf[MD5_DIGEST_LENGTH];
     MD5(reinterpret_cast<const uint8_t*>(fingerprint.data()), fingerprint.size(), buf);
-    EXPECT_CALL(socket_, setJA3Hash(absl::string_view(Envoy::Hex::encode(buf, MD5_DIGEST_LENGTH))));
+    EXPECT_CALL(socket_, setJA3Hash(absl::string_view(Envoy::Hex::encode(
+                             absl::Span<const uint8_t>(buf, MD5_DIGEST_LENGTH)))));
   } else {
     EXPECT_CALL(socket_, setJA3Hash(absl::string_view(hash)));
   }
@@ -402,7 +523,7 @@ void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_serve
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   // trigger the event to copy the client hello message into buffer
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
 }
@@ -440,7 +561,7 @@ TEST_P(TlsInspectorTest, ConnectionJA3HashGREASE) {
 
   uint8_t buf[MD5_DIGEST_LENGTH];
   MD5(reinterpret_cast<const uint8_t*>(fingerprint.data()), fingerprint.size(), buf);
-  std::string hash = Envoy::Hex::encode(buf, MD5_DIGEST_LENGTH);
+  std::string hash = Envoy::Hex::encode(absl::Span<const uint8_t>(buf, MD5_DIGEST_LENGTH));
 
   testJA3(fingerprint_with_grease, true, hash);
 }
@@ -474,7 +595,7 @@ TEST_P(TlsInspectorTest, NotSsl) {
   data.resize(100);
   mockSysCallForPeek(data);
   // trigger the event to copy the client hello message into buffer:q
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   Protobuf::Struct expected_metadata;
   auto& fields = *expected_metadata.mutable_fields();
@@ -508,7 +629,7 @@ TEST_P(TlsInspectorTest, NotSslCloseConnection) {
   data.resize(100);
   mockSysCallForPeek(data);
   // trigger the event to copy the client hello message into buffer:q
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
 
   Protobuf::Struct expected_metadata;
   auto& fields = *expected_metadata.mutable_fields();
@@ -539,7 +660,7 @@ TEST_P(TlsInspectorTest, NotSslOverMaxReadBytesSingleRead) {
   data.resize(Config::TLS_MAX_CLIENT_HELLO + 1);
   mockSysCallForPeek(data);
   // trigger the event to copy the client hello message into buffer:q
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
@@ -564,7 +685,7 @@ TEST_P(TlsInspectorTest, EarlyTerminationShouldNotRecordBytesProcessed) {
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   // Trigger the event to copy the client hello message into buffer
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
 
@@ -593,14 +714,14 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(_)).Times(0);
 
   mockSysCallForPeek(client_hello, true);
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(2 * initial_buffer_size, filter_->maxReadBytes());
   buffer_->resetCapacity(2 * initial_buffer_size);
 
   mockSysCallForPeek(client_hello, true);
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(max_size, filter_->maxReadBytes());
@@ -609,7 +730,7 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
   // The filter should not request a larger buffer as we've reached the max.
   // It should close the connection.
   mockSysCallForPeek(client_hello, true);
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(max_size, filter_->maxReadBytes());
@@ -618,6 +739,11 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
 
 void TlsInspectorTest::testJA4(const std::string& expected_ja4, const std::string& sni,
                                const std::string& alpn) {
+  testJA4(testing::Matcher<absl::string_view>(expected_ja4), sni, alpn);
+}
+
+void TlsInspectorTest::testJA4(testing::Matcher<absl::string_view> expected_ja4_matcher,
+                               const std::string& sni, const std::string& alpn) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
@@ -628,7 +754,7 @@ void TlsInspectorTest::testJA4(const std::string& expected_ja4, const std::strin
   init();
   mockSysCallForPeek(client_hello);
 
-  EXPECT_CALL(socket_, setJA4Hash(absl::string_view(expected_ja4)));
+  EXPECT_CALL(socket_, setJA4Hash(expected_ja4_matcher));
 
   if (!sni.empty()) {
     EXPECT_CALL(socket_, setRequestedServerName(absl::string_view(sni)));
@@ -652,7 +778,7 @@ void TlsInspectorTest::testJA4(const std::string& expected_ja4, const std::strin
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
 
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
 }
@@ -740,11 +866,15 @@ TEST_P(TlsInspectorTest, JA4WithSNIAndALPN) {
   const uint16_t min_version = std::get<0>(GetParam());
   const uint16_t max_version = std::get<1>(GetParam());
 
-  std::string expected_value = (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
-                                max_version == Config::TLS_MAX_SUPPORTED_VERSION)
-                                   ? SSL_SELECT("t13d1312h2_f57a46bbacb6_ef7df7f74e48",
-                                                "t13d5511h2_54f589121d70_3cecfd2c111c")
-                                   : alpn_sni_test_version_to_ja4_.at(min_version);
+  testing::Matcher<absl::string_view> expected_value =
+      (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
+       max_version == Config::TLS_MAX_SUPPORTED_VERSION)
+          ? SSL_SELECT(testing::Matcher<absl::string_view>(
+                           testing::AnyOf(testing::Eq("t13d1312h2_f57a46bbacb6_ef7df7f74e48"),
+                                          testing::Eq("t13d1311h2_f57a46bbacb6_78e6aca7449b"))),
+                       testing::Matcher<absl::string_view>(
+                           testing::Eq("t13d5511h2_54f589121d70_3cecfd2c111c")))
+          : alpn_sni_test_version_to_ja4_.at(min_version);
 
   testJA4(expected_value, "example.com", "\x02h2\x08http/1.1");
 }
@@ -814,7 +944,7 @@ TEST_P(TlsInspectorTest, JA4MalformedClientHello) {
   EXPECT_CALL(socket_, setJA4Hash(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(_)).Times(0);
 
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
@@ -849,7 +979,7 @@ TEST_P(TlsInspectorTest, JA4WithNoExtensions) {
   EXPECT_CALL(socket_, setJA4Hash(absl::string_view(expected_ja4)));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
 
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
 }
@@ -875,7 +1005,7 @@ TEST_P(TlsInspectorTest, JA4VersionFallback) {
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);           // No SNI in this test
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0); // No ALPN in this test
 
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
 }
@@ -910,7 +1040,7 @@ TEST_P(TlsInspectorTest, JA4EmptyExtensionsList) {
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
 
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
 }
@@ -1050,7 +1180,7 @@ TEST_P(TlsInspectorTest, JA4MaxValuesCiphers) {
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
 
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
 }
@@ -1084,9 +1214,93 @@ TEST_P(TlsInspectorTest, JA4NonAlphanumericALPN) {
   std::vector<absl::string_view> expected_alpn = {"*2)"};
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(testing::ContainerEq(expected_alpn)));
 
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
+}
+
+TEST_P(TlsInspectorTest, TlsVersionTooLow) {
+  init();
+  const std::string servername("example.com");
+  // Generate ClientHello with SSL v3 version (0x0300)
+  std::vector<uint8_t> client_hello = CreateClientHello(servername, 0, true, 0x0300);
+  mockSysCallForPeek(client_hello);
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  // trigger the event to copy the client hello message into buffer
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
+  Protobuf::Struct expected_metadata;
+  auto& fields = *expected_metadata.mutable_fields();
+  fields[Filter::failureReasonKey()].set_string_value(
+      Filter::failureReasonClientHelloInvalidTlsVersion());
+  EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
+  EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
+}
+
+TEST_P(TlsInspectorTest, TlsVersionTooLowAllowedByRuntime) {
+  Runtime::maybeSetRuntimeGuard(
+      "envoy.reloadable_features.tls_inspector_enforce_client_tls_version", false);
+  init();
+  const std::string servername("example.com");
+  // Generate ClientHello with SSL v3 version (0x0300)
+  std::vector<uint8_t> client_hello = CreateClientHello(servername, 0, true, 0x0300);
+  mockSysCallForPeek(client_hello);
+
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
+  auto state = filter_->onData(*buffer_);
+  // With guard false, it proceeds as a normal TLS connection for inspection
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+  EXPECT_EQ(1, cfg_->stats().tls_found_.value());
+  EXPECT_EQ(0, cfg_->stats().tls_not_found_.value());
+}
+
+TEST_P(TlsInspectorTest, TlsVersionTooHigh) {
+  init();
+  const std::string servername("example.com");
+  // Generate ClientHello with non existent version (1.3 is 0x0304)
+  std::vector<uint8_t> client_hello = CreateClientHello(servername, 0, true, 0x0305);
+  mockSysCallForPeek(client_hello);
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  // trigger the event to copy the client hello message into buffer
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
+  Protobuf::Struct expected_metadata;
+  auto& fields = *expected_metadata.mutable_fields();
+  fields[Filter::failureReasonKey()].set_string_value(
+      Filter::failureReasonClientHelloInvalidTlsVersion());
+  EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
+  EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
+}
+
+TEST_P(TlsInspectorTest, TlsVersionTooHighAllowedByRuntime) {
+  Runtime::maybeSetRuntimeGuard(
+      "envoy.reloadable_features.tls_inspector_enforce_client_tls_version", false);
+  init();
+  const std::string servername("example.com");
+  // Generate ClientHello with SSL v3 version (0x0300)
+  std::vector<uint8_t> client_hello = CreateClientHello(servername, 0, true, 0x0305);
+  mockSysCallForPeek(client_hello);
+
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
+  auto state = filter_->onData(*buffer_);
+  // With guard false, it proceeds as a normal TLS connection for inspection
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+  EXPECT_EQ(1, cfg_->stats().tls_found_.value());
+  EXPECT_EQ(0, cfg_->stats().tls_not_found_.value());
 }
 
 } // namespace

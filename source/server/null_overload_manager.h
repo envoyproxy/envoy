@@ -68,7 +68,7 @@ public:
     return std::nullopt;
   }
 
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotSharedPtr tls_;
   // The admin code runs in non-permissive mode, rejecting connections and
   // ensuring timer code is not called. Envoy mobile uses permissive mode and
   // does the opposite.

@@ -32,5 +32,6 @@ envoy_cc_library(
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/protobuf",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )

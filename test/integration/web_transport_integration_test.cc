@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
@@ -251,7 +252,7 @@ TEST_P(WebTransportIntegrationTest, EchoesBidirectionalStreamThroughBridge) {
   quiche::QuicheMemSlice slice(
       quiche::QuicheBuffer::Copy(quiche::SimpleBufferAllocator::Get(), payload));
   absl::Span<quiche::QuicheMemSlice> span(&slice, 1);
-  ASSERT_TRUE(client_stream->Writev(span, webtransport::StreamWriteOptions()).ok());
+  ASSERT_OK(client_stream->Writev(span, webtransport::StreamWriteOptions()));
 
   // Pump the client event loop until the echo arrives (the bytes traverse client -> Envoy bridge ->
   // upstream echo -> back).

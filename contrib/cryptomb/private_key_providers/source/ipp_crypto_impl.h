@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "contrib/cryptomb/private_key_providers/source/ipp_crypto.h"
 #include "crypto_mb/cpu_features.h"
 #include "crypto_mb/ec_nistp256.h"

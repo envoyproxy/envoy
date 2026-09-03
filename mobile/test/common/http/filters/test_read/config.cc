@@ -6,9 +6,10 @@ namespace Envoy {
 namespace HttpFilters {
 namespace TestRead {
 
-Http::FilterFactoryCb TestReadFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> TestReadFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoymobile::test::integration::filters::http::test_read::TestRead& /*config*/,
-    const std::string&, Server::Configuration::FactoryContext& /*context*/) {
+    Server::Configuration::ServerFactoryContext& /*context*/,
+    Server::Configuration::ExtraFactoryContext&) {
   return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<TestReadFilter>());
   };

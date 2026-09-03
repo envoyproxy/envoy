@@ -8,6 +8,7 @@
 #include "test/mocks/geoip/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -42,7 +43,7 @@ TEST_F(GeoipConfigTest, CreateFilterFactory) {
 
   GeoipFilterFactory factory;
   auto status_or_cb = factory.createFilterFactoryFromProto(proto_config, context_);
-  ASSERT_TRUE(status_or_cb.ok());
+  ASSERT_OK(status_or_cb);
   Network::FilterFactoryCb cb = status_or_cb.value();
   EXPECT_NE(nullptr, cb);
 
@@ -89,7 +90,7 @@ TEST_F(GeoipConfigTest, CreateFilterFactoryWithClientIp) {
 
   GeoipFilterFactory factory;
   auto status_or_cb = factory.createFilterFactoryFromProto(proto_config, context_);
-  ASSERT_TRUE(status_or_cb.ok());
+  ASSERT_OK(status_or_cb);
   Network::FilterFactoryCb cb = status_or_cb.value();
   EXPECT_NE(nullptr, cb);
 

@@ -42,7 +42,7 @@ public:
    * Determines whether the specified Value is in any of the intervals.
    *
    * @param value the value
-   * @return true if value is covered in the inteval set.
+   * @return true if value is covered in the interval set.
    */
   virtual bool test(Value value) const PURE;
 };

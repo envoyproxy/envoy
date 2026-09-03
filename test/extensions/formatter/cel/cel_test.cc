@@ -5,8 +5,10 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/formatter/cel/cel.h"
 
+#include "test/common/formatter/formatter_test_utility.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "fmt/format.h"
@@ -16,6 +18,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace Formatter {
+
+using ::Envoy::StatusHelpers::HasStatus;
+using ::testing::HasSubstr;
 
 class CELFormatterTest : public ::testing::Test {
 public:
@@ -90,35 +95,39 @@ TEST_F(CELFormatterTest, TestNodeId) {
   auto cel_parser = std::make_unique<CELFormatterCommandParser>();
   std::optional<size_t> max_length = std::nullopt;
   auto formatter = cel_parser->parse("CEL", "xds.node.id", max_length).value();
-  EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("node_name")));
 
   auto typed_formatter = cel_parser->parse("TYPED_CEL", "xds.node.id", max_length).value();
-  EXPECT_THAT(typed_formatter->formatValue(formatter_context_, stream_info_),
-              ProtoEq(ValueUtil::stringValue("node_name")));
+  EXPECT_THAT(
+      Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context_, stream_info_),
+      ProtoEq(ValueUtil::stringValue("node_name")));
 }
 
 TEST_F(CELFormatterTest, Testformat) {
   auto cel_parser = std::make_unique<CELFormatterCommandParser>();
   std::optional<size_t> max_length = std::nullopt;
   auto formatter = cel_parser->parse("CEL", "xds.node.id", max_length).value();
-  EXPECT_THAT(formatter->format(formatter_context_, stream_info_), "node_name");
+  EXPECT_THAT(Envoy::Formatter::formatForTest(*formatter, formatter_context_, stream_info_),
+              "node_name");
 
   auto typed_formatter = cel_parser->parse("TYPED_CEL", "xds.node.id", max_length).value();
-  EXPECT_THAT(typed_formatter->format(formatter_context_, stream_info_), "node_name");
+  EXPECT_THAT(Envoy::Formatter::formatForTest(*typed_formatter, formatter_context_, stream_info_),
+              "node_name");
 }
 
 TEST_F(CELFormatterTest, TestFormatStringValue) {
   auto cel_parser = std::make_unique<CELFormatterCommandParser>();
   std::optional<size_t> max_length = std::nullopt;
   auto formatter = cel_parser->parse("CEL", "request.headers[':method']", max_length).value();
-  EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("GET")));
 
   auto typed_formatter =
       cel_parser->parse("TYPED_CEL", "request.headers[':method']", max_length).value();
-  EXPECT_THAT(typed_formatter->formatValue(formatter_context_, stream_info_),
-              ProtoEq(ValueUtil::stringValue("GET")));
+  EXPECT_THAT(
+      Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context_, stream_info_),
+      ProtoEq(ValueUtil::stringValue("GET")));
 }
 
 TEST_F(CELFormatterTest, TestFormatNumberValue) {
@@ -126,25 +135,27 @@ TEST_F(CELFormatterTest, TestFormatNumberValue) {
   std::optional<size_t> max_length = std::nullopt;
   auto formatter =
       cel_parser->parse("CEL", "request.headers[':method'].size()", max_length).value();
-  EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("3")));
 
   auto typed_formatter =
       cel_parser->parse("TYPED_CEL", "request.headers[':method'].size()", max_length).value();
-  EXPECT_THAT(typed_formatter->formatValue(formatter_context_, stream_info_),
-              ProtoEq(ValueUtil::numberValue(3)));
+  EXPECT_THAT(
+      Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context_, stream_info_),
+      ProtoEq(ValueUtil::numberValue(3)));
 }
 
 TEST_F(CELFormatterTest, TestFormatNullValue) {
   auto cel_parser = std::make_unique<CELFormatterCommandParser>();
   std::optional<size_t> max_length = std::nullopt;
   auto formatter = cel_parser->parse("CEL", "request.headers.nope", max_length).value();
-  EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::nullValue()));
 
   auto typed_formatter = cel_parser->parse("TYPED_CEL", "request.headers.nope", max_length).value();
-  EXPECT_THAT(typed_formatter->formatValue(formatter_context_, stream_info_),
-              ProtoEq(ValueUtil::nullValue()));
+  EXPECT_THAT(
+      Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context_, stream_info_),
+      ProtoEq(ValueUtil::nullValue()));
 }
 
 TEST_F(CELFormatterTest, TestFormatNoHeaders) {
@@ -155,35 +166,38 @@ TEST_F(CELFormatterTest, TestFormatNoHeaders) {
 
   {
     auto formatter = cel_parser->parse("CEL", "request.headers.nope", max_length).value();
-    EXPECT_THAT(formatter->formatValue(formatter_context, stream_info_),
+    EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context, stream_info_),
                 ProtoEq(ValueUtil::nullValue()));
 
     auto typed_formatter =
         cel_parser->parse("TYPED_CEL", "request.headers.nope", max_length).value();
-    EXPECT_THAT(typed_formatter->formatValue(formatter_context, stream_info_),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_THAT(
+        Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context, stream_info_),
+        ProtoEq(ValueUtil::nullValue()));
   }
 
   {
     auto formatter = cel_parser->parse("CEL", "response.headers.nope", max_length).value();
-    EXPECT_THAT(formatter->formatValue(formatter_context, stream_info_),
+    EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context, stream_info_),
                 ProtoEq(ValueUtil::nullValue()));
 
     auto typed_formatter =
         cel_parser->parse("TYPED_CEL", "response.headers.nope", max_length).value();
-    EXPECT_THAT(typed_formatter->formatValue(formatter_context, stream_info_),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_THAT(
+        Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context, stream_info_),
+        ProtoEq(ValueUtil::nullValue()));
   }
 
   {
     auto formatter = cel_parser->parse("CEL", "response.trailers.nope", max_length).value();
-    EXPECT_THAT(formatter->formatValue(formatter_context, stream_info_),
+    EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context, stream_info_),
                 ProtoEq(ValueUtil::nullValue()));
 
     auto typed_formatter =
         cel_parser->parse("TYPED_CEL", "response.trailers.nope", max_length).value();
-    EXPECT_THAT(typed_formatter->formatValue(formatter_context, stream_info_),
-                ProtoEq(ValueUtil::nullValue()));
+    EXPECT_THAT(
+        Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context, stream_info_),
+        ProtoEq(ValueUtil::nullValue()));
   }
 }
 
@@ -192,25 +206,27 @@ TEST_F(CELFormatterTest, TestFormatBoolValue) {
   std::optional<size_t> max_length = std::nullopt;
   auto formatter =
       cel_parser->parse("CEL", "request.headers[':method'] == 'GET'", max_length).value();
-  EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("true")));
 
   auto typed_formatter =
       cel_parser->parse("TYPED_CEL", "request.headers[':method'] == 'GET'", max_length).value();
-  EXPECT_THAT(typed_formatter->formatValue(formatter_context_, stream_info_),
-              ProtoEq(ValueUtil::boolValue(true)));
+  EXPECT_THAT(
+      Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context_, stream_info_),
+      ProtoEq(ValueUtil::boolValue(true)));
 }
 
 TEST_F(CELFormatterTest, TestFormatDurationValue) {
   auto cel_parser = std::make_unique<CELFormatterCommandParser>();
   std::optional<size_t> max_length = std::nullopt;
   auto formatter = cel_parser->parse("CEL", "duration(\"1h30m\")", max_length).value();
-  EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("1h30m")));
 
   auto typed_formatter = cel_parser->parse("TYPED_CEL", "duration(\"1h30m\")", max_length).value();
-  EXPECT_THAT(typed_formatter->formatValue(formatter_context_, stream_info_),
-              ProtoEq(ValueUtil::stringValue("5400s")));
+  EXPECT_THAT(
+      Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context_, stream_info_),
+      ProtoEq(ValueUtil::stringValue("5400s")));
 }
 
 TEST_F(CELFormatterTest, TestFormatTimestampValue) {
@@ -218,38 +234,40 @@ TEST_F(CELFormatterTest, TestFormatTimestampValue) {
   std::optional<size_t> max_length = std::nullopt;
   auto formatter =
       cel_parser->parse("CEL", "timestamp(\"2023-08-26T12:39:00-07:00\")", max_length).value();
-  EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("2023-08-26T19:39:00+00:00")));
 
   auto typed_formatter =
       cel_parser->parse("TYPED_CEL", "timestamp(\"2023-08-26T12:39:00-07:00\")", max_length)
           .value();
-  EXPECT_THAT(typed_formatter->formatValue(formatter_context_, stream_info_),
-              ProtoEq(ValueUtil::stringValue("2023-08-26T19:39:00Z")));
+  EXPECT_THAT(
+      Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context_, stream_info_),
+      ProtoEq(ValueUtil::stringValue("2023-08-26T19:39:00Z")));
 }
 
 TEST_F(CELFormatterTest, TestFormatBytesValue) {
   auto cel_parser = std::make_unique<CELFormatterCommandParser>();
   std::optional<size_t> max_length = std::nullopt;
   auto formatter = cel_parser->parse("CEL", "bytes(\"hello\")", max_length).value();
-  EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("hello")));
 
   auto typed_formatter = cel_parser->parse("TYPED_CEL", "bytes(\"hello\")", max_length).value();
-  EXPECT_THAT(typed_formatter->formatValue(formatter_context_, stream_info_),
-              ProtoEq(ValueUtil::stringValue("aGVsbG8=")));
+  EXPECT_THAT(
+      Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context_, stream_info_),
+      ProtoEq(ValueUtil::stringValue("aGVsbG8=")));
 }
 
 TEST_F(CELFormatterTest, TestFormatListValue) {
   auto cel_parser = std::make_unique<CELFormatterCommandParser>();
   std::optional<size_t> max_length = std::nullopt;
   auto formatter = cel_parser->parse("CEL", "[\"foo\", 42, true]", max_length).value();
-  EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("CelList value")));
 
   auto typed_formatter = cel_parser->parse("TYPED_CEL", "[\"foo\", 42, true]", max_length).value();
   EXPECT_THAT(
-      typed_formatter->formatValue(formatter_context_, stream_info_),
+      Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context_, stream_info_),
       ProtoEq(ValueUtil::listValue({ValueUtil::stringValue("foo"), ValueUtil::numberValue(42),
                                     ValueUtil::boolValue(true)})));
 }
@@ -258,18 +276,20 @@ TEST_F(CELFormatterTest, TestFormatMapValue) {
   auto cel_parser = std::make_unique<CELFormatterCommandParser>();
   std::optional<size_t> max_length = std::nullopt;
   auto formatter = cel_parser->parse("CEL", "{\"foo\": \"42\"}", max_length).value();
-  EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("CelMap value")));
 
   auto typed_formatter = cel_parser->parse("TYPED_CEL", "{\"foo\": \"42\"}", max_length).value();
-  EXPECT_THAT(typed_formatter->formatValue(formatter_context_, stream_info_),
-              ProtoEq(ValueUtil::structValue(MessageUtil::keyValueStruct("foo", "42"))));
+  EXPECT_THAT(
+      Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context_, stream_info_),
+      ProtoEq(ValueUtil::structValue(MessageUtil::keyValueStruct("foo", "42"))));
 
   // Test something that fails to format. For whatever reason,
   // ExportAsProtoValue will not tolerate boolean keys.
   auto invalid_typed_formatter =
       cel_parser->parse("TYPED_CEL", "{true: \"42\"}", max_length).value();
-  EXPECT_THAT(invalid_typed_formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*invalid_typed_formatter, formatter_context_,
+                                                   stream_info_),
               ProtoEq(ValueUtil::nullValue()));
 }
 
@@ -277,13 +297,14 @@ TEST_F(CELFormatterTest, TestTruncation) {
   auto cel_parser = std::make_unique<CELFormatterCommandParser>();
   std::optional<size_t> max_length = 2;
   auto formatter = cel_parser->parse("CEL", "request.headers[':method']", max_length).value();
-  EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("GE")));
 
   auto typed_formatter =
       cel_parser->parse("TYPED_CEL", "request.headers[':method']", max_length).value();
-  EXPECT_THAT(typed_formatter->formatValue(formatter_context_, stream_info_),
-              ProtoEq(ValueUtil::stringValue("GE")));
+  EXPECT_THAT(
+      Envoy::Formatter::formatValueForTest(*typed_formatter, formatter_context_, stream_info_),
+      ProtoEq(ValueUtil::stringValue("GE")));
 }
 
 TEST_F(CELFormatterTest, TestParseFail) {
@@ -299,7 +320,7 @@ TEST_F(CELFormatterTest, TestNullFormatValue) {
   std::optional<size_t> max_length = std::nullopt;
   auto formatter =
       cel_parser->parse("CEL", "requests.headers['missing_headers']", max_length).value();
-  EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::nullValue()));
 }
 
@@ -309,25 +330,25 @@ TEST_F(CELFormatterTest, TestFormatConversionV1AlphaToDevCel) {
 
   // Test with a basic path expression
   auto formatter1 = cel_parser->parse("CEL", "request.path", max_length).value();
-  EXPECT_THAT(formatter1->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter1, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("/request/path?secret=parameter")));
 
   // Test with a more complex expression
   auto formatter2 =
       cel_parser->parse("CEL", "request.headers[':method'] == 'GET'", max_length).value();
   // The formatter returns boolean expressions as strings
-  EXPECT_THAT(formatter2->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter2, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("true")));
 
   // Test with string operations
   auto formatter3 =
       cel_parser->parse("CEL", "request.path.startsWith('/request')", max_length).value();
   // The formatter returns boolean expressions as strings
-  EXPECT_THAT(formatter3->formatValue(formatter_context_, stream_info_),
+  EXPECT_THAT(Envoy::Formatter::formatValueForTest(*formatter3, formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("true")));
 }
 
-TEST_F(CELFormatterTest, TestConfiguredFormatterWithoutCelConfig) {
+TEST_F(CELFormatterTest, TestRequestHeaderWithLegacyConfiguration) {
   const std::string yaml = R"EOF(
   text_format_source:
     inline_string: "%CEL(request.headers[':method'])%"
@@ -359,24 +380,6 @@ TEST_F(CELFormatterTest, TestCelConfigEnablesStringFunctions) {
   auto formatter =
       *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("/mutated/path?secret=parameter", formatter->format(formatter_context_, stream_info_));
-}
-
-// Without `cel_config`, string functions default off, so `replace()` is
-// unregistered and building the expression fails.
-TEST_F(CELFormatterTest, TestStringFunctionExpressionRejectedWithoutCelConfig) {
-  const std::string yaml = R"EOF(
-  text_format_source:
-    inline_string: "%CEL(request.headers['x-envoy-original-path'].replace('/original', '/mutated'))%"
-  formatters:
-    - name: envoy.formatter.cel
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
-)EOF";
-  TestUtility::loadFromYaml(yaml, config_);
-
-  EXPECT_THROW_WITH_REGEX(
-      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
-      EnvoyException, "failed to create an expression: .*");
 }
 
 TEST_F(CELFormatterTest, TestRequestHeader) {
@@ -637,9 +640,9 @@ TEST_F(CELFormatterTest, TestUntypedInvalidExpression) {
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  EXPECT_THROW_WITH_REGEX(
-      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
-      EnvoyException, "Not able to parse expression: .*");
+  EXPECT_THAT(
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+      HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("Not able to parse expression:")));
 }
 
 TEST_F(CELFormatterTest, TestTypedInvalidExpression) {
@@ -649,9 +652,9 @@ TEST_F(CELFormatterTest, TestTypedInvalidExpression) {
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  EXPECT_THROW_WITH_REGEX(
-      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
-      EnvoyException, "Not able to parse expression: .*");
+  EXPECT_THAT(
+      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+      HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("Not able to parse expression:")));
 }
 
 TEST_F(CELFormatterTest, TestInvalidSemanticExpression) {

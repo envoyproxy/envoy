@@ -12,19 +12,16 @@ namespace HttpFilters {
 namespace ConnectGrpcBridge {
 
 class ConnectGrpcFilterConfigFactory
-    : public Common::FactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig> {
 public:
-  ConnectGrpcFilterConfigFactory() : FactoryBase("envoy.filters.http.connect_grpc_bridge") {}
+  ConnectGrpcFilterConfigFactory() : UnifiedFactoryBase("envoy.filters.http.connect_grpc_bridge") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig& proto_config,
-      const std::string&, Server::Configuration::FactoryContext&) override;
-
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
-      const envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig& proto_config,
-      const std::string&, Server::Configuration::ServerFactoryContext&) override;
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 } // namespace ConnectGrpcBridge

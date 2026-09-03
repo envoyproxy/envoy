@@ -122,7 +122,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   bool commonHandleAfter1xxHeadersCallback(Filter1xxHeadersStatus status);
   bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& end_stream);
   bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
-                                     bool& buffer_was_streaming);
+                                     bool& buffer_was_streaming,
+                                     bool provided_data_nonempty_before_callback);
   bool commonHandleAfterTrailersCallback(FilterTrailersStatus status);
 
   // Buffers provided_data.
@@ -299,6 +300,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
   void
   removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
+  void addUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks& watermark_callbacks) override;
+  void removeUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks& watermark_callbacks) override;
   bool recreateStream(const Http::ResponseHeaderMap* original_response_headers) override;
 
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
@@ -840,6 +843,13 @@ public:
   void callHighWatermarkCallbacks();
   void callLowWatermarkCallbacks();
 
+  // Pass on upstream-request watermark callbacks to subscribers. These are driven by the aggregate
+  // back-pressure raised toward the request source via onDecoderFilterAboveWriteBufferHighWatermark
+  // (notably by the router's UpstreamRequest), and let a filter that produces request data of its
+  // own pause/resume in step with the upstream.
+  void callUpstreamHighWatermarkCallbacks();
+  void callUpstreamLowWatermarkCallbacks();
+
   void requestHeadersInitialized() {
     if (Http::Headers::get().MethodValues.Head ==
         filter_manager_callbacks_.requestHeaders()->getMethodValue()) {
@@ -993,6 +1003,14 @@ protected:
     bool decoder_filters_streaming_{true};
     bool destroyed_{false};
 
+    // Set true when a filter calls addDecodedData()/addEncodedData() during its own
+    // decodeData()/encodeData() callback. Reset immediately before each data callback. Combined
+    // with a frame that went from non-empty to empty across the callback, this signals the filter
+    // drained the current frame into the filter-manager buffer, so commonHandleAfterDataCallback()
+    // must forward the buffered data instead of the now-empty frame. See
+    // https://github.com/envoyproxy/envoy/issues/46841.
+    bool filter_added_data_in_data_callback_{false};
+
     // Result of filter chain creation.
     CreateChainResult create_chain_result_;
 
@@ -1106,6 +1124,8 @@ private:
                   FilterIterationStartState filter_iteration_start_state);
   void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers);
   void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
+  bool hasSavedResponseMetadata() const;
+  void encodeSavedResponseMetadataToCodec();
 
   // Returns true if new metadata is decoded. Otherwise, returns false.
   bool processNewlyAddedMetadata();
@@ -1157,8 +1177,11 @@ private:
   uint64_t buffer_limit_{0};
   uint32_t high_watermark_count_{0};
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
-  Network::Socket::OptionsSharedPtr upstream_options_ =
-      std::make_shared<Network::Socket::Options>();
+  // Upstream-request watermark subscribers and the count of outstanding high watermarks, so a
+  // filter subscribing mid-stream is brought up to the current back-pressure state.
+  uint32_t upstream_high_watermark_count_{0};
+  std::list<UpstreamWatermarkCallbacks*> upstream_watermark_callbacks_;
+  Network::Socket::OptionsSharedPtr upstream_options_;
   Upstream::LoadBalancerContext::OverrideHost upstream_override_host_;
 
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,

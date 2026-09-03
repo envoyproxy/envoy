@@ -15,19 +15,14 @@ namespace HeaderMutation {
  * Config registration for the stateful session filter. @see NamedHttpFilterConfigFactory.
  */
 class HeaderMutationFactoryConfig
-    : public Common::DualFactoryBase<ProtoConfig, PerRouteProtoConfig> {
+    : public Common::UnifiedFactoryBase<ProtoConfig, PerRouteProtoConfig> {
 public:
-  HeaderMutationFactoryConfig() : DualFactoryBase("envoy.filters.http.header_mutation") {}
+  HeaderMutationFactoryConfig() : UnifiedFactoryBase("envoy.filters.http.header_mutation") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProtoTyped(const ProtoConfig& proto_config,
-                                    const std::string& stats_prefix, DualInfo info,
-                                    Server::Configuration::ServerFactoryContext& context) override;
-
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
-      const ProtoConfig& proto_config, const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const ProtoConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const PerRouteProtoConfig& proto_config,

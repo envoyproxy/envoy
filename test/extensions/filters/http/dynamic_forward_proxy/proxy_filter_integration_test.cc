@@ -745,6 +745,43 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
   EXPECT_EQ("200", response2->headers().getStatusValue());
 }
 
+TEST_P(ProxyFilterIntegrationTest, DISABLED_ParallelRequestSecondHandleOrphanedWithoutFix) {
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  upstream_tls_ = false;
+  autonomous_upstream_ = true;
+  initializeWithArgs(1024, 1024, "");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Kick off request1. DNS starts and blocks.
+  // request1's handle is registered in pending_resolutions_.
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  test_server_->waitForCounter("dns_cache.foo.dns_query_attempt", Eq(1));
+
+  // Register request2's handle while DNS is still in flight.
+  // Both handles are now in pending_resolutions_ on the worker thread.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Now unblock DNS. The main thread runs finishResolve -> notifyThreads, which posts
+  // onHostMapUpdate to the worker. The worker processes this post and notifies both handles.
+  Network::TestResolver::unblockResolve();
+
+  ASSERT_TRUE(response1->waitForEndStream());
+  // Without L171-183: if notifyThreads had fired before handle2 was inserted (the race window),
+  // handle2 would be orphaned here and response2->waitForEndStream() would never return.
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+}
+
 // Currently if the first DNS resolution fails, the filter will continue with
 // a null address. Make sure this mode fails gracefully.
 TEST_P(ProxyFilterIntegrationTest, DISABLED_RequestWithUnknownDomainCares) {

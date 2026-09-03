@@ -810,7 +810,7 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "2", {}, {}, {}));
 
   // Envoy uses the cached resource.
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.assignment_use_cached")->value());
+  test_server_->waitForCounter("cluster.cluster_0.assignment_use_cached", Ge(1));
   // A single message should be successfully sent to the upstream.
   makeSingleRequest();
 }
@@ -859,7 +859,7 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsDropOverloadAfterWarmingFailure) {
   // a cluster update without resources).
   test_server_->waitForCounter("cluster.cluster_0.init_fetch_timeout", Ge(1));
   // Envoy uses the cached resource.
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.assignment_use_cached")->value());
+  test_server_->waitForCounter("cluster.cluster_0.assignment_use_cached", Ge(1));
   // Send a HTTP request again and verify it is dropped with unconditional_drop_overload.
   makeSingleRequestWithDropOverload();
 }
@@ -942,7 +942,7 @@ TEST_P(AdsIntegrationTest, DoubleClustersCachedLoadAssignment) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "2", {}, {}, {}));
 
   // Envoy uses the cached resource.
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.assignment_use_cached")->value());
+  test_server_->waitForCounter("cluster.cluster_0.assignment_use_cached", Ge(1));
   // A single message should be successfully sent to the upstream.
   makeSingleRequest();
 

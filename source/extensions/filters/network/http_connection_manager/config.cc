@@ -323,7 +323,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource(), context.direction());
+        server_context.mainThreadDispatcher().timeSource(), context.direction(), server_context);
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
@@ -604,7 +604,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRouteConfig:
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), context_.serverFactoryContext(),
+        // The inline route configuration inherits the init manager of this HTTP connection
+        // manager, so that any resource it owns can be warmed up together with the listener.
+        config.route_config(), context_.serverFactoryContext(), context_.initManager(),
         context_.messageValidationVisitor());
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
@@ -965,7 +967,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource(), context.direction());
+        server_context.mainThreadDispatcher().timeSource(), context.direction(), server_context);
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);
     }

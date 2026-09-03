@@ -576,14 +576,91 @@ TEST(TaggedFieldDeserializer, ShouldConsumeCorrectAmountOfData) {
   serializeCompactThenDeserializeAndCheckEquality<TaggedFieldDeserializer>(value);
 }
 
+TEST(TaggedFieldDeserializer, ShouldConsumeEmptyData) {
+  const TaggedField value{0, Bytes{}};
+  serializeCompactThenDeserializeAndCheckEquality<TaggedFieldDeserializer>(value);
+}
+
+TEST(TaggedFieldDeserializer, ShouldConsumeDataInChunks) {
+  const TaggedField value{42, Bytes{10, 20, 30, 40, 50}};
+  serializeCompactThenDeserializeAndCheckEqualityWithChunks<TaggedFieldDeserializer>(value);
+}
+
+TEST(TaggedFieldDeserializer, ShouldThrowOnExcessiveDataLength) {
+  // given
+  TaggedFieldDeserializer testee;
+  Buffer::OwnedImpl buffer;
+
+  const uint32_t tag = 0;
+  encoder.encodeCompact(tag, buffer);
+  const uint32_t oversized_length = TaggedFieldDeserializer::MAX_TAGGED_FIELD_DATA_SIZE + 1;
+  encoder.encodeCompact(oversized_length, buffer);
+
+  absl::string_view data = {getRawData(buffer), buffer.length()};
+
+  // when, then
+  EXPECT_THROW_WITH_REGEX(testee.feed(data), EnvoyException, "exceeds maximum allowed");
+}
+
+TEST(TaggedFieldDeserializer, ShouldAcceptDataLengthAtLimit) {
+  // given
+  TaggedFieldDeserializer testee;
+  Buffer::OwnedImpl buffer;
+
+  const uint32_t tag = 0;
+  encoder.encodeCompact(tag, buffer);
+  const uint32_t max_length = TaggedFieldDeserializer::MAX_TAGGED_FIELD_DATA_SIZE;
+  encoder.encodeCompact(max_length, buffer);
+
+  absl::string_view data = {getRawData(buffer), buffer.length()};
+
+  // when, then
+  EXPECT_NO_THROW(testee.feed(data));
+  ASSERT_EQ(testee.ready(), false);
+}
+
 TEST(TaggedFieldsDeserializer, ShouldConsumeCorrectAmountOfData) {
   std::vector<TaggedField> fields;
-  for (uint32_t i = 0; i < 200; ++i) {
+  for (uint32_t i = 0; i < 10; ++i) {
     const TaggedField tagged_field = {i, Bytes{1, 2, 3, 4}};
     fields.push_back(tagged_field);
   }
   const TaggedFields value{fields};
   serializeCompactThenDeserializeAndCheckEquality<TaggedFieldsDeserializer>(value);
+}
+
+TEST(TaggedFieldsDeserializer, ShouldConsumeZeroFields) {
+  const TaggedFields value{{}};
+  serializeCompactThenDeserializeAndCheckEquality<TaggedFieldsDeserializer>(value);
+}
+
+TEST(TaggedFieldsDeserializer, ShouldThrowOnExcessiveFieldCount) {
+  // given
+  TaggedFieldsDeserializer testee;
+  Buffer::OwnedImpl buffer;
+
+  const uint32_t oversized_count = TaggedFieldsDeserializer::MAX_TAGGED_FIELD_COUNT + 1;
+  encoder.encodeCompact(oversized_count, buffer);
+
+  absl::string_view data = {getRawData(buffer), buffer.length()};
+
+  // when, then
+  EXPECT_THROW_WITH_REGEX(testee.feed(data), EnvoyException, "exceeds maximum allowed");
+}
+
+TEST(TaggedFieldsDeserializer, ShouldAcceptFieldCountAtLimit) {
+  // given
+  TaggedFieldsDeserializer testee;
+  Buffer::OwnedImpl buffer;
+
+  const uint32_t max_count = TaggedFieldsDeserializer::MAX_TAGGED_FIELD_COUNT;
+  encoder.encodeCompact(max_count, buffer);
+
+  absl::string_view data = {getRawData(buffer), buffer.length()};
+
+  // when, then
+  EXPECT_NO_THROW(testee.feed(data));
+  ASSERT_EQ(testee.ready(), false);
 }
 
 // Just a helper to write shorter tests.
