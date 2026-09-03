@@ -106,9 +106,9 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, QuicUpstreamClientCertIntegrationTest,
-                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                              {Http::CodecType::HTTP1}, {Http::CodecType::HTTP3})),
-                          HttpProtocolIntegrationTest::protocolTestParamsToString);
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1}, {Http::CodecType::HTTP3})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // The configured client certificate is presented and successfully validated on the upstream QUIC
 // connection when the upstream requires one.
