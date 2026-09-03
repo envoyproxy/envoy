@@ -3670,6 +3670,58 @@ TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
   }
 }
 
+TEST(SubstitutionFormatterTest, RequestHeaderSha256Formatter) {
+  StreamInfo::MockStreamInfo stream_info;
+  const std::string expected_digest =
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+
+  Http::TestRequestHeaderMapImpl request_headers{{"authorization", "abc"},
+                                                 {"x-request-id", "ignored"}};
+  Context formatter_context;
+  formatter_context.setRequestHeaders(request_headers);
+
+  RequestHeaderSha256Formatter formatter("AUTHORIZATION", "X-REQUEST-ID");
+  EXPECT_EQ(expected_digest, formatter.format(formatter_context, stream_info));
+  EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+              ProtoEq(ValueUtil::stringValue(expected_digest)));
+
+  for (const std::string& command : {
+           "%REQUEST_HEADER_SHA256(authorization?x-request-id)%",
+           "%REQ_SHA256(authorization?x-request-id)%",
+       }) {
+    auto providers = SubstitutionFormatParser::parse(command);
+    ASSERT_TRUE(providers.ok()) << providers.status();
+    ASSERT_EQ(providers->size(), 1);
+    EXPECT_EQ(expected_digest, (*providers)[0]->format(formatter_context, stream_info));
+  }
+
+  Http::TestRequestHeaderMapImpl fallback_headers{{"x-request-id", "abc"}};
+  Context fallback_context;
+  fallback_context.setRequestHeaders(fallback_headers);
+  EXPECT_EQ(expected_digest, formatter.format(fallback_context, stream_info));
+
+  Http::TestRequestHeaderMapImpl empty_primary_headers{{"authorization", ""},
+                                                       {"x-request-id", "abc"}};
+  Context empty_primary_context;
+  empty_primary_context.setRequestHeaders(empty_primary_headers);
+  EXPECT_EQ(expected_digest, formatter.format(empty_primary_context, stream_info));
+
+  Http::TestRequestHeaderMapImpl empty_headers{{"authorization", ""}, {"x-request-id", ""}};
+  Context empty_context;
+  empty_context.setRequestHeaders(empty_headers);
+  EXPECT_EQ(std::nullopt, formatter.format(empty_context, stream_info));
+  EXPECT_THAT(formatter.formatValue(empty_context, stream_info), ProtoEq(ValueUtil::nullValue()));
+
+  RequestHeaderSha256Formatter no_fallback("missing", "");
+  EXPECT_EQ(std::nullopt, no_fallback.format(formatter_context, stream_info));
+  EXPECT_EQ(std::nullopt, formatter.format({}, stream_info));
+
+  EXPECT_FALSE(SubstitutionFormatParser::parse("%REQ_SHA256%").ok());
+  EXPECT_FALSE(SubstitutionFormatParser::parse("%REQ_SHA256(authorization):8%").ok());
+  EXPECT_FALSE(
+      SubstitutionFormatParser::parse("%REQ_SHA256(authorization?fallback?another)%").ok());
+}
+
 TEST(SubstitutionFormatterTest, QueryParameterFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/path?x=xxxxxx"}};
