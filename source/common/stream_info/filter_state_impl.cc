@@ -114,7 +114,8 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
   filter_object->data_ = data;
   filter_object->stream_sharing_ = stream_sharing;
   if (data_storage_ == nullptr) {
-    data_storage_ = std::make_unique<StringDataMap>();
+    data_storage_ =
+        std::make_unique<absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>>>();
   }
   (*data_storage_)[data_name] = std::move(filter_object);
 }
@@ -208,21 +209,23 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
       }
     }
   }
-  for (size_t i = 0; i < static_cast<size_t>(FilterStateIndex::MaxIndex); ++i) {
-    const auto& object = indexed_data_storage_[i];
-    if (object != nullptr) {
-      const FilterStateIndex index = static_cast<FilterStateIndex>(i);
-      switch (object->stream_sharing_) {
-      case StreamSharingMayImpactPooling::SharedWithUpstreamConnection:
-        objects->push_back(
-            {object->data_, object->stream_sharing_, std::string(FilterState::indexToName(index))});
-        break;
-      case StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce:
-        objects->push_back({object->data_, StreamSharingMayImpactPooling::None,
-                            std::string(FilterState::indexToName(index))});
-        break;
-      default:
-        break;
+  if (indexed_data_storage_ != nullptr) {
+    for (size_t i = 0; i < static_cast<size_t>(FilterStateIndex::MaxIndex); ++i) {
+      const auto& object = (*indexed_data_storage_)[i];
+      if (object != nullptr) {
+        const FilterStateIndex index = static_cast<FilterStateIndex>(i);
+        switch (object->stream_sharing_) {
+        case StreamSharingMayImpactPooling::SharedWithUpstreamConnection:
+          objects->push_back({object->data_, object->stream_sharing_,
+                              std::string(FilterState::indexToName(index))});
+          break;
+        case StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce:
+          objects->push_back({object->data_, StreamSharingMayImpactPooling::None,
+                              std::string(FilterState::indexToName(index))});
+          break;
+        default:
+          break;
+        }
       }
     }
   }
@@ -241,7 +244,7 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, absl::string_view d
     return;
   }
   if (life_span > life_span_) {
-    if (indexed_data_storage_[idx] != nullptr) {
+    if (indexed_data_storage_ != nullptr && (*indexed_data_storage_)[idx] != nullptr) {
       IS_ENVOY_BUG(fmt::format("FilterStateAccessViolation: FilterState::setIndexedData<T> "
                                "called twice with "
                                "conflicting life_span on index: {}.",
@@ -260,13 +263,17 @@ void FilterStateImpl::setIndexedData(FilterStateIndex index, absl::string_view d
     return;
   }
 
-  if (indexed_data_storage_[idx] == nullptr) {
+  if (indexed_data_storage_ == nullptr) {
+    indexed_data_storage_ = std::make_unique<IndexedDataArray>();
+  }
+
+  if ((*indexed_data_storage_)[idx] == nullptr) {
     ++indexed_count_;
   }
   auto filter_object = std::make_unique<FilterStateImpl::IndexedFilterObject>();
   filter_object->data_ = data;
   filter_object->stream_sharing_ = stream_sharing;
-  indexed_data_storage_[idx] = std::move(filter_object);
+  (*indexed_data_storage_)[idx] = std::move(filter_object);
 }
 
 const FilterState::Object*
@@ -275,7 +282,13 @@ FilterStateImpl::getIndexedDataReadOnlyGeneric(FilterStateIndex index) const {
   if (idx >= static_cast<size_t>(FilterStateIndex::MaxIndex)) {
     return nullptr;
   }
-  const auto& obj = indexed_data_storage_[idx];
+  if (indexed_data_storage_ == nullptr) {
+    if (parent_) {
+      return parent_->getIndexedDataReadOnlyGeneric(index);
+    }
+    return nullptr;
+  }
+  const auto& obj = (*indexed_data_storage_)[idx];
   if (obj == nullptr) {
     if (parent_) {
       return parent_->getIndexedDataReadOnlyGeneric(index);
@@ -295,7 +308,13 @@ FilterStateImpl::getIndexedDataSharedMutableGeneric(FilterStateIndex index) {
   if (idx >= static_cast<size_t>(FilterStateIndex::MaxIndex)) {
     return nullptr;
   }
-  const auto& obj = indexed_data_storage_[idx];
+  if (indexed_data_storage_ == nullptr) {
+    if (parent_) {
+      return parent_->getIndexedDataSharedMutableGeneric(index);
+    }
+    return nullptr;
+  }
+  const auto& obj = (*indexed_data_storage_)[idx];
   if (obj == nullptr) {
     if (parent_) {
       return parent_->getIndexedDataSharedMutableGeneric(index);
@@ -310,7 +329,10 @@ bool FilterStateImpl::hasIndexedData(FilterStateIndex index) const {
   if (idx >= static_cast<size_t>(FilterStateIndex::MaxIndex)) {
     return false;
   }
-  return indexed_data_storage_[idx] != nullptr || (parent_ && parent_->hasIndexedData(index));
+  if (indexed_data_storage_ == nullptr) {
+    return parent_ && parent_->hasIndexedData(index);
+  }
+  return (*indexed_data_storage_)[idx] != nullptr || (parent_ && parent_->hasIndexedData(index));
 }
 
 } // namespace StreamInfo

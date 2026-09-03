@@ -69,11 +69,11 @@ private:
 
   FilterStateSharedPtr parent_{};
   const FilterState::LifeSpan life_span_;
-  using StringDataMap = absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>>;
-  std::unique_ptr<StringDataMap> data_storage_{};
+  std::unique_ptr<absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>>> data_storage_{};
   uint32_t indexed_count_{0};
-  std::array<std::unique_ptr<IndexedFilterObject>, static_cast<size_t>(FilterStateIndex::MaxIndex)>
-      indexed_data_storage_{};
+  using IndexedDataArray = std::array<std::unique_ptr<IndexedFilterObject>,
+                                      static_cast<size_t>(FilterStateIndex::MaxIndex)>;
+  std::unique_ptr<IndexedDataArray> indexed_data_storage_{};
 };
 
 } // namespace StreamInfo
