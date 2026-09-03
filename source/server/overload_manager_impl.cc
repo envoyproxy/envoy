@@ -179,6 +179,10 @@ validateAndGetReduceTimeoutsConfigType(const envoy::config::overload::v3::Overlo
           fmt::format("Overload action \"{}\" has an invalid typed_config: {}", name,
                       factory_type_or_error.status().message()));
     }
+    if (factory_type_or_error->empty()) {
+      return absl::InvalidArgumentError(fmt::format(
+          "Overload action \"{}\" has an invalid typed_config: type_url is empty", name));
+    }
     factory_type = std::move(*factory_type_or_error);
   }
 
@@ -680,7 +684,8 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
 
   // Validate the trigger resources for Load shedPoints.
   for (const auto& point : config.loadshed_points()) {
-    if (actions_.contains(action_symbol_table_.get(point.name()))) {
+    const auto action_symbol = action_symbol_table_.lookup(point.name());
+    if (action_symbol.has_value() && actions_.contains(*action_symbol)) {
       creation_status = absl::InvalidArgumentError(
           fmt::format("Load shed point \"{}\" conflicts with an overload action of the same name",
                       point.name()));

@@ -859,6 +859,18 @@ TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithWrongTypedConfigMessage) {
                             "envoy.config.overload.v3.ScaleTimersOverloadActionConfig");
 }
 
+TEST_F(OverloadManagerImplTest, ActionWithEmptyTypedConfigIsRejected) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "connection_idle_timeouts"
+        typed_config: {}
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(createOverloadManager(config), EnvoyException,
+                            "Overload action \"connection_idle_timeouts\" has an invalid "
+                            "typed_config: type_url is empty");
+}
+
 TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithNoTimersSpecified) {
   const std::string config = R"EOF(
     actions:
