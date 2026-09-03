@@ -10099,3 +10099,233 @@ fn test_cluster_specifier_metrics_vec_metric_invalid_id() {
     .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
     .is_err());
 }
+
+// Stubs for the route provider callbacks the tests below drive. Envoy is not linked into the unit
+// test binary, so the module reads these instead of the real callbacks.
+const STUB_ROUTE_PROVIDER_RANDOM_VALUE: u64 = 4242;
+const STUB_ROUTE_PROVIDER_HEADER_COUNT: usize = 3;
+static STUB_ROUTE_PROVIDER_CLUSTER: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_provider_get_random_value(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+) -> u64 {
+  STUB_ROUTE_PROVIDER_RANDOM_VALUE
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_provider_get_request_headers_size(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+) -> usize {
+  STUB_ROUTE_PROVIDER_HEADER_COUNT
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_provider_select_route(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+  index: usize,
+) -> bool {
+  // The stub has two templates, so only indices 0 and 1 are in range.
+  index < 2
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_provider_set_cluster_name(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  let slice =
+    unsafe { std::slice::from_raw_parts(cluster_name.ptr as *const u8, cluster_name.length) };
+  *STUB_ROUTE_PROVIDER_CLUSTER.lock().unwrap() = String::from_utf8_lossy(slice).into_owned();
+}
+
+static STUB_ROUTE_PROVIDER_PER_ROUTE_CONFIG: std::sync::Mutex<String> =
+  std::sync::Mutex::new(String::new());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_provider_set_per_route_config_override(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let slice = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+  let name = String::from_utf8_lossy(slice).into_owned();
+  // The stub only declares the "known" override, so any other name misses.
+  let matched = name == "known";
+  *STUB_ROUTE_PROVIDER_PER_ROUTE_CONFIG.lock().unwrap() = name;
+  matched
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_route_provider_config_new_impl() {
+  struct TestRouteProviderConfig;
+  impl route_provider::RouteProviderConfig for TestRouteProviderConfig {
+    fn on_select(&self, _ctx: &mut route_provider::RouteProviderContext) -> bool {
+      false
+    }
+  }
+
+  let mut new_fn: NewRouteProviderConfigFunction =
+    |_, _, _| Some(Box::new(TestRouteProviderConfig));
+  let result = route_provider::envoy_dynamic_module_on_route_provider_config_new_impl(
+    "test_route_provider",
+    b"config",
+    2,
+    &new_fn,
+  );
+  assert!(!result.is_null());
+  unsafe {
+    route_provider::envoy_dynamic_module_on_route_provider_config_destroy(result);
+  }
+
+  // None should result in a null pointer (e.g. unknown provider name).
+  new_fn = |_, _, _| None;
+  let result = route_provider::envoy_dynamic_module_on_route_provider_config_new_impl(
+    "test_route_provider",
+    b"config",
+    2,
+    &new_fn,
+  );
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_route_provider_config_destroy() {
+  // This test ensures the wrapped trait object is dropped exactly once on `_destroy`.
+  static DROP_COUNT: AtomicU32 = AtomicU32::new(0);
+  struct TestRouteProviderConfig;
+  impl route_provider::RouteProviderConfig for TestRouteProviderConfig {
+    fn on_select(&self, _ctx: &mut route_provider::RouteProviderContext) -> bool {
+      false
+    }
+  }
+  impl Drop for TestRouteProviderConfig {
+    fn drop(&mut self) {
+      DROP_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let new_fn: NewRouteProviderConfigFunction = |_, _, _| Some(Box::new(TestRouteProviderConfig));
+  let config_ptr = route_provider::envoy_dynamic_module_on_route_provider_config_new_impl(
+    "test_route_provider",
+    b"",
+    1,
+    &new_fn,
+  );
+  assert!(!config_ptr.is_null());
+  unsafe {
+    route_provider::envoy_dynamic_module_on_route_provider_config_destroy(config_ptr);
+  }
+  assert_eq!(1, DROP_COUNT.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_route_provider_select() {
+  // Drives the select hook through the FFI entry point so the boxed trait object, the context
+  // wrapper, the template count passed at config time and the return value are all exercised.
+  static TEMPLATE_COUNT_SEEN: AtomicUsize = AtomicUsize::new(usize::MAX);
+  static RANDOM_VALUE_SEEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+  struct TestRouteProviderConfig {
+    decide: bool,
+  }
+  impl route_provider::RouteProviderConfig for TestRouteProviderConfig {
+    fn on_select(&self, ctx: &mut route_provider::RouteProviderContext) -> bool {
+      RANDOM_VALUE_SEEN.store(ctx.random_value(), std::sync::atomic::Ordering::SeqCst);
+      self.decide && ctx.select_route(0)
+    }
+  }
+
+  let new_fn: NewRouteProviderConfigFunction = |_, _, count| {
+    TEMPLATE_COUNT_SEEN.store(count, std::sync::atomic::Ordering::SeqCst);
+    Some(Box::new(TestRouteProviderConfig { decide: true }))
+  };
+  let config_ptr = route_provider::envoy_dynamic_module_on_route_provider_config_new_impl(
+    "test_route_provider",
+    b"",
+    2,
+    &new_fn,
+  );
+  assert!(!config_ptr.is_null());
+  assert_eq!(
+    2,
+    TEMPLATE_COUNT_SEEN.load(std::sync::atomic::Ordering::SeqCst)
+  );
+
+  let decided = unsafe {
+    route_provider::envoy_dynamic_module_on_route_provider_select(config_ptr, std::ptr::null_mut())
+  };
+  assert!(decided);
+  assert_eq!(
+    STUB_ROUTE_PROVIDER_RANDOM_VALUE,
+    RANDOM_VALUE_SEEN.load(std::sync::atomic::Ordering::SeqCst)
+  );
+  unsafe {
+    route_provider::envoy_dynamic_module_on_route_provider_config_destroy(config_ptr);
+  }
+
+  // A config that selects no route is reported as such, so Envoy resolves no route.
+  let new_fn: NewRouteProviderConfigFunction =
+    |_, _, _| Some(Box::new(TestRouteProviderConfig { decide: false }));
+  let config_ptr = route_provider::envoy_dynamic_module_on_route_provider_config_new_impl(
+    "test_route_provider",
+    b"",
+    2,
+    &new_fn,
+  );
+  let decided = unsafe {
+    route_provider::envoy_dynamic_module_on_route_provider_select(config_ptr, std::ptr::null_mut())
+  };
+  assert!(!decided);
+  unsafe {
+    route_provider::envoy_dynamic_module_on_route_provider_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_route_provider_select_recovers_from_panic() {
+  // Selection runs on worker threads, so a panic must be caught at the FFI boundary and reported as
+  // no route rather than unwinding across the ABI.
+  struct PanicConfig;
+  impl route_provider::RouteProviderConfig for PanicConfig {
+    fn on_select(&self, _ctx: &mut route_provider::RouteProviderContext) -> bool {
+      panic!("intentional panic in on_select");
+    }
+  }
+
+  let config: Box<dyn route_provider::RouteProviderConfig> = Box::new(PanicConfig);
+  let config_ptr = Box::into_raw(Box::new(config)) as *const std::ffi::c_void;
+  let decided = unsafe {
+    route_provider::envoy_dynamic_module_on_route_provider_select(config_ptr, std::ptr::null_mut())
+  };
+  assert!(!decided);
+  unsafe {
+    route_provider::envoy_dynamic_module_on_route_provider_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_route_provider_context_reads_and_selects() {
+  let mut ctx = unsafe { route_provider::RouteProviderContext::new(std::ptr::null_mut()) };
+  assert_eq!(
+    STUB_ROUTE_PROVIDER_HEADER_COUNT,
+    ctx.get_request_headers_count()
+  );
+  assert_eq!(STUB_ROUTE_PROVIDER_RANDOM_VALUE, ctx.random_value());
+  assert!(ctx.select_route(1));
+  assert!(!ctx.select_route(5));
+  ctx.set_cluster_name("my_cluster");
+  assert_eq!(
+    "my_cluster",
+    STUB_ROUTE_PROVIDER_CLUSTER.lock().unwrap().as_str()
+  );
+  // A declared per-route configuration override is selected, an undeclared one misses.
+  assert!(ctx.set_per_route_config_override("known"));
+  assert_eq!(
+    "known",
+    STUB_ROUTE_PROVIDER_PER_ROUTE_CONFIG
+      .lock()
+      .unwrap()
+      .as_str()
+  );
+  assert!(!ctx.set_per_route_config_override("missing"));
+}
