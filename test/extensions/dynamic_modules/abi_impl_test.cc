@@ -1886,6 +1886,80 @@ WEAK_STUB(ClusterSpecifierConfigRecordHistogramValue,
                                                                                         nullptr, 0,
                                                                                         0))
 
+WEAK_STUB(RouteProviderGetRequestHeadersSize,
+          envoy_dynamic_module_callback_route_provider_get_request_headers_size(nullptr))
+WEAK_STUB(RouteProviderGetRequestHeaders,
+          envoy_dynamic_module_callback_route_provider_get_request_headers(nullptr, nullptr))
+WEAK_STUB(RouteProviderGetRequestHeaderValue,
+          envoy_dynamic_module_callback_route_provider_get_request_header_value(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(RouteProviderGetAttributeString,
+          envoy_dynamic_module_callback_route_provider_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(RouteProviderGetAttributeInt,
+          envoy_dynamic_module_callback_route_provider_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(RouteProviderGetAttributeBool,
+          envoy_dynamic_module_callback_route_provider_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(RouteProviderGetRandomValue,
+          envoy_dynamic_module_callback_route_provider_get_random_value(nullptr))
+WEAK_STUB(RouteProviderSelectRoute,
+          envoy_dynamic_module_callback_route_provider_select_route(nullptr, 0))
+WEAK_STUB(RouteProviderSetClusterName,
+          envoy_dynamic_module_callback_route_provider_set_cluster_name(nullptr, {nullptr, 0}))
+WEAK_STUB(RouteProviderSetTimeout,
+          envoy_dynamic_module_callback_route_provider_set_timeout(nullptr, 0))
+WEAK_STUB(RouteProviderSetIdleTimeout,
+          envoy_dynamic_module_callback_route_provider_set_idle_timeout(nullptr, 0))
+WEAK_STUB(RouteProviderSetMaxStreamDuration,
+          envoy_dynamic_module_callback_route_provider_set_max_stream_duration(nullptr, 0))
+WEAK_STUB(RouteProviderSetPriority,
+          envoy_dynamic_module_callback_route_provider_set_priority(
+              nullptr, envoy_dynamic_module_type_resource_priority_Default))
+WEAK_STUB(RouteProviderSetRequestBodyBufferLimit,
+          envoy_dynamic_module_callback_route_provider_set_request_body_buffer_limit(nullptr, 0))
+WEAK_STUB(RouteProviderSetRouteActionOverride,
+          envoy_dynamic_module_callback_route_provider_set_route_action_override(nullptr,
+                                                                                 {nullptr, 0}))
+WEAK_STUB(RouteProviderSetPerRouteConfigOverride,
+          envoy_dynamic_module_callback_route_provider_set_per_route_config_override(nullptr,
+                                                                                     {nullptr, 0}))
+WEAK_STUB(RouteProviderSetRouteMetadataNumber,
+          envoy_dynamic_module_callback_route_provider_set_route_metadata_number(nullptr,
+                                                                                 {nullptr, 0},
+                                                                                 {nullptr, 0}, 0))
+WEAK_STUB(RouteProviderSetRouteMetadataString,
+          envoy_dynamic_module_callback_route_provider_set_route_metadata_string(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}))
+WEAK_STUB(RouteProviderSetRouteMetadataBool,
+          envoy_dynamic_module_callback_route_provider_set_route_metadata_bool(nullptr,
+                                                                               {nullptr, 0},
+                                                                               {nullptr, 0}, false))
+WEAK_STUB(RouteProviderSetRouteMetadataStruct,
+          envoy_dynamic_module_callback_route_provider_set_route_metadata_struct(nullptr,
+                                                                                 {nullptr, 0},
+                                                                                 {nullptr, 0}))
+WEAK_STUB(RouteProviderSetRouteTypedMetadata,
+          envoy_dynamic_module_callback_route_provider_set_route_typed_metadata(nullptr,
+                                                                                {nullptr, 0},
+                                                                                {nullptr, 0}))
+WEAK_STUB(RouteProviderSetRequestHeader,
+          envoy_dynamic_module_callback_route_provider_set_request_header(
+              nullptr, {nullptr, 0}, {nullptr, 0},
+              envoy_dynamic_module_type_route_provider_header_mutation_Append))
+WEAK_STUB(RouteProviderSetResponseHeader,
+          envoy_dynamic_module_callback_route_provider_set_response_header(
+              nullptr, {nullptr, 0}, {nullptr, 0},
+              envoy_dynamic_module_type_route_provider_header_mutation_Append))
+WEAK_STUB(RouteProviderSetPath,
+          envoy_dynamic_module_callback_route_provider_set_path(nullptr, {nullptr, 0}))
+WEAK_STUB(RouteProviderSetDirectResponse,
+          envoy_dynamic_module_callback_route_provider_set_direct_response(nullptr, 200,
+                                                                           {nullptr, 0}))
+WEAK_STUB(RouteProviderSetRedirect,
+          envoy_dynamic_module_callback_route_provider_set_redirect(nullptr, 302, {nullptr, 0}))
+
 WEAK_STUB(FormatterGetAccessLogType,
           envoy_dynamic_module_callback_formatter_get_access_log_type(nullptr))
 WEAK_STUB(FormatterGetAttributeBool,

@@ -3096,6 +3096,205 @@ envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
   return envoy_dynamic_module_type_metrics_result_MetricNotFound;
 }
 
+// ---------------------- Route Provider callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations are
+// provided in the route provider extension abi_impl.cc when the route provider extension is used.
+// This is necessary because the Rust SDK generates bindings for all callbacks in abi.h, and these
+// symbols must be resolvable when any Rust module is loaded.
+
+__attribute__((weak)) size_t envoy_dynamic_module_callback_route_provider_get_request_headers_size(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_get_request_headers_size: not "
+               "implemented in this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_route_provider_get_request_headers(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_get_request_headers: not implemented "
+               "in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_route_provider_get_request_header_value(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*, size_t,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_get_request_header_value: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_route_provider_get_attribute_string(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_get_attribute_string: not implemented "
+               "in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_route_provider_get_attribute_int(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id, uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_get_attribute_int: not implemented in "
+               "this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_route_provider_get_attribute_bool(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id, bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_get_attribute_bool: not implemented "
+               "in this context");
+  return false;
+}
+
+__attribute__((weak)) uint64_t envoy_dynamic_module_callback_route_provider_get_random_value(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_get_random_value: not implemented in "
+               "this context");
+  return 0;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_route_provider_select_route(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_select_route: not implemented in this "
+               "context");
+  return false;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_cluster_name(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_cluster_name: not implemented in "
+               "this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_timeout(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_route_provider_set_timeout: not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_idle_timeout(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_idle_timeout: not implemented in "
+               "this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_max_stream_duration(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_max_stream_duration: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_priority(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_resource_priority) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_route_provider_set_priority: not implemented in this context");
+}
+
+__attribute__((weak)) void
+envoy_dynamic_module_callback_route_provider_set_request_body_buffer_limit(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_request_body_buffer_limit: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_route_provider_set_route_action_override(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_route_action_override: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool
+envoy_dynamic_module_callback_route_provider_set_per_route_config_override(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_per_route_config_override: not "
+               "implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_route_metadata_number(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, double) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_route_metadata_number: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_route_metadata_string(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_route_metadata_string: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_route_metadata_bool(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, bool) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_route_metadata_bool: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_route_metadata_struct(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_route_metadata_struct: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_route_typed_metadata(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_route_typed_metadata: not "
+               "implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_request_header(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_route_provider_header_mutation) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_request_header: not implemented "
+               "in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_response_header(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_route_provider_header_mutation) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_response_header: not implemented "
+               "in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_route_provider_set_path(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_route_provider_set_path: not implemented in this context");
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_route_provider_set_direct_response(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr, uint32_t,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_route_provider_set_direct_response: not implemented "
+               "in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_route_provider_set_redirect(
+    envoy_dynamic_module_type_route_provider_context_envoy_ptr, uint32_t,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_route_provider_set_redirect: not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) envoy_dynamic_module_type_access_log_type
 envoy_dynamic_module_callback_formatter_get_access_log_type(
     envoy_dynamic_module_type_formatter_context_envoy_ptr) {

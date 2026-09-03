@@ -1,0 +1,131 @@
+syntax = "proto3";
+
+package envoy.extensions.router.route_providers.dynamic_modules.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.router.route_providers.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/router/route_providers/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Route Provider]
+//
+// Dynamic modules route provider :ref:`configuration reference documentation
+// <config_http_route_provider_dynamic_modules>`.
+// [#extension: envoy.router.route_provider.dynamic_modules]
+
+// Route action properties that a dynamic module may select for a request in place of the properties
+// of the selected route template. These properties are themselves built from other extensions, such
+// as retry host predicates and rate limit actions, so they must be declared here in advance rather
+// than chosen freely by the module on each request.
+//
+// Each entry is built and validated when the route provider is configured, so an invalid entry is
+// rejected at configuration load rather than on the request path. Every entry must replace at least
+// one property, so an entry that builds to no replacement is rejected as well.
+// [#next-free-field: 6]
+message RouteActionOverride {
+  // Retry policy replacing the retry policy of the selected route template. If not specified, the
+  // retry policy of the selected route template is used.
+  config.route.v3.RetryPolicy retry_policy = 1;
+
+  // Metadata match criteria replacing the criteria of the selected route template, used by subset
+  // load balancing. Only the ``envoy.lb`` entry of :ref:`filter_metadata
+  // <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` is used. If not specified, or if
+  // there is no ``envoy.lb`` entry, the criteria of the selected route template are used.
+  config.core.v3.Metadata metadata_match = 2;
+
+  // Request mirroring policies replacing the request mirroring policies of the selected route
+  // template. If not specified, the request mirroring policies of the selected route template are
+  // used. A named mirror cluster is resolved when a request is mirrored to it, so a cluster that
+  // does not exist mirrors nothing rather than being rejected at configuration load.
+  repeated config.route.v3.RouteAction.RequestMirrorPolicy request_mirror_policies = 3;
+
+  // Hash policy replacing the hash policy of the selected route template, used when the upstream
+  // cluster employs a hashing load balancer. If not specified, the hash policy of the selected route
+  // template is used.
+  repeated config.route.v3.RouteAction.HashPolicy hash_policy = 4;
+
+  // Rate limit policy replacing the rate limits of the selected route template. If not specified,
+  // the rate limits of the selected route template are used.
+  repeated config.route.v3.RateLimit rate_limits = 5;
+}
+
+// Per-route configuration that a dynamic module may select for a request in place of the per-route
+// configuration of the selected route template. Like the route action overrides, these properties
+// are built from other extensions, so they must be declared here in advance rather than chosen
+// freely by the module on each request.
+//
+// Each entry is built and validated when the route provider is configured, so an invalid entry is
+// rejected at configuration load rather than on the request path. Every entry must replace at least
+// one property, so an entry that builds to no replacement is rejected as well.
+message PerRouteConfigOverride {
+  // Per-filter configuration overlaid onto the per-filter configuration of the selected route
+  // template, keyed by filter name. Each filter reads its own entry through the route, so a filter
+  // named here observes this configuration while a filter that is not named keeps the configuration
+  // of the selected route template. If not specified, the per-filter configuration of the selected
+  // route template is used.
+  map<string, google.protobuf.Any> typed_per_filter_config = 1;
+
+  // Tracing configuration replacing the route-level tracing of the selected route template. If not
+  // specified, the tracing configuration of the selected route template is used.
+  config.route.v3.Tracing tracing = 2;
+}
+
+// Configuration for the Dynamic Modules Route Provider. This route provider allows loading shared
+// object files via ``dlopen`` to select the route template for a request and to replace the
+// cluster, timeouts, priority, request body buffer limit, route metadata, header mutations, path,
+// retry policy, hash policy, metadata match criteria, request mirroring policies, rate limits,
+// per-filter configuration and route-level tracing of the selected route template, or to resolve
+// the request to a direct response or a redirect.
+//
+// A module can be loaded by multiple route providers. It is loaded only once and shared across
+// multiple route provider instances. The module is invoked while the route is being resolved, so
+// the selection is visible to the router without clearing the route cache.
+// [#next-free-field: 6]
+message DynamicModuleRouteProvider {
+  // Specifies the shared-object level configuration. This field is required.
+  //
+  // .. note::
+  //   This extension loads the module while the route provider is configured, so it cannot wait for
+  //   an asynchronous fetch. A remote :ref:`module
+  //   <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>` is therefore
+  //   accepted only when the module is already cached on disk, and is otherwise rejected. Prefer
+  //   ``name`` or a local data source.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name for this route provider configuration. If not specified, defaults to an empty string.
+  //
+  // This can be used to distinguish between different route provider implementations inside a
+  // dynamic module. When Envoy receives this configuration, it passes the ``provider_name`` to the
+  // dynamic module's route provider config init function together with the ``provider_config``.
+  string provider_name = 2;
+
+  // The configuration for the route provider chosen by ``provider_name``. If not specified, an empty
+  // configuration is passed to the module.
+  //
+  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly without
+  // the wrapper.
+  google.protobuf.Any provider_config = 3;
+
+  // Route action overrides that the module may select by name for a request. If not specified, the
+  // module can only select the scalar properties of the route directly.
+  map<string, RouteActionOverride> route_action_overrides = 4
+      [(validate.rules).map = {keys {string {min_len: 1}}}];
+
+  // Per-route configuration overrides that the module may select by name for a request. If not
+  // specified, the per-filter configuration and route-level tracing of the selected route template
+  // are used.
+  map<string, PerRouteConfigOverride> per_route_config_overrides = 5
+      [(validate.rules).map = {keys {string {min_len: 1}}}];
+}
