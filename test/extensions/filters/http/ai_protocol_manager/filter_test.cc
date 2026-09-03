@@ -144,6 +144,11 @@ public:
     }
   }
 
+  uint64_t counterValue(const std::string& name) {
+    const auto counter = TestUtility::findCounter(stats_store_, "ai_protocol_manager." + name);
+    return counter != nullptr ? counter->value() : 0;
+  }
+
   std::deque<Event::PostCb> posted_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   InMemoryExternalBufferFactory factory_;
@@ -1159,6 +1164,9 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(injected_.toString(), payload);
   EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(counterValue("request_parsed"), 1);
+  EXPECT_EQ(counterValue("request_parse_error"), 0);
+  EXPECT_EQ(counterValue("request_schema_invalid"), 0);
 }
 
 // Malformed JSON is answered with a 400 and never reaches the upstream.
@@ -1174,6 +1182,11 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJson) {
   EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
   EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
   EXPECT_EQ(inject_calls_, 0);
+  // A body that is not JSON at all is a parse error, not a schema failure: the
+  // two 400s are counted apart because they mean different things to operate on.
+  EXPECT_EQ(counterValue("request_parse_error"), 1);
+  EXPECT_EQ(counterValue("request_schema_invalid"), 0);
+  EXPECT_EQ(counterValue("request_parsed"), 0);
 }
 
 // Where Envoy and the backend could otherwise read the same body differently.
@@ -1221,6 +1234,9 @@ TEST_F(AiProtocolManagerFilterTest, EmptyBodyOnDeclaredEndpointIsPassedThrough) 
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(injected_.length(), 0);
+  // No payload arrived, so there is no document and nothing to count parsed.
+  EXPECT_EQ(counterValue("request_parsed"), 0);
+  EXPECT_EQ(counterValue("request_parse_error"), 0);
 }
 
 // Only a stream with no body at all is exempt. Once bytes have arrived they are
@@ -1275,6 +1291,10 @@ TEST_F(AiProtocolManagerFilterTest, RejectsPayloadFailingSchemaValidation) {
   EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
   EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
   EXPECT_EQ(inject_calls_, 0);
+  // Well-formed JSON that the declared API rejects: schema drift, not garbage.
+  EXPECT_EQ(counterValue("request_schema_invalid"), 1);
+  EXPECT_EQ(counterValue("request_parse_error"), 0);
+  EXPECT_EQ(counterValue("request_parsed"), 0);
 }
 
 // Unknown fields are permitted and pass through untouched.
@@ -1360,6 +1380,9 @@ TEST_F(AiProtocolManagerFilterTest, PassesThroughUndeclaredRoute) {
   EXPECT_EQ(body.toString(), R"({"model":"gpt-4"})");
   EXPECT_EQ(inject_calls_, 0);
   EXPECT_EQ(local_reply_calls_, 0);
+  // A stream the filter never engages on touches none of the request counters.
+  EXPECT_EQ(counterValue("request_parsed"), 0);
+  EXPECT_EQ(counterValue("request_passthrough"), 0);
 }
 
 // Nor does it subscribe to watermarks or claim any replay machinery.
@@ -1411,6 +1434,10 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingAcceptsValidPayload) {
 
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(injected_.toString(), R"({"model":"gpt-4"})");
+  // An unconfigured route has no schema to check, but the document is still
+  // there for later filters, so it counts as parsed.
+  EXPECT_EQ(counterValue("request_parsed"), 1);
+  EXPECT_EQ(counterValue("request_passthrough"), 0);
 }
 
 // Best effort means exactly that: a payload that does not parse is forwarded
@@ -1426,6 +1453,10 @@ TEST_F(AiProtocolManagerFilterTest, BestEffortParsingForwardsMalformedPayload) {
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(injected_.toString(), R"({"model" "gpt-4"})");
   EXPECT_TRUE(injected_end_stream_);
+  // Forwarded, not failed -- so it is counted apart from the rejecting paths.
+  EXPECT_EQ(counterValue("request_passthrough"), 1);
+  EXPECT_EQ(counterValue("request_parse_error"), 0);
+  EXPECT_EQ(counterValue("request_parsed"), 0);
 }
 
 // A payload abandoned mid-upload is still offloaded and replayed in full.

@@ -211,7 +211,8 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // for none of it: constructing it subscribes to upstream watermarks and claims
   // a schedulable callback.
   decode_manager_ = std::make_unique<BufferManager>(
-      buffer_factory_, std::make_unique<DecoderFilterChainBridge>(*decoder_callbacks_));
+      buffer_factory_,
+      std::make_unique<DecoderFilterChainBridge>(*decoder_callbacks_, config_->stats()));
 
   // Pin the headers so routing and admission filters do not act on them before
   // the payload is offloaded. decodeData() still fires while iteration is stopped
@@ -242,11 +243,13 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
 
   if (!status.ok()) {
     if (isAiEndpoint()) {
+      config_->stats().request_parse_error_.inc();
       rejectInvalidPayload(status);
       return false;
     }
     // Best effort: the payload is forwarded as it stands, just without a
     // document for later filters to work from.
+    config_->stats().request_passthrough_.inc();
     ENVOY_LOG(debug, "ai_protocol_manager: forwarding unparsed payload: {}", status.message());
     request_parser_.reset();
     return true;
@@ -264,11 +267,13 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
           payload_schema != nullptr) {
         const absl::Status validation_status = payload_schema->validateRequest(request_json_);
         if (!validation_status.ok()) {
+          config_->stats().request_schema_invalid_.inc();
           rejectInvalidPayload(validation_status);
           return false;
         }
       }
     }
+    config_->stats().request_parsed_.inc();
   }
   return true;
 }

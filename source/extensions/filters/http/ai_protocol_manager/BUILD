@@ -79,6 +79,7 @@ envoy_cc_library(
     hdrs = ["filter_chain_bridge.h"],
     deps = [
         ":buffer_manager_lib",
+        ":stats_lib",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
     ],
