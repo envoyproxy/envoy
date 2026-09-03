@@ -83,6 +83,37 @@ CELFormatterCommandParser::CELFormatterCommandParser(
   ASSERT(configured_state_->expr_builder != nullptr);
 }
 
+bool CELFormatter::formatTo(std::string& sink, const Envoy::Formatter::Context& context,
+                            const StreamInfo::StreamInfo& stream_info) const {
+  const std::optional<std::string> value = format(context, stream_info);
+  if (!value.has_value()) {
+    return false;
+  }
+  sink.append(*value);
+  return true;
+}
+
+void CELFormatter::formatValueTo(Envoy::Formatter::ValueSink& sink,
+                                 const Envoy::Formatter::Context& context,
+                                 const StreamInfo::StreamInfo& stream_info) const {
+  if (!typed_) {
+    // The untyped form is always a string.
+    const std::optional<std::string> value = format(context, stream_info);
+    if (!value.has_value()) {
+      return;
+    }
+    sink.addString(*value);
+    return;
+  }
+  // The typed form produces a genuine proto value, so hand it to the sink as one.
+  const Protobuf::Value value = formatValue(context, stream_info);
+  if (value.kind_case() == Protobuf::Value::kNullValue ||
+      value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+    return;
+  }
+  sink.addValue(value);
+}
+
 absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 CELFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
                                  std::optional<size_t> max_length) const {
@@ -90,7 +121,8 @@ CELFormatterCommandParser::parse(absl::string_view command, absl::string_view su
   if (command == "CEL" || command == "TYPED_CEL") {
     auto parse_status = google::api::expr::parser::Parse(subcommand);
     if (!parse_status.ok()) {
-      throw EnvoyException("Not able to parse expression: " + parse_status.status().ToString());
+      return absl::InvalidArgumentError(
+          absl::StrCat("Not able to parse expression: ", parse_status.status().ToString()));
     }
 
     // Lazily resolve the active server context at CEL-command parse time: built-in command parsers
@@ -109,7 +141,7 @@ CELFormatterCommandParser::parse(absl::string_view command, absl::string_view su
 
   return nullptr;
 #else
-  throw EnvoyException("CEL is not available for use in this environment.");
+  return absl::UnimplementedError("CEL is not available for use in this environment.");
 #endif
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"

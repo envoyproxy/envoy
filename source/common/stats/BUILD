@@ -216,7 +216,7 @@ envoy_cc_library(
     srcs = ["tag_extractor_impl.cc"],
     hdrs = ["tag_extractor_impl.h"],
     deps = [
-        "//envoy/stats:stats_interface",
+        "//envoy/stats:tag_extractor_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:perf_annotation_lib",
         "//source/common/common:regex_lib",
@@ -232,6 +232,7 @@ envoy_cc_library(
         ":tag_extractor_lib",
         ":utility_lib",
         "//envoy/stats:stats_interface",
+        "//envoy/stats:tag_extractor_interface",
         "//source/common/common:perf_annotation_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf",
@@ -278,7 +279,7 @@ envoy_cc_library(
     hdrs = ["timespan_impl.h"],
     deps = [
         "//envoy/common:time_interface",
-        "//envoy/stats:stats_interface",
+        "//envoy/stats:histogram_interface",
         "//envoy/stats:timespan_interface",
         "//source/common/common:assert_lib",
     ],
@@ -292,5 +293,18 @@ envoy_cc_library(
         ":symbol_table_lib",
         "//envoy/stats:scope_interface",
         "//envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "prefix_utility_lib",
+    srcs = ["prefix_utility.cc"],
+    hdrs = ["prefix_utility.h"],
+    deps = [
+        ":utility_lib",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:tag_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/config:well_known_names",
     ],
 )

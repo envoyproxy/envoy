@@ -25,6 +25,7 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/http:async_client_lib",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
     ],
 )
 
@@ -56,6 +57,7 @@ envoy_cc_library(
         "//envoy/singleton:manager_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/config:well_known_names",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ] + envoy_select_google_grpc([":google_async_client_lib"]),
 )

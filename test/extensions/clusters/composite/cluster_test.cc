@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -263,7 +264,7 @@ cluster_type:
   // Test thread aware load balancer.
   CompositeThreadAwareLoadBalancer thread_aware_lb(*cluster_);
   EXPECT_NE(nullptr, thread_aware_lb.factory());
-  EXPECT_TRUE(thread_aware_lb.initialize().ok());
+  EXPECT_OK(thread_aware_lb.initialize());
 
   // Test load balancer factory.
   CompositeLoadBalancerFactory factory(*cluster_);
@@ -585,7 +586,7 @@ TEST_F(CompositeClusterTest, FactoryCreateMethod) {
   std::ignore = cluster_type->mutable_typed_config()->PackFrom(typed_config);
 
   auto result = factory.create(cluster_config, factory_context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   EXPECT_NE(nullptr, result.value().first);
   EXPECT_NE(nullptr, result.value().second);
 }

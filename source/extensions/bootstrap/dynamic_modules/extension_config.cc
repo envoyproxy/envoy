@@ -75,7 +75,7 @@ void DynamicModuleBootstrapExtensionConfig::onClusterAddOrUpdate(
   }
 }
 
-void DynamicModuleBootstrapExtensionConfig::onClusterRemoval(const std::string& cluster_name) {
+void DynamicModuleBootstrapExtensionConfig::onClusterRemoval(absl::string_view cluster_name) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_cluster_removal_ != nullptr) {
     on_bootstrap_extension_cluster_removal_(thisAsVoidPtr(), in_module_config_,
                                             {cluster_name.data(), cluster_name.size()});

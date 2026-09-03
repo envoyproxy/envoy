@@ -83,6 +83,8 @@ TEST(BoundTest, Compare) {
 
 class MatcherTest : public ::testing::Test {
 protected:
+  MatcherTest() { instance_.registerThread(dispatcher_, true); }
+
   void setup(const char* expression, unsigned int flag, bool report_start_of_matching) {
     std::vector<const char*> expressions{expression};
     std::vector<unsigned int> flags{flag};
@@ -96,7 +98,7 @@ protected:
     ::testing::Test::TearDown();
   }
 
-  Event::MockDispatcher dispatcher_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
   ThreadLocal::InstanceImpl instance_;
   std::unique_ptr<Matcher> matcher_;
 };

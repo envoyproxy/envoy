@@ -1,6 +1,10 @@
 #include "source/common/quic/envoy_tls_server_handshaker.h"
 
 #include "source/common/common/macros.h"
+#include "source/common/quic/envoy_quic_downstream_cert_verifier.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
+#include "source/common/quic/envoy_quic_server_session.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -10,9 +14,7 @@ EnvoyTlsServerHandshaker::EnvoyTlsServerHandshaker(
     Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption)
     : TlsServerHandshaker(session, crypto_config), pinned_ssl_ctx_(std::move(pinned_ssl_ctx)) {
   SSL_set_ex_data(ssl(), handshakerExDataIndex(), this);
-  // Also check the pinned context for keys: the factory is shared across workers and
-  // config_ may reflect an SDS update before ssl_ctx_ is swapped on the main thread.
-  if (disable_resumption || !pinnedServerContext()->hasSessionTicketKeys()) {
+  if (disable_resumption) {
     DisableResumption();
   }
 }
@@ -25,20 +27,53 @@ int EnvoyTlsServerHandshaker::handshakerExDataIndex() {
   }());
 }
 
+EnvoyTlsServerHandshaker* EnvoyTlsServerHandshaker::handshakerFromSsl(const SSL* ssl) {
+  auto* handshaker =
+      static_cast<EnvoyTlsServerHandshaker*>(SSL_get_ex_data(ssl, handshakerExDataIndex()));
+  ASSERT(handshaker == nullptr || dynamic_cast<EnvoyTlsServerHandshaker*>(handshaker) != nullptr);
+  return handshaker;
+}
+
 int EnvoyTlsServerHandshaker::ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t* iv,
                                                 EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
                                                 int encrypt) {
-  auto* handshaker =
-      static_cast<EnvoyTlsServerHandshaker*>(SSL_get_ex_data(ssl, handshakerExDataIndex()));
+  auto* handshaker = handshakerFromSsl(ssl);
   if (handshaker == nullptr || handshaker->pinnedServerContext() == nullptr) {
-    // Null handshaker can occur if the runtime guard was toggled between
-    // OnNewSslCtx (which installed this callback on the SSL_CTX) and
-    // connection creation (which fell back to the vanilla TlsServerHandshaker).
-    // Return 0 to disable ticket for this connection — graceful fallback.
     return 0;
   }
   return handshaker->pinnedServerContext()->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx,
                                                                  encrypt);
+}
+
+void EnvoyTlsServerHandshaker::keylogCallback(const SSL* ssl, const char* line) {
+  auto* handshaker = handshakerFromSsl(ssl);
+  if (handshaker == nullptr || handshaker->pinnedServerContext() == nullptr) {
+    return;
+  }
+  ASSERT(dynamic_cast<EnvoyQuicServerSession*>(handshaker->session()) != nullptr);
+  const auto& info =
+      static_cast<EnvoyQuicServerSession*>(handshaker->session())->connectionInfoProvider();
+  handshaker->pinnedServerContext()->maybeWriteKeyLog(line, info.localAddress().get(),
+                                                      info.remoteAddress().get());
+}
+
+quic::QuicAsyncStatus EnvoyTlsServerHandshaker::VerifyCertChain(
+    const std::vector<absl::string_view>& certs, std::string* error_details,
+    std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert,
+    std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_mtls_server_enabled")) {
+    *error_details = "QUIC mTLS server validation is disabled by runtime guard "
+                     "envoy.reloadable_features.quic_mtls_server_enabled";
+    *details = std::make_unique<CertVerifyResult>(false);
+    return quic::QUIC_FAILURE;
+  }
+  auto* context = pinnedServerContext();
+  if (context == nullptr) {
+    *error_details = "server SSL context not available because secrets are not loaded";
+    *details = std::make_unique<CertVerifyResult>(false);
+    return quic::QUIC_FAILURE;
+  }
+  return verifyQuicClientCertChain(certs, *context, error_details, details, out_alert);
 }
 
 } // namespace Quic

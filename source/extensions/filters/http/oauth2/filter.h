@@ -26,6 +26,7 @@
 #include "source/extensions/filters/http/oauth2/oauth.h"
 #include "source/extensions/filters/http/oauth2/oauth_client.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
@@ -49,12 +50,26 @@ using OAuth2Headers = ConstSingleton<OAuth2HeaderValues>;
 
 class OAuth2Client;
 
+// Entry names used when ``token_secret`` is supplied as a multi-entry generic secret. This form is
+// only used with the ``PRIVATE_KEY_JWT`` auth type, where it allows the key ID to be distributed
+// together with the signing key so the two do not drift apart.
+constexpr absl::string_view PrivateKeySecretEntry = "private_key";
+constexpr absl::string_view KeyIdSecretEntry = "key_id";
+
 // Helper class used to fetch secrets (usually from SDS).
 class SecretReader {
 public:
   virtual ~SecretReader() = default;
+  // The OAuth client secret sent to the token endpoint by the auth types that use a shared
+  // secret. Only ever the single-value form of ``token_secret``.
   virtual const std::string& clientSecret() const PURE;
   virtual const std::string& hmacSecret() const PURE;
+  // The PEM-encoded key used to sign the JWT client assertion, taken from the ``private_key``
+  // entry of a multi-entry ``token_secret``, or from a single-value secret.
+  virtual const std::string& privateKey() const PURE;
+  // The key ID distributed alongside the signing key in a multi-entry ``token_secret``, or an
+  // empty string when the secret does not carry one.
+  virtual const std::string& keyId() const PURE;
 };
 
 class SDSSecretReader : public SecretReader {
@@ -77,6 +92,18 @@ public:
     return client_secret_ ? client_secret_->secret() : empty_client_secret_;
   }
   const std::string& hmacSecret() const override { return hmac_secret_->secret(); }
+  const std::string& privateKey() const override {
+    if (client_secret_ == nullptr) {
+      return empty_client_secret_;
+    }
+    // A single-value secret holds the key directly; a multi-entry secret holds it in a named
+    // entry alongside the key ID.
+    const std::string& value = client_secret_->secret();
+    return value.empty() ? client_secret_->secret(PrivateKeySecretEntry) : value;
+  }
+  const std::string& keyId() const override {
+    return client_secret_ ? client_secret_->secret(KeyIdSecretEntry) : empty_client_secret_;
+  }
 
 private:
   std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> client_secret_;
@@ -154,7 +181,7 @@ public:
   FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
                Server::Configuration::CommonFactoryContext& context,
                std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
-               const std::string& stats_prefix);
+               const std::string& stats_prefix, absl::Status& creation_status);
   const std::string& clusterName() const { return oauth_token_endpoint_.cluster(); }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
@@ -180,23 +207,37 @@ public:
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
   const std::string& endSessionEndpoint() const { return end_session_endpoint_; }
+  const Formatter::Formatter* postLogoutRedirectUri() const {
+    return post_logout_redirect_uri_formatter_.get();
+  }
+  bool disablePostLogoutRedirectUri() const { return disable_post_logout_redirect_uri_; }
   const Http::Utility::QueryParamsMulti& authorizationQueryParams() const {
     return authorization_query_params_;
   }
-  const std::string& redirectUri() const { return redirect_uri_; }
+  const Formatter::Formatter& redirectUri() const { return *redirect_uri_formatter_; }
   const std::vector<std::string>& allowedRedirectDomains() const {
     return allowed_redirect_domains_;
   }
-  const std::string& originalRequestUri() const { return original_request_uri_; }
+  const Formatter::Formatter* originalRequestUri() const {
+    return original_request_uri_formatter_.get();
+  }
   const Matchers::PathMatcher& redirectPathMatcher() const { return redirect_matcher_; }
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string hmacSecret() const { return secret_reader_->hmacSecret(); }
+  std::string privateKey() const { return secret_reader_->privateKey(); }
+  std::string keyId() const { return secret_reader_->keyId(); }
   // The secrets are loaded asynchronously if per-route configurations are used, so the filter needs
   // to check if the secrets are available before processing the request.
   bool requiredSecretsAvailable() const {
-    return !secret_reader_->hmacSecret().empty() &&
-           (auth_type_ == AuthType::TlsClientAuth || !secret_reader_->clientSecret().empty());
+    if (secret_reader_->hmacSecret().empty()) {
+      return false;
+    }
+    if (auth_type_ == AuthType::TlsClientAuth) {
+      return true;
+    }
+    return auth_type_ == AuthType::PrivateKeyJwt ? !secret_reader_->privateKey().empty()
+                                                 : !secret_reader_->clientSecret().empty();
   }
   FilterStats& stats() const { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
@@ -249,6 +290,9 @@ public:
     return code_verifier_cookie_settings_;
   }
   bool disableTokenEncryption() const { return disable_token_encryption_; }
+  const std::string& jwtSigningAlgorithm() const { return jwt_signing_algorithm_; }
+  std::chrono::seconds jwtAssertionLifetime() const { return jwt_assertion_lifetime_; }
+  const std::string& jwtAssertionAudience() const { return jwt_assertion_audience_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix,
@@ -259,11 +303,13 @@ private:
   const std::string authorization_endpoint_;
   Http::Utility::Url authorization_endpoint_url_;
   const std::string end_session_endpoint_;
+  Formatter::FormatterPtr post_logout_redirect_uri_formatter_;
+  const bool disable_post_logout_redirect_uri_ : 1;
   const Http::Utility::QueryParamsMulti authorization_query_params_;
   const std::string client_id_;
-  const std::string redirect_uri_;
+  Formatter::FormatterPtr redirect_uri_formatter_;
+  Formatter::FormatterPtr original_request_uri_formatter_;
   const std::vector<std::string> allowed_redirect_domains_;
-  const std::string original_request_uri_;
   const Matchers::PathMatcher redirect_matcher_;
   const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
@@ -280,6 +326,10 @@ private:
   const std::chrono::seconds default_refresh_token_expires_in_;
   const std::chrono::seconds csrf_token_expires_in_;
   const std::chrono::seconds code_verifier_token_expires_in_;
+  // Always initialized even for non-JWT auth types; minimal overhead (two strings + 8 bytes).
+  const std::string jwt_signing_algorithm_;
+  const std::chrono::seconds jwt_assertion_lifetime_;
+  const std::string jwt_assertion_audience_;
   const bool forward_bearer_token_ : 1;
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
@@ -471,6 +521,7 @@ private:
   std::string encryptToken(const std::string& token) const;
   std::string decryptToken(const std::string& encrypted_token) const;
   void removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const;
+  absl::StatusOr<std::string> getClientCredential();
   void removeOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
   bool shouldAllowFailed(const Http::RequestHeaderMap& headers) const;
   bool shouldDenyRedirect(const Http::RequestHeaderMap& headers) const;

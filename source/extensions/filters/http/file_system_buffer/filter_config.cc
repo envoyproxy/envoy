@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 
+#include "source/common/common/assert.h"
 #include "source/extensions/filters/http/file_system_buffer/filter.h"
 
 namespace Envoy {
@@ -68,11 +69,12 @@ const BufferBehavior& selectBufferBehavior(const ProtoBufferBehavior& behavior) 
   case ProtoBufferBehavior::kFullyBuffer:
     return BufferBehaviorFullyBuffer::instance;
   case ProtoBufferBehavior::BEHAVIOR_NOT_SET:
-    // This should be impossible with the validate rule, but if it somehow happens we throw
-    // an exception.
     break;
   }
-  throw EnvoyException("invalid BufferBehavior in FileSystemBufferFilterConfig");
+  // An unset behavior is rejected at config load time, both by the proto ``(validate.required)``
+  // rule and by validateBufferBehavior in the FileSystemBufferFilterConfig constructor, so it can
+  // never reach here at runtime.
+  PANIC_DUE_TO_PROTO_UNSET;
 }
 
 namespace {
@@ -154,6 +156,20 @@ getBufferResponseConfig(const FilterConfigVector& configs, bool has_file_manager
   return FileSystemBufferFilterMergedConfig::StreamConfig(response_configs, has_file_manager);
 }
 
+// Ensures that, if a stream config specifies a buffer behavior, exactly one behavior is selected.
+// This complements the proto ``(validate.required)`` rule, guaranteeing an unset behavior is a
+// configuration load time error rather than a runtime failure even for configs that reach the
+// constructor without proto validation.
+absl::Status validateBufferBehavior(const ProtoStreamConfig& stream_config,
+                                    absl::string_view direction) {
+  if (stream_config.has_behavior() &&
+      stream_config.behavior().behavior_case() == ProtoBufferBehavior::BEHAVIOR_NOT_SET) {
+    return absl::InvalidArgumentError(absl::StrCat("FileSystemBufferFilterConfig: ", direction,
+                                                   " buffer behavior is set but empty"));
+  }
+  return absl::OkStatus();
+}
+
 } // namespace
 
 FileSystemBufferFilterMergedConfig::StreamConfig::StreamConfig(const StreamConfigVector& configs,
@@ -166,15 +182,24 @@ FileSystemBufferFilterMergedConfig::StreamConfig::StreamConfig(const StreamConfi
 FileSystemBufferFilterConfig::FileSystemBufferFilterConfig(
     std::shared_ptr<AsyncFileManagerFactory> factory,
     std::shared_ptr<AsyncFileManager> async_file_manager,
-    const ProtoFileSystemBufferFilterConfig& config)
+    const ProtoFileSystemBufferFilterConfig& config, absl::Status& creation_status)
     : factory_(std::move(factory)), async_file_manager_(async_file_manager), config_(config) {
+  if (creation_status = validateBufferBehavior(config_.request(), "request");
+      !creation_status.ok()) {
+    return;
+  }
+  if (creation_status = validateBufferBehavior(config_.response(), "response");
+      !creation_status.ok()) {
+    return;
+  }
   if (!config_.storage_buffer_path().value().empty()) {
     struct stat s;
     if (stat(config_.storage_buffer_path().value().c_str(), &s) != 0 ||
         (s.st_mode & S_IFDIR) == 0) {
-      throw EnvoyException(
+      creation_status = absl::InvalidArgumentError(
           absl::StrCat("FileSystemBufferFilterConfig: configured storage_buffer_path '",
                        config_.storage_buffer_path().value(), "' is not a directory"));
+      return;
     }
   }
 }

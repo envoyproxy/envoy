@@ -2,7 +2,6 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/tag.h"

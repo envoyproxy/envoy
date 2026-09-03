@@ -36,7 +36,7 @@ public:
   MOCK_METHOD(absl::Status, initialize, (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(bool, initialized, ());
   MOCK_METHOD(absl::StatusOr<bool>, addOrUpdateCluster,
-              (const envoy::config::cluster::v3::Cluster& cluster, const std::string& version_info,
+              (const envoy::config::cluster::v3::Cluster& cluster, absl::string_view version_info,
                const bool avoid_cds_removal));
   MOCK_METHOD(void, setPrimaryClustersInitializedCb, (PrimaryClustersReadyCallback));
   MOCK_METHOD(void, setInitializedCb, (InitializationCompleteCallback));
@@ -44,15 +44,15 @@ public:
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(ClusterInfoMaps, clusters, (), (const));
   MOCK_METHOD(void, forEachActiveCluster, (std::function<void(const Cluster&)>), (const));
-  MOCK_METHOD(OptRef<const Cluster>, getActiveCluster, (const std::string& cluster_name), (const));
-  MOCK_METHOD(OptRef<const Cluster>, getActiveOrWarmingCluster, (const std::string& cluster_name),
+  MOCK_METHOD(OptRef<const Cluster>, getActiveCluster, (absl::string_view cluster_name), (const));
+  MOCK_METHOD(OptRef<const Cluster>, getActiveOrWarmingCluster, (absl::string_view cluster_name),
               (const));
-  MOCK_METHOD(bool, hasCluster, (const std::string& cluster_name), (const));
+  MOCK_METHOD(bool, hasCluster, (absl::string_view cluster_name), (const));
   MOCK_METHOD(bool, hasActiveClusters, (), (const));
 
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
   MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));
-  MOCK_METHOD(bool, removeCluster, (const std::string& cluster, const bool remove_ignored));
+  MOCK_METHOD(bool, removeCluster, (absl::string_view cluster, const bool remove_ignored));
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(bool, isShutdown, ());
   MOCK_METHOD(const std::optional<envoy::config::core::v3::BindConfig>&, bindConfig, (), (const));
@@ -86,14 +86,14 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
   MOCK_METHOD(void, drainConnections,
-              (const std::string& cluster, DrainConnectionsHostPredicate predicate));
+              (absl::string_view cluster, DrainConnectionsHostPredicate predicate));
   MOCK_METHOD(void, drainConnections,
               (DrainConnectionsHostPredicate predicate,
                ConnectionPool::DrainBehavior drain_behavior));
   MOCK_METHOD(void, drainOrCloseConnPools,
               (DrainConnectionsPoolPredicate predicate,
                ConnectionPool::DrainBehavior drain_behavior));
-  MOCK_METHOD(absl::Status, checkActiveStaticCluster, (const std::string& cluster));
+  MOCK_METHOD(absl::Status, checkActiveStaticCluster, (absl::string_view cluster));
   MOCK_METHOD(absl::StatusOr<OdCdsApiHandlePtr>, allocateOdCdsApi,
               (OdCdsCreationFunction creation_function,
                const envoy::config::core::v3::ConfigSource& odcds_config,

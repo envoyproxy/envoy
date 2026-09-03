@@ -27,7 +27,7 @@ envoy_cc_fuzz_test(
         "substitution_formatter_fuzz_test.dict",
         "//test/fuzz:headers.dict",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":substitution_formatter_fuzz_proto_cc_proto",
         "//source/common/formatter:formatter_extension_lib",
@@ -37,10 +37,26 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test_library(
+    name = "formatter_test_utility_lib",
+    srcs = ["formatter_test_utility.cc"],
+    hdrs = ["formatter_test_utility.h"],
+    deps = [
+        "//envoy/formatter:substitution_formatter_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/formatter:serializer_lib",
+        "//source/common/formatter:stream_info_formatter_extension_lib",
+        "//source/common/json:json_utility_lib",
+        "//source/common/protobuf",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_test_library(
     name = "command_extension_lib",
     srcs = ["command_extension.cc"],
     hdrs = ["command_extension.h"],
     deps = [
+        "//source/common/formatter:serializer_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/protobuf:utility_lib",
     ],
@@ -49,10 +65,12 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "substitution_formatter_test",
     srcs = ["substitution_formatter_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":command_extension_lib",
+        ":formatter_test_utility_lib",
         "//source/common/common:utility_lib",
+        "//source/common/formatter:coalesce_formatter_lib",
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
@@ -68,9 +86,11 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/status",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -78,7 +98,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "substitution_format_string_test",
     srcs = ["substitution_format_string_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":command_extension_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -97,7 +117,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "substitution_formatter_speed_test",
     srcs = ["substitution_formatter_speed_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",

@@ -11,6 +11,8 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -18,6 +20,7 @@
 
 using testing::_;
 using testing::Invoke;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -91,7 +94,7 @@ public:
   // Create a simple formatter that returns a static string.
   Formatter::FormatterConstSharedPtr createFormatterFromString(const std::string& format_str) {
     auto formatter_or_error = Formatter::FormatterImpl::create(format_str, false);
-    EXPECT_TRUE(formatter_or_error.ok());
+    EXPECT_OK(formatter_or_error);
     return std::move(formatter_or_error.value());
   }
 
@@ -224,8 +227,8 @@ TEST_F(GeoipFilterTest, GeoipInfoSerialization) {
   auto proto = info.serializeAsProto();
   ASSERT_NE(nullptr, proto);
   const auto& proto_struct = dynamic_cast<const Protobuf::Struct&>(*proto);
-  EXPECT_EQ("Seattle", proto_struct.fields().at("x-geo-city").string_value());
-  EXPECT_EQ("US", proto_struct.fields().at("x-geo-country").string_value());
+  EXPECT_THAT(proto_struct.fields(), UnorderedElementsAre(IsStructString("x-geo-city", "Seattle"),
+                                                          IsStructString("x-geo-country", "US")));
 
   // Test serializeAsString.
   auto json_string = info.serializeAsString();

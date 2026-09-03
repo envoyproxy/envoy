@@ -12,7 +12,10 @@ envoy_cc_library(
     name = "api_interface",
     hdrs = ["api.h"],
     deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/common:pure_lib",
         "//envoy/common:random_generator_interface",
+        "//envoy/common:time_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:scaled_range_timer_manager_interface",
         "//envoy/filesystem:filesystem_interface",
@@ -27,6 +30,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "io_error_interface",
     hdrs = ["io_error.h"],
+    deps = [
+        "//envoy/common:pure_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -38,6 +44,8 @@ envoy_cc_library(
         "os_sys_calls_linux.h",
     ],
     deps = [
+        "//envoy/common:base_includes",
         "//envoy/network:address_interface",
+        "@abseil-cpp//absl/strings",
     ],
 )

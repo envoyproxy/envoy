@@ -15,25 +15,19 @@ namespace ExtAuthz {
  * Config registration for the external authorization filter. @see NamedHttpFilterConfigFactory.
  */
 class ExtAuthzFilterConfig
-    : public Common::FactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::ext_authz::v3::ExtAuthz,
           envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute> {
 public:
-  ExtAuthzFilterConfig() : FactoryBase("envoy.filters.http.ext_authz") {}
+  ExtAuthzFilterConfig() : UnifiedFactoryBase("envoy.filters.http.ext_authz") {}
 
 private:
   static constexpr uint64_t DefaultTimeout = 200;
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override {
-    return createFilterFactoryFromProtoWithServerContextTyped(proto_config, stats_prefix,
-                                                              context.serverFactoryContext());
-  }
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& server_context) override;
+      Server::Configuration::ServerFactoryContext& server_context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

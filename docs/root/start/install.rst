@@ -13,57 +13,14 @@ getting your Envoy proxy up and running.
 Install Envoy on Debian-based Linux
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
- If you are using a different deb-based distribution to the ones shown below, you may still be able to use one of them.
+.. note::
 
-.. tabs::
-
-   .. code-tab:: console Debian bookworm
-
-      $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
-      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io bookworm main" | sudo tee /etc/apt/sources.list.d/envoy.list
-      $ sudo apt-get update
-      $ sudo apt-get install envoy
-      $ envoy --version
-
-   .. code-tab:: console Debian bullseye
-
-      $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
-      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io bullseye main" | sudo tee /etc/apt/sources.list.d/envoy.list
-      $ sudo apt-get update
-      $ sudo apt-get install envoy
-      $ envoy --version
-
-   .. code-tab:: console Debian trixie
-
-      $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
-      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io trixie main" | sudo tee /etc/apt/sources.list.d/envoy.list
-      $ sudo apt-get update
-      $ sudo apt-get install envoy
-      $ envoy --version
-
-   .. code-tab:: console Ubuntu focal
-
-      $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
-      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io focal main" | sudo tee /etc/apt/sources.list.d/envoy.list
-      $ sudo apt-get update
-      $ sudo apt-get install envoy
-      $ envoy --version
-
-   .. code-tab:: console Ubuntu jammy
-
-      $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
-      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io jammy main" | sudo tee /etc/apt/sources.list.d/envoy.list
-      $ sudo apt-get update
-      $ sudo apt-get install envoy
-      $ envoy --version
-
-   .. code-tab:: console Ubuntu noble
-
-      $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
-      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io noble main" | sudo tee /etc/apt/sources.list.d/envoy.list
-      $ sudo apt-get update
-      $ sudo apt-get install envoy
-      $ envoy --version
+   The apt repository at ``https://apt.envoyproxy.io`` has not been updated for
+   some time and is not currently maintained. Please use the
+   :ref:`pre-built Docker images <install_binaries>` or download the static
+   binary from the `GitHub release page <https://github.com/envoyproxy/envoy/releases>`__.
+   See `issue #44405 <https://github.com/envoyproxy/envoy/issues/44405>`__ for
+   the tracking discussion.
 
 .. _start_install_macosx:
 

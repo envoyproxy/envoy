@@ -22,6 +22,7 @@
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
@@ -188,7 +189,8 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                Stats::Scope& scope, const std::string& stats_prefix,
-               Server::Configuration::ServerFactoryContext& factory_context);
+               Server::Configuration::ServerFactoryContext& factory_context,
+               absl::Status& creation_status);
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 
@@ -376,7 +378,8 @@ public:
   using ContextExtensionsMap = Protobuf::Map<std::string, std::string>;
 
   FilterConfigPerRoute(
-      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& config)
+      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& config,
+      absl::Status& creation_status)
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
@@ -392,9 +395,10 @@ public:
                           : std::nullopt) {
     if (config.has_check_settings() && config.check_settings().disable_request_body_buffering() &&
         config.check_settings().has_with_request_body()) {
-      ExceptionUtil::throwEnvoyException(
+      creation_status = absl::InvalidArgumentError(
           "Invalid configuration for check_settings. Only one of disable_request_body_buffering or "
           "with_request_body can be set.");
+      return;
     }
   }
 
@@ -584,7 +588,7 @@ private:
   bool initiating_call_{};
   bool buffer_data_{};
   bool skip_check_{false};
-  envoy::service::auth::v3::CheckRequest check_request_;
+  ArenaWrappedProto<envoy::service::auth::v3::CheckRequest> check_request_;
 };
 
 } // namespace ExtAuthz

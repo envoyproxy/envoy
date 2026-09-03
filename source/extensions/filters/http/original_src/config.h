@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/extensions/filters/http/original_src/v3/original_src.pb.h"
 
 namespace Envoy {

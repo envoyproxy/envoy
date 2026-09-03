@@ -59,6 +59,7 @@ public:
   MOCK_METHOD(const std::string&, pemEncodedPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificateChain, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, pemEncodedPeerCertificateChain, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, pemEncodedValidatedPeerCertificateChain, (), (const));
   MOCK_METHOD(bool, peerCertificateSanMatches, (const Ssl::SanMatcher&), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanLocalCertificate, (), (const));
@@ -76,7 +77,7 @@ public:
   MOCK_METHOD(std::optional<SystemTime>, expirationPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, sessionId, (), (const));
   MOCK_METHOD(uint16_t, ciphersuiteId, (), (const));
-  MOCK_METHOD(std::string, ciphersuiteString, (), (const));
+  MOCK_METHOD(absl::string_view, ciphersuiteString, (), (const));
   MOCK_METHOD(uint16_t, tlsGroupId, (), (const));
   MOCK_METHOD(absl::string_view, tlsGroupString, (), (const));
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));
@@ -93,6 +94,11 @@ public:
   MOCK_METHOD(std::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
   MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCertChainInformation, (), (const));
+  MOCK_METHOD(const TlsContext&, getTlsContext, (), (const));
+
+private:
+  // Default return value for getTlsContext(): an empty context with no certificate.
+  std::unique_ptr<TlsContext> default_tls_context_;
 };
 
 class MockClientContextConfig : public ClientContextConfig {

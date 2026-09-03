@@ -13,6 +13,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
+#include "source/common/network/drain_close_util.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -59,11 +61,16 @@ void AccessLog::logMessage(const Message& message, bool full,
 ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
                          const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
-                         const Network::DrainDecision& drain_decision, TimeSource& time_source,
-                         bool emit_dynamic_metadata, const MongoStatsSharedPtr& mongo_stats)
+                         const Network::DrainDecision& drain_decision,
+                         Server::Configuration::ServerFactoryContext& server_context,
+                         TimeSource& time_source, bool emit_dynamic_metadata,
+                         const MongoStatsSharedPtr& mongo_stats, uint32_t max_bson_depth)
     : stats_(generateStats(stat_prefix, scope)), runtime_(runtime), drain_decision_(drain_decision),
+      server_context_(server_context), use_connection_event_drain_(Runtime::runtimeFeatureEnabled(
+                                           "envoy.reloadable_features.use_connection_event_drain")),
       access_log_(access_log), fault_config_(fault_config), time_source_(time_source),
-      emit_dynamic_metadata_(emit_dynamic_metadata), mongo_stats_(mongo_stats) {
+      emit_dynamic_metadata_(emit_dynamic_metadata), mongo_stats_(mongo_stats),
+      max_bson_depth_(max_bson_depth) {
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
                                           100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we
@@ -251,7 +258,7 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
     break;
   }
 
-  if (active_query_list_.empty() && drain_decision_.drainClose(Network::DrainDirection::All) &&
+  if (active_query_list_.empty() && shouldDrainClose() &&
       runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().DrainCloseEnabled, 100)) {
     ENVOY_LOG(debug, "drain closing mongo connection");
     stats_.cx_drain_close_.inc();
@@ -285,6 +292,14 @@ void ProxyFilter::decodeCommandReply(CommandReplyMessagePtr&& message) {
   stats_.op_command_reply_.inc();
   logMessage(*message, true);
   ENVOY_LOG(debug, "decoded COMMANDREPLY: {}", message->toString(true));
+}
+
+bool ProxyFilter::shouldDrainClose() {
+  if (!use_connection_event_drain_) {
+    return drain_decision_.drainClose(Network::DrainDirection::All);
+  }
+
+  return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_);
 }
 
 void ProxyFilter::onDrainClose() {
@@ -389,7 +404,7 @@ Network::FilterStatus ProxyFilter::onWrite(Buffer::Instance& data, bool) {
 }
 
 DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
-  return DecoderPtr{new DecoderImpl(callbacks)};
+  return DecoderPtr{new DecoderImpl(callbacks, max_bson_depth_)};
 }
 
 std::optional<std::chrono::milliseconds> ProxyFilter::delayDuration() {

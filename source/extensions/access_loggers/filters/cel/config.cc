@@ -14,7 +14,7 @@ namespace AccessLoggers {
 namespace Filters {
 namespace CEL {
 
-Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
+absl::StatusOr<Envoy::AccessLog::FilterPtr> CELAccessLogExtensionFilterFactory::createFilter(
     const envoy::config::accesslog::v3::ExtensionFilter& config,
     Server::Configuration::GenericFactoryContext& context) {
 

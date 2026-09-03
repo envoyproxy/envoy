@@ -14,6 +14,7 @@ envoy_cc_test(
     srcs = ["eventstream_parser_test.cc"],
     deps = [
         "//source/extensions/common/aws/eventstream:eventstream_parser_lib",
+        "//test/test_common:status_utility_lib",
         "@abseil-cpp//absl/strings",
     ],
 )

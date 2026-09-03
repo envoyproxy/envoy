@@ -26,6 +26,7 @@
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -63,10 +64,9 @@ protected:
     if (cluster_config.has_cluster_type()) {
       ProtobufTypes::MessagePtr dns_cluster_msg =
           std::make_unique<envoy::extensions::clusters::dns::v3::DnsCluster>();
-      ASSERT_TRUE(Config::Utility::translateOpaqueConfig(
-                      cluster_config.cluster_type().typed_config(),
-                      factory_context.messageValidationVisitor(), *dns_cluster_msg)
-                      .ok());
+      ASSERT_OK(Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
+                                                       factory_context.messageValidationVisitor(),
+                                                       *dns_cluster_msg));
       dns_cluster =
           MessageUtil::downcastAndValidate<const envoy::extensions::clusters::dns::v3::DnsCluster&>(
               *dns_cluster_msg, factory_context.messageValidationVisitor());
@@ -831,7 +831,7 @@ TEST_P(LogicalDnsImplementationsTest, UseDnsExtension) {
 
   EXPECT_CALL(initialized_, ready());
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
-  ASSERT_TRUE(factorySetupFromV3Yaml(config).ok());
+  ASSERT_OK(factorySetupFromV3Yaml(config));
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -867,7 +867,7 @@ TEST_P(LogicalDnsImplementationsTest, TypedConfigBackcompat) {
 
   EXPECT_CALL(initialized_, ready());
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
-  ASSERT_TRUE(factorySetupFromV3Yaml(config).ok());
+  ASSERT_OK(factorySetupFromV3Yaml(config));
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1099,7 +1099,7 @@ TEST_P(LogicalDnsImplementationsTest, LogicalDnsUpdatesEntireAddressList) {
 
   EXPECT_CALL(initialized_, ready());
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
-  ASSERT_TRUE(factorySetupFromV3Yaml(config).ok());
+  ASSERT_OK(factorySetupFromV3Yaml(config));
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(testing::Ge(std::chrono::milliseconds(3000)), _))

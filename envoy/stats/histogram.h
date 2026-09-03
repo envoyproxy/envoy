@@ -2,11 +2,15 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/stats.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
