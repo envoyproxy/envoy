@@ -10,6 +10,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -19,6 +20,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
 
 using testing::Invoke;
 using testing::NiceMock;
@@ -92,8 +94,8 @@ public:
   // its expectation goes unsatisfied.
   Http::FilterHeadersStatus decodeHeadersEngaging() {
     replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
-    Http::TestRequestHeaderMapImpl headers = requestHeaders();
-    return filter_->decodeHeaders(headers, /*end_stream=*/false);
+    request_headers_ = requestHeaders();
+    return filter_->decodeHeaders(request_headers_, /*end_stream=*/false);
   }
 
   // Engages the filter where the payload is not what the test is about:
@@ -160,6 +162,7 @@ public:
   NiceMock<Event::MockSchedulableCallback>* replay_cb_{nullptr};
   std::unique_ptr<RouteConfig> route_config_;
   std::unique_ptr<AiProtocolManagerFilter> filter_;
+  Http::TestRequestHeaderMapImpl request_headers_;
 
   Buffer::OwnedImpl injected_;
   bool injected_end_stream_{false};
@@ -1162,11 +1165,53 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(), payload);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(counterValue("request_parsed"), 1);
   EXPECT_EQ(counterValue("request_parse_error"), 0);
   EXPECT_EQ(counterValue("request_schema_invalid"), 0);
+}
+
+// Content-Length header is set to the recalculated length when the filter manager serializes the
+// payload.
+TEST_F(AiProtocolManagerFilterTest, SetsContentLengthOnReplay) {
+  setRouteConfig();
+  replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+  request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                    {":path", "/chat/completions"},
+                                                    {"content-type", "application/json"},
+                                                    {"content-length", "999"}};
+  ASSERT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(request_headers_.getContentLengthValue(), "999");
+
+  const std::string payload = R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_NE(request_headers_.ContentLength(), nullptr);
+  EXPECT_EQ(request_headers_.getContentLengthValue(), absl::StrCat(injected_.length()));
+}
+
+// Content-Length header is not added if it was not previously present on request headers.
+TEST_F(AiProtocolManagerFilterTest, DoesNotSetContentLengthOnReplayWhenAbsent) {
+  setRouteConfig();
+  replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_);
+  request_headers_ = Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/chat/completions"}, {"content-type", "application/json"}};
+  ASSERT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(request_headers_.ContentLength(), nullptr);
+
+  const std::string payload = R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(request_headers_.ContentLength(), nullptr);
 }
 
 // Malformed JSON is answered with a 400 and never reaches the upstream.
@@ -1309,7 +1354,7 @@ TEST_F(AiProtocolManagerFilterTest, PassesThroughUnknownFields) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(), payload);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
   EXPECT_TRUE(injected_end_stream_);
 }
 
@@ -1328,8 +1373,9 @@ TEST_F(AiProtocolManagerFilterTest, ChunkedBodyWithEmptyTerminalFrame) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(),
-            R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(
+      nlohmann::json::parse(injected_.toString()),
+      nlohmann::json::parse(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})"));
 }
 
 // With trailers, no data frame carries end_stream, so the trailers close it.
@@ -1344,8 +1390,9 @@ TEST_F(AiProtocolManagerFilterTest, TrailerTerminatedJsonIsParsed) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(),
-            R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(
+      nlohmann::json::parse(injected_.toString()),
+      nlohmann::json::parse(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})"));
   EXPECT_EQ(continue_calls_, 1);
 }
 
@@ -1621,8 +1668,24 @@ TEST_F(AiProtocolManagerFilterTest, PassThroughEndpointIsParsedAndForwarded) {
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(),
-            R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(
+      nlohmann::json::parse(injected_.toString()),
+      nlohmann::json::parse(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})"));
+}
+
+TEST_F(AiProtocolManagerFilterTest, SetsFilterStateObjectOnParsedPayload) {
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  auto* fs = callbacks_.stream_info_.filterState()->getDataReadOnly<APMRequestPayloadIndex>(
+      APMRequestPayloadIndex::kFilterStateKey);
+  ASSERT_NE(fs, nullptr);
+  EXPECT_EQ(fs->index().json()["model"], "gpt-4");
 }
 
 // A payload with valid JSON syntax but violating the route's schema is rejected with 400.

@@ -165,6 +165,65 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ai_request_lib",
+    hdrs = ["ai_request.h"],
+    deps = [
+        ":json_with_ext_buf_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "serializer_lib",
+    srcs = ["serializer.cc"],
+    hdrs = ["serializer.h"],
+    deps = [
+        ":buffer_manager_lib",
+        ":json_with_ext_buf_lib",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_manager_lib",
+    srcs = ["filter_manager.cc"],
+    hdrs = [
+        "ai_filter.h",
+        "filter_manager.h",
+    ],
+    deps = [
+        ":ai_request_lib",
+        ":buffer_manager_lib",
+        ":json_with_ext_buf_lib",
+        ":serializer_lib",
+        "//envoy/http:codes_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/coroutine:async_queue_lib",
+        "//source/common/coroutine:dispatcher_executor_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
@@ -172,10 +231,12 @@ envoy_cc_library(
         ":buffer_manager_lib",
         ":external_buffer_interface",
         ":filter_chain_bridge_lib",
+        ":filter_manager_lib",
         ":json_with_ext_buf_lib",
         ":json_with_ext_buf_parser_lib",
         ":response_handler_lib",
         ":schema_lib",
+        ":serializer_lib",
         ":stats_lib",
         "//envoy/http:codes_interface",
         "//envoy/router:router_interface",

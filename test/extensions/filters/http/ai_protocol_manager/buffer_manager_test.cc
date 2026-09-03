@@ -7,7 +7,9 @@
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 
+#include "test/extensions/filters/http/ai_protocol_manager/fake_bridge.h"
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -20,45 +22,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 namespace {
-
-// Hand-written FilterChainBridge that records everything the BufferManager does
-// to the (notional) filter chain, so the path-agnostic offload/replay logic can
-// be unit-tested without any HTTP filter mocks. Tests drive replay back-pressure
-// through the captured ReplayWatermarkHandler, exactly as a real decoder/encoder
-// bridge would when the connection manager raises a watermark.
-class FakeBridge : public FilterChainBridge {
-public:
-  explicit FakeBridge(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
-
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  uint32_t bufferLimit() override { return buffer_limit_; }
-  void injectData(Buffer::Instance& data) override {
-    injected_.add(data);
-    ++inject_calls_;
-    // Simulate downstream back-pressure arising mid-replay: when configured, raise
-    // the replay high watermark right after the Nth injected chunk, as a real
-    // chain would when its write buffer fills.
-    if (handler_ != nullptr && inject_calls_ == raise_replay_watermark_at_inject_) {
-      handler_->onReplayAboveHighWatermark();
-    }
-  }
-  void pauseSource() override { ++pause_source_calls_; }
-  void resumeSource() override { ++resume_source_calls_; }
-  void registerReplayWatermarks(ReplayWatermarkHandler& handler) override { handler_ = &handler; }
-  void unregisterReplayWatermarks() override { handler_ = nullptr; }
-  void onUnrecoverableError() override { ++error_calls_; }
-
-  Event::Dispatcher& dispatcher_;
-  uint32_t buffer_limit_{1024 * 1024};
-  ReplayWatermarkHandler* handler_{nullptr};
-
-  Buffer::OwnedImpl injected_;
-  int inject_calls_{0};
-  int pause_source_calls_{0};
-  int resume_source_calls_{0};
-  int error_calls_{0};
-  int raise_replay_watermark_at_inject_{0}; // 0 = never.
-};
 
 // An ExternalBuffer that completes both write and read asynchronously, via
 // dispatcher.post() -- modelling a network/disk-backed store. Used to exercise
@@ -228,7 +191,11 @@ public:
   // (End-of-stream handling lives in the filter, not the manager, so the unit
   // tests just observe that the requested range was injected and done fired.)
   void replayAll() {
-    manager_->replay(0, manager_->length(), [this]() { replay_done_ = true; });
+    manager_->replay(0, manager_->length(), [this](absl::Status status) {
+      if (status.ok()) {
+        replay_done_ = true;
+      }
+    });
   }
 
   // Run all posted callbacks, including ones enqueued while draining.
@@ -419,9 +386,13 @@ TEST_F(BufferManagerTest, ReplaysSubRangesInSequence) {
 
   bool second_done = false;
   // Replay the first half, then chain the second half from its done callback.
-  manager_->replay(0, 5, [&]() {
+  manager_->replay(0, 5, [&](absl::Status status) {
+    ASSERT_OK(status);
     EXPECT_EQ(bridge_->injected_.toString(), "HELLO");
-    manager_->replay(5, 5, [&second_done]() { second_done = true; });
+    manager_->replay(5, 5, [&second_done](absl::Status status2) {
+      ASSERT_OK(status2);
+      second_done = true;
+    });
   });
 
   // First range was deferred (offload already durable).
@@ -466,7 +437,8 @@ TEST_F(BufferManagerTest, TerminalReplayDoneDetachesManagerSynchronously) {
   // The write is still in flight (posted) when replay() is requested, so replay
   // starts from the write completion during drain() and runs synchronously through
   // the in-memory store into this done callback.
-  manager_->replay(0, manager_->length(), [&]() {
+  manager_->replay(0, manager_->length(), [&](absl::Status status) {
+    ASSERT_OK(status);
     done_ran = true;
     injected = bridge_->injected_.toString();
     // Mirror the filter's teardown: detach on-stack, mid-read.
@@ -773,6 +745,184 @@ TEST_F(BufferManagerTest, ResumeSkipsReadWhileOneInFlight) {
   drain();
   EXPECT_TRUE(replay_done_);
   EXPECT_EQ(bridge_->injected_.toString(), big);
+}
+
+// In-memory replay injects small buffer data into the filter chain verbatim and triggers done
+// callback.
+TEST_F(BufferManagerTest, ReplaysInMemoryDataVerbatim) {
+  Buffer::OwnedImpl body("{\"messages\":[\"hello\"]}");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  Buffer::OwnedImpl in_memory_data("{\"modified\":true}");
+  bool in_mem_done = false;
+  manager_->replay(in_memory_data, [&in_mem_done](absl::Status status) {
+    ASSERT_OK(status);
+    in_mem_done = true;
+  });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  EXPECT_TRUE(in_mem_done);
+  EXPECT_EQ(bridge_->injected_.toString(), "{\"modified\":true}");
+}
+
+// In-memory replay pauses when high watermark is hit and resumes when low watermark drains.
+TEST_F(BufferManagerTest, ReplaysInMemoryDataWithWatermarkBackpressure) {
+  Buffer::OwnedImpl body("initial");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  // Set bridge to raise high watermark on the first injected chunk.
+  bridge_->raise_replay_watermark_at_inject_ = 1;
+
+  const std::string big_payload(200 * 1024, 'z'); // Multiple 64KB chunks
+  Buffer::OwnedImpl in_memory_data(big_payload);
+  bool in_mem_done = false;
+  manager_->replay(in_memory_data, [&in_mem_done](absl::Status status) {
+    ASSERT_OK(status);
+    in_mem_done = true;
+  });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // The first chunk injected and triggered high watermark, pausing replay.
+  EXPECT_FALSE(in_mem_done);
+  EXPECT_EQ(bridge_->injected_.length(), 64 * 1024);
+
+  // Now clear the watermark: low watermark schedules continuation to resume draining.
+  ASSERT_NE(bridge_->handler_, nullptr);
+  bridge_->handler_->onReplayBelowLowWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  EXPECT_TRUE(in_mem_done);
+  EXPECT_EQ(bridge_->injected_.toString(), big_payload);
+}
+
+// cancelReplay cancels in-flight external buffer replay so late read completions are dropped.
+TEST_F(BufferManagerTest, CancelReplayCancelsPendingExternalBufferReplay) {
+  resetManager(posting_factory_);
+
+  Buffer::OwnedImpl body("message data for offload");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  replayAll();
+
+  // A deferred replay was scheduled; fire replay_cb_ to issue read().
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // The read callback was posted to dispatcher, so read is currently in flight.
+  EXPECT_FALSE(posted_.empty());
+
+  // Now cancel replay before the posted read callback completes.
+  manager_->cancelReplay();
+
+  // Run the remaining posted read callback.
+  drain();
+
+  EXPECT_FALSE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.length(), 0);
+}
+
+// cancelReplay cancels in-flight in-memory replay so scheduled callbacks do not inject.
+TEST_F(BufferManagerTest, CancelReplayCancelsPendingInMemoryReplay) {
+  Buffer::OwnedImpl in_memory_data("{\"modified\":true}");
+  bool in_mem_done = false;
+  manager_->replay(in_memory_data, [&in_mem_done](absl::Status) { in_mem_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  manager_->cancelReplay();
+  EXPECT_FALSE(replay_cb_->enabled());
+
+  drain();
+  EXPECT_FALSE(in_mem_done);
+  EXPECT_EQ(bridge_->injected_.length(), 0);
+}
+
+// onDestroy cancels in-flight in-memory replay so scheduled callbacks do not inject or trigger
+// done.
+TEST_F(BufferManagerTest, DestroyCancelsPendingInMemoryReplay) {
+  Buffer::OwnedImpl in_memory_data("{\"modified\":true}");
+  bool in_mem_done = false;
+  manager_->replay(in_memory_data, [&in_mem_done](absl::Status) { in_mem_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  manager_->onDestroy();
+  EXPECT_FALSE(replay_cb_->enabled());
+
+  drain();
+  EXPECT_FALSE(in_mem_done);
+  EXPECT_EQ(bridge_->injected_.length(), 0);
+}
+
+// cancelReplay permanently disables starting any new replay.
+TEST_F(BufferManagerTest, CancelReplayPermanentlyPreventsFurtherReplay) {
+  Buffer::OwnedImpl body("some payload");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  manager_->cancelReplay();
+
+  // Attempting to replay after cancelReplay triggers an assert in debug builds.
+  EXPECT_DEBUG_DEATH(manager_->replay(0, 5, [](absl::Status) {}), ".*");
+
+  Buffer::OwnedImpl in_mem("test");
+  EXPECT_DEBUG_DEATH(manager_->replay(in_mem, [](absl::Status) {}), ".*");
+}
+
+// If in-memory replay is cancelled synchronously during injectData, draining stops immediately.
+TEST_F(BufferManagerTest, SynchronousCancelReplayStopsInMemoryDrainImmediately) {
+  Buffer::OwnedImpl body("initial");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  const std::string big_payload(200 * 1024, 'z'); // Multiple 64KB chunks
+  Buffer::OwnedImpl in_memory_data(big_payload);
+  bool in_mem_done = false;
+
+  bridge_->on_inject_ = [this]() { manager_->cancelReplay(); };
+
+  manager_->replay(in_memory_data, [&in_mem_done](absl::Status) { in_mem_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // Draining stopped after the first chunk was injected; no further chunks or done callback ran.
+  EXPECT_EQ(bridge_->inject_calls_, 1);
+  EXPECT_EQ(bridge_->injected_.length(), 64 * 1024);
+  EXPECT_FALSE(in_mem_done);
+}
+
+// If external buffer replay is cancelled synchronously during injectData, replay stops immediately.
+TEST_F(BufferManagerTest, SynchronousCancelReplayStopsExternalBufferReplayImmediately) {
+  const std::string big_payload(200 * 1024, 'z');
+  Buffer::OwnedImpl body(big_payload);
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  bool replay_done = false;
+  bridge_->on_inject_ = [this]() { manager_->cancelReplay(); };
+
+  manager_->replay(0, big_payload.size(), [&replay_done](absl::Status) { replay_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // Replay stopped after the first chunk was injected.
+  EXPECT_EQ(bridge_->inject_calls_, 1);
+  EXPECT_EQ(bridge_->injected_.length(), 64 * 1024);
+  EXPECT_FALSE(replay_done);
 }
 
 } // namespace
