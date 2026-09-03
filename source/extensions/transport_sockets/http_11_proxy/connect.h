@@ -29,8 +29,12 @@ public:
 
   // Helper method to create a properly formatted CONNECT request with Host header.
   // @param target the target hostname:port or IP:port to connect to.
+  // @param include_host_header whether to include the Host header in the CONNECT request.
+  // @param authorization when non-empty, added as the Proxy-Authorization header in the CONNECT
+  //        request.
   // @return a properly formatted CONNECT request string per RFC 9110 section 9.3.6.
-  static std::string formatConnectRequest(absl::string_view target);
+  static std::string formatConnectRequest(absl::string_view target, bool include_host_header,
+                                          absl::string_view authorization = "");
 
   UpstreamHttp11ConnectSocket(
       Network::TransportSocketPtr&& transport_socket,
