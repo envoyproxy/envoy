@@ -76,13 +76,6 @@ Protobuf::Value CELFormatter::formatValue(const Envoy::Formatter::Context& conte
   }
 }
 
-CELFormatterCommandParser::CELFormatterCommandParser(
-    const ::Envoy::LocalInfo::LocalInfo& local_info,
-    Expr::BuilderInstanceSharedConstPtr expr_builder)
-    : configured_state_(ConfiguredState{local_info, std::move(expr_builder)}) {
-  ASSERT(configured_state_->expr_builder != nullptr);
-}
-
 bool CELFormatter::formatTo(std::string& sink, const Envoy::Formatter::Context& context,
                             const StreamInfo::StreamInfo& stream_info) const {
   const std::optional<std::string> value = format(context, stream_info);
@@ -114,6 +107,12 @@ void CELFormatter::formatValueTo(Envoy::Formatter::ValueSink& sink,
   sink.addValue(value);
 }
 
+CELFormatterCommandParser::CELFormatterCommandParser(
+    Expr::BuilderInstanceSharedConstPtr expr_builder)
+    : configured_expr_builder_(std::move(expr_builder)) {
+  ASSERT(configured_expr_builder_ != nullptr);
+}
+
 absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 CELFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
                                  std::optional<size_t> max_length) const {
@@ -125,18 +124,15 @@ CELFormatterCommandParser::parse(absl::string_view command, absl::string_view su
           absl::StrCat("Not able to parse expression: ", parse_status.status().ToString()));
     }
 
-    // Lazily resolve the active server context at CEL-command parse time: built-in command parsers
-    // are process-global, so they cannot capture server-owned CEL state.
-    if (!configured_state_.has_value()) {
-      Server::Configuration::ServerFactoryContext& context =
-          Server::Configuration::ServerFactoryContextInstance::get();
-      return std::make_unique<CELFormatter>(context.localInfo(), Expr::getBuilder(context),
-                                            parse_status.value().expr(), max_length,
-                                            command == "TYPED_CEL");
-    }
-    return std::make_unique<CELFormatter>(
-        configured_state_->local_info.get(), configured_state_->expr_builder,
-        parse_status.value().expr(), max_length, command == "TYPED_CEL");
+    // Built-in parsers are process-global and may outlive a server context; resolve the default
+    // builder per parse to avoid reusing it across server contexts.
+    Server::Configuration::ServerFactoryContext& context =
+        Server::Configuration::ServerFactoryContextInstance::get();
+    const auto expr_builder =
+        configured_expr_builder_ != nullptr ? configured_expr_builder_ : Expr::getBuilder(context);
+    return std::make_unique<CELFormatter>(context.localInfo(), expr_builder,
+                                          parse_status.value().expr(), max_length,
+                                          command == "TYPED_CEL");
   }
 
   return nullptr;

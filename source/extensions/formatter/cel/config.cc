@@ -16,12 +16,14 @@ namespace Formatter {
   const auto& config =
       MessageUtil::downcastAndValidate<const envoy::extensions::formatter::cel::v3::Cel&>(
           proto_config, context.messageValidationVisitor());
-  const auto config_ref = config.has_cel_config()
-                              ? Envoy::makeOptRef(config.cel_config())
-                              : Envoy::OptRef<const envoy::config::core::v3::CelExpressionConfig>{};
-  return std::make_unique<CELFormatterCommandParser>(
-      context.serverFactoryContext().localInfo(),
-      Filters::Common::Expr::getBuilder(context.serverFactoryContext(), config_ref));
+  if (!config.has_cel_config()) {
+    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), warn,
+                        "'CEL' formatter is always enabled and only requires explicit "
+                        "configuration when 'cel_config' is set.");
+    return std::make_unique<CELFormatterCommandParser>();
+  }
+  return std::make_unique<CELFormatterCommandParser>(Filters::Common::Expr::getBuilder(
+      context.serverFactoryContext(), Envoy::makeOptRef(config.cel_config())));
 #else
   UNREFERENCED_PARAMETER(proto_config);
   UNREFERENCED_PARAMETER(context);
