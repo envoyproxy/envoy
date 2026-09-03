@@ -18,6 +18,33 @@ namespace Test {
 namespace {
 // Maximum size of a DNS message over UDP without EDNS(0) (RFC 1035).
 static constexpr size_t kMaxDnsMessageSize = 512;
+
+// Parse a DNS label-encoded name starting at offset. Advances offset past the name.
+static std::string parseDnsName(const uint8_t* data, size_t len, size_t& offset) {
+  std::string name;
+  while (offset < len) {
+    const uint8_t label_len = data[offset++];
+    if (label_len == 0) {
+      break;
+    }
+    if ((label_len & 0xC0) == 0xC0) {
+      // Compression pointer — skip the second byte and stop.
+      if (offset < len) {
+        offset++;
+      }
+      break;
+    }
+    if (offset + label_len > len) {
+      break;
+    }
+    if (!name.empty()) {
+      name += ".";
+    }
+    name.append(reinterpret_cast<const char*>(data + offset), label_len);
+    offset += label_len;
+  }
+  return name;
+}
 } // namespace
 
 FakeUdpDnsServer::FakeUdpDnsServer(Event::Dispatcher& dispatcher, bool ipv6) {
@@ -109,32 +136,6 @@ void FakeUdpDnsServer::tryFlushOutgoing() {
     // later. Either way remove the outgoing message from the queue.
     outgoing_.pop_front();
   }
-}
-
-std::string FakeUdpDnsServer::parseDnsName(const uint8_t* data, size_t len, size_t& offset) {
-  std::string name;
-  while (offset < len) {
-    const uint8_t label_len = data[offset++];
-    if (label_len == 0) {
-      break;
-    }
-    if ((label_len & 0xC0) == 0xC0) {
-      // Compression pointer — skip the second byte and stop.
-      if (offset < len) {
-        offset++;
-      }
-      break;
-    }
-    if (offset + label_len > len) {
-      break;
-    }
-    if (!name.empty()) {
-      name += ".";
-    }
-    name.append(reinterpret_cast<const char*>(data + offset), label_len);
-    offset += label_len;
-  }
-  return name;
 }
 
 std::vector<uint8_t> FakeUdpDnsServer::buildResponse(const uint8_t* query, size_t query_len) const {

@@ -55,9 +55,6 @@ private:
   // Write event handler: sends outgoing queued datagrams.
   void tryFlushOutgoing();
 
-  // Parse a DNS label-encoded name starting at offset. Advances offset past the name.
-  static std::string parseDnsName(const uint8_t* data, size_t len, size_t& offset);
-
   // Build a DNS response for the given query. Returns empty vector on parse failure.
   std::vector<uint8_t> buildResponse(const uint8_t* query, size_t query_len) const;
 
