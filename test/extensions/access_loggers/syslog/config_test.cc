@@ -85,7 +85,7 @@ TEST_F(SyslogConfigTest, ValidatesUnixSocket) {
 #endif
 }
 
-TEST_F(SyslogConfigTest, UnixSocketTakesPrecedenceOverCluster) {
+TEST_F(SyslogConfigTest, RejectsInvalidUnixSocketWithoutFallingBackToCluster) {
   auto config = loadConfig(UnixSocketConfigYaml);
   config.mutable_unix_socket()->clear_path();
   config.set_cluster_name("syslog");
