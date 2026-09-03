@@ -36,15 +36,6 @@ OAuth2ClientImpl::asyncGetAccessToken(const std::string& client_id, const std::s
   if (in_flight_request_ != nullptr) {
     return GetTokenResult::NotDispatchedAlreadyInFlight;
   }
-  // Use urlEncode(), not encode(value, ":/=&?"): the request body below is
-  // application/x-www-form-urlencoded, not a URI component, and the two encoding rulesets
-  // differ. encode() with this reserved-char set leaves '+' (and '%', and space) unescaped;
-  // per the x-www-form-urlencoded serialization spec a literal '+' is decoded by
-  // the receiving end as a space, silently corrupting any client_id/secret/scope that contains
-  // one -- which happens routinely, since identity providers commonly issue base64 client
-  // secrets. urlEncode()
-  // implements the x-www-form-urlencoded algorithm directly (percent-encodes everything except
-  // ALPHA | DIGIT | * | - | . | _, with space as %20) and is the correct encoder for this body.
   const auto encoded_client_id = Envoy::Http::Utility::PercentEncoding::urlEncode(client_id);
   const auto encoded_secret = Envoy::Http::Utility::PercentEncoding::urlEncode(secret);
 
