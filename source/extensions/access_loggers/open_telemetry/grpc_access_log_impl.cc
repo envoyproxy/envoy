@@ -32,7 +32,7 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
         config,
     Event::Dispatcher& dispatcher, Stats::Scope& scope,
     Server::Configuration::ServerFactoryContext& context,
-    const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider)
+    OptRef<const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider> resource_provider)
     : GrpcAccessLogger(
           config.common_config(), dispatcher, scope, std::nullopt,
           std::make_unique<Common::UnaryGrpcAccessLogClient<ExportLogsServiceRequest,

@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
@@ -44,8 +45,8 @@ public:
           config,
       Event::Dispatcher& dispatcher, Stats::Scope& scope,
       Server::Configuration::ServerFactoryContext& context,
-      const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider =
-          ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{});
+      OptRef<const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider>
+          resource_provider = {});
 
 private:
   class OTelLogRequestCallbacks

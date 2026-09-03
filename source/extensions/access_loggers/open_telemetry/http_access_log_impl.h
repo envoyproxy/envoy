@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/core/v3/http_service.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
@@ -23,6 +24,7 @@
 #include "source/extensions/access_loggers/common/access_log_base.h"
 #include "source/extensions/access_loggers/open_telemetry/otlp_log_utils.h"
 #include "source/extensions/access_loggers/open_telemetry/substitution_formatter.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
@@ -47,7 +49,9 @@ public:
       std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator,
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
           config,
-      Event::Dispatcher& dispatcher, Server::Configuration::ServerFactoryContext& server_context);
+      Event::Dispatcher& dispatcher, Server::Configuration::ServerFactoryContext& server_context,
+      OptRef<const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider>
+          resource_provider = {});
 
   using SharedPtr = std::shared_ptr<HttpAccessLoggerImpl>;
 
@@ -98,7 +102,9 @@ public:
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
           config,
       const envoy::config::core::v3::HttpService& http_service,
-      std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator);
+      std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator,
+      OptRef<const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider>
+          resource_provider = {});
 
   std::shared_ptr<const Http::HttpServiceHeadersApplicator>
   getOrCreateApplicator(const envoy::config::core::v3::HttpService& http_service,
