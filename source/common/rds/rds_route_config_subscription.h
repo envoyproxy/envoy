@@ -90,6 +90,12 @@ private:
 
   // Hooks that a derived subscription uses to react to a warmed up route configuration being
   // published.
+  //
+  // NOTE: a non-OK status returned by either hook does NOT affect xDS configuration loading. By
+  // the time these run the route configuration has been warmed up and is published regardless, and
+  // the call is not necessarily on the xDS update call stack - an update that warms up
+  // asynchronously completes long after the xDS response was accepted - so there is nothing left
+  // to reject. A failure is only logged as a warning.
   virtual absl::Status beforeProviderUpdate() { return absl::OkStatus(); }
   virtual absl::Status afterProviderUpdate() { return absl::OkStatus(); }
 
@@ -108,12 +114,6 @@ protected:
   // Target which starts the RDS subscription.
   Init::TargetImpl local_init_target_;
   Init::ManagerImpl local_init_manager_;
-  // Result of the last publishing attempt. Publishing is deferred until the route configuration is
-  // warmed up, so a failure is only reported back to the xDS layer in the common case where there
-  // is nothing to warm up and the publishing therefore happens synchronously. It also gates
-  // whether this subscription signals readiness, so that nothing is told a route configuration is
-  // ready when publishing it failed.
-  absl::Status publish_status_;
   const std::string stat_prefix_;
   const std::string rds_type_;
   RdsStats stats_;
