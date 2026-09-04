@@ -596,6 +596,25 @@ void ContextAccessor::setDynamicMetadataNumber(StreamInfo::StreamInfo& stream_in
   stream_info.setDynamicMetadata(std::string(filter_name), metadata_value);
 }
 
+bool ContextAccessor::getFilterStateBytes(const StreamInfo::StreamInfo& stream_info,
+                                          envoy_dynamic_module_type_module_buffer key,
+                                          envoy_dynamic_module_type_envoy_buffer* result) {
+  if (result == nullptr) {
+    return false;
+  }
+  const absl::string_view key_view(key.ptr, key.length);
+  const auto* accessor =
+      stream_info.filterState().getDataReadOnly<Router::StringAccessor>(key_view);
+  if (accessor == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "key '{}' not found in filter state", key_view);
+    return false;
+  }
+  const absl::string_view value = accessor->asString();
+  *result = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
+  return true;
+}
+
 bool ContextAccessor::setFilterStateBytes(
     StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
     std::optional<StreamInfo::FilterState::LifeSpan> life_span) {

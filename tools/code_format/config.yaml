@@ -373,6 +373,7 @@ paths:
     - test/extensions/bootstrap/wasm/wasm_speed_test.cc
     - test/extensions/bootstrap/wasm/wasm_test.cc
     - test/extensions/common/wasm/wasm_test.cc
+    - test/extensions/dynamic_modules/test_data/cpp/early_header_mutation_integration_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http_integration_test.cc
     - test/extensions/dynamic_modules/test_data/cpp/http.cc
     - test/extensions/dynamic_modules/test_data/cpp/listener_integration_test.cc

@@ -79,6 +79,14 @@ public:
                                      envoy_dynamic_module_type_module_buffer filter_name,
                                      envoy_dynamic_module_type_module_buffer path, bool* result);
 
+  // Get a bytes value from filter state by key. Only objects stored as Router::StringAccessor,
+  // which is what setFilterStateBytes() creates, are readable. Returns false when the key is absent
+  // or holds a different object type. Takes a const StreamInfo because FilterState::getDataReadOnly
+  // is const, so read-only contexts can use it too.
+  static bool getFilterStateBytes(const StreamInfo::StreamInfo& stream_info,
+                                  envoy_dynamic_module_type_module_buffer key,
+                                  envoy_dynamic_module_type_envoy_buffer* result);
+
   // Get the local reply body from the formatting context. Returns false when there is no body.
   static bool getLocalReplyBody(const Formatter::Context& context,
                                 envoy_dynamic_module_type_envoy_buffer* result);
