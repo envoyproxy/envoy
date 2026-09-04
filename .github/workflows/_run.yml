@@ -93,7 +93,7 @@ on:
           ERROR
           error:
           Error:
-          FAILED in
+          FAILED
           not meeting coverage
           FAIL:
       fail-match:

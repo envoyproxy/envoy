@@ -44,7 +44,7 @@ jobs:
         ERROR
         error:
         Error:
-        FAILED in
+        FAILED
         not meeting coverage
         FAIL:
       rbe: true

@@ -43,7 +43,7 @@ jobs:
         error:
         Error:
         lower than limit
-        FAILED in
+        FAILED
         not meeting coverage
         FAIL:
       rbe: true
