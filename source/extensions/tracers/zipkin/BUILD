@@ -65,7 +65,6 @@ envoy_cc_library(
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@zipkin-api",
-    ] + [
         ":zipkin_cc_proto",
     ],
 )
