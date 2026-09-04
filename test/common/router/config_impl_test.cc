@@ -4027,6 +4027,225 @@ TEST_F(RouteMatcherTest, WeightedClusterWithProvidedRandomValue) {
   EXPECT_EQ("cluster2", config.route(headers, 60)->routeEntry()->clusterName());
 }
 
+// A route provider used only in tests. It returns the first template, or nullptr when the request
+// carries the ``x-no-match`` header, which is enough to exercise the virtual host wiring and the
+// produceRoute dispatch.
+class TestRouteProvider : public RouteProducer {
+public:
+  explicit TestRouteProvider(std::vector<RouteEntryAndRouteConstSharedPtr> route_templates)
+      : route_templates_(std::move(route_templates)) {}
+
+  RouteConstSharedPtr produceRoute(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo&, uint64_t) const override {
+    if (headers.get(Http::LowerCaseString("x-no-match")).empty()) {
+      RouteConstSharedPtr route = route_templates_.front();
+      if (cb == nullptr) {
+        return route;
+      }
+      return cb(route, RouteEvalStatus::NoMoreRoutes) == RouteMatchStatus::Accept ? route : nullptr;
+    }
+    return nullptr;
+  }
+
+private:
+  const std::vector<RouteEntryAndRouteConstSharedPtr> route_templates_;
+};
+
+class TestRouteProviderFactory : public RouteProviderFactory {
+public:
+  absl::StatusOr<RouteProducerSharedPtr>
+  createRouteProvider(const Protobuf::Message&,
+                      const std::vector<RouteEntryAndRouteConstSharedPtr>& route_templates,
+                      Server::Configuration::ServerFactoryContext&, Init::Manager&) override {
+    if (fail_) {
+      return absl::InvalidArgumentError("route provider creation failed");
+    }
+    return std::make_shared<TestRouteProvider>(route_templates);
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  std::string name() const override { return "envoy.router.route_provider.test"; }
+
+  bool fail_{false};
+};
+
+TEST_F(RouteMatcherTest, RouteProvider) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  route_provider:
+    route_templates:
+    - match:
+        prefix: "/"
+      route:
+        cluster: provider_cluster
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+
+  factory_context_.cluster_manager_.initializeClusters({"provider_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  EXPECT_EQ(
+      "provider_cluster",
+      config.route(genHeaders("some.domain", "/whatever", "GET"), 0)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteMatcherTest, RouteProviderNoMatch) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  route_provider:
+    route_templates:
+    - match:
+        prefix: "/"
+      route:
+        cluster: provider_cluster
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+
+  factory_context_.cluster_manager_.initializeClusters({"provider_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  auto headers = genHeaders("some.domain", "/whatever", "GET");
+  headers.addCopy("x-no-match", "true");
+  EXPECT_EQ(nullptr, config.route(headers, 0).route);
+}
+
+TEST_F(RouteMatcherTest, RouteProviderUnknownResolver) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  route_provider:
+    route_templates:
+    - match:
+        prefix: "/"
+      route:
+        cluster: provider_cluster
+    resolver:
+      name: envoy.router.route_provider.does_not_exist
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"provider_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_THAT(creation_status_.message(),
+              testing::ContainsRegex("Didn't find a registered route provider for.*"));
+}
+
+TEST_F(RouteMatcherTest, RouteProviderCreationFailure) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  route_provider:
+    route_templates:
+    - match:
+        prefix: "/"
+      route:
+        cluster: provider_cluster
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestRouteProviderFactory factory;
+  factory.fail_ = true;
+  Registry::InjectFactory<RouteProviderFactory> registered(factory);
+
+  factory_context_.cluster_manager_.initializeClusters({"provider_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_THAT(creation_status_.message(), testing::ContainsRegex("route provider creation failed"));
+}
+
+TEST_F(RouteMatcherTest, RouteProviderConflictsWithRoutes) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: some_cluster
+  route_provider:
+    route_templates:
+    - match:
+        prefix: "/"
+      route:
+        cluster: provider_cluster
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false,
+                        creation_status_);
+  EXPECT_THAT(creation_status_.message(),
+              testing::ContainsRegex("cannot set route_provider with matcher or routes"));
+}
+
+TEST_F(RouteMatcherTest, RouteProviderConflictsWithMatcher) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  matcher:
+    on_no_match:
+      action:
+        name: route
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.route.v3.Route
+          match:
+            prefix: "/"
+          route:
+            cluster: some_cluster
+  route_provider:
+    route_templates:
+    - match:
+        prefix: "/"
+      route:
+        cluster: provider_cluster
+    resolver:
+      name: envoy.router.route_provider.test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false,
+                        creation_status_);
+  EXPECT_THAT(creation_status_.message(),
+              testing::ContainsRegex("cannot set route_provider with matcher or routes"));
+}
+
 TEST_F(RouteMatcherTest, InlineClusterSpecifierPlugin) {
   const std::string yaml = R"EOF(
 virtual_hosts:

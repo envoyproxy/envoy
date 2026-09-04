@@ -17,6 +17,7 @@
 #include "envoy/init/manager.h"
 #include "envoy/registry/registry.h"
 #include "envoy/router/cluster_specifier_plugin.h"
+#include "envoy/router/route_producer.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
@@ -483,10 +484,12 @@ public:
                                           const StreamInfo::StreamInfo& stream_info,
                                           uint64_t random_value) const;
 
-  RouteConstSharedPtr
+  // Walk an ordered list of routes and return the first that matches and is accepted by the
+  // callback. This holds no virtual host state, so the matcher actions can reuse it.
+  static RouteConstSharedPtr
   getRouteFromRoutes(const RouteCallback& cb, const RouteMatchContext& route_match_context,
                      const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-                     absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const;
+                     absl::Span<const RouteEntryImplBaseConstSharedPtr> routes);
 
   VirtualHostConstSharedPtr virtualHost() const { return shared_virtual_host_; }
 
@@ -500,6 +503,7 @@ private:
 
   absl::InlinedVector<RouteEntryImplBaseConstSharedPtr, 2> routes_;
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
+  RouteProducerSharedPtr route_provider_;
 };
 
 using VirtualHostImplSharedPtr = std::shared_ptr<VirtualHostImpl>;
@@ -673,6 +677,7 @@ class RouteEntryImplBase : public RouteEntryAndRoute,
                            public DirectResponseEntry,
                            public PathMatchCriterion,
                            public Matcher::ActionBase<envoy::config::route::v3::Route>,
+                           public RouteProducer,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            Logger::Loggable<Logger::Id::router> {
 protected:
@@ -693,6 +698,11 @@ public:
   bool matchRoute(const RouteMatchContext& route_match_context,
                   const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
   absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const;
+
+  // Router::RouteProducer
+  RouteConstSharedPtr produceRoute(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   uint64_t random_value) const override;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -1251,18 +1261,8 @@ struct RouteActionContext {
   Init::Manager& init_manager;
 };
 
-// Action used with the matching tree to specify route to use for an incoming stream.
-class RouteMatchAction : public Matcher::ActionBase<envoy::config::route::v3::Route> {
-public:
-  explicit RouteMatchAction(RouteEntryImplBaseConstSharedPtr route) : route_(std::move(route)) {}
-
-  RouteEntryImplBaseConstSharedPtr route() const { return route_; }
-
-private:
-  const RouteEntryImplBaseConstSharedPtr route_;
-};
-
-// Registered factory for RouteMatchAction.
+// Registered factory for the single route action. The action it builds is a RouteEntryImplBase,
+// which is a RouteProducer, so the match dispatch resolves it with a single virtual call.
 class RouteMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
   Matcher::ActionConstSharedPtr
@@ -1276,16 +1276,25 @@ public:
 
 DECLARE_FACTORY(RouteMatchActionFactory);
 
-// Similar to RouteMatchAction, but accepts v3::RouteList instead of v3::Route.
-class RouteListMatchAction : public Matcher::ActionBase<envoy::config::route::v3::RouteList> {
+// Action used with the matching tree to specify a list of routes to try in order.
+class RouteListMatchAction : public Matcher::ActionBase<envoy::config::route::v3::RouteList>,
+                             public RouteProducer {
 public:
-  explicit RouteListMatchAction(std::vector<RouteEntryImplBaseConstSharedPtr> routes)
-      : routes_(std::move(routes)) {}
+  RouteListMatchAction(std::vector<RouteEntryImplBaseConstSharedPtr> routes,
+                       bool ignore_path_parameters_in_path_matching)
+      : routes_(std::move(routes)),
+        ignore_path_parameters_in_path_matching_(ignore_path_parameters_in_path_matching) {}
 
   const std::vector<RouteEntryImplBaseConstSharedPtr>& routes() const { return routes_; }
 
+  // Router::RouteProducer
+  RouteConstSharedPtr produceRoute(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   uint64_t random_value) const override;
+
 private:
   const std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
+  const bool ignore_path_parameters_in_path_matching_;
 };
 
 // Registered factory for RouteListMatchAction.

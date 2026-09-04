@@ -26,6 +26,7 @@ pub mod load_balancer;
 pub mod matcher;
 pub mod matcher_data_input;
 pub mod network;
+pub mod route_provider;
 pub mod stats_sink;
 pub mod tracer;
 pub mod transport_socket;
@@ -684,6 +685,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `access_logger:` — [`NewAccessLoggerConfigFunction`] for access loggers
 /// - `formatter:` — [`NewFormatterConfigFunction`] for formatters
 /// - `cluster_specifier:` — [`NewClusterSpecifierConfigFunction`] for cluster specifiers
+/// - `route_provider:` — [`NewRouteProviderConfigFunction`] for route providers
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 ///
 /// # Examples
@@ -902,6 +904,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION,
       $fn,
       "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
+    );
+  };
+  (@register route_provider : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_PROVIDER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_ROUTE_PROVIDER_CONFIG_FUNCTION"
     );
   };
   (@register stat_sink : $fn:expr) => {
@@ -1322,6 +1331,91 @@ macro_rules! declare_cluster_specifier_init_functions {
           envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION,
           $new_cluster_specifier_config_fn,
           "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      })) {
+        ::std::result::Result::Ok(v) => v,
+        ::std::result::Result::Err(payload) => {
+          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
+          ::std::ptr::null()
+        },
+      }
+    }
+  };
+}
+
+// =================================================================================================
+// Route Provider Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new route provider configuration.
+///
+/// The `name` is the value of `provider_name` from the `dynamic_modules` route provider
+/// configuration, allowing a single module to dispatch to different route provider implementations.
+/// The `config` is the raw bytes from the `provider_config` field, and `route_template_count` is
+/// the number of route templates the provider selects among. Returning `None` causes Envoy to
+/// reject the route provider configuration.
+pub type NewRouteProviderConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    route_template_count: usize,
+  ) -> Option<Box<dyn route_provider::RouteProviderConfig>>;
+
+/// The global factory function for route providers. This is set via the `route_provider:` arm of
+/// [`declare_all_init_functions!`] (or the [`declare_route_provider_init_functions!`] shim) and is
+/// not intended to be set directly.
+pub static NEW_ROUTE_PROVIDER_CONFIG_FUNCTION: OnceLock<NewRouteProviderConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a route provider dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewRouteProviderConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::route_provider::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_route_provider_config(
+///   _name: &str,
+///   _config: &[u8],
+///   _route_template_count: usize,
+/// ) -> Option<Box<dyn RouteProviderConfig>> {
+///   Some(Box::new(MyRouteProviderConfig {}))
+/// }
+///
+/// struct MyRouteProviderConfig {}
+///
+/// impl RouteProviderConfig for MyRouteProviderConfig {
+///   fn on_select(&self, ctx: &mut RouteProviderContext) -> bool {
+///     ctx.select_route(0)
+///   }
+/// }
+///
+/// declare_route_provider_init_functions!(program_init, new_route_provider_config);
+/// ```
+#[macro_export]
+macro_rules! declare_route_provider_init_functions {
+  ($f:ident, $new_route_provider_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_PROVIDER_CONFIG_FUNCTION,
+          $new_route_provider_config_fn,
+          "NEW_ROUTE_PROVIDER_CONFIG_FUNCTION"
         );
         if ($f()) {
           envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()

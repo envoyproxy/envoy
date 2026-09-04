@@ -1566,6 +1566,13 @@ envoy.router.cluster_specifier_plugin.matcher:
   status: alpha
   type_urls:
   - envoy.extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier
+envoy.router.route_provider.dynamic_modules:
+  categories:
+  - envoy.router.route_provider
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.router.route_providers.dynamic_modules.v3.DynamicModuleRouteProvider
 envoy.stat_sinks.dog_statsd:
   categories:
   - envoy.stats_sinks

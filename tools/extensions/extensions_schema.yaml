@@ -160,6 +160,7 @@ categories:
 - envoy.http.ext_proc.processing_request_modifiers
 - envoy.http.ext_proc.response_processors
 - envoy.router.cluster_specifier_plugin
+- envoy.router.route_provider
 - envoy.tap_sinks.udp_sink
 - envoy.tracers.opentelemetry.resource_detectors
 - envoy.tracers.opentelemetry.samplers
