@@ -31,7 +31,7 @@ run --color=yes
 build --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/7b38d27d192670d0ec16ef9309d875387c781de9
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/b6e15c00b1c0493cd194b1b248c562bd8bc46648
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -304,14 +304,25 @@ common:fips-common --@envoy//bazel:fips=True
 common:boringssl-fips --config=fips-common
 common:boringssl-fips --@envoy//bazel:ssl=@boringssl-fips//:ssl
 common:boringssl-fips --@envoy//bazel:crypto=@boringssl-fips//:crypto
+common:boringssl-fips --@quiche//:ssl_lib=@boringssl-fips//:ssl
 
 # OpenSSL
 common:openssl --@envoy//bazel:openssl=True
 common:openssl --@envoy//bazel:ssl=@envoy//compat/openssl:ssl
 common:openssl --@envoy//bazel:crypto=@envoy//compat/openssl:crypto
+# Route QUICHE's SSL to the OpenSSL compat layer too. QUICHE is still linked in
+# OpenSSL builds via non-QUIC features (e.g. HTTP datagram / CONNECT-UDP capsule
+# support), and must use the same SSL implementation as the rest of the binary
+# to avoid linking BoringSSL and OpenSSL together (symbol/ABI collisions).
+common:openssl --@quiche//:ssl_lib=@envoy//compat/openssl:ssl
 common:openssl --copt=-DENVOY_SSL_OPENSSL
 common:openssl --host_copt=-DENVOY_SSL_OPENSSL
 common:openssl --@envoy//bazel:http3=False
+# Exclude QUIC/HTTP3 sources from the bzlmod quiche overlay (matches WORKSPACE,
+# where envoy_quic_cc_library strips them when HTTP/3 is disabled). This keeps
+# QUIC code that depends on BoringSSL-only primitives (e.g. SIPHASH_24) out of
+# the OpenSSL build. No-op in WORKSPACE mode.
+common:openssl --define=quiche_disable_http3=true
 common:openssl --test_tag_filters=-nofips,-quiche
 common:openssl --build_tag_filters=-nofips
 

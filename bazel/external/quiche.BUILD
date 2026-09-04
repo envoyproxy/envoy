@@ -25,6 +25,16 @@ label_flag(
     build_setting_default = "@envoy//bazel:zlib",
 )
 
+# SSL implementation, kept for parity with the bzlmod registry quiche overlay so
+# that `--@quiche//:ssl_lib=...` is a valid flag in both WORKSPACE and bzlmod
+# builds. In WORKSPACE mode QUICHE's SSL is actually routed via
+# `external_deps = ["ssl"]` (-> @envoy//bazel:ssl), which this flag mirrors, so
+# the two stay in sync.
+label_flag(
+    name = "ssl_lib",
+    build_setting_default = "@envoy//bazel:ssl",
+)
+
 label_flag(
     name = "quic_base_impl_lib",
     build_setting_default = "@envoy//source/common/quic/platform:quic_base_impl_lib",
