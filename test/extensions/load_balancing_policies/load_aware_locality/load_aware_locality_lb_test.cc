@@ -238,7 +238,8 @@ protected:
     auto lb_config = std::make_unique<LoadAwareLocalityLbConfig>(
         round_robin_factory, std::move(round_robin_lb_config), weight_update_period,
         variance_threshold, ewma_alpha, remote_probe_fraction, weight_expiration_period,
-        std::vector<std::string>{}, dispatcher_, context_.thread_local_);
+        std::vector<std::string>{}, false, Common::OrcaOobManagerConfig{}, dispatcher_,
+        context_.thread_local_);
 
     timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
@@ -1532,8 +1533,8 @@ TEST_F(LoadAwareLocalityLbTest, InitializePropagatesChildFactoryError) {
 
   auto lb_config = std::make_unique<LoadAwareLocalityLbConfig>(
       null_child_factory, nullptr, std::chrono::milliseconds(1000), 0.1, 0.3, 0.03,
-      std::chrono::milliseconds(180000), std::vector<std::string>{}, dispatcher_,
-      context_.thread_local_);
+      std::chrono::milliseconds(180000), std::vector<std::string>{}, false,
+      Common::OrcaOobManagerConfig{}, dispatcher_, context_.thread_local_);
 
   LoadAwareLocalityLoadBalancer lb(*lb_config, cluster_info_, priority_set_,
                                    context_.runtime_loader_, random_, context_.time_system_);

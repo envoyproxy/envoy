@@ -247,17 +247,51 @@ TEST(LoadAwareLocalityConfigTest, InvalidPolicyKnobsRejected) {
   }
 }
 
-TEST(LoadAwareLocalityConfigTest, OobFieldsAreAcceptedAsNoOp) {
+TEST(LoadAwareLocalityConfigTest, OobFieldsAreParsed) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  // Out-of-band reporting is not implemented yet; the fields must be accepted so configs can be
-  // rolled out ahead of the implementation.
   auto config_proto = loadAwareConfig({roundRobinEndpointPolicy()});
   config_proto.mutable_enable_oob_load_report()->set_value(true);
-  config_proto.mutable_oob_reporting_period()->set_seconds(10);
+  config_proto.mutable_oob_reporting_period()->set_seconds(5);
+  auto* oob_overrides = config_proto.mutable_oob_reporting_config();
+  oob_overrides->set_port_value(1234);
+  oob_overrides->set_authority("orca.example.com");
+  (*oob_overrides->mutable_transport_socket_match_criteria()->mutable_fields())["useMTLS"]
+      .set_bool_value(true);
 
   Factory factory;
-  EXPECT_TRUE(factory.loadConfig(context, config_proto).ok());
+  auto result = factory.loadConfig(context, config_proto);
+  ASSERT_TRUE(result.ok());
+  const auto* typed = typedConfig(result.value());
+  ASSERT_NE(typed, nullptr);
+  EXPECT_TRUE(typed->enableOobLoadReport());
+  EXPECT_EQ(typed->oobManagerConfig().reporting_period, std::chrono::milliseconds(5000));
+  EXPECT_EQ(typed->oobManagerConfig().port_value, 1234u);
+  EXPECT_EQ(typed->oobManagerConfig().authority, "orca.example.com");
+  ASSERT_NE(typed->oobManagerConfig().transport_socket_match_metadata, nullptr);
+  EXPECT_TRUE(typed->oobManagerConfig().transport_socket_match_metadata->filter_metadata().contains(
+      "envoy.transport_socket_match"));
+  EXPECT_TRUE(typed->oobManagerConfig()
+                  .transport_socket_match_metadata->filter_metadata()
+                  .at("envoy.transport_socket_match")
+                  .fields()
+                  .at("useMTLS")
+                  .bool_value());
+}
+
+TEST(LoadAwareLocalityConfigTest, OobDisabledByDefault) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto config_proto = loadAwareConfig({roundRobinEndpointPolicy()});
+
+  Factory factory;
+  auto result = factory.loadConfig(context, config_proto);
+  ASSERT_TRUE(result.ok());
+  const auto* typed = typedConfig(result.value());
+  ASSERT_NE(typed, nullptr);
+  EXPECT_FALSE(typed->enableOobLoadReport());
+  EXPECT_EQ(typed->oobManagerConfig().reporting_period,
+            std::chrono::milliseconds(Common::kDefaultOobReportingPeriodMs));
 }
 
 TEST(LoadAwareLocalityConfigTest, PolicyValidationPrecedesChildResolution) {
@@ -316,7 +350,8 @@ TEST(LoadAwareLocalityConfigTest, EndpointValidationDelegatesToChildConfig) {
   LoadAwareLocalityLbConfig config(
       child_factory, std::make_shared<RejectingEndpointValidationConfig>(),
       std::chrono::milliseconds(1000), 0.1, 0.3, 0.03, std::chrono::milliseconds(180000),
-      std::vector<std::string>{}, dispatcher, context.thread_local_);
+      std::vector<std::string>{}, false, Common::OrcaOobManagerConfig{}, dispatcher,
+      context.thread_local_);
 
   const Upstream::PriorityState priorities;
   auto status = config.validateEndpoints(priorities);
