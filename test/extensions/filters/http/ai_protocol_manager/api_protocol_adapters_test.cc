@@ -331,6 +331,35 @@ TEST(ExtractGeminiTest, ToolUseAndThoughtsAccounting) {
   EXPECT_EQ(usage.reasoning_tokens, 12);
 }
 
+TEST(ExtractGeminiTest, ThoughtsWithoutCandidatesAreCounted) {
+  // A response truncated at MAX_TOKENS while the model was still thinking
+  // carries `thoughtsTokenCount` and no `candidatesTokenCount` at all. Those
+  // tokens were generated and billed, so canonical output is the thoughts
+  // count rather than absent.
+  auto usage = extractUsage(ApiProtocol::GeminiGenerateContent, parse(R"(
+      {"candidates":[{"finishReason":"MAX_TOKENS"}],
+       "usageMetadata":{"promptTokenCount":6,"totalTokenCount":34,
+                        "thoughtsTokenCount":28}})"));
+  EXPECT_FALSE(usage.output_tokens.has_value()); // No native candidates count.
+  finalizeUsage(usage);
+  EXPECT_EQ(usage.input_tokens, 6);
+  EXPECT_EQ(usage.output_tokens, 28);
+  EXPECT_EQ(usage.total_tokens, 34);
+  EXPECT_EQ(usage.provider_total_tokens, 34);
+  EXPECT_EQ(usage.reasoning_tokens, 28);
+}
+
+TEST(ExtractGeminiTest, ToolUseWithoutPromptCountIsCounted) {
+  // Same shape on the input side: the tool-use adjunct still belongs in the
+  // canonical input when the native prompt count is absent.
+  auto usage = extractUsage(ApiProtocol::GeminiGenerateContent, parse(R"(
+      {"usageMetadata":{"toolUsePromptTokenCount":5,"candidatesTokenCount":10}})"));
+  finalizeUsage(usage);
+  EXPECT_EQ(usage.input_tokens, 5);
+  EXPECT_EQ(usage.output_tokens, 10);
+  EXPECT_EQ(usage.total_tokens, 15);
+}
+
 TEST(ExtractAnthropicTest, CanonicalInclusiveAccounting) {
   // Reviewer merge-gate case: input 100 + cache-creation 20 + cache-read 30
   // yields canonical input 150 and (with output 10) total 160.
@@ -342,6 +371,17 @@ TEST(ExtractAnthropicTest, CanonicalInclusiveAccounting) {
   EXPECT_EQ(usage.cached_input_tokens, 30);
   EXPECT_EQ(usage.cache_creation_input_tokens, 20);
   EXPECT_EQ(usage.total_tokens, 160);
+}
+
+TEST(ExtractAnthropicTest, CacheBucketsWithoutInputTokensAreCounted) {
+  // Same shape as the Gemini truncation case: the cache buckets still belong
+  // in the canonical input when the native input count is absent.
+  auto usage = extractUsage(ApiProtocol::AnthropicMessages, parse(R"(
+      {"type":"message","usage":{"cache_read_input_tokens":30,
+       "cache_creation_input_tokens":20,"output_tokens":10}})"));
+  finalizeUsage(usage);
+  EXPECT_EQ(usage.input_tokens, 50);
+  EXPECT_EQ(usage.total_tokens, 60);
 }
 
 TEST(ExtractAnthropicTest, PartialInputUpdatePreservesCacheBuckets) {
