@@ -1,9 +1,8 @@
 #include <openssl/ssl.h>
 
-#include "envoy/registry/registry.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "source/common/quic/envoy_quic_proof_source.h"
-#include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
 #include "source/common/tls/connection_info_impl_base.h"
 
 #include "test/integration/http_protocol_integration.h"
@@ -14,66 +13,63 @@
 namespace Envoy {
 namespace {
 
-// A proof source for the fake upstream which requests, but does not validate, a client
-// certificate on every connection: QUICHE installs no certificate verifier on the server SSL
-// context by default, so installing a permissive one here makes every server connection send a
-// CertificateRequest and accept whatever is (or isn't) presented.
-class ClientCertRequestingProofSource : public Quic::EnvoyQuicProofSource {
-public:
-  using Quic::EnvoyQuicProofSource::EnvoyQuicProofSource;
-
-  void OnNewSslCtx(SSL_CTX* ssl_ctx) override {
-    Quic::EnvoyQuicProofSource::OnNewSslCtx(ssl_ctx);
-    SSL_CTX_set_custom_verify(ssl_ctx, SSL_VERIFY_PEER,
-                              [](SSL*, uint8_t*) { return ssl_verify_ok; });
-  }
-};
-
-class ClientCertRequestingProofSourceFactory : public Quic::EnvoyQuicProofSourceFactoryInterface {
-public:
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Protobuf::Struct>();
-  }
-
-  std::string name() const override {
-    return "envoy.quic.proof_source.request_client_certificate_for_test";
-  }
-
-  std::unique_ptr<quic::ProofSource>
-  createQuicProofSource(Network::Socket& listen_socket,
-                        Network::FilterChainManager& filter_chain_manager,
-                        Server::ListenerStats& listener_stats, TimeSource& time_source) override {
-    return std::make_unique<ClientCertRequestingProofSource>(listen_socket, filter_chain_manager,
-                                                             listener_stats, time_source);
-  }
-};
-
-REGISTER_FACTORY(ClientCertRequestingProofSourceFactory,
-                 Quic::EnvoyQuicProofSourceFactoryInterface);
-
-// Tests that upstream QUIC connections present the configured client certificate. The fake
-// upstream requests the certificate but does not validate it; validation is exercised by the
-// server-side mTLS support in a follow-up.
+// Tests that upstream QUIC connections present the configured client certificate and that
+// the fake upstream properly verifies it using server-side mTLS support over QUIC.
 class QuicUpstreamClientCertIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
     upstream_tls_ = true;
-    // Make the fake upstream request (but not validate) a client certificate.
-    auto* proof_source_config = upstreamConfig().quic_options_.mutable_proof_source_config();
-    proof_source_config->set_name("envoy.quic.proof_source.request_client_certificate_for_test");
-    std::ignore = proof_source_config->mutable_typed_config()->PackFrom(Protobuf::Struct());
 
     // Configure the cluster with a client certificate.
     config_helper_.configureUpstreamTls(
         /*use_alpn=*/false, /*http3=*/true, /*alternate_protocol_cache_config=*/{},
-        [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
-          auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
-          certs->mutable_certificate_chain()->set_filename(
-              TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
-          certs->mutable_private_key()->set_filename(
-              TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+        [this](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
+          if (configure_client_cert_) {
+            auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
+            certs->mutable_certificate_chain()->set_filename(
+                TestEnvironment::runfilesPath(client_cert_path_));
+            certs->mutable_private_key()->set_filename(
+                TestEnvironment::runfilesPath(client_key_path_));
+          }
         });
     HttpProtocolIntegrationTest::initialize();
+  }
+
+  void createUpstreams() override {
+    for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+      auto endpoint = upstream_address_fn_(i);
+      FakeUpstreamConfig config(upstreamConfig());
+      Network::DownstreamTransportSocketFactoryPtr factory =
+          upstream_tls_ ? createCustomUpstreamTlsContext(config)
+                        : Network::Test::createRawBufferDownstreamSocketFactory();
+      fake_upstreams_.emplace_back(
+          std::make_unique<FakeUpstream>(std::move(factory), endpoint, config));
+    }
+  }
+
+  Network::DownstreamTransportSocketFactoryPtr
+  createCustomUpstreamTlsContext(const FakeUpstreamConfig& /*upstream_config*/) {
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    const std::string rundir = TestEnvironment::runfilesDirectory();
+    tls_context.mutable_common_tls_context()
+        ->mutable_validation_context()
+        ->mutable_trusted_ca()
+        ->set_filename(rundir + "/test/config/integration/certs/cacert.pem");
+    auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
+    certs->mutable_certificate_chain()->set_filename(
+        rundir + "/test/config/integration/certs/upstreamcert.pem");
+    certs->mutable_private_key()->set_filename(rundir +
+                                               "/test/config/integration/certs/upstreamkey.pem");
+    if (require_client_cert_) {
+      tls_context.mutable_require_client_certificate()->set_value(true);
+    }
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
+    quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
+
+    auto& config_factory = Config::Utility::getAndCheckFactoryByName<
+        Server::Configuration::DownstreamTransportSocketConfigFactory>(
+        "envoy.transport_sockets.quic");
+    return *config_factory.createTransportSocketFactory(quic_config, factory_context_, {});
   }
 
   // Returns whether the fake upstream received a client certificate on the current upstream
@@ -102,6 +98,11 @@ public:
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
+
+  bool configure_client_cert_{true};
+  bool require_client_cert_{false};
+  std::string client_cert_path_{"test/config/integration/certs/clientcert.pem"};
+  std::string client_key_path_{"test/config/integration/certs/clientkey.pem"};
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, QuicUpstreamClientCertIntegrationTest,
@@ -109,22 +110,50 @@ INSTANTIATE_TEST_SUITE_P(Protocols, QuicUpstreamClientCertIntegrationTest,
                              {Http::CodecType::HTTP1}, {Http::CodecType::HTTP3})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// The configured client certificate is presented on the upstream QUIC connection when the
-// upstream requests one.
-TEST_P(QuicUpstreamClientCertIntegrationTest, ClientCertificatePresented) {
+// The configured client certificate is presented and successfully validated on the upstream QUIC
+// connection when the upstream requires one.
+TEST_P(QuicUpstreamClientCertIntegrationTest, ClientCertificatePresentedAndValidated) {
+  require_client_cert_ = true;
   initialize();
   sendRequestAndExpectResponse();
   EXPECT_TRUE(upstreamSawClientCert());
 }
 
 // With the runtime guard disabled, the client certificate is not installed on the QUIC client
-// SSL context, so nothing is presented (the previous behavior).
+// SSL context, so nothing is presented. When client cert is optional, handshake still succeeds.
 TEST_P(QuicUpstreamClientCertIntegrationTest, NoClientCertificateWhenRuntimeDisabled) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_upstream_client_certificates",
                                     "false");
   initialize();
   sendRequestAndExpectResponse();
   EXPECT_FALSE(upstreamSawClientCert());
+}
+
+// When client cert is required by upstream and runtime guard is disabled, the upstream handshake
+// fails and the request results in a 503.
+TEST_P(QuicUpstreamClientCertIntegrationTest, RequireClientCertificateFailsWhenNoCertPresented) {
+  require_client_cert_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_upstream_client_certificates",
+                                    "false");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+// When an untrusted client certificate is presented by upstream client, the fake upstream
+// rejects it and the request results in a 503.
+TEST_P(QuicUpstreamClientCertIntegrationTest, UntrustedClientCertificateRejected) {
+  require_client_cert_ = true;
+  // `upstreamcert.pem` is signed by `upstreamcacert.pem`, not by `cacert.pem`.
+  client_cert_path_ = "test/config/integration/certs/upstreamcert.pem";
+  client_key_path_ = "test/config/integration/certs/upstreamkey.pem";
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 } // namespace
