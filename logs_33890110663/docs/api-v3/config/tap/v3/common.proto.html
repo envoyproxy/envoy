@@ -1,0 +1,667 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tap common configuration (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="Tap sink service (proto)" href="../../../service/tap/v3/tap.proto.html" />
+    <link rel="prev" title="Runtime discovery service (RTDS) (proto)" href="../../../service/runtime/v3/rtds.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../config.html">Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../service/service.html">Services</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../service/auth/v3/attribute_context.proto.html">Attribute context (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/auth/v3/external_auth.proto.html">Authorization service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/status/v3/csds.proto.html">Client status discovery service (CSDS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/extension/v3/config_discovery.proto.html">Extension config discovery service (ECDS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/ext_proc/v3/external_processor.proto.html">External processing service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/accesslog/v3/als.proto.html">gRPC access log service (ALS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/health/v3/hds.proto.html">Health discovery service (HDS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/load_stats/v3/lrs.proto.html">Load reporting service (LRS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/metrics/v3/metrics_service.proto.html">Metrics service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/ratelimit/v3/rls.proto.html">Rate limit service (RLS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/rate_limit_quota/v3/rlqs.proto.html">Rate Limit Quota Service (RLQS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/runtime/v3/rtds.proto.html">Runtime discovery service (RTDS) (proto)</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Tap common configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/tap/v3/tap.proto.html">Tap sink service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/redis_auth/v3/redis_external_auth.proto.html">Redis external authentication service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/network_ext_proc/v3/network_external_processor.proto.html">Network External Processing Service (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../service/service.html">Services</a></li>
+      <li class="breadcrumb-item active">Tap common configuration (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/config/tap/v3/common.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="tap-common-configuration-proto">
+<span id="envoy-v3-api-file-envoy-config-tap-v3-common-proto"></span><h1>Tap common configuration (proto)<a class="headerlink" href="#tap-common-configuration-proto" title="Link to this heading"></a></h1>
+<section id="config-tap-v3-tapconfig">
+<span id="envoy-v3-api-msg-config-tap-v3-tapconfig"></span><h2>config.tap.v3.TapConfig<a class="headerlink" href="#config-tap-v3-tapconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/tap/v3/common.proto#L27">[config.tap.v3.TapConfig proto]</a></p>
+<p>Tap configuration.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;match_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;output_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;tap_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-tapconfig-match-config">
+<dt>match_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-matchpredicate"><span class="std std-ref">config.tap.v3.MatchPredicate</span></a>) The match configuration. If the configuration matches the data source being tapped, a tap will
+occur, with the result written to the configured output.
+Exactly one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-tapconfig-match"><span class="std std-ref">match</span></a> and
+<a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-tapconfig-match-config"><span class="std std-ref">match_config</span></a> must be set. If both
+are set, the <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-tapconfig-match"><span class="std std-ref">match</span></a> will be used.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-tapconfig-match">
+<dt>match</dt><dd><p>(<a class="reference internal" href="../../common/matcher/v3/matcher.proto.html#envoy-v3-api-msg-config-common-matcher-v3-matchpredicate"><span class="std std-ref">config.common.matcher.v3.MatchPredicate</span></a>) The match configuration. If the configuration matches the data source being tapped, a tap will
+occur, with the result written to the configured output.
+Exactly one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-tapconfig-match"><span class="std std-ref">match</span></a> and
+<a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-tapconfig-match-config"><span class="std std-ref">match_config</span></a> must be set. If both
+are set, the <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-tapconfig-match"><span class="std std-ref">match</span></a> will be used.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-tapconfig-output-config">
+<dt>output_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-outputconfig"><span class="std std-ref">config.tap.v3.OutputConfig</span></a>, <em>REQUIRED</em>) The tap output configuration. If a match configuration matches a data source being tapped,
+a tap will occur and the data will be written to the configured output.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-tapconfig-tap-enabled">
+<dt>tap_enabled</dt><dd><p>(<a class="reference internal" href="../../core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-runtimefractionalpercent"><span class="std std-ref">config.core.v3.RuntimeFractionalPercent</span></a>) Specifies the fraction of requests (HTTP tap filter) or connections (transport
+socket tap) for which the tap match predicate is evaluated. When unset, every
+request/connection proceeds to match evaluation (equivalent to sampling at 100%),
+the runtime layer is not consulted, and <code class="docutils literal notranslate"><span class="pre">configured_sample_rate</span></code> is not set on
+emitted traces. When set, only the configured fraction is matched; the remainder
+is not tapped. The value can be overridden at runtime via <a class="reference internal" href="../../core/v3/base.proto.html#envoy-v3-api-field-config-core-v3-runtimefractionalpercent-runtime-key"><span class="std std-ref">runtime_key</span></a>. The
+configured sampling rate is recorded on the <a class="reference internal" href="../../../data/tap/v3/wrapper.proto.html#envoy-v3-api-field-data-tap-v3-tracewrapper-configured-sample-rate"><span class="std std-ref">configured_sample_rate</span></a> of the
+first segment of each emitted trace.</p>
+</dd>
+</dl>
+</section>
+<section id="config-tap-v3-matchpredicate">
+<span id="envoy-v3-api-msg-config-tap-v3-matchpredicate"></span><h2>config.tap.v3.MatchPredicate<a class="headerlink" href="#config-tap-v3-matchpredicate" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/tap/v3/common.proto#L68">[config.tap.v3.MatchPredicate proto]</a></p>
+<p>Tap match configuration. This is a recursive structure which allows complex nested match
+configurations to be built using various logical operators.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;or_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;and_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;not_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;any_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;http_request_headers_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;http_request_trailers_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;http_response_headers_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;http_response_trailers_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;http_request_generic_body_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;http_response_generic_body_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-tap-v3-matchpredicate-or-match">
+<dt>or_match</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-matchpredicate-matchset"><span class="std std-ref">config.tap.v3.MatchPredicate.MatchSet</span></a>) A set that describes a logical OR. If any member of the set matches, the match configuration
+matches.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-or-match"><span class="std std-ref">or_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-and-match"><span class="std std-ref">and_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-not-match"><span class="std std-ref">not_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-any-match"><span class="std std-ref">any_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-headers-match"><span class="std std-ref">http_request_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-trailers-match"><span class="std std-ref">http_request_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-headers-match"><span class="std std-ref">http_response_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-trailers-match"><span class="std std-ref">http_response_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-generic-body-match"><span class="std std-ref">http_request_generic_body_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-generic-body-match"><span class="std std-ref">http_response_generic_body_match</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-matchpredicate-and-match">
+<dt>and_match</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-matchpredicate-matchset"><span class="std std-ref">config.tap.v3.MatchPredicate.MatchSet</span></a>) A set that describes a logical AND. If all members of the set match, the match configuration
+matches.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-or-match"><span class="std std-ref">or_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-and-match"><span class="std std-ref">and_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-not-match"><span class="std std-ref">not_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-any-match"><span class="std std-ref">any_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-headers-match"><span class="std std-ref">http_request_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-trailers-match"><span class="std std-ref">http_request_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-headers-match"><span class="std std-ref">http_response_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-trailers-match"><span class="std std-ref">http_response_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-generic-body-match"><span class="std std-ref">http_request_generic_body_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-generic-body-match"><span class="std std-ref">http_response_generic_body_match</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-matchpredicate-not-match">
+<dt>not_match</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-matchpredicate"><span class="std std-ref">config.tap.v3.MatchPredicate</span></a>) A negation match. The match configuration will match if the negated match condition matches.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-or-match"><span class="std std-ref">or_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-and-match"><span class="std std-ref">and_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-not-match"><span class="std std-ref">not_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-any-match"><span class="std std-ref">any_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-headers-match"><span class="std std-ref">http_request_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-trailers-match"><span class="std std-ref">http_request_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-headers-match"><span class="std std-ref">http_response_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-trailers-match"><span class="std std-ref">http_response_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-generic-body-match"><span class="std std-ref">http_request_generic_body_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-generic-body-match"><span class="std std-ref">http_response_generic_body_match</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-matchpredicate-any-match">
+<dt>any_match</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) The match configuration will always match.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-or-match"><span class="std std-ref">or_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-and-match"><span class="std std-ref">and_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-not-match"><span class="std std-ref">not_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-any-match"><span class="std std-ref">any_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-headers-match"><span class="std std-ref">http_request_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-trailers-match"><span class="std std-ref">http_request_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-headers-match"><span class="std std-ref">http_response_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-trailers-match"><span class="std std-ref">http_response_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-generic-body-match"><span class="std std-ref">http_request_generic_body_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-generic-body-match"><span class="std std-ref">http_response_generic_body_match</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-headers-match">
+<dt>http_request_headers_match</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-httpheadersmatch"><span class="std std-ref">config.tap.v3.HttpHeadersMatch</span></a>) HTTP request headers match configuration.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-or-match"><span class="std std-ref">or_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-and-match"><span class="std std-ref">and_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-not-match"><span class="std std-ref">not_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-any-match"><span class="std std-ref">any_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-headers-match"><span class="std std-ref">http_request_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-trailers-match"><span class="std std-ref">http_request_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-headers-match"><span class="std std-ref">http_response_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-trailers-match"><span class="std std-ref">http_response_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-generic-body-match"><span class="std std-ref">http_request_generic_body_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-generic-body-match"><span class="std std-ref">http_response_generic_body_match</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-trailers-match">
+<dt>http_request_trailers_match</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-httpheadersmatch"><span class="std std-ref">config.tap.v3.HttpHeadersMatch</span></a>) HTTP request trailers match configuration.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-or-match"><span class="std std-ref">or_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-and-match"><span class="std std-ref">and_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-not-match"><span class="std std-ref">not_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-any-match"><span class="std std-ref">any_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-headers-match"><span class="std std-ref">http_request_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-trailers-match"><span class="std std-ref">http_request_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-headers-match"><span class="std std-ref">http_response_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-trailers-match"><span class="std std-ref">http_response_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-generic-body-match"><span class="std std-ref">http_request_generic_body_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-generic-body-match"><span class="std std-ref">http_response_generic_body_match</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-headers-match">
+<dt>http_response_headers_match</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-httpheadersmatch"><span class="std std-ref">config.tap.v3.HttpHeadersMatch</span></a>) HTTP response headers match configuration.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-or-match"><span class="std std-ref">or_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-and-match"><span class="std std-ref">and_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-not-match"><span class="std std-ref">not_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-any-match"><span class="std std-ref">any_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-headers-match"><span class="std std-ref">http_request_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-trailers-match"><span class="std std-ref">http_request_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-headers-match"><span class="std std-ref">http_response_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-trailers-match"><span class="std std-ref">http_response_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-generic-body-match"><span class="std std-ref">http_request_generic_body_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-generic-body-match"><span class="std std-ref">http_response_generic_body_match</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-trailers-match">
+<dt>http_response_trailers_match</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-httpheadersmatch"><span class="std std-ref">config.tap.v3.HttpHeadersMatch</span></a>) HTTP response trailers match configuration.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-or-match"><span class="std std-ref">or_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-and-match"><span class="std std-ref">and_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-not-match"><span class="std std-ref">not_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-any-match"><span class="std std-ref">any_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-headers-match"><span class="std std-ref">http_request_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-trailers-match"><span class="std std-ref">http_request_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-headers-match"><span class="std std-ref">http_response_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-trailers-match"><span class="std std-ref">http_response_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-generic-body-match"><span class="std std-ref">http_request_generic_body_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-generic-body-match"><span class="std std-ref">http_response_generic_body_match</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-generic-body-match">
+<dt>http_request_generic_body_match</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-httpgenericbodymatch"><span class="std std-ref">config.tap.v3.HttpGenericBodyMatch</span></a>) HTTP request generic body match configuration.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-or-match"><span class="std std-ref">or_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-and-match"><span class="std std-ref">and_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-not-match"><span class="std std-ref">not_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-any-match"><span class="std std-ref">any_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-headers-match"><span class="std std-ref">http_request_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-trailers-match"><span class="std std-ref">http_request_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-headers-match"><span class="std std-ref">http_response_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-trailers-match"><span class="std std-ref">http_response_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-generic-body-match"><span class="std std-ref">http_request_generic_body_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-generic-body-match"><span class="std std-ref">http_response_generic_body_match</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-generic-body-match">
+<dt>http_response_generic_body_match</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-httpgenericbodymatch"><span class="std std-ref">config.tap.v3.HttpGenericBodyMatch</span></a>) HTTP response generic body match configuration.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-or-match"><span class="std std-ref">or_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-and-match"><span class="std std-ref">and_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-not-match"><span class="std std-ref">not_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-any-match"><span class="std std-ref">any_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-headers-match"><span class="std std-ref">http_request_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-trailers-match"><span class="std std-ref">http_request_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-headers-match"><span class="std std-ref">http_response_headers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-trailers-match"><span class="std std-ref">http_response_trailers_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-request-generic-body-match"><span class="std std-ref">http_request_generic_body_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-matchpredicate-http-response-generic-body-match"><span class="std std-ref">http_response_generic_body_match</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="config-tap-v3-matchpredicate-matchset">
+<span id="envoy-v3-api-msg-config-tap-v3-matchpredicate-matchset"></span><h2>config.tap.v3.MatchPredicate.MatchSet<a class="headerlink" href="#config-tap-v3-matchpredicate-matchset" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/tap/v3/common.proto#L73">[config.tap.v3.MatchPredicate.MatchSet proto]</a></p>
+<p>A set of match configurations used for logical operations.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;rules&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-matchpredicate-matchset-rules">
+<dt>rules</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-matchpredicate"><span class="std std-ref">config.tap.v3.MatchPredicate</span></a>, <em>REQUIRED</em>) The list of rules that make up the set.</p>
+</dd>
+</dl>
+</section>
+<section id="config-tap-v3-httpheadersmatch">
+<span id="envoy-v3-api-msg-config-tap-v3-httpheadersmatch"></span><h2>config.tap.v3.HttpHeadersMatch<a class="headerlink" href="#config-tap-v3-httpheadersmatch" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/tap/v3/common.proto#L119">[config.tap.v3.HttpHeadersMatch proto]</a></p>
+<p>HTTP headers match configuration.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-httpheadersmatch-headers">
+<dt>headers</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-headermatcher"><span class="std std-ref">config.route.v3.HeaderMatcher</span></a>) HTTP headers to match.</p>
+</dd>
+</dl>
+</section>
+<section id="config-tap-v3-httpgenericbodymatch">
+<span id="envoy-v3-api-msg-config-tap-v3-httpgenericbodymatch"></span><h2>config.tap.v3.HttpGenericBodyMatch<a class="headerlink" href="#config-tap-v3-httpgenericbodymatch" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/tap/v3/common.proto#L137">[config.tap.v3.HttpGenericBodyMatch proto]</a></p>
+<p>HTTP generic body match configuration.
+List of text strings and hex strings to be located in HTTP body.
+All specified strings must be found in the HTTP body for positive match.
+The search may be limited to specified number of bytes from the body start.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, http body is scanned byte by byte to find a match.
+If multiple patterns are specified, the process is repeated for each pattern. If location of a pattern is known, <code class="docutils literal notranslate"><span class="pre">bytes_limit</span></code> should be specified
+to scan only part of the http body.</p>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;bytes_limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;patterns&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-httpgenericbodymatch-bytes-limit">
+<dt>bytes_limit</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) Limits search to specified number of bytes - default zero (no limit - match entire captured buffer).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-httpgenericbodymatch-patterns">
+<dt>patterns</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-httpgenericbodymatch-generictextmatch"><span class="std std-ref">config.tap.v3.HttpGenericBodyMatch.GenericTextMatch</span></a>, <em>REQUIRED</em>) List of patterns to match.</p>
+</dd>
+</dl>
+</section>
+<section id="config-tap-v3-httpgenericbodymatch-generictextmatch">
+<span id="envoy-v3-api-msg-config-tap-v3-httpgenericbodymatch-generictextmatch"></span><h2>config.tap.v3.HttpGenericBodyMatch.GenericTextMatch<a class="headerlink" href="#config-tap-v3-httpgenericbodymatch-generictextmatch" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/tap/v3/common.proto#L138">[config.tap.v3.HttpGenericBodyMatch.GenericTextMatch proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;string_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;binary_match&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-tap-v3-httpgenericbodymatch-generictextmatch-string-match">
+<dt>string_match</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Text string to be located in HTTP body.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-httpgenericbodymatch-generictextmatch-string-match"><span class="std std-ref">string_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-httpgenericbodymatch-generictextmatch-binary-match"><span class="std std-ref">binary_match</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-httpgenericbodymatch-generictextmatch-binary-match">
+<dt>binary_match</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bytes</a>) Sequence of bytes to be located in HTTP body.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-httpgenericbodymatch-generictextmatch-string-match"><span class="std std-ref">string_match</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-httpgenericbodymatch-generictextmatch-binary-match"><span class="std std-ref">binary_match</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="config-tap-v3-outputconfig">
+<span id="envoy-v3-api-msg-config-tap-v3-outputconfig"></span><h2>config.tap.v3.OutputConfig<a class="headerlink" href="#config-tap-v3-outputconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/tap/v3/common.proto#L159">[config.tap.v3.OutputConfig proto]</a></p>
+<p>Tap output configuration.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;sinks&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;max_buffered_rx_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_buffered_tx_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;streaming&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;min_streamed_sent_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-outputconfig-sinks">
+<dt>sinks</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-outputsink"><span class="std std-ref">config.tap.v3.OutputSink</span></a>, <em>REQUIRED</em>) Output sinks for tap data. Currently a single sink is allowed in the list. Once multiple
+sink types are supported this constraint will be relaxed.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-outputconfig-max-buffered-rx-bytes">
+<dt>max_buffered_rx_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) For buffered tapping, the maximum amount of received body that will be buffered prior to
+truncation. If truncation occurs, the <a class="reference internal" href="../../../data/tap/v3/common.proto.html#envoy-v3-api-field-data-tap-v3-body-truncated"><span class="std std-ref">truncated</span></a> field will be set. If not specified, the
+default is 1KiB.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-outputconfig-max-buffered-tx-bytes">
+<dt>max_buffered_tx_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) For buffered tapping, the maximum amount of transmitted body that will be buffered prior to
+truncation. If truncation occurs, the <a class="reference internal" href="../../../data/tap/v3/common.proto.html#envoy-v3-api-field-data-tap-v3-body-truncated"><span class="std std-ref">truncated</span></a> field will be set. If not specified, the
+default is 1KiB.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-outputconfig-streaming">
+<dt>streaming</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates whether taps produce a single buffered message per tap, or multiple streamed
+messages per tap in the emitted <a class="reference internal" href="../../../data/tap/v3/wrapper.proto.html#envoy-v3-api-msg-data-tap-v3-tracewrapper"><span class="std std-ref">TraceWrapper</span></a> messages. Note that streamed tapping does not
+mean that no buffering takes place. Buffering may be required if data is processed before a
+match can be determined. See the HTTP tap filter <a class="reference internal" href="../../../../configuration/http/http_filters/tap_filter.html#config-http-filters-tap-streaming"><span class="std std-ref">streaming</span></a> documentation for more information.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-outputconfig-min-streamed-sent-bytes">
+<dt>min_streamed_sent_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Tapped messages will be sent on each read/write event for streamed tapping by default.
+But this behavior could be controlled by setting this field.
+If set then the tapped messages will be send once the threshold is reached.
+This could be used to avoid high frequent sending.</p>
+</dd>
+</dl>
+</section>
+<section id="config-tap-v3-outputsink">
+<span id="envoy-v3-api-msg-config-tap-v3-outputsink"></span><h2>config.tap.v3.OutputSink<a class="headerlink" href="#config-tap-v3-outputsink" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/tap/v3/common.proto#L196">[config.tap.v3.OutputSink proto]</a></p>
+<p>Tap output sink configuration.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;format&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;streaming_admin&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;file_per_tap&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;buffered_admin&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;custom_sink&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-outputsink-format">
+<dt>format</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-config-tap-v3-outputsink-format"><span class="std std-ref">config.tap.v3.OutputSink.Format</span></a>) Sink output format.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-outputsink-streaming-admin">
+<dt>streaming_admin</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-streamingadminsink"><span class="std std-ref">config.tap.v3.StreamingAdminSink</span></a>) Tap output will be streamed out the <a class="reference internal" href="../../../../operations/admin.html#post--tap" title="POST /tap"><code class="xref http http-post docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/tap</span></code></a> admin endpoint.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>It is only allowed to specify the streaming admin output sink if the tap is being
+configured from the <a class="reference internal" href="../../../../operations/admin.html#post--tap" title="POST /tap"><code class="xref http http-post docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/tap</span></code></a> admin endpoint. Thus, if an extension has
+been configured to receive tap configuration from some other source (e.g., static
+file, XDS, etc.) configuring the streaming admin output type will fail.</p>
+</div>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-streaming-admin"><span class="std std-ref">streaming_admin</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-file-per-tap"><span class="std std-ref">file_per_tap</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-buffered-admin"><span class="std std-ref">buffered_admin</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-custom-sink"><span class="std std-ref">custom_sink</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-outputsink-file-per-tap">
+<dt>file_per_tap</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-filepertapsink"><span class="std std-ref">config.tap.v3.FilePerTapSink</span></a>) Tap output will be written to a file per tap sink.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-streaming-admin"><span class="std std-ref">streaming_admin</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-file-per-tap"><span class="std std-ref">file_per_tap</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-buffered-admin"><span class="std std-ref">buffered_admin</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-custom-sink"><span class="std std-ref">custom_sink</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-outputsink-buffered-admin">
+<dt>buffered_admin</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-tap-v3-bufferedadminsink"><span class="std std-ref">config.tap.v3.BufferedAdminSink</span></a>) Tap output will be buffered in a single block before flushing to the <a class="reference internal" href="../../../../operations/admin.html#post--tap" title="POST /tap"><code class="xref http http-post docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/tap</span></code></a> admin endpoint</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>It is only allowed to specify the buffered admin output sink if the tap is being
+configured from the <a class="reference internal" href="../../../../operations/admin.html#post--tap" title="POST /tap"><code class="xref http http-post docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/tap</span></code></a> admin endpoint. Thus, if an extension has
+been configured to receive tap configuration from some other source (e.g., static
+file, XDS, etc.) configuring the buffered admin output type will fail.</p>
+</div>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-streaming-admin"><span class="std std-ref">streaming_admin</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-file-per-tap"><span class="std std-ref">file_per_tap</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-buffered-admin"><span class="std std-ref">buffered_admin</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-custom-sink"><span class="std std-ref">custom_sink</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-tap-v3-outputsink-custom-sink">
+<dt>custom_sink</dt><dd><p>(<a class="reference internal" href="../../core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Tap output filter will be defined by an extension type</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-streaming-admin"><span class="std std-ref">streaming_admin</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-file-per-tap"><span class="std std-ref">file_per_tap</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-buffered-admin"><span class="std std-ref">buffered_admin</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-tap-v3-outputsink-custom-sink"><span class="std std-ref">custom_sink</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-config-tap-v3-outputsink-format">
+<span id="envoy-v3-api-enum-config-tap-v3-outputsink-format"></span><h2>Enum config.tap.v3.OutputSink.Format<a class="headerlink" href="#enum-config-tap-v3-outputsink-format" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/tap/v3/common.proto#L204">[config.tap.v3.OutputSink.Format proto]</a></p>
+<p>Output format. All output is in the form of one or more <a class="reference internal" href="../../../data/tap/v3/wrapper.proto.html#envoy-v3-api-msg-data-tap-v3-tracewrapper"><span class="std std-ref">TraceWrapper</span></a> messages. This enumeration indicates
+how those messages are written. Note that not all sinks support all output formats. See
+individual sink documentation for more information.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-config-tap-v3-outputsink-format-json-body-as-bytes">
+<dt>JSON_BODY_AS_BYTES</dt><dd><p><em>(DEFAULT)</em> ⁣Each message will be written as JSON. Any <a class="reference internal" href="../../../data/tap/v3/common.proto.html#envoy-v3-api-msg-data-tap-v3-body"><span class="std std-ref">body</span></a>
+data will be present in the <a class="reference internal" href="../../../data/tap/v3/common.proto.html#envoy-v3-api-field-data-tap-v3-body-as-bytes"><span class="std std-ref">as_bytes</span></a> field. This means that body data will be
+base64 encoded as per the <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto3#json">proto3 JSON mappings</a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-tap-v3-outputsink-format-json-body-as-string">
+<dt>JSON_BODY_AS_STRING</dt><dd><p>⁣Each message will be written as JSON. Any <a class="reference internal" href="../../../data/tap/v3/common.proto.html#envoy-v3-api-msg-data-tap-v3-body"><span class="std std-ref">body</span></a>
+data will be present in the <a class="reference internal" href="../../../data/tap/v3/common.proto.html#envoy-v3-api-field-data-tap-v3-body-as-string"><span class="std std-ref">as_string</span></a> field. This means that body data will be
+string encoded as per the <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto3#json">proto3 JSON mappings</a>. This format type is
+useful when it is known that that body is human readable (e.g., JSON over HTTP) and the
+user wishes to view it directly without being forced to base64 decode the body.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-tap-v3-outputsink-format-proto-binary">
+<dt>PROTO_BINARY</dt><dd><p>⁣Binary proto format. Note that binary proto is not self-delimiting. If a sink writes
+multiple binary messages without any length information the data stream will not be
+useful. However, for certain sinks that are self-delimiting (e.g., one message per file)
+this output format makes consumption simpler.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-tap-v3-outputsink-format-proto-binary-length-delimited">
+<dt>PROTO_BINARY_LENGTH_DELIMITED</dt><dd><p>⁣Messages are written as a sequence tuples, where each tuple is the message length encoded
+as a <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/cpp/google.protobuf.io.coded_stream">protobuf 32-bit varint</a>
+followed by the binary message. The messages can be read back using the language specific
+protobuf coded stream implementation to obtain the message length and the message.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-tap-v3-outputsink-format-proto-text">
+<dt>PROTO_TEXT</dt><dd><p>⁣Text proto format.</p>
+</dd>
+</dl>
+</section>
+<section id="config-tap-v3-streamingadminsink">
+<span id="envoy-v3-api-msg-config-tap-v3-streamingadminsink"></span><h2>config.tap.v3.StreamingAdminSink<a class="headerlink" href="#config-tap-v3-streamingadminsink" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/tap/v3/common.proto#L278">[config.tap.v3.StreamingAdminSink proto]</a></p>
+<p>Streaming admin sink configuration.</p>
+</section>
+<section id="config-tap-v3-bufferedadminsink">
+<span id="envoy-v3-api-msg-config-tap-v3-bufferedadminsink"></span><h2>config.tap.v3.BufferedAdminSink<a class="headerlink" href="#config-tap-v3-bufferedadminsink" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/tap/v3/common.proto#L287">[config.tap.v3.BufferedAdminSink proto]</a></p>
+<p>BufferedAdminSink configures a tap output to collect traces without returning them until
+one of multiple criteria are satisfied.
+Similar to StreamingAdminSink, it is only allowed to specify the buffered admin output
+sink if the tap is being configured from the <code class="docutils literal notranslate"><span class="pre">/tap</span></code> admin endpoint.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;max_traces&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-bufferedadminsink-max-traces">
+<dt>max_traces</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Stop collecting traces when the specified number are collected.
+If other criteria for ending collection are reached first, this value will not be used.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-bufferedadminsink-timeout">
+<dt>timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Acts as a fallback to prevent the client from waiting for long periods of time.
+After timeout has occurred, a buffer flush will be triggered, returning the traces buffered so far.
+This may result in returning fewer traces than were requested, and in the case that no traces are
+buffered during this time, no traces will be returned.
+Specifying 0 for the timeout value (or not specifying a value at all) indicates an infinite timeout.</p>
+</dd>
+</dl>
+</section>
+<section id="config-tap-v3-filepertapsink">
+<span id="envoy-v3-api-msg-config-tap-v3-filepertapsink"></span><h2>config.tap.v3.FilePerTapSink<a class="headerlink" href="#config-tap-v3-filepertapsink" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/tap/v3/common.proto#L301">[config.tap.v3.FilePerTapSink proto]</a></p>
+<p>The file per tap sink outputs a discrete file for every tapped stream.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;path_prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-tap-v3-filepertapsink-path-prefix">
+<dt>path_prefix</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) Path prefix. The output file will be of the form &lt;path_prefix&gt;_&lt;id&gt;.pb, where &lt;id&gt; is an
+identifier distinguishing the recorded trace for stream instances (the Envoy
+connection ID, HTTP stream ID, etc.).</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../../service/runtime/v3/rtds.proto.html" class="btn btn-neutral float-left" title="Runtime discovery service (RTDS) (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../../service/tap/v3/tap.proto.html" class="btn btn-neutral float-right" title="Tap sink service (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Tap common configuration (proto)</a><ul>
+<li><a class="reference internal" href="#config-tap-v3-tapconfig">config.tap.v3.TapConfig</a></li>
+<li><a class="reference internal" href="#config-tap-v3-matchpredicate">config.tap.v3.MatchPredicate</a></li>
+<li><a class="reference internal" href="#config-tap-v3-matchpredicate-matchset">config.tap.v3.MatchPredicate.MatchSet</a></li>
+<li><a class="reference internal" href="#config-tap-v3-httpheadersmatch">config.tap.v3.HttpHeadersMatch</a></li>
+<li><a class="reference internal" href="#config-tap-v3-httpgenericbodymatch">config.tap.v3.HttpGenericBodyMatch</a></li>
+<li><a class="reference internal" href="#config-tap-v3-httpgenericbodymatch-generictextmatch">config.tap.v3.HttpGenericBodyMatch.GenericTextMatch</a></li>
+<li><a class="reference internal" href="#config-tap-v3-outputconfig">config.tap.v3.OutputConfig</a></li>
+<li><a class="reference internal" href="#config-tap-v3-outputsink">config.tap.v3.OutputSink</a></li>
+<li><a class="reference internal" href="#enum-config-tap-v3-outputsink-format">Enum config.tap.v3.OutputSink.Format</a></li>
+<li><a class="reference internal" href="#config-tap-v3-streamingadminsink">config.tap.v3.StreamingAdminSink</a></li>
+<li><a class="reference internal" href="#config-tap-v3-bufferedadminsink">config.tap.v3.BufferedAdminSink</a></li>
+<li><a class="reference internal" href="#config-tap-v3-filepertapsink">config.tap.v3.FilePerTapSink</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

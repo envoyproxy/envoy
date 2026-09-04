@@ -1,0 +1,70 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/tap_sinks/udp_sink/v3alpha/udp_sink.proto:
+
+Udp sink configuration (proto)
+==============================
+
+.. _extension_envoy.tap_sinks.udp_sink:
+
+This extension has the qualified name ``envoy.tap_sinks.udp_sink``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+  - :ref:`envoy.transport_sockets.downstream <extension_category_envoy.transport_sockets.downstream>`
+
+  - :ref:`envoy.transport_sockets.upstream <extension_category_envoy.transport_sockets.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.tap_sinks.udp_sink.v3alpha.UdpSink <envoy_v3_api_msg_extensions.tap_sinks.udp_sink.v3alpha.UdpSink>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.tap_sinks.udp_sink.v3alpha.UdpSink:
+
+extensions.tap_sinks.udp_sink.v3alpha.UdpSink
+---------------------------------------------
+
+
+:repo:`[extensions.tap_sinks.udp_sink.v3alpha.UdpSink proto] <api/contrib/envoy/extensions/tap_sinks/udp_sink/v3alpha/udp_sink.proto#L18>`
+
+Udp sink configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "udp_address": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.tap_sinks.udp_sink.v3alpha.UdpSink.udp_address:
+
+
+udp_address
+  (:ref:`config.core.v3.SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`) Configure UDP Address.
+
+

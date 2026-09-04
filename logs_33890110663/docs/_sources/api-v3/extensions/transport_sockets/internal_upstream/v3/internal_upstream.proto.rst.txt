@@ -1,0 +1,118 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.proto:
+
+Internal Upstream (proto)
+=========================
+
+.. _extension_envoy.transport_sockets.internal_upstream:
+
+This extension has the qualified name ``envoy.transport_sockets.internal_upstream``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.transport_sockets.upstream <extension_category_envoy.transport_sockets.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport <envoy_v3_api_msg_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport:
+
+extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
+---------------------------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport proto] <api/envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.proto#L27>`
+
+Configuration for the internal upstream address. An internal address defines
+a loopback user space socket residing in the same proxy instance. This
+extension allows passing additional structured state across the user space
+socket in addition to the regular byte stream. The purpose is to facilitate
+communication between filters on the downstream and the upstream internal
+connections. All filter state objects that are shared with the upstream
+connection are also shared with the downstream internal connection using
+this transport socket.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "passthrough_metadata": [],
+    "transport_socket": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport.passthrough_metadata:
+
+
+passthrough_metadata
+  (**repeated** :ref:`extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport.MetadataValueSource <envoy_v3_api_msg_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport.MetadataValueSource>`) Specifies the metadata namespaces and values to insert into the downstream
+  internal connection dynamic metadata when an internal address is used as a
+  host. If the destination name is repeated across two metadata source
+  locations, and both locations contain the metadata with the given name,
+  then the latter in the list overrides the former.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport.transport_socket:
+
+
+transport_socket
+  (:ref:`config.core.v3.TransportSocket <envoy_v3_api_msg_config.core.v3.TransportSocket>`, *REQUIRED*) The underlying transport socket being wrapped.
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport.MetadataValueSource:
+
+extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport.MetadataValueSource
+-----------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport.MetadataValueSource proto] <api/envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.proto#L31>`
+
+Describes the location of the imported metadata value.
+If the metadata with the given name is not present at the source location,
+then no metadata is passed through for this particular instance.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "kind": {...},
+    "name": ...
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport.MetadataValueSource.kind:
+
+
+kind
+  (:ref:`type.metadata.v3.MetadataKind <envoy_v3_api_msg_type.metadata.v3.MetadataKind>`, *REQUIRED*) Specifies what kind of metadata.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport.MetadataValueSource.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Name is the filter namespace used in the dynamic metadata.
+
+
+

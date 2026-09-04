@@ -1,0 +1,9 @@
+External dependencies: ``observability_core``
+=============================================
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `libcircllhist <https://github.com/openhistogram/libcircllhist>`__, `0.3.2.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/libcircllhist/0.3.2.envoy/>`__, 2021-06-08, , `Apache-2.0 <https://github.com/openhistogram/libcircllhist/blob/0.3.2.envoy/LICENSE>`__
+

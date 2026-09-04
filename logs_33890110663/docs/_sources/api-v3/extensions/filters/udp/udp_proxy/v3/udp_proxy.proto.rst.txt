@@ -1,0 +1,585 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto:
+
+UDP proxy (proto)
+=================
+
+.. _extension_envoy.filters.udp_listener.udp_proxy:
+
+This extension has the qualified name ``envoy.filters.udp_listener.udp_proxy``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.udp_listener <extension_category_envoy.filters.udp_listener>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
+
+
+
+UDP proxy :ref:`configuration overview <config_udp_listener_filters_udp_proxy>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig:
+
+extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+--------------------------------------------------
+
+
+:repo:`[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig proto] <api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L34>`
+
+Configuration for the UDP proxy filter.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "cluster": ...,
+    "matcher": {...},
+    "idle_timeout": {...},
+    "use_original_src_ip": ...,
+    "hash_policies": [],
+    "upstream_socket_config": {...},
+    "use_per_packet_load_balancing": ...,
+    "access_log": [],
+    "proxy_access_log": [],
+    "session_filters": [],
+    "tunneling_config": {...},
+    "access_log_options": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The stat prefix used when emitting UDP proxy filter stats.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The upstream cluster to connect to.
+  This field is deprecated in favor of
+  :ref:`matcher <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.matcher>`.
+
+
+  
+
+  Precisely one of :ref:`cluster <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.cluster>`, :ref:`matcher <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.matcher>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.matcher:
+
+
+matcher
+  (:ref:`.xds.type.matcher.v3.Matcher <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`) The match tree to use when resolving route actions for incoming requests.
+  See :ref:`Routing <config_udp_listener_filters_udp_proxy_routing>` for more information.
+
+  .. warning::
+     This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+  
+
+  Precisely one of :ref:`cluster <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.cluster>`, :ref:`matcher <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.matcher>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.idle_timeout:
+
+
+idle_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The idle timeout for sessions. Idle is defined as no datagrams between received or sent by
+  the session. The default if not specified is 1 minute.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_original_src_ip:
+
+
+use_original_src_ip
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Use the remote downstream IP address as the sender IP address when sending packets to upstream hosts.
+  This option requires Envoy to be run with the ``CAP_NET_ADMIN`` capability on Linux.
+  And the IPv6 stack must be enabled on Linux kernel.
+  This option does not preserve the remote downstream port.
+  If this option is enabled, the IP address of sent datagrams will be changed to the remote downstream IP address.
+  This means that Envoy will not receive packets that are sent by upstream hosts because the upstream hosts
+  will send the packets with the remote downstream IP address as the destination. All packets will be routed
+  to the remote downstream directly if there are route rules on the upstream host side.
+  There are two options to return the packets back to the remote downstream.
+  The first one is to use DSR (Direct Server Return).
+  The other one is to configure routing rules on the upstream hosts to forward
+  all packets back to Envoy and configure iptables rules on the host running Envoy to
+  forward all packets from upstream hosts to the Envoy process so that Envoy can forward the packets to the downstream.
+  If the platform does not support this option, Envoy will raise a configuration error.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.hash_policies:
+
+
+hash_policies
+  (**repeated** :ref:`extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy>`) Optional configuration for UDP proxy hash policies. If hash_policies is not set, the hash-based
+  load balancing algorithms will select a host randomly. Currently the number of hash policies is
+  limited to 1.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.upstream_socket_config:
+
+
+upstream_socket_config
+  (:ref:`config.core.v3.UdpSocketConfig <envoy_v3_api_msg_config.core.v3.UdpSocketConfig>`) UDP socket configuration for upstream sockets. The default for
+  :ref:`prefer_gro <envoy_v3_api_field_config.core.v3.UdpSocketConfig.prefer_gro>` is true for upstream
+  sockets as the assumption is datagrams will be received from a single source.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_per_packet_load_balancing:
+
+
+use_per_packet_load_balancing
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Perform per packet load balancing (upstream host selection) on each received data chunk.
+  The default if not specified is false, that means each data chunk is forwarded
+  to upstream host selected on first chunk receival for that "session" (identified by source IP/port and local IP/port).
+  Only one of use_per_packet_load_balancing or session_filters can be used.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log:
+
+
+access_log
+  (**repeated** :ref:`config.accesslog.v3.AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`) Configuration for session access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.proxy_access_log:
+
+
+proxy_access_log
+  (**repeated** :ref:`config.accesslog.v3.AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`) Configuration for proxy access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.session_filters:
+
+
+session_filters
+  (**repeated** :ref:`extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter>`) Optional session filters that will run for each UDP session.
+  Only one of use_per_packet_load_balancing or session_filters can be used.
+
+
+  .. _extension_category_envoy.filters.udp.session:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.filters.udp.session.dynamic_forward_proxy <extension_envoy.filters.udp.session.dynamic_forward_proxy>`
+
+    - :ref:`envoy.filters.udp.session.ext_authz <extension_envoy.filters.udp.session.ext_authz>`
+
+    - :ref:`envoy.filters.udp.session.http_capsule <extension_envoy.filters.udp.session.http_capsule>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.tunneling_config:
+
+
+tunneling_config
+  (:ref:`extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig>`) If set, this configures UDP tunneling. See `Proxying UDP in HTTP <https://www.rfc-editor.org/rfc/rfc9298.html>`_.
+  More information can be found in the UDP Proxy and HTTP upgrade documentation.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.access_log_options:
+
+
+access_log_options
+  (:ref:`extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions>`) Additional access log options for UDP Proxy.
+
+
+.. _envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy:
+
+extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy
+-------------------------------------------------------------
+
+
+:repo:`[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy proto] <api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L40>`
+
+Specifies the UDP hash policy.
+The packets can be routed by hash policy.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "source_ip": ...,
+    "key": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy.source_ip:
+
+
+source_ip
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The source IP will be used to compute the hash used by hash-based load balancing algorithms.
+
+
+  
+
+  Precisely one of :ref:`source_ip <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy.source_ip>`, :ref:`key <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy.key>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) A given key will be used to compute the hash used by hash-based load balancing algorithms.
+  In certain cases there is a need to direct different UDP streams jointly towards the selected set of endpoints.
+  A possible use-case is VoIP telephony, where media (RTP) and its corresponding control (RTCP) belong to the same logical session,
+  although they travel in separate streams. To ensure that these pair of streams are load-balanced on session level
+  (instead of individual stream level), dynamically created listeners can use the same hash key for each stream in the session.
+
+
+  
+
+  Precisely one of :ref:`source_ip <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy.source_ip>`, :ref:`key <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy.key>` must be set.
+
+
+.. _envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter:
+
+extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter
+----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter proto] <api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L57>`
+
+Configuration for UDP session filters.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "typed_config": {...},
+    "config_discovery": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the filter configuration.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.typed_config:
+
+
+typed_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) Filter specific configuration which depends on the filter being
+  instantiated. See the supported filters for further documentation.
+
+
+  
+
+  Only one of :ref:`typed_config <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.typed_config>`, :ref:`config_discovery <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.config_discovery>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.config_discovery:
+
+
+config_discovery
+  (:ref:`config.core.v3.ExtensionConfigSource <envoy_v3_api_msg_config.core.v3.ExtensionConfigSource>`) Configuration source specifier for an extension configuration discovery
+  service. In case of a failure and without the default configuration, the
+  UDP session will be removed.
+
+
+  
+
+  Only one of :ref:`typed_config <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.typed_config>`, :ref:`config_discovery <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.config_discovery>` may be set.
+
+
+.. _envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig:
+
+extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig
+---------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig proto] <api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L76>`
+
+Configuration for tunneling UDP over other transports or application layers.
+Tunneling is currently supported over HTTP/2.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "proxy_host": ...,
+    "proxy_port": {...},
+    "target_host": ...,
+    "default_target_port": ...,
+    "use_post": ...,
+    "post_path": ...,
+    "retry_options": {...},
+    "headers_to_add": [],
+    "buffer_options": {...},
+    "propagate_response_headers": ...,
+    "propagate_response_trailers": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.proxy_host:
+
+
+proxy_host
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The hostname to send in the synthesized CONNECT headers to the upstream proxy.
+  This field evaluates command operators if set, otherwise returns hostname as is.
+
+  Example: dynamically set hostname using filter state
+
+  .. code-block:: yaml
+
+     tunneling_config:
+       proxy_host: "%FILTER_STATE(proxy.host.key:PLAIN)%"
+
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.proxy_port:
+
+
+proxy_port
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Optional port value to add to the HTTP request URI.
+  This value can be overridden per-session by setting the required port value for
+  the filter state key ``udp.connect.proxy_port``.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.target_host:
+
+
+target_host
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The target host to send in the synthesized CONNECT headers to the upstream proxy.
+  This field evaluates command operators if set, otherwise returns hostname as is.
+
+  Example: dynamically set target host using filter state
+
+  .. code-block:: yaml
+
+     tunneling_config:
+       target_host: "%FILTER_STATE(target.host.key:PLAIN)%"
+
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.default_target_port:
+
+
+default_target_port
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The default target port to send in the CONNECT headers to the upstream proxy.
+  This value can be overridden per-session by setting the required port value for
+  the filter state key ``udp.connect.target_port``.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.use_post:
+
+
+use_post
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Use POST method instead of CONNECT method to tunnel the UDP stream.
+
+  .. note::
+    If use_post is set, the upstream stream does not comply with the connect-udp RFC, and
+    instead it will be a POST request. the path used in the headers will be set from the
+    post_path field, and the headers will not contain the target host and target port, as
+    required by the connect-udp protocol. This flag should be used carefully.
+
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.post_path:
+
+
+post_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The path used with POST method. Default path is ``/``. If post path is specified and
+  use_post field isn't true, it will be rejected.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.retry_options:
+
+
+retry_options
+  (:ref:`extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions>`) Optional retry options, in case connecting to the upstream failed.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.headers_to_add:
+
+
+headers_to_add
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) Additional request headers to upstream proxy. Neither ``:-prefixed`` pseudo-headers
+  nor the Host: header can be overridden. Values of the added headers evaluates command
+  operators if they are set in the value template.
+
+  Example: dynamically set a header with the local port
+
+  .. code-block:: yaml
+
+     headers_to_add:
+     - header:
+         key: original_dst_port
+         value: "%DOWNSTREAM_LOCAL_PORT%"
+
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.buffer_options:
+
+
+buffer_options
+  (:ref:`extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.BufferOptions <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.BufferOptions>`) If configured, the filter will buffer datagrams in case that it is waiting for the upstream to be
+  ready, whether if it is during the connection process or due to upstream buffer watermarks.
+  If this field is not configured, there will be no buffering and downstream datagrams that arrive
+  while the upstream is not ready will be dropped. In case this field is set but the options
+  are not configured, the default values will be applied as described in the ``BufferOptions``.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.propagate_response_headers:
+
+
+propagate_response_headers
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Save the response headers to the downstream info filter state for consumption
+  by the session filters. The filter state key is ``envoy.udp_proxy.propagate_response_headers``.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.propagate_response_trailers:
+
+
+propagate_response_trailers
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Save the response trailers to the downstream info filter state for consumption
+  by the session filters. The filter state key is ``envoy.udp_proxy.propagate_response_trailers``.
+
+
+.. _envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.BufferOptions:
+
+extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.BufferOptions
+-----------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.BufferOptions proto] <api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L78>`
+
+Configuration for UDP datagrams buffering.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_buffered_datagrams": {...},
+    "max_buffered_bytes": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.BufferOptions.max_buffered_datagrams:
+
+
+max_buffered_datagrams
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) If set, the filter will only buffer datagrams up to the requested limit, and will drop
+  new UDP datagrams if the buffer contains the max_buffered_datagrams value at the time
+  of a new datagram arrival. If not set, the default value is 1024 datagrams.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.BufferOptions.max_buffered_bytes:
+
+
+max_buffered_bytes
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) If set, the filter will only buffer datagrams up to the requested total buffered bytes limit,
+  and will drop new UDP datagrams if the buffer contains the max_buffered_datagrams value
+  at the time of a new datagram arrival. If not set, the default value is 16,384 (16KB).
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions:
+
+extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions
+----------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions proto] <api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L90>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_connect_attempts": {...},
+    "backoff_options": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions.max_connect_attempts:
+
+
+max_connect_attempts
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The maximum number of unsuccessful connection attempts that will be made before giving up.
+  If the parameter is not specified, 1 connection attempt will be made.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions.backoff_options:
+
+
+backoff_options
+  (:ref:`config.core.v3.BackoffStrategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`) Sets the backoff strategy. If not set, the retries are performed without backoff.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions:
+
+extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions proto] <api/envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.proto#L182>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "access_log_flush_interval": {...},
+    "flush_access_log_on_tunnel_connected": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions.access_log_flush_interval:
+
+
+access_log_flush_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The interval to flush access log. The UDP proxy will flush only one access log when the session
+  is ended by default. If this field is set, the UDP proxy will flush access log periodically with
+  the specified interval.
+  This field does not require on-tunnel-connected access logging enabled, and the other way around.
+  The interval must be at least 1ms.
+
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions.flush_access_log_on_tunnel_connected:
+
+
+flush_access_log_on_tunnel_connected
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to true and UDP tunneling is configured, access log will be flushed when the UDP proxy has successfully
+  established a connection tunnel with the upstream. If the connection failed, the access log will not be flushed.
+
+
+

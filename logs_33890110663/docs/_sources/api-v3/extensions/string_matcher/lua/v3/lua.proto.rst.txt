@@ -1,0 +1,77 @@
+.. _envoy_v3_api_file_envoy/extensions/string_matcher/lua/v3/lua.proto:
+
+Lua StringMatcher (proto)
+=========================
+
+.. _extension_envoy.string_matcher.lua:
+
+This extension has the qualified name ``envoy.string_matcher.lua``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.string_matcher <extension_category_envoy.string_matcher>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.string_matcher.lua.v3.Lua <envoy_v3_api_msg_extensions.string_matcher.lua.v3.Lua>`
+
+
+
+A Lua StringMatcher allows executing a Lua script to determine if a string is a match. The configured source
+code must define a function named `envoy_match`. If the function returns true, the string is considered a match.
+Any other result, including an execution error, is considered a non-match.
+
+Example:
+
+.. code-block:: yaml
+
+  source_code:
+    inline_string: |
+      function envoy_match(str)
+          -- Do something.
+          return true
+      end
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.string_matcher.lua.v3.Lua:
+
+extensions.string_matcher.lua.v3.Lua
+------------------------------------
+
+
+:repo:`[extensions.string_matcher.lua.v3.Lua proto] <api/envoy/extensions/string_matcher/lua/v3/lua.proto#L33>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "source_code": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.string_matcher.lua.v3.Lua.source_code:
+
+
+source_code
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`, *REQUIRED*) The Lua code that Envoy will execute
+
+

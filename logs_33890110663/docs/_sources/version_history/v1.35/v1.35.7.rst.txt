@@ -1,0 +1,50 @@
+.. _version_history_1.35.7:
+
+1.35.7 (December 4, 2025)
+==========================
+
+
+
+
+Incompatible behavior changes
+-----------------------------
+
+*Changes that are expected to cause an incompatibility if applicable;
+deployment changes are likely required*
+
+
+
+* **dynamic modules**: The dynamic module ABI has been updated to support streaming body manipulation. This change also
+  fixed potential incorrect behavior when access or modify the request or response body. See
+  https://github.com/envoyproxy/envoy/issues/40918 for more details.
+* **http**: Added runtime flag ``envoy.reloadable_features.reject_early_connect_data`` to reject ``CONNECT`` requests
+  that receive data before Envoy sent a ``200`` response to the client. While this is not a strictly compliant behavior
+  it is very common as a latency reducing measure. As such the option is disabled by default.
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **http**: Fixed a remote ``jwt_auth`` token fetch crash with two or more auth headers when ``allow_missing_or_failed`` is set.
+* **tcp_proxy**: Fixed a connection leak in the TCP proxy when the ``receive_before_connect`` feature is enabled and the
+  downstream connection closes before the upstream connection is established.
+* **tls**: Fixed an issue where SANs of type ``OTHERNAME`` in a TLS cert were truncated if there was
+  an embedded null octet, leading to incorrect SAN validation.
+
+
+
+
+New features
+------------
+
+
+* **dynamic modules**: Added support for loading dynamic modules globally by setting :ref:`load_globally
+  <v1.35:envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.load_globally>` to true.
+

@@ -1,0 +1,211 @@
+.. _envoy_v3_api_file_envoy/data/tap/v3/http.proto:
+
+HTTP tap data (proto)
+=====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_data.tap.v3.HttpBufferedTrace:
+
+data.tap.v3.HttpBufferedTrace
+-----------------------------
+
+
+:repo:`[data.tap.v3.HttpBufferedTrace proto] <api/envoy/data/tap/v3/http.proto#L21>`
+
+A fully buffered HTTP trace message.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request": {...},
+    "response": {...},
+    "downstream_connection": {...},
+    "upstream_connection": {...}
+  }
+
+.. _envoy_v3_api_field_data.tap.v3.HttpBufferedTrace.request:
+
+
+request
+  (:ref:`data.tap.v3.HttpBufferedTrace.Message <envoy_v3_api_msg_data.tap.v3.HttpBufferedTrace.Message>`) Request message.
+
+
+.. _envoy_v3_api_field_data.tap.v3.HttpBufferedTrace.response:
+
+
+response
+  (:ref:`data.tap.v3.HttpBufferedTrace.Message <envoy_v3_api_msg_data.tap.v3.HttpBufferedTrace.Message>`) Response message.
+
+
+.. _envoy_v3_api_field_data.tap.v3.HttpBufferedTrace.downstream_connection:
+
+
+downstream_connection
+  (:ref:`data.tap.v3.Connection <envoy_v3_api_msg_data.tap.v3.Connection>`) downstream connection
+
+
+.. _envoy_v3_api_field_data.tap.v3.HttpBufferedTrace.upstream_connection:
+
+
+upstream_connection
+  (:ref:`data.tap.v3.Connection <envoy_v3_api_msg_data.tap.v3.Connection>`) upstream connection
+
+
+.. _envoy_v3_api_msg_data.tap.v3.HttpBufferedTrace.Message:
+
+data.tap.v3.HttpBufferedTrace.Message
+-------------------------------------
+
+
+:repo:`[data.tap.v3.HttpBufferedTrace.Message proto] <api/envoy/data/tap/v3/http.proto#L26>`
+
+HTTP message wrapper.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "headers": [],
+    "body": {...},
+    "trailers": [],
+    "headers_received_time": {...}
+  }
+
+.. _envoy_v3_api_field_data.tap.v3.HttpBufferedTrace.Message.headers:
+
+
+headers
+  (**repeated** :ref:`config.core.v3.HeaderValue <envoy_v3_api_msg_config.core.v3.HeaderValue>`) Message headers.
+
+
+.. _envoy_v3_api_field_data.tap.v3.HttpBufferedTrace.Message.body:
+
+
+body
+  (:ref:`data.tap.v3.Body <envoy_v3_api_msg_data.tap.v3.Body>`) Message body.
+
+
+.. _envoy_v3_api_field_data.tap.v3.HttpBufferedTrace.Message.trailers:
+
+
+trailers
+  (**repeated** :ref:`config.core.v3.HeaderValue <envoy_v3_api_msg_config.core.v3.HeaderValue>`) Message trailers.
+
+
+.. _envoy_v3_api_field_data.tap.v3.HttpBufferedTrace.Message.headers_received_time:
+
+
+headers_received_time
+  (`Timestamp <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp>`_) The timestamp after receiving the message headers.
+
+
+
+
+.. _envoy_v3_api_msg_data.tap.v3.HttpStreamedTraceSegment:
+
+data.tap.v3.HttpStreamedTraceSegment
+------------------------------------
+
+
+:repo:`[data.tap.v3.HttpStreamedTraceSegment proto] <api/envoy/data/tap/v3/http.proto#L58>`
+
+A streamed HTTP trace segment. Multiple segments make up a full trace.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "trace_id": ...,
+    "request_headers": {...},
+    "request_body_chunk": {...},
+    "request_trailers": {...},
+    "response_headers": {...},
+    "response_body_chunk": {...},
+    "response_trailers": {...}
+  }
+
+.. _envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.trace_id:
+
+
+trace_id
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Trace ID unique to the originating Envoy only. Trace IDs can repeat and should not be used
+  for long term stable uniqueness.
+
+
+.. _envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_headers:
+
+
+request_headers
+  (:ref:`config.core.v3.HeaderMap <envoy_v3_api_msg_config.core.v3.HeaderMap>`) Request headers.
+
+
+  
+
+  Only one of :ref:`request_headers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_headers>`, :ref:`request_body_chunk <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_body_chunk>`, :ref:`request_trailers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_trailers>`, :ref:`response_headers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_headers>`, :ref:`response_body_chunk <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_body_chunk>`, :ref:`response_trailers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_trailers>` may be set.
+
+.. _envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_body_chunk:
+
+
+request_body_chunk
+  (:ref:`data.tap.v3.Body <envoy_v3_api_msg_data.tap.v3.Body>`) Request body chunk.
+
+
+  
+
+  Only one of :ref:`request_headers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_headers>`, :ref:`request_body_chunk <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_body_chunk>`, :ref:`request_trailers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_trailers>`, :ref:`response_headers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_headers>`, :ref:`response_body_chunk <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_body_chunk>`, :ref:`response_trailers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_trailers>` may be set.
+
+.. _envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_trailers:
+
+
+request_trailers
+  (:ref:`config.core.v3.HeaderMap <envoy_v3_api_msg_config.core.v3.HeaderMap>`) Request trailers.
+
+
+  
+
+  Only one of :ref:`request_headers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_headers>`, :ref:`request_body_chunk <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_body_chunk>`, :ref:`request_trailers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_trailers>`, :ref:`response_headers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_headers>`, :ref:`response_body_chunk <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_body_chunk>`, :ref:`response_trailers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_trailers>` may be set.
+
+.. _envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_headers:
+
+
+response_headers
+  (:ref:`config.core.v3.HeaderMap <envoy_v3_api_msg_config.core.v3.HeaderMap>`) Response headers.
+
+
+  
+
+  Only one of :ref:`request_headers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_headers>`, :ref:`request_body_chunk <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_body_chunk>`, :ref:`request_trailers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_trailers>`, :ref:`response_headers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_headers>`, :ref:`response_body_chunk <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_body_chunk>`, :ref:`response_trailers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_trailers>` may be set.
+
+.. _envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_body_chunk:
+
+
+response_body_chunk
+  (:ref:`data.tap.v3.Body <envoy_v3_api_msg_data.tap.v3.Body>`) Response body chunk.
+
+
+  
+
+  Only one of :ref:`request_headers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_headers>`, :ref:`request_body_chunk <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_body_chunk>`, :ref:`request_trailers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_trailers>`, :ref:`response_headers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_headers>`, :ref:`response_body_chunk <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_body_chunk>`, :ref:`response_trailers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_trailers>` may be set.
+
+.. _envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_trailers:
+
+
+response_trailers
+  (:ref:`config.core.v3.HeaderMap <envoy_v3_api_msg_config.core.v3.HeaderMap>`) Response trailers.
+
+
+  
+
+  Only one of :ref:`request_headers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_headers>`, :ref:`request_body_chunk <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_body_chunk>`, :ref:`request_trailers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.request_trailers>`, :ref:`response_headers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_headers>`, :ref:`response_body_chunk <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_body_chunk>`, :ref:`response_trailers <envoy_v3_api_field_data.tap.v3.HttpStreamedTraceSegment.response_trailers>` may be set.
+

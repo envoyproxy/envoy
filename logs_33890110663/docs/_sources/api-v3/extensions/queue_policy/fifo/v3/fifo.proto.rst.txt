@@ -1,0 +1,50 @@
+.. _envoy_v3_api_file_envoy/extensions/queue_policy/fifo/v3/fifo.proto:
+
+FIFO Queue Policy (proto)
+=========================
+
+.. _extension_envoy.queue_policy.fifo:
+
+This extension has the qualified name ``envoy.queue_policy.fifo``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.queue_policy <extension_category_envoy.queue_policy>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.queue_policy.fifo.v3.FifoQueuePolicyConfig <envoy_v3_api_msg_extensions.queue_policy.fifo.v3.FifoQueuePolicyConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.queue_policy.fifo.v3.FifoQueuePolicyConfig:
+
+extensions.queue_policy.fifo.v3.FifoQueuePolicyConfig
+-----------------------------------------------------
+
+
+:repo:`[extensions.queue_policy.fifo.v3.FifoQueuePolicyConfig proto] <api/envoy/extensions/queue_policy/fifo/v3/fifo.proto#L16>`
+
+Configuration for the FIFO pending requests queue policy.
+
+
+
+

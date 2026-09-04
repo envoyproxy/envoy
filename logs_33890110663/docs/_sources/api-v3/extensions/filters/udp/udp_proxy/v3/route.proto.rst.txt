@@ -1,0 +1,36 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/udp/udp_proxy/v3/route.proto:
+
+UDP proxy route configuration (proto)
+=====================================
+
+
+UDP proxy :ref:`configuration overview <config_udp_listener_filters_udp_proxy>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.Route:
+
+extensions.filters.udp.udp_proxy.v3.Route
+-----------------------------------------
+
+
+:repo:`[extensions.filters.udp.udp_proxy.v3.Route proto] <api/envoy/extensions/filters/udp/udp_proxy/v3/route.proto#L16>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.Route.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Indicates the upstream cluster to which the request should be routed.
+
+

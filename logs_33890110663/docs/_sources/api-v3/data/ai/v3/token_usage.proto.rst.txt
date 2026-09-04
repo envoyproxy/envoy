@@ -1,0 +1,244 @@
+.. _envoy_v3_api_file_envoy/data/ai/v3/token_usage.proto:
+
+AI token usage (proto)
+======================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_data.ai.v3.TokenUsage:
+
+data.ai.v3.TokenUsage
+---------------------
+
+
+:repo:`[data.ai.v3.TokenUsage proto] <api/envoy/data/ai/v3/token_usage.proto#L39>`
+
+Canonical LLM token usage extracted from a provider response by the
+:ref:`AI Protocol Manager filter <config_http_filters_ai_protocol_manager>`,
+published as typed dynamic metadata under one namespace at a clean end of
+stream.
+
+Counts are normalized onto one *inclusive* contract regardless of wire API:
+``input_tokens`` covers all input consumed (uncached input, cached reads,
+cache writes, and tool-use prompt tokens) and ``output_tokens`` covers all
+generated output including reasoning/thought tokens; the detail messages
+are subsets of those canonical values. Every value remains
+provider-reported and is not independently verified by Envoy.
+
+Every count is optional: wire APIs report different subsets, and a
+status-only record (``api_protocol``, ``model`` when captured, and
+``extraction_status: FAILED``) is published when extraction failed
+outright, distinguishing that from a response that supplied no usage
+(which publishes nothing).
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "api_protocol": ...,
+    "model": ...,
+    "input_tokens": {...},
+    "output_tokens": {...},
+    "total_tokens": {...},
+    "input_token_details": {...},
+    "output_token_details": {...},
+    "provider_total_tokens": {...},
+    "extraction_status": ...
+  }
+
+.. _envoy_v3_api_field_data.ai.v3.TokenUsage.api_protocol:
+
+
+api_protocol
+  (:ref:`type.ai.v3.ApiProtocol <envoy_v3_api_enum_type.ai.v3.ApiProtocol>`) The wire API the usage was extracted from. This names an API contract,
+  not a provider identity: any OpenAI-compatible backend reports an OpenAI
+  protocol here.
+
+
+.. _envoy_v3_api_field_data.ai.v3.TokenUsage.model:
+
+
+model
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The model reported by the response, when present.
+
+
+.. _envoy_v3_api_field_data.ai.v3.TokenUsage.input_tokens:
+
+
+input_tokens
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Canonical inclusive input token count.
+
+
+.. _envoy_v3_api_field_data.ai.v3.TokenUsage.output_tokens:
+
+
+output_tokens
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Canonical inclusive output token count.
+
+
+.. _envoy_v3_api_field_data.ai.v3.TokenUsage.total_tokens:
+
+
+total_tokens
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Canonical total: ``input_tokens + output_tokens``. Present only when
+  both canonical components are known, so the triple is always internally
+  consistent. Compare against ``provider_total_tokens`` to detect a
+  provider that reports inconsistently or in buckets unknown to the
+  extractor.
+
+
+.. _envoy_v3_api_field_data.ai.v3.TokenUsage.input_token_details:
+
+
+input_token_details
+  (:ref:`data.ai.v3.InputTokenDetails <envoy_v3_api_msg_data.ai.v3.InputTokenDetails>`) Canonical input token breakdown.
+
+
+.. _envoy_v3_api_field_data.ai.v3.TokenUsage.output_token_details:
+
+
+output_token_details
+  (:ref:`data.ai.v3.OutputTokenDetails <envoy_v3_api_msg_data.ai.v3.OutputTokenDetails>`) Canonical output token breakdown.
+
+
+.. _envoy_v3_api_field_data.ai.v3.TokenUsage.provider_total_tokens:
+
+
+provider_total_tokens
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) The total token count reported directly by the provider, when it
+  reported one — preserved regardless of whether it agrees with
+  ``total_tokens``.
+
+
+.. _envoy_v3_api_field_data.ai.v3.TokenUsage.extraction_status:
+
+
+extraction_status
+  (:ref:`data.ai.v3.TokenUsage.ExtractionStatus <envoy_v3_api_enum_data.ai.v3.TokenUsage.ExtractionStatus>`) Quality of the extraction result.
+
+
+.. _envoy_v3_api_enum_data.ai.v3.TokenUsage.ExtractionStatus:
+
+Enum data.ai.v3.TokenUsage.ExtractionStatus
+-------------------------------------------
+
+
+:repo:`[data.ai.v3.TokenUsage.ExtractionStatus proto] <api/envoy/data/ai/v3/token_usage.proto#L41>`
+
+Quality of the extraction result.
+
+
+
+.. _envoy_v3_api_enum_value_data.ai.v3.TokenUsage.ExtractionStatus.EXTRACTION_STATUS_UNSPECIFIED:
+
+
+EXTRACTION_STATUS_UNSPECIFIED
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_data.ai.v3.TokenUsage.ExtractionStatus.COMPLETE:
+
+
+COMPLETE
+  ⁣All observed usage-bearing data was parsed successfully.
+
+
+.. _envoy_v3_api_enum_value_data.ai.v3.TokenUsage.ExtractionStatus.PARTIAL:
+
+
+PARTIAL
+  ⁣Usable counts were extracted, but some usage-bearing input was lost:
+  malformed, truncated, or skipped by a configured resource limit. The
+  counts may be stale (an earlier cumulative snapshot) or incomplete.
+
+
+.. _envoy_v3_api_enum_value_data.ai.v3.TokenUsage.ExtractionStatus.FAILED:
+
+
+FAILED
+  ⁣Usage-bearing input was observed but no usable canonical count could
+  be extracted; only ``api_protocol`` and ``model`` may be populated.
+
+
+
+
+.. _envoy_v3_api_msg_data.ai.v3.InputTokenDetails:
+
+data.ai.v3.InputTokenDetails
+----------------------------
+
+
+:repo:`[data.ai.v3.InputTokenDetails proto] <api/envoy/data/ai/v3/token_usage.proto#L95>`
+
+Subsets of :ref:`input_tokens
+<envoy_v3_api_field_data.ai.v3.TokenUsage.input_tokens>`.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cached_tokens": {...},
+    "cache_creation_tokens": {...},
+    "tool_use_tokens": {...}
+  }
+
+.. _envoy_v3_api_field_data.ai.v3.InputTokenDetails.cached_tokens:
+
+
+cached_tokens
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Cache-read input tokens.
+
+
+.. _envoy_v3_api_field_data.ai.v3.InputTokenDetails.cache_creation_tokens:
+
+
+cache_creation_tokens
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Cache-creation (cache-write) input tokens.
+
+
+.. _envoy_v3_api_field_data.ai.v3.InputTokenDetails.tool_use_tokens:
+
+
+tool_use_tokens
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Tool-use prompt tokens.
+
+
+
+.. _envoy_v3_api_msg_data.ai.v3.OutputTokenDetails:
+
+data.ai.v3.OutputTokenDetails
+-----------------------------
+
+
+:repo:`[data.ai.v3.OutputTokenDetails proto] <api/envoy/data/ai/v3/token_usage.proto#L108>`
+
+Subsets of :ref:`output_tokens
+<envoy_v3_api_field_data.ai.v3.TokenUsage.output_tokens>`.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "reasoning_tokens": {...}
+  }
+
+.. _envoy_v3_api_field_data.ai.v3.OutputTokenDetails.reasoning_tokens:
+
+
+reasoning_tokens
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Reasoning or thought tokens.
+
+

@@ -1,0 +1,37 @@
+.. _envoy_v3_api_file_envoy/extensions/matching/common_inputs/stats/v3/stats.proto:
+
+Stats matcher (proto)
+=====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput:
+
+extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput proto] <api/envoy/extensions/matching/common_inputs/stats/v3/stats.proto#L15>`
+
+Specifies the way to match stats with full name.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.stats.v3.StatTagValueInput:
+
+extensions.matching.common_inputs.stats.v3.StatTagValueInput
+------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.stats.v3.StatTagValueInput proto] <api/envoy/extensions/matching/common_inputs/stats/v3/stats.proto#L19>`
+
+Specifies the way to match stat tags with value.
+
+
+
+

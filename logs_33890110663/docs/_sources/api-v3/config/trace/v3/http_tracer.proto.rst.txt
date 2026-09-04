@@ -1,0 +1,113 @@
+.. _envoy_v3_api_file_envoy/config/trace/v3/http_tracer.proto:
+
+Tracing (proto)
+===============
+
+
+Tracing :ref:`architecture overview <arch_overview_tracing>`.
+
+
+
+
+.. _envoy_v3_api_msg_config.trace.v3.Tracing:
+
+config.trace.v3.Tracing
+-----------------------
+
+
+:repo:`[config.trace.v3.Tracing proto] <api/envoy/config/trace/v3/http_tracer.proto#L28>`
+
+The tracing configuration specifies settings for an HTTP tracer provider used by Envoy.
+
+Envoy may support other tracers in the future, but right now the HTTP tracer is the only one
+supported.
+
+.. attention::
+
+  Use of this message type has been deprecated in favor of direct use of
+  :ref:`Tracing.Http <envoy_v3_api_msg_config.trace.v3.Tracing.Http>`.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "http": {...}
+  }
+
+.. _envoy_v3_api_field_config.trace.v3.Tracing.http:
+
+
+http
+  (:ref:`config.trace.v3.Tracing.Http <envoy_v3_api_msg_config.trace.v3.Tracing.Http>`) Provides configuration for the HTTP tracer.
+
+
+.. _envoy_v3_api_msg_config.trace.v3.Tracing.Http:
+
+config.trace.v3.Tracing.Http
+----------------------------
+
+
+:repo:`[config.trace.v3.Tracing.Http proto] <api/envoy/config/trace/v3/http_tracer.proto#L37>`
+
+Configuration for an HTTP tracer provider used by Envoy.
+
+The configuration is defined by the
+:ref:`HttpConnectionManager.Tracing <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing>`
+:ref:`provider <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`
+field.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "typed_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.trace.v3.Tracing.Http.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the HTTP trace driver to instantiate. The name must match a
+  supported HTTP trace driver.
+  See the :ref:`extensions listed in typed_config below <extension_category_envoy.tracers>` for the default list of the HTTP trace driver.
+
+
+.. _envoy_v3_api_field_config.trace.v3.Tracing.Http.typed_config:
+
+
+typed_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) 
+  Trace driver specific configuration which must be set according to the driver being instantiated.
+
+
+  .. _extension_category_envoy.tracers:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.tracers.datadog <extension_envoy.tracers.datadog>`
+
+    - :ref:`envoy.tracers.dynamic_modules <extension_envoy.tracers.dynamic_modules>`
+
+    - :ref:`envoy.tracers.fluentd <extension_envoy.tracers.fluentd>`
+
+    - :ref:`envoy.tracers.opentelemetry <extension_envoy.tracers.opentelemetry>`
+
+    - :ref:`envoy.tracers.skywalking <extension_envoy.tracers.skywalking>`
+
+    - :ref:`envoy.tracers.xray <extension_envoy.tracers.xray>`
+
+    - :ref:`envoy.tracers.zipkin <extension_envoy.tracers.zipkin>`
+
+
+
+
+
+

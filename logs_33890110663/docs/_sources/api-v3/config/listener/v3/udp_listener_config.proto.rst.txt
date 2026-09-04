@@ -1,0 +1,88 @@
+.. _envoy_v3_api_file_envoy/config/listener/v3/udp_listener_config.proto:
+
+UDP listener config (proto)
+===========================
+
+
+Listener :ref:`configuration overview <config_listeners>`
+
+
+
+
+.. _envoy_v3_api_msg_config.listener.v3.UdpListenerConfig:
+
+config.listener.v3.UdpListenerConfig
+------------------------------------
+
+
+:repo:`[config.listener.v3.UdpListenerConfig proto] <api/envoy/config/listener/v3/udp_listener_config.proto#L21>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "downstream_socket_config": {...},
+    "quic_options": {...},
+    "udp_packet_packet_writer_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.listener.v3.UdpListenerConfig.downstream_socket_config:
+
+
+downstream_socket_config
+  (:ref:`config.core.v3.UdpSocketConfig <envoy_v3_api_msg_config.core.v3.UdpSocketConfig>`) UDP socket configuration for the listener. The default for
+  :ref:`prefer_gro <envoy_v3_api_field_config.core.v3.UdpSocketConfig.prefer_gro>` is false for
+  listener sockets. If receiving a large amount of datagrams from a small number of sources, it
+  may be worthwhile to enable this option after performance testing.
+
+
+.. _envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options:
+
+
+quic_options
+  (:ref:`config.listener.v3.QuicProtocolOptions <envoy_v3_api_msg_config.listener.v3.QuicProtocolOptions>`) Configuration for QUIC protocol. If empty, QUIC will not be enabled on this listener. Set
+  to the default object to enable QUIC without modifying any additional options.
+
+
+.. _envoy_v3_api_field_config.listener.v3.UdpListenerConfig.udp_packet_packet_writer_config:
+
+
+udp_packet_packet_writer_config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Configuration for the UDP packet writer. If empty, HTTP/3 will use GSO if available
+  (:ref:`UdpDefaultWriterFactory <envoy_v3_api_msg_extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory>`)
+  or the default kernel sendmsg if not,
+  (:ref:`UdpDefaultWriterFactory <envoy_v3_api_msg_extensions.udp_packet_writer.v3.UdpDefaultWriterFactory>`)
+  and raw UDP will use kernel sendmsg.
+
+
+  .. _extension_category_envoy.udp_packet_writer:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.udp_packet_writer.default <extension_envoy.udp_packet_writer.default>`
+
+    - :ref:`envoy.udp_packet_writer.gso <extension_envoy.udp_packet_writer.gso>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.listener.v3.ActiveRawUdpListenerConfig:
+
+config.listener.v3.ActiveRawUdpListenerConfig
+---------------------------------------------
+
+
+:repo:`[config.listener.v3.ActiveRawUdpListenerConfig proto] <api/envoy/config/listener/v3/udp_listener_config.proto#L48>`
+
+
+
+
+

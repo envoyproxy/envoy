@@ -1,0 +1,64 @@
+.. _envoy_v3_api_file_envoy/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.proto:
+
+Allow listed routes internal redirect predicate (proto)
+=======================================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig:
+
+extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig
+---------------------------------------------------------------------------
+
+
+:repo:`[extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig proto] <api/envoy/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.proto#L17>`
+
+An internal redirect predicate that accepts only explicitly allowed target routes.
+
+.. _extension_envoy.internal_redirect_predicates.allow_listed_routes:
+
+This extension has the qualified name ``envoy.internal_redirect_predicates.allow_listed_routes``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.internal_redirect_predicates <extension_category_envoy.internal_redirect_predicates>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig <envoy_v3_api_msg_extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "allowed_route_names": []
+  }
+
+.. _envoy_v3_api_field_extensions.internal_redirect.allow_listed_routes.v3.AllowListedRoutesConfig.allowed_route_names:
+
+
+allowed_route_names
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The list of routes that's allowed as redirect target by this predicate,
+  identified by the route's :ref:`name <envoy_v3_api_field_config.route.v3.Route.route>`.
+  Empty route names are not allowed.
+
+

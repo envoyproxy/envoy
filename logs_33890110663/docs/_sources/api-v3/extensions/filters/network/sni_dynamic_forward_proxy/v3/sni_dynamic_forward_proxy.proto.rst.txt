@@ -1,0 +1,92 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3/sni_dynamic_forward_proxy.proto:
+
+SNI dynamic forward proxy (proto)
+=================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig:
+
+extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
+--------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig proto] <api/envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3/sni_dynamic_forward_proxy.proto#L23>`
+
+Configuration for the SNI-based dynamic forward proxy filter. See the
+:ref:`architecture overview <arch_overview_http_dynamic_forward_proxy>` for
+more information. Note this filter must be configured along with
+:ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>`
+to work.
+
+.. _extension_envoy.filters.network.sni_dynamic_forward_proxy:
+
+This extension has the qualified name ``envoy.filters.network.sni_dynamic_forward_proxy``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig <envoy_v3_api_msg_extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dns_cache_config": {...},
+    "port_value": ...,
+    "save_upstream_address": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig.dns_cache_config:
+
+
+dns_cache_config
+  (:ref:`extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig <envoy_v3_api_msg_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig>`, *REQUIRED*) The DNS cache configuration that the filter will attach to. Note this
+  configuration must match that of associated :ref:`dynamic forward proxy
+  cluster configuration
+  <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig.port_value:
+
+
+port_value
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The port number to connect to the upstream.
+
+
+  
+
+.. _envoy_v3_api_field_extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig.save_upstream_address:
+
+
+save_upstream_address
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When this flag is set, the filter will add the resolved upstream address in the filter
+  state. The state should be saved with key
+  ``envoy.stream.upstream_address`` (See
+  :repo:`upstream_address.h<source/common/stream_info/upstream_address.h>`).
+
+

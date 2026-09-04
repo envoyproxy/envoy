@@ -1,0 +1,19 @@
+.. _version_history_v1.8:
+
+v1.8
+----
+
+Latest release:
+  `1.8.0 <https://github.com/envoyproxy/envoy/releases/tag/v1.8.0>`_ (October 4, 2018)
+
+Initial release date:
+  October 4, 2018
+
+
+.. toctree::
+  :titlesonly:
+  :maxdepth: 2
+  :caption: Changelog
+
+  v1.8.0
+

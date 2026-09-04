@@ -1,0 +1,38 @@
+.. _envoy_v3_api_file_xds/core/v3/authority.proto:
+
+xds/core/v3/authority.proto (proto)
+===================================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+.. _envoy_v3_api_msg_.xds.core.v3.Authority:
+
+.xds.core.v3.Authority
+----------------------
+
+
+`[.xds.core.v3.Authority proto] <https://github.com/cncf/xds/blob/main/xds/core/v3/authority.proto#L16>`_
+
+xDS authority information.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...
+  }
+
+.. _envoy_v3_api_field_.xds.core.v3.Authority.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) 
+

@@ -1,0 +1,1253 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Protocol options (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="Proxy protocol (proto)" href="proxy_protocol.proto.html" />
+    <link rel="prev" title="Network addresses (proto)" href="address.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../config.html">Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../service/service.html">Services</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../common_messages/common_messages.html">Common messages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/common/async_files/v3/async_file_manager.proto.html">AsyncFileManager configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="backoff.proto.html">Backoff strategy (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../service/discovery/v3/discovery.proto.html">Common discovery API components (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/filters/common/fault/v3/fault.proto.html">Common fault injection types (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/filters/common/jwks/v3/jwks.proto.html">Common JWKS fetch (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/filters/common/jwks/v3/jwt_handshake.proto.html">JWT handshake validation (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="base.proto.html">Common types (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cel.proto.html">CEL Expression Configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/filters/common/matcher/action/v3/skip_action.proto.html">Common match actions (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/actions/transform_stat/v3/transform_stat.proto.html">Transform Stat actions (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/common_inputs/network/v3/network_inputs.proto.html">Common network matching inputs (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/common/ratelimit/v3/ratelimit.proto.html">Common rate limit components (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/common_inputs/stats/v3/stats.proto.html">Stats matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto.html">Common SSL matching inputs (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="config_source.proto.html">Configuration sources (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/http/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules HTTP Match Input (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.proto.html">Consistent hashing matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/input_matchers/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Input Matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/network/socket_interface/v3/default_socket_interface.proto.html">Default socket interface configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/common_inputs/environment_variable/v3/input.proto.html">Environment variable input (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="extension.proto.html">Extension configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/common/aws/v3/credential_provider.proto.html">AWS common configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/common/matching/v3/extension_matcher.proto.html">Extension matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/filters/common/dependency/v3/dependency.proto.html">Filter dependency specification (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/regex_engines/v3/google_re2.proto.html">Google RE2 (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_method_list.proto.html">gRPC method list (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http_service.proto.html">HTTP services (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="grpc_service.proto.html">gRPC services (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/key_value/file_based/v3/config.proto.html">Key/value file-based store storage plugin (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../common/key_value/v3/config.proto.html">Key/value store storage plugin (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../common/mutation_rules/v3/mutation_rules.proto.html">Header mutation rules (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/early_data/v3/default_early_data_policy.proto.html">HTTP request early data policy (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="http_uri.proto.html">HTTP service URI  (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../type/v3/scope.proto.html">Scope (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/input_matchers/ip/v3/ip.proto.html">IP matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/input_matchers/metadata/v3/metadata.proto.html">metadata matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/matching/input_matchers/runtime_fraction/v3/runtime_fraction.proto.html">Runtime matcher (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="address.proto.html">Network addresses (proto)</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Protocol options (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="proxy_protocol.proto.html">Proxy protocol (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="resolver.proto.html">Resolver (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="socket_option.proto.html">Socket option (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="substitution_format_string.proto.html">Substitution format string (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="udp_socket_config.proto.html">UDP socket config (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/filters/common/set_filter_state/v3/value.proto.html">Set-Filter-State filter state value (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="socket_cmsg_headers.proto.html">Socket CMSG headers (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Common Configuration (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../common_messages/common_messages.html">Common messages</a></li>
+      <li class="breadcrumb-item active">Protocol options (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/config/core/v3/protocol.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="protocol-options-proto">
+<span id="envoy-v3-api-file-envoy-config-core-v3-protocol-proto"></span><h1>Protocol options (proto)<a class="headerlink" href="#protocol-options-proto" title="Link to this heading"></a></h1>
+<section id="config-core-v3-quickeepalivesettings">
+<span id="envoy-v3-api-msg-config-core-v3-quickeepalivesettings"></span><h2>config.core.v3.QuicKeepAliveSettings<a class="headerlink" href="#config-core-v3-quickeepalivesettings" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L38">[config.core.v3.QuicKeepAliveSettings proto]</a></p>
+<p>Config for keepalive probes in a QUIC connection.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>QUIC keep-alive probing packets work differently from HTTP/2 keep-alive PINGs in a sense that the probing packet
+itself doesn’t timeout waiting for a probing response. QUIC has a shorter idle timeout than TCP, so it doesn’t rely on such probing to discover dead connections. If the peer fails to respond, the connection will idle timeout eventually. Thus, they are configured differently from <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-http2protocoloptions-connection-keepalive"><span class="std std-ref">connection_keepalive</span></a>.</p>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;max_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;initial_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-core-v3-quickeepalivesettings-max-interval">
+<dt>max_interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The max interval for a connection to send keep-alive probing packets (with <code class="docutils literal notranslate"><span class="pre">PING</span></code> or <code class="docutils literal notranslate"><span class="pre">PATH_RESPONSE</span></code>). The value should be smaller than <a class="reference internal" href="../../listener/v3/quic_config.proto.html#envoy-v3-api-field-config-listener-v3-quicprotocoloptions-idle-timeout"><span class="std std-ref">connection idle_timeout</span></a> to prevent idle timeout while not less than <code class="docutils literal notranslate"><span class="pre">1s</span></code> to avoid throttling the connection or flooding the peer with probes.</p>
+<p>If <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-quickeepalivesettings-initial-interval"><span class="std std-ref">initial_interval</span></a> is absent or zero, a client connection will use this value to start probing.</p>
+<p>If zero, disable keepalive probing.
+If absent, use the QUICHE default interval to probe.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-quickeepalivesettings-initial-interval">
+<dt>initial_interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The interval to send the first few keep-alive probing packets to prevent connection from hitting the idle timeout. Subsequent probes will be sent, each one with an interval exponentially longer than previous one, till it reaches <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-quickeepalivesettings-max-interval"><span class="std std-ref">max_interval</span></a>. And the probes afterwards will always use <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-quickeepalivesettings-max-interval"><span class="std std-ref">max_interval</span></a>.</p>
+<p>The value should be smaller than <a class="reference internal" href="../../listener/v3/quic_config.proto.html#envoy-v3-api-field-config-listener-v3-quicprotocoloptions-idle-timeout"><span class="std std-ref">connection idle_timeout</span></a> to prevent idle timeout and smaller than max_interval to take effect.</p>
+<p>If absent, disable keepalive probing for a server connection. For a client connection, if <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-quickeepalivesettings-max-interval"><span class="std std-ref">max_interval</span></a> is zero, do not keepalive, otherwise use max_interval or QUICHE default to probe all the time.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-quicprotocoloptions">
+<span id="envoy-v3-api-msg-config-core-v3-quicprotocoloptions"></span><h2>config.core.v3.QuicProtocolOptions<a class="headerlink" href="#config-core-v3-quicprotocoloptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L60">[config.core.v3.QuicProtocolOptions proto]</a></p>
+<p>QUIC protocol options which apply to both downstream and upstream connections.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;max_concurrent_streams&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;initial_stream_window_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;initial_connection_window_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;num_timeouts_to_trigger_port_migration&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;connection_keepalive&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;connection_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;client_connection_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;idle_network_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_packet_length&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;client_packet_writer&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;memory_reduction_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;enable_scone&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-max-concurrent-streams">
+<dt>max_concurrent_streams</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Maximum number of streams that the client can negotiate per connection. <code class="docutils literal notranslate"><span class="pre">100</span></code>
+if not specified.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-initial-stream-window-size">
+<dt>initial_stream_window_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) <a class="reference external" href="https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-4.1">Initial stream-level flow-control receive window</a> size. Valid values range from
+<code class="docutils literal notranslate"><span class="pre">1</span></code> to <code class="docutils literal notranslate"><span class="pre">16777216</span></code> (<code class="docutils literal notranslate"><span class="pre">2^24</span></code>, maximum supported by QUICHE) and defaults to <code class="docutils literal notranslate"><span class="pre">16777216</span></code> (<code class="docutils literal notranslate"><span class="pre">16</span> <span class="pre">*</span> <span class="pre">1024</span> <span class="pre">*</span> <span class="pre">1024</span></code>).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">16384</span></code> (<code class="docutils literal notranslate"><span class="pre">2^14</span></code>) is the minimum window size supported in Google QUIC. If configured smaller than it, we will use
+<code class="docutils literal notranslate"><span class="pre">16384</span></code> instead. QUICHE IETF QUIC implementation supports <code class="docutils literal notranslate"><span class="pre">1</span></code> byte window. We only support increasing the default
+window size now, so it’s also the minimum.</p>
+</div>
+<p>This field also acts as a soft limit on the number of bytes Envoy will buffer per-stream in the
+QUIC stream send and receive buffers. Once the buffer reaches this pointer, watermark callbacks will fire to
+stop the flow of data to the stream buffers.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-initial-connection-window-size">
+<dt>initial_connection_window_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Similar to <code class="docutils literal notranslate"><span class="pre">initial_stream_window_size</span></code>, but for connection-level
+flow-control. Valid values range from <code class="docutils literal notranslate"><span class="pre">1</span></code> to <code class="docutils literal notranslate"><span class="pre">25165824</span></code> (<code class="docutils literal notranslate"><span class="pre">24MB</span></code>, maximum supported by QUICHE) and defaults
+to <code class="docutils literal notranslate"><span class="pre">25165824</span></code> (<code class="docutils literal notranslate"><span class="pre">24</span> <span class="pre">*</span> <span class="pre">1024</span> <span class="pre">*</span> <span class="pre">1024</span></code>).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">16384</span></code> (<code class="docutils literal notranslate"><span class="pre">2^14</span></code>) is the minimum window size supported in Google QUIC. We only support increasing the default
+window size now, so it’s also the minimum.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-num-timeouts-to-trigger-port-migration">
+<dt>num_timeouts_to_trigger_port_migration</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The number of timeouts that can occur before port migration is triggered for QUIC clients.
+This defaults to <code class="docutils literal notranslate"><span class="pre">4</span></code>. If set to <code class="docutils literal notranslate"><span class="pre">0</span></code>, port migration will not occur on path degrading.
+Timeout here refers to QUIC internal path degrading timeout mechanism, such as <code class="docutils literal notranslate"><span class="pre">PTO</span></code>.
+This has no effect on server sessions.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-connection-keepalive">
+<dt>connection_keepalive</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-quickeepalivesettings"><span class="std std-ref">config.core.v3.QuicKeepAliveSettings</span></a>) Probes the peer at the configured interval to solicit traffic, i.e. <code class="docutils literal notranslate"><span class="pre">ACK</span></code> or <code class="docutils literal notranslate"><span class="pre">PATH_RESPONSE</span></code>, from the peer to push back connection idle timeout.
+If absent, use the default keepalive behavior of which a client connection sends <code class="docutils literal notranslate"><span class="pre">PING``s</span> <span class="pre">every</span> <span class="pre">``15s</span></code>, and a server connection doesn’t do anything.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-connection-options">
+<dt>connection_options</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) A comma-separated list of strings representing QUIC connection options defined in
+<a class="reference external" href="https://github.com/google/quiche/blob/main/quiche/quic/core/crypto/crypto_protocol.h">QUICHE</a> and to be sent by upstream connections.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-client-connection-options">
+<dt>client_connection_options</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) A comma-separated list of strings representing QUIC client connection options defined in
+<a class="reference external" href="https://github.com/google/quiche/blob/main/quiche/quic/core/crypto/crypto_protocol.h">QUICHE</a> and to be sent by upstream connections.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-idle-network-timeout">
+<dt>idle_network_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The duration that a QUIC connection stays idle before it closes itself. If this field is not present, QUICHE
+default <code class="docutils literal notranslate"><span class="pre">600s</span></code> will be applied.
+For internal corporate network, a long timeout is often fine.
+But for client facing network, <code class="docutils literal notranslate"><span class="pre">30s</span></code> is usually a good choice.
+Do not add an upper bound here. A long idle timeout is useful for maintaining warm connections at non-front-line proxy for low QPS services.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-max-packet-length">
+<dt>max_packet_length</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value">UInt64Value</a>) Maximum packet length for QUIC connections. It refers to the largest size of a QUIC packet that can be transmitted over the connection.
+If not specified, one of the <a class="reference external" href="https://github.com/google/quiche/blob/main/quiche/quic/core/quic_constants.h">default values in QUICHE</a> is used.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-client-packet-writer">
+<dt>client_packet_writer</dt><dd><p>(<a class="reference internal" href="extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) A customized UDP socket and a QUIC packet writer using the socket for
+client connections. i.e. Mobile uses its own implementation to interact
+with platform socket APIs.
+If not present, the default platform-independent socket and writer will be used.</p>
+<div class="admonition tip" id="extension-category-envoy-quic-client-packet-writer">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../extensions/quic/client_writer_factory/v3/default_client_writer.proto.html#extension-envoy-quic-packet-writer-default"><span class="std std-ref">envoy.quic.packet_writer.default</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-memory-reduction-timeout">
+<dt>memory_reduction_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Timeout for a QUIC connection to schedule memory reduction callback when the network has been idle for a while.
+This value should be smaller than the idle timeout to take effect.
+If not specified, memory reduction is set to infinite by QUIC connection (disabled).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-enable-scone">
+<dt>enable_scone</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) If true, the QUIC connection will signal support for <a class="reference external" href="https://datatracker.ietf.org/doc/draft-ietf-scone-protocol/">SCONE</a> (Standard
+Communication with Network Elements) and process SCONE packets.
+If not present, the QUICHE default behavior will be used.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-quicprotocoloptions-connectionmigrationsettings">
+<span id="envoy-v3-api-msg-config-core-v3-quicprotocoloptions-connectionmigrationsettings"></span><h2>config.core.v3.QuicProtocolOptions.ConnectionMigrationSettings<a class="headerlink" href="#config-core-v3-quicprotocoloptions-connectionmigrationsettings" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L69">[config.core.v3.QuicProtocolOptions.ConnectionMigrationSettings proto]</a></p>
+<p>Config for QUIC connection migration across network interfaces, i.e. cellular to WIFI, upon
+network change events from the platform, i.e. the current network gets
+disconnected, or upon the QUIC detecting a bad connection. After migration, the
+connection may be on a different network other than the default network
+picked by the platform. Both iOS and Android will use a default network to interact with the internet, usually prefer unmetered network (WIFI)
+over metered ones (cellular). And users can specify which network to be used as the default. A connection on non-default network is only allowed to
+serve new requests for a certain period of time before being drained, and
+meanwhile, QUIC will try to migrate to the default network if possible.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;migrate_idle_connections&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_time_on_non_default_network&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-connectionmigrationsettings-migrate-idle-connections">
+<dt>migrate_idle_connections</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-quicprotocoloptions-connectionmigrationsettings-migrateidleconnectionsettings"><span class="std std-ref">config.core.v3.QuicProtocolOptions.ConnectionMigrationSettings.MigrateIdleConnectionSettings</span></a>) Config whether and how to migrate idle connections.
+If absent, idle connections will not be migrated but be closed upon
+migration signals.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-connectionmigrationsettings-max-time-on-non-default-network">
+<dt>max_time_on_non_default_network</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) After migrating to a non-default network interface, the connection will
+only be allowed to stay on that network for up to this period of time before
+being drained unless it migrates to the default network or that network
+gets picked as the default by the device by then.
+Default to 128s.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-quicprotocoloptions-connectionmigrationsettings-migrateidleconnectionsettings">
+<span id="envoy-v3-api-msg-config-core-v3-quicprotocoloptions-connectionmigrationsettings-migrateidleconnectionsettings"></span><h2>config.core.v3.QuicProtocolOptions.ConnectionMigrationSettings.MigrateIdleConnectionSettings<a class="headerlink" href="#config-core-v3-quicprotocoloptions-connectionmigrationsettings-migrateidleconnectionsettings" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L71">[config.core.v3.QuicProtocolOptions.ConnectionMigrationSettings.MigrateIdleConnectionSettings proto]</a></p>
+<p>Config for options to migrate idle connections which aren’t serving any requests.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;max_idle_time_before_migration&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-quicprotocoloptions-connectionmigrationsettings-migrateidleconnectionsettings-max-idle-time-before-migration">
+<dt>max_idle_time_before_migration</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) If idle connections are allowed to be migrated, only migrate the connection
+if it hasn’t been idle for longer than this idle period. Otherwise, the
+connection will be closed instead.
+Default to 30s.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-upstreamhttpprotocoloptions">
+<span id="envoy-v3-api-msg-config-core-v3-upstreamhttpprotocoloptions"></span><h2>config.core.v3.UpstreamHttpProtocolOptions<a class="headerlink" href="#config-core-v3-upstreamhttpprotocoloptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L188">[config.core.v3.UpstreamHttpProtocolOptions proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;auto_sni&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;auto_san_validation&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;override_auto_sni_header&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-core-v3-upstreamhttpprotocoloptions-auto-sni">
+<dt>auto_sni</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Set transport socket <a class="reference external" href="https://en.wikipedia.org/wiki/Server_Name_Indication">SNI</a> for new
+upstream connections based on the downstream HTTP host/authority header or any other arbitrary
+header when <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-upstreamhttpprotocoloptions-override-auto-sni-header"><span class="std std-ref">override_auto_sni_header</span></a>
+is set, as seen by the <a class="reference internal" href="../../../../configuration/http/http_filters/router_filter.html#config-http-filters-router"><span class="std std-ref">router filter</span></a>.
+Does nothing if a filter before the http router filter sets the corresponding metadata.</p>
+<p>See <a class="reference internal" href="../../../../start/quick-start/securing.html#start-quick-start-securing-sni-client"><span class="std std-ref">SNI configuration</span></a> for details on how this
+interacts with other validation options.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-upstreamhttpprotocoloptions-auto-san-validation">
+<dt>auto_san_validation</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Automatic validate upstream presented certificate for new upstream connections based on the
+downstream HTTP host/authority header or any other arbitrary header when <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-upstreamhttpprotocoloptions-override-auto-sni-header"><span class="std std-ref">override_auto_sni_header</span></a>
+is set, as seen by the <a class="reference internal" href="../../../../configuration/http/http_filters/router_filter.html#config-http-filters-router"><span class="std std-ref">router filter</span></a>.
+This field is intended to be set with <code class="docutils literal notranslate"><span class="pre">auto_sni</span></code> field.
+Does nothing if a filter before the http router filter sets the corresponding metadata.</p>
+<p>See <a class="reference internal" href="../../../../start/quick-start/securing.html#start-quick-start-securing-validation"><span class="std std-ref">validation configuration</span></a> for how this interacts with
+other validation options.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-upstreamhttpprotocoloptions-override-auto-sni-header">
+<dt>override_auto_sni_header</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) An optional alternative to the host/authority header to be used for setting the SNI value.
+It should be a valid downstream HTTP header, as seen by the
+<a class="reference internal" href="../../../../configuration/http/http_filters/router_filter.html#config-http-filters-router"><span class="std std-ref">router filter</span></a>.
+If unset, host/authority header will be used for populating the SNI. If the specified header
+is not found or the value is empty, host/authority header will be used instead.
+This field is intended to be set with <code class="docutils literal notranslate"><span class="pre">auto_sni</span></code> and/or <code class="docutils literal notranslate"><span class="pre">auto_san_validation</span></code> fields.
+If none of these fields are set then setting this would be a no-op.
+Does nothing if a filter before the http router filter sets the corresponding metadata.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-alternateprotocolscacheoptions">
+<span id="envoy-v3-api-msg-config-core-v3-alternateprotocolscacheoptions"></span><h2>config.core.v3.AlternateProtocolsCacheOptions<a class="headerlink" href="#config-core-v3-alternateprotocolscacheoptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L229">[config.core.v3.AlternateProtocolsCacheOptions proto]</a></p>
+<p>Configures the alternate protocols cache which tracks alternate protocols that can be used to
+make an HTTP connection to an origin server. See <a class="reference external" href="https://tools.ietf.org/html/rfc7838">https://tools.ietf.org/html/rfc7838</a> for
+HTTP Alternative Services and <a class="reference external" href="https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04">https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04</a>
+for the “HTTPS” DNS resource record.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max_entries&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;key_value_store_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;prepopulated_entries&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-alternateprotocolscacheoptions-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The name of the cache. Multiple named caches allow independent alternate protocols cache
+configurations to operate within a single Envoy process using different configurations. All
+alternate protocols cache options with the same name <em>must</em> be equal in all fields when
+referenced from different configuration components. Configuration will fail to load if this is
+not the case.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-alternateprotocolscacheoptions-max-entries">
+<dt>max_entries</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The maximum number of entries that the cache will hold. If not specified defaults to <code class="docutils literal notranslate"><span class="pre">1024</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The implementation is approximate and enforced independently on each worker thread, thus
+it is possible for the maximum entries in the cache to go slightly above the configured
+value depending on timing. This is similar to how other circuit breakers work.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-alternateprotocolscacheoptions-key-value-store-config">
+<dt>key_value_store_config</dt><dd><p>(<a class="reference internal" href="extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Allows configuring a persistent
+<a class="reference internal" href="../../common/key_value/v3/config.proto.html#envoy-v3-api-msg-config-common-key-value-v3-keyvaluestoreconfig"><span class="std std-ref">key value store</span></a> to flush
+alternate protocols entries to disk.
+This function is currently only supported if concurrency is 1
+Cached entries will take precedence over pre-populated entries below.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-alternateprotocolscacheoptions-prepopulated-entries">
+<dt>prepopulated_entries</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-alternateprotocolscacheoptions-alternateprotocolscacheentry"><span class="std std-ref">config.core.v3.AlternateProtocolsCacheOptions.AlternateProtocolsCacheEntry</span></a>) Allows pre-populating the cache with entries, as described above.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-alternateprotocolscacheoptions-alternateprotocolscacheentry">
+<span id="envoy-v3-api-msg-config-core-v3-alternateprotocolscacheoptions-alternateprotocolscacheentry"></span><h2>config.core.v3.AlternateProtocolsCacheOptions.AlternateProtocolsCacheEntry<a class="headerlink" href="#config-core-v3-alternateprotocolscacheoptions-alternateprotocolscacheentry" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L239">[config.core.v3.AlternateProtocolsCacheOptions.AlternateProtocolsCacheEntry proto]</a></p>
+<p>Allows pre-populating the cache with HTTP/3 alternate protocols entries with a 7 day lifetime.
+This will cause Envoy to attempt HTTP/3 to those upstreams, even if the upstreams have not
+advertised HTTP/3 support. These entries will be overwritten by alt-svc
+response headers or cached values.
+As with regular cached entries, if the origin response would result in clearing an existing
+alternate protocol cache entry, pre-populated entries will also be cleared.
+Adding a cache entry with hostname=foo.com port=123 is the equivalent of getting
+response headers
+alt-svc: h3=:”123”; ma=86400” in a response to a request to foo.com:123</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;hostname&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;port&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-alternateprotocolscacheoptions-alternateprotocolscacheentry-hostname">
+<dt>hostname</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The host name for the alternate protocol entry.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-alternateprotocolscacheoptions-alternateprotocolscacheentry-port">
+<dt>port</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) The port for the alternate protocol entry.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-httpprotocoloptions">
+<span id="envoy-v3-api-msg-config-core-v3-httpprotocoloptions"></span><h2>config.core.v3.HttpProtocolOptions<a class="headerlink" href="#config-core-v3-httpprotocoloptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L287">[config.core.v3.HttpProtocolOptions proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;idle_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_connection_duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_connection_duration_jitter&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_headers_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_response_headers_kb&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_stream_duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;headers_with_underscores_action&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max_requests_per_connection&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-core-v3-httpprotocoloptions-idle-timeout">
+<dt>idle_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The idle timeout for connections. The idle timeout is defined as the
+period in which there are no active requests. When the
+idle timeout is reached the connection will be closed. If the connection is an HTTP/2
+downstream connection a drain sequence will occur prior to closing the connection, see
+<a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-drain-timeout"><span class="std std-ref">drain_timeout</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Request based timeouts mean that HTTP/2 PINGs will not keep the connection alive.</p>
+</div>
+<p>If not specified, this defaults to <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">hour</span></code>. To disable idle timeouts explicitly set this to <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP
+FIN packets, etc.</p>
+</div>
+<p>If the <a class="reference internal" href="../../../../configuration/operations/overload_manager/overload_manager.html#config-overload-manager-overload-actions"><span class="std std-ref">overload action</span></a> “envoy.overload_actions.reduce_timeouts”
+is configured, this timeout is scaled for downstream connections according to the value for
+<a class="reference internal" href="../../overload/v3/overload.proto.html#envoy-v3-api-enum-value-config-overload-v3-scaletimersoverloadactionconfig-timertype-http-downstream-connection-idle"><span class="std std-ref">HTTP_DOWNSTREAM_CONNECTION_IDLE</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-httpprotocoloptions-max-connection-duration">
+<dt>max_connection_duration</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The maximum duration of a connection. The duration is defined as a period since a connection
+was established. If not set, there is no max duration. When max_connection_duration is reached,
+the drain sequence will kick-in. The connection will be closed after the drain timeout period
+if there are no active streams. See <a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-drain-timeout"><span class="std std-ref">drain_timeout</span></a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-httpprotocoloptions-max-connection-duration-jitter">
+<dt>max_connection_duration_jitter</dt><dd><p>(<a class="reference internal" href="../../../type/v3/percent.proto.html#envoy-v3-api-msg-type-v3-percent"><span class="std std-ref">type.v3.Percent</span></a>) Percentage-based jitter for <code class="docutils literal notranslate"><span class="pre">max_connection_duration</span></code>. If set, the actual connection duration
+limit is extended by a random duration up to <code class="docutils literal notranslate"><span class="pre">max_connection_duration</span> <span class="pre">*</span> <span class="pre">jitter</span> <span class="pre">/</span> <span class="pre">100</span></code>.
+This staggers connection teardowns across time and prevents a thundering-herd of reconnects
+when many connections are established at roughly the same time.
+This field is ignored if <code class="docutils literal notranslate"><span class="pre">max_connection_duration</span></code> is not set. If not set, no jitter is added.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This field is currently only honored for downstream connections by the HTTP connection
+manager. It is not yet supported for upstream cluster connections.</p>
+</div>
+<p>This is analogous to
+<a class="reference internal" href="../../../extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto.html#envoy-v3-api-field-extensions-filters-network-tcp-proxy-v3-tcpproxy-max-downstream-connection-duration-jitter-percentage"><span class="std std-ref">max_downstream_connection_duration_jitter_percentage</span></a>
+in the TCP proxy filter.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-httpprotocoloptions-max-headers-count">
+<dt>max_headers_count</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The maximum number of headers (request headers if configured on HttpConnectionManager,
+response headers when configured on a cluster).
+If unconfigured, the default maximum number of headers allowed is <code class="docutils literal notranslate"><span class="pre">100</span></code>.
+The default value for requests can be overridden by setting runtime key <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.max_request_headers_count</span></code>.
+The default value for responses can be overridden by setting runtime key <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.max_response_headers_count</span></code>.
+Downstream requests that exceed this limit will receive a <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">431</span></code> response for HTTP/1.x and cause a stream
+reset for HTTP/2.
+Upstream responses that exceed this limit will result in a <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">502</span></code> response.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-httpprotocoloptions-max-response-headers-kb">
+<dt>max_response_headers_kb</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The maximum size of response headers.
+If unconfigured, the default is <code class="docutils literal notranslate"><span class="pre">60</span> <span class="pre">KiB</span></code>, except for HTTP/1 response headers which have a default
+of <code class="docutils literal notranslate"><span class="pre">80</span> <span class="pre">KiB</span></code>.
+The default value can be overridden by setting runtime key <code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.max_response_headers_size_kb</span></code>.
+Responses that exceed this limit will result in a <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">503</span></code> response.
+In Envoy, this setting is only valid when configured on an upstream cluster, not on the
+<a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-common-http-protocol-options"><span class="std std-ref">HTTP Connection Manager</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Currently some protocol codecs impose limits on the maximum size of a single header.</p>
+<ul class="simple">
+<li><p>HTTP/2 (when using nghttp2) limits a single header to around 100 KB by default. This can be
+adjusted via <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-http2protocoloptions-max-header-field-size-kb"><span class="std std-ref">max_header_field_size_kb</span></a>.</p></li>
+<li><p>HTTP/3 limits a single header to around 1024 KB.</p></li>
+</ul>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-httpprotocoloptions-max-stream-duration">
+<dt>max_stream_duration</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Total duration to keep alive an HTTP request/response stream. If the time limit is reached the stream will be
+reset independent of any other timeouts. If not specified, this value is not set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-httpprotocoloptions-headers-with-underscores-action">
+<dt>headers_with_underscores_action</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-config-core-v3-httpprotocoloptions-headerswithunderscoresaction"><span class="std std-ref">config.core.v3.HttpProtocolOptions.HeadersWithUnderscoresAction</span></a>) Action to take when a client request with a header name containing underscore characters is received.
+If this setting is not specified, the value defaults to <code class="docutils literal notranslate"><span class="pre">ALLOW</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Upstream responses are not affected by this setting.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This only affects client headers. It does not affect headers added by Envoy filters and does not have any
+impact if added to cluster config.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-httpprotocoloptions-max-requests-per-connection">
+<dt>max_requests_per_connection</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Optional maximum requests for both upstream and downstream connections.
+If not specified, there is no limit.
+Setting this parameter to <code class="docutils literal notranslate"><span class="pre">1</span></code> will effectively disable keep alive.
+For HTTP/2 and HTTP/3, due to concurrent stream processing, the limit is approximate.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-config-core-v3-httpprotocoloptions-headerswithunderscoresaction">
+<span id="envoy-v3-api-enum-config-core-v3-httpprotocoloptions-headerswithunderscoresaction"></span><h2>Enum config.core.v3.HttpProtocolOptions.HeadersWithUnderscoresAction<a class="headerlink" href="#enum-config-core-v3-httpprotocoloptions-headerswithunderscoresaction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L296">[config.core.v3.HttpProtocolOptions.HeadersWithUnderscoresAction proto]</a></p>
+<p>Action to take when Envoy receives client request with header names containing underscore
+characters.
+Underscore character is allowed in header names by the RFC-7230 and this behavior is implemented
+as a security measure due to systems that treat ‘_’ and ‘-’ as interchangeable. Envoy by default allows client request headers with underscore
+characters.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-httpprotocoloptions-headerswithunderscoresaction-allow">
+<dt>ALLOW</dt><dd><p><em>(DEFAULT)</em> ⁣Allow headers with underscores. This is the default behavior.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-httpprotocoloptions-headerswithunderscoresaction-reject-request">
+<dt>REJECT_REQUEST</dt><dd><p>⁣Reject client request. HTTP/1 requests are rejected with <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">400</span></code> status. HTTP/2 requests
+end with the stream reset. The <code class="docutils literal notranslate"><span class="pre">httpN.requests_rejected_with_underscores_in_headers</span></code> counter
+is incremented for each rejected request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-core-v3-httpprotocoloptions-headerswithunderscoresaction-drop-header">
+<dt>DROP_HEADER</dt><dd><p>⁣Drop the client header with name containing underscores. The header is dropped before the filter chain is
+invoked and as such filters will not see dropped headers. The
+<code class="docutils literal notranslate"><span class="pre">httpN.dropped_headers_with_underscores</span></code> is incremented for each dropped header.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-http1protocoloptions">
+<span id="envoy-v3-api-msg-config-core-v3-http1protocoloptions"></span><h2>config.core.v3.Http1ProtocolOptions<a class="headerlink" href="#config-core-v3-http1protocoloptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L412">[config.core.v3.Http1ProtocolOptions proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;allow_absolute_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;accept_http_10&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;default_host_for_http_10&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;header_key_format&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;enable_trailers&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;allow_chunked_length&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;override_stream_error_on_invalid_http_message&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;send_fully_qualified_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;ignore_http_11_upgrade&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http1protocoloptions-allow-absolute-url">
+<dt>allow_absolute_url</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Handle HTTP requests with absolute URLs in the requests. These requests
+are generally sent by clients to forward/explicit proxies. This allows clients to configure
+envoy as their HTTP proxy. In Unix, for example, this is typically done by setting the
+<code class="docutils literal notranslate"><span class="pre">http_proxy</span></code> environment variable.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http1protocoloptions-accept-http-10">
+<dt>accept_http_10</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Handle incoming HTTP/1.0 and HTTP/0.9 requests.
+This is off by default, and not fully standards compliant. There is support for pre-HTTP/1.1
+style connect logic, dechunking, and handling lack of client host iff
+<code class="docutils literal notranslate"><span class="pre">default_host_for_http_10</span></code> is configured.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http1protocoloptions-default-host-for-http-10">
+<dt>default_host_for_http_10</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) A default host for HTTP/1.0 requests. This is highly suggested if <code class="docutils literal notranslate"><span class="pre">accept_http_10</span></code> is true as
+Envoy does not otherwise support HTTP/1.0 without a Host header.
+This is a no-op if <code class="docutils literal notranslate"><span class="pre">accept_http_10</span></code> is not true.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http1protocoloptions-header-key-format">
+<dt>header_key_format</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-http1protocoloptions-headerkeyformat"><span class="std std-ref">config.core.v3.Http1ProtocolOptions.HeaderKeyFormat</span></a>) Describes how the keys for headers encoded by the HTTP/1 codec should be formatted. By
+default, all header keys are lower cased.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http1protocoloptions-enable-trailers">
+<dt>enable_trailers</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Enables trailers for HTTP/1. By default the HTTP/1 codec drops proxied trailers.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>This only happens when Envoy is chunk encoding which occurs when:
+- The request is HTTP/1.1.
+- Is neither a <code class="docutils literal notranslate"><span class="pre">HEAD</span></code> only request nor a HTTP Upgrade.
+- Not a response to a <code class="docutils literal notranslate"><span class="pre">HEAD</span></code> request.
+- The <code class="docutils literal notranslate"><span class="pre">Content-Length</span></code> header is not present.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http1protocoloptions-allow-chunked-length">
+<dt>allow_chunked_length</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Allows Envoy to process requests/responses with both <code class="docutils literal notranslate"><span class="pre">Content-Length</span></code> and <code class="docutils literal notranslate"><span class="pre">Transfer-Encoding</span></code>
+headers set. By default such messages are rejected, but if option is enabled - Envoy will
+remove <code class="docutils literal notranslate"><span class="pre">Content-Length</span></code> header and process message.
+See <a class="reference external" href="https://tools.ietf.org/html/rfc7230#section-3.3.3">RFC7230, sec. 3.3.3</a> for details.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Enabling this option might lead to request smuggling vulnerability, especially if traffic
+is proxied via multiple layers of proxies.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http1protocoloptions-override-stream-error-on-invalid-http-message">
+<dt>override_stream_error_on_invalid_http_message</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Allows invalid HTTP messaging. When this option is false, then Envoy will terminate
+HTTP/1.1 connections upon receiving an invalid HTTP message. However,
+when this option is true, then Envoy will leave the HTTP/1.1 connection
+open where possible.
+If set, this overrides any HCM <a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-stream-error-on-invalid-http-message"><span class="std std-ref">stream_error_on_invalid_http_messaging</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http1protocoloptions-send-fully-qualified-url">
+<dt>send_fully_qualified_url</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Allows sending fully qualified URLs when proxying the first line of the
+response. By default, Envoy will only send the path components in the first line.
+If this is true, Envoy will create a fully qualified URI composing scheme
+(inferred if not present), host (from the host/:authority header) and path
+(from first line or :path header).</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http1protocoloptions-ignore-http-11-upgrade">
+<dt>ignore_http_11_upgrade</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../type/matcher/v3/string.proto.html#envoy-v3-api-msg-type-matcher-v3-stringmatcher"><span class="std std-ref">type.matcher.v3.StringMatcher</span></a>) Ignore HTTP/1.1 upgrade values matching any of the supplied matchers.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">h2c</span></code> upgrades are always removed for backwards compatibility, regardless of the
+value in this setting.</p>
+</div>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-http1protocoloptions-headerkeyformat">
+<span id="envoy-v3-api-msg-config-core-v3-http1protocoloptions-headerkeyformat"></span><h2>config.core.v3.Http1ProtocolOptions.HeaderKeyFormat<a class="headerlink" href="#config-core-v3-http1protocoloptions-headerkeyformat" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L417">[config.core.v3.Http1ProtocolOptions.HeaderKeyFormat proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;proper_case_words&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;stateful_formatter&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-core-v3-http1protocoloptions-headerkeyformat-proper-case-words">
+<dt>proper_case_words</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-http1protocoloptions-headerkeyformat-propercasewords"><span class="std std-ref">config.core.v3.Http1ProtocolOptions.HeaderKeyFormat.ProperCaseWords</span></a>) Formats the header by proper casing words: the first character and any character following
+a special character will be capitalized if it’s an alpha character. For example,
+<code class="docutils literal notranslate"><span class="pre">&quot;content-type&quot;</span></code> becomes <code class="docutils literal notranslate"><span class="pre">&quot;Content-Type&quot;</span></code>, and <code class="docutils literal notranslate"><span class="pre">&quot;foo$b#$are&quot;</span></code> becomes <code class="docutils literal notranslate"><span class="pre">&quot;Foo$B#$Are&quot;</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>While this results in most headers following conventional casing, certain headers
+are not covered. For example, the <code class="docutils literal notranslate"><span class="pre">&quot;TE&quot;</span></code> header will be formatted as <code class="docutils literal notranslate"><span class="pre">&quot;Te&quot;</span></code>.</p>
+</div>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-http1protocoloptions-headerkeyformat-proper-case-words"><span class="std std-ref">proper_case_words</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-http1protocoloptions-headerkeyformat-stateful-formatter"><span class="std std-ref">stateful_formatter</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http1protocoloptions-headerkeyformat-stateful-formatter">
+<dt>stateful_formatter</dt><dd><p>(<a class="reference internal" href="extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Configuration for stateful formatter extensions that allow using received headers to
+affect the output of encoding headers. E.g., preserving case during proxying.</p>
+<div class="admonition tip" id="extension-category-envoy-http-stateful-header-formatters">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../extensions/http/header_formatters/preserve_case/v3/preserve_case.proto.html#extension-envoy-http-stateful-header-formatters-preserve-case"><span class="std std-ref">envoy.http.stateful_header_formatters.preserve_case</span></a></p></li>
+</ul>
+</div>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-http1protocoloptions-headerkeyformat-proper-case-words"><span class="std std-ref">proper_case_words</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-http1protocoloptions-headerkeyformat-stateful-formatter"><span class="std std-ref">stateful_formatter</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-http1protocoloptions-headerkeyformat-propercasewords">
+<span id="envoy-v3-api-msg-config-core-v3-http1protocoloptions-headerkeyformat-propercasewords"></span><h2>config.core.v3.Http1ProtocolOptions.HeaderKeyFormat.ProperCaseWords<a class="headerlink" href="#config-core-v3-http1protocoloptions-headerkeyformat-propercasewords" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L421">[config.core.v3.Http1ProtocolOptions.HeaderKeyFormat.ProperCaseWords proto]</a></p>
+</section>
+<section id="config-core-v3-keepalivesettings">
+<span id="envoy-v3-api-msg-config-core-v3-keepalivesettings"></span><h2>config.core.v3.KeepaliveSettings<a class="headerlink" href="#config-core-v3-keepalivesettings" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L537">[config.core.v3.KeepaliveSettings proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;interval_jitter&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;connection_idle_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-keepalivesettings-interval">
+<dt>interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Send HTTP/2 PING frames at this period, in order to test that the connection is still alive.
+If this is zero, interval PINGs will not be sent.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-keepalivesettings-timeout">
+<dt>timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>, <em>REQUIRED</em>) How long to wait for a response to a keepalive PING. If a response is not received within this
+time period, the connection will be aborted.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In order to prevent the influence of Head-of-line (HOL) blocking the timeout period is extended when <em>any</em> frame is received on
+the connection, under the assumption that if a frame is received the connection is healthy.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-keepalivesettings-interval-jitter">
+<dt>interval_jitter</dt><dd><p>(<a class="reference internal" href="../../../type/v3/percent.proto.html#envoy-v3-api-msg-type-v3-percent"><span class="std std-ref">type.v3.Percent</span></a>) A random jitter amount as a percentage of interval that will be added to each interval.
+A value of zero means there will be no jitter.
+The default value is <code class="docutils literal notranslate"><span class="pre">15%</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-keepalivesettings-connection-idle-interval">
+<dt>connection_idle_interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) If the connection has been idle for this duration, send a HTTP/2 ping ahead
+of new stream creation, to quickly detect dead connections.
+If this is zero, this type of PING will not be sent.
+If an interval ping is outstanding, a second ping will not be sent as the
+interval ping will determine if the connection is dead.</p>
+<p>The same feature for HTTP/3 is given by inheritance from QUICHE which uses <a class="reference internal" href="../../listener/v3/quic_config.proto.html#envoy-v3-api-field-config-listener-v3-quicprotocoloptions-idle-timeout"><span class="std std-ref">connection idle_timeout</span></a> and the current PTO of the connection to decide whether to probe before sending a new request.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-http2protocoloptions">
+<span id="envoy-v3-api-msg-config-core-v3-http2protocoloptions"></span><h2>config.core.v3.Http2ProtocolOptions<a class="headerlink" href="#config-core-v3-http2protocoloptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L571">[config.core.v3.Http2ProtocolOptions proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;hpack_table_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_concurrent_streams&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;initial_stream_window_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;initial_connection_window_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;allow_connect&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max_outbound_frames&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_outbound_control_frames&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_consecutive_inbound_frames_with_empty_payload&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_inbound_priority_frames_per_stream&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_inbound_window_update_frames_per_data_frame_sent&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;stream_error_on_invalid_http_messaging&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;override_stream_error_on_invalid_http_message&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;connection_keepalive&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_metadata_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;enable_huffman_encoding&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_header_field_size_kb&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;disallow_obs_text&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;stream_reset_burst&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;stream_reset_rate&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http2protocoloptions-hpack-table-size">
+<dt>hpack_table_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) <a class="reference external" href="https://httpwg.org/specs/rfc7541.html#rfc.section.4.2">Maximum table size</a>
+(in octets) that the encoder is permitted to use for the dynamic HPACK table. Valid values
+range from <code class="docutils literal notranslate"><span class="pre">0</span></code> to <code class="docutils literal notranslate"><span class="pre">4294967295</span></code> (<code class="docutils literal notranslate"><span class="pre">2^32</span> <span class="pre">-</span> <span class="pre">1</span></code>) and defaults to <code class="docutils literal notranslate"><span class="pre">4096</span></code>. <code class="docutils literal notranslate"><span class="pre">0</span></code> effectively disables header
+compression.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http2protocoloptions-max-concurrent-streams">
+<dt>max_concurrent_streams</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) <a class="reference external" href="https://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2">Maximum concurrent streams</a>
+allowed for peer on one HTTP/2 connection. Valid values range from <code class="docutils literal notranslate"><span class="pre">1</span></code> to <code class="docutils literal notranslate"><span class="pre">2147483647</span></code> (<code class="docutils literal notranslate"><span class="pre">2^31</span> <span class="pre">-</span> <span class="pre">1</span></code>)
+and defaults to <code class="docutils literal notranslate"><span class="pre">1024</span></code> for safety and should be sufficient for most use cases.</p>
+<p>For upstream connections, this also limits how many streams Envoy will initiate concurrently
+on a single connection. If the limit is reached, Envoy may queue requests or establish
+additional connections (as allowed per circuit breaker limits).</p>
+<p>This acts as an upper bound: Envoy will lower the max concurrent streams allowed on a given
+connection based on upstream settings. Config dumps will reflect the configured upper bound,
+not the per-connection negotiated limits.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http2protocoloptions-initial-stream-window-size">
+<dt>initial_stream_window_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) <a class="reference external" href="https://httpwg.org/specs/rfc7540.html#rfc.section.6.9.2">Initial stream-level flow-control window</a> size. Valid values range from <code class="docutils literal notranslate"><span class="pre">65535</span></code>
+(<code class="docutils literal notranslate"><span class="pre">2^16</span> <span class="pre">-</span> <span class="pre">1</span></code>, HTTP/2 default) to <code class="docutils literal notranslate"><span class="pre">2147483647</span></code> (<code class="docutils literal notranslate"><span class="pre">2^31</span> <span class="pre">-</span> <span class="pre">1</span></code>, HTTP/2 maximum) and defaults to
+<code class="docutils literal notranslate"><span class="pre">16MiB</span></code> (<code class="docutils literal notranslate"><span class="pre">16</span> <span class="pre">*</span> <span class="pre">1024</span> <span class="pre">*</span> <span class="pre">1024</span></code>).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">65535</span></code> is the initial window size from HTTP/2 spec. We only support increasing the default window size now,
+so it’s also the minimum.</p>
+</div>
+<p>This field also acts as a soft limit on the number of bytes Envoy will buffer per-stream in the
+HTTP/2 codec buffers. Once the buffer reaches this pointer, watermark callbacks will fire to
+stop the flow of data to the codec buffers.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http2protocoloptions-initial-connection-window-size">
+<dt>initial_connection_window_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Similar to <code class="docutils literal notranslate"><span class="pre">initial_stream_window_size</span></code>, but for connection-level flow-control
+window. The default is <code class="docutils literal notranslate"><span class="pre">24MiB</span></code> (<code class="docutils literal notranslate"><span class="pre">24</span> <span class="pre">*</span> <span class="pre">1024</span> <span class="pre">*</span> <span class="pre">1024</span></code>).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http2protocoloptions-allow-connect">
+<dt>allow_connect</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Allows proxying Websocket and other upgrades over H2 connect.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http2protocoloptions-max-outbound-frames">
+<dt>max_outbound_frames</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Limit the number of pending outbound downstream frames of all types (frames that are waiting to
+be written into the socket). Exceeding this limit triggers flood mitigation and connection is
+terminated. The <code class="docutils literal notranslate"><span class="pre">http2.outbound_flood</span></code> stat tracks the number of terminated connections due
+to flood mitigation. The default limit is <code class="docutils literal notranslate"><span class="pre">10000</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http2protocoloptions-max-outbound-control-frames">
+<dt>max_outbound_control_frames</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Limit the number of pending outbound downstream frames of types <code class="docutils literal notranslate"><span class="pre">PING</span></code>, <code class="docutils literal notranslate"><span class="pre">SETTINGS</span></code> and <code class="docutils literal notranslate"><span class="pre">RST_STREAM</span></code>,
+preventing high memory utilization when receiving continuous stream of these frames. Exceeding
+this limit triggers flood mitigation and connection is terminated. The
+<code class="docutils literal notranslate"><span class="pre">http2.outbound_control_flood</span></code> stat tracks the number of terminated connections due to flood
+mitigation. The default limit is <code class="docutils literal notranslate"><span class="pre">1000</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http2protocoloptions-max-consecutive-inbound-frames-with-empty-payload">
+<dt>max_consecutive_inbound_frames_with_empty_payload</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Limit the number of consecutive inbound frames of types <code class="docutils literal notranslate"><span class="pre">HEADERS</span></code>, <code class="docutils literal notranslate"><span class="pre">CONTINUATION</span></code> and <code class="docutils literal notranslate"><span class="pre">DATA</span></code> with an
+empty payload and no end stream flag. Those frames have no legitimate use and are abusive, but
+might be a result of a broken HTTP/2 implementation. The <code class="docutils literal notranslate"><span class="pre">http2.inbound_empty_frames_flood</span></code>
+stat tracks the number of connections terminated due to flood mitigation.
+Setting this to <code class="docutils literal notranslate"><span class="pre">0</span></code> will terminate connection upon receiving first frame with an empty payload
+and no end stream flag. The default limit is <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http2protocoloptions-max-inbound-priority-frames-per-stream">
+<dt>max_inbound_priority_frames_per_stream</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Limit the number of inbound <code class="docutils literal notranslate"><span class="pre">PRIORITY</span></code> frames allowed per each opened stream. If the number
+of <code class="docutils literal notranslate"><span class="pre">PRIORITY</span></code> frames received over the lifetime of connection exceeds the value calculated
+using this formula:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>``max_inbound_priority_frames_per_stream`` * (1 + ``opened_streams``)
+</pre></div>
+</div>
+<p>the connection is terminated. For downstream connections the <code class="docutils literal notranslate"><span class="pre">opened_streams</span></code> is incremented when
+Envoy receives complete response headers from the upstream server. For upstream connection the
+<code class="docutils literal notranslate"><span class="pre">opened_streams</span></code> is incremented when Envoy sends the <code class="docutils literal notranslate"><span class="pre">HEADERS</span></code> frame for a new stream. The
+<code class="docutils literal notranslate"><span class="pre">http2.inbound_priority_frames_flood</span></code> stat tracks
+the number of connections terminated due to flood mitigation. The default limit is <code class="docutils literal notranslate"><span class="pre">100</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http2protocoloptions-max-inbound-window-update-frames-per-data-frame-sent">
+<dt>max_inbound_window_update_frames_per_data_frame_sent</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Limit the number of inbound <code class="docutils literal notranslate"><span class="pre">WINDOW_UPDATE</span></code> frames allowed per <code class="docutils literal notranslate"><span class="pre">DATA</span></code> frame sent. If the number
+of <code class="docutils literal notranslate"><span class="pre">WINDOW_UPDATE</span></code> frames received over the lifetime of connection exceeds the value calculated
+using this formula:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>``5 + 2 * (opened_streams +
+         max_inbound_window_update_frames_per_data_frame_sent * outbound_data_frames)``
+</pre></div>
+</div>
+<p>the connection is terminated. For downstream connections the <code class="docutils literal notranslate"><span class="pre">opened_streams</span></code> is incremented when
+Envoy receives complete response headers from the upstream server. For upstream connections the
+<code class="docutils literal notranslate"><span class="pre">opened_streams</span></code> is incremented when Envoy sends the <code class="docutils literal notranslate"><span class="pre">HEADERS</span></code> frame for a new stream. The
+<code class="docutils literal notranslate"><span class="pre">http2.inbound_window_update_frames_flood</span></code> stat tracks the number of connections terminated due to
+flood mitigation. The default <code class="docutils literal notranslate"><span class="pre">max_inbound_window_update_frames_per_data_frame_sent</span></code> value is <code class="docutils literal notranslate"><span class="pre">10</span></code>.
+Setting this to <code class="docutils literal notranslate"><span class="pre">1</span></code> should be enough to support HTTP/2 implementations with basic flow control,
+but more complex implementations that try to estimate available bandwidth require at least <code class="docutils literal notranslate"><span class="pre">2</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http2protocoloptions-stream-error-on-invalid-http-messaging">
+<dt>stream_error_on_invalid_http_messaging</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Allows invalid HTTP messaging and headers. When this option is disabled (default), then
+the whole HTTP/2 connection is terminated upon receiving invalid HEADERS frame. However,
+when this option is enabled, only the offending stream is terminated.</p>
+<p>This is overridden by HCM <a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-stream-error-on-invalid-http-message"><span class="std std-ref">stream_error_on_invalid_http_messaging</span></a>
+iff present.</p>
+<p>This is deprecated in favor of <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-http2protocoloptions-override-stream-error-on-invalid-http-message"><span class="std std-ref">override_stream_error_on_invalid_http_message</span></a></p>
+<p>See <a class="reference external" href="https://tools.ietf.org/html/rfc7540#section-8.1">RFC7540, sec. 8.1</a> for details.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http2protocoloptions-override-stream-error-on-invalid-http-message">
+<dt>override_stream_error_on_invalid_http_message</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Allows invalid HTTP messaging and headers. When this option is disabled (default), then
+the whole HTTP/2 connection is terminated upon receiving invalid HEADERS frame. However,
+when this option is enabled, only the offending stream is terminated.</p>
+<p>This overrides any HCM <a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-stream-error-on-invalid-http-message"><span class="std std-ref">stream_error_on_invalid_http_messaging</span></a></p>
+<p>See <a class="reference external" href="https://tools.ietf.org/html/rfc7540#section-8.1">RFC7540, sec. 8.1</a> for details.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http2protocoloptions-connection-keepalive">
+<dt>connection_keepalive</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-keepalivesettings"><span class="std std-ref">config.core.v3.KeepaliveSettings</span></a>) Send HTTP/2 PING frames to verify that the connection is still healthy. If the remote peer
+does not respond within the configured timeout, the connection will be aborted.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http2protocoloptions-max-metadata-size">
+<dt>max_metadata_size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value">UInt64Value</a>) Configure the maximum amount of metadata than can be handled per stream. Defaults to <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">MB</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http2protocoloptions-enable-huffman-encoding">
+<dt>enable_huffman_encoding</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Controls whether to encode headers using huffman encoding.
+This can be useful in cases where the cpu spent encoding the headers isn’t
+worth the network bandwidth saved e.g. for localhost.
+If unset, uses the data plane’s default value.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http2protocoloptions-max-header-field-size-kb">
+<dt>max_header_field_size_kb</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Configures the maximum wire-encoded size in KB of an individual header field (name or value)
+that the <code class="docutils literal notranslate"><span class="pre">nghttp2</span></code> HPACK inflater will accept. This limit applies to the HPACK-compressed
+length on the wire, not the decoded length. If not specified, defaults to <code class="docutils literal notranslate"><span class="pre">64</span></code> KB
+which is the <code class="docutils literal notranslate"><span class="pre">nghttp2</span></code> default.</p>
+<p>This limit applies to headers received by the codec. When configured on the downstream
+HTTP Connection Manager, it limits individual request header fields. When configured on an
+upstream cluster, it limits individual response header fields.</p>
+<p>Due to Huffman encoding, the decoded header size that passes a given wire limit depends
+on the compression ratio of the content. For example, at the default <code class="docutils literal notranslate"><span class="pre">64</span></code> KB wire
+limit, highly compressible header values can be approximately <code class="docutils literal notranslate"><span class="pre">100</span></code> KB when decoded.
+Increasing this limit allows accepting larger individual headers at the cost of increased
+memory usage during HPACK decompression.</p>
+<p>This option only applies when using <code class="docutils literal notranslate"><span class="pre">nghttp2</span></code>. It is a no-op for <code class="docutils literal notranslate"><span class="pre">oghttp2</span></code>. The configured
+value of this field sets the per-header field size limit, which must not exceed the
+applicable aggregate total header size limit. Since a single header field cannot be larger
+than the total size allowed for all headers combined, this value is validated against
+<a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-max-request-headers-kb"><span class="std std-ref">max_request_headers_kb</span></a>
+when configured on the downstream HTTP Connection Manager, and against
+<a class="reference internal" href="#envoy-v3-api-field-config-core-v3-httpprotocoloptions-max-response-headers-kb"><span class="std std-ref">max_response_headers_kb</span></a>
+when configured on an upstream cluster.</p>
+<p>Since <code class="docutils literal notranslate"><span class="pre">Http2ProtocolOptions</span></code> is configured independently for downstream and upstream,
+different per-header field limits can be set for each direction without requiring separate
+request and response fields.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When increasing this limit, ensure that upstream services and other proxies in the request
+path can also handle the larger individual header sizes. Mismatched limits may result in
+request failures.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http2protocoloptions-disallow-obs-text">
+<dt>disallow_obs_text</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Whether to disallow obsolete text for oghttp2 in header field values.
+If not set, it defaults to false.
+From RFC 9110, <a class="reference external" href="https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5">https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5</a>:
+obs-text = %x80-FF</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http2protocoloptions-stream-reset-burst">
+<dt>stream_reset_burst</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value">UInt64Value</a>) Configures the initial token count for the RST_STREAM rate limiter used by the <code class="docutils literal notranslate"><span class="pre">nghttp2</span></code>
+server-side connection. This uses a token-bucket algorithm where each received RST_STREAM
+frame consumes one token, and tokens are replenished at <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-http2protocoloptions-stream-reset-rate"><span class="std std-ref">stream_reset_rate</span></a> per second.
+When no tokens remain, <code class="docutils literal notranslate"><span class="pre">nghttp2</span></code> sends GOAWAY with <code class="docutils literal notranslate"><span class="pre">INTERNAL_ERROR</span></code> to close the
+connection, protecting against CVE-2023-44487 (HTTP/2 Rapid Reset). Defaults to <code class="docutils literal notranslate"><span class="pre">1000</span></code>.</p>
+<p>This option only applies when using <code class="docutils literal notranslate"><span class="pre">nghttp2</span></code> as a server. It has no effect on <code class="docutils literal notranslate"><span class="pre">oghttp2</span></code>
+or on client-side connections.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http2protocoloptions-stream-reset-rate">
+<dt>stream_reset_rate</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value">UInt64Value</a>) Configures the token replenishment rate (tokens per second) for the RST_STREAM rate limiter
+used by the <code class="docutils literal notranslate"><span class="pre">nghttp2</span></code> server-side connection. See <a class="reference internal" href="#envoy-v3-api-field-config-core-v3-http2protocoloptions-stream-reset-burst"><span class="std std-ref">stream_reset_burst</span></a> for details.
+Defaults to <code class="docutils literal notranslate"><span class="pre">33</span></code>.</p>
+<p>This option only applies when using <code class="docutils literal notranslate"><span class="pre">nghttp2</span></code> as a server. It has no effect on <code class="docutils literal notranslate"><span class="pre">oghttp2</span></code>
+or on client-side connections.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-http2protocoloptions-settingsparameter">
+<span id="envoy-v3-api-msg-config-core-v3-http2protocoloptions-settingsparameter"></span><h2>config.core.v3.Http2ProtocolOptions.SettingsParameter<a class="headerlink" href="#config-core-v3-http2protocoloptions-settingsparameter" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L577">[config.core.v3.Http2ProtocolOptions.SettingsParameter proto]</a></p>
+<p>Defines a parameter to be sent in the SETTINGS frame.
+See <a class="reference external" href="https://tools.ietf.org/html/rfc7540#section-6.5.1">RFC7540, sec. 6.5.1</a> for details.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;identifier&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http2protocoloptions-settingsparameter-identifier">
+<dt>identifier</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>, <em>REQUIRED</em>) The 16 bit parameter identifier.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http2protocoloptions-settingsparameter-value">
+<dt>value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>, <em>REQUIRED</em>) The 32 bit parameter value.</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-http3protocoloptions">
+<span id="envoy-v3-api-msg-config-core-v3-http3protocoloptions"></span><h2>config.core.v3.Http3ProtocolOptions<a class="headerlink" href="#config-core-v3-http3protocoloptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L841">[config.core.v3.Http3ProtocolOptions proto]</a></p>
+<p>A message which allows using HTTP/3.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;quic_protocol_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;override_stream_error_on_invalid_http_message&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;allow_extended_connect&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;disable_connection_flow_control_for_streams&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;disallow_obs_text&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http3protocoloptions-quic-protocol-options">
+<dt>quic_protocol_options</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-core-v3-quicprotocoloptions"><span class="std std-ref">config.core.v3.QuicProtocolOptions</span></a>)</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http3protocoloptions-override-stream-error-on-invalid-http-message">
+<dt>override_stream_error_on_invalid_http_message</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Allows invalid HTTP messaging and headers. When this option is disabled (default), then
+the whole HTTP/3 connection is terminated upon receiving invalid HEADERS frame. However,
+when this option is enabled, only the offending stream is terminated.</p>
+<p>If set, this overrides any HCM <a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-stream-error-on-invalid-http-message"><span class="std std-ref">stream_error_on_invalid_http_messaging</span></a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-core-v3-http3protocoloptions-allow-extended-connect">
+<dt>allow_extended_connect</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Allows proxying Websocket and other upgrades over HTTP/3 CONNECT using
+the header mechanisms from the <a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc8441">HTTP/2 extended connect RFC</a>
+and settings <a class="reference external" href="https://datatracker.ietf.org/doc/draft-ietf-httpbis-h3-websockets/">proposed for HTTP/3</a></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>HTTP/3 CONNECT is not yet an RFC.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the <a class="reference internal" href="../../../../intro/arch_overview/security/threat_model.html#arch-overview-threat-model"><span class="std std-ref">threat model</span></a>, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http3protocoloptions-disable-connection-flow-control-for-streams">
+<dt>disable_connection_flow_control_for_streams</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Disables connection level flow control for HTTP/3 streams. This is useful in situations where the streams share the same connection
+but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-http3protocoloptions-disallow-obs-text">
+<dt>disallow_obs_text</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) Whether to disallow obsolete text in header field values.
+If not set, it defaults to true for alignment with current behavior.
+As defined in RFC 9110, <a class="reference external" href="https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5">https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5</a>:
+an obs-text character is a character in the range %x80-FF</p>
+</dd>
+</dl>
+</section>
+<section id="config-core-v3-schemeheadertransformation">
+<span id="envoy-v3-api-msg-config-core-v3-schemeheadertransformation"></span><h2>config.core.v3.SchemeHeaderTransformation<a class="headerlink" href="#config-core-v3-schemeheadertransformation" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/core/v3/protocol.proto#L891">[config.core.v3.SchemeHeaderTransformation proto]</a></p>
+<p>A message to control transformations to the :scheme header</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;scheme_to_overwrite&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;match_upstream&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-schemeheadertransformation-scheme-to-overwrite">
+<dt>scheme_to_overwrite</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Overwrite any Scheme header with the contents of this string.
+If set, takes precedence over <code class="docutils literal notranslate"><span class="pre">match_upstream</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-core-v3-schemeheadertransformation-match-upstream">
+<dt>match_upstream</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Set the Scheme header to match the upstream transport protocol. For example, should a
+request be sent to the upstream over TLS, the scheme header will be set to <code class="docutils literal notranslate"><span class="pre">&quot;https&quot;</span></code>. Should the
+request be sent over plaintext, the scheme header will be set to <code class="docutils literal notranslate"><span class="pre">&quot;http&quot;</span></code>.
+If <code class="docutils literal notranslate"><span class="pre">scheme_to_overwrite</span></code> is set, this field is not used.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="address.proto.html" class="btn btn-neutral float-left" title="Network addresses (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="proxy_protocol.proto.html" class="btn btn-neutral float-right" title="Proxy protocol (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Protocol options (proto)</a><ul>
+<li><a class="reference internal" href="#config-core-v3-quickeepalivesettings">config.core.v3.QuicKeepAliveSettings</a></li>
+<li><a class="reference internal" href="#config-core-v3-quicprotocoloptions">config.core.v3.QuicProtocolOptions</a></li>
+<li><a class="reference internal" href="#config-core-v3-quicprotocoloptions-connectionmigrationsettings">config.core.v3.QuicProtocolOptions.ConnectionMigrationSettings</a></li>
+<li><a class="reference internal" href="#config-core-v3-quicprotocoloptions-connectionmigrationsettings-migrateidleconnectionsettings">config.core.v3.QuicProtocolOptions.ConnectionMigrationSettings.MigrateIdleConnectionSettings</a></li>
+<li><a class="reference internal" href="#config-core-v3-upstreamhttpprotocoloptions">config.core.v3.UpstreamHttpProtocolOptions</a></li>
+<li><a class="reference internal" href="#config-core-v3-alternateprotocolscacheoptions">config.core.v3.AlternateProtocolsCacheOptions</a></li>
+<li><a class="reference internal" href="#config-core-v3-alternateprotocolscacheoptions-alternateprotocolscacheentry">config.core.v3.AlternateProtocolsCacheOptions.AlternateProtocolsCacheEntry</a></li>
+<li><a class="reference internal" href="#config-core-v3-httpprotocoloptions">config.core.v3.HttpProtocolOptions</a></li>
+<li><a class="reference internal" href="#enum-config-core-v3-httpprotocoloptions-headerswithunderscoresaction">Enum config.core.v3.HttpProtocolOptions.HeadersWithUnderscoresAction</a></li>
+<li><a class="reference internal" href="#config-core-v3-http1protocoloptions">config.core.v3.Http1ProtocolOptions</a></li>
+<li><a class="reference internal" href="#config-core-v3-http1protocoloptions-headerkeyformat">config.core.v3.Http1ProtocolOptions.HeaderKeyFormat</a></li>
+<li><a class="reference internal" href="#config-core-v3-http1protocoloptions-headerkeyformat-propercasewords">config.core.v3.Http1ProtocolOptions.HeaderKeyFormat.ProperCaseWords</a></li>
+<li><a class="reference internal" href="#config-core-v3-keepalivesettings">config.core.v3.KeepaliveSettings</a></li>
+<li><a class="reference internal" href="#config-core-v3-http2protocoloptions">config.core.v3.Http2ProtocolOptions</a></li>
+<li><a class="reference internal" href="#config-core-v3-http2protocoloptions-settingsparameter">config.core.v3.Http2ProtocolOptions.SettingsParameter</a></li>
+<li><a class="reference internal" href="#config-core-v3-http3protocoloptions">config.core.v3.Http3ProtocolOptions</a></li>
+<li><a class="reference internal" href="#config-core-v3-schemeheadertransformation">config.core.v3.SchemeHeaderTransformation</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

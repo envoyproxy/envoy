@@ -1,0 +1,117 @@
+.. _envoy_v3_api_file_envoy/extensions/clusters/composite/v3/cluster.proto:
+
+Composite cluster configuration (proto)
+=======================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.clusters.composite.v3.ClusterConfig:
+
+extensions.clusters.composite.v3.ClusterConfig
+----------------------------------------------
+
+
+:repo:`[extensions.clusters.composite.v3.ClusterConfig proto] <api/envoy/extensions/clusters/composite/v3/cluster.proto#L42>`
+
+Configuration for the composite cluster. See the :ref:`architecture overview
+<arch_overview_composite_cluster>` for more information. This cluster type enables retry-aware
+cluster selection, allowing different retry attempts to automatically target
+different upstream clusters. Unlike the standard aggregate cluster which uses
+health-based selection, the composite cluster uses the retry attempt count to
+deterministically select which sub-cluster to route to.
+
+When retry attempts exceed the number of configured clusters, requests will fail with no
+host available.
+
+Example configuration:
+
+.. code-block:: yaml
+
+    name: composite_cluster
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.composite
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+        clusters:
+        - name: primary_cluster
+        - name: secondary_cluster
+        - name: fallback_cluster
+
+
+.. _extension_envoy.clusters.composite:
+
+This extension has the qualified name ``envoy.clusters.composite``
+
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.clusters <extension_category_envoy.clusters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig <envoy_v3_api_msg_extensions.clusters.composite.v3.ClusterConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "clusters": []
+  }
+
+.. _envoy_v3_api_field_extensions.clusters.composite.v3.ClusterConfig.clusters:
+
+
+clusters
+  (**repeated** :ref:`extensions.clusters.composite.v3.ClusterConfig.ClusterEntry <envoy_v3_api_msg_extensions.clusters.composite.v3.ClusterConfig.ClusterEntry>`, *REQUIRED*) List of clusters to use for request routing. The first cluster is used for the
+  initial request (attempt 1), the second cluster for the first retry (attempt 2),
+  and so on. Must contain at least one cluster. When retry attempts exceed the number
+  of configured clusters, requests will fail with no host available.
+
+
+.. _envoy_v3_api_msg_extensions.clusters.composite.v3.ClusterConfig.ClusterEntry:
+
+extensions.clusters.composite.v3.ClusterConfig.ClusterEntry
+-----------------------------------------------------------
+
+
+:repo:`[extensions.clusters.composite.v3.ClusterConfig.ClusterEntry proto] <api/envoy/extensions/clusters/composite/v3/cluster.proto#L44>`
+
+Configuration for an individual cluster entry.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...
+  }
+
+.. _envoy_v3_api_field_extensions.clusters.composite.v3.ClusterConfig.ClusterEntry.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Name of the cluster. This cluster must be defined elsewhere in the configuration.
+
+
+

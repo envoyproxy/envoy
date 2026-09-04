@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/stats.h"
@@ -8,8 +9,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/transport_sockets/common/passthrough.h"
-
-#include "envoy/formatter/substitution_formatter.h"
 
 using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
@@ -72,8 +71,7 @@ class UpstreamProxyProtocolSocketFactory : public PassthroughFactory {
 public:
   UpstreamProxyProtocolSocketFactory(
       Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
-      ProxyProtocolConfig config, Stats::Scope& scope,
-      std::vector<TlvFormatter>&& added_tlvs);
+      ProxyProtocolConfig config, Stats::Scope& scope, std::vector<TlvFormatter>&& added_tlvs);
 
   // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr

@@ -1,0 +1,21 @@
+.. _version_history_1.30.9:
+
+1.30.9 (December 18, 2024)
+===========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **happy_eyeballs**: Validate that ``additional_address`` are IP addresses instead of crashing when sorting.
+* **http/1**: Fixes sending overload crashes when HTTP/1 request is reset.
+

@@ -1,0 +1,55 @@
+.. _envoy_v3_api_file_envoy/extensions/local_address_selectors/filter_state_override/v3/config.proto:
+
+Linux Network Namespace Local Address Selector (proto)
+======================================================
+
+.. _extension_envoy.upstream.local_address_selector.filter_state_override:
+
+This extension has the qualified name ``envoy.upstream.local_address_selector.filter_state_override``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.upstream.local_address_selector <extension_category_envoy.upstream.local_address_selector>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.local_address_selectors.filter_state_override.v3.Config <envoy_v3_api_msg_extensions.local_address_selectors.filter_state_override.v3.Config>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.local_address_selectors.filter_state_override.v3.Config:
+
+extensions.local_address_selectors.filter_state_override.v3.Config
+------------------------------------------------------------------
+
+
+:repo:`[extensions.local_address_selectors.filter_state_override.v3.Config proto] <api/envoy/extensions/local_address_selectors/filter_state_override/v3/config.proto#L20>`
+
+Overrides the upstream bind address Linux network namespace using a filter
+state object with the key ``envoy.network.upstream_bind_override.network_namespace``
+passed from the downstream. The override applies over the :ref:`default
+address selector
+<extension_envoy.upstream.local_address_selector.default_local_address_selector>`
+
+
+
+

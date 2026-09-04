@@ -1,0 +1,117 @@
+.. _envoy_v3_api_file_envoy/extensions/formatter/dynamic_modules/v3/dynamic_modules.proto:
+
+Dynamic Modules Formatter (proto)
+=================================
+
+.. _extension_envoy.formatter.dynamic_modules:
+
+This extension has the qualified name ``envoy.formatter.dynamic_modules``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.formatter <extension_category_envoy.formatter>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter <envoy_v3_api_msg_extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter:
+
+extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter
+--------------------------------------------------------------
+
+
+:repo:`[extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter proto] <api/envoy/extensions/formatter/dynamic_modules/v3/dynamic_modules.proto#L28>`
+
+Configuration for the Dynamic Modules Formatter. This formatter allows loading shared object
+files via ``dlopen`` to implement custom ``%COMMAND%`` operators for access logs and header
+formatting.
+
+A module can be loaded by multiple formatters; the module is loaded only once and shared across
+multiple command parser instances. Each parsed command produces a provider that is invoked on the
+worker threads to compute the substitution value, with access to request and response headers,
+stream info attributes, dynamic metadata, and the local reply body.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "formatter_name": ...,
+    "formatter_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`, *REQUIRED*) Specifies the shared-object level configuration. This field is required.
+
+
+.. _envoy_v3_api_field_extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter.formatter_name:
+
+
+formatter_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name for this formatter configuration. If not specified, defaults to an empty string.
+
+  This can be used to distinguish between different formatter implementations inside a dynamic
+  module. When Envoy receives this configuration, it passes the ``formatter_name`` to the dynamic
+  module's formatter config init function together with the ``formatter_config``. That way a
+  module can decide which in-module command parser implementation to use based on the name at
+  load time.
+
+
+.. _envoy_v3_api_field_extensions.formatter.dynamic_modules.v3.DynamicModuleFormatter.formatter_config:
+
+
+formatter_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the formatter chosen by ``formatter_name``. If not specified, an empty
+  configuration is passed to the module.
+
+  This is passed to the module's formatter initialization function. Together with the
+  ``formatter_name``, the module can decide which in-module command parser implementation to use
+  and fine-tune which commands it recognizes.
+
+  ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
+  without the wrapper.
+
+  .. code-block:: yaml
+
+   # Passing a JSON struct configuration
+   formatter_config:
+     "@type": "type.googleapis.com/google.protobuf.Struct"
+     value:
+       redact_headers:
+       - authorization
+       - cookie
+
+   # Passing a simple string configuration
+   formatter_config:
+     "@type": "type.googleapis.com/google.protobuf.StringValue"
+     value: "x-request-id"
+
+
+

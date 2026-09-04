@@ -1,0 +1,66 @@
+.. _envoy_v3_api_file_envoy/extensions/config/validators/minimum_clusters/v3/minimum_clusters.proto:
+
+Minimum Clusters (proto)
+========================
+
+.. _extension_envoy.config.validators.minimum_clusters_validator:
+
+This extension has the qualified name ``envoy.config.validators.minimum_clusters_validator``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.config.validators <extension_category_envoy.config.validators>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.config.validators.minimum_clusters.v3.MinimumClustersValidator <envoy_v3_api_msg_extensions.config.validators.minimum_clusters.v3.MinimumClustersValidator>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.config.validators.minimum_clusters.v3.MinimumClustersValidator:
+
+extensions.config.validators.minimum_clusters.v3.MinimumClustersValidator
+-------------------------------------------------------------------------
+
+
+:repo:`[extensions.config.validators.minimum_clusters.v3.MinimumClustersValidator proto] <api/envoy/extensions/config/validators/minimum_clusters/v3/minimum_clusters.proto#L17>`
+
+Validates a CDS config, and ensures that the number of clusters is above the
+set threshold.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "min_clusters_num": ...
+  }
+
+.. _envoy_v3_api_field_extensions.config.validators.minimum_clusters.v3.MinimumClustersValidator.min_clusters_num:
+
+
+min_clusters_num
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The minimal clusters threshold. Any CDS config update leading to less than
+  this number will be rejected.
+  Default value is 0.
+
+

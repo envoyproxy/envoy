@@ -1,0 +1,86 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/http/language/v3alpha/language.proto:
+
+Language (proto)
+================
+
+.. _extension_envoy.filters.http.language:
+
+This extension has the qualified name ``envoy.filters.http.language``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+
+
+Language :ref:`configuration overview <config_http_filters_language>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.language.v3alpha.Language:
+
+extensions.filters.http.language.v3alpha.Language
+-------------------------------------------------
+
+
+:repo:`[extensions.filters.http.language.v3alpha.Language proto] <api/contrib/envoy/extensions/filters/http/language/v3alpha/language.proto#L18>`
+
+Language detection filter config.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "default_language": ...,
+    "supported_languages": [],
+    "clear_route_cache": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.language.v3alpha.Language.default_language:
+
+
+default_language
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The default language to be used as a fallback.
+  The value will be included in the list of the supported languages.
+
+  See https://unicode-org.github.io/icu/userguide/locale/
+
+
+.. _envoy_v3_api_field_extensions.filters.http.language.v3alpha.Language.supported_languages:
+
+
+supported_languages
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The set of supported languages. There is no order priority.
+  The order will be determined by the Accept-Language header priority list
+  of the client.
+
+  See https://unicode-org.github.io/icu/userguide/locale/
+
+
+.. _envoy_v3_api_field_extensions.filters.http.language.v3alpha.Language.clear_route_cache:
+
+
+clear_route_cache
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If the x-language header is altered, clear the route cache for the current request.
+  This should be set if the route configuration may depend on the x-language header.
+  Otherwise it should be unset to avoid the performance cost of route recalculation.
+
+

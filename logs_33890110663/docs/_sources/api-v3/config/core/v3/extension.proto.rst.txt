@@ -1,0 +1,51 @@
+.. _envoy_v3_api_file_envoy/config/core/v3/extension.proto:
+
+Extension configuration (proto)
+===============================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.TypedExtensionConfig:
+
+config.core.v3.TypedExtensionConfig
+-----------------------------------
+
+
+:repo:`[config.core.v3.TypedExtensionConfig proto] <api/envoy/config/core/v3/extension.proto#L19>`
+
+Message type for extension configuration.
+.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "typed_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of an extension. This is not used to select the extension, instead
+  it serves the role of an opaque identifier.
+
+
+.. _envoy_v3_api_field_config.core.v3.TypedExtensionConfig.typed_config:
+
+
+typed_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The typed config for the extension. The type URL will be used to identify
+  the extension. In the case that the type URL is ``xds.type.v3.TypedStruct``
+  (or, for historical reasons, ``udpa.type.v1.TypedStruct``), the inner type
+  URL of ``TypedStruct`` will be utilized. See the
+  :ref:`extension configuration overview
+  <config_overview_extension_configuration>` for further details.
+
+

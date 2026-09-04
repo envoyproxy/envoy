@@ -1,0 +1,75 @@
+.. _envoy_v3_api_file_envoy/config/grpc_credential/v3/file_based_metadata.proto:
+
+Grpc Credentials File Based Metadata (proto)
+============================================
+
+.. _extension_envoy.grpc_credentials.file_based_metadata:
+
+This extension has the qualified name ``envoy.grpc_credentials.file_based_metadata``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.grpc_credentials <extension_category_envoy.grpc_credentials>`
+
+
+
+
+
+Configuration for File Based Metadata Grpc Credentials Plugin
+
+
+
+
+.. _envoy_v3_api_msg_config.grpc_credential.v3.FileBasedMetadataConfig:
+
+config.grpc_credential.v3.FileBasedMetadataConfig
+-------------------------------------------------
+
+
+:repo:`[config.grpc_credential.v3.FileBasedMetadataConfig proto] <api/envoy/config/grpc_credential/v3/file_based_metadata.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "secret_data": {...},
+    "header_key": ...,
+    "header_prefix": ...
+  }
+
+.. _envoy_v3_api_field_config.grpc_credential.v3.FileBasedMetadataConfig.secret_data:
+
+
+secret_data
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) Location or inline data of secret to use for authentication of the Google gRPC connection
+  this secret will be attached to a header of the gRPC connection
+
+
+.. _envoy_v3_api_field_config.grpc_credential.v3.FileBasedMetadataConfig.header_key:
+
+
+header_key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Metadata header key to use for sending the secret data
+  if no header key is set, "authorization" header will be used
+
+
+.. _envoy_v3_api_field_config.grpc_credential.v3.FileBasedMetadataConfig.header_prefix:
+
+
+header_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Prefix to prepend to the secret in the metadata header
+  if no prefix is set, the default is to use no prefix
+
+

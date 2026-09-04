@@ -1,0 +1,383 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>1.6.0 (March 20, 2018) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="v1.5" href="../v1.5/v1.5.html" />
+    <link rel="prev" title="v1.6" href="v1.6.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../version_history.html">Version history</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../v1.40/v1.40.0.html">1.40.0 (Pending)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.39/v1.39.html">v1.39: 1.39.1 (August 27, 2026)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.38/v1.38.html">v1.38: 1.38.4 (August 26, 2026)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.37/v1.37.html">v1.37: 1.37.6 (August 26, 2026)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.36/v1.36.html">v1.36: 1.36.10 (August 26, 2026)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.35/v1.35.html">v1.35: 1.35.13 (June 23, 2026)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.34/v1.34.html">v1.34: 1.34.14 (April 10, 2026)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.33/v1.33.html">v1.33: 1.33.14 (December 9, 2025)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.32/v1.32.html">v1.32: 1.32.13 (October 13, 2025)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.31/v1.31.html">v1.31: 1.31.10 (July 18, 2025)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.30/v1.30.html">v1.30: 1.30.11 (March 25, 2025)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.29/v1.29.html">v1.29: 1.29.12 (December 18, 2024)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.28/v1.28.html">v1.28: 1.28.7 (September 19, 2024)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.27/v1.27.html">v1.27: 1.27.7 (June 28, 2024)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.26/v1.26.html">v1.26: 1.26.8 (April 4, 2024)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.25/v1.25.html">v1.25: 1.25.11 (October 16, 2023)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.24/v1.24.html">v1.24: 1.24.11 (October 10, 2023)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.23/v1.23.html">v1.23: 1.23.12 (July 25, 2023)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.22/v1.22.html">v1.22: 1.22.11 (April 11, 2023)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.21/v1.21.html">v1.21: 1.21.6 (November 28, 2022)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.20/v1.20.html">v1.20: 1.20.7 (July 21, 2022)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.19/v1.19.html">v1.19: 1.19.5 (June 9, 2022)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.18/v1.18.html">v1.18: 1.18.6 (February 22, 2022)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.17/v1.17.html">v1.17: 1.17.4 (August 24, 2021)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.16/v1.16.html">v1.16: 1.16.5 (August 24, 2021)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.15/v1.15.html">v1.15: 1.15.5 (May 11, 2021)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.14/v1.14.html">v1.14: 1.14.7 (April 15, 2020)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.13/v1.13.html">v1.13: 1.13.8 (January 15, 2021)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.12/v1.12.html">v1.12: 1.12.7 (September 29, 2020)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.11/v1.11.html">v1.11: 1.11.2 (October 8, 2019)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.10/v1.10.html">v1.10: 1.10.0 (April 5, 2019)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.9/v1.9.html">v1.9: 1.9.1 (April 2, 2019)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.8/v1.8.html">v1.8: 1.8.0 (October 4, 2018)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.7/v1.7.html">v1.7: 1.7.1 (August 3, 2018)</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="v1.6.html">v1.6: 1.6.0 (March 20, 2018)</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">1.6.0 (March 20, 2018)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.5/v1.5.html">v1.5: 1.5.0 (December 4, 2017)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.4/v1.4.html">v1.4: 1.4.0 (August 24, 2017)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.3/v1.3.html">v1.3: 1.3.0 (May 17, 2017)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.2/v1.2.html">v1.2: 1.2.0 (March 7, 2017)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.1/v1.1.html">v1.1: 1.1.0 (November 30, 2016)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../v1.0/v1.0.html">v1.0: 1.0.0 (September 12, 2016)</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../version_history.html">Version history</a></li>
+          <li class="breadcrumb-item"><a href="v1.6.html">v1.6</a></li>
+      <li class="breadcrumb-item active">1.6.0 (March 20, 2018)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/version_history/v1.6/v1.6.0.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="march-20-2018">
+<span id="version-history-1-6-0"></span><h1>1.6.0 (March 20, 2018)<a class="headerlink" href="#march-20-2018" title="Link to this heading"></a></h1>
+<section id="changes">
+<h2>Changes<a class="headerlink" href="#changes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>access log</strong>: added <code class="docutils literal notranslate"><span class="pre">DOWNSTREAM_REMOTE_ADDRESS</span></code>, <code class="docutils literal notranslate"><span class="pre">DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT</span></code>, and <code class="docutils literal notranslate"><span class="pre">DOWNSTREAM_LOCAL_ADDRESS</span></code>
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/configuration/access_log.html#config-access-log-format" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">access log formatters</span></a>. <code class="docutils literal notranslate"><span class="pre">DOWNSTREAM_ADDRESS</span></code> access log formatter has been
+deprecated.</p></li>
+<li><p><strong>access log</strong>: added configuration to <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/config/filter/accesslog/v2/accesslog.proto.html#envoy-api-msg-config-filter-accesslog-v2-runtimefilter" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">runtime filter</span></a> to set default
+sampling rate, divisor, and whether to use independent randomness or not.</p></li>
+<li><p><strong>access log</strong>: added less than or equal (LE) <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/config/filter/accesslog/v2/accesslog.proto.html#envoy-api-msg-config-filter-accesslog-v2-comparisonfilter" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">comparison filter</span></a>.</p></li>
+<li><p><strong>admin</strong>: added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/operations/admin.html#operations-admin-interface-runtime" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">/runtime</span></a> admin endpoint to read the current runtime values.</p></li>
+<li><p><strong>build</strong>: added support for <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/bazel#enabling-optional-features">building Envoy with exported symbols</a>. This change allows
+scripts loaded with the Lua filter to load shared object libraries such as those installed via <a class="reference external" href="https://luarocks.org/">LuaRocks</a>.</p></li>
+<li><p><strong>config</strong>: added restrictions for the backing <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/core/config_source.proto.html#envoy-api-msg-core-configsource" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">config sources</span></a> of xDS resources. For
+filesystem based xDS the file must exist at configuration time. For cluster based xDS the backing cluster must be
+statically defined and be of non-EDS type.</p></li>
+<li><p><strong>config</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/core/base.proto.html#envoy-api-msg-core-datasource" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">inline delivery</span></a> of TLS certificates and private keys.</p></li>
+<li><p><strong>config</strong>: added support for sending error details as <a class="reference external" href="https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto">grpc.rpc.Status</a> in <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/discovery.proto.html#envoy-api-msg-discoveryrequest" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">DiscoveryRequest</span></a>.</p></li>
+<li><p><strong>envoy</strong>: Many small bug fixes and performance improvements not listed.</p></li>
+<li><p><strong>grpc</strong>: the Google gRPC C++ library client is now supported as specified in the <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/intro/arch_overview/grpc.html#arch-overview-grpc-services" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">gRPC services overview</span></a> and <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/core/grpc_service.proto.html#envoy-api-msg-core-grpcservice" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">GrpcService</span></a>.</p></li>
+<li><p><strong>grpc-json</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/config/filter/http/transcoder/v2/transcoder.proto.html#envoy-api-field-config-filter-http-transcoder-v2-grpcjsontranscoder-proto-descriptor-bin" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">inline descriptors</span></a>.</p></li>
+<li><p><strong>health check</strong>: added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/core/health_check.proto.html#envoy-api-field-core-healthcheck-grpc-health-check" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">gRPC health check</span></a> based on <a class="reference external" href="https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto">grpc.health.v1.Health</a> service.</p></li>
+<li><p><strong>health check</strong>: added ability to set <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/core/health_check.proto.html#envoy-api-field-core-healthcheck-httphealthcheck-host" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">host header value</span></a> for http health
+check.</p></li>
+<li><p><strong>health check</strong>: added setting for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/core/health_check.proto.html#envoy-api-field-core-healthcheck-no-traffic-interval" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">no-traffic interval</span></a>.</p></li>
+<li><p><strong>health check</strong>: extended the health check filter to support computation of the health check response based on the <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/config/filter/http/health_check/v2/health_check.proto.html#envoy-api-field-config-filter-http-health-check-v2-healthcheck-cluster-min-healthy-percentages" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">percentage of
+healthy servers in upstream clusters</span></a>.</p></li>
+<li><p><strong>hot restart</strong>: added SIGTERM propagation to children to <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/operations/hot_restarter.html#operations-hot-restarter" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">hot-restarter.py</span></a>, which enables using it as a
+parent of containers.</p></li>
+<li><p><strong>http</strong>: added idle timeout for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/core/protocol.proto.html#envoy-api-field-core-httpprotocoloptions-idle-timeout" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">upstream http connections</span></a>.</p></li>
+<li><p><strong>http</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/core/protocol.proto.html#envoy-api-field-core-http1protocoloptions-accept-http-10" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">incoming HTTP/1.0</span></a>.</p></li>
+<li><p><strong>http</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/config/filter/network/http_connection_manager/v2/http_connection_manager.proto.html#envoy-api-field-config-filter-network-http-connection-manager-v2-httpconnectionmanager-proxy-100-continue" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">proxying 100-Continue responses</span></a>.</p></li>
+<li><p><strong>http</strong>: added support for trusting additional hops in the <a class="reference internal" href="../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-forwarded-for"><span class="std std-ref">x-forwarded-for</span></a> request header.</p></li>
+<li><p><strong>http</strong>: added the ability to pass a URL encoded PEM encoded peer certificate in the
+<a class="reference internal" href="../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-forwarded-client-cert"><span class="std std-ref">x-forwarded-client-cert</span></a> header.</p></li>
+<li><p><strong>ip tagging</strong>: added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/configuration/http_filters/ip_tagging_filter.html#config-http-filters-ip-tagging" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">HTTP IP Tagging filter</span></a>.</p></li>
+<li><p><strong>listeners</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/core/address.proto.html#envoy-api-msg-core-pipe" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">abstract unix domain sockets</span></a> on Linux. The abstract namespace can be
+used by prepending ‘&#64;’ to a socket path.</p></li>
+<li><p><strong>listeners</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/core/address.proto.html#envoy-api-field-core-socketaddress-ipv4-compat" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">listening for both IPv4 and IPv6</span></a> when binding
+to ::.</p></li>
+<li><p><strong>listeners</strong>: added support for listening on <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/core/address.proto.html#envoy-api-field-core-address-pipe" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">UNIX domain sockets</span></a>.</p></li>
+<li><p><strong>load balancer</strong>: added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/intro/arch_overview/load_balancing.html#arch-overview-load-balancing-types-maglev" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">Maglev</span></a> consistent hash load balancer.</p></li>
+<li><p><strong>load balancer</strong>: added cluster configuration for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/cds.proto.html#envoy-api-field-cluster-commonlbconfig-healthy-panic-threshold" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">healthy panic threshold</span></a> percentage.</p></li>
+<li><p><strong>load balancer</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/endpoint/endpoint.proto.html#envoy-api-msg-endpoint-localitylbendpoints" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">LocalityLbEndpoints</span></a> priorities.</p></li>
+<li><p><strong>lua</strong>: added headers <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/configuration/http_filters/lua_filter.html#config-http-filters-lua-header-wrapper" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">replace()</span></a> API.</p></li>
+<li><p><strong>lua</strong>: extended to support <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/configuration/http_filters/lua_filter.html#config-http-filters-lua-metadata-wrapper" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">metadata object</span></a> API.</p></li>
+<li><p><strong>redis</strong>: added <code class="docutils literal notranslate"><span class="pre">GEORADIUS_RO</span></code> and <code class="docutils literal notranslate"><span class="pre">GEORADIUSBYMEMBER_RO</span></code> to the <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/intro/arch_overview/redis.html#arch-overview-redis" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">Redis command splitter</span></a>
+allowlist.</p></li>
+<li><p><strong>redis</strong>: added local <code class="docutils literal notranslate"><span class="pre">PING</span></code> support to the <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/intro/arch_overview/redis.html#arch-overview-redis" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">Redis filter</span></a>.</p></li>
+<li><p><strong>router</strong>: added <code class="docutils literal notranslate"><span class="pre">DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT</span></code>, <code class="docutils literal notranslate"><span class="pre">DOWNSTREAM_LOCAL_ADDRESS</span></code>,
+<code class="docutils literal notranslate"><span class="pre">DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT</span></code>, <code class="docutils literal notranslate"><span class="pre">PROTOCOL</span></code>, and <code class="docutils literal notranslate"><span class="pre">UPSTREAM_METADATA</span></code> <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/configuration/http_conn_man/headers.html#config-http-conn-man-headers-custom-request-headers" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">header formatters</span></a>. The <code class="docutils literal notranslate"><span class="pre">CLIENT_IP</span></code> header formatter has been deprecated.</p></li>
+<li><p><strong>router</strong>: added gateway-error <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/configuration/http_filters/router_filter.html#config-http-filters-router-x-envoy-retry-on" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">retry-on</span></a> policy.</p></li>
+<li><p><strong>router</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/route/route.proto.html#envoy-api-field-route-redirectaction-https-redirect" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">HTTPS redirects</span></a> on specific routes.</p></li>
+<li><p><strong>router</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/configuration/http_conn_man/headers.html#config-http-conn-man-headers-custom-request-headers" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">custom request/response headers</span></a> with
+mixed static and dynamic values.</p></li>
+<li><p><strong>router</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/route/route.proto.html#envoy-api-field-route-route-direct-response" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">direct responses</span></a>. I.e., sending a preconfigured
+HTTP response without proxying anywhere.</p></li>
+<li><p><strong>router</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/route/route.proto.html#envoy-api-field-route-redirectaction-prefix-rewrite" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">prefix_rewrite</span></a> for redirects.</p></li>
+<li><p><strong>router</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/route/route.proto.html#envoy-api-field-route-headermatcher-range-match" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">range based header matching</span></a> for request
+routing.</p></li>
+<li><p><strong>router</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/route/route.proto.html#envoy-api-field-route-redirectaction-strip-query" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">stripping the query string</span></a> for redirects.</p></li>
+<li><p><strong>router</strong>: added support for downstream request/upstream response <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/configuration/http_conn_man/headers.html#config-http-conn-man-headers-custom-request-headers" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">header manipulation</span></a> in <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/route/route.proto.html#envoy-api-msg-route-weightedcluster" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">weighted cluster</span></a>.</p></li>
+<li><p><strong>router</strong>: added support for more granular weighted cluster routing by allowing the <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/route/route.proto.html#envoy-api-field-route-weightedcluster-total-weight" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">total_weight</span></a> to be specified in configuration.</p></li>
+<li><p><strong>router</strong>: added support for route matching based on <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/route/route.proto.html#envoy-api-msg-route-queryparametermatcher" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">URL query string parameters</span></a>.</p></li>
+<li><p><strong>squash</strong>: added support for the <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/configuration/http_filters/squash_filter.html#config-http-filters-squash" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">Squash microservices debugger</span></a>. Allows debugging an incoming
+request to a microservice in the mesh.</p></li>
+<li><p><strong>stats</strong>: added metrics service API implementation.</p></li>
+<li><p><strong>stats</strong>: added native <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/config/metrics/v2/stats.proto.html#envoy-api-msg-config-metrics-v2-dogstatsdsink" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">DogStatsd</span></a> support.</p></li>
+<li><p><strong>stats</strong>: added support for <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/config/metrics/v2/stats.proto.html#envoy-api-field-config-metrics-v2-tagspecifier-fixed-value" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">fixed stats tag values</span></a> which will
+be added to all metrics.</p></li>
+<li><p><strong>tcp proxy</strong>: access logs now bring an IP address without a port when using DOWNSTREAM_ADDRESS. Use <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/configuration/access_log.html#config-access-log-format" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">DOWNSTREAM_REMOTE_ADDRESS</span></a> instead.</p></li>
+<li><p><strong>tcp proxy</strong>: added <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/config/filter/network/tcp_proxy/v2/tcp_proxy.proto.html#envoy-api-field-config-filter-network-tcp-proxy-v2-tcpproxy-idle-timeout" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">idle timeout</span></a>.</p></li>
+<li><p><strong>tcp proxy</strong>: added support for specifying a <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/config/filter/network/tcp_proxy/v2/tcp_proxy.proto.html#envoy-api-field-config-filter-network-tcp-proxy-v2-tcpproxy-metadata-match" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">metadata matcher</span></a> for upstream clusters in the tcp filter.</p></li>
+<li><p><strong>tcp proxy</strong>: improved TCP proxy to correctly proxy TCP half-close.</p></li>
+<li><p><strong>tracing</strong>: added support for dynamically loading an <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/config/trace/v2/trace.proto.html#envoy-api-msg-config-trace-v2-dynamicotconfig" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">OpenTracing tracer</span></a>.</p></li>
+<li><p><strong>tracing</strong>: when using the Zipkin tracer, it is no longer necessary to propagate the <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/configuration/http_conn_man/headers.html#config-http-conn-man-headers-x-ot-span-context" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">x-ot-span-context</span></a> header. See more on trace context propagation <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/intro/arch_overview/tracing.html#arch-overview-tracing" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">here</span></a>.</p></li>
+<li><p><strong>tracing</strong>: when using the Zipkin tracer, it is now possible for clients to specify the sampling decision (using the
+<a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/configuration/http_conn_man/headers.html#config-http-conn-man-headers-x-b3-sampled" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">x-b3-sampled</span></a> header) and have the decision propagated through to
+subsequently invoked services.</p></li>
+<li><p><strong>transport sockets</strong>: added transport socket interface to allow custom implementations of transport sockets. A transport socket provides read
+and write logic with buffer encryption and decryption (if applicable). The existing TLS implementation has been
+refactored with the interface.</p></li>
+<li><p><strong>upstream</strong>: added support for specifying an <a class="reference external" href="https://www.envoyproxy.io/docs/envoy/v1.6.0/api-v2/api/v2/cds.proto.html#envoy-api-field-cluster-alt-stat-name" title="(in envoy vtag-v1.6.0)"><span class="xref std std-ref">alternate stats name</span></a> while emitting stats
+for clusters.</p></li>
+</ul>
+</section>
+<section id="deprecated">
+<h2>Deprecated<a class="headerlink" href="#deprecated" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>headers</strong>: <code class="docutils literal notranslate"><span class="pre">CLIENT_IP</span></code> header formatter is deprecated. Use <code class="docutils literal notranslate"><span class="pre">DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT</span></code> instead.</p></li>
+<li><p><strong>lds</strong>: ‘use_original_dst’ field in the v2 LDS API is deprecated. Use listener filters and filter chain matching instead.</p></li>
+<li><p><strong>logging</strong>: <code class="docutils literal notranslate"><span class="pre">DOWNSTREAM_ADDRESS</span></code> log formatter is deprecated. Use <code class="docutils literal notranslate"><span class="pre">DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT</span></code> instead.</p></li>
+<li><p><strong>matching</strong>: <code class="docutils literal notranslate"><span class="pre">value</span></code> and <code class="docutils literal notranslate"><span class="pre">regex</span></code> fields in the <code class="docutils literal notranslate"><span class="pre">HeaderMatcher</span></code> message is deprecated. Use the <code class="docutils literal notranslate"><span class="pre">exact_match</span></code> or
+<code class="docutils literal notranslate"><span class="pre">regex_match</span></code> oneof instead.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="v1.6.html" class="btn btn-neutral float-left" title="v1.6" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../v1.5/v1.5.html" class="btn btn-neutral float-right" title="v1.5" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">1.6.0 (March 20, 2018)</a><ul>
+<li><a class="reference internal" href="#changes">Changes</a></li>
+<li><a class="reference internal" href="#deprecated">Deprecated</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

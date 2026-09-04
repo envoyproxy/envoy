@@ -1,0 +1,78 @@
+.. _envoy_v3_api_file_envoy/extensions/matching/input_matchers/runtime_fraction/v3/runtime_fraction.proto:
+
+Runtime matcher (proto)
+=======================
+
+.. _extension_envoy.matching.matchers.runtime_fraction:
+
+This extension has the qualified name ``envoy.matching.matchers.runtime_fraction``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.input_matchers <extension_category_envoy.matching.input_matchers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction <envoy_v3_api_msg_extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction:
+
+extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction proto] <api/envoy/extensions/matching/input_matchers/runtime_fraction/v3/runtime_fraction.proto#L25>`
+
+The runtime fraction matchers computes a hash from the input and matches if runtime feature is enabled
+for the the resulting hash. Every time the input is considered for a match, its hash must fall within
+the percentage of matches indicated by this field. For a fraction N/D, a number is computed as a hash
+of the input on a field in the range [0,D). If the number is less than or equal to the value of the
+numerator N, the matcher evaluates to true. A runtime_fraction input matcher can be used to gradually
+roll out matcher changes without requiring full code or configuration deployments.
+Note that distribution of matching results is only as good as one of the input.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "runtime_fraction": {...},
+    "seed": ...
+  }
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction.runtime_fraction:
+
+
+runtime_fraction
+  (:ref:`config.core.v3.RuntimeFractionalPercent <envoy_v3_api_msg_config.core.v3.RuntimeFractionalPercent>`, *REQUIRED*) Match the input against the given runtime key. The specified default value is used if key is not
+  present in the runtime configuration.
+
+
+.. _envoy_v3_api_field_extensions.matching.input_matchers.runtime_fraction.v3.RuntimeFraction.seed:
+
+
+seed
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional seed passed through the hash function. This allows using additional information when computing
+  the hash value: by changing the seed value, a potentially different outcome can be achieved for the same input.
+
+

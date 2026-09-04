@@ -1,0 +1,223 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/transform/v3/transform.proto:
+
+Transform filter configuration (proto)
+======================================
+
+.. _extension_envoy.filters.http.transform:
+
+This extension has the qualified name ``envoy.filters.http.transform``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.transform.v3.TransformConfig <envoy_v3_api_msg_extensions.filters.http.transform.v3.TransformConfig>`
+
+
+
+Transform filter :ref:`configuration overview <config_http_filters_transform>` to perform
+HTTP header and body transformations.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.transform.v3.TransformConfig:
+
+extensions.filters.http.transform.v3.TransformConfig
+----------------------------------------------------
+
+
+:repo:`[extensions.filters.http.transform.v3.TransformConfig proto] <api/envoy/extensions/filters/http/transform/v3/transform.proto#L26>`
+
+Configuration for the transform filter. The filter may buffer the request/response until the
+entire body is received, and then mutate the headers and body according to the contents
+of the request/response. The request and response transformations are independent and could
+be configured separately.
+Only JSON body transformation is supported for now.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_transformation": {...},
+    "response_transformation": {...},
+    "clear_cluster_cache": ...,
+    "clear_route_cache": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.transform.v3.TransformConfig.request_transformation:
+
+
+request_transformation
+  (:ref:`extensions.filters.http.transform.v3.Transformation <envoy_v3_api_msg_extensions.filters.http.transform.v3.Transformation>`) Configuration for transforming request.
+
+  .. note::
+
+    If set then the entire request headers and body will always be buffered on a JSON request
+    even if only headers are transformed.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.transform.v3.TransformConfig.response_transformation:
+
+
+response_transformation
+  (:ref:`extensions.filters.http.transform.v3.Transformation <envoy_v3_api_msg_extensions.filters.http.transform.v3.Transformation>`) Configuration for transforming response.
+
+  .. note::
+
+    If set then the entire response headers and body will always be buffered on a JSON response
+    even if only headers are transformed.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.transform.v3.TransformConfig.clear_cluster_cache:
+
+
+clear_cluster_cache
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true and the request headers are transformed, Envoy will re-evaluate the target
+  cluster in the same route. Please ensure the cluster specifier in the route supports
+  dynamic evaluation or this flag will have no effect, e.g.
+  :ref:`matcher cluster specifier
+  <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`.
+
+  Only one of ``clear_cluster_cache`` and ``clear_route_cache`` can be true.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.transform.v3.TransformConfig.clear_route_cache:
+
+
+clear_route_cache
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true and the request headers are transformed, Envoy will clear the route cache for
+  the current request and force re-evaluation of the route. This has performance penalty and
+  should only be used when the route match criteria depends on the transformed headers.
+
+  Only one of ``clear_cluster_cache`` and ``clear_route_cache`` can be true.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.transform.v3.Transformation:
+
+extensions.filters.http.transform.v3.Transformation
+---------------------------------------------------
+
+
+:repo:`[extensions.filters.http.transform.v3.Transformation proto] <api/envoy/extensions/filters/http/transform/v3/transform.proto#L60>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "headers_mutations": [],
+    "body_transformation": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.transform.v3.Transformation.headers_mutations:
+
+
+headers_mutations
+  (**repeated** :ref:`config.common.mutation_rules.v3.HeaderMutation <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation>`) The header mutations to perform.
+  The :ref:`substitution format specifier <config_access_log_format>` could be applied here.
+  In addition to the commonly used format specifiers, this filter introduces additional format specifiers:
+
+  * ``%REQUEST_BODY(KEY*)%``: the request body. And ``Key`` KEY is an optional
+    lookup key in the namespace with the option of specifying nested keys separated by ':'.
+  * ``%RESPONSE_BODY(KEY*)%``: the response body. And ``Key`` KEY is an optional
+    lookup key in the namespace with the option of specifying nested keys separated by ':'.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.transform.v3.Transformation.body_transformation:
+
+
+body_transformation
+  (:ref:`extensions.filters.http.transform.v3.BodyTransformation <envoy_v3_api_msg_extensions.filters.http.transform.v3.BodyTransformation>`) The body transformation configuration. If not set, no body transformation will be performed.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.transform.v3.BodyTransformation:
+
+extensions.filters.http.transform.v3.BodyTransformation
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.transform.v3.BodyTransformation proto] <api/envoy/extensions/filters/http/transform/v3/transform.proto#L75>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "body_format": {...},
+    "action": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.transform.v3.BodyTransformation.body_format:
+
+
+body_format
+  (:ref:`config.core.v3.SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`, *REQUIRED*) Body transformation configuration. The substitution format string is used as the template
+  to generate the transformed new body content.
+  The :ref:`substitution format specifier <config_access_log_format>` could be applied here.
+  And except the commonly used format specifiers, the additional format specifiers
+  ``%REQUEST_BODY(KEY*)%`` and ``%RESPONSE_BODY(KEY*)%`` could also be used here.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.transform.v3.BodyTransformation.action:
+
+
+action
+  (:ref:`extensions.filters.http.transform.v3.BodyTransformation.TransformAction <envoy_v3_api_enum_extensions.filters.http.transform.v3.BodyTransformation.TransformAction>`) The action to perform for new body content and original body content.
+  For example, if ``MERGE`` is used, then the new body content generated from the ``body_format``
+  will be merged into the original body content.
+
+  Default is ``MERGE``.
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.transform.v3.BodyTransformation.TransformAction:
+
+Enum extensions.filters.http.transform.v3.BodyTransformation.TransformAction
+----------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.transform.v3.BodyTransformation.TransformAction proto] <api/envoy/extensions/filters/http/transform/v3/transform.proto#L76>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.transform.v3.BodyTransformation.TransformAction.MERGE:
+
+
+MERGE
+  *(DEFAULT)* ⁣Merge the transformed body with the original body. This is the default action.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.transform.v3.BodyTransformation.TransformAction.REPLACE:
+
+
+REPLACE
+  ⁣Replace the original body with the transformed body.
+
+
+

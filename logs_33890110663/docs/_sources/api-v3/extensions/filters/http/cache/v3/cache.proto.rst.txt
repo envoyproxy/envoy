@@ -1,0 +1,120 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/cache/v3/cache.proto:
+
+HTTP Cache Filter (proto)
+=========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.cache.v3.CacheConfig:
+
+extensions.filters.http.cache.v3.CacheConfig
+--------------------------------------------
+
+
+:repo:`[extensions.filters.http.cache.v3.CacheConfig proto] <api/envoy/extensions/filters/http/cache/v3/cache.proto#L23>`
+
+
+.. _extension_envoy.filters.http.cache:
+
+This extension has the qualified name ``envoy.filters.http.cache``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.cache.v3.CacheConfig <envoy_v3_api_msg_extensions.filters.http.cache.v3.CacheConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "typed_config": {...},
+    "disabled": {...},
+    "allowed_vary_headers": [],
+    "ignore_request_cache_control_header": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.cache.v3.CacheConfig.typed_config:
+
+
+typed_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) Config specific to the cache storage implementation. Required unless ``disabled``
+  is true.
+
+
+  .. _extension_category_envoy.http.cache:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.extensions.http.cache.file_system_http_cache <extension_envoy.extensions.http.cache.file_system_http_cache>`
+
+    - :ref:`envoy.extensions.http.cache.simple <extension_envoy.extensions.http.cache.simple>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cache.v3.CacheConfig.disabled:
+
+
+disabled
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) When true, the cache filter is a no-op filter.
+
+  Possible use-cases for this include:
+  - Turning a filter on and off with :ref:`ECDS <envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cache.v3.CacheConfig.allowed_vary_headers:
+
+
+allowed_vary_headers
+  (**repeated** :ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) List of matching rules that defines allowed ``Vary`` headers.
+
+  The ``vary`` response header holds a list of header names that affect the
+  contents of a response, as described by
+  https://httpwg.org/specs/rfc7234.html#caching.negotiated.responses.
+
+  During insertion, ``allowed_vary_headers`` acts as a allowlist: if a
+  response's ``vary`` header mentions any header names that aren't matched by any rules in
+  ``allowed_vary_headers``, that response will not be cached.
+
+  During lookup, ``allowed_vary_headers`` controls what request headers will be
+  sent to the cache storage implementation.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cache.v3.CacheConfig.ignore_request_cache_control_header:
+
+
+ignore_request_cache_control_header
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) By default, a ``cache-control: no-cache`` or ``pragma: no-cache`` header in the request
+  causes the cache to validate with its upstream even if the lookup is a hit. Setting this
+  to true will ignore these headers.
+
+
+
+

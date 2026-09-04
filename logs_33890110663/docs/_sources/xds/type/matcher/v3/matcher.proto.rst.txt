@@ -1,0 +1,473 @@
+.. _envoy_v3_api_file_xds/type/matcher/v3/matcher.proto:
+
+Unified Matcher API (proto)
+===========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Matcher:
+
+.xds.type.matcher.v3.Matcher
+----------------------------
+
+
+`[.xds.type.matcher.v3.Matcher proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/matcher.proto#L21>`_
+
+A matcher, which may traverse a matching tree in order to result in a match action.
+During matching, the tree will be traversed until a match is found, or if no match
+is found the action specified by the most specific on_no_match will be evaluated.
+As an on_no_match might result in another matching tree being evaluated, this process
+might repeat several times until the final OnMatch (or no match) is decided.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "matcher_list": {...},
+    "matcher_tree": {...},
+    "on_no_match": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.matcher_list:
+
+
+matcher_list
+  (:ref:`.xds.type.matcher.v3.Matcher.MatcherList <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList>`) A linear list of matchers to evaluate.
+
+
+  
+
+  Only one of :ref:`matcher_list <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.matcher_list>`, :ref:`matcher_tree <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.matcher_tree>` may be set.
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.matcher_tree:
+
+
+matcher_tree
+  (:ref:`.xds.type.matcher.v3.Matcher.MatcherTree <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherTree>`) A match tree to evaluate.
+
+
+  
+
+  Only one of :ref:`matcher_list <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.matcher_list>`, :ref:`matcher_tree <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.matcher_tree>` may be set.
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.on_no_match:
+
+
+on_no_match
+  (:ref:`.xds.type.matcher.v3.Matcher.OnMatch <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.OnMatch>`) Optional OnMatch to use if no matcher above matched (e.g., if there are no matchers specified
+  above, or if none of the matches specified above succeeded).
+  If no matcher above matched and this field is not populated, the match will be considered unsuccessful.
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.OnMatch:
+
+.xds.type.matcher.v3.Matcher.OnMatch
+------------------------------------
+
+
+`[.xds.type.matcher.v3.Matcher.OnMatch proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/matcher.proto#L23>`_
+
+What to do if a match is successful.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "matcher": {...},
+    "action": {...},
+    "keep_matching": ...
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.OnMatch.matcher:
+
+
+matcher
+  (:ref:`.xds.type.matcher.v3.Matcher <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`) Nested matcher to evaluate.
+  If the nested matcher does not match and does not specify
+  on_no_match, then this matcher is considered not to have
+  matched, even if a predicate at this level or above returned
+  true.
+
+
+  
+
+  Precisely one of :ref:`matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.OnMatch.matcher>`, :ref:`action <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.OnMatch.action>` must be set.
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.OnMatch.action:
+
+
+action
+  (:ref:`.xds.core.v3.TypedExtensionConfig <envoy_v3_api_msg_.xds.core.v3.TypedExtensionConfig>`) Protocol-specific action to take.
+
+
+  
+
+  Precisely one of :ref:`matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.OnMatch.matcher>`, :ref:`action <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.OnMatch.action>` must be set.
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.OnMatch.keep_matching:
+
+
+keep_matching
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true and the Matcher matches, the action will be taken but the caller
+  will behave as if the Matcher did not match. A subsequent matcher or
+  on_no_match action will be used instead.
+  This field is not supported in all contexts in which the matcher API is
+  used. If this field is set in a context in which it's not supported,
+  the resource will be rejected.
+
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList:
+
+.xds.type.matcher.v3.Matcher.MatcherList
+----------------------------------------
+
+
+`[.xds.type.matcher.v3.Matcher.MatcherList proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/matcher.proto#L50>`_
+
+A linear list of field matchers.
+The field matchers are evaluated in order, and the first match
+wins.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "matchers": []
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.matchers:
+
+
+matchers
+  (**repeated** :ref:`.xds.type.matcher.v3.Matcher.MatcherList.FieldMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList.FieldMatcher>`, *REQUIRED*) A list of matchers. First match wins.
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList.Predicate:
+
+.xds.type.matcher.v3.Matcher.MatcherList.Predicate
+--------------------------------------------------
+
+
+`[.xds.type.matcher.v3.Matcher.MatcherList.Predicate proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/matcher.proto#L52>`_
+
+Predicate to determine if a match is successful.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "single_predicate": {...},
+    "or_matcher": {...},
+    "and_matcher": {...},
+    "not_matcher": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.single_predicate:
+
+
+single_predicate
+  (:ref:`.xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate>`) A single predicate to evaluate.
+
+
+  
+
+  Precisely one of :ref:`single_predicate <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.single_predicate>`, :ref:`or_matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.or_matcher>`, :ref:`and_matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.and_matcher>`, :ref:`not_matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.not_matcher>` must be set.
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.or_matcher:
+
+
+or_matcher
+  (:ref:`.xds.type.matcher.v3.Matcher.MatcherList.Predicate.PredicateList <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.PredicateList>`) A list of predicates to be OR-ed together.
+
+
+  
+
+  Precisely one of :ref:`single_predicate <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.single_predicate>`, :ref:`or_matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.or_matcher>`, :ref:`and_matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.and_matcher>`, :ref:`not_matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.not_matcher>` must be set.
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.and_matcher:
+
+
+and_matcher
+  (:ref:`.xds.type.matcher.v3.Matcher.MatcherList.Predicate.PredicateList <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.PredicateList>`) A list of predicates to be AND-ed together.
+
+
+  
+
+  Precisely one of :ref:`single_predicate <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.single_predicate>`, :ref:`or_matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.or_matcher>`, :ref:`and_matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.and_matcher>`, :ref:`not_matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.not_matcher>` must be set.
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.not_matcher:
+
+
+not_matcher
+  (:ref:`.xds.type.matcher.v3.Matcher.MatcherList.Predicate <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList.Predicate>`) The invert of a predicate
+
+
+  
+
+  Precisely one of :ref:`single_predicate <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.single_predicate>`, :ref:`or_matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.or_matcher>`, :ref:`and_matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.and_matcher>`, :ref:`not_matcher <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.not_matcher>` must be set.
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate:
+
+.xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate
+------------------------------------------------------------------
+
+
+`[.xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/matcher.proto#L54>`_
+
+Predicate for a single input field.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "input": {...},
+    "value_match": {...},
+    "custom_match": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate.input:
+
+
+input
+  (:ref:`.xds.core.v3.TypedExtensionConfig <envoy_v3_api_msg_.xds.core.v3.TypedExtensionConfig>`, *REQUIRED*) Protocol-specific specification of input field to match on.
+
+
+  .. _extension_category_envoy.matching.common_inputs:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.matching.common_inputs.environment_variable <extension_envoy.matching.common_inputs.environment_variable>`
+
+
+
+
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate.value_match:
+
+
+value_match
+  (:ref:`.xds.type.matcher.v3.StringMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.StringMatcher>`) Built-in string matcher.
+
+
+  
+
+  Precisely one of :ref:`value_match <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate.value_match>`, :ref:`custom_match <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate.custom_match>` must be set.
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate.custom_match:
+
+
+custom_match
+  (:ref:`.xds.core.v3.TypedExtensionConfig <envoy_v3_api_msg_.xds.core.v3.TypedExtensionConfig>`) Extension for custom matching logic.
+
+
+  .. _extension_category_envoy.matching.input_matchers:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.matching.matchers.cel_matcher <extension_envoy.matching.matchers.cel_matcher>`
+
+    - :ref:`envoy.matching.matchers.consistent_hashing <extension_envoy.matching.matchers.consistent_hashing>`
+
+    - :ref:`envoy.matching.matchers.dynamic_modules <extension_envoy.matching.matchers.dynamic_modules>`
+
+    - :ref:`envoy.matching.matchers.ip <extension_envoy.matching.matchers.ip>`
+
+    - :ref:`envoy.matching.matchers.metadata_matcher <extension_envoy.matching.matchers.metadata_matcher>`
+
+    - :ref:`envoy.matching.matchers.runtime_fraction <extension_envoy.matching.matchers.runtime_fraction>`
+
+
+
+
+    The following extensions are available in :ref:`contrib <install_contrib>` images only:
+
+
+    - :ref:`envoy.matching.input_matchers.hyperscan <extension_envoy.matching.input_matchers.hyperscan>`
+
+
+
+  
+
+  Precisely one of :ref:`value_match <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate.value_match>`, :ref:`custom_match <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate.custom_match>` must be set.
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.PredicateList:
+
+.xds.type.matcher.v3.Matcher.MatcherList.Predicate.PredicateList
+----------------------------------------------------------------
+
+
+`[.xds.type.matcher.v3.Matcher.MatcherList.Predicate.PredicateList proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/matcher.proto#L72>`_
+
+A list of two or more matchers. Used to allow using a list within a oneof.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "predicate": []
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.Predicate.PredicateList.predicate:
+
+
+predicate
+  (**repeated** :ref:`.xds.type.matcher.v3.Matcher.MatcherList.Predicate <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList.Predicate>`, *REQUIRED*) 
+
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList.FieldMatcher:
+
+.xds.type.matcher.v3.Matcher.MatcherList.FieldMatcher
+-----------------------------------------------------
+
+
+`[.xds.type.matcher.v3.Matcher.MatcherList.FieldMatcher proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/matcher.proto#L94>`_
+
+An individual matcher.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "predicate": {...},
+    "on_match": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.FieldMatcher.predicate:
+
+
+predicate
+  (:ref:`.xds.type.matcher.v3.Matcher.MatcherList.Predicate <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherList.Predicate>`, *REQUIRED*) Determines if the match succeeds.
+
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherList.FieldMatcher.on_match:
+
+
+on_match
+  (:ref:`.xds.type.matcher.v3.Matcher.OnMatch <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.OnMatch>`, *REQUIRED*) What to do if the match succeeds.
+
+
+
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherTree:
+
+.xds.type.matcher.v3.Matcher.MatcherTree
+----------------------------------------
+
+
+`[.xds.type.matcher.v3.Matcher.MatcherTree proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/matcher.proto#L106>`_
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "input": {...},
+    "exact_match_map": {...},
+    "prefix_match_map": {...},
+    "custom_match": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.input:
+
+
+input
+  (:ref:`.xds.core.v3.TypedExtensionConfig <envoy_v3_api_msg_.xds.core.v3.TypedExtensionConfig>`, *REQUIRED*) Protocol-specific specification of input field to match on.
+
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.exact_match_map:
+
+
+exact_match_map
+  (:ref:`.xds.type.matcher.v3.Matcher.MatcherTree.MatchMap <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherTree.MatchMap>`) 
+  Exact or prefix match maps in which to look up the input value.
+  If the lookup succeeds, the match is considered successful, and
+  the corresponding OnMatch is used.
+
+
+  Precisely one of :ref:`exact_match_map <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.exact_match_map>`, :ref:`prefix_match_map <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.prefix_match_map>`, :ref:`custom_match <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.custom_match>` must be set.
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.prefix_match_map:
+
+
+prefix_match_map
+  (:ref:`.xds.type.matcher.v3.Matcher.MatcherTree.MatchMap <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherTree.MatchMap>`) Longest matching prefix wins.
+
+
+  Exact or prefix match maps in which to look up the input value.
+  If the lookup succeeds, the match is considered successful, and
+  the corresponding OnMatch is used.
+
+
+  Precisely one of :ref:`exact_match_map <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.exact_match_map>`, :ref:`prefix_match_map <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.prefix_match_map>`, :ref:`custom_match <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.custom_match>` must be set.
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.custom_match:
+
+
+custom_match
+  (:ref:`.xds.core.v3.TypedExtensionConfig <envoy_v3_api_msg_.xds.core.v3.TypedExtensionConfig>`) Extension for custom matching logic.
+
+
+  Exact or prefix match maps in which to look up the input value.
+  If the lookup succeeds, the match is considered successful, and
+  the corresponding OnMatch is used.
+
+
+  Precisely one of :ref:`exact_match_map <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.exact_match_map>`, :ref:`prefix_match_map <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.prefix_match_map>`, :ref:`custom_match <envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.custom_match>` must be set.
+
+.. _envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.MatcherTree.MatchMap:
+
+.xds.type.matcher.v3.Matcher.MatcherTree.MatchMap
+-------------------------------------------------
+
+
+`[.xds.type.matcher.v3.Matcher.MatcherTree.MatchMap proto] <https://github.com/cncf/xds/blob/main/xds/type/matcher/v3/matcher.proto#L108>`_
+
+A map of configured matchers. Used to allow using a map within a oneof.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "map": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.type.matcher.v3.Matcher.MatcherTree.MatchMap.map:
+
+
+map
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`.xds.type.matcher.v3.Matcher.OnMatch <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher.OnMatch>`>) 
+
+
+
+
+

@@ -1,0 +1,20 @@
+.. _version_history_v1.9:
+
+v1.9
+----
+
+Latest release:
+  `1.9.1 <https://github.com/envoyproxy/envoy/releases/tag/v1.9.1>`_ (April 2, 2019)
+
+Initial release date:
+  December 20, 2018
+
+
+.. toctree::
+  :titlesonly:
+  :maxdepth: 2
+  :caption: Changelog
+
+  v1.9.1
+  v1.9.0
+

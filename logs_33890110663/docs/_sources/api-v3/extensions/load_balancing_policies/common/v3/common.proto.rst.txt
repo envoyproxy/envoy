@@ -1,0 +1,389 @@
+.. _envoy_v3_api_file_envoy/extensions/load_balancing_policies/common/v3/common.proto:
+
+Common configuration for two or more load balancing policy extensions (proto)
+=============================================================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.LocalityLbConfig:
+
+extensions.load_balancing_policies.common.v3.LocalityLbConfig
+-------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.common.v3.LocalityLbConfig proto] <api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L24>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "zone_aware_lb_config": {...},
+    "locality_weighted_lb_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.zone_aware_lb_config:
+
+
+zone_aware_lb_config
+  (:ref:`extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig>`) Configuration for local zone aware load balancing.
+
+
+  
+
+  Precisely one of :ref:`zone_aware_lb_config <envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.zone_aware_lb_config>`, :ref:`locality_weighted_lb_config <envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.locality_weighted_lb_config>` must be set.
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.locality_weighted_lb_config:
+
+
+locality_weighted_lb_config
+  (:ref:`extensions.load_balancing_policies.common.v3.LocalityLbConfig.LocalityWeightedLbConfig <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.LocalityLbConfig.LocalityWeightedLbConfig>`) Enable locality weighted load balancing.
+
+
+  
+
+  Precisely one of :ref:`zone_aware_lb_config <envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.zone_aware_lb_config>`, :ref:`locality_weighted_lb_config <envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.locality_weighted_lb_config>` must be set.
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig:
+
+extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig
+-------------------------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig proto] <api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L28>`
+
+Configuration for :ref:`zone aware routing
+<arch_overview_load_balancing_zone_aware_routing>`.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "routing_enabled": {...},
+    "min_cluster_size": {...},
+    "fail_traffic_on_panic": ...,
+    "force_locality_direct_routing": ...,
+    "force_local_zone": {...},
+    "locality_basis": ...
+  }
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.routing_enabled:
+
+
+routing_enabled
+  (:ref:`type.v3.Percent <envoy_v3_api_msg_type.v3.Percent>`) Configures percentage of requests that will be considered for zone aware routing
+  if zone aware routing is configured. If not specified, the default is 100%.
+  * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
+  * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.min_cluster_size:
+
+
+min_cluster_size
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Configures minimum upstream cluster size required for zone aware routing
+  If upstream cluster size is less than specified, zone aware routing is not performed
+  even if zone aware routing is configured. If not specified, the default is 6.
+  * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
+  * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.fail_traffic_on_panic:
+
+
+fail_traffic_on_panic
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to true, Envoy will not consider any hosts when the cluster is in :ref:`panic
+  mode<arch_overview_load_balancing_panic_threshold>`. Instead, the cluster will fail all
+  requests as if all hosts are unhealthy. This can help avoid potentially overwhelming a
+  failing service.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.force_locality_direct_routing:
+
+
+force_locality_direct_routing
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to true, Envoy will force LocalityDirect routing if a local locality exists.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.force_local_zone:
+
+
+force_local_zone
+  (:ref:`extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.ForceLocalZone <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.ForceLocalZone>`) 
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.locality_basis:
+
+
+locality_basis
+  (:ref:`extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.LocalityBasis <envoy_v3_api_enum_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.LocalityBasis>`) Determines how locality percentages are computed:
+  - HEALTHY_HOSTS_NUM: proportional to the count of healthy hosts.
+  - HEALTHY_HOSTS_WEIGHT: proportional to the weights of healthy hosts.
+  Default value is HEALTHY_HOSTS_NUM if unset.
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.ForceLocalZone:
+
+extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.ForceLocalZone
+----------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.ForceLocalZone proto] <api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L45>`
+
+Configures Envoy to always route requests to the local zone regardless of the
+upstream zone structure. In Envoy's default configuration, traffic is distributed proportionally
+across all upstream hosts while trying to maximize local routing when possible. The approach
+with force_local_zone aims to be more predictable and if there are upstream hosts in the local
+zone, they will receive all traffic.
+* :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
+* :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "min_size": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.ForceLocalZone.min_size:
+
+
+min_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Configures the minimum number of upstream hosts in the local zone required when force_local_zone
+  is enabled. If the number of upstream hosts in the local zone is less than the specified value,
+  Envoy will fall back to the default proportional-based distribution across localities.
+  If not specified, the default is 1.
+  * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
+  * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
+
+
+
+.. _envoy_v3_api_enum_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.LocalityBasis:
+
+Enum extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.LocalityBasis
+--------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.LocalityBasis proto] <api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L30>`
+
+Basis for computing per-locality percentages in zone-aware routing.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.LocalityBasis.HEALTHY_HOSTS_NUM:
+
+
+HEALTHY_HOSTS_NUM
+  *(DEFAULT)* ⁣Use the number of healthy hosts in each locality.
+
+
+.. _envoy_v3_api_enum_value_extensions.load_balancing_policies.common.v3.LocalityLbConfig.ZoneAwareLbConfig.LocalityBasis.HEALTHY_HOSTS_WEIGHT:
+
+
+HEALTHY_HOSTS_WEIGHT
+  ⁣Use the weights of healthy hosts in each locality.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.LocalityLbConfig.LocalityWeightedLbConfig:
+
+extensions.load_balancing_policies.common.v3.LocalityLbConfig.LocalityWeightedLbConfig
+--------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.common.v3.LocalityLbConfig.LocalityWeightedLbConfig proto] <api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L89>`
+
+Configuration for :ref:`locality weighted load balancing
+<arch_overview_load_balancing_locality_weighted_lb>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.SlowStartConfig:
+
+extensions.load_balancing_policies.common.v3.SlowStartConfig
+------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.common.v3.SlowStartConfig proto] <api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L104>`
+
+Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "slow_start_window": {...},
+    "aggression": {...},
+    "min_weight_percent": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.SlowStartConfig.slow_start_window:
+
+
+slow_start_window
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Represents the size of slow start window.
+  If set, the newly created host remains in slow start mode starting from its creation time
+  for the duration of slow start window.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.SlowStartConfig.aggression:
+
+
+aggression
+  (:ref:`config.core.v3.RuntimeDouble <envoy_v3_api_msg_config.core.v3.RuntimeDouble>`) This parameter controls the speed of traffic increase over the slow start window. Defaults to 1.0,
+  so that endpoint would get linearly increasing amount of traffic.
+  When increasing the value for this parameter, the speed of traffic ramp-up increases non-linearly.
+  The value of aggression parameter should be greater than 0.0.
+  By tuning the parameter, is possible to achieve polynomial or exponential shape of ramp-up curve.
+
+  During slow start window, effective weight of an endpoint would be scaled with time factor and aggression:
+  ``new_weight = weight * max(min_weight_percent, time_factor ^ (1 / aggression))``,
+  where ``time_factor=(time_since_start_seconds / slow_start_time_seconds)``.
+
+  As time progresses, more and more traffic would be sent to endpoint, which is in slow start window.
+  Once host exits slow start, time_factor and aggression no longer affect its weight.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.SlowStartConfig.min_weight_percent:
+
+
+min_weight_percent
+  (:ref:`type.v3.Percent <envoy_v3_api_msg_type.v3.Percent>`) Configures the minimum percentage of origin weight that avoids too small new weight,
+  which may cause endpoints in slow start mode receive no traffic in slow start window.
+  If not specified, the default is 10%.
+
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig:
+
+extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig
+----------------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig proto] <api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L131>`
+
+Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "use_hostname_for_hashing": ...,
+    "hash_balance_factor": {...},
+    "hash_policy": []
+  }
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig.use_hostname_for_hashing:
+
+
+use_hostname_for_hashing
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to ``true``, the cluster will use hostname instead of the resolved
+  address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig.hash_balance_factor:
+
+
+hash_balance_factor
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Configures percentage of average cluster load to bound per upstream host. For example, with a value of 150
+  no upstream host will get a load more than 1.5 times the average load of all the hosts in the cluster.
+  If not specified, the load is not bounded for any upstream host. Typical value for this parameter is between 120 and 200.
+  Minimum is 100.
+
+  Applies to both Ring Hash and Maglev load balancers.
+
+  This is implemented based on the method described in the paper https://arxiv.org/abs/1608.01350. For the specified
+  ``hash_balance_factor``, requests to any upstream host are capped at ``hash_balance_factor/100`` times the average number of requests
+  across the cluster. When a request arrives for an upstream host that is currently serving at its max capacity, linear probing
+  is used to identify an eligible host. Further, the linear probe is implemented using a random jump in hosts ring/table to identify
+  the eligible host (this technique is as described in the paper https://arxiv.org/abs/1908.08762 - the random jump avoids the
+  cascading overflow effect when choosing the next host in the ring/table).
+
+  If weights are specified on the hosts, they are respected.
+
+  This is an O(N) algorithm, unlike other load balancers. Using a lower ``hash_balance_factor`` results in more hosts
+  being probed, so use a higher value if you require better performance.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig.hash_policy:
+
+
+hash_policy
+  (**repeated** :ref:`config.route.v3.RouteAction.HashPolicy <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy>`)  Specifies a list of hash policies to use for ring hash load balancing. If ``hash_policy`` is
+  set, then
+  :ref:`route level hash policy <envoy_v3_api_field_config.route.v3.RouteAction.hash_policy>`
+  will be ignored.
+
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.OrcaOobReportingConfig:
+
+extensions.load_balancing_policies.common.v3.OrcaOobReportingConfig
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.common.v3.OrcaOobReportingConfig proto] <api/envoy/extensions/load_balancing_policies/common/v3/common.proto#L168>`
+
+Connection overrides for the ORCA out-of-band (OOB) reporting stream, used by
+load balancing policies that consume ORCA load reports (e.g.
+:ref:`client_side_weighted_round_robin
+<envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`).
+Whether and when OOB reporting runs is controlled by the embedding policy.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "port_value": ...,
+    "authority": ...,
+    "transport_socket_match_criteria": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.OrcaOobReportingConfig.port_value:
+
+
+port_value
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional alternative port for the OOB reporting connection, for example an
+  ORCA reporting sidecar listening on a dedicated port. If 0 or unset, the
+  port of the host's ORCA reporting address is used. Ignored for non-IP
+  (pipe/UDS) host addresses.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.OrcaOobReportingConfig.authority:
+
+
+authority
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Value of the ``:authority`` header on the OOB gRPC stream. If empty, the
+  endpoint hostname is used, then the dialed address, then the cluster name.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.common.v3.OrcaOobReportingConfig.transport_socket_match_criteria:
+
+
+transport_socket_match_criteria
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) Optional key/value pairs used to select a transport socket from the
+  cluster's :ref:`transport_socket_matches
+  <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`
+  for the OOB connection. If unset, or if no match is found, the cluster's
+  default transport socket is used. ALPN ``h2`` is always forced on the OOB
+  connection regardless of this setting.
+
+

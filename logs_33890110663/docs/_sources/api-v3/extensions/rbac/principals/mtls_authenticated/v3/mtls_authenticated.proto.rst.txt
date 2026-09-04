@@ -1,0 +1,79 @@
+.. _envoy_v3_api_file_envoy/extensions/rbac/principals/mtls_authenticated/v3/mtls_authenticated.proto:
+
+RBAC MTls Authenticated Principal (proto)
+=========================================
+
+.. _extension_envoy.rbac.principals.mtls_authenticated:
+
+This extension has the qualified name ``envoy.rbac.principals.mtls_authenticated``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.rbac.principals <extension_category_envoy.rbac.principals>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.rbac.principals.mtls_authenticated.v3.Config <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config:
+
+extensions.rbac.principals.mtls_authenticated.v3.Config
+-------------------------------------------------------
+
+
+:repo:`[extensions.rbac.principals.mtls_authenticated.v3.Config proto] <api/envoy/extensions/rbac/principals/mtls_authenticated/v3/mtls_authenticated.proto#L27>`
+
+Authentication attributes for a downstream mTLS connection. All modes require that a peer certificate
+was presented and validated using the ValidationContext in the DownstreamTlsContext configuration.
+
+If neither field is set, a configuration loading error will be generated. This is so that
+not validating SANs requires an affirmative configuration to disable, to prevent accidentally
+not configuring SAN validation.
+
+If ``any_validated_client_certificate`` is set in addition to ``san_matcher`` or a future field
+which specifies additional validation, the other field always takes precedence over
+``any_validated_client_certificate`` and all specified validation is performed.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "san_matcher": {...},
+    "any_validated_client_certificate": ...
+  }
+
+.. _envoy_v3_api_field_extensions.rbac.principals.mtls_authenticated.v3.Config.san_matcher:
+
+
+san_matcher
+  (:ref:`extensions.transport_sockets.tls.v3.SubjectAltNameMatcher <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SubjectAltNameMatcher>`) Specifies a SAN that must be present in the validated peer certificate.
+
+
+.. _envoy_v3_api_field_extensions.rbac.principals.mtls_authenticated.v3.Config.any_validated_client_certificate:
+
+
+any_validated_client_certificate
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Only require that the peer certificate is present and valid.
+
+

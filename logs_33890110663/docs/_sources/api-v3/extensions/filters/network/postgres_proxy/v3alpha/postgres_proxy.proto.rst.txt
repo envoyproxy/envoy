@@ -1,0 +1,162 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.proto:
+
+Postgres proxy (proto)
+======================
+
+.. _extension_envoy.filters.network.postgres_proxy:
+
+This extension has the qualified name ``envoy.filters.network.postgres_proxy``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+Postgres Proxy :ref:`configuration overview
+<config_network_filters_postgres_proxy>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy:
+
+extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy
+---------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy proto] <api/contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.proto#L23>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "enable_sql_parsing": {...},
+    "terminate_ssl": ...,
+    "upstream_ssl": ...,
+    "downstream_ssl": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The human readable prefix to use when emitting :ref:`statistics
+  <config_network_filters_postgres_proxy_stats>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.enable_sql_parsing:
+
+
+enable_sql_parsing
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Controls whether SQL statements received in Frontend Query messages
+  are parsed. Parsing is required to produce Postgres proxy filter
+  metadata. Defaults to true.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.terminate_ssl:
+
+
+terminate_ssl
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Controls whether to terminate SSL session initiated by a client.
+  If the value is false, the Postgres proxy filter will not try to
+  terminate SSL session, but will pass all the packets to the upstream server.
+  If the value is true, the Postgres proxy filter will try to terminate SSL
+  session. In order to do that, the filter chain must use :ref:`starttls transport socket
+  <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
+  If the filter does not manage to terminate the SSL session, it will close the connection from the client.
+  Refer to official documentation for details
+  `SSL Session Encryption Message Flow <https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.5.7.11>`_.
+  This field is deprecated.
+  Please use :ref:`downstream_ssl <envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.downstream_ssl>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.upstream_ssl:
+
+
+upstream_ssl
+  (:ref:`extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.SSLMode <envoy_v3_api_enum_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.SSLMode>`) Controls whether to establish upstream SSL connection to the server.
+  Envoy will try to establish upstream SSL connection to the server only when
+  Postgres filter is able to read Postgres payload in clear-text. It happens when
+  a client established a clear-text connection to Envoy or when a client established
+  SSL connection to Envoy and Postgres filter is configured to terminate SSL.
+  In order for upstream encryption to work, the corresponding cluster must be configured to use
+  :ref:`starttls transport socket <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig>`.
+  Defaults to ``DISABLE``.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.downstream_ssl:
+
+
+downstream_ssl
+  (:ref:`extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.SSLMode <envoy_v3_api_enum_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.SSLMode>`) Controls whether to close downstream connections that refuse to upgrade to SSL.
+  If enabled, the filter chain must use
+  :ref:`starttls transport socket <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig>`.
+  Defaults to ``DISABLE``.
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.SSLMode:
+
+Enum extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.SSLMode
+----------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.SSLMode proto] <api/contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.proto#L25>`
+
+Downstream and Upstream SSL operational modes.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.SSLMode.DISABLE:
+
+
+DISABLE
+  *(DEFAULT)* ⁣If used in downstream ssl, do not terminate SSL session initiated by a client.
+  The Postgres proxy filter will pass all encrypted and unencrypted packets to the upstream server.
+  If used in upstream ssl, do not encrypt upstream connection to the server.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.SSLMode.REQUIRE:
+
+
+REQUIRE
+  ⁣If used in downstream ssl, the Postgres proxy filter will terminate SSL
+  session and close downstream connections that refuse to upgrade to SSL.
+  If used in upstream SSL, establish upstream SSL connection to the server. If the server does not
+  accept the request for SSL connection, the session is terminated.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.SSLMode.ALLOW:
+
+
+ALLOW
+  ⁣If used in downstream SSL, the Postgres proxy filter will accept downstream
+  client's encryption settings. If the client wants to use clear-text,
+  Envoy will not enforce SSL encryption.
+  If the client wants to use encryption, Envoy will terminate SSL.
+
+
+

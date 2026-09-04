@@ -1,0 +1,103 @@
+.. _envoy_v3_api_file_envoy/extensions/rate_limit_descriptors/expr/v3/expr.proto:
+
+Rate limit descriptor expression (proto)
+========================================
+
+.. _extension_envoy.rate_limit_descriptors.expr:
+
+This extension has the qualified name ``envoy.rate_limit_descriptors.expr``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.rate_limit_descriptors <extension_category_envoy.rate_limit_descriptors>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor <envoy_v3_api_msg_extensions.rate_limit_descriptors.expr.v3.Descriptor>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.rate_limit_descriptors.expr.v3.Descriptor:
+
+extensions.rate_limit_descriptors.expr.v3.Descriptor
+----------------------------------------------------
+
+
+:repo:`[extensions.rate_limit_descriptors.expr.v3.Descriptor proto] <api/envoy/extensions/rate_limit_descriptors/expr/v3/expr.proto#L26>`
+
+The following descriptor entry is appended with a value computed
+from a symbolic Common Expression Language expression.
+See :ref:`attributes <arch_overview_attributes>` for the set of
+available attributes.
+
+.. code-block:: cpp
+
+  ("<descriptor_key>", "<expression_value>")
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "descriptor_key": ...,
+    "skip_if_error": ...,
+    "text": ...,
+    "parsed": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.rate_limit_descriptors.expr.v3.Descriptor.descriptor_key:
+
+
+descriptor_key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The key to use in the descriptor entry.
+
+
+.. _envoy_v3_api_field_extensions.rate_limit_descriptors.expr.v3.Descriptor.skip_if_error:
+
+
+skip_if_error
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to true, Envoy skips the descriptor if the expression evaluates to an error.
+  By default, the rate limit is not applied when an expression produces an error.
+
+
+.. _envoy_v3_api_field_extensions.rate_limit_descriptors.expr.v3.Descriptor.text:
+
+
+text
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Expression in a text form, e.g. "connection.requested_server_name".
+
+
+  
+
+  Only one of :ref:`text <envoy_v3_api_field_extensions.rate_limit_descriptors.expr.v3.Descriptor.text>`, :ref:`parsed <envoy_v3_api_field_extensions.rate_limit_descriptors.expr.v3.Descriptor.parsed>` may be set.
+
+.. _envoy_v3_api_field_extensions.rate_limit_descriptors.expr.v3.Descriptor.parsed:
+
+
+parsed
+  (.google.api.expr.v1alpha1.Expr) Parsed expression in AST form.
+
+
+  
+
+  Only one of :ref:`text <envoy_v3_api_field_extensions.rate_limit_descriptors.expr.v3.Descriptor.text>`, :ref:`parsed <envoy_v3_api_field_extensions.rate_limit_descriptors.expr.v3.Descriptor.parsed>` may be set.
+

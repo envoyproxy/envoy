@@ -48,7 +48,7 @@ public:
     auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
     inner_socket_ = inner_socket.get();
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
-    
+
     std::vector<TlvFormatter> added_tlvs;
     for (const auto& entry : config.added_tlvs()) {
       TlvFormatter tlv;
@@ -1095,22 +1095,28 @@ TEST_F(ProxyProtocolTest, V2FormatStringTlv) {
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
   auto tlv = config.add_added_tlvs();
   tlv->set_type(0x55);
-  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string("%UPSTREAM_REMOTE_ADDRESS%");
-  
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+      "%UPSTREAM_REMOTE_ADDRESS%");
+
   // Set up mock remote address
   auto remote_address = Network::Utility::resolveUrl("tcp://10.0.0.1:8080");
-  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(remote_address);
-  transport_callbacks_.connection_.stream_info_.upstreamInfo()->setUpstreamRemoteAddress(remote_address);
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(remote_address);
+  transport_callbacks_.connection_.stream_info_.upstreamInfo()->setUpstreamRemoteAddress(
+      remote_address);
 
   initialize(config, nullptr);
 
   // The proxy protocol header contains a TLV with type 0x55 and value "10.0.0.1:8080"
   // Proxy protocol header + 0x55 + length (13) + value ("10.0.0.1:8080")
   std::vector<uint8_t> expected = {
-      0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, // proxy protocol magic
-      0x20, 0x00, 0x00, 0x10, // version 2, local connection, length 16 (3 byte header + 13 bytes address)
-      0x55, 0x00, 0x0d, // type 0x55, length 13
-      0x31, 0x30, 0x2e, 0x30, 0x2e, 0x30, 0x2e, 0x31, 0x3a, 0x38, 0x30, 0x38, 0x30 // "10.0.0.1:8080"
+      0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a,
+      0x51, 0x55, 0x49, 0x54, 0x0a, // proxy protocol magic
+      0x20, 0x00, 0x00, 0x10, // version 2, local connection, length 16 (3 byte header + 13 bytes
+                              // address)
+      0x55, 0x00, 0x0d,       // type 0x55, length 13
+      0x31, 0x30, 0x2e, 0x30, 0x2e, 0x30, 0x2e,
+      0x31, 0x3a, 0x38, 0x30, 0x38, 0x30 // "10.0.0.1:8080"
   };
 
   EXPECT_CALL(io_handle_, write(_))

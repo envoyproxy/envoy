@@ -1,0 +1,123 @@
+.. _envoy_v3_api_file_envoy/extensions/bootstrap/dynamic_modules/v3/dynamic_modules.proto:
+
+Dynamic Modules Bootstrap Extension (proto)
+===========================================
+
+.. _extension_envoy.bootstrap.dynamic_modules:
+
+This extension has the qualified name ``envoy.bootstrap.dynamic_modules``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.bootstrap <extension_category_envoy.bootstrap>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension <envoy_v3_api_msg_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension:
+
+extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
+-----------------------------------------------------------------------
+
+
+:repo:`[extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension proto] <api/envoy/extensions/bootstrap/dynamic_modules/v3/dynamic_modules.proto#L31>`
+
+Configuration for the Dynamic Modules bootstrap extension. This extension allows loading shared
+object files that can be loaded via ``dlopen`` to extend Envoy's bootstrap behavior.
+
+A module can be loaded by multiple bootstrap extensions; the module is loaded only once and shared
+across multiple extensions.
+
+Bootstrap extensions run on the main thread and are initialized when Envoy starts. They can:
+
+* Perform initialization tasks when the server is initialized.
+* Perform per-worker thread initialization when worker threads start.
+* Access server-level resources like the cluster manager and dispatcher.
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "extension_name": ...,
+    "extension_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`) Specifies the shared-object level configuration.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension.extension_name:
+
+
+extension_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name for this extension configuration.
+
+  This can be used to distinguish between different extension implementations inside a dynamic
+  module. For example, a module can have completely different extension implementations. When Envoy
+  receives this configuration, it passes the ``extension_name`` to the dynamic module's bootstrap
+  extension config init function together with the ``extension_config``. That way a module can
+  decide which in-module extension implementation to use based on the name at load time.
+
+  If not specified, defaults to an empty string.
+
+
+.. _envoy_v3_api_field_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension.extension_config:
+
+
+extension_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the extension chosen by ``extension_name``.
+
+  This is passed to the module's bootstrap extension initialization function. Together with the
+  ``extension_name``, the module can decide which in-module extension implementation to use and
+  fine-tune the behavior of the extension.
+
+  For example, if a module has two extension implementations, one for configuration loading and
+  one for metric initialization, ``extension_name`` is used to choose the implementation. The
+  ``extension_config`` can be used to configure the specific behavior of each implementation.
+
+  ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
+  without the wrapper.
+
+  .. code-block:: yaml
+
+   # Passing a string value
+   extension_config:
+     "@type": "type.googleapis.com/google.protobuf.StringValue"
+     value: hello
+
+   # Passing raw bytes
+   extension_config:
+     "@type": "type.googleapis.com/google.protobuf.BytesValue"
+     value: aGVsbG8=  # echo -n "hello" | base64
+
+
+

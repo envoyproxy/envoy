@@ -1,0 +1,280 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/v3/payload_to_metadata.proto:
+
+Payload-To-Metadata Filter (proto)
+==================================
+
+.. _extension_envoy.filters.thrift.payload_to_metadata:
+
+This extension has the qualified name ``envoy.filters.thrift.payload_to_metadata``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.thrift_proxy.filters <extension_category_envoy.thrift_proxy.filters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata>`
+
+
+
+
+The configuration for transforming payloads into metadata. This is useful
+for matching load balancer subsets, logging, etc.
+
+Payload to Metadata :ref:`configuration overview <config_thrift_filters_payload_to_metadata>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata:
+
+extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata
+----------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata proto] <api/envoy/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/v3/payload_to_metadata.proto#L23>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_rules": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.request_rules:
+
+
+request_rules
+  (**repeated** :ref:`extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule>`, *REQUIRED*) The list of rules to apply to requests.
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair:
+
+extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair
+-----------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair proto] <api/envoy/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/v3/payload_to_metadata.proto#L30>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "metadata_namespace": ...,
+    "key": ...,
+    "value": ...,
+    "regex_value_rewrite": {...},
+    "type": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair.metadata_namespace:
+
+
+metadata_namespace
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The namespace — if this is empty, the filter's namespace will be used.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The key to use within the namespace.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair.value:
+
+
+value
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The value to pair with the given key.
+
+  When used for on_present case, if value is non-empty it'll be used instead
+  of the field value. If both are empty, the field value is used as-is.
+
+  When used for on_missing case, a non-empty value must be provided.
+
+
+  
+
+  Only one of :ref:`value <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair.value>`, :ref:`regex_value_rewrite <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair.regex_value_rewrite>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair.regex_value_rewrite:
+
+
+regex_value_rewrite
+  (:ref:`type.matcher.v3.RegexMatchAndSubstitute <envoy_v3_api_msg_type.matcher.v3.RegexMatchAndSubstitute>`) If present, the header's value will be matched and substituted with this.
+  If there is no match or substitution, the field value is used as-is.
+
+  This is only used for on_present.
+
+
+  
+
+  Only one of :ref:`value <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair.value>`, :ref:`regex_value_rewrite <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair.regex_value_rewrite>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair.type:
+
+
+type
+  (:ref:`extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.ValueType <envoy_v3_api_enum_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.ValueType>`) The value's type — defaults to string.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule:
+
+extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule
+---------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule proto] <api/envoy/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/v3/payload_to_metadata.proto#L59>`
+
+A Rule defines what metadata to apply when a field is present or missing.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "method_name": ...,
+    "service_name": ...,
+    "field_selector": {...},
+    "on_present": {...},
+    "on_missing": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.method_name:
+
+
+method_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If specified, the route must exactly match the request method name. As a special case,
+  an empty string matches any request method name.
+
+
+  
+
+  Precisely one of :ref:`method_name <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.method_name>`, :ref:`service_name <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.service_name>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.service_name:
+
+
+service_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If specified, the route must have the service name as the request method name prefix.
+  As a special case, an empty string matches any service name. Only relevant when service
+  multiplexing.
+
+
+  
+
+  Precisely one of :ref:`method_name <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.method_name>`, :ref:`service_name <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.service_name>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.field_selector:
+
+
+field_selector
+  (:ref:`extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.FieldSelector <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.FieldSelector>`, *REQUIRED*) Specifies that a match will be performed on the value of a field.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.on_present:
+
+
+on_present
+  (:ref:`extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair>`) If the field is present, apply this metadata KeyValuePair.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.on_missing:
+
+
+on_missing
+  (:ref:`extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.KeyValuePair>`) If the field is missing, apply this metadata KeyValuePair.
+
+  The value in the KeyValuePair must be set, since it'll be used in lieu
+  of the missing field value.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.FieldSelector:
+
+extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.FieldSelector
+------------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.FieldSelector proto] <api/envoy/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/v3/payload_to_metadata.proto#L86>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "id": ...,
+    "child": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.FieldSelector.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) field name to log
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.FieldSelector.id:
+
+
+id
+  (`int32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) field id to match
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.FieldSelector.child:
+
+
+child
+  (:ref:`extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.FieldSelector <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.FieldSelector>`) next node of the field selector
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.ValueType:
+
+Enum extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.ValueType
+-------------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.ValueType proto] <api/envoy/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/v3/payload_to_metadata.proto#L24>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.ValueType.STRING:
+
+
+STRING
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.ValueType.NUMBER:
+
+
+NUMBER
+  ⁣
+
+

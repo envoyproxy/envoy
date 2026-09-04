@@ -1,0 +1,542 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Attribute context (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="Authorization service (proto)" href="external_auth.proto.html" />
+    <link rel="prev" title="External Authorization" href="../../../../intro/arch_overview/security/ext_authz_filter.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../intro/what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../intro/arch_overview/arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../intro/arch_overview/intro/intro.html">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../intro/arch_overview/listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../intro/arch_overview/http/http.html">HTTP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../intro/arch_overview/upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../intro/arch_overview/observability/observability.html">Observability</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../intro/arch_overview/security/security.html">Security</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/ssl.html">TLS</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/jwt_authn_filter.html">JSON Web Token (JWT) Authentication</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../intro/arch_overview/security/ext_authz_filter.html">External Authorization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/rbac_filter.html">Role Based Access Control</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/threat_model.html">Threat model</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/threat_model.html#extension-security-robust-to-untrusted-downstream-and-upstream">Extension security: <code class="docutils literal notranslate"><span class="pre">robust_to_untrusted_downstream_and_upstream</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/threat_model.html#extension-security-data-plane-agnostic">Extension security: <code class="docutils literal notranslate"><span class="pre">data_plane_agnostic</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/threat_model.html#extension-security-robust-to-untrusted-downstream">Extension security: <code class="docutils literal notranslate"><span class="pre">robust_to_untrusted_downstream</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/threat_model.html#extension-security-requires-trusted-downstream-and-upstream">Extension security: <code class="docutils literal notranslate"><span class="pre">requires_trusted_downstream_and_upstream</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/threat_model.html#extension-security-unknown">Extension security: <code class="docutils literal notranslate"><span class="pre">unknown</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/external_deps.html">External dependencies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/external_deps.html#external-dependencies-dataplane-core">External dependencies: <code class="docutils literal notranslate"><span class="pre">dataplane_core</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/external_deps.html#external-dependencies-dataplane-ext">External dependencies: <code class="docutils literal notranslate"><span class="pre">dataplane_ext</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/external_deps.html#external-dependencies-controlplane">External dependencies: <code class="docutils literal notranslate"><span class="pre">controlplane</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/external_deps.html#external-dependencies-api">External dependencies: <code class="docutils literal notranslate"><span class="pre">api</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/external_deps.html#external-dependencies-observability-core">External dependencies: <code class="docutils literal notranslate"><span class="pre">observability_core</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/external_deps.html#external-dependencies-observability-ext">External dependencies: <code class="docutils literal notranslate"><span class="pre">observability_ext</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/external_deps.html#external-dependencies-build">External dependencies: <code class="docutils literal notranslate"><span class="pre">build</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/external_deps.html#external-dependencies-other">External dependencies: <code class="docutils literal notranslate"><span class="pre">other</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/external_deps.html#external-dependencies-test-only">External dependencies: <code class="docutils literal notranslate"><span class="pre">test_only</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../intro/arch_overview/security/google_vrp.html">Google Patch Reward Program (PRP)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../intro/arch_overview/operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../intro/arch_overview/other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../intro/arch_overview/other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../intro/arch_overview/advanced/advanced.html">Advanced</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../intro/life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../intro/deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../intro/getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../intro/intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../../../../intro/arch_overview/arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="../../../../intro/arch_overview/security/security.html">Security</a></li>
+          <li class="breadcrumb-item"><a href="../../../../intro/arch_overview/security/ext_authz_filter.html">External Authorization</a></li>
+      <li class="breadcrumb-item active">Attribute context (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/service/auth/v3/attribute_context.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="attribute-context-proto">
+<span id="envoy-v3-api-file-envoy-service-auth-v3-attribute-context-proto"></span><h1>Attribute context (proto)<a class="headerlink" href="#attribute-context-proto" title="Link to this heading"></a></h1>
+<p>See <a class="reference internal" href="../../../../configuration/listeners/network_filters/ext_authz_filter.html#config-network-filters-ext-authz"><span class="std std-ref">network filter configuration overview</span></a>
+and <a class="reference internal" href="../../../../configuration/http/http_filters/ext_authz_filter.html#config-http-filters-ext-authz"><span class="std std-ref">HTTP filter configuration overview</span></a>.</p>
+<section id="service-auth-v3-attributecontext">
+<span id="envoy-v3-api-msg-service-auth-v3-attributecontext"></span><h2>service.auth.v3.AttributeContext<a class="headerlink" href="#service-auth-v3-attributecontext" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/auth/v3/attribute_context.proto#L42">[service.auth.v3.AttributeContext proto]</a></p>
+<p>An attribute is a piece of metadata that describes an activity on a network.
+For example, the size of an HTTP request, or the status code of an HTTP response.</p>
+<p>Each attribute has a type and a name, which is logically defined as a proto message field
+of the <code class="docutils literal notranslate"><span class="pre">AttributeContext</span></code>. The <code class="docutils literal notranslate"><span class="pre">AttributeContext</span></code> is a collection of individual attributes
+supported by Envoy authorization system.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;destination&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;request&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;context_extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;metadata_context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;route_metadata_context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;tls_session&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-source">
+<dt>source</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-auth-v3-attributecontext-peer"><span class="std std-ref">service.auth.v3.AttributeContext.Peer</span></a>) The source of a network activity, such as starting a TCP connection.
+In a multi hop network activity, the source represents the sender of the
+last hop.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-destination">
+<dt>destination</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-auth-v3-attributecontext-peer"><span class="std std-ref">service.auth.v3.AttributeContext.Peer</span></a>) The destination of a network activity, such as accepting a TCP connection.
+In a multi hop network activity, the destination represents the receiver of
+the last hop.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-request">
+<dt>request</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-auth-v3-attributecontext-request"><span class="std std-ref">service.auth.v3.AttributeContext.Request</span></a>) Represents a network request, such as an HTTP request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-context-extensions">
+<dt>context_extensions</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>&gt;) This is analogous to http_request.headers, however these contents will not be sent to the
+upstream server. Context_extensions provide an extension mechanism for sending additional
+information to the auth server without modifying the proto definition. It maps to the
+internal opaque context in the filter chain.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-metadata-context">
+<dt>metadata_context</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-metadata"><span class="std std-ref">config.core.v3.Metadata</span></a>) Dynamic metadata associated with the request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-route-metadata-context">
+<dt>route_metadata_context</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-metadata"><span class="std std-ref">config.core.v3.Metadata</span></a>) Metadata associated with the selected route.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-tls-session">
+<dt>tls_session</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-auth-v3-attributecontext-tlssession"><span class="std std-ref">service.auth.v3.AttributeContext.TLSSession</span></a>) TLS session details of the underlying connection.
+This is not populated by default and will be populated only if the ext_authz filter has
+been specifically configured to include this information.
+For HTTP ext_authz, that requires <a class="reference internal" href="../../../../configuration/http/http_filters/ext_authz_filter.html#config-http-filters-ext-authz"><span class="std std-ref">include_tls_session</span></a>
+to be set to true.
+For network ext_authz, that requires <a class="reference internal" href="../../../../configuration/listeners/network_filters/ext_authz_filter.html#config-network-filters-ext-authz"><span class="std std-ref">include_tls_session</span></a>
+to be set to true.</p>
+</dd>
+</dl>
+</section>
+<section id="service-auth-v3-attributecontext-peer">
+<span id="envoy-v3-api-msg-service-auth-v3-attributecontext-peer"></span><h2>service.auth.v3.AttributeContext.Peer<a class="headerlink" href="#service-auth-v3-attributecontext-peer" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/auth/v3/attribute_context.proto#L51">[service.auth.v3.AttributeContext.Peer proto]</a></p>
+<p>This message defines attributes for a node that handles a network request.
+The node can be either a service or an application that sends, forwards,
+or receives the request. Service peers should fill in the <code class="docutils literal notranslate"><span class="pre">service</span></code>,
+<code class="docutils literal notranslate"><span class="pre">principal</span></code>, and <code class="docutils literal notranslate"><span class="pre">labels</span></code> as appropriate.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;service&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;labels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;principal&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;certificate&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-peer-address">
+<dt>address</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-address"><span class="std std-ref">config.core.v3.Address</span></a>) The address of the peer, this is typically the IP address.
+It can also be UDS path, or others.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-peer-service">
+<dt>service</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The canonical service name of the peer.
+It should be set to <a class="reference internal" href="../../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-downstream-service-cluster"><span class="std std-ref">the HTTP x-envoy-downstream-service-cluster</span></a>
+If a more trusted source of the service name is available through mTLS/secure naming, it
+should be used.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-peer-labels">
+<dt>labels</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>&gt;) The labels associated with the peer.
+These could be pod labels for Kubernetes or tags for VMs.
+The source of the labels could be an X.509 certificate or other configuration.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-auth-v3-attributecontext-peer-principal">
+<dt>principal</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The authenticated identity of this peer.
+For example, the identity associated with the workload such as a service account.
+If an X.509 certificate is used to assert the identity this field should be sourced from
+<code class="docutils literal notranslate"><span class="pre">URI</span> <span class="pre">Subject</span> <span class="pre">Alternative</span> <span class="pre">Names</span></code>, <code class="docutils literal notranslate"><span class="pre">DNS</span> <span class="pre">Subject</span> <span class="pre">Alternate</span> <span class="pre">Names</span></code> or <code class="docutils literal notranslate"><span class="pre">Subject</span></code> in that order.
+The primary identity should be the principal. The principal format is issuer specific.</p>
+<p>Examples:</p>
+<ul class="simple">
+<li><p>SPIFFE format is <code class="docutils literal notranslate"><span class="pre">spiffe://trust-domain/path</span></code>.</p></li>
+<li><p>Google account format is <code class="docutils literal notranslate"><span class="pre">https://accounts.google.com/{userid}</span></code>.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-peer-certificate">
+<dt>certificate</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The X.509 certificate used to authenticate the identify of this peer.
+When present, the certificate contents are encoded in URL and PEM format.</p>
+</dd>
+</dl>
+</section>
+<section id="service-auth-v3-attributecontext-request">
+<span id="envoy-v3-api-msg-service-auth-v3-attributecontext-request"></span><h2>service.auth.v3.AttributeContext.Request<a class="headerlink" href="#service-auth-v3-attributecontext-request" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/auth/v3/attribute_context.proto#L89">[service.auth.v3.AttributeContext.Request proto]</a></p>
+<p>Represents a network request, such as an HTTP request.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;time&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;http&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-request-time">
+<dt>time</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#timestamp">Timestamp</a>) The timestamp when the proxy receives the first byte of the request.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-request-http">
+<dt>http</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-auth-v3-attributecontext-httprequest"><span class="std std-ref">service.auth.v3.AttributeContext.HttpRequest</span></a>) Represents an HTTP request or an HTTP-like request.</p>
+</dd>
+</dl>
+</section>
+<section id="service-auth-v3-attributecontext-httprequest">
+<span id="envoy-v3-api-msg-service-auth-v3-attributecontext-httprequest"></span><h2>service.auth.v3.AttributeContext.HttpRequest<a class="headerlink" href="#service-auth-v3-attributecontext-httprequest" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/auth/v3/attribute_context.proto#L103">[service.auth.v3.AttributeContext.HttpRequest proto]</a></p>
+<p>This message defines attributes for an HTTP request.
+HTTP/1.x, HTTP/2, gRPC are all considered as HTTP requests.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;method&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;header_map&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;host&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;scheme&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;query&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;fragment&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;size&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;protocol&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;body&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;raw_body&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-id">
+<dt>id</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The unique ID for a request, which can be propagated to downstream
+systems. The ID should have low probability of collision
+within a single day for a specific service.
+For HTTP requests, it should be X-Request-ID or equivalent.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-method">
+<dt>method</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The HTTP request method, such as <code class="docutils literal notranslate"><span class="pre">GET</span></code>, <code class="docutils literal notranslate"><span class="pre">POST</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-headers">
+<dt>headers</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>&gt;) The HTTP request headers. If multiple headers share the same key, they
+must be merged according to the HTTP spec. All header keys must be
+lower-cased, because HTTP header keys are case-insensitive.
+Header value is encoded as UTF-8 string. Non-UTF-8 characters will be replaced by “!”.
+This field will not be set if
+<a class="reference internal" href="../../../extensions/filters/http/ext_authz/v3/ext_authz.proto.html#envoy-v3-api-field-extensions-filters-http-ext-authz-v3-extauthz-encode-raw-headers"><span class="std std-ref">encode_raw_headers</span></a>
+is set to true.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-header-map">
+<dt>header_map</dt><dd><p>(<a class="reference internal" href="../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-headermap"><span class="std std-ref">config.core.v3.HeaderMap</span></a>) A list of the raw HTTP request headers. This is used instead of
+<a class="reference internal" href="#envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-headers"><span class="std std-ref">headers</span></a> when
+<a class="reference internal" href="../../../extensions/filters/http/ext_authz/v3/ext_authz.proto.html#envoy-v3-api-field-extensions-filters-http-ext-authz-v3-extauthz-encode-raw-headers"><span class="std std-ref">encode_raw_headers</span></a>
+is set to true.</p>
+<p>Note that this is not actually a map type. <code class="docutils literal notranslate"><span class="pre">header_map</span></code> contains a single repeated field
+<code class="docutils literal notranslate"><span class="pre">headers</span></code>.</p>
+<p>Here, only the <code class="docutils literal notranslate"><span class="pre">key</span></code> and <code class="docutils literal notranslate"><span class="pre">raw_value</span></code> fields will be populated for each HeaderValue, and
+that is only when
+<a class="reference internal" href="../../../extensions/filters/http/ext_authz/v3/ext_authz.proto.html#envoy-v3-api-field-extensions-filters-http-ext-authz-v3-extauthz-encode-raw-headers"><span class="std std-ref">encode_raw_headers</span></a>
+is set to true.</p>
+<p>Also, unlike the
+<a class="reference internal" href="#envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-headers"><span class="std std-ref">headers</span></a>
+field, headers with the same key are not combined into a single comma separated header.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-path">
+<dt>path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The request target, as it appears in the first line of the HTTP request. This includes
+the URL path and query-string. No decoding is performed.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-host">
+<dt>host</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The HTTP request <code class="docutils literal notranslate"><span class="pre">Host</span></code> or <code class="docutils literal notranslate"><span class="pre">:authority</span></code> header value.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-scheme">
+<dt>scheme</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The HTTP URL scheme, such as <code class="docutils literal notranslate"><span class="pre">http</span></code> and <code class="docutils literal notranslate"><span class="pre">https</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-query">
+<dt>query</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) This field is always empty, and exists for compatibility reasons. The HTTP URL query is
+included in <code class="docutils literal notranslate"><span class="pre">path</span></code> field.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-fragment">
+<dt>fragment</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) This field is always empty, and exists for compatibility reasons. The URL fragment is
+not submitted as part of HTTP requests; it is unknowable.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-size">
+<dt>size</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">int64</a>) The HTTP request size in bytes. If unknown, it must be -1.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-protocol">
+<dt>protocol</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The network protocol used with the request, such as “HTTP/1.0”, “HTTP/1.1”, or “HTTP/2”.</p>
+<p>See <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/source/common/http/headers.h">headers.h:ProtocolStrings</a> for a list of all
+possible values.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-body">
+<dt>body</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The HTTP request body.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-raw-body">
+<dt>raw_body</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bytes</a>) The HTTP request body in bytes. This is used instead of
+<a class="reference internal" href="#envoy-v3-api-field-service-auth-v3-attributecontext-httprequest-body"><span class="std std-ref">body</span></a> when
+<a class="reference internal" href="../../../extensions/filters/http/ext_authz/v3/ext_authz.proto.html#envoy-v3-api-field-extensions-filters-http-ext-authz-v3-buffersettings-pack-as-bytes"><span class="std std-ref">pack_as_bytes</span></a>
+is set to true.</p>
+</dd>
+</dl>
+</section>
+<section id="service-auth-v3-attributecontext-tlssession">
+<span id="envoy-v3-api-msg-service-auth-v3-attributecontext-tlssession"></span><h2>service.auth.v3.AttributeContext.TLSSession<a class="headerlink" href="#service-auth-v3-attributecontext-tlssession" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/auth/v3/attribute_context.proto#L183">[service.auth.v3.AttributeContext.TLSSession proto]</a></p>
+<p>This message defines attributes for the underlying TLS session.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;sni&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-auth-v3-attributecontext-tlssession-sni">
+<dt>sni</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) SNI used for TLS session.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../../../intro/arch_overview/security/ext_authz_filter.html" class="btn btn-neutral float-left" title="External Authorization" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="external_auth.proto.html" class="btn btn-neutral float-right" title="Authorization service (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Attribute context (proto)</a><ul>
+<li><a class="reference internal" href="#service-auth-v3-attributecontext">service.auth.v3.AttributeContext</a></li>
+<li><a class="reference internal" href="#service-auth-v3-attributecontext-peer">service.auth.v3.AttributeContext.Peer</a></li>
+<li><a class="reference internal" href="#service-auth-v3-attributecontext-request">service.auth.v3.AttributeContext.Request</a></li>
+<li><a class="reference internal" href="#service-auth-v3-attributecontext-httprequest">service.auth.v3.AttributeContext.HttpRequest</a></li>
+<li><a class="reference internal" href="#service-auth-v3-attributecontext-tlssession">service.auth.v3.AttributeContext.TLSSession</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

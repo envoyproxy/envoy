@@ -1,0 +1,57 @@
+.. _envoy_v3_api_file_xds/core/v3/resource.proto:
+
+xds/core/v3/resource.proto (proto)
+==================================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+.. _envoy_v3_api_msg_.xds.core.v3.Resource:
+
+.xds.core.v3.Resource
+---------------------
+
+
+`[.xds.core.v3.Resource proto] <https://github.com/cncf/xds/blob/main/xds/core/v3/resource.proto#L18>`_
+
+xDS resource wrapper. This encapsulates a xDS resource when appearing in an
+xDS transport discovery response or when accessed as a filesystem object.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": {...},
+    "version": ...,
+    "resource": {...}
+  }
+
+.. _envoy_v3_api_field_.xds.core.v3.Resource.name:
+
+
+name
+  (:ref:`.xds.core.v3.ResourceName <envoy_v3_api_msg_.xds.core.v3.ResourceName>`) Resource name. This may be omitted for filesystem resources.
+
+
+.. _envoy_v3_api_field_.xds.core.v3.Resource.version:
+
+
+version
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The resource's logical version. It is illegal to have the same named xDS
+  resource name at a given version with different resource payloads.
+
+
+.. _envoy_v3_api_field_.xds.core.v3.Resource.resource:
+
+
+resource
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The resource payload, including type URL.
+
+

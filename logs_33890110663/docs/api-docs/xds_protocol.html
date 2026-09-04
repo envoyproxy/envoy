@@ -1,0 +1,1182 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>xDS REST and gRPC protocol &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Well Known Client Features" href="../api/client_features.html" />
+    <link rel="prev" title="Address Matcher (proto)" href="../api-v3/type/matcher/v3/address.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../searchindex.js"
+          data-envoy-search-page="../search.html"
+          data-envoy-root="../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api-v3/api.html">v3 API reference</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../api/api.html">API</a></li>
+      <li class="breadcrumb-item active">xDS REST and gRPC protocol</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api-docs/xds_protocol.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="xds-rest-and-grpc-protocol">
+<span id="xds-protocol"></span><h1>xDS REST and gRPC protocol<a class="headerlink" href="#xds-rest-and-grpc-protocol" title="Link to this heading"></a></h1>
+<p>Envoy discovers its various dynamic resources via the filesystem or by
+querying one or more management servers. Collectively, these discovery
+services and their corresponding APIs are referred to as <code class="docutils literal notranslate"><span class="pre">xDS</span></code>.
+Resources are requested via <code class="docutils literal notranslate"><span class="pre">subscriptions</span></code>, by specifying a filesystem
+path to watch, initiating gRPC streams, or polling a REST-JSON URL. The
+latter two methods involve sending requests with a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a>
+proto payload. Resources are delivered in a
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a>
+proto payload in all methods. We discuss each type of subscription
+below.</p>
+<section id="resource-types">
+<h2>Resource Types<a class="headerlink" href="#resource-types" title="Link to this heading"></a></h2>
+<p>Every configuration resource in the xDS API has a type associated with it. Resource types follow a
+<a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/API_VERSIONING.md">versioning scheme</a>. Resource types are versioned independent of the
+transports described below.</p>
+<p>The following v3 xDS resource types are supported:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">envoy.config.listener.v3.Listener</span></a></p></li>
+<li><p><a class="reference internal" href="../api-v3/config/route/v3/route.proto.html#envoy-v3-api-msg-config-route-v3-routeconfiguration"><span class="std std-ref">envoy.config.route.v3.RouteConfiguration</span></a>,</p></li>
+<li><p><a class="reference internal" href="../api-v3/config/route/v3/scoped_route.proto.html#envoy-v3-api-msg-config-route-v3-scopedrouteconfiguration"><span class="std std-ref">envoy.config.route.v3.ScopedRouteConfiguration</span></a>,</p></li>
+<li><p><a class="reference internal" href="../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-virtualhost"><span class="std std-ref">envoy.config.route.v3.VirtualHost</span></a></p></li>
+<li><p><a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">envoy.config.cluster.v3.Cluster</span></a></p></li>
+<li><p><a class="reference internal" href="../api-v3/config/endpoint/v3/endpoint.proto.html#envoy-v3-api-msg-config-endpoint-v3-clusterloadassignment"><span class="std std-ref">envoy.config.endpoint.v3.ClusterLoadAssignment</span></a></p></li>
+<li><p><a class="reference internal" href="../api-v3/extensions/transport_sockets/tls/v3/secret.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-secret"><span class="std std-ref">envoy.extensions.transport_sockets.tls.v3.Secret</span></a></p></li>
+<li><p><a class="reference internal" href="../api-v3/service/runtime/v3/rtds.proto.html#envoy-v3-api-msg-service-runtime-v3-runtime"><span class="std std-ref">envoy.service.runtime.v3.Runtime</span></a></p></li>
+</ul>
+<p>The concept of <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto3#any">type URLs</a>
+appears below, and takes the form <code class="docutils literal notranslate"><span class="pre">type.googleapis.com/&lt;resource</span> <span class="pre">type&gt;</span></code> – e.g.,
+<code class="docutils literal notranslate"><span class="pre">type.googleapis.com/envoy.config.cluster.v3.Cluster</span></code> for a <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> resource. In various requests from
+Envoy and responses by the management server, the resource type URL is stated.</p>
+<section id="protoc-gen-validate-annotations">
+<h3>Protoc-Gen-Validate Annotations<a class="headerlink" href="#protoc-gen-validate-annotations" title="Link to this heading"></a></h3>
+<p>The protobuf messages for the individual xDS resource types have annotations
+using <a class="reference external" href="https://github.com/bufbuild/protoc-gen-validate">protoc-gen-validate</a>
+(PGV), which indicate semantic constraints to be used to validate the contents
+of a resource when it is received by a client.</p>
+<p>Clients are not required to use these PGV annotations to validate the
+resources (e.g., Envoy does this validation, but gRPC does not). Also, the
+PGV annotations are not intended to be an exhaustive list of validation checks
+to be performed by the client; clients may reject a resource for reasons
+unrelated to the PGV annotations.</p>
+<p>In general, the PGV annotations are not intended to be used by control
+planes or xDS proxies directly. There may be some cases where a control
+plane may wish to do validation using the PGV annotations as a means of
+catching problems earlier in the config pipeline (e.g., rejecting invalid
+input when the resource is added to the control plane, before it is ever
+sent to any client). However, the PGV annotations evolve over time as the
+xDS API evolves, and it is not considered a breaking change in the API
+to make a PGV annotation less strict. Therefore, in the general case,
+a control plane cannot assume that all of its clients were compiled
+with the same version of the xDS proto files as the control plane was,
+which means that it cannot know that the client will actually use the
+same validations that the server does. This can lead to problems where
+the server rejects a resource that the client would have accepted.</p>
+</section>
+</section>
+<section id="filesystem-subscriptions">
+<span id="extension-envoy-config-subscription-filesystem-collection"></span><span id="extension-envoy-config-subscription-filesystem"></span><h2>Filesystem subscriptions<a class="headerlink" href="#filesystem-subscriptions" title="Link to this heading"></a></h2>
+<p>The simplest approach to delivering dynamic configuration is to place it
+at a well known path specified in the <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSource</span></a>.
+Envoy will use <code class="docutils literal notranslate"><span class="pre">inotify</span></code> (<code class="docutils literal notranslate"><span class="pre">kqueue</span></code> on macOS) to monitor the file for
+changes and parse the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a> proto in the file on update.
+Binary protobufs, JSON, YAML and proto text are supported formats for
+the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a>.</p>
+<p>There is no mechanism available for filesystem subscriptions to ACK/NACK
+updates beyond stats counters and logs. The last valid configuration for
+an xDS API will continue to apply if an configuration update rejection
+occurs.</p>
+</section>
+<section id="streaming-grpc-subscriptions">
+<span id="extension-envoy-config-subscription-aggregated-grpc-collection"></span><span id="extension-envoy-config-subscription-grpc"></span><span id="xds-protocol-streaming-grpc-subscriptions"></span><h2>Streaming gRPC subscriptions<a class="headerlink" href="#streaming-grpc-subscriptions" title="Link to this heading"></a></h2>
+<section id="api-flow">
+<h3>API flow<a class="headerlink" href="#api-flow" title="Link to this heading"></a></h3>
+<p>For typical HTTP routing scenarios, the core resource types for the client’s configuration are
+<code class="docutils literal notranslate"><span class="pre">Listener</span></code>, <code class="docutils literal notranslate"><span class="pre">RouteConfiguration</span></code>, <code class="docutils literal notranslate"><span class="pre">Cluster</span></code>, and <code class="docutils literal notranslate"><span class="pre">ClusterLoadAssignment</span></code>. Each <code class="docutils literal notranslate"><span class="pre">Listener</span></code> resource
+may point to a <code class="docutils literal notranslate"><span class="pre">RouteConfiguration</span></code> resource, which may point to one or more <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> resources,
+and each <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> resource may point to a <code class="docutils literal notranslate"><span class="pre">ClusterLoadAssignment</span></code> resource.</p>
+<p>Envoy fetches all <code class="docutils literal notranslate"><span class="pre">Listener</span></code> and <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> resources at startup. It then fetches whatever
+<code class="docutils literal notranslate"><span class="pre">RouteConfiguration</span></code> and <code class="docutils literal notranslate"><span class="pre">ClusterLoadAssignment</span></code> resources that are required by the <code class="docutils literal notranslate"><span class="pre">Listener</span></code> and
+<code class="docutils literal notranslate"><span class="pre">Cluster</span></code> resources. In effect, every <code class="docutils literal notranslate"><span class="pre">Listener</span></code> or <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> resource is a root to part of Envoy’s
+configuration tree.</p>
+<p>A non-proxy client such as gRPC might start by fetching only the specific <code class="docutils literal notranslate"><span class="pre">Listener</span></code> resources
+that it is interested in. It then fetches the <code class="docutils literal notranslate"><span class="pre">RouteConfiguration</span></code> resources required by those
+<code class="docutils literal notranslate"><span class="pre">Listener</span></code> resources, followed by whichever <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> resources are required by those
+<code class="docutils literal notranslate"><span class="pre">RouteConfiguration</span></code> resources, followed by the <code class="docutils literal notranslate"><span class="pre">ClusterLoadAssignment</span></code> resources required
+by the <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> resources. In effect, the original <code class="docutils literal notranslate"><span class="pre">Listener</span></code> resources are the roots to
+the client’s configuration tree.</p>
+</section>
+<section id="variants-of-the-xds-transport-protocol">
+<span id="extension-envoy-config-mux-sotw-grpc-mux-factory"></span><span id="extension-envoy-config-mux-delta-grpc-mux-factory"></span><h3>Variants of the xDS Transport Protocol<a class="headerlink" href="#variants-of-the-xds-transport-protocol" title="Link to this heading"></a></h3>
+<section id="four-variants">
+<h4>Four Variants<a class="headerlink" href="#four-variants" title="Link to this heading"></a></h4>
+<p>There are four variants of the xDS transport protocol used via streaming gRPC, which cover all
+combinations of two dimensions.</p>
+<p>The first dimension is State of the World (SotW) vs. incremental. The SotW approach was the
+original mechanism used by xDS, in which the client must specify all resource names it is
+interested in with each request, and for LDS and CDS resources, the server must return all
+resources that the client has subscribed to in each request. This means that if the client is
+already subscribing to 99 resources and wants to add an additional one, it must send a request
+with all 100 resource names, rather than just the one new one. And for LDS and CDS resources, the
+server must then respond by sending all 100 resources, even if the 99 that were already subscribed
+to have not changed. This mechanism can be a scalability limitation, which is why the incremental
+protocol variant was introduced. The incremental approach allows both the client and server to
+indicate only deltas relative to their previous state – i.e., the client can say that it wants
+to add or remove its subscription to a particular resource name without resending those that have
+not changed, and the server can send updates only for those resources that have changed. The
+incremental protocol also provides a mechanism for lazy loading of resources. For details on the
+incremental protocol, see <a class="reference internal" href="#xds-protocol-delta"><span class="std std-ref">Incremental xDS</span></a> below.</p>
+<p>The second dimension is using a separate gRPC stream for each resource type vs. aggregating all
+resource types onto a single gRPC stream. The former approach was the original mechanism used by
+xDS, and it offers an eventual consistency model. The latter approach was added for environments
+in which explicit control of sequencing is required. For details, see <a class="reference internal" href="#xds-protocol-eventual-consistency-considerations"><span class="std std-ref">Eventual consistency
+considerations</span></a> below.</p>
+<p>So, the four variants of the xDS transport protocol are:</p>
+<ol class="arabic simple">
+<li><p>State of the World (Basic xDS): SotW, separate gRPC stream for each resource type</p></li>
+<li><p>Incremental xDS: incremental, separate gRPC stream for each resource type</p></li>
+<li><p>Aggregated Discovery Service (ADS): SotW, aggregate stream for all resource types</p></li>
+<li><p>Incremental ADS: incremental, aggregate stream for all resource types</p></li>
+</ol>
+</section>
+<section id="rpc-services-and-methods-for-each-variant">
+<h4>RPC Services and Methods for Each Variant<a class="headerlink" href="#rpc-services-and-methods-for-each-variant" title="Link to this heading"></a></h4>
+<p>For the non-aggregated protocol variants, there is a separate RPC service for each resource type.
+Each of these RPC services can provide a method for each of the SotW and Incremental protocol
+variants. Here are the RPC services and methods for each resource type:</p>
+<ul class="simple">
+<li><p>Listener: Listener Discovery Service (LDS)</p>
+<ul>
+<li><p>SotW: ListenerDiscoveryService.StreamListeners</p></li>
+<li><p>Incremental: ListenerDiscoveryService.DeltaListeners</p></li>
+</ul>
+</li>
+<li><p>RouteConfiguration: Route Discovery Service (RDS)</p>
+<ul>
+<li><p>SotW: RouteDiscoveryService.StreamRoutes</p></li>
+<li><p>Incremental: RouteDiscoveryService.DeltaRoutes</p></li>
+</ul>
+</li>
+<li><p>ScopedRouteConfiguration: Scoped Route Discovery Service (SRDS)</p>
+<ul>
+<li><p>SotW: ScopedRouteDiscoveryService.StreamScopedRoutes</p></li>
+<li><p>Incremental: ScopedRouteDiscoveryService.DeltaScopedRoutes</p></li>
+</ul>
+</li>
+<li><p>VirtualHost: Virtual Host Discovery Service (VHDS)</p>
+<ul>
+<li><p>SotW: N/A</p></li>
+<li><p>Incremental: VirtualHostDiscoveryService.DeltaVirtualHosts</p></li>
+</ul>
+</li>
+<li><p>Cluster: Cluster Discovery Service (CDS)</p>
+<ul>
+<li><p>SotW: ClusterDiscoveryService.StreamClusters</p></li>
+<li><p>Incremental: ClusterDiscoveryService.DeltaClusters</p></li>
+</ul>
+</li>
+<li><p>ClusterLoadAssignment: Endpoint Discovery Service (EDS)</p>
+<ul>
+<li><p>SotW: EndpointDiscoveryService.StreamEndpoints</p></li>
+<li><p>Incremental: EndpointDiscoveryService.DeltaEndpoints</p></li>
+</ul>
+</li>
+<li><p>Secret: Secret Discovery Service (SDS)</p>
+<ul>
+<li><p>SotW: SecretDiscoveryService.StreamSecrets</p></li>
+<li><p>Incremental: SecretDiscoveryService.DeltaSecrets</p></li>
+</ul>
+</li>
+<li><p>Runtime: Runtime Discovery Service (RTDS)</p>
+<ul>
+<li><p>SotW: RuntimeDiscoveryService.StreamRuntime</p></li>
+<li><p>Incremental: RuntimeDiscoveryService.DeltaRuntime</p></li>
+</ul>
+</li>
+</ul>
+<p>In the aggregated protocol variants, all resource types are multiplexed on a single gRPC stream,
+where each resource type is treated as a separate logical stream within the aggregated stream.
+In effect, it simply combines all of the above separate APIs into a single stream by treating
+requests and responses for each resource type as a separate sub-stream on the single aggregated
+stream. The RPC service and methods for the aggregated protocol variants are:</p>
+<ul class="simple">
+<li><p>SotW: AggregatedDiscoveryService.StreamAggregatedResources</p></li>
+<li><p>Incremental: AggregatedDiscoveryService.DeltaAggregatedResources</p></li>
+</ul>
+<p>For all of the SotW methods, the request type is <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a> and the response type is <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a>.</p>
+<p>For all of the incremental methods, the request type is <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryrequest"><span class="std std-ref">DeltaDiscoveryRequest</span></a> and the response type is <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryresponse"><span class="std std-ref">DeltaDiscoveryResponse</span></a>.</p>
+</section>
+<section id="configuring-which-variant-to-use">
+<h4>Configuring Which Variant to Use<a class="headerlink" href="#configuring-which-variant-to-use" title="Link to this heading"></a></h4>
+<p>In the xDS API, the <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSource</span></a> message indicates how to
+obtain resources of a particular type. If the <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSource</span></a>
+contains a gRPC <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-apiconfigsource"><span class="std std-ref">ApiConfigSource</span></a>, it points to an
+upstream cluster for the management server; this will initiate an independent bidirectional gRPC
+stream for each xDS resource type, potentially to distinct management servers. If the
+<a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSource</span></a> contains a <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-aggregatedconfigsource"><span class="std std-ref">AggregatedConfigSource</span></a>, it tells the client to use <a class="reference internal" href="#xds-protocol-ads"><span class="std std-ref">ADS</span></a>.</p>
+<p>Currently, the client is expected to be given some local configuration that tells it how to obtain
+the <a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> and <a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> resources.
+<a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> resources may include a
+<a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSource</span></a> that indicates how the
+<a class="reference internal" href="../api-v3/config/route/v3/route.proto.html#envoy-v3-api-msg-config-route-v3-routeconfiguration"><span class="std std-ref">RouteConfiguration</span></a> resources are obtained, and
+<a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> resources may include a
+<a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSource</span></a> that indicates how the
+<a class="reference internal" href="../api-v3/config/endpoint/v3/endpoint.proto.html#envoy-v3-api-msg-config-endpoint-v3-clusterloadassignment"><span class="std std-ref">ClusterLoadAssignment</span></a> resources are obtained.</p>
+<section id="client-configuration">
+<h5>Client Configuration<a class="headerlink" href="#client-configuration" title="Link to this heading"></a></h5>
+<p>In Envoy, the bootstrap file contains two <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSource</span></a>
+messages, one indicating how <a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> resources are obtained and
+another indicating how <a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> resources are obtained. It also
+contains a separate <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-apiconfigsource"><span class="std std-ref">ApiConfigSource</span></a> message indicating
+how to contact the ADS server, which will be used whenever a <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSource</span></a> message (either in the bootstrap file or in a <a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> or <a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> resource obtained from a
+management server) contains an <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-aggregatedconfigsource"><span class="std std-ref">AggregatedConfigSource</span></a> message.</p>
+<p>A current limitation in Envoy is that any xDS <a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> resources
+should be specified first in the <cite>static_resources</cite> field of the Bootstrap configuration prior to any static
+<a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> resources that depend on the xDS cluster. Failure to do
+so will result in slower Envoy initialization (see the <a class="reference external" href="https://github.com/envoyproxy/envoy/issues/27702">GitHub issue</a>
+for details). As an example, if a cluster depends on an xDS <a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a>
+for SDS to configure the secrets on a transport socket, the xDS <a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a>
+should be specified first in the <cite>static_resources</cite> field, before the cluster with the transport socket secret is specified.</p>
+<p>In a gRPC client that uses xDS, only ADS is supported, and the bootstrap file contains the name of
+the ADS server, which will be used for all resources. The <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSource</span></a> messages in the <a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> and
+<a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> resources must contain <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-aggregatedconfigsource"><span class="std std-ref">AggregatedConfigSource</span></a> messages.</p>
+</section>
+</section>
+</section>
+<section id="the-xds-transport-protocol">
+<h3>The xDS transport Protocol<a class="headerlink" href="#the-xds-transport-protocol" title="Link to this heading"></a></h3>
+<section id="transport-api-version">
+<h4>Transport API version<a class="headerlink" href="#transport-api-version" title="Link to this heading"></a></h4>
+<p>In addition the resource type version described above, the xDS wire protocol has a
+transport version associated with it. This provides type versioning for messages such as
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a> and <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a>. It is also encoded in the gRPC method name, so a server
+can determine which version a client is speaking based on which method it calls.</p>
+</section>
+<section id="basic-protocol-overview">
+<h4>Basic Protocol Overview<a class="headerlink" href="#basic-protocol-overview" title="Link to this heading"></a></h4>
+<p>Each xDS stream begins with a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a> from the
+client, which specifies the list of resources to subscribe to, the type URL corresponding to the
+subscribed resources, the node identifier, and an optional resource type instance version
+indicating the most recent version of the resource type that the client has already seen (see
+<a class="reference internal" href="#xds-ack-nack"><span class="std std-ref">ACK/NACK and resource type instance version</span></a> for details).</p>
+<p>The server will then send a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a> containing
+any resources that the client has subscribed to that have changed since the last resource type
+instance version that the client indicated it has seen. The server may send additional responses
+at any time when the subscribed resources change.</p>
+<p>Whenever the client receives a new response, it will send another request indicating whether or
+not the <em>individual</em> resources in the response were valid in isolation (see
+<a class="reference internal" href="#xds-ack-nack"><span class="std std-ref">ACK/NACK and resource type instance version</span></a> for details).</p>
+<p>All server responses will contain a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryresponse-nonce"><span class="std std-ref">nonce</span></a>, and
+all subsequent requests from the client must set the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-response-nonce"><span class="std std-ref">response_nonce</span></a> field to the most recent
+nonce received from the server on that stream. This allows servers to determine which response a
+given request is associated with, which avoids various race conditions in the SotW protocol
+variants. Note that the nonce is valid only in the context of an individual xDS stream; it does
+not survive stream restarts. In the aggregated protocol variant, the nonce is tracked separately for each resource type.</p>
+<p>Only the first request on a stream is guaranteed to carry the node identifier.
+The subsequent discovery requests on the same stream may carry an empty node
+identifier. This holds true regardless of the acceptance of the discovery
+responses on the same stream. The node identifier should always be identical if
+present more than once on the stream. It is sufficient to only check the first
+message for the node identifier as a result.</p>
+</section>
+<section id="ack-nack-and-resource-type-instance-version">
+<span id="xds-ack-nack"></span><h4>ACK/NACK and resource type instance version<a class="headerlink" href="#ack-nack-and-resource-type-instance-version" title="Link to this heading"></a></h4>
+<p>Every xDS resource type has a version string that indicates the version for that resource type.
+Whenever one resource of that type changes, the version is changed.</p>
+<p>In a response sent by the xDS server, the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryresponse-version-info"><span class="std std-ref">version_info</span></a> field indicates the current
+version for that resource type. The client then sends another request to the server with the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-version-info"><span class="std std-ref">version_info</span></a> field indicating the most
+recent valid version seen by the client. This provides a way for the server to determine when
+it sends a version that the client considers invalid.</p>
+<p>(In the <a class="reference internal" href="#xds-protocol-delta"><span class="std std-ref">incremental protocol variants</span></a>, the resource type instance
+version is sent by the server in the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryresponse-system-version-info"><span class="std std-ref">system_version_info</span></a> field.
+However, this information is not actually used by the client to communicate which resources are
+valid, because the incremental API variants have a separate mechanism for that.)</p>
+<p>The resource type instance version is separate for each resource type. When using the aggregated
+protocol variants, each resource type has its own version even though all resource types are being
+sent on the same stream.</p>
+<p>The resource type instance version is also separate for each xDS server (where an xDS server is
+identified by a unique <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSource</span></a>). When obtaining
+resources of a given type from multiple xDS servers, each xDS server will have a different notion
+of version.</p>
+<p>Note that the version for a resource type is not a property of an individual xDS stream but rather
+a property of the resources themselves. If the stream becomes broken and the client creates a new
+stream, the client’s initial request on the new stream should indicate the most recent version
+seen by the client on the previous stream. Servers may decide to optimize by not resending
+resources that the client had already seen on the previous stream, but only if they know that the
+client is not subscribing to a new resource that it was not previously subscribed to. For example,
+it is generally safe for servers to do this optimization for LDS and CDS when the only subscription
+is a wildcard subscription, and it is safe to do in environments where the clients will always
+subscribe to exactly the same set of resources.</p>
+<p>An example EDS request might be:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">version_info</span><span class="p">:</span>
+<span class="nt">node</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> id</span><span class="p">:</span><span class="w"> </span><span class="nv">envoy</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<span class="nt">resource_names</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bar</span>
+<span class="nt">type_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment</span>
+<span class="nt">response_nonce</span><span class="p">:</span>
+</pre></div>
+</div>
+<p>The management server may reply either immediately or when the requested
+resources are available with a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a>, e.g.:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">version_info</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">X</span>
+<span class="nt">resources</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo ClusterLoadAssignment proto encoding</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bar ClusterLoadAssignment proto encoding</span>
+<span class="nt">type_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment</span>
+<span class="nt">nonce</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">A</span>
+</pre></div>
+</div>
+<p>After processing the <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a>, Envoy will send a new
+request on the stream, specifying the last version successfully applied
+and the nonce provided by the management server. The version provides Envoy and the
+management server a shared notion of the currently applied configuration,
+as well as a mechanism to ACK/NACK configuration updates.</p>
+</section>
+<section id="ack">
+<h4>ACK<a class="headerlink" href="#ack" title="Link to this heading"></a></h4>
+<p>If <em>all</em> resources in the update were valid, the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-version-info"><span class="std std-ref">version_info</span></a> will be <code class="docutils literal notranslate"><span class="pre">X</span></code>, as indicated
+in the sequence diagram:</p>
+<figure class="align-default">
+<img alt="Version update after ACK" src="../_images/simple-ack.svg" />
+</figure>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>ACKing simply means that the client considered each of the resources in the response to be valid
+when evaluated in isolation.</p>
+</div>
+</section>
+<section id="nack">
+<h4>NACK<a class="headerlink" href="#nack" title="Link to this heading"></a></h4>
+<p>If Envoy had instead found some resources in configuration
+update <code class="docutils literal notranslate"><span class="pre">X</span></code> to be invalid, it would reply with <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-error-detail"><span class="std std-ref">error_detail</span></a>
+populated and its previous version, which in this case was the empty
+initial version. Note that a <code class="docutils literal notranslate"><span class="pre">NACK</span></code> does not necessarily mean that none of the resources were
+accepted. The <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-error-detail"><span class="std std-ref">error_detail</span></a> has more details around the
+exact error message populated in the message field:</p>
+<figure class="align-default">
+<img alt="No version update after NACK" src="../_images/simple-nack.svg" />
+</figure>
+<p>In the sequence diagrams, the following format is used to abbreviate messages:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">DiscoveryRequest</span></code>: (V=version_info,R=resource_names,N=response_nonce,T=type_url)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DiscoveryResponse</span></code>: (V=version_info,R=resources,N=nonce,T=type_url)</p></li>
+</ul>
+<p>After a NACK, an API update may succeed at a new version <code class="docutils literal notranslate"><span class="pre">Y</span></code>:</p>
+<figure class="align-default">
+<img alt="ACK after NACK" src="../_images/later-ack.svg" />
+</figure>
+<p>The preferred mechanism for a server to detect a NACK is to look for the presence of the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-error-detail"><span class="std std-ref">error_detail</span></a> field in the request sent by
+the client. Some older servers may instead detect a NACK by looking at both the version and the
+nonce in the request: if the version in the request is not equal to the one sent by the server with
+that nonce, then the client has rejected the most recent version. However, this approach does not
+work for APIs other than LDS and CDS for clients that may dynamically change the set of resources
+that they are subscribing to, unless the server has somehow arranged to increment the resource
+type instance version every time any one client subscribes to a new resource. Specifically,
+consider the following example:</p>
+<figure class="align-default">
+<img alt="detecting NACK from error_detail instead of version and nonce" src="../_images/error-detail-nack.svg" />
+</figure>
+</section>
+<section id="ack-and-nack-semantics-summary">
+<h4>ACK and NACK semantics summary<a class="headerlink" href="#ack-and-nack-semantics-summary" title="Link to this heading"></a></h4>
+<ul class="simple">
+<li><p>The xDS client should <code class="docutils literal notranslate"><span class="pre">ACK</span></code> or <code class="docutils literal notranslate"><span class="pre">NACK</span></code> every <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a>
+received from the management server. The <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-response-nonce"><span class="std std-ref">response_nonce</span></a> field tells the server which of its responses
+the <code class="docutils literal notranslate"><span class="pre">ACK</span></code> or <code class="docutils literal notranslate"><span class="pre">NACK</span></code> is associated with.</p></li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">ACK</span></code> signifies that the individual resources were valid and that the client’s intent is to</dt><dd><p>apply them; however, it does not mean that the configuration has been applied successfully. After
+the client sends <code class="docutils literal notranslate"><span class="pre">ACK</span></code>, it can still fail to apply the resources. It contains the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryresponse-version-info"><span class="std std-ref">version_info</span></a> from
+the <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a>.</p>
+</dd>
+</dl>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">NACK</span></code> signifies that at least one of the resources in the response were considered invalid. A <code class="docutils literal notranslate"><span class="pre">NACK</span></code>
+is indicated by the presence of the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-error-detail"><span class="std std-ref">error_detail</span></a> field. The <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryresponse-version-info"><span class="std std-ref">version_info</span></a> indicates the most recent version that the
+client is using, although that may not be an older version in the case where the client has
+subscribed to a new resource from an existing version and that new resource is invalid (see
+example above).</p></li>
+</ul>
+</section>
+<section id="when-to-send-an-update">
+<span id="xds-protocol-resource-update"></span><h4>When to send an update<a class="headerlink" href="#when-to-send-an-update" title="Link to this heading"></a></h4>
+<p>The management server should only send updates to the Envoy client when
+the resources in the <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a> have changed. Envoy replies
+to any <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a> with a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a> containing the
+<code class="docutils literal notranslate"><span class="pre">ACK</span></code>/<code class="docutils literal notranslate"><span class="pre">NACK</span></code> immediately after it has been either accepted or rejected. If
+the management server provides the same set of resources rather than
+waiting for a change to occur, it will cause needless work on both the client and the management
+server, which could have a severe performance impact.</p>
+<p>Within a stream, new <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequests</span></a> supersede any prior
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequests</span></a> having the same resource type. This means that
+the management server only needs to respond to the latest
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a> on each stream for any given resource type.</p>
+</section>
+<section id="how-the-client-specifies-what-resources-to-return">
+<span id="xds-protocol-resource-hints"></span><h4>How the client specifies what resources to return<a class="headerlink" href="#how-the-client-specifies-what-resources-to-return" title="Link to this heading"></a></h4>
+<p>xDS requests allow the client to specify a set of resource names as a hint to the server about
+which resources the client is interested in. In the SotW protocol variants, this is done via the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-resource-names"><span class="std std-ref">resource_names</span></a> specified in the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a>; in the incremental protocol variants,
+this is done via the <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-subscribe"><span class="std std-ref">resource_names_subscribe</span></a> and
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-unsubscribe"><span class="std std-ref">resource_names_unsubscribe</span></a> fields in the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryrequest"><span class="std std-ref">DeltaDiscoveryRequest</span></a>.</p>
+<p>Normally (see below for exceptions), requests must specify the set of resource names that the
+client is interested in. The management server must supply the requested resources if they exist.
+The client will silently ignore any supplied resources that were not explicitly requested. When
+the client sends a new request that changes the set of resources being requested, the server must
+resend any newly requested resources, even if it previously sent those resources without having
+been asked for them and the resources have not changed since that time. If the list of resource
+names becomes empty, that means that the client is no longer interested in any resources of the
+specified type.</p>
+<p>For <a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> and <a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> resource
+types, there is also a “wildcard” subscription, which is triggered when subscribing to the special
+name <code class="docutils literal notranslate"><span class="pre">*</span></code>. In this case, the server should use site-specific business logic to determine the full
+set of resources that the client is interested in, typically based on the client’s
+<a class="reference internal" href="../api-v3/config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-node"><span class="std std-ref">node</span></a> identification.</p>
+<p>For historical reasons, if the client sends a request for a given resource type but has never
+explicitly subscribed to any resource names (i.e., in SotW, all requests on the stream for that
+resource type have had an empty <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-resource-names"><span class="std std-ref">resource_names</span></a>
+field, or in incremental, having never sent a request on the stream for that resource type with a
+non-empty <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-subscribe"><span class="std std-ref">resource_names_subscribe</span></a>
+field), the server should treat that identically to how it would treat the client having
+explicitly subscribed to <code class="docutils literal notranslate"><span class="pre">*</span></code>. However, once the client does explicitly subscribe to a resource
+name (whether it be <code class="docutils literal notranslate"><span class="pre">*</span></code> or any other name), then this legacy semantic is no longer available; at
+that point, clearing the list of subscribed resources is interpretted as an unsubscription (see
+<a class="reference internal" href="#xds-protocol-unsubscribing"><span class="std std-ref">Unsubscribing From Resources</span></a>) rather than as a subscription
+to <code class="docutils literal notranslate"><span class="pre">*</span></code>.</p>
+<p>For example, in SotW:</p>
+<ul class="simple">
+<li><p>Client sends a request with <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-resource-names"><span class="std std-ref">resource_names</span></a> unset. Server interprets this as a subscription to <code class="docutils literal notranslate"><span class="pre">*</span></code>.</p></li>
+<li><p>Client sends a request with <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-resource-names"><span class="std std-ref">resource_names</span></a> set to <code class="docutils literal notranslate"><span class="pre">*</span></code> and <code class="docutils literal notranslate"><span class="pre">A</span></code>. Server interprets this as continuing the existing subscription to <code class="docutils literal notranslate"><span class="pre">*</span></code> and adding a new subscription to <code class="docutils literal notranslate"><span class="pre">A</span></code>.</p></li>
+<li><p>Client sends a request with <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-resource-names"><span class="std std-ref">resource_names</span></a> set to <code class="docutils literal notranslate"><span class="pre">A</span></code>. Server interprets this as unsubscribing to <code class="docutils literal notranslate"><span class="pre">*</span></code> and continuing the existing subscription to <code class="docutils literal notranslate"><span class="pre">A</span></code>.</p></li>
+<li><p>Client sends a request with <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-resource-names"><span class="std std-ref">resource_names</span></a> unset. Server interprets this as unsubscribing to <code class="docutils literal notranslate"><span class="pre">A</span></code> (i.e., the client has now unsubscribed to all resources). Although this request is identical to the first one, it is not interpreted as a wildcard subscription, because there has previously been a request on this stream for this resource type that set the <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-resource-names"><span class="std std-ref">resource_names</span></a> field.</p></li>
+</ul>
+<p>And in incremental:</p>
+<ul class="simple">
+<li><p>Client sends a request with <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-subscribe"><span class="std std-ref">resource_names_subscribe</span></a> unset. Server interprets this as a subscription to <code class="docutils literal notranslate"><span class="pre">*</span></code>.</p></li>
+<li><p>Client sends a request with <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-subscribe"><span class="std std-ref">resource_names_subscribe</span></a> set to <code class="docutils literal notranslate"><span class="pre">A</span></code>. Server interprets this as continuing the existing subscription to <code class="docutils literal notranslate"><span class="pre">*</span></code> and adding a new subscription to <code class="docutils literal notranslate"><span class="pre">A</span></code>.</p></li>
+<li><p>Client sends a request with <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-unsubscribe"><span class="std std-ref">resource_names_unsubscribe</span></a> set to <code class="docutils literal notranslate"><span class="pre">*</span></code>. Server interprets this as unsubscribing to <code class="docutils literal notranslate"><span class="pre">*</span></code> and continuing the existing subscription to <code class="docutils literal notranslate"><span class="pre">A</span></code>.</p></li>
+<li><p>Client sends a request with <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-unsubscribe"><span class="std std-ref">resource_names_unsubscribe</span></a> set to <code class="docutils literal notranslate"><span class="pre">A</span></code>. Server interprets this as unsubscribing to <code class="docutils literal notranslate"><span class="pre">A</span></code> (i.e., the client has now unsubscribed to all resources). Although the set of subscribed resources is now empty, just as it was after the initial request, it is not interpreted as a wildcard subscription, because there has previously been a request on this stream for this resource type that set the <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-subscribe"><span class="std std-ref">resource_names_subscribe</span></a> field.</p></li>
+</ul>
+<section id="client-behavior">
+<h5>Client Behavior<a class="headerlink" href="#client-behavior" title="Link to this heading"></a></h5>
+<p>Envoy will always use wildcard subscriptions for <a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> and
+<a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> resources. However, other xDS clients (such as gRPC clients
+that use xDS) may explicitly subscribe to specific resource names for these resource types, for example if they
+only have a singleton listener and already know its name from some out-of-band configuration.</p>
+</section>
+</section>
+<section id="grouping-resources-into-responses">
+<h4>Grouping Resources into Responses<a class="headerlink" href="#grouping-resources-into-responses" title="Link to this heading"></a></h4>
+<p>In the incremental protocol variants, the server sends each resource in its own response. This
+means that if the server has previously sent 100 resources and only one of them has changed, it
+may send a response containing only the changed resource; it does not need to resend the 99
+resources that have not changed, and the client must not delete the unchanged resources.</p>
+<p>In the SotW protocol variants, all resource types except for <a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> and <a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> are grouped into responses
+in the same way as in the incremental protocol variants. However,
+<a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> and <a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> resource types
+are handled differently: the server must include the complete state of the world, meaning that all
+resources of the relevant type that are needed by the client must be included, even if they did
+not change since the last response. This means that if the server has previously sent 100
+resources and only one of them has changed, it must resend all 100 of them, even the 99 that were
+not modified.</p>
+<p>Note that all of the protocol variants operate on units of whole named resources. There is
+no mechanism for providing incremental updates of repeated fields within a named resource.
+Most notably, there is currently no mechanism for incrementally updating individual
+endpoints within an EDS response.</p>
+</section>
+<section id="duplicate-resource-names">
+<h4>Duplicate Resource Names<a class="headerlink" href="#duplicate-resource-names" title="Link to this heading"></a></h4>
+<p>It is an error for a server to send a single response that contains the same resource name
+twice. Clients should NACK responses that contain multiple instances of the same resource name.</p>
+</section>
+<section id="deleting-resources">
+<h4>Deleting Resources<a class="headerlink" href="#deleting-resources" title="Link to this heading"></a></h4>
+<p>In the incremental protocol variants, the server signals the client that a resource should be
+deleted via the <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryresponse-removed-resources"><span class="std std-ref">removed_resources</span></a>
+field of the response. This tells the client to remove the resource from its local cache.</p>
+<p>In the SotW protocol variants, the criteria for deleting resources is more complex. For
+<a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> and <a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> resource types,
+if a previously seen resource is not present in a new response, that indicates that the resource
+has been removed, and the client must delete it; a response containing no resources means to delete
+all resources of that type. However, for other resource types, the API provides no mechanism for
+the server to tell the client that resources have been deleted; instead, deletions are indicated
+implicitly by parent resources being changed to no longer refer to a child resource. For example,
+when the client receives an LDS update removing a <a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a>
+that was previously pointing to <a class="reference internal" href="../api-v3/config/route/v3/route.proto.html#envoy-v3-api-msg-config-route-v3-routeconfiguration"><span class="std std-ref">RouteConfiguration</span></a> A,
+if no other <a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> is pointing to <a class="reference internal" href="../api-v3/config/route/v3/route.proto.html#envoy-v3-api-msg-config-route-v3-routeconfiguration"><span class="std std-ref">RouteConfiguration</span></a> A, then the client may delete A. For those resource types,
+an empty <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a> is effectively a no-op
+from the client’s perspective.</p>
+</section>
+<section id="knowing-when-a-requested-resource-does-not-exist">
+<span id="xds-protocol-resource-not-existed"></span><h4>Knowing When a Requested Resource Does Not Exist<a class="headerlink" href="#knowing-when-a-requested-resource-does-not-exist" title="Link to this heading"></a></h4>
+<p>The SotW protocol variants do not provide any explicit mechanism to determine when a requested
+resource does not exist.</p>
+<p>Responses for <a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> and <a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a>
+resource types must include all resources requested by the client. However, it may not be possible
+for the client to know that a resource does not exist based solely on its absence in a response,
+because the delivery of the updates is eventually consistent: if the client initially sends a
+request for resource <code class="docutils literal notranslate"><span class="pre">A</span></code>, then sends a request for resources <code class="docutils literal notranslate"><span class="pre">A</span></code> and <code class="docutils literal notranslate"><span class="pre">B</span></code>, and then sees a response
+containing only resource <code class="docutils literal notranslate"><span class="pre">A</span></code>, the client cannot conclude that resource <code class="docutils literal notranslate"><span class="pre">B</span></code> does not exist, because
+the response may have been sent on the basis of the first request, before the server saw the
+second request.</p>
+<p>For other resource types, because each resource can be sent in its own response, there is no way
+to know from the next response whether the newly requested resource exists, because the next
+response could be an unrelated update for another resource that had already been subscribed to
+previously.</p>
+<p>As a result, clients are expected to use a timeout (recommended duration is 15 seconds) after
+sending a request for a new resource, after which they will consider the requested resource to
+not exist if they have not received the resource. In Envoy, this is done for
+<a class="reference internal" href="../api-v3/config/route/v3/route.proto.html#envoy-v3-api-msg-config-route-v3-routeconfiguration"><span class="std std-ref">RouteConfiguration</span></a> and <a class="reference internal" href="../api-v3/config/endpoint/v3/endpoint.proto.html#envoy-v3-api-msg-config-endpoint-v3-clusterloadassignment"><span class="std std-ref">ClusterLoadAssignment</span></a> resources during <a class="reference internal" href="#xds-protocol-resource-warming"><span class="std std-ref">resource warming</span></a>.</p>
+<p>Note that even if a requested resource does not exist at the moment when the client requests it,
+that resource could be created at any time. Management servers must remember the set of resources
+being requested by the client, and if one of those resources springs into existence later, the
+server must send an update to the client informing it of the new resource. Clients that initially
+see a resource that does not exist must be prepared for the resource to be created at any time.</p>
+</section>
+<section id="unsubscribing-from-resources">
+<span id="xds-protocol-unsubscribing"></span><h4>Unsubscribing From Resources<a class="headerlink" href="#unsubscribing-from-resources" title="Link to this heading"></a></h4>
+<p>In the incremental protocol variants, resources can be unsubscribed to via the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-unsubscribe"><span class="std std-ref">resource_names_unsubscribe</span></a> field.</p>
+<p>In the SotW protocol variants, each request must contain the full list of resource names being
+subscribed to in the <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-resource-names"><span class="std std-ref">resource_names</span></a> field,
+so unsubscribing to a set of resources is done by sending a new request containing all resource
+names that are still being subscribed to but not containing the resource names being unsubscribed
+to. For example, if the client had previously been subscribed to resources <code class="docutils literal notranslate"><span class="pre">A</span></code> and <code class="docutils literal notranslate"><span class="pre">B</span></code> but wishes to
+unsubscribe from <code class="docutils literal notranslate"><span class="pre">B</span></code>, it must send a new request containing only resource <code class="docutils literal notranslate"><span class="pre">A</span></code>.</p>
+<p>Note that for <a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> and <a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a>
+resource types where the client is using a “wildcard” subscription (see <a class="reference internal" href="#xds-protocol-resource-hints"><span class="std std-ref">How the client specifies what
+resources to return</span></a> for details), the set of resources being
+subscribed to is determined by the server instead of the client, so the client cannot unsubscribe
+from those resources individually; it can only unsubscribe from the wildcard as a whole.</p>
+</section>
+<section id="requesting-multiple-resources-on-a-single-stream">
+<h4>Requesting Multiple Resources on a Single Stream<a class="headerlink" href="#requesting-multiple-resources-on-a-single-stream" title="Link to this heading"></a></h4>
+<p>For EDS/RDS, Envoy may either generate a distinct stream for each
+resource of a given type (e.g. if each <a class="reference internal" href="../api-v3/config/core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSource</span></a> has its own
+distinct upstream cluster for a management server), or may combine
+together multiple resource requests for a given resource type when they
+are destined for the same management server. While this is left to
+implementation specifics, management servers should be capable of
+handling one or more <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-resource-names"><span class="std std-ref">resource_names</span></a> for a given resource type in
+each request. Both sequence diagrams below are valid for fetching two
+EDS resources <code class="docutils literal notranslate"><span class="pre">{foo,</span> <span class="pre">bar}</span></code>:</p>
+<p><img alt="Multiple EDS requests on the same stream" src="../_images/eds-same-stream.svg" /> <img alt="Multiple EDS requests on distinct streams" src="../_images/eds-distinct-stream.svg" /></p>
+</section>
+<section id="resource-updates">
+<h4>Resource updates<a class="headerlink" href="#resource-updates" title="Link to this heading"></a></h4>
+<p>As discussed above, Envoy may update the list of <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-resource-names"><span class="std std-ref">resource_names</span></a> it
+presents to the management server in each <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a> that
+ACK/NACKs a specific <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a>. In addition, Envoy may later
+issue additional <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequests</span></a> at a given <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-version-info"><span class="std std-ref">version_info</span></a> to
+update the management server with new resource hints. For example, if
+Envoy is at EDS version <code class="docutils literal notranslate"><span class="pre">X</span></code> and knows only about cluster <code class="docutils literal notranslate"><span class="pre">foo</span></code>, but
+then receives a CDS update and learns about <code class="docutils literal notranslate"><span class="pre">bar</span></code> in addition, it may
+issue an additional <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a> for <code class="docutils literal notranslate"><span class="pre">X</span></code> with <code class="docutils literal notranslate"><span class="pre">{foo,bar}</span></code> as
+<code class="docutils literal notranslate"><span class="pre">resource_names</span></code>.</p>
+<figure class="align-default">
+<img alt="CDS response leads to EDS resource hint update" src="../_images/cds-eds-resources.svg" />
+</figure>
+<p>There is a race condition that may arise here; if after a resource hint
+update is issued by Envoy at <code class="docutils literal notranslate"><span class="pre">X</span></code>, but before the management server
+processes the update it replies with a new version <code class="docutils literal notranslate"><span class="pre">Y</span></code>, the resource
+hint update may be interpreted as a rejection of <code class="docutils literal notranslate"><span class="pre">Y</span></code> by presenting an
+<code class="docutils literal notranslate"><span class="pre">X</span></code> <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryresponse-version-info"><span class="std std-ref">version_info</span></a>. To avoid this, the management server provides a
+<code class="docutils literal notranslate"><span class="pre">nonce</span></code> that Envoy uses to indicate the specific <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a>
+each <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a> corresponds to:</p>
+<figure class="align-default">
+<img alt="EDS update race motivates nonces" src="../_images/update-race.svg" />
+</figure>
+<p>The management server should not send a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a> for any
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a> that has a stale nonce. A nonce becomes stale
+following a newer nonce being presented to Envoy in a
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a>. A management server does not need to send an
+update until it determines a new version is available. Earlier requests
+at a version then also become stale. It may process multiple
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequests</span></a> at a version until a new version is ready.</p>
+<figure class="align-default">
+<img alt="Requests become stale" src="../_images/stale-requests.svg" />
+</figure>
+<p>An implication of the above resource update sequencing is that Envoy
+does not expect a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a> for every <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequests</span></a>
+it issues.</p>
+</section>
+</section>
+<section id="resource-warming">
+<span id="xds-protocol-resource-warming"></span><h3>Resource warming<a class="headerlink" href="#resource-warming" title="Link to this heading"></a></h3>
+<p><a class="reference internal" href="../intro/arch_overview/upstream/cluster_manager.html#arch-overview-cluster-warming"><span class="std std-ref">Clusters</span></a> and
+<a class="reference internal" href="../configuration/listeners/lds.html#config-listeners-lds"><span class="std std-ref">Listeners</span></a>
+go through warming before they can serve requests. This process
+happens both during <a class="reference internal" href="../intro/arch_overview/operations/init.html#arch-overview-initialization"><span class="std std-ref">Envoy initialization</span></a>
+and when the <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> or <code class="docutils literal notranslate"><span class="pre">Listener</span></code> is updated. Warming of
+<code class="docutils literal notranslate"><span class="pre">Cluster</span></code> is completed only when a <code class="docutils literal notranslate"><span class="pre">ClusterLoadAssignment</span></code> response
+is supplied by management server. Similarly, warming of <code class="docutils literal notranslate"><span class="pre">Listener</span></code> is
+completed only when a <code class="docutils literal notranslate"><span class="pre">RouteConfiguration</span></code> is supplied by management
+server if the listener refers to an RDS configuration. Management server
+is expected to provide the EDS/RDS updates during warming. If management
+server does not provide EDS/RDS responses, Envoy will not initialize
+itself during the initialization phase and the updates sent via CDS/LDS
+will not take effect until EDS/RDS responses are supplied.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Envoy specific implementation notes:</p>
+<ul class="simple">
+<li><p>Warming of <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> is completed only when a new <code class="docutils literal notranslate"><span class="pre">ClusterLoadAssignment</span></code>
+response is supplied by management server even if there is no change in endpoints.
+Envoy will use a cached <code class="docutils literal notranslate"><span class="pre">ClusterLoadAssignment</span></code> for a cluster, if exists, after
+the resource warming times out.</p></li>
+<li><p>Warming of <code class="docutils literal notranslate"><span class="pre">Listener</span></code> is completed even if management server does not send a
+response for <code class="docutils literal notranslate"><span class="pre">RouteConfiguration</span></code> referenced by <code class="docutils literal notranslate"><span class="pre">Listener</span></code>. Envoy will use the
+previously sent <code class="docutils literal notranslate"><span class="pre">RouteConfiguration</span></code> to finish <code class="docutils literal notranslate"><span class="pre">Listener</span></code> warming. Management Server
+has to send the <code class="docutils literal notranslate"><span class="pre">RouteConfiguration</span></code> response only if it has changed or it was never
+sent in the past.</p></li>
+</ul>
+</div>
+<section id="eventual-consistency-considerations">
+<span id="xds-protocol-eventual-consistency-considerations"></span><h4>Eventual consistency considerations<a class="headerlink" href="#eventual-consistency-considerations" title="Link to this heading"></a></h4>
+<p>Since Envoy’s xDS APIs are eventually consistent, traffic may drop
+briefly during updates. For example, if only cluster <code class="docutils literal notranslate"><span class="pre">X</span></code> is known via
+CDS/EDS, a <code class="docutils literal notranslate"><span class="pre">RouteConfiguration</span></code> references cluster <code class="docutils literal notranslate"><span class="pre">X</span></code> and is then
+adjusted to cluster <code class="docutils literal notranslate"><span class="pre">Y</span></code> just before the CDS/EDS update providing
+<code class="docutils literal notranslate"><span class="pre">Y</span></code>, traffic will be blackholed until <code class="docutils literal notranslate"><span class="pre">Y</span></code> is known about by the
+Envoy instance.</p>
+<p>For some applications, a temporary drop of traffic is acceptable,
+retries at the client or by other Envoy sidecars will hide this drop.
+For other scenarios where drop can’t be tolerated, traffic drop could
+have been avoided by providing a CDS/EDS update with both <code class="docutils literal notranslate"><span class="pre">X</span></code> and
+<code class="docutils literal notranslate"><span class="pre">Y</span></code>, then the RDS update repointing from <code class="docutils literal notranslate"><span class="pre">X</span></code> to <code class="docutils literal notranslate"><span class="pre">Y</span></code> and then a
+CDS/EDS update dropping <code class="docutils literal notranslate"><span class="pre">X</span></code>.</p>
+<p>In general, to avoid traffic drop, sequencing of updates should follow a
+make before break model, wherein:</p>
+<ul class="simple">
+<li><p>CDS updates (if any) must always be pushed first.</p></li>
+<li><p>EDS updates (if any) must arrive after CDS updates for the respective clusters.</p></li>
+<li><p>LDS updates must arrive after corresponding CDS/EDS updates.</p></li>
+<li><p>RDS updates related to the newly added listeners must arrive after CDS/EDS/LDS updates.</p></li>
+<li><p>VHDS updates (if any) related to the newly added RouteConfigurations must arrive after RDS updates.</p></li>
+<li><p>Stale CDS clusters and related EDS endpoints (ones no longer being referenced) can then be removed.</p></li>
+</ul>
+<p>xDS updates can be pushed independently if no new
+clusters/routes/listeners are added or if it’s acceptable to temporarily
+drop traffic during updates. Note that in case of LDS updates, the
+listeners will be warmed before they receive traffic, i.e. the dependent
+routes are fetched through RDS if configured. Clusters are warmed when
+adding/removing/updating clusters. On the other hand, routes are not
+warmed, i.e., the management plane must ensure that clusters referenced
+by a route are in place, before pushing the updates for a route.</p>
+</section>
+</section>
+<section id="ttl">
+<span id="xds-protocol-ttl"></span><h3>TTL<a class="headerlink" href="#ttl" title="Link to this heading"></a></h3>
+<p>In the event that the management server becomes unreachable, the last known configuration received
+by Envoy will persist until the connection is reestablished. For some services, this may not be
+desirable. For example, in the case of a fault injection service, a management server crash at the
+wrong time may leave Envoy in an undesirable state. The TTL setting allows Envoy to remove a set of
+resources after a specified period of time if contact with the management server is lost. This can
+be used, for example, to terminate a fault injection test when the management server can no longer
+be reached.</p>
+<p>For clients that support the <em>xds.config.supports-resource-ttl</em> client feature, A TTL field may
+be specified on each <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-resource"><span class="std std-ref">Resource</span></a>. Each resource will have its own TTL
+expiry time, at which point the resource will be expired. Each xDS type may have different ways of
+handling such an expiry.</p>
+<p>To update the TTL associated with a <em>Resource</em>, the management server resends the resource with a
+new TTL. To remove the TTL, the management server resends the resource with the TTL field unset.</p>
+<p>To allow for lightweight TTL updates (“heartbeats”), a response can be sent that provides a
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-resource"><span class="std std-ref">Resource</span></a> with the <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-resource"><span class="std std-ref">resource</span></a>
+unset and version matching the most recently sent version can be used to update the TTL. These
+resources will not be treated as resource updates, but only as TTL updates.</p>
+<section id="sotw-ttl">
+<h4>SotW TTL<a class="headerlink" href="#sotw-ttl" title="Link to this heading"></a></h4>
+<p>In order to use TTL with SotW xDS, the relevant resources must be wrapped in a
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-resource"><span class="std std-ref">Resource</span></a>. This allows setting the same TTL field that is used for
+Delta xDS with SotW, without changing the SotW API. Heartbeats are supported for SotW as well:
+any resource within the response that look like a heartbeat resource will only be used to update the TTL.</p>
+<p>This feature is gated by the <em>xds.config.supports-resource-in-sotw</em> client feature.</p>
+</section>
+</section>
+<section id="aggregated-discovery-service">
+<span id="xds-protocol-ads"></span><h3>Aggregated Discovery Service<a class="headerlink" href="#aggregated-discovery-service" title="Link to this heading"></a></h3>
+<p id="extension-envoy-config-subscription-ads-collection"><span id="extension-envoy-config-subscription-ads"></span>It’s challenging to provide the above guarantees on sequencing to avoid
+traffic drop when management servers are distributed. ADS allow a single
+management server, via a single gRPC stream, to deliver all API updates.
+This provides the ability to carefully sequence updates to avoid traffic
+drop. With ADS, a single stream is used with multiple independent
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a>/<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a> sequences multiplexed via the
+type URL. For any given type URL, the above sequencing of
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a> and <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a> messages applies. An
+example update sequence might look like:</p>
+<figure class="align-default">
+<img alt="EDS/CDS multiplexed on an ADS stream" src="../_images/ads.svg" />
+</figure>
+<p>A single ADS stream is available per Envoy instance.</p>
+<p>An example minimal <code class="docutils literal notranslate"><span class="pre">bootstrap.yaml</span></code> fragment for ADS configuration is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">node</span><span class="p">:</span>
+  <span class="c1"># set &lt;cluster identifier&gt;</span>
+  <span class="n">cluster</span><span class="p">:</span> <span class="n">envoy_cluster</span>
+  <span class="c1"># set &lt;node identifier&gt;</span>
+  <span class="nb">id</span><span class="p">:</span> <span class="n">envoy_node</span>
+
+<span class="n">dynamic_resources</span><span class="p">:</span>
+  <span class="n">ads_config</span><span class="p">:</span>
+    <span class="n">api_type</span><span class="p">:</span> <span class="n">GRPC</span>
+    <span class="n">grpc_services</span><span class="p">:</span>
+    <span class="o">-</span> <span class="n">envoy_grpc</span><span class="p">:</span>
+        <span class="n">cluster_name</span><span class="p">:</span> <span class="n">ads_cluster</span>
+  <span class="n">cds_config</span><span class="p">:</span>
+    <span class="n">ads</span><span class="p">:</span> <span class="p">{}</span>
+  <span class="n">lds_config</span><span class="p">:</span>
+    <span class="n">ads</span><span class="p">:</span> <span class="p">{}</span>
+
+<span class="n">static_resources</span><span class="p">:</span>
+  <span class="n">clusters</span><span class="p">:</span>
+  <span class="o">-</span> <span class="n">name</span><span class="p">:</span> <span class="n">ads_cluster</span>
+    <span class="nb">type</span><span class="p">:</span> <span class="n">STRICT_DNS</span>
+    <span class="n">load_assignment</span><span class="p">:</span>
+      <span class="n">cluster_name</span><span class="p">:</span> <span class="n">ads_cluster</span>
+      <span class="n">endpoints</span><span class="p">:</span>
+      <span class="o">-</span> <span class="n">lb_endpoints</span><span class="p">:</span>
+        <span class="o">-</span> <span class="n">endpoint</span><span class="p">:</span>
+            <span class="n">address</span><span class="p">:</span>
+              <span class="n">socket_address</span><span class="p">:</span>
+                <span class="c1"># set &lt;ADS management server address&gt;</span>
+                <span class="n">address</span><span class="p">:</span> <span class="n">my</span><span class="o">-</span><span class="n">control</span><span class="o">-</span><span class="n">plane</span>
+                <span class="c1"># set &lt;ADS management server port&gt;</span>
+                <span class="n">port_value</span><span class="p">:</span> <span class="mi">777</span>
+    <span class="c1"># It is recommended to configure either HTTP/2 or TCP keepalives in order to detect</span>
+    <span class="c1"># connection issues, and allow Envoy to reconnect. TCP keepalive is less expensive, but</span>
+    <span class="c1"># may be inadequate if there is a TCP proxy between Envoy and the management server.</span>
+    <span class="c1"># HTTP/2 keepalive is slightly more expensive, but may detect issues through more types</span>
+    <span class="c1"># of intermediate proxies.</span>
+    <span class="n">typed_extension_protocol_options</span><span class="p">:</span>
+      <span class="n">envoy</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">upstreams</span><span class="o">.</span><span class="n">http</span><span class="o">.</span><span class="n">v3</span><span class="o">.</span><span class="n">HttpProtocolOptions</span><span class="p">:</span>
+        <span class="s2">&quot;@type&quot;</span><span class="p">:</span> <span class="nb">type</span><span class="o">.</span><span class="n">googleapis</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">envoy</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">upstreams</span><span class="o">.</span><span class="n">http</span><span class="o">.</span><span class="n">v3</span><span class="o">.</span><span class="n">HttpProtocolOptions</span>
+        <span class="n">explicit_http_config</span><span class="p">:</span>
+          <span class="n">http2_protocol_options</span><span class="p">:</span>
+            <span class="n">connection_keepalive</span><span class="p">:</span>
+              <span class="n">interval</span><span class="p">:</span> <span class="mi">30</span><span class="n">s</span>
+              <span class="n">timeout</span><span class="p">:</span> <span class="mi">5</span><span class="n">s</span>
+    <span class="n">upstream_connection_options</span><span class="p">:</span>
+      <span class="n">tcp_keepalive</span><span class="p">:</span> <span class="p">{}</span>
+</pre></div>
+</div>
+</section>
+<section id="incremental-xds">
+<span id="extension-envoy-config-subscription-aggregated-delta-grpc-collection"></span><span id="extension-envoy-config-subscription-delta-grpc"></span><span id="xds-protocol-delta"></span><h3>Incremental xDS<a class="headerlink" href="#incremental-xds" title="Link to this heading"></a></h3>
+<p>Incremental xDS is a separate xDS endpoint that:</p>
+<ul class="simple">
+<li><p>Allows the protocol to communicate on the wire in terms of
+resource/resource name deltas (“Delta xDS”). This supports the goal
+of scalability of xDS resources. Rather than deliver all 100k
+clusters when a single cluster is modified, the management server
+only needs to deliver the single cluster that changed.</p></li>
+<li><p>Allows the Envoy to on-demand / lazily request additional resources.
+For example, requesting a cluster only when a request for that
+cluster arrives.</p></li>
+</ul>
+<p>An Incremental xDS session is always in the context of a gRPC
+bidirectional stream. This allows the xDS server to keep track of the
+state of xDS clients connected to it. There is no REST version of
+Incremental xDS yet.</p>
+<p>In the delta xDS wire protocol, the nonce field is required and used to
+pair a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryresponse"><span class="std std-ref">DeltaDiscoveryResponse</span></a>
+to a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryrequest"><span class="std std-ref">DeltaDiscoveryRequest</span></a>
+ACK or NACK. Optionally, a response message level <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryresponse-system-version-info"><span class="std std-ref">system_version_info</span></a>
+is present for debugging purposes only.</p>
+<p><a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryrequest"><span class="std std-ref">DeltaDiscoveryRequest</span></a> can be sent in the following situations:</p>
+<ul class="simple">
+<li><p>Initial message in a xDS bidirectional gRPC stream.</p></li>
+<li><p>As an ACK or NACK response to a previous <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryresponse"><span class="std std-ref">DeltaDiscoveryResponse</span></a>. In this case the <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-response-nonce"><span class="std std-ref">response_nonce</span></a> is set to the nonce value in the Response. ACK or NACK is determined by the absence or presence of <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-error-detail"><span class="std std-ref">error_detail</span></a>.</p></li>
+<li><p>Spontaneous <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryrequest"><span class="std std-ref">DeltaDiscoveryRequests</span></a> from the client. This can be done to dynamically add or remove elements from the tracked <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-resource-names"><span class="std std-ref">resource_names</span></a> set. In this case <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-response-nonce"><span class="std std-ref">response_nonce</span></a> must be omitted.</p></li>
+</ul>
+<p>Note that while a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-discoveryrequest-response-nonce"><span class="std std-ref">response_nonce</span></a> may
+be set on the request, the server must honor changes to the subscription state even if the nonce is stale. The nonce
+may be used to correlate an ack/nack with a server response, but should <em>not</em> be used to reject stale requests.</p>
+<p>In this first example the client connects and receives a first update
+that it ACKs. The second update fails and the client NACKs the update.
+Later the xDS client spontaneously requests the “wc” resource.</p>
+<figure class="align-default">
+<img alt="Incremental session example" src="../_images/incremental.svg" />
+</figure>
+<p>On reconnect the Incremental xDS client may tell the server of its known
+resources to avoid resending them over the network by sending them in
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-initial-resource-versions"><span class="std std-ref">initial_resource_versions</span></a>.
+Because no state is assumed to be preserved from the previous stream, the reconnecting
+client must provide the server with all resource names it is interested in.</p>
+<p>Note that for “wildcard” subscriptions (see <a class="reference internal" href="#xds-protocol-resource-hints"><span class="std std-ref">How the client specifies what
+resources to return</span></a> for details), the
+request must either specify <code class="docutils literal notranslate"><span class="pre">*</span></code> in the <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-subscribe"><span class="std std-ref">resource_names_subscribe</span></a>
+field or (legacy behavior) the request must have no resources in both
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-subscribe"><span class="std std-ref">resource_names_subscribe</span></a> and
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-unsubscribe"><span class="std std-ref">resource_names_unsubscribe</span></a>.</p>
+<figure class="align-default">
+<img alt="Incremental reconnect example" src="../_images/incremental-reconnect.svg" />
+</figure>
+<section id="resource-names">
+<h4>Resource names<a class="headerlink" href="#resource-names" title="Link to this heading"></a></h4>
+<p>Resources are identified by a resource name or an alias. Aliases of a
+resource, if present, can be identified by the alias field in the
+resource of a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryresponse"><span class="std std-ref">DeltaDiscoveryResponse</span></a>. The resource name will be
+returned in the name field in the resource of a
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryresponse"><span class="std std-ref">DeltaDiscoveryResponse</span></a>.</p>
+</section>
+<section id="subscribing-to-resources">
+<span id="xds-protocol-delta-subscribe"></span><h4>Subscribing to Resources<a class="headerlink" href="#subscribing-to-resources" title="Link to this heading"></a></h4>
+<p>The client can send either an alias or the name of a resource in the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-subscribe"><span class="std std-ref">resource_names_subscribe</span></a> field of a <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryrequest"><span class="std std-ref">DeltaDiscoveryRequest</span></a> in
+order to subscribe to a resource. Both the names and aliases of
+resources should be checked in order to determine whether the entity in
+question has been subscribed to.</p>
+<p>A <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-subscribe"><span class="std std-ref">resource_names_subscribe</span></a> field may contain resource names that the
+server believes the client is already subscribed to, and furthermore has
+the most recent versions of. However, the server <em>must</em> still provide
+those resources in the response; due to implementation details hidden
+from the server, the client may have “forgotten” those resources despite
+apparently remaining subscribed.</p>
+</section>
+<section id="xds-protocol-unsubscribe">
+<span id="id1"></span><h4>Unsubscribing from Resources<a class="headerlink" href="#xds-protocol-unsubscribe" title="Link to this heading"></a></h4>
+<p>When a client loses interest in some resources, it will indicate that
+with the <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-unsubscribe"><span class="std std-ref">resource_names_unsubscribe</span></a> field of a
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryrequest"><span class="std std-ref">DeltaDiscoveryRequest</span></a>. As with <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-subscribe"><span class="std std-ref">resource_names_subscribe</span></a>, these
+may be resource names or aliases.</p>
+<p>A <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryrequest-resource-names-unsubscribe"><span class="std std-ref">resource_names_unsubscribe</span></a> field may contain superfluous resource
+names, which the server thought the client was already not subscribed
+to. The server must cleanly process such a request; it can simply ignore
+these phantom unsubscriptions.</p>
+<p>In most cases (see below for exception), a server does not need to send any response if a request
+does nothing except unsubscribe from a resource; in particular, servers are not generally required
+to send a response with the unsubscribed resource name in the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryresponse-removed-resources"><span class="std std-ref">removed_resources</span></a>
+field.</p>
+<p>However, there is one exception to the above: When a client has a wildcard subscription (<code class="docutils literal notranslate"><span class="pre">*</span></code>) <em>and</em>
+a subscription to another specific resource name, it is possible that the specific resource name is
+also included in the wildcard subscription, so if the client unsubscribes from that specific
+resource name, it does not know whether or not to continue to cache the resource. To address this,
+the server must send a response that includes the specific resource in either the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryresponse-removed-resources"><span class="std std-ref">removed_resources</span></a>
+field (if it is not included in the wildcard) or in the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryresponse-resources"><span class="std std-ref">resources</span></a>
+field (if it <em>is</em> included in the wildcard).</p>
+</section>
+<section id="id2">
+<h4>Knowing When a Requested Resource Does Not Exist<a class="headerlink" href="#id2" title="Link to this heading"></a></h4>
+<p>When a resource subscribed to by a client does not exist, the server
+will send a
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-deltadiscoveryresponse"><span class="std std-ref">DeltaDiscoveryResponse</span></a>
+message that contains that resource’s name in the
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-field-service-discovery-v3-deltadiscoveryresponse-removed-resources"><span class="std std-ref">removed_resources</span></a>
+field. This allows the client to quickly determine when a resource does not exist without
+waiting for a timeout, as would be done in the SotW protocol variants. However, clients are still
+encouraged to use a timeout to protect against the case where the management server fails to send
+a response in a timely manner.</p>
+</section>
+</section>
+</section>
+<section id="rest-json-polling-subscriptions">
+<span id="extension-envoy-config-subscription-rest"></span><h2>REST-JSON polling subscriptions<a class="headerlink" href="#rest-json-polling-subscriptions" title="Link to this heading"></a></h2>
+<p>Synchronous (long) polling via REST endpoints is also available for the
+xDS singleton APIs. The above sequencing of messages is similar, except
+no persistent stream is maintained to the management server. It is
+expected that there is only a single outstanding request at any point in
+time, and as a result the response nonce is optional in REST-JSON. The
+<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto3#json">JSON canonical transform of
+proto3</a>
+is used to encode <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryrequest"><span class="std std-ref">DiscoveryRequest</span></a> and <a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a>
+messages. ADS is not available for REST-JSON polling.</p>
+<p>When the poll period is set to a small value, with the intention of long
+polling, then there is also a requirement to avoid sending a
+<a class="reference internal" href="../api-v3/service/discovery/v3/discovery.proto.html#envoy-v3-api-msg-service-discovery-v3-discoveryresponse"><span class="std std-ref">DiscoveryResponse</span></a> unless a change to the underlying resources has
+occurred via a <a class="reference internal" href="#xds-protocol-resource-update"><span class="std std-ref">resource update</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../api-v3/type/matcher/v3/address.proto.html" class="btn btn-neutral float-left" title="Address Matcher (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../api/client_features.html" class="btn btn-neutral float-right" title="Well Known Client Features" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">xDS REST and gRPC protocol</a><ul>
+<li><a class="reference internal" href="#resource-types">Resource Types</a><ul>
+<li><a class="reference internal" href="#protoc-gen-validate-annotations">Protoc-Gen-Validate Annotations</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#filesystem-subscriptions">Filesystem subscriptions</a></li>
+<li><a class="reference internal" href="#streaming-grpc-subscriptions">Streaming gRPC subscriptions</a><ul>
+<li><a class="reference internal" href="#api-flow">API flow</a></li>
+<li><a class="reference internal" href="#variants-of-the-xds-transport-protocol">Variants of the xDS Transport Protocol</a><ul>
+<li><a class="reference internal" href="#four-variants">Four Variants</a></li>
+<li><a class="reference internal" href="#rpc-services-and-methods-for-each-variant">RPC Services and Methods for Each Variant</a></li>
+<li><a class="reference internal" href="#configuring-which-variant-to-use">Configuring Which Variant to Use</a><ul>
+<li><a class="reference internal" href="#client-configuration">Client Configuration</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-xds-transport-protocol">The xDS transport Protocol</a><ul>
+<li><a class="reference internal" href="#transport-api-version">Transport API version</a></li>
+<li><a class="reference internal" href="#basic-protocol-overview">Basic Protocol Overview</a></li>
+<li><a class="reference internal" href="#ack-nack-and-resource-type-instance-version">ACK/NACK and resource type instance version</a></li>
+<li><a class="reference internal" href="#ack">ACK</a></li>
+<li><a class="reference internal" href="#nack">NACK</a></li>
+<li><a class="reference internal" href="#ack-and-nack-semantics-summary">ACK and NACK semantics summary</a></li>
+<li><a class="reference internal" href="#when-to-send-an-update">When to send an update</a></li>
+<li><a class="reference internal" href="#how-the-client-specifies-what-resources-to-return">How the client specifies what resources to return</a><ul>
+<li><a class="reference internal" href="#client-behavior">Client Behavior</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#grouping-resources-into-responses">Grouping Resources into Responses</a></li>
+<li><a class="reference internal" href="#duplicate-resource-names">Duplicate Resource Names</a></li>
+<li><a class="reference internal" href="#deleting-resources">Deleting Resources</a></li>
+<li><a class="reference internal" href="#knowing-when-a-requested-resource-does-not-exist">Knowing When a Requested Resource Does Not Exist</a></li>
+<li><a class="reference internal" href="#unsubscribing-from-resources">Unsubscribing From Resources</a></li>
+<li><a class="reference internal" href="#requesting-multiple-resources-on-a-single-stream">Requesting Multiple Resources on a Single Stream</a></li>
+<li><a class="reference internal" href="#resource-updates">Resource updates</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#resource-warming">Resource warming</a><ul>
+<li><a class="reference internal" href="#eventual-consistency-considerations">Eventual consistency considerations</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#ttl">TTL</a><ul>
+<li><a class="reference internal" href="#sotw-ttl">SotW TTL</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#aggregated-discovery-service">Aggregated Discovery Service</a></li>
+<li><a class="reference internal" href="#incremental-xds">Incremental xDS</a><ul>
+<li><a class="reference internal" href="#resource-names">Resource names</a></li>
+<li><a class="reference internal" href="#subscribing-to-resources">Subscribing to Resources</a></li>
+<li><a class="reference internal" href="#xds-protocol-unsubscribe">Unsubscribing from Resources</a></li>
+<li><a class="reference internal" href="#id2">Knowing When a Requested Resource Does Not Exist</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#rest-json-polling-subscriptions">REST-JSON polling subscriptions</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

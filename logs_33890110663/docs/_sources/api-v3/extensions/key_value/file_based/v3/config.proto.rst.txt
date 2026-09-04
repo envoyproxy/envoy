@@ -1,0 +1,84 @@
+.. _envoy_v3_api_file_envoy/extensions/key_value/file_based/v3/config.proto:
+
+Key/value file-based store storage plugin (proto)
+=================================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig:
+
+extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig
+---------------------------------------------------------------
+
+
+:repo:`[extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig proto] <api/envoy/extensions/key_value/file_based/v3/config.proto#L22>`
+
+This is configuration to flush a key value store out to disk.
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+.. _extension_envoy.key_value.file_based:
+
+This extension has the qualified name ``envoy.key_value.file_based``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.common.key_value <extension_category_envoy.common.key_value>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig <envoy_v3_api_msg_extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "filename": ...,
+    "flush_interval": {...},
+    "max_entries": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig.filename:
+
+
+filename
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The filename to read the keys and values from, and write the keys and
+  values to.
+
+
+.. _envoy_v3_api_field_extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig.flush_interval:
+
+
+flush_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The interval at which the key value store should be flushed to the file.
+
+
+.. _envoy_v3_api_field_extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig.max_entries:
+
+
+max_entries
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The maximum number of entries to cache, or 0 to allow for unlimited entries.
+  Defaults to 1000 if not present.
+
+

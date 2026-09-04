@@ -1,0 +1,835 @@
+.. _envoy_v3_api_file_envoy/config/core/v3/health_check.proto:
+
+Health check (proto)
+====================
+
+
+* Health checking :ref:`architecture overview <arch_overview_health_checking>`.
+* If health checking is configured for a cluster, additional statistics are emitted. They are
+  documented :ref:`here <config_cluster_manager_cluster_stats>`.
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.HealthStatusSet:
+
+config.core.v3.HealthStatusSet
+------------------------------
+
+
+:repo:`[config.core.v3.HealthStatusSet proto] <api/envoy/config/core/v3/health_check.proto#L59>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "statuses": []
+  }
+
+.. _envoy_v3_api_field_config.core.v3.HealthStatusSet.statuses:
+
+
+statuses
+  (**repeated** :ref:`config.core.v3.HealthStatus <envoy_v3_api_enum_config.core.v3.HealthStatus>`) An order-independent set of health status.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.HealthCheck:
+
+config.core.v3.HealthCheck
+--------------------------
+
+
+:repo:`[config.core.v3.HealthCheck proto] <api/envoy/config/core/v3/health_check.proto#L66>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "timeout": {...},
+    "interval": {...},
+    "initial_jitter": {...},
+    "interval_jitter": {...},
+    "interval_jitter_percent": ...,
+    "unhealthy_threshold": {...},
+    "healthy_threshold": {...},
+    "reuse_connection": {...},
+    "http_health_check": {...},
+    "tcp_health_check": {...},
+    "grpc_health_check": {...},
+    "custom_health_check": {...},
+    "no_traffic_interval": {...},
+    "no_traffic_healthy_interval": {...},
+    "unhealthy_interval": {...},
+    "unhealthy_edge_interval": {...},
+    "healthy_edge_interval": {...},
+    "event_log_path": ...,
+    "event_logger": [],
+    "always_log_health_check_failures": ...,
+    "always_log_health_check_success": ...,
+    "tls_options": {...},
+    "transport_socket_match_criteria": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.timeout:
+
+
+timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_, *REQUIRED*) The time to wait for a health check response. If the timeout is reached the
+  health check attempt will be considered a failure.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.interval:
+
+
+interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_, *REQUIRED*) The interval between health checks.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.initial_jitter:
+
+
+initial_jitter
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) An optional jitter amount in milliseconds. If specified, Envoy will start health
+  checking after for a random time in ms between 0 and initial_jitter. This only
+  applies to the first health check.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.interval_jitter:
+
+
+interval_jitter
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) An optional jitter amount in milliseconds. If specified, during every
+  interval Envoy will add interval_jitter to the wait time.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.interval_jitter_percent:
+
+
+interval_jitter_percent
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) An optional jitter amount as a percentage of interval_ms. If specified,
+  during every interval Envoy will add ``interval_ms`` *
+  ``interval_jitter_percent`` / 100 to the wait time.
+
+  If interval_jitter_ms and interval_jitter_percent are both set, both of
+  them will be used to increase the wait time.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.unhealthy_threshold:
+
+
+unhealthy_threshold
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_, *REQUIRED*) The number of unhealthy health checks required before a host is marked
+  unhealthy. Note that for ``http`` health checking if a host responds with a code not in
+  :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`
+  or :ref:`retriable_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.retriable_statuses>`,
+  this threshold is ignored and the host is considered immediately unhealthy.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.healthy_threshold:
+
+
+healthy_threshold
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_, *REQUIRED*) The number of healthy health checks required before a host is marked
+  healthy. Note that during startup, only a single successful health check is
+  required to mark a host healthy.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.reuse_connection:
+
+
+reuse_connection
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Reuse health check connection between health checks. Default is true.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.http_health_check:
+
+
+http_health_check
+  (:ref:`config.core.v3.HealthCheck.HttpHealthCheck <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>`) HTTP health check.
+
+
+  
+
+  Precisely one of :ref:`http_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.http_health_check>`, :ref:`tcp_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.tcp_health_check>`, :ref:`grpc_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.grpc_health_check>`, :ref:`custom_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.custom_health_check>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.tcp_health_check:
+
+
+tcp_health_check
+  (:ref:`config.core.v3.HealthCheck.TcpHealthCheck <envoy_v3_api_msg_config.core.v3.HealthCheck.TcpHealthCheck>`) TCP health check.
+
+
+  
+
+  Precisely one of :ref:`http_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.http_health_check>`, :ref:`tcp_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.tcp_health_check>`, :ref:`grpc_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.grpc_health_check>`, :ref:`custom_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.custom_health_check>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.grpc_health_check:
+
+
+grpc_health_check
+  (:ref:`config.core.v3.HealthCheck.GrpcHealthCheck <envoy_v3_api_msg_config.core.v3.HealthCheck.GrpcHealthCheck>`) gRPC health check.
+
+
+  
+
+  Precisely one of :ref:`http_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.http_health_check>`, :ref:`tcp_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.tcp_health_check>`, :ref:`grpc_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.grpc_health_check>`, :ref:`custom_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.custom_health_check>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.custom_health_check:
+
+
+custom_health_check
+  (:ref:`config.core.v3.HealthCheck.CustomHealthCheck <envoy_v3_api_msg_config.core.v3.HealthCheck.CustomHealthCheck>`) Custom health check.
+
+
+  
+
+  Precisely one of :ref:`http_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.http_health_check>`, :ref:`tcp_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.tcp_health_check>`, :ref:`grpc_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.grpc_health_check>`, :ref:`custom_health_check <envoy_v3_api_field_config.core.v3.HealthCheck.custom_health_check>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.no_traffic_interval:
+
+
+no_traffic_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The "no traffic interval" is a special health check interval that is used when a cluster has
+  never had traffic routed to it. This lower interval allows cluster information to be kept up to
+  date, without sending a potentially large amount of active health checking traffic for no
+  reason. Once a cluster has been used for traffic routing, Envoy will shift back to using the
+  standard health check interval that is defined. Note that this interval takes precedence over
+  any other.
+
+  The default value for "no traffic interval" is 60 seconds.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.no_traffic_healthy_interval:
+
+
+no_traffic_healthy_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The "no traffic healthy interval" is a special health check interval that
+  is used for hosts that are currently passing active health checking
+  (including new hosts) when the cluster has received no traffic.
+
+  This is useful for when we want to send frequent health checks with
+  ``no_traffic_interval`` but then revert to lower frequency ``no_traffic_healthy_interval`` once
+  a host in the cluster is marked as healthy.
+
+  Once a cluster has been used for traffic routing, Envoy will shift back to using the
+  standard health check interval that is defined.
+
+  If no_traffic_healthy_interval is not set, it will default to the
+  no traffic interval and send that interval regardless of health state.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.unhealthy_interval:
+
+
+unhealthy_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The "unhealthy interval" is a health check interval that is used for hosts that are marked as
+  unhealthy. As soon as the host is marked as healthy, Envoy will shift back to using the
+  standard health check interval that is defined.
+
+  The default value for "unhealthy interval" is the same as "interval".
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.unhealthy_edge_interval:
+
+
+unhealthy_edge_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The "unhealthy edge interval" is a special health check interval that is used for the first
+  health check right after a host is marked as unhealthy. For subsequent health checks
+  Envoy will shift back to using either "unhealthy interval" if present or the standard health
+  check interval that is defined.
+
+  The default value for "unhealthy edge interval" is the same as "unhealthy interval".
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.healthy_edge_interval:
+
+
+healthy_edge_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The "healthy edge interval" is a special health check interval that is used for the first
+  health check right after a host is marked as healthy. For subsequent health checks
+  Envoy will shift back to using the standard health check interval that is defined.
+
+  The default value for "healthy edge interval" is the same as the default interval.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.event_log_path:
+
+
+event_log_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
+
+  .. attention::
+    This field is deprecated in favor of the extension
+    :ref:`event_logger <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>` and
+    :ref:`event_log_path <envoy_v3_api_field_extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink.event_log_path>`
+    in the file sink extension.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.event_logger:
+
+
+event_logger
+  (**repeated** :ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) A list of event log sinks to process the health check event.
+
+
+  .. _extension_category_envoy.health_check.event_sinks:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.health_check.event_sinks.file <extension_envoy.health_check.event_sinks.file>`
+
+
+
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.always_log_health_check_failures:
+
+
+always_log_health_check_failures
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to true, health check failure events will always be logged. If set to false, only the
+  initial health check failure event will be logged.
+  The default value is false.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.always_log_health_check_success:
+
+
+always_log_health_check_success
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to true, health check success events will always be logged. If set to false, only host addition event will be logged
+  if it is the first successful health check, or if the healthy threshold is reached.
+  The default value is false.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.tls_options:
+
+
+tls_options
+  (:ref:`config.core.v3.HealthCheck.TlsOptions <envoy_v3_api_msg_config.core.v3.HealthCheck.TlsOptions>`) This allows overriding the cluster TLS settings, just for health check connections.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria:
+
+
+transport_socket_match_criteria
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) Optional key/value pairs that will be used to match a transport socket from those specified in the cluster's
+  :ref:`tranport socket matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
+  For example, the following match criteria
+
+  .. code-block:: yaml
+
+   transport_socket_match_criteria:
+     useMTLS: true
+
+  Will match the following :ref:`cluster socket match <envoy_v3_api_msg_config.cluster.v3.Cluster.TransportSocketMatch>`
+
+  .. code-block:: yaml
+
+   transport_socket_matches:
+   - name: "useMTLS"
+     match:
+       useMTLS: true
+     transport_socket:
+       name: envoy.transport_sockets.tls
+       config: { ... } # tls socket configuration
+
+  If this field is set, then for health checks it will supersede an entry of ``envoy.transport_socket`` in the
+  :ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>`.
+  This allows using different transport socket capabilities for health checking versus proxying to the
+  endpoint.
+
+  If the key/values pairs specified do not match any
+  :ref:`transport socket matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`,
+  the cluster's :ref:`transport socket <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>`
+  will be used for health check socket configuration.
+
+
+.. _envoy_v3_api_msg_config.core.v3.HealthCheck.Payload:
+
+config.core.v3.HealthCheck.Payload
+----------------------------------
+
+
+:repo:`[config.core.v3.HealthCheck.Payload proto] <api/envoy/config/core/v3/health_check.proto#L70>`
+
+Describes the encoding of the payload bytes in the payload.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "text": ...,
+    "binary": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.Payload.text:
+
+
+text
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Hex encoded payload. E.g., "000000FF".
+
+
+  
+
+  Precisely one of :ref:`text <envoy_v3_api_field_config.core.v3.HealthCheck.Payload.text>`, :ref:`binary <envoy_v3_api_field_config.core.v3.HealthCheck.Payload.binary>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.Payload.binary:
+
+
+binary
+  (`bytes <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Binary payload.
+
+
+  
+
+  Precisely one of :ref:`text <envoy_v3_api_field_config.core.v3.HealthCheck.Payload.text>`, :ref:`binary <envoy_v3_api_field_config.core.v3.HealthCheck.Payload.binary>` must be set.
+
+
+.. _envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck:
+
+config.core.v3.HealthCheck.HttpHealthCheck
+------------------------------------------
+
+
+:repo:`[config.core.v3.HealthCheck.HttpHealthCheck proto] <api/envoy/config/core/v3/health_check.proto#L86>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "host": ...,
+    "path": ...,
+    "send": {...},
+    "receive": [],
+    "response_buffer_size": {...},
+    "request_headers_to_add": [],
+    "request_headers_to_remove": [],
+    "expected_statuses": [],
+    "retriable_statuses": [],
+    "codec_client_type": ...,
+    "service_name_matcher": {...},
+    "method": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.host:
+
+
+host
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The value of the host header in the HTTP health check request. If
+  left empty (default value), the name of the cluster this health check is associated
+  with will be used. The host header can be customized for a specific endpoint by setting the
+  :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.path:
+
+
+path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Specifies the HTTP path that will be requested during health checking. For example
+  ``/healthcheck``.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.send:
+
+
+send
+  (:ref:`config.core.v3.HealthCheck.Payload <envoy_v3_api_msg_config.core.v3.HealthCheck.Payload>`) HTTP specific payload to be sent as the request body during health checking.
+  If specified, the method should support a request body (POST, PUT, PATCH, etc.).
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.receive:
+
+
+receive
+  (**repeated** :ref:`config.core.v3.HealthCheck.Payload <envoy_v3_api_msg_config.core.v3.HealthCheck.Payload>`) Specifies a list of HTTP expected responses to match in the first ``response_buffer_size`` bytes of the response body.
+  If it is set, both the expected response check and status code determine the health check.
+  When checking the response, “fuzzy” matching is performed such that each payload block must be found,
+  and in the order specified, but not necessarily contiguous.
+
+  .. note::
+
+    It is recommended to set ``response_buffer_size`` based on the total Payload size for efficiency.
+    The default buffer size is 1024 bytes when it is not set.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_buffer_size:
+
+
+response_buffer_size
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Specifies the size of response buffer in bytes that is used to Payload match.
+  The default value is 1024. Setting to 0 implies that the Payload will be matched against the entire response.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.request_headers_to_add:
+
+
+request_headers_to_add
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) Specifies a list of HTTP headers that should be added to each request that is sent to the
+  health checked cluster. For more information, including details on header value syntax, see
+  the documentation on :ref:`custom request headers
+  <config_http_conn_man_headers_custom_request_headers>`.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.request_headers_to_remove:
+
+
+request_headers_to_remove
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies a list of HTTP headers that should be removed from each request that is sent to the
+  health checked cluster.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses:
+
+
+expected_statuses
+  (**repeated** :ref:`type.v3.Int64Range <envoy_v3_api_msg_type.v3.Int64Range>`) Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
+  200-only policy - 200 must be included explicitly as needed. Ranges follow half-open
+  semantics of :ref:`Int64Range <envoy_v3_api_msg_type.v3.Int64Range>`. The start and end of each
+  range are required. Only statuses in the range [100, 600) are allowed.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.retriable_statuses:
+
+
+retriable_statuses
+  (**repeated** :ref:`type.v3.Int64Range <envoy_v3_api_msg_type.v3.Int64Range>`) Specifies a list of HTTP response statuses considered retriable. If provided, responses in this range
+  will count towards the configured :ref:`unhealthy_threshold <envoy_v3_api_field_config.core.v3.HealthCheck.unhealthy_threshold>`,
+  but will not result in the host being considered immediately unhealthy. Ranges follow half-open semantics of
+  :ref:`Int64Range <envoy_v3_api_msg_type.v3.Int64Range>`. The start and end of each range are required.
+  Only statuses in the range [100, 600) are allowed. The :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`
+  field takes precedence for any range overlaps with this field i.e. if status code 200 is both retriable and expected, a 200 response will
+  be considered a successful health check. By default all responses not in
+  :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>` will result in
+  the host being considered immediately unhealthy i.e. if status code 200 is expected and there are no configured retriable statuses, any
+  non-200 response will result in the host being marked unhealthy.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.codec_client_type:
+
+
+codec_client_type
+  (:ref:`type.v3.CodecClientType <envoy_v3_api_enum_type.v3.CodecClientType>`) Use specified application protocol for health checks.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.service_name_matcher:
+
+
+service_name_matcher
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) An optional service name parameter which is used to validate the identity of
+  the health checked cluster using a :ref:`StringMatcher
+  <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`. See the :ref:`architecture overview
+  <arch_overview_health_checking_identity>` for more information.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.method:
+
+
+method
+  (:ref:`config.core.v3.RequestMethod <envoy_v3_api_enum_config.core.v3.RequestMethod>`) HTTP Method that will be used for health checking, default is "GET".
+  GET, HEAD, POST, PUT, DELETE, OPTIONS, TRACE, PATCH methods are supported.
+  Request body payloads are supported for POST, PUT, PATCH, and OPTIONS methods only.
+  CONNECT method is disallowed because it is not appropriate for health check request.
+  If a non-200 response is expected by the method, it needs to be set in :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.HealthCheck.TcpHealthCheck:
+
+config.core.v3.HealthCheck.TcpHealthCheck
+-----------------------------------------
+
+
+:repo:`[config.core.v3.HealthCheck.TcpHealthCheck proto] <api/envoy/config/core/v3/health_check.proto#L171>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "send": {...},
+    "receive": [],
+    "proxy_protocol_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.send:
+
+
+send
+  (:ref:`config.core.v3.HealthCheck.Payload <envoy_v3_api_msg_config.core.v3.HealthCheck.Payload>`) Empty payloads imply a connect-only health check.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.receive:
+
+
+receive
+  (**repeated** :ref:`config.core.v3.HealthCheck.Payload <envoy_v3_api_msg_config.core.v3.HealthCheck.Payload>`) When checking the response, “fuzzy” matching is performed such that each
+  payload block must be found, and in the order specified, but not
+  necessarily contiguous.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.TcpHealthCheck.proxy_protocol_config:
+
+
+proxy_protocol_config
+  (:ref:`config.core.v3.ProxyProtocolConfig <envoy_v3_api_msg_config.core.v3.ProxyProtocolConfig>`) When setting this value, it tries to attempt health check request with ProxyProtocol.
+  When ``send`` is presented, they are sent after preceding ProxyProtocol header.
+  Only ProxyProtocol header is sent when ``send`` is not presented.
+  It allows to use both ProxyProtocol V1 and V2. In V1, it presents L3/L4. In V2, it includes
+  LOCAL command and doesn't include L3/L4.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.HealthCheck.RedisHealthCheck:
+
+config.core.v3.HealthCheck.RedisHealthCheck
+-------------------------------------------
+
+
+:repo:`[config.core.v3.HealthCheck.RedisHealthCheck proto] <api/envoy/config/core/v3/health_check.proto#L191>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "key": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.RedisHealthCheck.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set, optionally perform ``EXISTS <key>`` instead of ``PING``. A return value
+  from Redis of 0 (does not exist) is considered a passing healthcheck. A return value other
+  than 0 is considered a failure. This allows the user to mark a Redis instance for maintenance
+  by setting the specified key to any value and waiting for traffic to drain.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.HealthCheck.GrpcHealthCheck:
+
+config.core.v3.HealthCheck.GrpcHealthCheck
+------------------------------------------
+
+
+:repo:`[config.core.v3.HealthCheck.GrpcHealthCheck proto] <api/envoy/config/core/v3/health_check.proto#L206>`
+
+`grpc.health.v1.Health
+<https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto>`_-based
+healthcheck. See `gRPC doc <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_
+for details.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "service_name": ...,
+    "authority": ...,
+    "initial_metadata": []
+  }
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.GrpcHealthCheck.service_name:
+
+
+service_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) An optional service name parameter which will be sent to gRPC service in
+  `grpc.health.v1.HealthCheckRequest
+  <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto#L20>`_.
+  message. See `gRPC health-checking overview
+  <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_ for more information.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.GrpcHealthCheck.authority:
+
+
+authority
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The value of the :authority header in the gRPC health check request. If
+  left empty (default value), the name of the cluster this health check is associated
+  with will be used. The authority header can be customized for a specific endpoint by setting
+  the :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.hostname>` field.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.GrpcHealthCheck.initial_metadata:
+
+
+initial_metadata
+  (**repeated** :ref:`config.core.v3.HeaderValueOption <envoy_v3_api_msg_config.core.v3.HeaderValueOption>`) Specifies a list of key-value pairs that should be added to the metadata of each GRPC call
+  that is sent to the health checked cluster. For more information, including details on header value syntax,
+  see the documentation on :ref:`custom request headers
+  <config_http_conn_man_headers_custom_request_headers>`.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.HealthCheck.CustomHealthCheck:
+
+config.core.v3.HealthCheck.CustomHealthCheck
+--------------------------------------------
+
+
+:repo:`[config.core.v3.HealthCheck.CustomHealthCheck proto] <api/envoy/config/core/v3/health_check.proto#L232>`
+
+Custom health check.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "typed_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.CustomHealthCheck.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The registered name of the custom health checker.
+
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.CustomHealthCheck.typed_config:
+
+
+typed_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) 
+  A custom health checker specific configuration which depends on the custom health checker
+  being instantiated. See :api:`envoy/config/health_checker` for reference.
+
+
+  .. _extension_category_envoy.health_checkers:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.health_checkers.dynamic_modules <extension_envoy.health_checkers.dynamic_modules>`
+
+    - :ref:`envoy.health_checkers.grpc <extension_envoy.health_checkers.grpc>`
+
+    - :ref:`envoy.health_checkers.http <extension_envoy.health_checkers.http>`
+
+    - :ref:`envoy.health_checkers.redis <extension_envoy.health_checkers.redis>`
+
+    - :ref:`envoy.health_checkers.tcp <extension_envoy.health_checkers.tcp>`
+
+    - :ref:`envoy.health_checkers.thrift <extension_envoy.health_checkers.thrift>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.HealthCheck.TlsOptions:
+
+config.core.v3.HealthCheck.TlsOptions
+-------------------------------------
+
+
+:repo:`[config.core.v3.HealthCheck.TlsOptions proto] <api/envoy/config/core/v3/health_check.proto#L255>`
+
+Health checks occur over the transport socket specified for the cluster. This implies that if a
+cluster is using a TLS-enabled transport socket, the health check will also occur over TLS.
+
+This allows overriding the cluster TLS settings, just for health check connections.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "alpn_protocols": []
+  }
+
+.. _envoy_v3_api_field_config.core.v3.HealthCheck.TlsOptions.alpn_protocols:
+
+
+alpn_protocols
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the ALPN protocols for health check connections. This is useful if the
+  corresponding upstream is using ALPN-based :ref:`FilterChainMatch
+  <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>` along with different protocols for health checks
+  versus data connections. If empty, no ALPN protocols will be set on health check connections.
+
+
+
+
+.. _envoy_v3_api_enum_config.core.v3.HealthStatus:
+
+Enum config.core.v3.HealthStatus
+--------------------------------
+
+
+:repo:`[config.core.v3.HealthStatus proto] <api/envoy/config/core/v3/health_check.proto#L34>`
+
+Endpoint health status.
+
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.HealthStatus.UNKNOWN:
+
+
+UNKNOWN
+  *(DEFAULT)* ⁣The health status is not known. This is interpreted by Envoy as ``HEALTHY``.
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.HealthStatus.HEALTHY:
+
+
+HEALTHY
+  ⁣Healthy.
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.HealthStatus.UNHEALTHY:
+
+
+UNHEALTHY
+  ⁣Unhealthy.
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.HealthStatus.DRAINING:
+
+
+DRAINING
+  ⁣Connection draining in progress. E.g.,
+  `<https://aws.amazon.com/blogs/aws/elb-connection-draining-remove-instances-from-service-with-care/>`_
+  or
+  `<https://cloud.google.com/compute/docs/load-balancing/enabling-connection-draining>`_.
+  This is interpreted by Envoy as ``UNHEALTHY``.
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.HealthStatus.TIMEOUT:
+
+
+TIMEOUT
+  ⁣Health check timed out. This is part of HDS and is interpreted by Envoy as
+  ``UNHEALTHY``.
+
+
+.. _envoy_v3_api_enum_value_config.core.v3.HealthStatus.DEGRADED:
+
+
+DEGRADED
+  ⁣Degraded.
+
+

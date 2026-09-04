@@ -1,0 +1,93 @@
+.. _envoy_v3_api_file_envoy/type/v3/hash_policy.proto:
+
+Hash Policy (proto)
+===================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.v3.HashPolicy:
+
+type.v3.HashPolicy
+------------------
+
+
+:repo:`[type.v3.HashPolicy proto] <api/envoy/type/v3/hash_policy.proto#L17>`
+
+Specifies the hash policy
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "source_ip": {...},
+    "filter_state": {...}
+  }
+
+.. _envoy_v3_api_field_type.v3.HashPolicy.source_ip:
+
+
+source_ip
+  (:ref:`type.v3.HashPolicy.SourceIp <envoy_v3_api_msg_type.v3.HashPolicy.SourceIp>`) 
+  
+
+  Precisely one of :ref:`source_ip <envoy_v3_api_field_type.v3.HashPolicy.source_ip>`, :ref:`filter_state <envoy_v3_api_field_type.v3.HashPolicy.filter_state>` must be set.
+
+.. _envoy_v3_api_field_type.v3.HashPolicy.filter_state:
+
+
+filter_state
+  (:ref:`type.v3.HashPolicy.FilterState <envoy_v3_api_msg_type.v3.HashPolicy.FilterState>`) 
+  
+
+  Precisely one of :ref:`source_ip <envoy_v3_api_field_type.v3.HashPolicy.source_ip>`, :ref:`filter_state <envoy_v3_api_field_type.v3.HashPolicy.filter_state>` must be set.
+
+.. _envoy_v3_api_msg_type.v3.HashPolicy.SourceIp:
+
+type.v3.HashPolicy.SourceIp
+---------------------------
+
+
+:repo:`[type.v3.HashPolicy.SourceIp proto] <api/envoy/type/v3/hash_policy.proto#L22>`
+
+The source IP will be used to compute the hash used by hash-based load balancing
+algorithms.
+
+
+
+
+
+.. _envoy_v3_api_msg_type.v3.HashPolicy.FilterState:
+
+type.v3.HashPolicy.FilterState
+------------------------------
+
+
+:repo:`[type.v3.HashPolicy.FilterState proto] <api/envoy/type/v3/hash_policy.proto#L28>`
+
+An Object in the :ref:`filterState <arch_overview_data_sharing_between_filters>` will be used
+to compute the hash used by hash-based load balancing algorithms.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "key": ...
+  }
+
+.. _envoy_v3_api_field_type.v3.HashPolicy.FilterState.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the Object in the filterState, which is an Envoy::Hashable object. If there is no
+  data associated with the key, or the stored object is not Envoy::Hashable, no hash will be
+  produced.
+
+
+

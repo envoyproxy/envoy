@@ -1,0 +1,507 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wasm Stats Filter Sink &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Application logging" href="../application_logging.html" />
+    <link rel="prev" title="Wasm Stat Sink" href="wasm_stat_sink.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../http/http.html">HTTP</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../observability.html">Observability</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../statistics.html">Statistics</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="stat_sinks.html">Stat sinks</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="dynamic_modules_stat_sink.html">Dynamic Modules Stats Sink</a></li>
+<li class="toctree-l4"><a class="reference internal" href="graphite_statsd_stat_sink.html">Graphite+Statsd Stat Sink</a></li>
+<li class="toctree-l4"><a class="reference internal" href="kafka_stat_sink.html">Kafka Stat Sink</a></li>
+<li class="toctree-l4"><a class="reference internal" href="open_telemetry_stat_sink.html">OpenTelemetry Stat Sink</a></li>
+<li class="toctree-l4"><a class="reference internal" href="wasm_stat_sink.html">Wasm Stat Sink</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Wasm Stats Filter Sink</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../application_logging.html">Application logging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../access_log/access_log.html">Access Logs</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../observability.html">Observability</a></li>
+          <li class="breadcrumb-item"><a href="stat_sinks.html">Stat sinks</a></li>
+      <li class="breadcrumb-item active">Wasm Stats Filter Sink</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/observability/stat_sinks/wasm_filter_stat_sink.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="wasm-stats-filter-sink">
+<span id="config-stat-sinks-wasm-filter"></span><h1>Wasm Stats Filter Sink<a class="headerlink" href="#wasm-stats-filter-sink" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="../../../api-v3/extensions/stat_sinks/wasm_filter/v3/wasm_filter.proto.html#envoy-v3-api-msg-extensions-stat-sinks-wasm-filter-v3-wasmfilterstatssinkconfig"><span class="std std-ref">WasmFilterStatsSinkConfig</span></a>
+configuration specifies a stats sink middleware that runs a
+<a class="reference external" href="https://webassembly.org/">WebAssembly</a> (WASM) plugin to filter, transform,
+and enrich metrics before delegating to an inner stats sink.</p>
+<p>This is useful when you need custom, programmable logic to decide which metrics are
+exported – for example, dropping high-cardinality metrics by name pattern, injecting
+tags from node metadata, renaming metrics, or adding synthetic metrics. It replaces
+centralized metric processing services with distributed in-proxy logic.</p>
+<ul class="simple">
+<li><p>This extension should be configured with the type URL
+<code class="docutils literal notranslate"><span class="pre">type.googleapis.com/envoy.extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig</span></code>.</p></li>
+<li><p><a class="reference internal" href="../../../api-v3/extensions/stat_sinks/wasm_filter/v3/wasm_filter.proto.html#envoy-v3-api-msg-extensions-stat-sinks-wasm-filter-v3-wasmfilterstatssinkconfig"><span class="std std-ref">v3 API reference</span></a></p></li>
+</ul>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>The Wasm stats filter sink is only included in <a class="reference internal" href="../../../start/install.html#install-contrib"><span class="std std-ref">contrib images</span></a></p>
+</div>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>The Wasm stats filter sink is experimental and is currently under active development.
+Capabilities will be expanded over time and the configuration structures are likely to change.</p>
+</div>
+<section id="how-it-works">
+<h2>How it works<a class="headerlink" href="#how-it-works" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">wasm_filter</span></code> sink wraps any existing stats sink (the <em>inner sink</em>) and
+interposes a WASM plugin on each flush cycle:</p>
+<ol class="arabic simple">
+<li><p>Envoy’s flush timer fires and passes the full <code class="docutils literal notranslate"><span class="pre">MetricSnapshot</span></code> to the
+<code class="docutils literal notranslate"><span class="pre">wasm_filter</span></code> sink.</p></li>
+<li><p>The sink serializes all <strong>counters</strong> and <strong>gauges</strong> into a compact binary buffer
+and invokes the WASM plugin’s <code class="docutils literal notranslate"><span class="pre">onStatsUpdate()</span></code> callback.</p></li>
+<li><p>The plugin iterates the metrics and applies custom logic. It may call foreign
+functions to:</p>
+<ul class="simple">
+<li><p><strong>Get additional data</strong>: histogram names, per-metric tags</p></li>
+<li><p><strong>Set global tags</strong>: applied to all metrics on every flush</p></li>
+<li><p><strong>Rename metrics</strong>: override the name of specific counters/gauges/histograms</p></li>
+<li><p><strong>Inject synthetic metrics</strong>: add new counters/gauges to the snapshot</p></li>
+<li><p><strong>Emit kept indices</strong>: declare which metrics to keep</p></li>
+</ul>
+</li>
+<li><p>The host builds an enriched snapshot: filtered metrics wrapped with tag/name
+overrides, plus any injected synthetic metrics.</p></li>
+<li><p>The enriched snapshot is flushed to the inner sink.</p></li>
+</ol>
+<p><strong>Text readouts</strong> and <strong>host counters/gauges</strong> pass through unfiltered.</p>
+</section>
+<section id="capabilities">
+<h2>Capabilities<a class="headerlink" href="#capabilities" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 30.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Capability</p></th>
+<th class="head"><p>Foreign Function</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>Filter</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">stats_filter_emit</span></code></p></td>
+<td><p>Declare which counters, gauges, and histograms to keep.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Global tag injection</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">stats_filter_set_global_tags</span></code></p></td>
+<td><p>Set tags (e.g. datacenter, pod) applied to ALL metrics. Called once at
+startup from <code class="docutils literal notranslate"><span class="pre">onConfigure()</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Metric renaming</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">stats_filter_set_name_overrides</span></code></p></td>
+<td><p>Override the name of specific metrics (e.g. prefix with <code class="docutils literal notranslate"><span class="pre">envoy.</span></code>).
+Called per flush.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Synthetic metrics</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">stats_filter_inject_metrics</span></code></p></td>
+<td><p>Inject new counters/gauges with custom names, values, and tags.
+Called per flush.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Histogram discovery</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">stats_filter_get_histograms</span></code></p></td>
+<td><p>Get the list of histogram names (not in the standard <code class="docutils literal notranslate"><span class="pre">onStatsUpdate</span></code>
+buffer).</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Per-metric tags</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">stats_filter_get_metric_tags</span></code></p></td>
+<td><p>Get tags for a single metric by type and index.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Bulk tags</strong></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">stats_filter_get_all_metric_tags</span></code></p></td>
+<td><p>Get tags for all metrics in one call.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="configuration-example">
+<h2>Configuration example<a class="headerlink" href="#configuration-example" title="Link to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">stats_flush_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10s</span>
+
+<span class="nt">stats_sinks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.stat_sinks.wasm_filter</span>
+<span class="w">    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">      </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig</span>
+<span class="w">      </span><span class="nt">wasm_config</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_stats_filter&quot;</span>
+<span class="w">        </span><span class="nt">root_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;stats_filter&quot;</span>
+<span class="w">        </span><span class="nt">vm_config</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">runtime</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy.wasm.runtime.v8&quot;</span>
+<span class="w">          </span><span class="nt">code</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">local</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/etc/envoy/stats_filter_plugin.wasm&quot;</span>
+<span class="w">        </span><span class="nt">configuration</span><span class="p">:</span>
+<span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/google.protobuf.StringValue</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;{&quot;exclude_prefixes&quot;:</span><span class="nv"> </span><span class="s">[&quot;server.compilation&quot;,</span><span class="nv"> </span><span class="s">&quot;runtime.&quot;],</span><span class="nv"> </span><span class="s">&quot;rename_with_prefix&quot;:</span><span class="nv"> </span><span class="s">true}&#39;</span>
+<span class="w">      </span><span class="nt">inner_sink</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.stat_sinks.kafka</span>
+<span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig</span>
+<span class="w">          </span><span class="nt">broker_list</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;kafka:9092&quot;</span>
+<span class="w">          </span><span class="nt">topic</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;envoy-metrics&quot;</span>
+<span class="w">          </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PROTOBUF</span>
+<span class="w">          </span><span class="nt">emit_tags_as_labels</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+</section>
+<section id="wire-format-reference">
+<h2>Wire format reference<a class="headerlink" href="#wire-format-reference" title="Link to this heading"></a></h2>
+<section id="stats-filter-emit">
+<h3><code class="docutils literal notranslate"><span class="pre">stats_filter_emit</span></code><a class="headerlink" href="#stats-filter-emit" title="Link to this heading"></a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[counter_count] [counter_idx_0] ... [counter_idx_N]
+[gauge_count]   [gauge_idx_0]   ... [gauge_idx_M]
+[hist_count]    [hist_idx_0]    ... [hist_idx_K]   (optional)
+</pre></div>
+</div>
+</section>
+<section id="stats-filter-set-global-tags">
+<h3><code class="docutils literal notranslate"><span class="pre">stats_filter_set_global_tags</span></code><a class="headerlink" href="#stats-filter-set-global-tags" title="Link to this heading"></a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[tag_count: uint32]
+For each tag:
+  [name_len: uint32] [name bytes] [value_len: uint32] [value bytes]
+</pre></div>
+</div>
+</section>
+<section id="stats-filter-set-name-overrides">
+<h3><code class="docutils literal notranslate"><span class="pre">stats_filter_set_name_overrides</span></code><a class="headerlink" href="#stats-filter-set-name-overrides" title="Link to this heading"></a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[count: uint32]
+For each override:
+  [type: uint32 (1=counter, 2=gauge, 3=histogram)]
+  [index: uint32]
+  [new_name_len: uint32] [new_name bytes]
+</pre></div>
+</div>
+</section>
+<section id="stats-filter-inject-metrics">
+<h3><code class="docutils literal notranslate"><span class="pre">stats_filter_inject_metrics</span></code><a class="headerlink" href="#stats-filter-inject-metrics" title="Link to this heading"></a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[counter_count: uint32]
+For each counter:
+  [name_len: uint32] [name bytes] [value: uint64]
+  [tag_count: uint32] for each tag: [name_len][name][value_len][value]
+[gauge_count: uint32]
+For each gauge:
+  [name_len: uint32] [name bytes] [value: uint64]
+  [tag_count: uint32] for each tag: [name_len][name][value_len][value]
+</pre></div>
+</div>
+</section>
+<section id="stats-filter-get-histograms">
+<h3><code class="docutils literal notranslate"><span class="pre">stats_filter_get_histograms</span></code><a class="headerlink" href="#stats-filter-get-histograms" title="Link to this heading"></a></h3>
+<p><strong>Input</strong>: empty. <strong>Output</strong>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[count: uint32] for each: [name_len: uint32] [name bytes]
+</pre></div>
+</div>
+</section>
+<section id="stats-filter-get-metric-tags-single">
+<h3><code class="docutils literal notranslate"><span class="pre">stats_filter_get_metric_tags</span></code> (single)<a class="headerlink" href="#stats-filter-get-metric-tags-single" title="Link to this heading"></a></h3>
+<p><strong>Input</strong>: <code class="docutils literal notranslate"><span class="pre">[type:</span> <span class="pre">uint32]</span> <span class="pre">[index:</span> <span class="pre">uint32]</span></code>. <strong>Output</strong>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[tag_count: uint32]
+For each tag: [name_len: uint32] [name] [value_len: uint32] [value]
+</pre></div>
+</div>
+</section>
+<section id="stats-filter-get-all-metric-tags-bulk">
+<h3><code class="docutils literal notranslate"><span class="pre">stats_filter_get_all_metric_tags</span></code> (bulk)<a class="headerlink" href="#stats-filter-get-all-metric-tags-bulk" title="Link to this heading"></a></h3>
+<p><strong>Input</strong>: empty. <strong>Output</strong>: three consecutive blocks (counters, gauges, histograms):</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[metric_count: uint32]
+For each metric:
+  [tag_count: uint32]
+  For each tag: [name_len: uint32] [name] [value_len: uint32] [value]
+</pre></div>
+</div>
+</section>
+</section>
+<section id="reading-node-metadata">
+<h2>Reading node metadata<a class="headerlink" href="#reading-node-metadata" title="Link to this heading"></a></h2>
+<p>The plugin can read Envoy’s node metadata during <code class="docutils literal notranslate"><span class="pre">onConfigure()</span></code> using
+<code class="docutils literal notranslate"><span class="pre">getProperty()</span></code> / <code class="docutils literal notranslate"><span class="pre">getValue()</span></code> with paths like:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">[&quot;xds&quot;,</span> <span class="pre">&quot;node&quot;,</span> <span class="pre">&quot;id&quot;]</span></code> – node ID (hostname)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[&quot;xds&quot;,</span> <span class="pre">&quot;node&quot;,</span> <span class="pre">&quot;cluster&quot;]</span></code> – cluster name</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[&quot;xds&quot;,</span> <span class="pre">&quot;node&quot;,</span> <span class="pre">&quot;metadata&quot;,</span> <span class="pre">&quot;datacenter&quot;]</span></code> – custom metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[&quot;xds&quot;,</span> <span class="pre">&quot;node&quot;,</span> <span class="pre">&quot;locality&quot;,</span> <span class="pre">&quot;region&quot;]</span></code> – locality region</p></li>
+</ul>
+<p>These are used to compute global tags via <code class="docutils literal notranslate"><span class="pre">stats_filter_set_global_tags</span></code>.</p>
+</section>
+<section id="performance-considerations">
+<h2>Performance considerations<a class="headerlink" href="#performance-considerations" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Global tags</strong>: set once at startup, zero per-flush overhead.</p></li>
+<li><p><strong>Metric filtering</strong>: single WASM boundary crossing for the serialized buffer.</p></li>
+<li><p><strong>Bulk tag lookup</strong>: <code class="docutils literal notranslate"><span class="pre">stats_filter_get_all_metric_tags</span></code> – one crossing vs N.</p></li>
+<li><p><strong>Name overrides and injection</strong>: one crossing each per flush.</p></li>
+</ul>
+</section>
+<section id="current-limitations">
+<h2>Current limitations<a class="headerlink" href="#current-limitations" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Text readouts are not filterable</strong> – they pass through to the inner sink.</p></li>
+<li><p><strong>Value transformation is not supported</strong> – the plugin can rename and tag
+metrics but cannot modify counter/gauge values.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="wasm_stat_sink.html" class="btn btn-neutral float-left" title="Wasm Stat Sink" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../application_logging.html" class="btn btn-neutral float-right" title="Application logging" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Wasm Stats Filter Sink</a><ul>
+<li><a class="reference internal" href="#how-it-works">How it works</a></li>
+<li><a class="reference internal" href="#capabilities">Capabilities</a></li>
+<li><a class="reference internal" href="#configuration-example">Configuration example</a></li>
+<li><a class="reference internal" href="#wire-format-reference">Wire format reference</a><ul>
+<li><a class="reference internal" href="#stats-filter-emit"><code class="docutils literal notranslate"><span class="pre">stats_filter_emit</span></code></a></li>
+<li><a class="reference internal" href="#stats-filter-set-global-tags"><code class="docutils literal notranslate"><span class="pre">stats_filter_set_global_tags</span></code></a></li>
+<li><a class="reference internal" href="#stats-filter-set-name-overrides"><code class="docutils literal notranslate"><span class="pre">stats_filter_set_name_overrides</span></code></a></li>
+<li><a class="reference internal" href="#stats-filter-inject-metrics"><code class="docutils literal notranslate"><span class="pre">stats_filter_inject_metrics</span></code></a></li>
+<li><a class="reference internal" href="#stats-filter-get-histograms"><code class="docutils literal notranslate"><span class="pre">stats_filter_get_histograms</span></code></a></li>
+<li><a class="reference internal" href="#stats-filter-get-metric-tags-single"><code class="docutils literal notranslate"><span class="pre">stats_filter_get_metric_tags</span></code> (single)</a></li>
+<li><a class="reference internal" href="#stats-filter-get-all-metric-tags-bulk"><code class="docutils literal notranslate"><span class="pre">stats_filter_get_all_metric_tags</span></code> (bulk)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#reading-node-metadata">Reading node metadata</a></li>
+<li><a class="reference internal" href="#performance-considerations">Performance considerations</a></li>
+<li><a class="reference internal" href="#current-limitations">Current limitations</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

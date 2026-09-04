@@ -1,0 +1,41 @@
+.. _version_history_1.25.2:
+
+1.25.2 (March 1, 2023)
+=======================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **dependency**: update Kafka to resolve CVE-2023-25194.
+
+
+
+
+New features
+------------
+
+
+* **docker**: unify published images as tag variants. For example, ``envoyproxy/envoy-dev`` is now available
+  as ``envoyproxy/envoy:dev``.
+
+
+
+Deprecated
+----------
+
+
+* **ext_authz**: deprecated (1.25.0) :ref:`ext_authz.v3.AuthorizationRequest.allowed_headers
+  <v1.25:envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationRequest.allowed_headers>` in favour
+  of :ref:`ext_authz.v3.ExtAuthz.allowed_headers
+  <v1.25:envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
+

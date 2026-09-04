@@ -1,0 +1,90 @@
+.. _envoy_v3_api_file_envoy/extensions/stat_sinks/graphite_statsd/v3/graphite_statsd.proto:
+
+Graphite+Statsd (proto)
+=======================
+
+.. _extension_envoy.stat_sinks.graphite_statsd:
+
+This extension has the qualified name ``envoy.stat_sinks.graphite_statsd``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.stats_sinks <extension_category_envoy.stats_sinks>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.stat_sinks.graphite_statsd.v3.GraphiteStatsdSink <envoy_v3_api_msg_extensions.stat_sinks.graphite_statsd.v3.GraphiteStatsdSink>`
+
+
+
+Stats configuration proto schema for ``envoy.stat_sinks.graphite_statsd`` sink.
+The sink emits stats with `Graphite <https://graphite.readthedocs.io/en/latest/tags.html>`_
+compatible tags. Tags are configurable via :ref:`StatsConfig
+<envoy_v3_api_msg_config.metrics.v3.StatsConfig>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.stat_sinks.graphite_statsd.v3.GraphiteStatsdSink:
+
+extensions.stat_sinks.graphite_statsd.v3.GraphiteStatsdSink
+-----------------------------------------------------------
+
+
+:repo:`[extensions.stat_sinks.graphite_statsd.v3.GraphiteStatsdSink proto] <api/envoy/extensions/stat_sinks/graphite_statsd/v3/graphite_statsd.proto#L24>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "address": {...},
+    "prefix": ...,
+    "max_bytes_per_datagram": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.stat_sinks.graphite_statsd.v3.GraphiteStatsdSink.address:
+
+
+address
+  (:ref:`config.core.v3.Address <envoy_v3_api_msg_config.core.v3.Address>`, *REQUIRED*) The UDP address of a running Graphite-compliant listener. If specified,
+  statistics will be flushed to this address.
+
+
+  
+
+.. _envoy_v3_api_field_extensions.stat_sinks.graphite_statsd.v3.GraphiteStatsdSink.prefix:
+
+
+prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional custom metric name prefix. See :ref:`StatsdSink's prefix field
+  <envoy_v3_api_field_config.metrics.v3.StatsdSink.prefix>` for more details.
+
+
+.. _envoy_v3_api_field_extensions.stat_sinks.graphite_statsd.v3.GraphiteStatsdSink.max_bytes_per_datagram:
+
+
+max_bytes_per_datagram
+  (`UInt64Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value>`_) Optional max datagram size to use when sending UDP messages. By default Envoy
+  will emit one metric per datagram. By specifying a max-size larger than a single
+  metric, Envoy will emit multiple, new-line separated metrics. The max datagram
+  size should not exceed your network's MTU.
+
+  Note that this value may not be respected if smaller than a single metric.
+
+

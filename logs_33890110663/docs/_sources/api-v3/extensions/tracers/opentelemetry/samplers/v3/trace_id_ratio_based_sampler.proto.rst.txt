@@ -1,0 +1,91 @@
+.. _envoy_v3_api_file_envoy/extensions/tracers/opentelemetry/samplers/v3/trace_id_ratio_based_sampler.proto:
+
+Trace Id Ratio Based Sampler config (proto)
+===========================================
+
+.. _extension_envoy.tracers.opentelemetry.samplers.trace_id_ratio_based:
+
+This extension has the qualified name ``envoy.tracers.opentelemetry.samplers.trace_id_ratio_based``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers.opentelemetry.samplers <extension_category_envoy.tracers.opentelemetry.samplers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.TraceIdRatioBasedSamplerConfig <envoy_v3_api_msg_extensions.tracers.opentelemetry.samplers.v3.TraceIdRatioBasedSamplerConfig>`
+
+
+
+Configuration for the "TraceIdRatioBased" Sampler extension.
+The sampler follows the "TraceIdRatioBased" implementation from the OpenTelemetry
+SDK specification.
+
+See:
+`TraceIdRatioBased sampler specification <https://opentelemetry.io/docs/specs/otel/trace/sdk/#traceidratiobased>`_
+
+
+
+
+.. _envoy_v3_api_msg_extensions.tracers.opentelemetry.samplers.v3.TraceIdRatioBasedSamplerConfig:
+
+extensions.tracers.opentelemetry.samplers.v3.TraceIdRatioBasedSamplerConfig
+---------------------------------------------------------------------------
+
+
+:repo:`[extensions.tracers.opentelemetry.samplers.v3.TraceIdRatioBasedSamplerConfig proto] <api/envoy/extensions/tracers/opentelemetry/samplers/v3/trace_id_ratio_based_sampler.proto#L23>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "sampling_percentage": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.tracers.opentelemetry.samplers.v3.TraceIdRatioBasedSamplerConfig.sampling_percentage:
+
+
+sampling_percentage
+  (:ref:`type.v3.FractionalPercent <envoy_v3_api_msg_type.v3.FractionalPercent>`) If the given trace_id falls into a given percentage of all possible
+  trace_id values, ShouldSample will return RECORD_AND_SAMPLE.
+  required
+
+
+  .. _extension_category_envoy.tracers.opentelemetry.samplers:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.always_on <extension_envoy.tracers.opentelemetry.samplers.always_on>`
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.cel <extension_envoy.tracers.opentelemetry.samplers.cel>`
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.dynatrace <extension_envoy.tracers.opentelemetry.samplers.dynatrace>`
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.parent_based <extension_envoy.tracers.opentelemetry.samplers.parent_based>`
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.trace_id_ratio_based <extension_envoy.tracers.opentelemetry.samplers.trace_id_ratio_based>`
+
+
+
+
+

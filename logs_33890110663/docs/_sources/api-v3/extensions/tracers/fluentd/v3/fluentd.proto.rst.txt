@@ -1,0 +1,112 @@
+.. _envoy_v3_api_file_envoy/extensions/tracers/fluentd/v3/fluentd.proto:
+
+Fluentd tracer (proto)
+======================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.tracers.fluentd.v3.FluentdConfig:
+
+extensions.tracers.fluentd.v3.FluentdConfig
+-------------------------------------------
+
+
+:repo:`[extensions.tracers.fluentd.v3.FluentdConfig proto] <api/envoy/extensions/tracers/fluentd/v3/fluentd.proto#L28>`
+
+Configuration for the Fluentd tracer.
+This tracer extension will send the emitted traces over a TCP connection to an upstream that is accepting
+the Fluentd Forward Protocol as described in: `Fluentd Forward Protocol Specification
+<https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
+
+.. _extension_envoy.tracers.fluentd:
+
+This extension has the qualified name ``envoy.tracers.fluentd``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers <extension_category_envoy.tracers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.tracers.fluentd.v3.FluentdConfig <envoy_v3_api_msg_extensions.tracers.fluentd.v3.FluentdConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster": ...,
+    "tag": ...,
+    "stat_prefix": ...,
+    "buffer_flush_interval": {...},
+    "buffer_size_bytes": {...},
+    "retry_policy": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.tracers.fluentd.v3.FluentdConfig.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The upstream cluster to connect to for streaming the Fluentd messages.
+
+
+.. _envoy_v3_api_field_extensions.tracers.fluentd.v3.FluentdConfig.tag:
+
+
+tag
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) A tag is a string separated with ``.`` (e.g. ``log.type``) to categorize events.
+  See: https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#message-modes
+
+
+.. _envoy_v3_api_field_extensions.tracers.fluentd.v3.FluentdConfig.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The prefix to use when emitting tracer stats.
+
+
+.. _envoy_v3_api_field_extensions.tracers.fluentd.v3.FluentdConfig.buffer_flush_interval:
+
+
+buffer_flush_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Interval for flushing traces to the TCP stream. Tracer will flush requests every time
+  this interval is elapsed, or when batch size limit is hit, whichever comes first. Defaults to
+  1 second.
+
+
+.. _envoy_v3_api_field_extensions.tracers.fluentd.v3.FluentdConfig.buffer_size_bytes:
+
+
+buffer_size_bytes
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Soft size limit in bytes for access log entries buffer. The logger will buffer requests until
+  this limit it hit, or every time flush interval is elapsed, whichever comes first. When the buffer
+  limit is hit, the logger will immediately flush the buffer contents. Setting it to zero effectively
+  disables the batching. Defaults to 16384.
+
+
+.. _envoy_v3_api_field_extensions.tracers.fluentd.v3.FluentdConfig.retry_policy:
+
+
+retry_policy
+  (:ref:`config.core.v3.RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>`) Optional retry, in case upstream connection has failed. If this field is not set, the default values will be applied.
+
+

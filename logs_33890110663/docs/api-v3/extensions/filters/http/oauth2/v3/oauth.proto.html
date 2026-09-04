@@ -1,0 +1,976 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OAuth (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../../../_static/favicon.ico"/>
+      <script src="../../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+    <link rel="next" title="On Demand Discovery (proto)" href="../../on_demand/v3/on_demand.proto.html" />
+    <link rel="prev" title="MCP Multiplexer/Demultiplexer (proto)" href="../../mcp_router/v3/mcp_router.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../../../searchindex.js"
+          data-envoy-search-page="../../../../../../search.html"
+          data-envoy-root="../../../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../../config/config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../../config/filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/filter.html">Filters</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/http/http.html">HTTP filters</a></li>
+      <li class="breadcrumb-item active">OAuth (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../../_sources/api-v3/extensions/filters/http/oauth2/v3/oauth.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="oauth-proto">
+<span id="envoy-v3-api-file-envoy-extensions-filters-http-oauth2-v3-oauth-proto"></span><h1>OAuth (proto)<a class="headerlink" href="#oauth-proto" title="Link to this heading"></a></h1>
+<p id="extension-envoy-filters-http-oauth2">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.filters.http.oauth2</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension is intended to be robust against untrusted downstream traffic. It
+assumes that the upstream is trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension category:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../filter_chain/v3/filter_chain.proto.html#extension-category-envoy-filters-http"><span class="std std-ref">envoy.filters.http</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2</span></a></p></li>
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2perroute"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2PerRoute</span></a></p></li>
+</ul>
+</div>
+<p>OAuth <a class="reference internal" href="../../../../../../configuration/http/http_filters/oauth2_filter.html#config-http-filters-oauth"><span class="std std-ref">configuration overview</span></a>.</p>
+<section id="extensions-filters-http-oauth2-v3-cookieconfig">
+<span id="envoy-v3-api-msg-extensions-filters-http-oauth2-v3-cookieconfig"></span><h2>extensions.filters.http.oauth2.v3.CookieConfig<a class="headerlink" href="#extensions-filters-http-oauth2-v3-cookieconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L29">[extensions.filters.http.oauth2.v3.CookieConfig proto]</a></p>
+<p>OAuth cookie configuration attributes.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;same_site&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;partitioned&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-cookieconfig-same-site">
+<dt>same_site</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-filters-http-oauth2-v3-cookieconfig-samesite"><span class="std std-ref">extensions.filters.http.oauth2.v3.CookieConfig.SameSite</span></a>) The value used for the SameSite cookie attribute.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-cookieconfig-path">
+<dt>path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The path attribute for the cookie.</p>
+<p>This controls the scope of the cookie and is useful for path-based routing scenarios
+where different logical boundaries or applications may operate with different OAuth2 clients.
+The CSRF cookie (nonce cookie) can be configured with a different path than session cookies
+to support flows where the callback URL is on a different path.</p>
+<p>If not specified, defaults to <code class="docutils literal notranslate"><span class="pre">/</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-cookieconfig-partitioned">
+<dt>partitioned</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If true, the <code class="docutils literal notranslate"><span class="pre">Partitioned</span></code> attribute will be set on the cookie.</p>
+<p>Modern browsers (Firefox, Chrome with third-party cookie deprecation) warn or block
+“foreign” cookies unless they carry the <code class="docutils literal notranslate"><span class="pre">Partitioned</span></code> attribute alongside <code class="docutils literal notranslate"><span class="pre">SameSite=None;</span> <span class="pre">Secure</span></code>.
+When Envoy is used in a gateway/IdP flow that sets OAuth/OIDC cookies for a parent domain
+(e.g., <code class="docutils literal notranslate"><span class="pre">Domain=.example.com</span></code>) while running on a different host, those cookies are
+considered third-party and will be rejected without <code class="docutils literal notranslate"><span class="pre">Partitioned</span></code>.</p>
+<p>See <a class="reference external" href="https://developers.google.com/privacy-sandbox/3pcd/chips">CHIPS</a> for more information.</p>
+<p>Default is false.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-filters-http-oauth2-v3-cookieconfig-samesite">
+<span id="envoy-v3-api-enum-extensions-filters-http-oauth2-v3-cookieconfig-samesite"></span><h2>Enum extensions.filters.http.oauth2.v3.CookieConfig.SameSite<a class="headerlink" href="#enum-extensions-filters-http-oauth2-v3-cookieconfig-samesite" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L30">[extensions.filters.http.oauth2.v3.CookieConfig.SameSite proto]</a></p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-cookieconfig-samesite-disabled">
+<dt>DISABLED</dt><dd><p><em>(DEFAULT)</em> ⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-cookieconfig-samesite-strict">
+<dt>STRICT</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-cookieconfig-samesite-lax">
+<dt>LAX</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-cookieconfig-samesite-none">
+<dt>NONE</dt><dd><p>⁣</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-oauth2-v3-cookieconfigs">
+<span id="envoy-v3-api-msg-extensions-filters-http-oauth2-v3-cookieconfigs"></span><h2>extensions.filters.http.oauth2.v3.CookieConfigs<a class="headerlink" href="#extensions-filters-http-oauth2-v3-cookieconfigs" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L65">[extensions.filters.http.oauth2.v3.CookieConfigs proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;bearer_token_cookie_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;oauth_hmac_cookie_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;oauth_expires_cookie_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;id_token_cookie_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;refresh_token_cookie_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;oauth_nonce_cookie_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;code_verifier_cookie_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-cookieconfigs-bearer-token-cookie-config">
+<dt>bearer_token_cookie_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-cookieconfig"><span class="std std-ref">extensions.filters.http.oauth2.v3.CookieConfig</span></a>) Configuration for the bearer token cookie.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-cookieconfigs-oauth-hmac-cookie-config">
+<dt>oauth_hmac_cookie_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-cookieconfig"><span class="std std-ref">extensions.filters.http.oauth2.v3.CookieConfig</span></a>) Configuration for the OAuth HMAC cookie.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-cookieconfigs-oauth-expires-cookie-config">
+<dt>oauth_expires_cookie_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-cookieconfig"><span class="std std-ref">extensions.filters.http.oauth2.v3.CookieConfig</span></a>) Configuration for the OAuth expires cookie.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-cookieconfigs-id-token-cookie-config">
+<dt>id_token_cookie_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-cookieconfig"><span class="std std-ref">extensions.filters.http.oauth2.v3.CookieConfig</span></a>) Configuration for the ID token cookie.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-cookieconfigs-refresh-token-cookie-config">
+<dt>refresh_token_cookie_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-cookieconfig"><span class="std std-ref">extensions.filters.http.oauth2.v3.CookieConfig</span></a>) Configuration for the refresh token cookie.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-cookieconfigs-oauth-nonce-cookie-config">
+<dt>oauth_nonce_cookie_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-cookieconfig"><span class="std std-ref">extensions.filters.http.oauth2.v3.CookieConfig</span></a>) Configuration for the OAuth nonce cookie.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-cookieconfigs-code-verifier-cookie-config">
+<dt>code_verifier_cookie_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-cookieconfig"><span class="std std-ref">extensions.filters.http.oauth2.v3.CookieConfig</span></a>) Configuration for the code verifier cookie.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-oauth2-v3-oauth2credentials">
+<span id="envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2credentials"></span><h2>extensions.filters.http.oauth2.v3.OAuth2Credentials<a class="headerlink" href="#extensions-filters-http-oauth2-v3-oauth2credentials" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L89">[extensions.filters.http.oauth2.v3.OAuth2Credentials proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;client_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;token_secret&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;hmac_secret&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;cookie_names&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;cookie_domain&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-client-id">
+<dt>client_id</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The client_id to be used in the authorize calls. This value will be URL encoded when sent to the OAuth server.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-token-secret">
+<dt>token_secret</dt><dd><p>(<a class="reference internal" href="../../../../transport_sockets/tls/v3/secret.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-sdssecretconfig"><span class="std std-ref">extensions.transport_sockets.tls.v3.SdsSecretConfig</span></a>) The secret used to retrieve the access token. This value will be URL encoded when sent to the OAuth server.
+This field is required unless <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-auth-type"><span class="std std-ref">auth_type</span></a>
+is set to <code class="docutils literal notranslate"><span class="pre">TLS_CLIENT_AUTH</span></code>, in which case authentication is done via the client certificate.
+When <code class="docutils literal notranslate"><span class="pre">auth_type</span></code> is <code class="docutils literal notranslate"><span class="pre">PRIVATE_KEY_JWT</span></code>, this field must contain the PEM-encoded private key
+used to sign the JWT client assertion. The key may be supplied in either of two forms:</p>
+<ul class="simple">
+<li><p>As a single-value generic secret holding the PEM-encoded private key. No <code class="docutils literal notranslate"><span class="pre">kid</span></code> header
+parameter is included in the client assertion.</p></li>
+<li><p>As a multi-entry generic secret with a <code class="docutils literal notranslate"><span class="pre">private_key</span></code> entry holding the PEM-encoded private
+key and an optional <code class="docutils literal notranslate"><span class="pre">key_id</span></code> entry. When present, the <code class="docutils literal notranslate"><span class="pre">key_id</span></code> value is set as the
+<code class="docutils literal notranslate"><span class="pre">kid</span></code> header parameter of the client assertion, per
+<a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.4">RFC 7515 Section 4.1.4</a>.
+Identity providers use it to select the correct verification key when more than one key is
+registered for the client. Distributing both in one secret means the key ID is always
+rotated together with the key it identifies.</p></li>
+</ul>
+<p>The multi-entry form is only read when <code class="docutils literal notranslate"><span class="pre">auth_type</span></code> is <code class="docutils literal notranslate"><span class="pre">PRIVATE_KEY_JWT</span></code>. The other auth
+types read the single-value form only.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-hmac-secret">
+<dt>hmac_secret</dt><dd><p>(<a class="reference internal" href="../../../../transport_sockets/tls/v3/secret.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-sdssecretconfig"><span class="std std-ref">extensions.transport_sockets.tls.v3.SdsSecretConfig</span></a>, <em>REQUIRED</em>) If present, the secret token will be a HMAC using the provided secret.</p>
+<p>Configures how the secret token should be created.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-cookie-names">
+<dt>cookie_names</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2credentials-cookienames"><span class="std std-ref">extensions.filters.http.oauth2.v3.OAuth2Credentials.CookieNames</span></a>) The cookie names used in OAuth filters flow.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-cookie-domain">
+<dt>cookie_domain</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The domain to set the cookie on. If not set, the cookie will default to the host of the request, not including the subdomains.
+This is useful when token cookies need to be shared across multiple subdomains.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-oauth2-v3-oauth2credentials-cookienames">
+<span id="envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2credentials-cookienames"></span><h2>extensions.filters.http.oauth2.v3.OAuth2Credentials.CookieNames<a class="headerlink" href="#extensions-filters-http-oauth2-v3-oauth2credentials-cookienames" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L91">[extensions.filters.http.oauth2.v3.OAuth2Credentials.CookieNames proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;bearer_token&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;oauth_hmac&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;oauth_expires&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;id_token&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;refresh_token&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;oauth_nonce&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;code_verifier&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-cookienames-bearer-token">
+<dt>bearer_token</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Cookie name to hold OAuth bearer token value. When the authentication server validates the
+client and returns an authorization token back to the OAuth filter, no matter what format
+that token is, if <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-forward-bearer-token"><span class="std std-ref">forward_bearer_token</span></a>
+is set to true the filter will send over the bearer token as a cookie with this name to the
+upstream. Defaults to <code class="docutils literal notranslate"><span class="pre">BearerToken</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-cookienames-oauth-hmac">
+<dt>oauth_hmac</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Cookie name to hold OAuth HMAC value. Defaults to <code class="docutils literal notranslate"><span class="pre">OauthHMAC</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-cookienames-oauth-expires">
+<dt>oauth_expires</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Cookie name to hold OAuth expiry value. Defaults to <code class="docutils literal notranslate"><span class="pre">OauthExpires</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-cookienames-id-token">
+<dt>id_token</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Cookie name to hold the id token. Defaults to <code class="docutils literal notranslate"><span class="pre">IdToken</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-cookienames-refresh-token">
+<dt>refresh_token</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Cookie name to hold the refresh token. Defaults to <code class="docutils literal notranslate"><span class="pre">RefreshToken</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-cookienames-oauth-nonce">
+<dt>oauth_nonce</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Cookie name to hold the nonce value. Defaults to <code class="docutils literal notranslate"><span class="pre">OauthNonce</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2credentials-cookienames-code-verifier">
+<dt>code_verifier</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Cookie name to hold the PKCE code verifier. Defaults to <code class="docutils literal notranslate"><span class="pre">OauthCodeVerifier</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-oauth2-v3-privatekeyjwtconfig">
+<span id="envoy-v3-api-msg-extensions-filters-http-oauth2-v3-privatekeyjwtconfig"></span><h2>extensions.filters.http.oauth2.v3.PrivateKeyJwtConfig<a class="headerlink" href="#extensions-filters-http-oauth2-v3-privatekeyjwtconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L167">[extensions.filters.http.oauth2.v3.PrivateKeyJwtConfig proto]</a></p>
+<p>Configuration for <code class="docutils literal notranslate"><span class="pre">PRIVATE_KEY_JWT</span></code> client authentication (RFC 7523).</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;signing_algorithm&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;assertion_lifetime&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;assertion_audience&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-signing-algorithm">
+<dt>signing_algorithm</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-signingalgorithm"><span class="std std-ref">extensions.filters.http.oauth2.v3.PrivateKeyJwtConfig.SigningAlgorithm</span></a>) The signing algorithm to use for the JWT assertion.
+The private key provided in <code class="docutils literal notranslate"><span class="pre">token_secret</span></code> must match the algorithm family: an RSA key for
+the <code class="docutils literal notranslate"><span class="pre">RS*</span></code> algorithms, or an EC key for the <code class="docutils literal notranslate"><span class="pre">ES*</span></code> algorithms.
+Default: <code class="docutils literal notranslate"><span class="pre">RS256</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-assertion-lifetime">
+<dt>assertion_lifetime</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The lifetime of the JWT assertion. After this duration, the assertion expires.
+The value is truncated to whole seconds, so it must be at least <code class="docutils literal notranslate"><span class="pre">1s</span></code> when set.
+Default: <code class="docutils literal notranslate"><span class="pre">60s</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-assertion-audience">
+<dt>assertion_audience</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The value to use as the <code class="docutils literal notranslate"><span class="pre">aud</span></code> (audience) claim in the JWT client assertion.</p>
+<p><a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc7523#section-3">RFC 7523 Section 3</a> requires the
+<code class="docutils literal notranslate"><span class="pre">aud</span></code> claim to identify the authorization server, and allows the token endpoint URL to be
+used for this purpose.
+<a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc9126#section-2.1">RFC 9126 Section 2.1</a> recommends
+the authorization server’s issuer identifier instead, and
+<a class="reference external" href="https://openid.net/specs/fapi-security-profile-2_0-final.html">FAPI 2.0</a> requires it, as a
+single canonical value identifies the server regardless of which endpoint receives the
+assertion.</p>
+<p>If not set, defaults to the configured <code class="docutils literal notranslate"><span class="pre">token_endpoint</span></code> URI.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-signingalgorithm">
+<span id="envoy-v3-api-enum-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-signingalgorithm"></span><h2>Enum extensions.filters.http.oauth2.v3.PrivateKeyJwtConfig.SigningAlgorithm<a class="headerlink" href="#enum-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-signingalgorithm" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L169">[extensions.filters.http.oauth2.v3.PrivateKeyJwtConfig.SigningAlgorithm proto]</a></p>
+<p>Supported JWT signing algorithms for the client assertion.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-signingalgorithm-rs256">
+<dt>RS256</dt><dd><p><em>(DEFAULT)</em> ⁣``RSASSA-PKCS1-v1_5`` using SHA-256.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-signingalgorithm-rs384">
+<dt>RS384</dt><dd><p>⁣``RSASSA-PKCS1-v1_5`` using SHA-384.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-signingalgorithm-rs512">
+<dt>RS512</dt><dd><p>⁣``RSASSA-PKCS1-v1_5`` using SHA-512.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-signingalgorithm-es256">
+<dt>ES256</dt><dd><p>⁣ECDSA using P-256 and SHA-256.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-signingalgorithm-es384">
+<dt>ES384</dt><dd><p>⁣ECDSA using P-384 and SHA-384.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-signingalgorithm-es512">
+<dt>ES512</dt><dd><p>⁣ECDSA using P-521 and SHA-512.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-oauth2-v3-oauth2tokenforwarding">
+<span id="envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2tokenforwarding"></span><h2>extensions.filters.http.oauth2.v3.OAuth2TokenForwarding<a class="headerlink" href="#extensions-filters-http-oauth2-v3-oauth2tokenforwarding" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L216">[extensions.filters.http.oauth2.v3.OAuth2TokenForwarding proto]</a></p>
+<p>Defines how an OAuth token is forwarded upstream.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;header&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2tokenforwarding-header">
+<dt>header</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The upstream request header that will carry the token.
+Pseudo-headers (names starting with <code class="docutils literal notranslate"><span class="pre">:</span></code>) and the <code class="docutils literal notranslate"><span class="pre">Host</span></code> header are not allowed.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-oauth2-v3-postlogoutredirecturi">
+<span id="envoy-v3-api-msg-extensions-filters-http-oauth2-v3-postlogoutredirecturi"></span><h2>extensions.filters.http.oauth2.v3.PostLogoutRedirectUri<a class="headerlink" href="#extensions-filters-http-oauth2-v3-postlogoutredirecturi" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L226">[extensions.filters.http.oauth2.v3.PostLogoutRedirectUri proto]</a></p>
+<p>Configuration for the <code class="docutils literal notranslate"><span class="pre">post_logout_redirect_uri</span></code> parameter used in OpenID Connect
+<a class="reference external" href="https://openid.net/specs/openid-connect-rpinitiated-1_0.html">RP-Initiated Logout requests</a>.
+This configuration is ignored if <code class="docutils literal notranslate"><span class="pre">end_session_endpoint</span></code> is not set.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;disabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-postlogoutredirecturi-disabled">
+<dt>disabled</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Do not include the <code class="docutils literal notranslate"><span class="pre">post_logout_redirect_uri</span></code> parameter in requests to the
+configured <code class="docutils literal notranslate"><span class="pre">end_session_endpoint</span></code>.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-oauth2-v3-postlogoutredirecturi-disabled"><span class="std std-ref">disabled</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-oauth2-v3-postlogoutredirecturi-uri"><span class="std std-ref">uri</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-postlogoutredirecturi-uri">
+<dt>uri</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) URI to send as the <code class="docutils literal notranslate"><span class="pre">post_logout_redirect_uri</span></code> parameter. Supports header formatting
+tokens, and will be percent-encoded automatically when building the logout URL.</p>
+<p>The URI should be registered with the authorization server.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-oauth2-v3-postlogoutredirecturi-disabled"><span class="std std-ref">disabled</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-oauth2-v3-postlogoutredirecturi-uri"><span class="std std-ref">uri</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-oauth2-v3-oauth2config">
+<span id="envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2config"></span><h2>extensions.filters.http.oauth2.v3.OAuth2Config<a class="headerlink" href="#extensions-filters-http-oauth2-v3-oauth2config" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L245">[extensions.filters.http.oauth2.v3.OAuth2Config proto]</a></p>
+<p>OAuth config</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;token_endpoint&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;retry_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;authorization_endpoint&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;end_session_endpoint&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;post_logout_redirect_uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;credentials&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;redirect_uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;redirect_path_matcher&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;signout_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;forward_bearer_token&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;forward_id_token&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;preserve_authorization_header&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;pass_through_matcher&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;auth_scopes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;resources&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;auth_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;use_refresh_token&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;default_expires_in&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;deny_redirect_matcher&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;default_refresh_token_expires_in&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;disable_id_token_set_cookie&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;disable_access_token_set_cookie&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;disable_refresh_token_set_cookie&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cookie_configs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;stat_prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;csrf_token_expires_in&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;code_verifier_token_expires_in&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;disable_token_encryption&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;allow_failed_matcher&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;original_request_uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;allowed_redirect_domains&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;use_access_token_expiry_for_id_token_cookie&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;private_key_jwt_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-token-endpoint">
+<dt>token_endpoint</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/http_uri.proto.html#envoy-v3-api-msg-config-core-v3-httpuri"><span class="std std-ref">config.core.v3.HttpUri</span></a>) Endpoint on the authorization server to retrieve the access token from.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-retry-policy">
+<dt>retry_policy</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-retrypolicy"><span class="std std-ref">config.core.v3.RetryPolicy</span></a>) Specifies the retry policy for requests to the OAuth server. If not specified, then no retries will be performed.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-authorization-endpoint">
+<dt>authorization_endpoint</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The endpoint redirect to for authorization in response to unauthorized requests.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-end-session-endpoint">
+<dt>end_session_endpoint</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The endpoint at the authorization server to request the user be logged out of the Authorization server.
+This field is optional and should be set only if openid is in the auth_scopes and the authorization server
+supports the OpenID Connect RP-Initiated Logout specification.
+For more information, see <a class="reference external" href="https://openid.net/specs/openid-connect-rpinitiated-1_0.html">https://openid.net/specs/openid-connect-rpinitiated-1_0.html</a></p>
+<p>If configured, the OAuth2 filter will redirect users to this endpoint when they access the signout_path.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-post-logout-redirect-uri">
+<dt>post_logout_redirect_uri</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-postlogoutredirecturi"><span class="std std-ref">extensions.filters.http.oauth2.v3.PostLogoutRedirectUri</span></a>) Optional control for the <code class="docutils literal notranslate"><span class="pre">post_logout_redirect_uri</span></code> parameter sent to the <code class="docutils literal notranslate"><span class="pre">end_session_endpoint</span></code> when a user
+accesses the <code class="docutils literal notranslate"><span class="pre">signout_path</span></code>.
+This field should be set only if <code class="docutils literal notranslate"><span class="pre">openid</span></code> is in the <code class="docutils literal notranslate"><span class="pre">auth_scopes</span></code>, the <code class="docutils literal notranslate"><span class="pre">end_session_endpoint</span></code> is configured,
+and the authorization server supports the OpenID Connect RP-Initiated Logout specification.</p>
+<p>If unset, Envoy preserves the historical behavior and sends <code class="docutils literal notranslate"><span class="pre">&lt;scheme&gt;://&lt;host&gt;/</span></code>, constructed from the inbound
+request, as <code class="docutils literal notranslate"><span class="pre">post_logout_redirect_uri</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-credentials">
+<dt>credentials</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2credentials"><span class="std std-ref">extensions.filters.http.oauth2.v3.OAuth2Credentials</span></a>, <em>REQUIRED</em>) Credentials used for OAuth.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-redirect-uri">
+<dt>redirect_uri</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The redirect URI passed to the authorization endpoint. Supports header formatting
+tokens. For more information, including details on header value syntax, see the
+documentation on <a class="reference internal" href="../../../../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-custom-request-headers"><span class="std std-ref">custom request headers</span></a>.</p>
+<p>This URI should not contain any query parameters.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-redirect-path-matcher">
+<dt>redirect_path_matcher</dt><dd><p>(<a class="reference internal" href="../../../../../type/matcher/v3/path.proto.html#envoy-v3-api-msg-type-matcher-v3-pathmatcher"><span class="std std-ref">type.matcher.v3.PathMatcher</span></a>, <em>REQUIRED</em>) Matching criteria used to determine whether a path appears to be the result of a redirect from the authorization server.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-signout-path">
+<dt>signout_path</dt><dd><p>(<a class="reference internal" href="../../../../../type/matcher/v3/path.proto.html#envoy-v3-api-msg-type-matcher-v3-pathmatcher"><span class="std std-ref">type.matcher.v3.PathMatcher</span></a>, <em>REQUIRED</em>) The path to sign a user out, clearing their credential cookies.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-forward-bearer-token">
+<dt>forward_bearer_token</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Forward the OAuth token as a Bearer to upstream web service.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-forward-id-token">
+<dt>forward_id_token</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2tokenforwarding"><span class="std std-ref">extensions.filters.http.oauth2.v3.OAuth2TokenForwarding</span></a>) Forward the OIDC ID token to the upstream.</p>
+<p>If the configured header is <code class="docutils literal notranslate"><span class="pre">Authorization</span></code>, Envoy forwards the ID token using the
+<code class="docutils literal notranslate"><span class="pre">Bearer</span></code> prefix. For any other header, Envoy forwards the raw token value.
+If not specified, the ID token will not be forwarded.</p>
+<p>This can not be configured with <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-forward-bearer-token"><span class="std std-ref">forward_bearer_token</span></a>
+or <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-preserve-authorization-header"><span class="std std-ref">preserve_authorization_header</span></a>
+when the header is <code class="docutils literal notranslate"><span class="pre">Authorization</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-preserve-authorization-header">
+<dt>preserve_authorization_header</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to true, preserve the existing authorization header.
+By default the client strips the existing authorization header before forwarding upstream.
+Can not be set to true if forward_bearer_token is already set to true.
+Default value is false.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-pass-through-matcher">
+<dt>pass_through_matcher</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-headermatcher"><span class="std std-ref">config.route.v3.HeaderMatcher</span></a>) Any request that matches any of the provided matchers will be passed through without OAuth validation.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-auth-scopes">
+<dt>auth_scopes</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional list of OAuth scopes to be claimed in the authorization request. If not specified,
+defaults to “user” scope.
+OAuth RFC <a class="reference external" href="https://tools.ietf.org/html/rfc6749#section-3.3">https://tools.ietf.org/html/rfc6749#section-3.3</a></p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-resources">
+<dt>resources</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional resource parameter for authorization request
+RFC: <a class="reference external" href="https://tools.ietf.org/html/rfc8707">https://tools.ietf.org/html/rfc8707</a></p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-auth-type">
+<dt>auth_type</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-filters-http-oauth2-v3-oauth2config-authtype"><span class="std std-ref">extensions.filters.http.oauth2.v3.OAuth2Config.AuthType</span></a>) Defines how <code class="docutils literal notranslate"><span class="pre">client_id</span></code> and <code class="docutils literal notranslate"><span class="pre">client_secret</span></code> are sent in OAuth client to OAuth server requests.
+RFC <a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc6749#section-2.3.1">https://datatracker.ietf.org/doc/html/rfc6749#section-2.3.1</a></p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-use-refresh-token">
+<dt>use_refresh_token</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) If set to true, allows automatic access token refresh using the associated refresh token (see
+<a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc6749#section-6">RFC 6749 section 6</a>), provided that the OAuth server supports that.
+Default value is true.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-default-expires-in">
+<dt>default_expires_in</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The default lifetime in seconds of the access token, if omitted by the authorization server.</p>
+<p>If this value is not set, it will default to <code class="docutils literal notranslate"><span class="pre">0s</span></code>. In this case, the expiry must be set by
+the authorization server or the OAuth flow will fail.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-deny-redirect-matcher">
+<dt>deny_redirect_matcher</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-headermatcher"><span class="std std-ref">config.route.v3.HeaderMatcher</span></a>) Any request that matches any of the provided matchers won’t be redirected to OAuth server when tokens are not valid.
+Automatic access token refresh will be performed for these requests, if enabled.
+This behavior can be useful for AJAX requests.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-default-refresh-token-expires-in">
+<dt>default_refresh_token_expires_in</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The default lifetime in seconds of the refresh token, if the exp (expiration time) claim is omitted in the refresh token or the refresh token is not JWT.</p>
+<p>If this value is not set, it will default to <code class="docutils literal notranslate"><span class="pre">604800s</span></code>. In this case, the cookie with the refresh token will be expired
+in a week.
+This setting is only considered if <code class="docutils literal notranslate"><span class="pre">use_refresh_token</span></code> is set to true, otherwise the authorization server expiration or <code class="docutils literal notranslate"><span class="pre">default_expires_in</span></code> is used.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-disable-id-token-set-cookie">
+<dt>disable_id_token_set_cookie</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to true, the client will not set a cookie for ID Token even if one is received from the Identity Provider. This may be useful in cases where the ID
+Token is too large for HTTP cookies (longer than 4096 characters). Enabling this option will only disable setting the cookie response header, the filter
+will still process incoming ID Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
+sessions would not set the IdToken cookie header.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-disable-access-token-set-cookie">
+<dt>disable_access_token_set_cookie</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to true, the client will not set a cookie for Access Token even if one is received from the Identity Provider.
+Enabling this option will only disable setting the cookie response header, the filter
+will still process incoming Access Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
+sessions would not set the Access Token cookie header.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-disable-refresh-token-set-cookie">
+<dt>disable_refresh_token_set_cookie</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to true, the client will not set a cookie for Refresh Token even if one is received from the Identity Provider.
+Enabling this option will only disable setting the cookie response header, the filter
+will still process incoming Refresh Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
+sessions would not set the Refresh Token cookie header.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-cookie-configs">
+<dt>cookie_configs</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-cookieconfigs"><span class="std std-ref">extensions.filters.http.oauth2.v3.CookieConfigs</span></a>) Controls for attributes that can be set on the cookies.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-stat-prefix">
+<dt>stat_prefix</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional additional prefix to use when emitting statistics.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-csrf-token-expires-in">
+<dt>csrf_token_expires_in</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Optional expiration time for the CSRF protection token cookie.
+The CSRF token prevents cross-site request forgery attacks during the OAuth2 flow.
+If not specified, defaults to <code class="docutils literal notranslate"><span class="pre">600s</span></code> (10 minutes), which should provide sufficient time
+for users to complete the OAuth2 authorization flow.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-code-verifier-token-expires-in">
+<dt>code_verifier_token_expires_in</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Optional expiration time for the code verifier cookie.
+The code verifier is stored in a secure, HTTP-only cookie during the OAuth2 authorization process.
+If not specified, defaults to <code class="docutils literal notranslate"><span class="pre">600s</span></code> (10 minutes), which should provide sufficient time
+for users to complete the OAuth2 authorization flow.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-disable-token-encryption">
+<dt>disable_token_encryption</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Disable token encryption. When set to true, both the access token and the ID token will be stored in plain text.
+This option should only be used in secure environments where token encryption is not required.
+Default is false (tokens are encrypted).</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-allow-failed-matcher">
+<dt>allow_failed_matcher</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-headermatcher"><span class="std std-ref">config.route.v3.HeaderMatcher</span></a>) Any request that matches any of the provided matchers will be allowed to continue to upstream
+even if OAuth validation fails (missing, invalid, or expired credentials).
+This is useful for services that can handle both authenticated and unauthenticated requests,
+enabling graceful degradation patterns.</p>
+<p>When triggered, all OAuth cookies are stripped from the request and the request proceeds as unauthenticated.
+Context headers <code class="docutils literal notranslate"><span class="pre">x-envoy-oauth-status:</span> <span class="pre">failed</span></code> and <code class="docutils literal notranslate"><span class="pre">x-envoy-oauth-failure-reason</span></code> are added to inform upstream.</p>
+<p>Note: If a request matches pass_through_matcher, it bypasses OAuth validation and this matcher won’t be evaluated.
+This matcher takes precedence over deny_redirect_matcher.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-original-request-uri">
+<dt>original_request_uri</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional base URI (scheme + host, e.g. <code class="docutils literal notranslate"><span class="pre">https://app.example.com</span></code>) used to build the
+original request URI that is encoded into the OAuth2 <code class="docutils literal notranslate"><span class="pre">state</span></code> parameter.
+This URI will be used later to redirect users on a successful OAuth.</p>
+<p>This is useful when Envoy sits behind a gateway or load balancer that terminates the
+user-facing hostname: In that case, the post-authentication redirect derived from <code class="docutils literal notranslate"><span class="pre">state</span></code> would
+send the user to an internal host they didn’t request.</p>
+<p>Supports request header formatting tokens.</p>
+<p>Example:</p>
+<blockquote>
+<div><p>original_request_uri: “%REQ(x-forwarded-proto?:scheme)%://%REQ(x-forwarded-host?:authority)%”</p>
+</div></blockquote>
+<p>If not set, defaults to <code class="docutils literal notranslate"><span class="pre">&lt;:scheme&gt;://&lt;:authority&gt;</span></code> of the incoming request.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-allowed-redirect-domains">
+<dt>allowed_redirect_domains</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional list of domains that are allowed as
+1. redirect_uri: which is what the IdP calls after OAuth
+2. original_request_uri: the one extracted from the state of an OAuth callback (where should the request go after OAuth)</p>
+<p>This mitigates:
+- injecting a malicious x-forwarded-host or any header that is used to template the redirect urls
+- open redirect attacks where an attacker crafts a <code class="docutils literal notranslate"><span class="pre">state</span></code> value pointing to an untrusted host.</p>
+<p>Each entry is matched against the host (with any port stripped) extracted from the
+formatted <code class="docutils literal notranslate"><span class="pre">redirect_uri</span></code>, the formatted <code class="docutils literal notranslate"><span class="pre">original_request_uri</span></code>, and the URL decoded from
+the <code class="docutils literal notranslate"><span class="pre">state</span></code> parameter on callback. Matching is case-insensitive and supports two forms:</p>
+<ul class="simple">
+<li><p>Exact match, e.g. <code class="docutils literal notranslate"><span class="pre">example.com</span></code> matches only <code class="docutils literal notranslate"><span class="pre">example.com</span></code>.</p></li>
+<li><p>Wildcard subdomain match using a leading <code class="docutils literal notranslate"><span class="pre">*.</span></code>, e.g. <code class="docutils literal notranslate"><span class="pre">*.example.com</span></code> matches
+<code class="docutils literal notranslate"><span class="pre">foo.example.com</span></code> and <code class="docutils literal notranslate"><span class="pre">bar.baz.example.com</span></code> but not <code class="docutils literal notranslate"><span class="pre">example.com</span></code> itself.</p></li>
+</ul>
+<p>IPv6 literals must be configured without surrounding brackets (e.g. <code class="docutils literal notranslate"><span class="pre">::1</span></code>, not <code class="docutils literal notranslate"><span class="pre">[::1]</span></code>).</p>
+<p>If this list is empty (the default), all hosts are allowed and no validation is performed.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-use-access-token-expiry-for-id-token-cookie">
+<dt>use_access_token_expiry_for_id_token_cookie</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to true, the expiration time for the ID token cookie will always be derived from the
+<code class="docutils literal notranslate"><span class="pre">expires_in</span></code> field of the access token response rather than from the <code class="docutils literal notranslate"><span class="pre">exp</span></code> claim in the
+ID token JWT. This is useful when the access token response advertises a longer lifetime than
+the ID token and you want the ID token cookie to remain valid for that full duration.
+Default is false (use the ID token’s own <code class="docutils literal notranslate"><span class="pre">exp</span></code> claim when available).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-private-key-jwt-config">
+<dt>private_key_jwt_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-privatekeyjwtconfig"><span class="std std-ref">extensions.filters.http.oauth2.v3.PrivateKeyJwtConfig</span></a>) Configuration for <code class="docutils literal notranslate"><span class="pre">PRIVATE_KEY_JWT</span></code> client authentication.
+Only used when <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2config-auth-type"><span class="std std-ref">auth_type</span></a>
+is set to <code class="docutils literal notranslate"><span class="pre">PRIVATE_KEY_JWT</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-filters-http-oauth2-v3-oauth2config-authtype">
+<span id="envoy-v3-api-enum-extensions-filters-http-oauth2-v3-oauth2config-authtype"></span><h2>Enum extensions.filters.http.oauth2.v3.OAuth2Config.AuthType<a class="headerlink" href="#enum-extensions-filters-http-oauth2-v3-oauth2config-authtype" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L246">[extensions.filters.http.oauth2.v3.OAuth2Config.AuthType proto]</a></p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-oauth2config-authtype-url-encoded-body">
+<dt>URL_ENCODED_BODY</dt><dd><p><em>(DEFAULT)</em> ⁣The <code class="docutils literal notranslate"><span class="pre">client_id</span></code> and <code class="docutils literal notranslate"><span class="pre">client_secret</span></code> will be sent in the URL encoded request body.
+This type should only be used when Auth server does not support Basic authentication.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-oauth2config-authtype-basic-auth">
+<dt>BASIC_AUTH</dt><dd><p>⁣The <code class="docutils literal notranslate"><span class="pre">client_id</span></code> and <code class="docutils literal notranslate"><span class="pre">client_secret</span></code> will be sent using HTTP Basic authentication scheme.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-oauth2config-authtype-tls-client-auth">
+<dt>TLS_CLIENT_AUTH</dt><dd><p>⁣The client will be authenticated using mutual TLS (mTLS) with a client certificate.
+The <code class="docutils literal notranslate"><span class="pre">client_secret</span></code> is not required and will not be sent in the request to the
+authorization server.
+The client certificate must be configured in the cluster used by <code class="docutils literal notranslate"><span class="pre">token_endpoint</span></code> via
+transport socket configuration.
+This implements OAuth 2.0 Mutual-TLS Client Authentication as defined in RFC 8705.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-http-oauth2-v3-oauth2config-authtype-private-key-jwt">
+<dt>PRIVATE_KEY_JWT</dt><dd><p>⁣The client authenticates using a signed JWT assertion (RFC 7523).
+The <code class="docutils literal notranslate"><span class="pre">token_secret</span></code> in credentials must contain the PEM-encoded private key used to sign the assertion.
+The JWT assertion is sent as <code class="docutils literal notranslate"><span class="pre">client_assertion</span></code> in the token request body along with
+<code class="docutils literal notranslate"><span class="pre">client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-oauth2-v3-oauth2perroute">
+<span id="envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2perroute"></span><h2>extensions.filters.http.oauth2.v3.OAuth2PerRoute<a class="headerlink" href="#extensions-filters-http-oauth2-v3-oauth2perroute" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L482">[extensions.filters.http.oauth2.v3.OAuth2PerRoute proto]</a></p>
+<p>Per-route OAuth2 config.</p>
+<p>This message supplies an OAuth2Config for the matched route.
+It overrides the filter-level config for requests matching the route.
+If neither the global config nor a per-route config is specified, OAuth2 is disabled for the route.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2perroute-config">
+<dt>config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2config"><span class="std std-ref">extensions.filters.http.oauth2.v3.OAuth2Config</span></a>, <em>REQUIRED</em>) Full OAuth2 config for this route.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-oauth2-v3-oauth2">
+<span id="envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2"></span><h2>extensions.filters.http.oauth2.v3.OAuth2<a class="headerlink" href="#extensions-filters-http-oauth2-v3-oauth2" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/oauth2/v3/oauth.proto#L488">[extensions.filters.http.oauth2.v3.OAuth2 proto]</a></p>
+<p>Filter config.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-oauth2-v3-oauth2-config">
+<dt>config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-oauth2-v3-oauth2config"><span class="std std-ref">extensions.filters.http.oauth2.v3.OAuth2Config</span></a>) The OAuth2 filter config.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../mcp_router/v3/mcp_router.proto.html" class="btn btn-neutral float-left" title="MCP Multiplexer/Demultiplexer (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../on_demand/v3/on_demand.proto.html" class="btn btn-neutral float-right" title="On Demand Discovery (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">OAuth (proto)</a><ul>
+<li><a class="reference internal" href="#extensions-filters-http-oauth2-v3-cookieconfig">extensions.filters.http.oauth2.v3.CookieConfig</a></li>
+<li><a class="reference internal" href="#enum-extensions-filters-http-oauth2-v3-cookieconfig-samesite">Enum extensions.filters.http.oauth2.v3.CookieConfig.SameSite</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-oauth2-v3-cookieconfigs">extensions.filters.http.oauth2.v3.CookieConfigs</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-oauth2-v3-oauth2credentials">extensions.filters.http.oauth2.v3.OAuth2Credentials</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-oauth2-v3-oauth2credentials-cookienames">extensions.filters.http.oauth2.v3.OAuth2Credentials.CookieNames</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-oauth2-v3-privatekeyjwtconfig">extensions.filters.http.oauth2.v3.PrivateKeyJwtConfig</a></li>
+<li><a class="reference internal" href="#enum-extensions-filters-http-oauth2-v3-privatekeyjwtconfig-signingalgorithm">Enum extensions.filters.http.oauth2.v3.PrivateKeyJwtConfig.SigningAlgorithm</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-oauth2-v3-oauth2tokenforwarding">extensions.filters.http.oauth2.v3.OAuth2TokenForwarding</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-oauth2-v3-postlogoutredirecturi">extensions.filters.http.oauth2.v3.PostLogoutRedirectUri</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-oauth2-v3-oauth2config">extensions.filters.http.oauth2.v3.OAuth2Config</a></li>
+<li><a class="reference internal" href="#enum-extensions-filters-http-oauth2-v3-oauth2config-authtype">Enum extensions.filters.http.oauth2.v3.OAuth2Config.AuthType</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-oauth2-v3-oauth2perroute">extensions.filters.http.oauth2.v3.OAuth2PerRoute</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-oauth2-v3-oauth2">extensions.filters.http.oauth2.v3.OAuth2</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

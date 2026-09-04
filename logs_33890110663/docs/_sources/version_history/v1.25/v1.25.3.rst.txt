@@ -1,0 +1,20 @@
+.. _version_history_1.25.3:
+
+1.25.3 (March 24, 2023)
+========================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **dependency**: update Wasmtime -> 6.0.1, to resolve CVE-2023-26489, CVE-2023-27477.
+

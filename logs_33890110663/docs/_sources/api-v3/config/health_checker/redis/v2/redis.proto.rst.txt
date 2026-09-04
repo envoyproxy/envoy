@@ -1,0 +1,65 @@
+.. _envoy_v3_api_file_envoy/config/health_checker/redis/v2/redis.proto:
+
+Redis (proto)
+=============
+
+.. _extension_envoy.health_checkers.redis:
+
+This extension has the qualified name ``envoy.health_checkers.redis``
+
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.health_checkers <extension_category_envoy.health_checkers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis <envoy_v3_api_msg_extensions.health_checkers.redis.v3.Redis>`
+
+
+
+Redis health checker :ref:`configuration overview <config_health_checkers_redis>`.
+
+
+
+
+.. _envoy_v3_api_msg_config.health_checker.redis.v2.Redis:
+
+config.health_checker.redis.v2.Redis
+------------------------------------
+
+
+:repo:`[config.health_checker.redis.v2.Redis proto] <api/envoy/config/health_checker/redis/v2/redis.proto#L16>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "key": ...
+  }
+
+.. _envoy_v3_api_field_config.health_checker.redis.v2.Redis.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set, optionally perform ``EXISTS <key>`` instead of ``PING``. A return value
+  from Redis of 0 (does not exist) is considered a passing healthcheck. A return value other
+  than 0 is considered a failure. This allows the user to mark a Redis instance for maintenance
+  by setting the specified key to any value and waiting for traffic to drain.
+
+

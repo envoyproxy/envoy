@@ -1,0 +1,430 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.proto:
+
+Sip Proxy (proto)
+=================
+
+.. _extension_envoy.filters.network.sip_proxy:
+
+This extension has the qualified name ``envoy.filters.network.sip_proxy``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.SipProxy:
+
+extensions.filters.network.sip_proxy.v3alpha.SipProxy
+-----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.v3alpha.SipProxy proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.proto#L22>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "stat_prefix": ...,
+    "route_config": {...},
+    "sip_filters": [],
+    "settings": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipProxy.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The human readable prefix to use when emitting statistics.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipProxy.route_config:
+
+
+route_config
+  (:ref:`extensions.filters.network.sip_proxy.v3alpha.RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.RouteConfiguration>`) The route table for the connection manager is static and is specified in this property.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipProxy.sip_filters:
+
+
+sip_filters
+  (**repeated** :ref:`extensions.filters.network.sip_proxy.v3alpha.SipFilter <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.SipFilter>`) A list of individual Sip filters that make up the filter chain for requests made to the
+  Sip proxy. Order matters as the filters are processed sequentially. For backwards
+  compatibility, if no sip_filters are specified, a default Sip router filter
+  (``envoy.filters.sip.router``) is used.
+
+
+  .. _extension_category_envoy.sip_proxy.filters:
+
+  .. tip::
+
+
+    The following extensions are available in :ref:`contrib <install_contrib>` images only:
+
+
+    - :ref:`envoy.filters.sip.router <extension_envoy.filters.sip.router>`
+
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipProxy.settings:
+
+
+settings
+  (:ref:`extensions.filters.network.sip_proxy.v3alpha.SipProxy.SipSettings <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.SipProxy.SipSettings>`) 
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.SipProxy.SipSettings:
+
+extensions.filters.network.sip_proxy.v3alpha.SipProxy.SipSettings
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.v3alpha.SipProxy.SipSettings proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.proto#L23>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "transaction_timeout": {...},
+    "local_services": [],
+    "tra_service_config": {...},
+    "operate_via": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipProxy.SipSettings.transaction_timeout:
+
+
+transaction_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) transaction timeout timer [Timer B] unit is milliseconds, default value 64*T1.
+
+  Session Initiation Protocol (SIP) timer summary
+
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | Timer   | Default value           | Section  | Meaning                                                                      |
+  +=========+=========================+==========+==============================================================================+
+  | T1      | 500 ms                  | 17.1.1.1 | Round-trip time (RTT) estimate                                               |
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | T2      | 4 sec                   | 17.1.2.2 | Maximum re-transmission interval for non-INVITE requests and INVITE responses|
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | T4      | 5 sec                   | 17.1.2.2 | Maximum duration that a message can remain in the network                    |
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | Timer A | initially T1            | 17.1.1.2 | INVITE request re-transmission interval, for UDP only                        |
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | Timer B | 64*T1                   | 17.1.1.2 | INVITE transaction timeout timer                                             |
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | Timer D | > 32 sec. for UDP       | 17.1.1.2 | Wait time for response re-transmissions                                      |
+  |         | 0 sec. for TCP and SCTP |          |                                                                              |
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | Timer E | initially T1            | 17.1.2.2 | Non-INVITE request re-transmission interval, UDP only                        |
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | Timer F | 64*T1                   | 17.1.2.2 | Non-INVITE transaction timeout timer                                         |
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | Timer G | initially T1            | 17.2.1   | INVITE response re-transmission interval                                     |
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | Timer H | 64*T1                   | 17.2.1   | Wait time for ACK receipt                                                    |
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | Timer I | T4 for UDP              | 17.2.1   | Wait time for ACK re-transmissions                                           |
+  |         | 0 sec. for TCP and SCTP |          |                                                                              |
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | Timer J | 64*T1 for UDP           | 17.2.2   | Wait time for re-transmissions of non-INVITE requests                        |
+  |         | 0 sec. for TCP and SCTP |          |                                                                              |
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+  | Timer K | T4 for UDP              | 17.1.2.2 | Wait time for response re-transmissions                                      |
+  |         | 0 sec. for TCP and SCTP |          |                                                                              |
+  +---------+-------------------------+----------+------------------------------------------------------------------------------+
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipProxy.SipSettings.local_services:
+
+
+local_services
+  (**repeated** :ref:`extensions.filters.network.sip_proxy.v3alpha.LocalService <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.LocalService>`) The service to match for ep insert
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipProxy.SipSettings.tra_service_config:
+
+
+tra_service_config
+  (:ref:`extensions.filters.network.sip_proxy.tra.v3alpha.TraServiceConfig <envoy_v3_api_msg_extensions.filters.network.sip_proxy.tra.v3alpha.TraServiceConfig>`) 
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipProxy.SipSettings.operate_via:
+
+
+operate_via
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether via header is operated, including add via for request and pop via for response
+  False: sip service proxy
+  True:  sip load balancer
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.SipFilter:
+
+extensions.filters.network.sip_proxy.v3alpha.SipFilter
+------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.v3alpha.SipFilter proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.proto#L91>`
+
+SipFilter configures a Sip filter.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "typed_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipFilter.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the filter to instantiate. The name must match a supported
+  filter. The built-in filters are:
+
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipFilter.typed_config:
+
+
+typed_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) 
+  Filter specific configuration which depends on the filter being instantiated. See the supported
+  filters for further documentation.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.SipProtocolOptions:
+
+extensions.filters.network.sip_proxy.v3alpha.SipProtocolOptions
+---------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.v3alpha.SipProtocolOptions proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.proto#L107>`
+
+SipProtocolOptions specifies Sip upstream protocol options. This object is used in
+:ref:`typed_extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
+keyed by the name ``envoy.filters.network.sip_proxy``.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "session_affinity": ...,
+    "registration_affinity": ...,
+    "customized_affinity": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipProtocolOptions.session_affinity:
+
+
+session_affinity
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) All sip messages in one dialog should go to the same endpoint.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipProtocolOptions.registration_affinity:
+
+
+registration_affinity
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The Register with Authorization header should go to the same endpoint which send out the 401 Unauthorized.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.SipProtocolOptions.customized_affinity:
+
+
+customized_affinity
+  (:ref:`extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinity <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinity>`) Customized affinity
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinity:
+
+extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinity
+---------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinity proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.proto#L119>`
+
+For affinity
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "entries": [],
+    "stop_load_balance": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinity.entries:
+
+
+entries
+  (**repeated** :ref:`extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinityEntry <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinityEntry>`) Affinity rules to conclude the upstream endpoint
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinity.stop_load_balance:
+
+
+stop_load_balance
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Configures whether load balance should be stopped or continued after affinity handling.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinityEntry:
+
+extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinityEntry
+--------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinityEntry proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.proto#L128>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "header": ...,
+    "key_name": ...,
+    "subscribe": ...,
+    "query": ...,
+    "cache": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinityEntry.header:
+
+
+header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The header name to match, e.g. "From", if not specified, default is "Route"
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinityEntry.key_name:
+
+
+key_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Affinity key for TRA query/subscribe, e.g. "lskpmc", if key_name is "text" means use the header content as key.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinityEntry.subscribe:
+
+
+subscribe
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether subscribe to TRA is required
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinityEntry.query:
+
+
+query
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether query to TRA is required
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.CustomizedAffinityEntry.cache:
+
+
+cache
+  (:ref:`extensions.filters.network.sip_proxy.v3alpha.Cache <envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.Cache>`) Local cache
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.Cache:
+
+extensions.filters.network.sip_proxy.v3alpha.Cache
+--------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.v3alpha.Cache proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.proto#L145>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_cache_item": ...,
+    "add_query_to_cache": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.Cache.max_cache_item:
+
+
+max_cache_item
+  (`int32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Affinity local cache item max number
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.Cache.add_query_to_cache:
+
+
+add_query_to_cache
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether query result can be added to local cache
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sip_proxy.v3alpha.LocalService:
+
+extensions.filters.network.sip_proxy.v3alpha.LocalService
+---------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sip_proxy.v3alpha.LocalService proto] <api/contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.proto#L154>`
+
+Local Service
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "domain": ...,
+    "parameter": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.LocalService.domain:
+
+
+domain
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The domain need to matched
+
+
+.. _envoy_v3_api_field_extensions.filters.network.sip_proxy.v3alpha.LocalService.parameter:
+
+
+parameter
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The parameter to get domain
+
+

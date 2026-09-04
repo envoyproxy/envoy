@@ -1,0 +1,45 @@
+.. _envoy_v3_api_file_envoy/type/matcher/v3/node.proto:
+
+Node matcher (proto)
+====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.NodeMatcher:
+
+type.matcher.v3.NodeMatcher
+---------------------------
+
+
+:repo:`[type.matcher.v3.NodeMatcher proto] <api/envoy/type/matcher/v3/node.proto#L20>`
+
+Specifies the way to match a Node.
+The match follows AND semantics.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "node_id": {...},
+    "node_metadatas": []
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.NodeMatcher.node_id:
+
+
+node_id
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) Specifies match criteria on the node id.
+
+
+.. _envoy_v3_api_field_type.matcher.v3.NodeMatcher.node_metadatas:
+
+
+node_metadatas
+  (**repeated** :ref:`type.matcher.v3.StructMatcher <envoy_v3_api_msg_type.matcher.v3.StructMatcher>`) Specifies match criteria on the node metadata.
+
+

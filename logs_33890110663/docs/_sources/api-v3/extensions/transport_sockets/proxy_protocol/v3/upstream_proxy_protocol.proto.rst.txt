@@ -1,0 +1,70 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.proto:
+
+Upstream Proxy Protocol (proto)
+===============================
+
+.. _extension_envoy.transport_sockets.upstream_proxy_protocol:
+
+This extension has the qualified name ``envoy.transport_sockets.upstream_proxy_protocol``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.transport_sockets.upstream <extension_category_envoy.transport_sockets.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.proxy_protocol.v3.ProxyProtocolUpstreamTransport <envoy_v3_api_msg_extensions.transport_sockets.proxy_protocol.v3.ProxyProtocolUpstreamTransport>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.proxy_protocol.v3.ProxyProtocolUpstreamTransport:
+
+extensions.transport_sockets.proxy_protocol.v3.ProxyProtocolUpstreamTransport
+-----------------------------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.proxy_protocol.v3.ProxyProtocolUpstreamTransport proto] <api/envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.proto#L20>`
+
+Configuration for PROXY protocol socket
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config": {...},
+    "transport_socket": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.proxy_protocol.v3.ProxyProtocolUpstreamTransport.config:
+
+
+config
+  (:ref:`config.core.v3.ProxyProtocolConfig <envoy_v3_api_msg_config.core.v3.ProxyProtocolConfig>`) The PROXY protocol settings
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.proxy_protocol.v3.ProxyProtocolUpstreamTransport.transport_socket:
+
+
+transport_socket
+  (:ref:`config.core.v3.TransportSocket <envoy_v3_api_msg_config.core.v3.TransportSocket>`, *REQUIRED*) The underlying transport socket being wrapped.
+
+

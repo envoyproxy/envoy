@@ -1,0 +1,418 @@
+.. _envoy_v3_api_file_envoy/service/health/v3/hds.proto:
+
+Health discovery service (HDS) (proto)
+======================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_service.health.v3.Capability:
+
+service.health.v3.Capability
+----------------------------
+
+
+:repo:`[service.health.v3.Capability proto] <api/envoy/service/health/v3/hds.proto#L81>`
+
+Defines supported protocols etc, so the management server can assign proper
+endpoints to healthcheck.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "health_check_protocols": []
+  }
+
+.. _envoy_v3_api_field_service.health.v3.Capability.health_check_protocols:
+
+
+health_check_protocols
+  (**repeated** :ref:`service.health.v3.Capability.Protocol <envoy_v3_api_enum_service.health.v3.Capability.Protocol>`) 
+
+.. _envoy_v3_api_enum_service.health.v3.Capability.Protocol:
+
+Enum service.health.v3.Capability.Protocol
+------------------------------------------
+
+
+:repo:`[service.health.v3.Capability.Protocol proto] <api/envoy/service/health/v3/hds.proto#L87>`
+
+Different Envoy instances may have different capabilities (e.g. Redis)
+and/or have ports enabled for different protocols.
+
+
+
+.. _envoy_v3_api_enum_value_service.health.v3.Capability.Protocol.HTTP:
+
+
+HTTP
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_service.health.v3.Capability.Protocol.TCP:
+
+
+TCP
+  ⁣
+
+.. _envoy_v3_api_enum_value_service.health.v3.Capability.Protocol.REDIS:
+
+
+REDIS
+  ⁣
+
+
+
+.. _envoy_v3_api_msg_service.health.v3.HealthCheckRequest:
+
+service.health.v3.HealthCheckRequest
+------------------------------------
+
+
+:repo:`[service.health.v3.HealthCheckRequest proto] <api/envoy/service/health/v3/hds.proto#L96>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "node": {...},
+    "capability": {...}
+  }
+
+.. _envoy_v3_api_field_service.health.v3.HealthCheckRequest.node:
+
+
+node
+  (:ref:`config.core.v3.Node <envoy_v3_api_msg_config.core.v3.Node>`) 
+
+.. _envoy_v3_api_field_service.health.v3.HealthCheckRequest.capability:
+
+
+capability
+  (:ref:`service.health.v3.Capability <envoy_v3_api_msg_service.health.v3.Capability>`) 
+
+
+.. _envoy_v3_api_msg_service.health.v3.EndpointHealth:
+
+service.health.v3.EndpointHealth
+--------------------------------
+
+
+:repo:`[service.health.v3.EndpointHealth proto] <api/envoy/service/health/v3/hds.proto#L105>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "endpoint": {...},
+    "health_status": ...,
+    "health_metadata": {...}
+  }
+
+.. _envoy_v3_api_field_service.health.v3.EndpointHealth.endpoint:
+
+
+endpoint
+  (:ref:`config.endpoint.v3.Endpoint <envoy_v3_api_msg_config.endpoint.v3.Endpoint>`) 
+
+.. _envoy_v3_api_field_service.health.v3.EndpointHealth.health_status:
+
+
+health_status
+  (:ref:`config.core.v3.HealthStatus <envoy_v3_api_enum_config.core.v3.HealthStatus>`) 
+
+.. _envoy_v3_api_field_service.health.v3.EndpointHealth.health_metadata:
+
+
+health_metadata
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) Optional metadata about the health check result, populated by the active
+  health checker and forwarded to the management server for richer health
+  state interpretation.
+
+  Well-known keys:
+
+  ``http_status_code`` (number)
+    Set by the HTTP health checker. Contains the HTTP response status code
+    returned by the upstream endpoint during the most recent health check,
+    e.g. ``200``, ``503``. Only present when the health check received a
+    complete HTTP response; absent on connection failures or timeouts.
+
+
+
+.. _envoy_v3_api_msg_service.health.v3.LocalityEndpointsHealth:
+
+service.health.v3.LocalityEndpointsHealth
+-----------------------------------------
+
+
+:repo:`[service.health.v3.LocalityEndpointsHealth proto] <api/envoy/service/health/v3/hds.proto#L128>`
+
+Group endpoint health by locality under each cluster.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "locality": {...},
+    "endpoints_health": []
+  }
+
+.. _envoy_v3_api_field_service.health.v3.LocalityEndpointsHealth.locality:
+
+
+locality
+  (:ref:`config.core.v3.Locality <envoy_v3_api_msg_config.core.v3.Locality>`) 
+
+.. _envoy_v3_api_field_service.health.v3.LocalityEndpointsHealth.endpoints_health:
+
+
+endpoints_health
+  (**repeated** :ref:`service.health.v3.EndpointHealth <envoy_v3_api_msg_service.health.v3.EndpointHealth>`) 
+
+
+.. _envoy_v3_api_msg_service.health.v3.ClusterEndpointsHealth:
+
+service.health.v3.ClusterEndpointsHealth
+----------------------------------------
+
+
+:repo:`[service.health.v3.ClusterEndpointsHealth proto] <api/envoy/service/health/v3/hds.proto#L136>`
+
+The health status of endpoints in a cluster. The cluster name and locality
+should match the corresponding fields in ClusterHealthCheck message.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster_name": ...,
+    "locality_endpoints_health": []
+  }
+
+.. _envoy_v3_api_field_service.health.v3.ClusterEndpointsHealth.cluster_name:
+
+
+cluster_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+
+.. _envoy_v3_api_field_service.health.v3.ClusterEndpointsHealth.locality_endpoints_health:
+
+
+locality_endpoints_health
+  (**repeated** :ref:`service.health.v3.LocalityEndpointsHealth <envoy_v3_api_msg_service.health.v3.LocalityEndpointsHealth>`) 
+
+
+.. _envoy_v3_api_msg_service.health.v3.EndpointHealthResponse:
+
+service.health.v3.EndpointHealthResponse
+----------------------------------------
+
+
+:repo:`[service.health.v3.EndpointHealthResponse proto] <api/envoy/service/health/v3/hds.proto#L142>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "endpoints_health": [],
+    "cluster_endpoints_health": []
+  }
+
+.. _envoy_v3_api_field_service.health.v3.EndpointHealthResponse.endpoints_health:
+
+
+endpoints_health
+  (**repeated** :ref:`service.health.v3.EndpointHealth <envoy_v3_api_msg_service.health.v3.EndpointHealth>`) Deprecated - Flat list of endpoint health information.
+
+
+.. _envoy_v3_api_field_service.health.v3.EndpointHealthResponse.cluster_endpoints_health:
+
+
+cluster_endpoints_health
+  (**repeated** :ref:`service.health.v3.ClusterEndpointsHealth <envoy_v3_api_msg_service.health.v3.ClusterEndpointsHealth>`) Organize Endpoint health information by cluster.
+
+
+
+.. _envoy_v3_api_msg_service.health.v3.HealthCheckRequestOrEndpointHealthResponse:
+
+service.health.v3.HealthCheckRequestOrEndpointHealthResponse
+------------------------------------------------------------
+
+
+:repo:`[service.health.v3.HealthCheckRequestOrEndpointHealthResponse proto] <api/envoy/service/health/v3/hds.proto#L154>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "health_check_request": {...},
+    "endpoint_health_response": {...}
+  }
+
+.. _envoy_v3_api_field_service.health.v3.HealthCheckRequestOrEndpointHealthResponse.health_check_request:
+
+
+health_check_request
+  (:ref:`service.health.v3.HealthCheckRequest <envoy_v3_api_msg_service.health.v3.HealthCheckRequest>`) 
+  
+
+  Only one of :ref:`health_check_request <envoy_v3_api_field_service.health.v3.HealthCheckRequestOrEndpointHealthResponse.health_check_request>`, :ref:`endpoint_health_response <envoy_v3_api_field_service.health.v3.HealthCheckRequestOrEndpointHealthResponse.endpoint_health_response>` may be set.
+
+.. _envoy_v3_api_field_service.health.v3.HealthCheckRequestOrEndpointHealthResponse.endpoint_health_response:
+
+
+endpoint_health_response
+  (:ref:`service.health.v3.EndpointHealthResponse <envoy_v3_api_msg_service.health.v3.EndpointHealthResponse>`) 
+  
+
+  Only one of :ref:`health_check_request <envoy_v3_api_field_service.health.v3.HealthCheckRequestOrEndpointHealthResponse.health_check_request>`, :ref:`endpoint_health_response <envoy_v3_api_field_service.health.v3.HealthCheckRequestOrEndpointHealthResponse.endpoint_health_response>` may be set.
+
+
+.. _envoy_v3_api_msg_service.health.v3.LocalityEndpoints:
+
+service.health.v3.LocalityEndpoints
+-----------------------------------
+
+
+:repo:`[service.health.v3.LocalityEndpoints proto] <api/envoy/service/health/v3/hds.proto#L165>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "locality": {...},
+    "endpoints": []
+  }
+
+.. _envoy_v3_api_field_service.health.v3.LocalityEndpoints.locality:
+
+
+locality
+  (:ref:`config.core.v3.Locality <envoy_v3_api_msg_config.core.v3.Locality>`) 
+
+.. _envoy_v3_api_field_service.health.v3.LocalityEndpoints.endpoints:
+
+
+endpoints
+  (**repeated** :ref:`config.endpoint.v3.Endpoint <envoy_v3_api_msg_config.endpoint.v3.Endpoint>`) 
+
+
+.. _envoy_v3_api_msg_service.health.v3.ClusterHealthCheck:
+
+service.health.v3.ClusterHealthCheck
+------------------------------------
+
+
+:repo:`[service.health.v3.ClusterHealthCheck proto] <api/envoy/service/health/v3/hds.proto#L179>`
+
+The cluster name and locality is provided to Envoy for the endpoints that it
+health checks to support statistics reporting, logging and debugging by the
+Envoy instance (outside of HDS). For maximum usefulness, it should match the
+same cluster structure as that provided by EDS.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster_name": ...,
+    "health_checks": [],
+    "locality_endpoints": [],
+    "transport_socket_matches": [],
+    "upstream_bind_config": {...}
+  }
+
+.. _envoy_v3_api_field_service.health.v3.ClusterHealthCheck.cluster_name:
+
+
+cluster_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+
+.. _envoy_v3_api_field_service.health.v3.ClusterHealthCheck.health_checks:
+
+
+health_checks
+  (**repeated** :ref:`config.core.v3.HealthCheck <envoy_v3_api_msg_config.core.v3.HealthCheck>`) 
+
+.. _envoy_v3_api_field_service.health.v3.ClusterHealthCheck.locality_endpoints:
+
+
+locality_endpoints
+  (**repeated** :ref:`service.health.v3.LocalityEndpoints <envoy_v3_api_msg_service.health.v3.LocalityEndpoints>`) 
+
+.. _envoy_v3_api_field_service.health.v3.ClusterHealthCheck.transport_socket_matches:
+
+
+transport_socket_matches
+  (**repeated** :ref:`config.cluster.v3.Cluster.TransportSocketMatch <envoy_v3_api_msg_config.cluster.v3.Cluster.TransportSocketMatch>`) Optional map that gets filtered by :ref:`health_checks.transport_socket_match_criteria <envoy_v3_api_field_config.core.v3.HealthCheck.transport_socket_match_criteria>`
+  on connection when health checking. For more details, see
+  :ref:`config.cluster.v3.Cluster.transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
+
+
+.. _envoy_v3_api_field_service.health.v3.ClusterHealthCheck.upstream_bind_config:
+
+
+upstream_bind_config
+  (:ref:`config.core.v3.BindConfig <envoy_v3_api_msg_config.core.v3.BindConfig>`) Optional configuration used to bind newly established upstream connections.
+  If the address and port are empty, no bind will be performed.
+
+
+
+.. _envoy_v3_api_msg_service.health.v3.HealthCheckSpecifier:
+
+service.health.v3.HealthCheckSpecifier
+--------------------------------------
+
+
+:repo:`[service.health.v3.HealthCheckSpecifier proto] <api/envoy/service/health/v3/hds.proto#L199>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster_health_checks": [],
+    "interval": {...}
+  }
+
+.. _envoy_v3_api_field_service.health.v3.HealthCheckSpecifier.cluster_health_checks:
+
+
+cluster_health_checks
+  (**repeated** :ref:`service.health.v3.ClusterHealthCheck <envoy_v3_api_msg_service.health.v3.ClusterHealthCheck>`) 
+
+.. _envoy_v3_api_field_service.health.v3.HealthCheckSpecifier.interval:
+
+
+interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The default is 1 second.
+
+
+
+

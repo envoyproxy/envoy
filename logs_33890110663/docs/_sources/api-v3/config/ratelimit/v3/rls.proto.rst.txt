@@ -1,0 +1,47 @@
+.. _envoy_v3_api_file_envoy/config/ratelimit/v3/rls.proto:
+
+Rate limit service (proto)
+==========================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.ratelimit.v3.RateLimitServiceConfig:
+
+config.ratelimit.v3.RateLimitServiceConfig
+------------------------------------------
+
+
+:repo:`[config.ratelimit.v3.RateLimitServiceConfig proto] <api/envoy/config/ratelimit/v3/rls.proto#L20>`
+
+Rate limit :ref:`configuration overview <config_rate_limit_service>`.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "grpc_service": {...},
+    "transport_api_version": ...
+  }
+
+.. _envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.grpc_service:
+
+
+grpc_service
+  (:ref:`config.core.v3.GrpcService <envoy_v3_api_msg_config.core.v3.GrpcService>`, *REQUIRED*) Specifies the gRPC service that hosts the rate limit service. The client
+  will connect to this cluster when it needs to make rate limit service
+  requests.
+
+
+.. _envoy_v3_api_field_config.ratelimit.v3.RateLimitServiceConfig.transport_api_version:
+
+
+transport_api_version
+  (:ref:`config.core.v3.ApiVersion <envoy_v3_api_enum_config.core.v3.ApiVersion>`) API version for rate limit transport protocol. This describes the rate limit gRPC endpoint and
+  version of messages used on the wire.
+
+

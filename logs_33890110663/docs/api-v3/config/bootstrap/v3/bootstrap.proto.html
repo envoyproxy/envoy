@@ -1,0 +1,1310 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bootstrap (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="Internal Listener (proto)" href="../../../extensions/bootstrap/internal_listener/v3/internal_listener.proto.html" />
+    <link rel="prev" title="Bootstrap" href="../../../bootstrap/bootstrap.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="../../../bootstrap/bootstrap.html">Bootstrap</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Bootstrap (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/bootstrap/internal_listener/v3/internal_listener.proto.html">Internal Listener (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.proto.html">Bootstrap settings for downstream reverse connection socket interface (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.proto.html">Upstream reverse connection socket interface (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/network/socket_interface/sockmap/v3/sockmap.proto.html">Sockmap socket interface configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../metrics/v3/metrics_service.proto.html">Metrics service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../overload/v3/overload.proto.html">Overload Manager (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ratelimit/v3/rls.proto.html">Rate limit service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../metrics/v3/stats.proto.html">Stats (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/vcl/v3alpha/vcl_socket_interface.proto.html">VCL socket interface configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/wasm/v3/wasm.proto.html">Wasm (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../extensions/bootstrap/dynamic_modules/v3/dynamic_modules.proto.html">Dynamic Modules Bootstrap Extension (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../config.html">Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+      <li class="breadcrumb-item active">Bootstrap (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/config/bootstrap/v3/bootstrap.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="bootstrap-proto">
+<span id="envoy-v3-api-file-envoy-config-bootstrap-v3-bootstrap-proto"></span><h1>Bootstrap (proto)<a class="headerlink" href="#bootstrap-proto" title="Link to this heading"></a></h1>
+<p>This proto is supplied via the <a class="reference internal" href="../../../../operations/cli.html#cmdoption-c"><code class="xref std std-option docutils literal notranslate"><span class="pre">-c</span></code></a> CLI flag and acts as the root
+of the Envoy v3 configuration. See the <a class="reference internal" href="../../../../configuration/overview/bootstrap.html#config-overview-bootstrap"><span class="std std-ref">v3 configuration overview</span></a> for more detail.</p>
+<section id="config-bootstrap-v3-bootstrap">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-bootstrap"></span><h2>config.bootstrap.v3.Bootstrap<a class="headerlink" href="#config-bootstrap-v3-bootstrap" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L45">[config.bootstrap.v3.Bootstrap proto]</a></p>
+<p>Bootstrap <a class="reference internal" href="../../../../configuration/overview/bootstrap.html#config-overview-bootstrap"><span class="std std-ref">configuration overview</span></a>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;node&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;static_resources&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;dynamic_resources&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;cluster_manager&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;hds_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;flags_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;stats_sinks&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;deferred_stat_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;stats_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;stats_flush_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;stats_flush_on_admin&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;stats_eviction_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;watchdog&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;watchdogs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;tracing&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;layered_runtime&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;admin&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;overload_manager&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;enable_dispatcher_stats&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;header_prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;stats_server_version_override&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;use_tcp_for_dns_lookups&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;dns_resolution_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;typed_dns_resolver_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;bootstrap_extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;fatal_actions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;default_socket_interface&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;inline_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;perf_tracing_file_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;default_regex_engine&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;xds_config_tracker_extension&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;application_log_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;grpc_async_client_manager_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;memory_allocator_manager&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;enable_worker_cpu_affinity&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-node">
+<dt>node</dt><dd><p>(<a class="reference internal" href="../../core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-node"><span class="std std-ref">config.core.v3.Node</span></a>) Node identity to present to the management server and for instance
+identification purposes (e.g. in generated headers).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-static-resources">
+<dt>static_resources</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-bootstrap-staticresources"><span class="std std-ref">config.bootstrap.v3.Bootstrap.StaticResources</span></a>) Statically specified resources.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-dynamic-resources">
+<dt>dynamic_resources</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-bootstrap-dynamicresources"><span class="std std-ref">config.bootstrap.v3.Bootstrap.DynamicResources</span></a>) xDS configuration sources.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-cluster-manager">
+<dt>cluster_manager</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-clustermanager"><span class="std std-ref">config.bootstrap.v3.ClusterManager</span></a>) Configuration for the cluster manager which owns all upstream clusters
+within the server.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-hds-config">
+<dt>hds_config</dt><dd><p>(<a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-apiconfigsource"><span class="std std-ref">config.core.v3.ApiConfigSource</span></a>) Health discovery service config option.
+(<a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-apiconfigsource"><span class="std std-ref">core.ApiConfigSource</span></a>)</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-flags-path">
+<dt>flags_path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional file system path to search for startup flag files.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-stats-sinks">
+<dt>stats_sinks</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../metrics/v3/stats.proto.html#envoy-v3-api-msg-config-metrics-v3-statssink"><span class="std std-ref">config.metrics.v3.StatsSink</span></a>) Optional set of stats sinks.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-deferred-stat-options">
+<dt>deferred_stat_options</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-bootstrap-deferredstatoptions"><span class="std std-ref">config.bootstrap.v3.Bootstrap.DeferredStatOptions</span></a>) Options to control behaviors of deferred creation compatible stats.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-stats-config">
+<dt>stats_config</dt><dd><p>(<a class="reference internal" href="../../metrics/v3/stats.proto.html#envoy-v3-api-msg-config-metrics-v3-statsconfig"><span class="std std-ref">config.metrics.v3.StatsConfig</span></a>) Configuration for internal processing of stats.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-stats-flush-interval">
+<dt>stats_flush_interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Optional duration between flushes to configured stats sinks. For
+performance reasons Envoy latches counters and only flushes counters and
+gauges at a periodic interval. If not specified the default is <code class="docutils literal notranslate"><span class="pre">5000ms</span></code> (<code class="docutils literal notranslate"><span class="pre">5</span></code> seconds).
+Only one of <code class="docutils literal notranslate"><span class="pre">stats_flush_interval</span></code> or <code class="docutils literal notranslate"><span class="pre">stats_flush_on_admin</span></code>
+can be set.
+Duration must be at least <code class="docutils literal notranslate"><span class="pre">1ms</span></code> and at most <code class="docutils literal notranslate"><span class="pre">5</span> <span class="pre">min</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-stats-flush-on-admin">
+<dt>stats_flush_on_admin</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Flush stats to sinks only when queried for on the admin interface. If set,
+a flush timer is not created. Only one of <code class="docutils literal notranslate"><span class="pre">stats_flush_on_admin</span></code> or
+<code class="docutils literal notranslate"><span class="pre">stats_flush_interval</span></code> can be set.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-stats-eviction-interval">
+<dt>stats_eviction_interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Optional duration to perform metric eviction. At every interval, during the stats flush
+the unused metrics are removed from the worker caches and the used metrics
+are marked as unused. Must be a multiple of the <code class="docutils literal notranslate"><span class="pre">stats_flush_interval</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-watchdog">
+<dt>watchdog</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-watchdog"><span class="std std-ref">config.bootstrap.v3.Watchdog</span></a>) Optional watchdog configuration.
+This is for a single watchdog configuration for the entire system.
+Deprecated in favor of <code class="docutils literal notranslate"><span class="pre">watchdogs</span></code> which has finer granularity.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-watchdogs">
+<dt>watchdogs</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-watchdogs"><span class="std std-ref">config.bootstrap.v3.Watchdogs</span></a>) Optional watchdogs configuration.
+This is used for specifying different watchdogs for the different subsystems.</p>
+<div class="admonition tip" id="extension-category-envoy-guarddog-actions">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../extensions/watchdog/backtrace_action/v3/backtrace_action.proto.html#extension-envoy-watchdog-backtrace-action"><span class="std std-ref">envoy.watchdog.backtrace_action</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/watchdog/profile_action/v3/profile_action.proto.html#extension-envoy-watchdog-profile-action"><span class="std std-ref">envoy.watchdog.profile_action</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-tracing">
+<dt>tracing</dt><dd><p>(<a class="reference internal" href="../../trace/v3/http_tracer.proto.html#envoy-v3-api-msg-config-trace-v3-tracing"><span class="std std-ref">config.trace.v3.Tracing</span></a>) Configuration for an external tracing provider.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>This field has been deprecated in favor of <a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-tracing-provider"><span class="std std-ref">HttpConnectionManager.Tracing.provider</span></a>.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-layered-runtime">
+<dt>layered_runtime</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-layeredruntime"><span class="std std-ref">config.bootstrap.v3.LayeredRuntime</span></a>) Configuration for the runtime configuration provider. If not
+specified, a “null” provider will be used which will result in all defaults
+being used.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-admin">
+<dt>admin</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-admin"><span class="std std-ref">config.bootstrap.v3.Admin</span></a>) Configuration for the local administration HTTP server.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-overload-manager">
+<dt>overload_manager</dt><dd><p>(<a class="reference internal" href="../../overload/v3/overload.proto.html#envoy-v3-api-msg-config-overload-v3-overloadmanager"><span class="std std-ref">config.overload.v3.OverloadManager</span></a>) Optional overload manager configuration.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>This field should be configured in the presence of untrusted <em>downstreams</em>.</p>
+<p>This field should be configured in the presence of untrusted <em>upstreams</em>.</p>
+<p>Example configuration for untrusted environments:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">overload_manager</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">actions</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.overload_actions.shrink_heap</span>
+<span class="w">    </span><span class="nt">triggers</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.resource_monitors.fixed_heap</span>
+<span class="w">      </span><span class="nt">threshold</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.9</span>
+<span class="w">    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">      </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.config.overload.v3.ShrinkHeapConfig</span>
+<span class="w">      </span><span class="nt">max_unfreed_memory_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">104857600.0</span>
+<span class="w">      </span><span class="nt">timer_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10s</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.overload_actions.stop_accepting_requests</span>
+<span class="w">    </span><span class="nt">triggers</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.resource_monitors.fixed_heap</span>
+<span class="w">      </span><span class="nt">threshold</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.95</span>
+<span class="w">  </span><span class="nt">refresh_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.25s</span>
+<span class="w">  </span><span class="nt">resource_monitors</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.resource_monitors.fixed_heap</span>
+<span class="w">    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">      </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig</span>
+<span class="w">      </span><span class="nt">max_heap_size_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1073741824.0</span>
+</pre></div>
+</div>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-enable-dispatcher-stats">
+<dt>enable_dispatcher_stats</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Enable <a class="reference internal" href="../../../../operations/performance.html#operations-performance"><span class="std std-ref">stats for event dispatcher</span></a>. Defaults to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This records a value for each iteration of the event loop on every thread. This
+should normally be minimal overhead, but when using
+<a class="reference internal" href="../../metrics/v3/stats.proto.html#envoy-v3-api-msg-config-metrics-v3-statsdsink"><span class="std std-ref">statsd</span></a>, it will send each observed value
+over the wire individually because the statsd protocol doesn’t have any way to represent a
+histogram summary. Be aware that this can be a very large volume of data.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-header-prefix">
+<dt>header_prefix</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional string which will be used in lieu of <code class="docutils literal notranslate"><span class="pre">x-envoy</span></code> in prefixing headers.</p>
+<p>For example, if this string is present and set to <code class="docutils literal notranslate"><span class="pre">X-Foo</span></code>, then <code class="docutils literal notranslate"><span class="pre">x-envoy-retry-on</span></code> will be
+transformed into <code class="docutils literal notranslate"><span class="pre">x-foo-retry-on</span></code> etc.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This applies to the headers Envoy will generate, the headers Envoy will sanitize, and the
+headers Envoy will trust for core code and core extensions only. Be VERY careful making
+changes to this string, especially in multi-layer Envoy deployments or deployments using
+extensions which are not upstream.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-stats-server-version-override">
+<dt>stats_server_version_override</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value">UInt64Value</a>) Optional proxy version which will be used to set the value of <a class="reference internal" href="../../../../configuration/observability/statistics.html#server-statistics"><span class="std std-ref">server.version statistic</span></a> if specified. Envoy will not process this value, it will be sent as is to
+<a class="reference internal" href="../../metrics/v3/stats.proto.html#envoy-v3-api-msg-config-metrics-v3-statssink"><span class="std std-ref">stats sinks</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-use-tcp-for-dns-lookups">
+<dt>use_tcp_for_dns_lookups</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Always use <code class="docutils literal notranslate"><span class="pre">TCP</span></code> queries instead of <code class="docutils literal notranslate"><span class="pre">UDP</span></code> queries for DNS lookups.
+This may be overridden on a per-cluster basis in <code class="docutils literal notranslate"><span class="pre">cds_config</span></code>,
+when <a class="reference internal" href="../../cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-dns-resolvers"><span class="std std-ref">dns_resolvers</span></a> and
+<a class="reference internal" href="../../cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-use-tcp-for-dns-lookups"><span class="std std-ref">use_tcp_for_dns_lookups</span></a> are
+specified.
+This field is deprecated in favor of <code class="docutils literal notranslate"><span class="pre">dns_resolution_config</span></code>
+which aggregates all of the DNS resolver configuration in a single message.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-dns-resolution-config">
+<dt>dns_resolution_config</dt><dd><p>(<a class="reference internal" href="../../core/v3/resolver.proto.html#envoy-v3-api-msg-config-core-v3-dnsresolutionconfig"><span class="std std-ref">config.core.v3.DnsResolutionConfig</span></a>) DNS resolution configuration which includes the underlying DNS resolver addresses and options.
+This may be overridden on a per-cluster basis in <code class="docutils literal notranslate"><span class="pre">cds_config</span></code>, when
+<a class="reference internal" href="../../cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-dns-resolution-config"><span class="std std-ref">dns_resolution_config</span></a>
+is specified.
+This field is deprecated in favor of
+<a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-bootstrap-typed-dns-resolver-config"><span class="std std-ref">typed_dns_resolver_config</span></a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-typed-dns-resolver-config">
+<dt>typed_dns_resolver_config</dt><dd><p>(<a class="reference internal" href="../../core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) DNS resolver type configuration extension. This extension can be used to configure <code class="docutils literal notranslate"><span class="pre">c-ares</span></code>, <code class="docutils literal notranslate"><span class="pre">apple</span></code>,
+or any other DNS resolver types and the related parameters.
+For example, an object of
+<a class="reference internal" href="../../../extensions/network/dns_resolver/cares/v3/cares_dns_resolver.proto.html#envoy-v3-api-msg-extensions-network-dns-resolver-cares-v3-caresdnsresolverconfig"><span class="std std-ref">CaresDnsResolverConfig</span></a>
+can be packed into this <code class="docutils literal notranslate"><span class="pre">typed_dns_resolver_config</span></code>. This configuration replaces the
+<a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-bootstrap-dns-resolution-config"><span class="std std-ref">dns_resolution_config</span></a>
+configuration.</p>
+<p>During the transition period when both <code class="docutils literal notranslate"><span class="pre">dns_resolution_config</span></code> and <code class="docutils literal notranslate"><span class="pre">typed_dns_resolver_config</span></code> exist,
+when <code class="docutils literal notranslate"><span class="pre">typed_dns_resolver_config</span></code> is in place, Envoy will use it and ignore <code class="docutils literal notranslate"><span class="pre">dns_resolution_config</span></code>.
+When <code class="docutils literal notranslate"><span class="pre">typed_dns_resolver_config</span></code> is missing, the default behavior is in place.</p>
+<div class="admonition tip" id="extension-category-envoy-network-dns-resolver">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../extensions/network/dns_resolver/apple/v3/apple_dns_resolver.proto.html#extension-envoy-network-dns-resolver-apple"><span class="std std-ref">envoy.network.dns_resolver.apple</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/network/dns_resolver/cares/v3/cares_dns_resolver.proto.html#extension-envoy-network-dns-resolver-cares"><span class="std std-ref">envoy.network.dns_resolver.cares</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.proto.html#extension-envoy-network-dns-resolver-getaddrinfo"><span class="std std-ref">envoy.network.dns_resolver.getaddrinfo</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/network/dns_resolver/hickory/v3/hickory_dns_resolver.proto.html#extension-envoy-network-dns-resolver-hickory"><span class="std std-ref">envoy.network.dns_resolver.hickory</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-bootstrap-extensions">
+<dt>bootstrap_extensions</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Specifies optional bootstrap extensions to be instantiated at startup time.
+Each item contains extension specific configuration.</p>
+<div class="admonition tip" id="extension-category-envoy-bootstrap">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../extensions/bootstrap/dynamic_modules/v3/dynamic_modules.proto.html#extension-envoy-bootstrap-dynamic-modules"><span class="std std-ref">envoy.bootstrap.dynamic_modules</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/bootstrap/internal_listener/v3/internal_listener.proto.html#extension-envoy-bootstrap-internal-listener"><span class="std std-ref">envoy.bootstrap.internal_listener</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.proto.html#extension-envoy-bootstrap-reverse-tunnel-downstream-socket-interface"><span class="std std-ref">envoy.bootstrap.reverse_tunnel.downstream_socket_interface</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.proto.html#extension-envoy-bootstrap-reverse-tunnel-upstream-socket-interface"><span class="std std-ref">envoy.bootstrap.reverse_tunnel.upstream_socket_interface</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/wasm/v3/wasm.proto.html#extension-envoy-bootstrap-wasm"><span class="std std-ref">envoy.bootstrap.wasm</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/network/socket_interface/sockmap/v3/sockmap.proto.html#extension-envoy-extensions-network-socket-interface-sockmap"><span class="std std-ref">envoy.extensions.network.socket_interface.sockmap</span></a></p></li>
+</ul>
+<p>The following extensions are available in <a class="reference internal" href="../../../../start/install.html#install-contrib"><span class="std std-ref">contrib</span></a> images only:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../contrib/reverse_tunnel_reporter/reverse_tunnel_reporter.html#extension-envoy-bootstrap-reverse-tunnel-reverse-tunnel-reporting-service"><span class="std std-ref">envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service</span></a></p></li>
+<li><p><a class="reference internal" href="../../../extensions/vcl/v3alpha/vcl_socket_interface.proto.html#extension-envoy-bootstrap-vcl"><span class="std std-ref">envoy.bootstrap.vcl</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-fatal-actions">
+<dt>fatal_actions</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-fatalaction"><span class="std std-ref">config.bootstrap.v3.FatalAction</span></a>) Specifies optional extensions instantiated at startup time and
+invoked during crash time on the request that caused the crash.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-default-socket-interface">
+<dt>default_socket_interface</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional overriding of default socket interface. The value must be the name of one of the
+socket interface factories initialized through a bootstrap extension</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-inline-headers">
+<dt>inline_headers</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-custominlineheader"><span class="std std-ref">config.bootstrap.v3.CustomInlineHeader</span></a>) Specifies a set of headers that need to be registered as inline header. This configuration
+allows users to customize the inline headers on-demand at Envoy startup without modifying
+Envoy’s source code.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">set-cookie</span></code> header cannot be registered as inline header.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-perf-tracing-file-path">
+<dt>perf_tracing_file_path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional path to a file with performance tracing data created by <code class="docutils literal notranslate"><span class="pre">Perfetto</span></code> SDK in binary
+ProtoBuf format. The default value is <code class="docutils literal notranslate"><span class="pre">envoy.pftrace</span></code>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-default-regex-engine">
+<dt>default_regex_engine</dt><dd><p>(<a class="reference internal" href="../../core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Optional overriding of default regex engine.
+If the value is not specified, <code class="docutils literal notranslate"><span class="pre">Google</span> <span class="pre">RE2</span></code> will be used by default.</p>
+<div class="admonition tip" id="extension-category-envoy-regex-engines">
+<p class="admonition-title">Tip</p>
+<p>This extension category has the following known extensions:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../extensions/regex_engines/v3/google_re2.proto.html#extension-envoy-regex-engines-google-re2"><span class="std std-ref">envoy.regex_engines.google_re2</span></a></p></li>
+</ul>
+<p>The following extensions are available in <a class="reference internal" href="../../../../start/install.html#install-contrib"><span class="std std-ref">contrib</span></a> images only:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../extensions/regex_engines/hyperscan/v3alpha/hyperscan.proto.html#extension-envoy-regex-engines-hyperscan"><span class="std std-ref">envoy.regex_engines.hyperscan</span></a></p></li>
+</ul>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-xds-config-tracker-extension">
+<dt>xds_config_tracker_extension</dt><dd><p>(<a class="reference internal" href="../../core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Optional XdsConfigTracker configuration, which allows tracking xDS responses in external components,
+e.g., external tracer or monitor. It provides the process point when receive, ingest, or fail to
+process xDS resources and messages. If a value is not specified, no <code class="docutils literal notranslate"><span class="pre">XdsConfigTracker</span></code> will be used.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>There are no in-repo extensions currently, and the <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/envoy/config/xds_config_tracker.h">XdsConfigTracker</a>
+interface should be implemented before using.
+See <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/test/integration/xds_config_tracker_integration_test.cc">xds_config_tracker_integration_test</a>
+for an example usage of the interface.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-application-log-config">
+<dt>application_log_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-bootstrap-applicationlogconfig"><span class="std std-ref">config.bootstrap.v3.Bootstrap.ApplicationLogConfig</span></a>) Optional application log configuration.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-grpc-async-client-manager-config">
+<dt>grpc_async_client_manager_config</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-bootstrap-grpcasyncclientmanagerconfig"><span class="std std-ref">config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig</span></a>) Optional gRPC async client manager config.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-memory-allocator-manager">
+<dt>memory_allocator_manager</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-memoryallocatormanager"><span class="std std-ref">config.bootstrap.v3.MemoryAllocatorManager</span></a>) Optional configuration for memory allocation manager.
+Memory releasing is only supported for <a class="reference external" href="https://github.com/google/tcmalloc">tcmalloc allocator</a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-enable-worker-cpu-affinity">
+<dt>enable_worker_cpu_affinity</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) When enabled, Envoy pins each worker thread to a distinct CPU from the process affinity mask,
+worker <code class="docutils literal notranslate"><span class="pre">i</span></code> to the <code class="docutils literal notranslate"><span class="pre">i-th</span></code> CPU in ascending order. This improves CPU cache and <code class="docutils literal notranslate"><span class="pre">NUMA</span></code>
+locality for high concurrency deployments on bare metal. It is available on Linux only and is
+ignored on other platforms. Pinning requires a worker count no greater than the number of CPUs
+in the process affinity mask. When the worker count exceeds the available CPUs no worker is
+pinned. Pinning is applied once when the workers start, so a later change to the process
+affinity mask does not re-pin.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-bootstrap-staticresources">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-bootstrap-staticresources"></span><h2>config.bootstrap.v3.Bootstrap.StaticResources<a class="headerlink" href="#config-bootstrap-v3-bootstrap-staticresources" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L49">[config.bootstrap.v3.Bootstrap.StaticResources proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;listeners&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;clusters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;secrets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-staticresources-listeners">
+<dt>listeners</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">config.listener.v3.Listener</span></a>) Static <a class="reference internal" href="../../listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listeners</span></a>. These listeners are
+available regardless of LDS configuration.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-staticresources-clusters">
+<dt>clusters</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">config.cluster.v3.Cluster</span></a>) If a network based configuration source is specified for <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-bootstrap-dynamicresources-cds-config"><span class="std std-ref">cds_config</span></a>, it’s necessary
+to have some initial cluster definitions available to allow Envoy to know
+how to speak to the management server.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-staticresources-secrets">
+<dt>secrets</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../extensions/transport_sockets/tls/v3/secret.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-secret"><span class="std std-ref">extensions.transport_sockets.tls.v3.Secret</span></a>) These static secrets can be used by <a class="reference internal" href="../../../extensions/transport_sockets/tls/v3/secret.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-sdssecretconfig"><span class="std std-ref">SdsSecretConfig</span></a></p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-bootstrap-dynamicresources">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-bootstrap-dynamicresources"></span><h2>config.bootstrap.v3.Bootstrap.DynamicResources<a class="headerlink" href="#config-bootstrap-v3-bootstrap-dynamicresources" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L69">[config.bootstrap.v3.Bootstrap.DynamicResources proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;lds_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;cds_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;ads_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-dynamicresources-lds-config">
+<dt>lds_config</dt><dd><p>(<a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">config.core.v3.ConfigSource</span></a>) All <a class="reference internal" href="../../listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listeners</span></a> are provided by a single
+<a class="reference internal" href="../../../../intro/arch_overview/operations/dynamic_configuration.html#arch-overview-dynamic-config-lds"><span class="std std-ref">LDS</span></a> configuration source.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-dynamicresources-cds-config">
+<dt>cds_config</dt><dd><p>(<a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">config.core.v3.ConfigSource</span></a>) All post-bootstrap <a class="reference internal" href="../../cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">Cluster</span></a> definitions are
+provided by a single <a class="reference internal" href="../../../../intro/arch_overview/operations/dynamic_configuration.html#arch-overview-dynamic-config-cds"><span class="std std-ref">CDS</span></a>
+configuration source.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-dynamicresources-ads-config">
+<dt>ads_config</dt><dd><p>(<a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-apiconfigsource"><span class="std std-ref">config.core.v3.ApiConfigSource</span></a>) A single <a class="reference internal" href="../../../../configuration/overview/xds_api.html#config-overview-ads"><span class="std std-ref">ADS</span></a> source may be optionally
+specified. This must have <a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-field-config-core-v3-apiconfigsource-api-type"><span class="std std-ref">api_type</span></a> <a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-enum-value-config-core-v3-apiconfigsource-apitype-grpc"><span class="std std-ref">GRPC</span></a>. Only
+<a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">ConfigSources</span></a> that have
+the <a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-field-config-core-v3-configsource-ads"><span class="std std-ref">ads</span></a> field set will be
+streamed on the ADS channel.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-bootstrap-applicationlogconfig">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-bootstrap-applicationlogconfig"></span><h2>config.bootstrap.v3.Bootstrap.ApplicationLogConfig<a class="headerlink" href="#config-bootstrap-v3-bootstrap-applicationlogconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L102">[config.bootstrap.v3.Bootstrap.ApplicationLogConfig proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;log_format&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-applicationlogconfig-log-format">
+<dt>log_format</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-bootstrap-applicationlogconfig-logformat"><span class="std std-ref">config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat</span></a>) Optional field to set the application logs format. If this field is set, it will override
+the default log format. Setting both this field and <a class="reference internal" href="../../../../operations/cli.html#cmdoption-log-format"><code class="xref std std-option docutils literal notranslate"><span class="pre">--log-format</span></code></a> command line
+option is not allowed, and will cause a bootstrap error.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-bootstrap-applicationlogconfig-logformat">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-bootstrap-applicationlogconfig-logformat"></span><h2>config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat<a class="headerlink" href="#config-bootstrap-v3-bootstrap-applicationlogconfig-logformat" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L103">[config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;json_format&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;text_format&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-applicationlogconfig-logformat-json-format">
+<dt>json_format</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct">Struct</a>) Flush application logs in JSON format. The configured JSON struct can
+support all the format flags specified in the <a class="reference internal" href="../../../../operations/cli.html#cmdoption-log-format"><code class="xref std std-option docutils literal notranslate"><span class="pre">--log-format</span></code></a>
+command line options section, except for the <code class="docutils literal notranslate"><span class="pre">%v</span></code> and <code class="docutils literal notranslate"><span class="pre">%_</span></code> flags.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-bootstrap-applicationlogconfig-logformat-json-format"><span class="std std-ref">json_format</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-bootstrap-applicationlogconfig-logformat-text-format"><span class="std std-ref">text_format</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-applicationlogconfig-logformat-text-format">
+<dt>text_format</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Flush application log in a format defined by a string. The text format
+can support all the format flags specified in the <a class="reference internal" href="../../../../operations/cli.html#cmdoption-log-format"><code class="xref std std-option docutils literal notranslate"><span class="pre">--log-format</span></code></a>
+command line option section.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-bootstrap-applicationlogconfig-logformat-json-format"><span class="std std-ref">json_format</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-bootstrap-applicationlogconfig-logformat-text-format"><span class="std std-ref">text_format</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-bootstrap-deferredstatoptions">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-bootstrap-deferredstatoptions"></span><h2>config.bootstrap.v3.Bootstrap.DeferredStatOptions<a class="headerlink" href="#config-bootstrap-v3-bootstrap-deferredstatoptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L125">[config.bootstrap.v3.Bootstrap.DeferredStatOptions proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;enable_deferred_creation_stats&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-deferredstatoptions-enable-deferred-creation-stats">
+<dt>enable_deferred_creation_stats</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) When the flag is enabled, Envoy will lazily initialize a subset of the stats (see below).
+This will save memory and CPU cycles when creating the objects that own these stats, if those
+stats are never referenced throughout the lifetime of the process. However, it will incur additional
+memory overhead for these objects, and a small increase of CPU usage when at least one of the stats
+is updated for the first time.</p>
+<p>Groups of stats that will be lazily initialized:</p>
+<ul class="simple">
+<li><p>Cluster traffic stats: a subgroup of the <a class="reference internal" href="../../../../configuration/upstream/cluster_manager/cluster_stats.html#config-cluster-manager-cluster-stats"><span class="std std-ref">cluster statistics</span></a>
+that are used when requests are routed to the cluster.</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-bootstrap-grpcasyncclientmanagerconfig">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-bootstrap-grpcasyncclientmanagerconfig"></span><h2>config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig<a class="headerlink" href="#config-bootstrap-v3-bootstrap-grpcasyncclientmanagerconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L139">[config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;max_cached_entry_idle_duration&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-bootstrap-grpcasyncclientmanagerconfig-max-cached-entry-idle-duration">
+<dt>max_cached_entry_idle_duration</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Optional field to set the expiration time for the cached gRPC client object.
+The minimal value is <code class="docutils literal notranslate"><span class="pre">5s</span></code> and the default is <code class="docutils literal notranslate"><span class="pre">50s</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-admin">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-admin"></span><h2>config.bootstrap.v3.Admin<a class="headerlink" href="#config-bootstrap-v3-admin" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L451">[config.bootstrap.v3.Admin proto]</a></p>
+<p>Administration interface <a class="reference internal" href="../../../../operations/admin.html#operations-admin-interface"><span class="std std-ref">operations documentation</span></a>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;access_log&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;access_log_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;profile_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;socket_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;ignore_global_conn_limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;allow_paths&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-admin-access-log">
+<dt>access_log</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../accesslog/v3/accesslog.proto.html#envoy-v3-api-msg-config-accesslog-v3-accesslog"><span class="std std-ref">config.accesslog.v3.AccessLog</span></a>) Configuration for <a class="reference internal" href="../../../../intro/arch_overview/observability/access_logging.html#arch-overview-access-logs"><span class="std std-ref">access logs</span></a>
+emitted by the administration server.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-admin-access-log-path">
+<dt>access_log_path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The path to write the access log for the administration server. If no
+access log is desired specify <code class="docutils literal notranslate"><span class="pre">/dev/null</span></code>. This is only required if
+<a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-admin-address"><span class="std std-ref">address</span></a> is set.
+Deprecated in favor of <code class="docutils literal notranslate"><span class="pre">access_log</span></code> which offers more options.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-admin-profile-path">
+<dt>profile_path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The CPU profiler output path for the administration server. If no profile
+path is specified, the default is <code class="docutils literal notranslate"><span class="pre">/var/log/envoy/envoy.prof</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-admin-address">
+<dt>address</dt><dd><p>(<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-address"><span class="std std-ref">config.core.v3.Address</span></a>) The TCP address that the administration server will listen on.
+If not specified, Envoy will not start an administration server.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-admin-socket-options">
+<dt>socket_options</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../core/v3/socket_option.proto.html#envoy-v3-api-msg-config-core-v3-socketoption"><span class="std std-ref">config.core.v3.SocketOption</span></a>) Additional socket options that may not be present in Envoy source code or
+precompiled binaries.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-admin-ignore-global-conn-limit">
+<dt>ignore_global_conn_limit</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates whether <a class="reference internal" href="../../../../configuration/operations/overload_manager/overload_manager.html#config-overload-manager-limiting-connections"><span class="std std-ref">global_downstream_max_connections</span></a>
+should apply to the admin interface or not.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-admin-allow-paths">
+<dt>allow_paths</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../type/matcher/v3/string.proto.html#envoy-v3-api-msg-type-matcher-v3-stringmatcher"><span class="std std-ref">type.matcher.v3.StringMatcher</span></a>) List of admin paths that are accessible. If not specified, all admin endpoints are accessible.
+Matchers are evaluated against the request path. For endpoints commonly queried with
+parameters (for example <code class="docutils literal notranslate"><span class="pre">/stats?format=...</span></code>), prefer <code class="docutils literal notranslate"><span class="pre">prefix</span></code> matchers.</p>
+<p>When specified, only paths in this list will be accessible, all others will return <code class="docutils literal notranslate"><span class="pre">HTTP</span> <span class="pre">403</span> <span class="pre">Forbidden</span></code>.</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">allow_paths</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/stats</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/config_dump</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ready</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/healthcheck</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-clustermanager">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-clustermanager"></span><h2>config.bootstrap.v3.ClusterManager<a class="headerlink" href="#config-bootstrap-v3-clustermanager" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L502">[config.bootstrap.v3.ClusterManager proto]</a></p>
+<p>Cluster manager <a class="reference internal" href="../../../../intro/arch_overview/upstream/cluster_manager.html#arch-overview-cluster-manager"><span class="std std-ref">architecture overview</span></a>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;local_cluster_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;outlier_detection&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;upstream_bind_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;load_stats_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;enable_deferred_cluster_creation&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-clustermanager-local-cluster-name">
+<dt>local_cluster_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Name of the local cluster (i.e., the cluster that owns the Envoy running
+this configuration). In order to enable <a class="reference internal" href="../../../../intro/arch_overview/upstream/load_balancing/zone_aware.html#arch-overview-load-balancing-zone-aware-routing"><span class="std std-ref">zone aware routing</span></a> this option must be set.
+If <code class="docutils literal notranslate"><span class="pre">local_cluster_name</span></code> is defined then <a class="reference internal" href="../../cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">clusters</span></a> must be defined in the <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-bootstrap-staticresources-clusters"><span class="std std-ref">Bootstrap
+static cluster resources</span></a>. This is unrelated to
+the <a class="reference internal" href="../../../../operations/cli.html#cmdoption-service-cluster"><code class="xref std std-option docutils literal notranslate"><span class="pre">--service-cluster</span></code></a> option which does not <a class="reference external" href="https://github.com/envoyproxy/envoy/issues/774">affect zone aware
+routing</a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-clustermanager-outlier-detection">
+<dt>outlier_detection</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-clustermanager-outlierdetection"><span class="std std-ref">config.bootstrap.v3.ClusterManager.OutlierDetection</span></a>) Optional global configuration for outlier detection.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-clustermanager-upstream-bind-config">
+<dt>upstream_bind_config</dt><dd><p>(<a class="reference internal" href="../../core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-bindconfig"><span class="std std-ref">config.core.v3.BindConfig</span></a>) Optional configuration used to bind newly established upstream connections.
+This may be overridden on a per-cluster basis by <code class="docutils literal notranslate"><span class="pre">upstream_bind_config</span></code> in the <code class="docutils literal notranslate"><span class="pre">cds_config</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-clustermanager-load-stats-config">
+<dt>load_stats_config</dt><dd><p>(<a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-apiconfigsource"><span class="std std-ref">config.core.v3.ApiConfigSource</span></a>) A management server endpoint to stream load stats to via
+<code class="docutils literal notranslate"><span class="pre">StreamLoadStats</span></code>. This must have <a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-field-config-core-v3-apiconfigsource-api-type"><span class="std std-ref">api_type</span></a> <a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-enum-value-config-core-v3-apiconfigsource-apitype-grpc"><span class="std std-ref">GRPC</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-clustermanager-enable-deferred-cluster-creation">
+<dt>enable_deferred_cluster_creation</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Whether the ClusterManager will create clusters on the worker threads
+inline during requests. This will save memory and CPU cycles in cases where
+there are lots of inactive clusters and <code class="docutils literal notranslate"><span class="pre">&gt;</span> <span class="pre">1</span></code> worker thread.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-clustermanager-outlierdetection">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-clustermanager-outlierdetection"></span><h2>config.bootstrap.v3.ClusterManager.OutlierDetection<a class="headerlink" href="#config-bootstrap-v3-clustermanager-outlierdetection" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L506">[config.bootstrap.v3.ClusterManager.OutlierDetection proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;event_log_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-clustermanager-outlierdetection-event-log-path">
+<dt>event_log_path</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Specifies the path to the outlier event log.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-watchdogs">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-watchdogs"></span><h2>config.bootstrap.v3.Watchdogs<a class="headerlink" href="#config-bootstrap-v3-watchdogs" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L552">[config.bootstrap.v3.Watchdogs proto]</a></p>
+<p>Allows you to specify different watchdog configs for different subsystems.
+This allows finer tuned policies for the watchdog. If a subsystem is omitted
+the default values for that system will be used.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;main_thread_watchdog&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;worker_watchdog&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-watchdogs-main-thread-watchdog">
+<dt>main_thread_watchdog</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-watchdog"><span class="std std-ref">config.bootstrap.v3.Watchdog</span></a>) Watchdog for the main thread.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-watchdogs-worker-watchdog">
+<dt>worker_watchdog</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-watchdog"><span class="std std-ref">config.bootstrap.v3.Watchdog</span></a>) Watchdog for the worker threads.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-watchdog">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-watchdog"></span><h2>config.bootstrap.v3.Watchdog<a class="headerlink" href="#config-bootstrap-v3-watchdog" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L564">[config.bootstrap.v3.Watchdog proto]</a></p>
+<p>Envoy process watchdog configuration. When configured, this monitors for
+nonresponsive threads and kills the process after the configured thresholds.
+See the <a class="reference internal" href="../../../../operations/performance.html#operations-performance-watchdog"><span class="std std-ref">watchdog documentation</span></a> for more information.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;actions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;miss_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;megamiss_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;kill_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_kill_timeout_jitter&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;multikill_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;multikill_threshold&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-watchdog-actions">
+<dt>actions</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-watchdog-watchdogaction"><span class="std std-ref">config.bootstrap.v3.Watchdog.WatchdogAction</span></a>) Register actions that will fire on given Watchdog events.
+See <code class="docutils literal notranslate"><span class="pre">WatchdogAction</span></code> for priority of events.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-watchdog-miss-timeout">
+<dt>miss_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The duration after which Envoy counts a nonresponsive thread in the
+<code class="docutils literal notranslate"><span class="pre">watchdog_miss</span></code> statistic. If not specified the default is <code class="docutils literal notranslate"><span class="pre">200ms</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-watchdog-megamiss-timeout">
+<dt>megamiss_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The duration after which Envoy counts a nonresponsive thread in the
+<code class="docutils literal notranslate"><span class="pre">watchdog_mega_miss</span></code> statistic. If not specified the default is <code class="docutils literal notranslate"><span class="pre">1000ms</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-watchdog-kill-timeout">
+<dt>kill_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) If a watched thread has been nonresponsive for this duration, assume a
+programming error and kill the entire Envoy process. Set to <code class="docutils literal notranslate"><span class="pre">0</span></code> to disable
+kill behavior. If not specified the default is <code class="docutils literal notranslate"><span class="pre">0</span></code> (disabled).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-watchdog-max-kill-timeout-jitter">
+<dt>max_kill_timeout_jitter</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Defines the maximum jitter used to adjust the <code class="docutils literal notranslate"><span class="pre">kill_timeout</span></code> if <code class="docutils literal notranslate"><span class="pre">kill_timeout</span></code> is
+enabled. Enabling this feature would help to reduce risk of synchronized
+watchdog kill events across proxies due to external triggers. Set to <code class="docutils literal notranslate"><span class="pre">0</span></code> to
+disable. If not specified the default is <code class="docutils literal notranslate"><span class="pre">0</span></code> (disabled).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-watchdog-multikill-timeout">
+<dt>multikill_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) If <code class="docutils literal notranslate"><span class="pre">max(2,</span> <span class="pre">ceil(registered_threads</span> <span class="pre">*</span> <span class="pre">Fraction(multikill_threshold)))</span></code>
+threads have been nonresponsive for at least this duration kill the entire
+Envoy process. Set to <code class="docutils literal notranslate"><span class="pre">0</span></code> to disable this behavior. If not specified the
+default is <code class="docutils literal notranslate"><span class="pre">0</span></code> (disabled).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-watchdog-multikill-threshold">
+<dt>multikill_threshold</dt><dd><p>(<a class="reference internal" href="../../../type/v3/percent.proto.html#envoy-v3-api-msg-type-v3-percent"><span class="std std-ref">type.v3.Percent</span></a>) Sets the threshold for <code class="docutils literal notranslate"><span class="pre">multikill_timeout</span></code> in terms of the percentage of
+nonresponsive threads required for the <code class="docutils literal notranslate"><span class="pre">multikill_timeout</span></code>.
+If not specified the default is <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-watchdog-watchdogaction">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-watchdog-watchdogaction"></span><h2>config.bootstrap.v3.Watchdog.WatchdogAction<a class="headerlink" href="#config-bootstrap-v3-watchdog-watchdogaction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L567">[config.bootstrap.v3.Watchdog.WatchdogAction proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;event&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-watchdog-watchdogaction-config">
+<dt>config</dt><dd><p>(<a class="reference internal" href="../../core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Extension specific configuration for the action.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-watchdog-watchdogaction-event">
+<dt>event</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-config-bootstrap-v3-watchdog-watchdogaction-watchdogevent"><span class="std std-ref">config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent</span></a>)</p>
+</dd>
+</dl>
+</section>
+<section id="enum-config-bootstrap-v3-watchdog-watchdogaction-watchdogevent">
+<span id="envoy-v3-api-enum-config-bootstrap-v3-watchdog-watchdogaction-watchdogevent"></span><h2>Enum config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent<a class="headerlink" href="#enum-config-bootstrap-v3-watchdog-watchdogaction-watchdogevent" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L574">[config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent proto]</a></p>
+<p>The events are fired in this order: <code class="docutils literal notranslate"><span class="pre">KILL</span></code>, <code class="docutils literal notranslate"><span class="pre">MULTIKILL</span></code>, <code class="docutils literal notranslate"><span class="pre">MEGAMISS</span></code>, <code class="docutils literal notranslate"><span class="pre">MISS</span></code>.
+Within an event type, actions execute in the order they are configured.
+For <code class="docutils literal notranslate"><span class="pre">KILL</span></code>/<code class="docutils literal notranslate"><span class="pre">MULTIKILL</span></code> there is a default <code class="docutils literal notranslate"><span class="pre">PANIC</span></code> that will run after the
+registered actions and kills the process if it wasn’t already killed.
+It might be useful to specify several debug actions, and possibly an
+alternate <code class="docutils literal notranslate"><span class="pre">FATAL</span></code> action.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-config-bootstrap-v3-watchdog-watchdogaction-watchdogevent-unknown">
+<dt>UNKNOWN</dt><dd><p><em>(DEFAULT)</em> ⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-bootstrap-v3-watchdog-watchdogaction-watchdogevent-kill">
+<dt>KILL</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-bootstrap-v3-watchdog-watchdogaction-watchdogevent-multikill">
+<dt>MULTIKILL</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-bootstrap-v3-watchdog-watchdogaction-watchdogevent-megamiss">
+<dt>MEGAMISS</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-bootstrap-v3-watchdog-watchdogaction-watchdogevent-miss">
+<dt>MISS</dt><dd><p>⁣</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-fatalaction">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-fatalaction"></span><h2>config.bootstrap.v3.FatalAction<a class="headerlink" href="#config-bootstrap-v3-fatalaction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L634">[config.bootstrap.v3.FatalAction proto]</a></p>
+<p>Fatal actions to run while crashing. Actions can be safe (meaning they are
+async-signal safe) or unsafe. We run all safe actions before we run unsafe actions.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If using an unsafe action that could get stuck or deadlock, it is important to
+have an out of band system to terminate the process.</p>
+</div>
+<p>The interface for the extension is <code class="docutils literal notranslate"><span class="pre">Envoy::Server::Configuration::FatalAction</span></code>.
+<code class="docutils literal notranslate"><span class="pre">FatalAction</span></code> extensions live in the <code class="docutils literal notranslate"><span class="pre">envoy.extensions.fatal_actions</span></code> API
+namespace.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-fatalaction-config">
+<dt>config</dt><dd><p>(<a class="reference internal" href="../../core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Extension specific configuration for the action. It’s expected to conform
+to the <code class="docutils literal notranslate"><span class="pre">Envoy::Server::Configuration::FatalAction</span></code> interface.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-runtime">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-runtime"></span><h2>config.bootstrap.v3.Runtime<a class="headerlink" href="#config-bootstrap-v3-runtime" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L641">[config.bootstrap.v3.Runtime proto]</a></p>
+<p>Runtime <a class="reference internal" href="../../../../configuration/operations/runtime.html#config-runtime"><span class="std std-ref">configuration overview</span></a> (deprecated).</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;symlink_root&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;subdirectory&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;override_subdirectory&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;base&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-runtime-symlink-root">
+<dt>symlink_root</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The implementation assumes that the file system tree is accessed via a
+symbolic link. An atomic link swap is used when a new tree should be
+switched to. This parameter specifies the path to the symbolic link. Envoy
+will watch the location for changes and reload the file system tree when
+they happen. If this parameter is not set, there will be no disk based
+runtime.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-runtime-subdirectory">
+<dt>subdirectory</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Specifies the subdirectory to load within the root directory. This is
+useful if multiple systems share the same delivery mechanism. Envoy
+configuration elements can be contained in a dedicated subdirectory.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-runtime-override-subdirectory">
+<dt>override_subdirectory</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Specifies an optional subdirectory to load within the root directory. If
+specified and the directory exists, configuration values within this
+directory will override those found in the primary subdirectory. This is
+useful when Envoy is deployed across many different types of servers.
+Sometimes it is useful to have a per service cluster directory for runtime
+configuration. See below for exactly how the override directory is used.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-runtime-base">
+<dt>base</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct">Struct</a>) Static base runtime. This will be <a class="reference internal" href="../../../../configuration/operations/runtime.html#config-runtime-layering"><span class="std std-ref">overridden</span></a> by other runtime layers, e.g.
+disk or admin. This follows the <a class="reference internal" href="../../../../configuration/operations/runtime.html#config-runtime-proto-json"><span class="std std-ref">runtime protobuf JSON representation
+encoding</span></a>.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-runtimelayer">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-runtimelayer"></span><h2>config.bootstrap.v3.RuntimeLayer<a class="headerlink" href="#config-bootstrap-v3-runtimelayer" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L673">[config.bootstrap.v3.RuntimeLayer proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;static_layer&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;disk_layer&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;admin_layer&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;rtds_layer&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-runtimelayer-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) Descriptive name for the runtime layer. This is only used for the runtime
+<a class="reference internal" href="../../../../operations/admin.html#get--runtime" title="GET /runtime"><code class="xref http http-get docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/runtime</span></code></a> output.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-runtimelayer-static-layer">
+<dt>static_layer</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct">Struct</a>) <a class="reference internal" href="../../../../configuration/operations/runtime.html#config-runtime-bootstrap"><span class="std std-ref">Static runtime</span></a> layer.
+This follows the <a class="reference internal" href="../../../../configuration/operations/runtime.html#config-runtime-proto-json"><span class="std std-ref">runtime protobuf JSON representation encoding</span></a>. Unlike static xDS resources, this static
+layer is overridable by later layers in the runtime virtual filesystem.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-static-layer"><span class="std std-ref">static_layer</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-disk-layer"><span class="std std-ref">disk_layer</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-admin-layer"><span class="std std-ref">admin_layer</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-rtds-layer"><span class="std std-ref">rtds_layer</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-runtimelayer-disk-layer">
+<dt>disk_layer</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-runtimelayer-disklayer"><span class="std std-ref">config.bootstrap.v3.RuntimeLayer.DiskLayer</span></a>)</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-static-layer"><span class="std std-ref">static_layer</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-disk-layer"><span class="std std-ref">disk_layer</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-admin-layer"><span class="std std-ref">admin_layer</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-rtds-layer"><span class="std std-ref">rtds_layer</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-runtimelayer-admin-layer">
+<dt>admin_layer</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-runtimelayer-adminlayer"><span class="std std-ref">config.bootstrap.v3.RuntimeLayer.AdminLayer</span></a>)</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-static-layer"><span class="std std-ref">static_layer</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-disk-layer"><span class="std std-ref">disk_layer</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-admin-layer"><span class="std std-ref">admin_layer</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-rtds-layer"><span class="std std-ref">rtds_layer</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-runtimelayer-rtds-layer">
+<dt>rtds_layer</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-runtimelayer-rtdslayer"><span class="std std-ref">config.bootstrap.v3.RuntimeLayer.RtdsLayer</span></a>)</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-static-layer"><span class="std std-ref">static_layer</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-disk-layer"><span class="std std-ref">disk_layer</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-admin-layer"><span class="std std-ref">admin_layer</span></a>, <a class="reference internal" href="#envoy-v3-api-field-config-bootstrap-v3-runtimelayer-rtds-layer"><span class="std std-ref">rtds_layer</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-runtimelayer-disklayer">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-runtimelayer-disklayer"></span><h2>config.bootstrap.v3.RuntimeLayer.DiskLayer<a class="headerlink" href="#config-bootstrap-v3-runtimelayer-disklayer" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L678">[config.bootstrap.v3.RuntimeLayer.DiskLayer proto]</a></p>
+<p><a class="reference internal" href="../../../../configuration/operations/runtime.html#config-runtime-local-disk"><span class="std std-ref">Disk runtime</span></a> layer.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;symlink_root&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;subdirectory&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;append_service_cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-runtimelayer-disklayer-symlink-root">
+<dt>symlink_root</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The implementation assumes that the file system tree is accessed via a
+symbolic link. An atomic link swap is used when a new tree should be
+switched to. This parameter specifies the path to the symbolic link.
+Envoy will watch the location for changes and reload the file system tree
+when they happen. See documentation on runtime <a class="reference internal" href="../../../../configuration/operations/runtime.html#config-runtime-atomicity"><span class="std std-ref">atomicity</span></a> for further details on how reloads are
+treated.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-runtimelayer-disklayer-subdirectory">
+<dt>subdirectory</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Specifies the subdirectory to load within the root directory. This is
+useful if multiple systems share the same delivery mechanism. Envoy
+configuration elements can be contained in a dedicated subdirectory.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-runtimelayer-disklayer-append-service-cluster">
+<dt>append_service_cluster</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) <a class="reference internal" href="../../../../configuration/operations/runtime.html#config-runtime-local-disk-service-cluster-subdirs"><span class="std std-ref">Append</span></a> the
+service cluster to the path under symlink root.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-runtimelayer-adminlayer">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-runtimelayer-adminlayer"></span><h2>config.bootstrap.v3.RuntimeLayer.AdminLayer<a class="headerlink" href="#config-bootstrap-v3-runtimelayer-adminlayer" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L702">[config.bootstrap.v3.RuntimeLayer.AdminLayer proto]</a></p>
+<p><a class="reference internal" href="../../../../configuration/operations/runtime.html#config-runtime-admin"><span class="std std-ref">Admin console runtime</span></a> layer.</p>
+</section>
+<section id="config-bootstrap-v3-runtimelayer-rtdslayer">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-runtimelayer-rtdslayer"></span><h2>config.bootstrap.v3.RuntimeLayer.RtdsLayer<a class="headerlink" href="#config-bootstrap-v3-runtimelayer-rtdslayer" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L708">[config.bootstrap.v3.RuntimeLayer.RtdsLayer proto]</a></p>
+<p><a class="reference internal" href="../../../../configuration/operations/runtime.html#config-runtime-rtds"><span class="std std-ref">Runtime Discovery Service (RTDS)</span></a> layer.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;rtds_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-runtimelayer-rtdslayer-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Resource to subscribe to at the <code class="docutils literal notranslate"><span class="pre">rtds_config</span></code> for the RTDS layer.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-runtimelayer-rtdslayer-rtds-config">
+<dt>rtds_config</dt><dd><p>(<a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">config.core.v3.ConfigSource</span></a>) RTDS configuration source.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-layeredruntime">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-layeredruntime"></span><h2>config.bootstrap.v3.LayeredRuntime<a class="headerlink" href="#config-bootstrap-v3-layeredruntime" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L741">[config.bootstrap.v3.LayeredRuntime proto]</a></p>
+<p>Runtime <a class="reference internal" href="../../../../configuration/operations/runtime.html#config-runtime"><span class="std std-ref">configuration overview</span></a>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;layers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-layeredruntime-layers">
+<dt>layers</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-config-bootstrap-v3-runtimelayer"><span class="std std-ref">config.bootstrap.v3.RuntimeLayer</span></a>) The <a class="reference internal" href="../../../../configuration/operations/runtime.html#config-runtime-layering"><span class="std std-ref">layers</span></a> of the runtime. This is ordered
+such that later layers in the list overlay earlier entries.</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-custominlineheader">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-custominlineheader"></span><h2>config.bootstrap.v3.CustomInlineHeader<a class="headerlink" href="#config-bootstrap-v3-custominlineheader" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L774">[config.bootstrap.v3.CustomInlineHeader proto]</a></p>
+<p>Used to specify the header that needs to be registered as an inline header.</p>
+<p>If request or response contain multiple headers with the same name and the header
+name is registered as an inline header, then multiple headers will be folded
+into one, and multiple header values will be concatenated by a suitable delimiter.
+The delimiter is generally a comma.</p>
+<p>For example, if <code class="docutils literal notranslate"><span class="pre">foo</span></code> is registered as an inline header, and the headers contain
+the following two headers:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>foo: bar
+foo: eep
+</pre></div>
+</div>
+<p>Then they will eventually be folded into:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>foo: bar, eep
+</pre></div>
+</div>
+<p>Inline headers provide O(1) search performance, but each inline header imposes
+an additional memory overhead on all instances of the corresponding type of
+HeaderMap or TrailerMap.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;inline_header_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;inline_header_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-custominlineheader-inline-header-name">
+<dt>inline_header_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The name of the header that is expected to be set as the inline header.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-custominlineheader-inline-header-type">
+<dt>inline_header_type</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-config-bootstrap-v3-custominlineheader-inlineheadertype"><span class="std std-ref">config.bootstrap.v3.CustomInlineHeader.InlineHeaderType</span></a>) The type of the header that is expected to be set as the inline header.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-config-bootstrap-v3-custominlineheader-inlineheadertype">
+<span id="envoy-v3-api-enum-config-bootstrap-v3-custominlineheader-inlineheadertype"></span><h2>Enum config.bootstrap.v3.CustomInlineHeader.InlineHeaderType<a class="headerlink" href="#enum-config-bootstrap-v3-custominlineheader-inlineheadertype" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L775">[config.bootstrap.v3.CustomInlineHeader.InlineHeaderType proto]</a></p>
+<dl class="simple" id="envoy-v3-api-enum-value-config-bootstrap-v3-custominlineheader-inlineheadertype-request-header">
+<dt>REQUEST_HEADER</dt><dd><p><em>(DEFAULT)</em> ⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-bootstrap-v3-custominlineheader-inlineheadertype-request-trailer">
+<dt>REQUEST_TRAILER</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-bootstrap-v3-custominlineheader-inlineheadertype-response-header">
+<dt>RESPONSE_HEADER</dt><dd><p>⁣</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-config-bootstrap-v3-custominlineheader-inlineheadertype-response-trailer">
+<dt>RESPONSE_TRAILER</dt><dd><p>⁣</p>
+</dd>
+</dl>
+</section>
+<section id="config-bootstrap-v3-memoryallocatormanager">
+<span id="envoy-v3-api-msg-config-bootstrap-v3-memoryallocatormanager"></span><h2>config.bootstrap.v3.MemoryAllocatorManager<a class="headerlink" href="#config-bootstrap-v3-memoryallocatormanager" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/bootstrap/v3/bootstrap.proto#L791">[config.bootstrap.v3.MemoryAllocatorManager proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;bytes_to_release&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;memory_release_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;soft_memory_limit_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_per_cpu_cache_size_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_unfreed_memory_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-memoryallocatormanager-bytes-to-release">
+<dt>bytes_to_release</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Configures tcmalloc to perform background release of free memory in amount of bytes per <code class="docutils literal notranslate"><span class="pre">memory_release_interval</span></code> interval.
+If equals to <code class="docutils literal notranslate"><span class="pre">0</span></code>, no memory release will occur. Defaults to <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-bootstrap-v3-memoryallocatormanager-memory-release-interval">
+<dt>memory_release_interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Interval in milliseconds for memory releasing. If specified, during every
+interval Envoy will try to release <code class="docutils literal notranslate"><span class="pre">bytes_to_release</span></code> of free memory back to operating system for reuse.
+Defaults to <code class="docutils literal notranslate"><span class="pre">1000</span></code> milliseconds.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-memoryallocatormanager-soft-memory-limit-bytes">
+<dt>soft_memory_limit_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint64value">UInt64Value</a>) Sets the soft memory limit for tcmalloc. When the total memory used by tcmalloc exceeds this
+limit, background release will be performed more aggressively to bring memory usage below the
+limit. If not set, no soft memory limit is applied.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is currently only supported with tcmalloc and not with <code class="docutils literal notranslate"><span class="pre">gperftools</span></code>.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-memoryallocatormanager-max-per-cpu-cache-size-bytes">
+<dt>max_per_cpu_cache_size_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) Sets the maximum per-CPU cache size in bytes for tcmalloc. Smaller values reduce per-CPU
+memory overhead at the cost of increased contention on the central free list. If not set,
+tcmalloc’s default is used.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is currently only supported with tcmalloc and not with <code class="docutils literal notranslate"><span class="pre">gperftools</span></code>.</p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-bootstrap-v3-memoryallocatormanager-max-unfreed-memory-bytes">
+<dt>max_unfreed_memory_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) The threshold of unfreed memory in bytes that triggers the heap shrinker to release memory
+back to the OS. When the difference between physical memory used and application-allocated
+memory exceeds this threshold, free memory is released.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">104857600</span></code> (100 MB).</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../../bootstrap/bootstrap.html" class="btn btn-neutral float-left" title="Bootstrap" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../../extensions/bootstrap/internal_listener/v3/internal_listener.proto.html" class="btn btn-neutral float-right" title="Internal Listener (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Bootstrap (proto)</a><ul>
+<li><a class="reference internal" href="#config-bootstrap-v3-bootstrap">config.bootstrap.v3.Bootstrap</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-bootstrap-staticresources">config.bootstrap.v3.Bootstrap.StaticResources</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-bootstrap-dynamicresources">config.bootstrap.v3.Bootstrap.DynamicResources</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-bootstrap-applicationlogconfig">config.bootstrap.v3.Bootstrap.ApplicationLogConfig</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-bootstrap-applicationlogconfig-logformat">config.bootstrap.v3.Bootstrap.ApplicationLogConfig.LogFormat</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-bootstrap-deferredstatoptions">config.bootstrap.v3.Bootstrap.DeferredStatOptions</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-bootstrap-grpcasyncclientmanagerconfig">config.bootstrap.v3.Bootstrap.GrpcAsyncClientManagerConfig</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-admin">config.bootstrap.v3.Admin</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-clustermanager">config.bootstrap.v3.ClusterManager</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-clustermanager-outlierdetection">config.bootstrap.v3.ClusterManager.OutlierDetection</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-watchdogs">config.bootstrap.v3.Watchdogs</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-watchdog">config.bootstrap.v3.Watchdog</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-watchdog-watchdogaction">config.bootstrap.v3.Watchdog.WatchdogAction</a></li>
+<li><a class="reference internal" href="#enum-config-bootstrap-v3-watchdog-watchdogaction-watchdogevent">Enum config.bootstrap.v3.Watchdog.WatchdogAction.WatchdogEvent</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-fatalaction">config.bootstrap.v3.FatalAction</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-runtime">config.bootstrap.v3.Runtime</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-runtimelayer">config.bootstrap.v3.RuntimeLayer</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-runtimelayer-disklayer">config.bootstrap.v3.RuntimeLayer.DiskLayer</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-runtimelayer-adminlayer">config.bootstrap.v3.RuntimeLayer.AdminLayer</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-runtimelayer-rtdslayer">config.bootstrap.v3.RuntimeLayer.RtdsLayer</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-layeredruntime">config.bootstrap.v3.LayeredRuntime</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-custominlineheader">config.bootstrap.v3.CustomInlineHeader</a></li>
+<li><a class="reference internal" href="#enum-config-bootstrap-v3-custominlineheader-inlineheadertype">Enum config.bootstrap.v3.CustomInlineHeader.InlineHeaderType</a></li>
+<li><a class="reference internal" href="#config-bootstrap-v3-memoryallocatormanager">config.bootstrap.v3.MemoryAllocatorManager</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

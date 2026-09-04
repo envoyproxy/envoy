@@ -1,0 +1,406 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/thrift_proxy/v3/route.proto:
+
+Thrift Proxy Route Configuration (proto)
+========================================
+
+
+Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteConfiguration:
+
+extensions.filters.network.thrift_proxy.v3.RouteConfiguration
+-------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.v3.RouteConfiguration proto] <api/envoy/extensions/filters/network/thrift_proxy/v3/route.proto#L22>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "routes": [],
+    "validate_clusters": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteConfiguration.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of the route configuration. This name is used in asynchronous route discovery.
+  For example, it might match
+  :ref:`route_config_name
+  <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.Trds.route_config_name>` in
+  :ref:`envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.Trds`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteConfiguration.routes:
+
+
+routes
+  (**repeated** :ref:`extensions.filters.network.thrift_proxy.v3.Route <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.Route>`) The list of routes that will be matched, in order, against incoming requests. The first route
+  that matches will be used.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteConfiguration.validate_clusters:
+
+
+validate_clusters
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) An optional boolean that specifies whether the clusters that the route
+  table refers to will be validated by the cluster manager. If set to true
+  and a route refers to a non-existent cluster, the route table will not
+  load. If set to false and a route refers to a non-existent cluster, the
+  route table will load and the router filter will return a INTERNAL_ERROR
+  if the route is selected at runtime. This setting defaults to true if the route table
+  is statically defined via the :ref:`route_config
+  <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.route_config>`
+  option. This setting default to false if the route table is loaded dynamically via the
+  :ref:`trds
+  <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.trds>`
+  option. Users may wish to override the default behavior in certain cases (for example when
+  using CDS with a static route table).
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.Route:
+
+extensions.filters.network.thrift_proxy.v3.Route
+------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.v3.Route proto] <api/envoy/extensions/filters/network/thrift_proxy/v3/route.proto#L53>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "match": {...},
+    "route": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.Route.match:
+
+
+match
+  (:ref:`extensions.filters.network.thrift_proxy.v3.RouteMatch <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteMatch>`, *REQUIRED*) Route matching parameters.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.Route.route:
+
+
+route
+  (:ref:`extensions.filters.network.thrift_proxy.v3.RouteAction <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteAction>`, *REQUIRED*) Route request to some upstream cluster.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteMatch:
+
+extensions.filters.network.thrift_proxy.v3.RouteMatch
+-----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.v3.RouteMatch proto] <api/envoy/extensions/filters/network/thrift_proxy/v3/route.proto#L64>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "method_name": ...,
+    "service_name": ...,
+    "invert": ...,
+    "headers": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.method_name:
+
+
+method_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If specified, the route must exactly match the request method name. As a special case, an
+  empty string matches any request method name.
+
+
+  
+
+  Precisely one of :ref:`method_name <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.method_name>`, :ref:`service_name <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.service_name>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.service_name:
+
+
+service_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If specified, the route must have the service name as the request method name prefix. As a
+  special case, an empty string matches any service name. Only relevant when service
+  multiplexing.
+
+
+  
+
+  Precisely one of :ref:`method_name <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.method_name>`, :ref:`service_name <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.service_name>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.invert:
+
+
+invert
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Inverts whatever matching is done in the :ref:`method_name
+  <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.method_name>` or
+  :ref:`service_name
+  <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.service_name>` fields.
+  Cannot be combined with wildcard matching as that would result in routes never being matched.
+
+  .. note::
+
+    This does not invert matching done as part of the :ref:`headers field
+    <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.headers>` field. To
+    invert header matching, see :ref:`invert_match
+    <envoy_v3_api_field_config.route.v3.HeaderMatcher.invert_match>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.headers:
+
+
+headers
+  (**repeated** :ref:`config.route.v3.HeaderMatcher <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`) Specifies a set of headers that the route should match on. The router will check the request’s
+  headers against all the specified headers in the route config. A match will happen if all the
+  headers in the route are present in the request with the same values (or based on presence if
+  the value field is not in the config). Note that this only applies for Thrift transports and/or
+  protocols that support headers.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteAction:
+
+extensions.filters.network.thrift_proxy.v3.RouteAction
+------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.v3.RouteAction proto] <api/envoy/extensions/filters/network/thrift_proxy/v3/route.proto#L104>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster": ...,
+    "weighted_clusters": {...},
+    "cluster_header": ...,
+    "metadata_match": {...},
+    "rate_limits": [],
+    "strip_service_name": ...,
+    "request_mirror_policies": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates a single upstream cluster to which the request should be routed
+  to.
+
+
+  
+
+  Precisely one of :ref:`cluster <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.cluster>`, :ref:`weighted_clusters <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.weighted_clusters>`, :ref:`cluster_header <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.cluster_header>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.weighted_clusters:
+
+
+weighted_clusters
+  (:ref:`extensions.filters.network.thrift_proxy.v3.WeightedCluster <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.WeightedCluster>`) Multiple upstream clusters can be specified for a given route. The
+  request is routed to one of the upstream clusters based on weights
+  assigned to each cluster.
+
+
+  
+
+  Precisely one of :ref:`cluster <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.cluster>`, :ref:`weighted_clusters <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.weighted_clusters>`, :ref:`cluster_header <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.cluster_header>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.cluster_header:
+
+
+cluster_header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Envoy will determine the cluster to route to by reading the value of the
+  Thrift header named by cluster_header from the request headers. If the
+  header is not found or the referenced cluster does not exist Envoy will
+  respond with an unknown method exception or an internal error exception,
+  respectively.
+
+
+  
+
+  Precisely one of :ref:`cluster <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.cluster>`, :ref:`weighted_clusters <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.weighted_clusters>`, :ref:`cluster_header <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.cluster_header>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.metadata_match:
+
+
+metadata_match
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
+  the upstream cluster with metadata matching what is set in this field will be considered.
+  Note that this will be merged with what's provided in :ref:`WeightedCluster.metadata_match
+  <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight.metadata_match>`,
+  with values there taking precedence. Keys and values should be provided under the "envoy.lb"
+  metadata key.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.rate_limits:
+
+
+rate_limits
+  (**repeated** :ref:`config.route.v3.RateLimit <envoy_v3_api_msg_config.route.v3.RateLimit>`) Specifies a set of rate limit configurations that could be applied to the route.
+  N.B. Thrift service or method name matching can be achieved by specifying a RequestHeaders
+  action with the header name ":method-name".
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.strip_service_name:
+
+
+strip_service_name
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Strip the service prefix from the method name, if there's a prefix. For
+  example, the method call Service:method would end up being just method.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.request_mirror_policies:
+
+
+request_mirror_policies
+  (**repeated** :ref:`extensions.filters.network.thrift_proxy.v3.RouteAction.RequestMirrorPolicy <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteAction.RequestMirrorPolicy>`) Indicates that the route has request mirroring policies.
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteAction.RequestMirrorPolicy:
+
+extensions.filters.network.thrift_proxy.v3.RouteAction.RequestMirrorPolicy
+--------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.v3.RouteAction.RequestMirrorPolicy proto] <api/envoy/extensions/filters/network/thrift_proxy/v3/route.proto#L116>`
+
+The router is capable of shadowing traffic from one cluster to another. The current
+implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
+respond before returning the response from the primary cluster. All normal statistics are
+collected for the shadow cluster making this feature useful for testing.
+
+.. note::
+
+  Shadowing will not be triggered if the primary cluster does not exist.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster": ...,
+    "runtime_fraction": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.RequestMirrorPolicy.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Specifies the cluster that requests will be mirrored to. The cluster must
+  exist in the cluster manager configuration when the route configuration is loaded.
+  If it disappears at runtime, the shadow request will silently be ignored.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.RequestMirrorPolicy.runtime_fraction:
+
+
+runtime_fraction
+  (:ref:`config.core.v3.RuntimeFractionalPercent <envoy_v3_api_msg_config.core.v3.RuntimeFractionalPercent>`) If not specified, all requests to the target cluster will be mirrored.
+
+  For some fraction N/D, a random number in the range [0,D) is selected. If the
+  number is <= the value of the numerator N, or if the key is not present, the default
+  value, the request will be mirrored.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.WeightedCluster:
+
+extensions.filters.network.thrift_proxy.v3.WeightedCluster
+----------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.v3.WeightedCluster proto] <api/envoy/extensions/filters/network/thrift_proxy/v3/route.proto#L175>`
+
+Allows for specification of multiple upstream clusters along with weights that indicate the
+percentage of traffic to be forwarded to each cluster. The router selects an upstream cluster
+based on these weights.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "clusters": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.WeightedCluster.clusters:
+
+
+clusters
+  (**repeated** :ref:`extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight>`, *REQUIRED*) Specifies one or more upstream clusters associated with the route.
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight:
+
+extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight
+------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight proto] <api/envoy/extensions/filters/network/thrift_proxy/v3/route.proto#L179>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "weight": {...},
+    "metadata_match": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Name of the upstream cluster.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight.weight:
+
+
+weight
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) When a request matches the route, the choice of an upstream cluster is determined by its
+  weight. The sum of weights across all entries in the clusters array determines the total
+  weight.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight.metadata_match:
+
+
+metadata_match
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
+  the upstream cluster with metadata matching what is set in this field, combined with what's
+  provided in :ref:`RouteAction's metadata_match
+  <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.metadata_match>`,
+  will be considered. Values here will take precedence. Keys and values should be provided
+  under the "envoy.lb" metadata key.
+
+
+

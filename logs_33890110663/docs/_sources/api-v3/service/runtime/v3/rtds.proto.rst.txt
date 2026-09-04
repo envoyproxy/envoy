@@ -1,0 +1,47 @@
+.. _envoy_v3_api_file_envoy/service/runtime/v3/rtds.proto:
+
+Runtime discovery service (RTDS) (proto)
+========================================
+
+
+RTDS :ref:`configuration overview <config_runtime_rtds>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_service.runtime.v3.Runtime:
+
+service.runtime.v3.Runtime
+--------------------------
+
+
+:repo:`[service.runtime.v3.Runtime proto] <api/envoy/service/runtime/v3/rtds.proto#L49>`
+
+RTDS resource type. This describes a layer in the runtime virtual filesystem.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "layer": {...}
+  }
+
+.. _envoy_v3_api_field_service.runtime.v3.Runtime.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Runtime resource name. This makes the Runtime a self-describing xDS
+  resource.
+
+
+.. _envoy_v3_api_field_service.runtime.v3.Runtime.layer:
+
+
+layer
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) 
+

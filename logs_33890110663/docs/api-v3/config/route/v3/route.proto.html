@@ -1,0 +1,444 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HTTP route configuration (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="HTTP scoped routing configuration (proto)" href="scoped_route.proto.html" />
+    <link rel="prev" title="HTTP route components (proto)" href="route_components.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../http_routes/http_routes.html">HTTP route management</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="route_components.proto.html">HTTP route components (proto)</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">HTTP route configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="scoped_route.proto.html">HTTP scoped routing configuration (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../config.html">Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../http_routes/http_routes.html">HTTP route management</a></li>
+      <li class="breadcrumb-item active">HTTP route configuration (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/config/route/v3/route.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="http-route-configuration-proto">
+<span id="envoy-v3-api-file-envoy-config-route-v3-route-proto"></span><h1>HTTP route configuration (proto)<a class="headerlink" href="#http-route-configuration-proto" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p>Routing <a class="reference internal" href="../../../../intro/arch_overview/http/http_routing.html#arch-overview-http-routing"><span class="std std-ref">architecture overview</span></a></p></li>
+<li><p>HTTP <a class="reference internal" href="../../../../configuration/http/http_filters/router_filter.html#config-http-filters-router"><span class="std std-ref">router filter</span></a></p></li>
+</ul>
+<section id="config-route-v3-routeconfiguration">
+<span id="envoy-v3-api-msg-config-route-v3-routeconfiguration"></span><h2>config.route.v3.RouteConfiguration<a class="headerlink" href="#config-route-v3-routeconfiguration" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/route/v3/route.proto#L26">[config.route.v3.RouteConfiguration proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;virtual_hosts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;vhds&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;internal_only_headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;response_headers_to_add&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;response_headers_to_remove&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;request_headers_to_add&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;request_headers_to_remove&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;most_specific_header_mutations_wins&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;validate_clusters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_direct_response_body_size_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;cluster_specifier_plugins&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;request_mirror_policies&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;ignore_port_in_host_matching&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;vhost_header&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;ignore_path_parameters_in_path_matching&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;typed_per_filter_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-name">
+<dt>name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The name of the route configuration. For example, it might match
+<a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-rds-route-config-name"><span class="std std-ref">route_config_name</span></a> in
+<a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-msg-extensions-filters-network-http-connection-manager-v3-rds"><span class="std std-ref">extensions.filters.network.http_connection_manager.v3.Rds</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-virtual-hosts">
+<dt>virtual_hosts</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="route_components.proto.html#envoy-v3-api-msg-config-route-v3-virtualhost"><span class="std std-ref">config.route.v3.VirtualHost</span></a>) An array of virtual hosts that make up the route table.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-vhds">
+<dt>vhds</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-config-route-v3-vhds"><span class="std std-ref">config.route.v3.Vhds</span></a>) An array of virtual hosts will be dynamically loaded via the VHDS API.
+Both <code class="docutils literal notranslate"><span class="pre">virtual_hosts</span></code> and <code class="docutils literal notranslate"><span class="pre">vhds</span></code> fields will be used when present. <code class="docutils literal notranslate"><span class="pre">virtual_hosts</span></code> can be used
+for a base routing table or for infrequently changing virtual hosts. <code class="docutils literal notranslate"><span class="pre">vhds</span></code> is used for
+on-demand discovery of virtual hosts. The contents of these two fields will be merged to
+generate a routing table for a given RouteConfiguration, with <code class="docutils literal notranslate"><span class="pre">vhds</span></code> derived configuration
+taking precedence.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-internal-only-headers">
+<dt>internal_only_headers</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optionally specifies a list of HTTP headers that the connection manager
+will consider to be internal only. If they are found on external requests they will be cleaned
+prior to filter invocation. See <a class="reference internal" href="../../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-envoy-internal"><span class="std std-ref">x-envoy-internal</span></a> for more
+information.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-response-headers-to-add">
+<dt>response_headers_to_add</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-headervalueoption"><span class="std std-ref">config.core.v3.HeaderValueOption</span></a>) Specifies a list of HTTP headers that should be added to each response that
+the connection manager encodes. Headers specified at this level are applied
+after headers from any enclosed <a class="reference internal" href="route_components.proto.html#envoy-v3-api-msg-config-route-v3-virtualhost"><span class="std std-ref">config.route.v3.VirtualHost</span></a> or
+<a class="reference internal" href="route_components.proto.html#envoy-v3-api-msg-config-route-v3-routeaction"><span class="std std-ref">config.route.v3.RouteAction</span></a>. For more information, including details on
+header value syntax, see the documentation on <a class="reference internal" href="../../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-custom-request-headers"><span class="std std-ref">custom request headers</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-response-headers-to-remove">
+<dt>response_headers_to_remove</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Specifies a list of HTTP headers that should be removed from each response
+that the connection manager encodes.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-request-headers-to-add">
+<dt>request_headers_to_add</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-headervalueoption"><span class="std std-ref">config.core.v3.HeaderValueOption</span></a>) Specifies a list of HTTP headers that should be added to each request
+routed by the HTTP connection manager. Headers specified at this level are
+applied after headers from any enclosed <a class="reference internal" href="route_components.proto.html#envoy-v3-api-msg-config-route-v3-virtualhost"><span class="std std-ref">config.route.v3.VirtualHost</span></a> or
+<a class="reference internal" href="route_components.proto.html#envoy-v3-api-msg-config-route-v3-routeaction"><span class="std std-ref">config.route.v3.RouteAction</span></a>. For more information, including details on
+header value syntax, see the documentation on <a class="reference internal" href="../../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-custom-request-headers"><span class="std std-ref">custom request headers</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-request-headers-to-remove">
+<dt>request_headers_to_remove</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Specifies a list of HTTP headers that should be removed from each request
+routed by the HTTP connection manager.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-most-specific-header-mutations-wins">
+<dt>most_specific_header_mutations_wins</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Headers mutations at all levels are evaluated, if specified. By default, the order is from most
+specific (i.e. route entry level) to least specific (i.e. route configuration level). Later header
+mutations may override earlier mutations.
+This order can be reversed by setting this field to true. In other words, most specific level mutation
+is evaluated last.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-validate-clusters">
+<dt>validate_clusters</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a>) An optional boolean that specifies whether the clusters that the route
+table refers to will be validated by the cluster manager. If set to true
+and a route refers to a non-existent cluster, the route table will not
+load. If set to false and a route refers to a non-existent cluster, the
+route table will load and the router filter will return a 404 if the route
+is selected at runtime. This setting defaults to true if the route table
+is statically defined via the <a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-route-config"><span class="std std-ref">route_config</span></a>
+option. This setting default to false if the route table is loaded dynamically via the
+<a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-rds"><span class="std std-ref">rds</span></a>
+option. Users may wish to override the default behavior in certain cases (for example when
+using CDS with a static route table).</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-route-v3-routeconfiguration-max-direct-response-body-size-bytes">
+<dt>max_direct_response_body_size_bytes</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) The maximum bytes of the response <a class="reference internal" href="route_components.proto.html#envoy-v3-api-field-config-route-v3-directresponseaction-body"><span class="std std-ref">direct response body</span></a> size. If not specified the default
+is 4096.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Envoy currently holds the content of <a class="reference internal" href="route_components.proto.html#envoy-v3-api-field-config-route-v3-directresponseaction-body"><span class="std std-ref">direct response body</span></a> in memory. Be careful setting
+this to be larger than the default 4KB, since the allocated memory for direct response body
+is not subject to data plane buffering controls.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-cluster-specifier-plugins">
+<dt>cluster_specifier_plugins</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="route_components.proto.html#envoy-v3-api-msg-config-route-v3-clusterspecifierplugin"><span class="std std-ref">config.route.v3.ClusterSpecifierPlugin</span></a>) A list of plugins and their configurations which may be used by a
+<a class="reference internal" href="route_components.proto.html#envoy-v3-api-field-config-route-v3-routeaction-cluster-specifier-plugin"><span class="std std-ref">cluster specifier plugin name</span></a>
+within the route. All <code class="docutils literal notranslate"><span class="pre">extension.name</span></code> fields in this list must be unique.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-request-mirror-policies">
+<dt>request_mirror_policies</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="route_components.proto.html#envoy-v3-api-msg-config-route-v3-routeaction-requestmirrorpolicy"><span class="std std-ref">config.route.v3.RouteAction.RequestMirrorPolicy</span></a>) Specify a set of default request mirroring policies which apply to all routes under its virtual hosts.
+Note that policies are not merged, the most specific non-empty one becomes the mirror policies.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-config-route-v3-routeconfiguration-ignore-port-in-host-matching">
+<dt>ignore_port_in_host_matching</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) By default, port in :authority header (if any) is used in host matching.
+With this option enabled, Envoy will ignore the port number in the :authority header (if any) when picking VirtualHost.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This option will not strip the port number (if any) contained in route config
+<a class="reference internal" href="route_components.proto.html#envoy-v3-api-msg-config-route-v3-virtualhost"><span class="std std-ref">config.route.v3.VirtualHost</span></a>.domains field.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-vhost-header">
+<dt>vhost_header</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Normally, virtual host matching is done using the :authority (or
+Host: in HTTP &lt; 2) HTTP header. Setting this will instead, use a
+different HTTP header for this purpose.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-ignore-path-parameters-in-path-matching">
+<dt>ignore_path_parameters_in_path_matching</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Ignore path-parameters in path-matching.
+Before RFC3986, URI were like(RFC1808): &lt;scheme&gt;://&lt;net_loc&gt;/&lt;path&gt;;&lt;params&gt;?&lt;query&gt;#&lt;fragment&gt;
+Envoy by default takes “:path” as “&lt;path&gt;;&lt;params&gt;”.
+For users who want to only match path on the “&lt;path&gt;” portion, this option should be true.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-typed-per-filter-config">
+<dt>typed_per_filter_config</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any">Any</a>&gt;) This field can be used to provide RouteConfiguration level per filter config. The key should match the
+<a class="reference internal" href="../../../extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpfilter-name"><span class="std std-ref">filter config name</span></a>.
+See <a class="reference internal" href="../../../../intro/arch_overview/http/http_filters.html#arch-overview-http-filters-per-filter-config"><span class="std std-ref">Http filter route specific config</span></a>
+for details.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-routeconfiguration-metadata">
+<dt>metadata</dt><dd><p>(<a class="reference internal" href="../../core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-metadata"><span class="std std-ref">config.core.v3.Metadata</span></a>) The metadata field can be used to provide additional information
+about the route configuration. It can be used for configuration, stats, and logging.
+The metadata should go under the filter namespace that will need it.
+For instance, if the metadata is intended for the Router filter,
+the filter name should be specified as <code class="docutils literal notranslate"><span class="pre">envoy.filters.http.router</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="config-route-v3-vhds">
+<span id="envoy-v3-api-msg-config-route-v3-vhds"></span><h2>config.route.v3.Vhds<a class="headerlink" href="#config-route-v3-vhds" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/config/route/v3/route.proto#L166">[config.route.v3.Vhds proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;config_source&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-config-route-v3-vhds-config-source">
+<dt>config_source</dt><dd><p>(<a class="reference internal" href="../../core/v3/config_source.proto.html#envoy-v3-api-msg-config-core-v3-configsource"><span class="std std-ref">config.core.v3.ConfigSource</span></a>, <em>REQUIRED</em>) Configuration source specifier for VHDS.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="route_components.proto.html" class="btn btn-neutral float-left" title="HTTP route components (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="scoped_route.proto.html" class="btn btn-neutral float-right" title="HTTP scoped routing configuration (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">HTTP route configuration (proto)</a><ul>
+<li><a class="reference internal" href="#config-route-v3-routeconfiguration">config.route.v3.RouteConfiguration</a></li>
+<li><a class="reference internal" href="#config-route-v3-vhds">config.route.v3.Vhds</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

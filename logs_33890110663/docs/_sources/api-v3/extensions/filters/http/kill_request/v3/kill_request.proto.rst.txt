@@ -1,0 +1,104 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/kill_request/v3/kill_request.proto:
+
+Kill Request (proto)
+====================
+
+.. _extension_envoy.filters.http.kill_request:
+
+This extension has the qualified name ``envoy.filters.http.kill_request``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.kill_request.v3.KillRequest <envoy_v3_api_msg_extensions.filters.http.kill_request.v3.KillRequest>`
+
+
+
+Kill Request :ref:`configuration overview <config_http_filters_kill_request>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.kill_request.v3.KillRequest:
+
+extensions.filters.http.kill_request.v3.KillRequest
+---------------------------------------------------
+
+
+:repo:`[extensions.filters.http.kill_request.v3.KillRequest proto] <api/envoy/extensions/filters/http/kill_request/v3/kill_request.proto#L20>`
+
+Configuration for KillRequest filter.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "probability": {...},
+    "kill_request_header": ...,
+    "direction": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.kill_request.v3.KillRequest.probability:
+
+
+probability
+  (:ref:`type.v3.FractionalPercent <envoy_v3_api_msg_type.v3.FractionalPercent>`) The probability that a Kill request will be triggered.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.kill_request.v3.KillRequest.kill_request_header:
+
+
+kill_request_header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of the kill request header. If this field is not empty, it will override the :ref:`default header <config_http_filters_kill_request_http_header>` name. Otherwise the default header name will be used.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.kill_request.v3.KillRequest.direction:
+
+
+direction
+  (:ref:`extensions.filters.http.kill_request.v3.KillRequest.Direction <envoy_v3_api_enum_extensions.filters.http.kill_request.v3.KillRequest.Direction>`) 
+
+.. _envoy_v3_api_enum_extensions.filters.http.kill_request.v3.KillRequest.Direction:
+
+Enum extensions.filters.http.kill_request.v3.KillRequest.Direction
+------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.kill_request.v3.KillRequest.Direction proto] <api/envoy/extensions/filters/http/kill_request/v3/kill_request.proto#L23>`
+
+On which direction should the filter check for the ``kill_request_header``.
+Default to ``REQUEST`` if unspecified.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.kill_request.v3.KillRequest.Direction.REQUEST:
+
+
+REQUEST
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.kill_request.v3.KillRequest.Direction.RESPONSE:
+
+
+RESPONSE
+  ⁣
+
+

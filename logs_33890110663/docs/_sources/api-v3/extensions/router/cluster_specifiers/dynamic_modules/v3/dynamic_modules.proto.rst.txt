@@ -1,0 +1,217 @@
+.. _envoy_v3_api_file_envoy/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.proto:
+
+Dynamic Modules Cluster Specifier (proto)
+=========================================
+
+.. _extension_envoy.router.cluster_specifier_plugin.dynamic_modules:
+
+This extension has the qualified name ``envoy.router.cluster_specifier_plugin.dynamic_modules``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.router.cluster_specifier_plugin <extension_category_envoy.router.cluster_specifier_plugin>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier <envoy_v3_api_msg_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier>`
+
+
+
+
+Dynamic modules cluster specifier :ref:`configuration reference documentation
+<config_http_cluster_specifier_dynamic_modules>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.router.cluster_specifiers.dynamic_modules.v3.RouteActionOverride:
+
+extensions.router.cluster_specifiers.dynamic_modules.v3.RouteActionOverride
+---------------------------------------------------------------------------
+
+
+:repo:`[extensions.router.cluster_specifiers.dynamic_modules.v3.RouteActionOverride proto] <api/envoy/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.proto#L33>`
+
+Route action properties that a dynamic module may select for a request in place of the properties
+of the matched route. These properties are themselves built from other extensions, such as retry
+host predicates and retry priorities, so they must be declared here in advance rather than chosen
+freely by the module on each request.
+
+Each entry is built and validated when the cluster specifier is configured, so an invalid entry
+is rejected at configuration load rather than on the request path. Every entry must replace at
+least one property, so an entry that builds to no replacement is rejected as well.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "retry_policy": {...},
+    "metadata_match": {...},
+    "request_mirror_policies": [],
+    "hash_policy": []
+  }
+
+.. _envoy_v3_api_field_extensions.router.cluster_specifiers.dynamic_modules.v3.RouteActionOverride.retry_policy:
+
+
+retry_policy
+  (:ref:`config.route.v3.RetryPolicy <envoy_v3_api_msg_config.route.v3.RetryPolicy>`) Retry policy replacing the retry policy of the matched route. If not specified, the retry
+  policy of the matched route is used, so an entry cannot be used to remove a retry policy that
+  the matched route configures.
+
+
+.. _envoy_v3_api_field_extensions.router.cluster_specifiers.dynamic_modules.v3.RouteActionOverride.metadata_match:
+
+
+metadata_match
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Metadata match criteria replacing the criteria of the matched route, used by subset load
+  balancing. Only the ``envoy.lb`` entry of :ref:`filter_metadata
+  <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>` is used, matching the behavior of
+  :ref:`RouteAction.metadata_match
+  <envoy_v3_api_field_config.route.v3.RouteAction.metadata_match>`. If not specified, or if there
+  is no ``envoy.lb`` entry, the criteria of the matched route are used, so an entry cannot be used
+  to remove the criteria that the matched route configures. An entry whose only property is a
+  ``metadata_match`` without an ``envoy.lb`` entry therefore replaces nothing and is rejected.
+
+
+.. _envoy_v3_api_field_extensions.router.cluster_specifiers.dynamic_modules.v3.RouteActionOverride.request_mirror_policies:
+
+
+request_mirror_policies
+  (**repeated** :ref:`config.route.v3.RouteAction.RequestMirrorPolicy <envoy_v3_api_msg_config.route.v3.RouteAction.RequestMirrorPolicy>`) Request mirroring policies replacing the request mirroring policies of the matched route. If
+  not specified, the request mirroring policies of the matched route are used, so an entry cannot
+  be used to turn off mirroring that the matched route configures. Statically named mirror
+  clusters are checked against the cluster manager when :ref:`validate_clusters
+  <envoy_v3_api_field_config.route.v3.RouteConfiguration.validate_clusters>` is enabled.
+
+
+.. _envoy_v3_api_field_extensions.router.cluster_specifiers.dynamic_modules.v3.RouteActionOverride.hash_policy:
+
+
+hash_policy
+  (**repeated** :ref:`config.route.v3.RouteAction.HashPolicy <envoy_v3_api_msg_config.route.v3.RouteAction.HashPolicy>`) Hash policy replacing the hash policy of the matched route, used when the upstream cluster
+  employs a hashing load balancer. If not specified, the hash policy of the matched route is used,
+  so an entry cannot be used to remove a hash policy that the matched route configures. A
+  cluster-level hash policy and a load-balancer-level hash policy, when configured, take precedence
+  over this route-level policy.
+
+
+
+.. _envoy_v3_api_msg_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier:
+
+extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier
+-------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier proto] <api/envoy/extensions/router/cluster_specifiers/dynamic_modules/v3/dynamic_modules.proto#L77>`
+
+Configuration for the Dynamic Modules Cluster Specifier. This cluster specifier allows loading
+shared object files via ``dlopen`` to select the upstream cluster for a request, and to replace
+the timeout, idle timeout, priority, request body buffer limit, cluster not found response code,
+hash policy, retry policy, metadata match criteria and request mirroring policies of the matched
+route.
+
+A module can be loaded by multiple cluster specifiers. It is loaded only once and shared across
+multiple cluster specifier instances. The module is invoked while the route is being
+resolved, so the selection is visible to the router without clearing the route cache. It is
+invoked again whenever a filter refreshes the route cluster, or a retry re-selects it when
+:ref:`refresh_cluster_on_retry
+<envoy_v3_api_field_config.route.v3.RetryPolicy.refresh_cluster_on_retry>` is set, so the module
+must be able to produce a decision from the request headers and the stream info alone.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "specifier_name": ...,
+    "specifier_config": {...},
+    "route_action_overrides": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`, *REQUIRED*) Specifies the shared-object level configuration. This field is required.
+
+  .. note::
+    This extension loads the module while the cluster specifier is configured, so it cannot wait
+    for an asynchronous fetch. A remote :ref:`module
+    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>` is therefore
+    accepted only when the module is already cached on disk, and is otherwise rejected. Setting
+    :ref:`nack_on_cache_miss
+    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.nack_on_cache_miss>` to
+    ``true`` makes the rejection start a background fetch so that a later update succeeds. Prefer
+    ``name`` or a local data source.
+
+
+.. _envoy_v3_api_field_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier.specifier_name:
+
+
+specifier_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name for this cluster specifier configuration. If not specified, defaults to an empty
+  string.
+
+  This can be used to distinguish between different cluster specifier implementations inside a
+  dynamic module. When Envoy receives this configuration, it passes the ``specifier_name`` to the
+  dynamic module's cluster specifier config init function together with the ``specifier_config``.
+  That way a module can decide which in-module implementation to use based on the name at load
+  time.
+
+
+.. _envoy_v3_api_field_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier.specifier_config:
+
+
+specifier_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the cluster specifier chosen by ``specifier_name``. If not specified, an
+  empty configuration is passed to the module.
+
+  ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly without
+  the wrapper.
+
+  .. code-block:: yaml
+
+   # Passing a JSON struct configuration
+   specifier_config:
+     "@type": "type.googleapis.com/google.protobuf.Struct"
+     value:
+       cluster_name_prefix: shard-
+
+   # Passing a simple string configuration
+   specifier_config:
+     "@type": "type.googleapis.com/google.protobuf.StringValue"
+     value: "shard-"
+
+
+
+.. _envoy_v3_api_field_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier.route_action_overrides:
+
+
+route_action_overrides
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.router.cluster_specifiers.dynamic_modules.v3.RouteActionOverride <envoy_v3_api_msg_extensions.router.cluster_specifiers.dynamic_modules.v3.RouteActionOverride>`>) Route action overrides that the module may select by name for a request. If not specified, the
+  module can only select the cluster, the timeout, the idle timeout, the priority, the request
+  body buffer limit and the cluster not found response code.
+
+
+
+

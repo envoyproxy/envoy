@@ -1,0 +1,65 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.proto:
+
+Filter state certificate mapper (proto)
+=======================================
+
+.. _extension_envoy.tls.upstream_certificate_mappers.filter_state_override:
+
+This extension has the qualified name ``envoy.tls.upstream_certificate_mappers.filter_state_override``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tls.upstream_certificate_mappers <extension_category_envoy.tls.upstream_certificate_mappers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config:
+
+extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config
+-----------------------------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config proto] <api/envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.proto#L18>`
+
+Uses a filter state value for the key ``envoy.tls.certificate_mappers.on_demand_secret`` as the
+secret resource name. This filter state is expected to be shared from the downstream connection.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "default_value": ...
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config.default_value:
+
+
+default_value
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The value to use as the secret name when the filter state is absent.
+
+

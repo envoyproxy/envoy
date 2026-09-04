@@ -1,0 +1,57 @@
+.. _envoy_v3_api_file_envoy/extensions/tracers/opentelemetry/resource_detectors/v3/dynatrace_resource_detector.proto:
+
+Dynatrace Resource Detector config (proto)
+==========================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.tracers.opentelemetry.resource_detectors.v3.DynatraceResourceDetectorConfig:
+
+extensions.tracers.opentelemetry.resource_detectors.v3.DynatraceResourceDetectorConfig
+--------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.tracers.opentelemetry.resource_detectors.v3.DynatraceResourceDetectorConfig proto] <api/envoy/extensions/tracers/opentelemetry/resource_detectors/v3/dynatrace_resource_detector.proto#L23>`
+
+Configuration for the Dynatrace Resource Detector extension.
+The resource detector reads from the Dynatrace enrichment files
+and adds host/process related attributes to the OpenTelemetry resource.
+
+See:
+
+`Enrich ingested data with Dynatrace-specific dimensions <https://docs.dynatrace.com/docs/shortlink/enrichment-files>`_
+
+
+.. _extension_envoy.tracers.opentelemetry.resource_detectors.dynatrace:
+
+This extension has the qualified name ``envoy.tracers.opentelemetry.resource_detectors.dynatrace``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers.opentelemetry.resource_detectors <extension_category_envoy.tracers.opentelemetry.resource_detectors>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.tracers.opentelemetry.resource_detectors.v3.DynatraceResourceDetectorConfig <envoy_v3_api_msg_extensions.tracers.opentelemetry.resource_detectors.v3.DynatraceResourceDetectorConfig>`
+
+
+
+
+

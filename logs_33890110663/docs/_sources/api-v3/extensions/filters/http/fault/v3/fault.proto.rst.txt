@@ -1,0 +1,318 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/fault/v3/fault.proto:
+
+Fault Injection (proto)
+=======================
+
+.. _extension_envoy.filters.http.fault:
+
+This extension has the qualified name ``envoy.filters.http.fault``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault <envoy_v3_api_msg_extensions.filters.http.fault.v3.HTTPFault>`
+
+
+
+Fault Injection :ref:`configuration overview <config_http_filters_fault_injection>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.fault.v3.FaultAbort:
+
+extensions.filters.http.fault.v3.FaultAbort
+-------------------------------------------
+
+
+:repo:`[extensions.filters.http.fault.v3.FaultAbort proto] <api/envoy/extensions/filters/http/fault/v3/fault.proto#L26>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "http_status": ...,
+    "grpc_status": ...,
+    "header_abort": {...},
+    "percentage": {...},
+    "response_body": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.http_status:
+
+
+http_status
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) HTTP status code to use to abort the HTTP request.
+
+
+  
+
+  Precisely one of :ref:`http_status <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.http_status>`, :ref:`grpc_status <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.grpc_status>`, :ref:`header_abort <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.header_abort>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.grpc_status:
+
+
+grpc_status
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) gRPC status code to use to abort the gRPC request.
+
+
+  
+
+  Precisely one of :ref:`http_status <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.http_status>`, :ref:`grpc_status <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.grpc_status>`, :ref:`header_abort <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.header_abort>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.header_abort:
+
+
+header_abort
+  (:ref:`extensions.filters.http.fault.v3.FaultAbort.HeaderAbort <envoy_v3_api_msg_extensions.filters.http.fault.v3.FaultAbort.HeaderAbort>`) Fault aborts are controlled via an HTTP header (if applicable).
+
+
+  
+
+  Precisely one of :ref:`http_status <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.http_status>`, :ref:`grpc_status <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.grpc_status>`, :ref:`header_abort <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.header_abort>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.percentage:
+
+
+percentage
+  (:ref:`type.v3.FractionalPercent <envoy_v3_api_msg_type.v3.FractionalPercent>`) The percentage of requests/operations/connections that will be aborted with the error code
+  provided.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.response_body:
+
+
+response_body
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The response body to be returned when aborting the request.
+  If not specified, defaults to "fault filter abort".
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.fault.v3.FaultAbort.HeaderAbort:
+
+extensions.filters.http.fault.v3.FaultAbort.HeaderAbort
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.fault.v3.FaultAbort.HeaderAbort proto] <api/envoy/extensions/filters/http/fault/v3/fault.proto#L33>`
+
+Fault aborts are controlled via an HTTP header (if applicable). See the
+:ref:`HTTP fault filter <config_http_filters_fault_injection_http_header>` documentation for
+more information.
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.fault.v3.HTTPFault:
+
+extensions.filters.http.fault.v3.HTTPFault
+------------------------------------------
+
+
+:repo:`[extensions.filters.http.fault.v3.HTTPFault proto] <api/envoy/extensions/filters/http/fault/v3/fault.proto#L63>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "delay": {...},
+    "abort": {...},
+    "upstream_cluster": ...,
+    "headers": [],
+    "downstream_nodes": [],
+    "max_active_faults": {...},
+    "response_rate_limit": {...},
+    "delay_percent_runtime": ...,
+    "abort_percent_runtime": ...,
+    "delay_duration_runtime": ...,
+    "abort_http_status_runtime": ...,
+    "max_active_faults_runtime": ...,
+    "response_rate_limit_percent_runtime": ...,
+    "abort_grpc_status_runtime": ...,
+    "disable_downstream_cluster_stats": ...,
+    "filter_metadata": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.delay:
+
+
+delay
+  (:ref:`extensions.filters.common.fault.v3.FaultDelay <envoy_v3_api_msg_extensions.filters.common.fault.v3.FaultDelay>`) If specified, the filter will inject delays based on the values in the
+  object.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.abort:
+
+
+abort
+  (:ref:`extensions.filters.http.fault.v3.FaultAbort <envoy_v3_api_msg_extensions.filters.http.fault.v3.FaultAbort>`) If specified, the filter will abort requests based on the values in
+  the object. At least ``abort`` or ``delay`` must be specified.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.upstream_cluster:
+
+
+upstream_cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the name of the (destination) upstream cluster that the
+  filter should match on. Fault injection will be restricted to requests
+  bound to the specific upstream cluster.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.headers:
+
+
+headers
+  (**repeated** :ref:`config.route.v3.HeaderMatcher <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`) Specifies a set of headers that the filter should match on. The fault
+  injection filter can be applied selectively to requests that match a set of
+  headers specified in the fault filter config. The chances of actual fault
+  injection further depend on the value of the :ref:`percentage
+  <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.percentage>` field.
+  The filter will check the request's headers against all the specified
+  headers in the filter config. A match will happen if all the headers in the
+  config are present in the request with the same values (or based on
+  presence if the ``value`` field is not in the config).
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.downstream_nodes:
+
+
+downstream_nodes
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Faults are injected for the specified list of downstream hosts. If this
+  setting is not set, faults are injected for all downstream nodes.
+  Downstream node name is taken from :ref:`the HTTP
+  x-envoy-downstream-service-node
+  <config_http_conn_man_headers_downstream-service-node>` header and compared
+  against downstream_nodes list.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.max_active_faults:
+
+
+max_active_faults
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The maximum number of faults that can be active at a single time via the configured fault
+  filter. Note that because this setting can be overridden at the route level, it's possible
+  for the number of active faults to be greater than this value (if injected via a different
+  route). If not specified, defaults to unlimited. This setting can be overridden via
+  ``runtime <config_http_filters_fault_injection_runtime>`` and any faults that are not injected
+  due to overflow will be indicated via the ``faults_overflow
+  <config_http_filters_fault_injection_stats>`` stat.
+
+  .. attention::
+    Like other :ref:`circuit breakers <arch_overview_circuit_break>` in Envoy, this is a fuzzy
+    limit. It's possible for the number of active faults to rise slightly above the configured
+    amount due to the implementation details.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.response_rate_limit:
+
+
+response_rate_limit
+  (:ref:`extensions.filters.common.fault.v3.FaultRateLimit <envoy_v3_api_msg_extensions.filters.common.fault.v3.FaultRateLimit>`) The response rate limit to be applied to the response body of the stream. When configured,
+  the percentage can be overridden by the :ref:`fault.http.rate_limit.response_percent
+  <config_http_filters_fault_injection_runtime>` runtime key.
+
+  .. attention::
+   This is a per-stream limit versus a connection level limit. This means that concurrent streams
+   will each get an independent limit.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.delay_percent_runtime:
+
+
+delay_percent_runtime
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  runtime. The default is: fault.http.delay.fixed_delay_percent
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.abort_percent_runtime:
+
+
+abort_percent_runtime
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  runtime. The default is: fault.http.abort.abort_percent
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.delay_duration_runtime:
+
+
+delay_duration_runtime
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  runtime. The default is: fault.http.delay.fixed_duration_ms
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.abort_http_status_runtime:
+
+
+abort_http_status_runtime
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  runtime. The default is: fault.http.abort.http_status
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.max_active_faults_runtime:
+
+
+max_active_faults_runtime
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  runtime. The default is: fault.http.max_active_faults
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.response_rate_limit_percent_runtime:
+
+
+response_rate_limit_percent_runtime
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  runtime. The default is: fault.http.rate_limit.response_percent
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.abort_grpc_status_runtime:
+
+
+abort_grpc_status_runtime
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The runtime key to override the :ref:`default <config_http_filters_fault_injection_runtime>`
+  runtime. The default is: fault.http.abort.grpc_status
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.disable_downstream_cluster_stats:
+
+
+disable_downstream_cluster_stats
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) To control whether stats storage is allocated dynamically for each downstream server.
+  If set to true, "x-envoy-downstream-service-cluster" field of header will be ignored by this filter.
+  If set to false, dynamic stats storage will be allocated for the downstream cluster name.
+  Default value is false.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.filter_metadata:
+
+
+filter_metadata
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) When an abort or delay fault is executed, the metadata struct provided here will be added to the
+  request's dynamic metadata under the namespace corresponding to the name of the fault filter.
+  This data can be logged as part of Access Logs using the :ref:`command operator
+  <config_access_log_command_operators>` %DYNAMIC_METADATA(NAMESPACE)%, where NAMESPACE is the name of
+  the fault filter.
+
+

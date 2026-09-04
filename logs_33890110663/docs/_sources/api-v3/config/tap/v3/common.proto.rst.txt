@@ -1,0 +1,679 @@
+.. _envoy_v3_api_file_envoy/config/tap/v3/common.proto:
+
+Tap common configuration (proto)
+================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.tap.v3.TapConfig:
+
+config.tap.v3.TapConfig
+-----------------------
+
+
+:repo:`[config.tap.v3.TapConfig proto] <api/envoy/config/tap/v3/common.proto#L27>`
+
+Tap configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "match_config": {...},
+    "match": {...},
+    "output_config": {...},
+    "tap_enabled": {...}
+  }
+
+.. _envoy_v3_api_field_config.tap.v3.TapConfig.match_config:
+
+
+match_config
+  (:ref:`config.tap.v3.MatchPredicate <envoy_v3_api_msg_config.tap.v3.MatchPredicate>`) The match configuration. If the configuration matches the data source being tapped, a tap will
+  occur, with the result written to the configured output.
+  Exactly one of :ref:`match <envoy_v3_api_field_config.tap.v3.TapConfig.match>` and
+  :ref:`match_config <envoy_v3_api_field_config.tap.v3.TapConfig.match_config>` must be set. If both
+  are set, the :ref:`match <envoy_v3_api_field_config.tap.v3.TapConfig.match>` will be used.
+
+
+.. _envoy_v3_api_field_config.tap.v3.TapConfig.match:
+
+
+match
+  (:ref:`config.common.matcher.v3.MatchPredicate <envoy_v3_api_msg_config.common.matcher.v3.MatchPredicate>`) The match configuration. If the configuration matches the data source being tapped, a tap will
+  occur, with the result written to the configured output.
+  Exactly one of :ref:`match <envoy_v3_api_field_config.tap.v3.TapConfig.match>` and
+  :ref:`match_config <envoy_v3_api_field_config.tap.v3.TapConfig.match_config>` must be set. If both
+  are set, the :ref:`match <envoy_v3_api_field_config.tap.v3.TapConfig.match>` will be used.
+
+
+.. _envoy_v3_api_field_config.tap.v3.TapConfig.output_config:
+
+
+output_config
+  (:ref:`config.tap.v3.OutputConfig <envoy_v3_api_msg_config.tap.v3.OutputConfig>`, *REQUIRED*) The tap output configuration. If a match configuration matches a data source being tapped,
+  a tap will occur and the data will be written to the configured output.
+
+
+.. _envoy_v3_api_field_config.tap.v3.TapConfig.tap_enabled:
+
+
+tap_enabled
+  (:ref:`config.core.v3.RuntimeFractionalPercent <envoy_v3_api_msg_config.core.v3.RuntimeFractionalPercent>`) Specifies the fraction of requests (HTTP tap filter) or connections (transport
+  socket tap) for which the tap match predicate is evaluated. When unset, every
+  request/connection proceeds to match evaluation (equivalent to sampling at 100%),
+  the runtime layer is not consulted, and ``configured_sample_rate`` is not set on
+  emitted traces. When set, only the configured fraction is matched; the remainder
+  is not tapped. The value can be overridden at runtime via :ref:`runtime_key
+  <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>`. The
+  configured sampling rate is recorded on the :ref:`configured_sample_rate
+  <envoy_v3_api_field_data.tap.v3.TraceWrapper.configured_sample_rate>` of the
+  first segment of each emitted trace.
+
+
+
+.. _envoy_v3_api_msg_config.tap.v3.MatchPredicate:
+
+config.tap.v3.MatchPredicate
+----------------------------
+
+
+:repo:`[config.tap.v3.MatchPredicate proto] <api/envoy/config/tap/v3/common.proto#L68>`
+
+Tap match configuration. This is a recursive structure which allows complex nested match
+configurations to be built using various logical operators.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "or_match": {...},
+    "and_match": {...},
+    "not_match": {...},
+    "any_match": ...,
+    "http_request_headers_match": {...},
+    "http_request_trailers_match": {...},
+    "http_response_headers_match": {...},
+    "http_response_trailers_match": {...},
+    "http_request_generic_body_match": {...},
+    "http_response_generic_body_match": {...}
+  }
+
+.. _envoy_v3_api_field_config.tap.v3.MatchPredicate.or_match:
+
+
+or_match
+  (:ref:`config.tap.v3.MatchPredicate.MatchSet <envoy_v3_api_msg_config.tap.v3.MatchPredicate.MatchSet>`) A set that describes a logical OR. If any member of the set matches, the match configuration
+  matches.
+
+
+  
+
+  Precisely one of :ref:`or_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.or_match>`, :ref:`and_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.and_match>`, :ref:`not_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.not_match>`, :ref:`any_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.any_match>`, :ref:`http_request_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_headers_match>`, :ref:`http_request_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_trailers_match>`, :ref:`http_response_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_headers_match>`, :ref:`http_response_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_trailers_match>`, :ref:`http_request_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_generic_body_match>`, :ref:`http_response_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_generic_body_match>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.MatchPredicate.and_match:
+
+
+and_match
+  (:ref:`config.tap.v3.MatchPredicate.MatchSet <envoy_v3_api_msg_config.tap.v3.MatchPredicate.MatchSet>`) A set that describes a logical AND. If all members of the set match, the match configuration
+  matches.
+
+
+  
+
+  Precisely one of :ref:`or_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.or_match>`, :ref:`and_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.and_match>`, :ref:`not_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.not_match>`, :ref:`any_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.any_match>`, :ref:`http_request_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_headers_match>`, :ref:`http_request_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_trailers_match>`, :ref:`http_response_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_headers_match>`, :ref:`http_response_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_trailers_match>`, :ref:`http_request_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_generic_body_match>`, :ref:`http_response_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_generic_body_match>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.MatchPredicate.not_match:
+
+
+not_match
+  (:ref:`config.tap.v3.MatchPredicate <envoy_v3_api_msg_config.tap.v3.MatchPredicate>`) A negation match. The match configuration will match if the negated match condition matches.
+
+
+  
+
+  Precisely one of :ref:`or_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.or_match>`, :ref:`and_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.and_match>`, :ref:`not_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.not_match>`, :ref:`any_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.any_match>`, :ref:`http_request_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_headers_match>`, :ref:`http_request_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_trailers_match>`, :ref:`http_response_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_headers_match>`, :ref:`http_response_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_trailers_match>`, :ref:`http_request_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_generic_body_match>`, :ref:`http_response_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_generic_body_match>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.MatchPredicate.any_match:
+
+
+any_match
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The match configuration will always match.
+
+
+  
+
+  Precisely one of :ref:`or_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.or_match>`, :ref:`and_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.and_match>`, :ref:`not_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.not_match>`, :ref:`any_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.any_match>`, :ref:`http_request_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_headers_match>`, :ref:`http_request_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_trailers_match>`, :ref:`http_response_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_headers_match>`, :ref:`http_response_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_trailers_match>`, :ref:`http_request_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_generic_body_match>`, :ref:`http_response_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_generic_body_match>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_headers_match:
+
+
+http_request_headers_match
+  (:ref:`config.tap.v3.HttpHeadersMatch <envoy_v3_api_msg_config.tap.v3.HttpHeadersMatch>`) HTTP request headers match configuration.
+
+
+  
+
+  Precisely one of :ref:`or_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.or_match>`, :ref:`and_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.and_match>`, :ref:`not_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.not_match>`, :ref:`any_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.any_match>`, :ref:`http_request_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_headers_match>`, :ref:`http_request_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_trailers_match>`, :ref:`http_response_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_headers_match>`, :ref:`http_response_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_trailers_match>`, :ref:`http_request_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_generic_body_match>`, :ref:`http_response_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_generic_body_match>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_trailers_match:
+
+
+http_request_trailers_match
+  (:ref:`config.tap.v3.HttpHeadersMatch <envoy_v3_api_msg_config.tap.v3.HttpHeadersMatch>`) HTTP request trailers match configuration.
+
+
+  
+
+  Precisely one of :ref:`or_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.or_match>`, :ref:`and_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.and_match>`, :ref:`not_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.not_match>`, :ref:`any_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.any_match>`, :ref:`http_request_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_headers_match>`, :ref:`http_request_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_trailers_match>`, :ref:`http_response_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_headers_match>`, :ref:`http_response_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_trailers_match>`, :ref:`http_request_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_generic_body_match>`, :ref:`http_response_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_generic_body_match>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_headers_match:
+
+
+http_response_headers_match
+  (:ref:`config.tap.v3.HttpHeadersMatch <envoy_v3_api_msg_config.tap.v3.HttpHeadersMatch>`) HTTP response headers match configuration.
+
+
+  
+
+  Precisely one of :ref:`or_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.or_match>`, :ref:`and_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.and_match>`, :ref:`not_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.not_match>`, :ref:`any_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.any_match>`, :ref:`http_request_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_headers_match>`, :ref:`http_request_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_trailers_match>`, :ref:`http_response_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_headers_match>`, :ref:`http_response_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_trailers_match>`, :ref:`http_request_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_generic_body_match>`, :ref:`http_response_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_generic_body_match>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_trailers_match:
+
+
+http_response_trailers_match
+  (:ref:`config.tap.v3.HttpHeadersMatch <envoy_v3_api_msg_config.tap.v3.HttpHeadersMatch>`) HTTP response trailers match configuration.
+
+
+  
+
+  Precisely one of :ref:`or_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.or_match>`, :ref:`and_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.and_match>`, :ref:`not_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.not_match>`, :ref:`any_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.any_match>`, :ref:`http_request_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_headers_match>`, :ref:`http_request_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_trailers_match>`, :ref:`http_response_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_headers_match>`, :ref:`http_response_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_trailers_match>`, :ref:`http_request_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_generic_body_match>`, :ref:`http_response_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_generic_body_match>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_generic_body_match:
+
+
+http_request_generic_body_match
+  (:ref:`config.tap.v3.HttpGenericBodyMatch <envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>`) HTTP request generic body match configuration.
+
+
+  
+
+  Precisely one of :ref:`or_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.or_match>`, :ref:`and_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.and_match>`, :ref:`not_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.not_match>`, :ref:`any_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.any_match>`, :ref:`http_request_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_headers_match>`, :ref:`http_request_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_trailers_match>`, :ref:`http_response_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_headers_match>`, :ref:`http_response_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_trailers_match>`, :ref:`http_request_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_generic_body_match>`, :ref:`http_response_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_generic_body_match>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_generic_body_match:
+
+
+http_response_generic_body_match
+  (:ref:`config.tap.v3.HttpGenericBodyMatch <envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>`) HTTP response generic body match configuration.
+
+
+  
+
+  Precisely one of :ref:`or_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.or_match>`, :ref:`and_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.and_match>`, :ref:`not_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.not_match>`, :ref:`any_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.any_match>`, :ref:`http_request_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_headers_match>`, :ref:`http_request_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_trailers_match>`, :ref:`http_response_headers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_headers_match>`, :ref:`http_response_trailers_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_trailers_match>`, :ref:`http_request_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_request_generic_body_match>`, :ref:`http_response_generic_body_match <envoy_v3_api_field_config.tap.v3.MatchPredicate.http_response_generic_body_match>` must be set.
+
+.. _envoy_v3_api_msg_config.tap.v3.MatchPredicate.MatchSet:
+
+config.tap.v3.MatchPredicate.MatchSet
+-------------------------------------
+
+
+:repo:`[config.tap.v3.MatchPredicate.MatchSet proto] <api/envoy/config/tap/v3/common.proto#L73>`
+
+A set of match configurations used for logical operations.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "rules": []
+  }
+
+.. _envoy_v3_api_field_config.tap.v3.MatchPredicate.MatchSet.rules:
+
+
+rules
+  (**repeated** :ref:`config.tap.v3.MatchPredicate <envoy_v3_api_msg_config.tap.v3.MatchPredicate>`, *REQUIRED*) The list of rules that make up the set.
+
+
+
+
+.. _envoy_v3_api_msg_config.tap.v3.HttpHeadersMatch:
+
+config.tap.v3.HttpHeadersMatch
+------------------------------
+
+
+:repo:`[config.tap.v3.HttpHeadersMatch proto] <api/envoy/config/tap/v3/common.proto#L119>`
+
+HTTP headers match configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "headers": []
+  }
+
+.. _envoy_v3_api_field_config.tap.v3.HttpHeadersMatch.headers:
+
+
+headers
+  (**repeated** :ref:`config.route.v3.HeaderMatcher <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`) HTTP headers to match.
+
+
+
+.. _envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch:
+
+config.tap.v3.HttpGenericBodyMatch
+----------------------------------
+
+
+:repo:`[config.tap.v3.HttpGenericBodyMatch proto] <api/envoy/config/tap/v3/common.proto#L137>`
+
+HTTP generic body match configuration.
+List of text strings and hex strings to be located in HTTP body.
+All specified strings must be found in the HTTP body for positive match.
+The search may be limited to specified number of bytes from the body start.
+
+.. attention::
+
+  Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, http body is scanned byte by byte to find a match.
+  If multiple patterns are specified, the process is repeated for each pattern. If location of a pattern is known, ``bytes_limit`` should be specified
+  to scan only part of the http body.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "bytes_limit": ...,
+    "patterns": []
+  }
+
+.. _envoy_v3_api_field_config.tap.v3.HttpGenericBodyMatch.bytes_limit:
+
+
+bytes_limit
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Limits search to specified number of bytes - default zero (no limit - match entire captured buffer).
+
+
+.. _envoy_v3_api_field_config.tap.v3.HttpGenericBodyMatch.patterns:
+
+
+patterns
+  (**repeated** :ref:`config.tap.v3.HttpGenericBodyMatch.GenericTextMatch <envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch.GenericTextMatch>`, *REQUIRED*) List of patterns to match.
+
+
+.. _envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch.GenericTextMatch:
+
+config.tap.v3.HttpGenericBodyMatch.GenericTextMatch
+---------------------------------------------------
+
+
+:repo:`[config.tap.v3.HttpGenericBodyMatch.GenericTextMatch proto] <api/envoy/config/tap/v3/common.proto#L138>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "string_match": ...,
+    "binary_match": ...
+  }
+
+.. _envoy_v3_api_field_config.tap.v3.HttpGenericBodyMatch.GenericTextMatch.string_match:
+
+
+string_match
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Text string to be located in HTTP body.
+
+
+  
+
+  Precisely one of :ref:`string_match <envoy_v3_api_field_config.tap.v3.HttpGenericBodyMatch.GenericTextMatch.string_match>`, :ref:`binary_match <envoy_v3_api_field_config.tap.v3.HttpGenericBodyMatch.GenericTextMatch.binary_match>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.HttpGenericBodyMatch.GenericTextMatch.binary_match:
+
+
+binary_match
+  (`bytes <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Sequence of bytes to be located in HTTP body.
+
+
+  
+
+  Precisely one of :ref:`string_match <envoy_v3_api_field_config.tap.v3.HttpGenericBodyMatch.GenericTextMatch.string_match>`, :ref:`binary_match <envoy_v3_api_field_config.tap.v3.HttpGenericBodyMatch.GenericTextMatch.binary_match>` must be set.
+
+
+
+.. _envoy_v3_api_msg_config.tap.v3.OutputConfig:
+
+config.tap.v3.OutputConfig
+--------------------------
+
+
+:repo:`[config.tap.v3.OutputConfig proto] <api/envoy/config/tap/v3/common.proto#L159>`
+
+Tap output configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "sinks": [],
+    "max_buffered_rx_bytes": {...},
+    "max_buffered_tx_bytes": {...},
+    "streaming": ...,
+    "min_streamed_sent_bytes": {...}
+  }
+
+.. _envoy_v3_api_field_config.tap.v3.OutputConfig.sinks:
+
+
+sinks
+  (**repeated** :ref:`config.tap.v3.OutputSink <envoy_v3_api_msg_config.tap.v3.OutputSink>`, *REQUIRED*) Output sinks for tap data. Currently a single sink is allowed in the list. Once multiple
+  sink types are supported this constraint will be relaxed.
+
+
+.. _envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_rx_bytes:
+
+
+max_buffered_rx_bytes
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) For buffered tapping, the maximum amount of received body that will be buffered prior to
+  truncation. If truncation occurs, the :ref:`truncated
+  <envoy_v3_api_field_data.tap.v3.Body.truncated>` field will be set. If not specified, the
+  default is 1KiB.
+
+
+.. _envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_tx_bytes:
+
+
+max_buffered_tx_bytes
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) For buffered tapping, the maximum amount of transmitted body that will be buffered prior to
+  truncation. If truncation occurs, the :ref:`truncated
+  <envoy_v3_api_field_data.tap.v3.Body.truncated>` field will be set. If not specified, the
+  default is 1KiB.
+
+
+.. _envoy_v3_api_field_config.tap.v3.OutputConfig.streaming:
+
+
+streaming
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates whether taps produce a single buffered message per tap, or multiple streamed
+  messages per tap in the emitted :ref:`TraceWrapper
+  <envoy_v3_api_msg_data.tap.v3.TraceWrapper>` messages. Note that streamed tapping does not
+  mean that no buffering takes place. Buffering may be required if data is processed before a
+  match can be determined. See the HTTP tap filter :ref:`streaming
+  <config_http_filters_tap_streaming>` documentation for more information.
+
+
+.. _envoy_v3_api_field_config.tap.v3.OutputConfig.min_streamed_sent_bytes:
+
+
+min_streamed_sent_bytes
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Tapped messages will be sent on each read/write event for streamed tapping by default.
+  But this behavior could be controlled by setting this field.
+  If set then the tapped messages will be send once the threshold is reached.
+  This could be used to avoid high frequent sending.
+
+
+
+.. _envoy_v3_api_msg_config.tap.v3.OutputSink:
+
+config.tap.v3.OutputSink
+------------------------
+
+
+:repo:`[config.tap.v3.OutputSink proto] <api/envoy/config/tap/v3/common.proto#L196>`
+
+Tap output sink configuration.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "format": ...,
+    "streaming_admin": {...},
+    "file_per_tap": {...},
+    "buffered_admin": {...},
+    "custom_sink": {...}
+  }
+
+.. _envoy_v3_api_field_config.tap.v3.OutputSink.format:
+
+
+format
+  (:ref:`config.tap.v3.OutputSink.Format <envoy_v3_api_enum_config.tap.v3.OutputSink.Format>`) Sink output format.
+
+
+.. _envoy_v3_api_field_config.tap.v3.OutputSink.streaming_admin:
+
+
+streaming_admin
+  (:ref:`config.tap.v3.StreamingAdminSink <envoy_v3_api_msg_config.tap.v3.StreamingAdminSink>`) Tap output will be streamed out the :http:post:`/tap` admin endpoint.
+
+  .. attention::
+
+    It is only allowed to specify the streaming admin output sink if the tap is being
+    configured from the :http:post:`/tap` admin endpoint. Thus, if an extension has
+    been configured to receive tap configuration from some other source (e.g., static
+    file, XDS, etc.) configuring the streaming admin output type will fail.
+
+
+  
+
+  Precisely one of :ref:`streaming_admin <envoy_v3_api_field_config.tap.v3.OutputSink.streaming_admin>`, :ref:`file_per_tap <envoy_v3_api_field_config.tap.v3.OutputSink.file_per_tap>`, :ref:`buffered_admin <envoy_v3_api_field_config.tap.v3.OutputSink.buffered_admin>`, :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.OutputSink.file_per_tap:
+
+
+file_per_tap
+  (:ref:`config.tap.v3.FilePerTapSink <envoy_v3_api_msg_config.tap.v3.FilePerTapSink>`) Tap output will be written to a file per tap sink.
+
+
+  
+
+  Precisely one of :ref:`streaming_admin <envoy_v3_api_field_config.tap.v3.OutputSink.streaming_admin>`, :ref:`file_per_tap <envoy_v3_api_field_config.tap.v3.OutputSink.file_per_tap>`, :ref:`buffered_admin <envoy_v3_api_field_config.tap.v3.OutputSink.buffered_admin>`, :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.OutputSink.buffered_admin:
+
+
+buffered_admin
+  (:ref:`config.tap.v3.BufferedAdminSink <envoy_v3_api_msg_config.tap.v3.BufferedAdminSink>`) Tap output will be buffered in a single block before flushing to the :http:post:`/tap` admin endpoint
+
+  .. attention::
+
+    It is only allowed to specify the buffered admin output sink if the tap is being
+    configured from the :http:post:`/tap` admin endpoint. Thus, if an extension has
+    been configured to receive tap configuration from some other source (e.g., static
+    file, XDS, etc.) configuring the buffered admin output type will fail.
+
+
+  
+
+  Precisely one of :ref:`streaming_admin <envoy_v3_api_field_config.tap.v3.OutputSink.streaming_admin>`, :ref:`file_per_tap <envoy_v3_api_field_config.tap.v3.OutputSink.file_per_tap>`, :ref:`buffered_admin <envoy_v3_api_field_config.tap.v3.OutputSink.buffered_admin>`, :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` must be set.
+
+.. _envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink:
+
+
+custom_sink
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Tap output filter will be defined by an extension type
+
+
+  
+
+  Precisely one of :ref:`streaming_admin <envoy_v3_api_field_config.tap.v3.OutputSink.streaming_admin>`, :ref:`file_per_tap <envoy_v3_api_field_config.tap.v3.OutputSink.file_per_tap>`, :ref:`buffered_admin <envoy_v3_api_field_config.tap.v3.OutputSink.buffered_admin>`, :ref:`custom_sink <envoy_v3_api_field_config.tap.v3.OutputSink.custom_sink>` must be set.
+
+.. _envoy_v3_api_enum_config.tap.v3.OutputSink.Format:
+
+Enum config.tap.v3.OutputSink.Format
+------------------------------------
+
+
+:repo:`[config.tap.v3.OutputSink.Format proto] <api/envoy/config/tap/v3/common.proto#L204>`
+
+Output format. All output is in the form of one or more :ref:`TraceWrapper
+<envoy_v3_api_msg_data.tap.v3.TraceWrapper>` messages. This enumeration indicates
+how those messages are written. Note that not all sinks support all output formats. See
+individual sink documentation for more information.
+
+
+
+.. _envoy_v3_api_enum_value_config.tap.v3.OutputSink.Format.JSON_BODY_AS_BYTES:
+
+
+JSON_BODY_AS_BYTES
+  *(DEFAULT)* ⁣Each message will be written as JSON. Any :ref:`body <envoy_v3_api_msg_data.tap.v3.Body>`
+  data will be present in the :ref:`as_bytes
+  <envoy_v3_api_field_data.tap.v3.Body.as_bytes>` field. This means that body data will be
+  base64 encoded as per the `proto3 JSON mappings
+  <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
+
+
+.. _envoy_v3_api_enum_value_config.tap.v3.OutputSink.Format.JSON_BODY_AS_STRING:
+
+
+JSON_BODY_AS_STRING
+  ⁣Each message will be written as JSON. Any :ref:`body <envoy_v3_api_msg_data.tap.v3.Body>`
+  data will be present in the :ref:`as_string
+  <envoy_v3_api_field_data.tap.v3.Body.as_string>` field. This means that body data will be
+  string encoded as per the `proto3 JSON mappings
+  <https://developers.google.com/protocol-buffers/docs/proto3#json>`_. This format type is
+  useful when it is known that that body is human readable (e.g., JSON over HTTP) and the
+  user wishes to view it directly without being forced to base64 decode the body.
+
+
+.. _envoy_v3_api_enum_value_config.tap.v3.OutputSink.Format.PROTO_BINARY:
+
+
+PROTO_BINARY
+  ⁣Binary proto format. Note that binary proto is not self-delimiting. If a sink writes
+  multiple binary messages without any length information the data stream will not be
+  useful. However, for certain sinks that are self-delimiting (e.g., one message per file)
+  this output format makes consumption simpler.
+
+
+.. _envoy_v3_api_enum_value_config.tap.v3.OutputSink.Format.PROTO_BINARY_LENGTH_DELIMITED:
+
+
+PROTO_BINARY_LENGTH_DELIMITED
+  ⁣Messages are written as a sequence tuples, where each tuple is the message length encoded
+  as a `protobuf 32-bit varint
+  <https://developers.google.com/protocol-buffers/docs/reference/cpp/google.protobuf.io.coded_stream>`_
+  followed by the binary message. The messages can be read back using the language specific
+  protobuf coded stream implementation to obtain the message length and the message.
+
+
+.. _envoy_v3_api_enum_value_config.tap.v3.OutputSink.Format.PROTO_TEXT:
+
+
+PROTO_TEXT
+  ⁣Text proto format.
+
+
+
+
+.. _envoy_v3_api_msg_config.tap.v3.StreamingAdminSink:
+
+config.tap.v3.StreamingAdminSink
+--------------------------------
+
+
+:repo:`[config.tap.v3.StreamingAdminSink proto] <api/envoy/config/tap/v3/common.proto#L278>`
+
+Streaming admin sink configuration.
+
+
+
+
+
+.. _envoy_v3_api_msg_config.tap.v3.BufferedAdminSink:
+
+config.tap.v3.BufferedAdminSink
+-------------------------------
+
+
+:repo:`[config.tap.v3.BufferedAdminSink proto] <api/envoy/config/tap/v3/common.proto#L287>`
+
+BufferedAdminSink configures a tap output to collect traces without returning them until
+one of multiple criteria are satisfied.
+Similar to StreamingAdminSink, it is only allowed to specify the buffered admin output
+sink if the tap is being configured from the ``/tap`` admin endpoint.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_traces": ...,
+    "timeout": {...}
+  }
+
+.. _envoy_v3_api_field_config.tap.v3.BufferedAdminSink.max_traces:
+
+
+max_traces
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Stop collecting traces when the specified number are collected.
+  If other criteria for ending collection are reached first, this value will not be used.
+
+
+.. _envoy_v3_api_field_config.tap.v3.BufferedAdminSink.timeout:
+
+
+timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Acts as a fallback to prevent the client from waiting for long periods of time.
+  After timeout has occurred, a buffer flush will be triggered, returning the traces buffered so far.
+  This may result in returning fewer traces than were requested, and in the case that no traces are
+  buffered during this time, no traces will be returned.
+  Specifying 0 for the timeout value (or not specifying a value at all) indicates an infinite timeout.
+
+
+
+.. _envoy_v3_api_msg_config.tap.v3.FilePerTapSink:
+
+config.tap.v3.FilePerTapSink
+----------------------------
+
+
+:repo:`[config.tap.v3.FilePerTapSink proto] <api/envoy/config/tap/v3/common.proto#L301>`
+
+The file per tap sink outputs a discrete file for every tapped stream.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "path_prefix": ...
+  }
+
+.. _envoy_v3_api_field_config.tap.v3.FilePerTapSink.path_prefix:
+
+
+path_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Path prefix. The output file will be of the form <path_prefix>_<id>.pb, where <id> is an
+  identifier distinguishing the recorded trace for stream instances (the Envoy
+  connection ID, HTTP stream ID, etc.).
+
+
+
+

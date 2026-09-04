@@ -1,0 +1,49 @@
+.. _envoy_v3_api_file_envoy/extensions/quic/connection_debug_visitor/v3/connection_debug_visitor_basic.proto:
+
+QUIC connection debug visitor basic config (proto)
+==================================================
+
+.. _extension_envoy.quic.connection_debug_visitor.basic:
+
+This extension has the qualified name ``envoy.quic.connection_debug_visitor.basic``
+
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.quic.connection_debug_visitor <extension_category_envoy.quic.connection_debug_visitor>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.quic.connection_debug_visitor.v3.BasicConfig <envoy_v3_api_msg_extensions.quic.connection_debug_visitor.v3.BasicConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.quic.connection_debug_visitor.v3.BasicConfig:
+
+extensions.quic.connection_debug_visitor.v3.BasicConfig
+-------------------------------------------------------
+
+
+:repo:`[extensions.quic.connection_debug_visitor.v3.BasicConfig proto] <api/envoy/extensions/quic/connection_debug_visitor/v3/connection_debug_visitor_basic.proto#L16>`
+
+Configuration for a basic QUIC connection debug visitor.
+
+
+
+

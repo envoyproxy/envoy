@@ -1,0 +1,21 @@
+Extension security: ``data_plane_agnostic``
+===========================================
+
+* :ref:`envoy.grpc_credentials.file_based_metadata <extension_envoy.grpc_credentials.file_based_metadata>` (alpha)
+* :ref:`envoy.key_value.file_based <extension_envoy.key_value.file_based>` (alpha)
+* :ref:`envoy.resource_monitors.cgroup_memory <extension_envoy.resource_monitors.cgroup_memory>` (alpha)
+* :ref:`envoy.resource_monitors.cpu_utilization <extension_envoy.resource_monitors.cpu_utilization>` (alpha)
+* :ref:`envoy.resource_monitors.fixed_heap <extension_envoy.resource_monitors.fixed_heap>` (alpha)
+* :ref:`envoy.resource_monitors.global_downstream_max_connections <extension_envoy.resource_monitors.global_downstream_max_connections>`
+* :ref:`envoy.resource_monitors.injected_resource <extension_envoy.resource_monitors.injected_resource>` (alpha)
+* :ref:`envoy.stat_sinks.dog_statsd <extension_envoy.stat_sinks.dog_statsd>`
+* :ref:`envoy.stat_sinks.graphite_statsd <extension_envoy.stat_sinks.graphite_statsd>` (alpha)
+* :ref:`envoy.stat_sinks.hystrix <extension_envoy.stat_sinks.hystrix>`
+* :ref:`envoy.stat_sinks.kafka <extension_envoy.stat_sinks.kafka>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.stat_sinks.metrics_service <extension_envoy.stat_sinks.metrics_service>`
+* :ref:`envoy.stat_sinks.open_telemetry <extension_envoy.stat_sinks.open_telemetry>` (alpha)
+* :ref:`envoy.stat_sinks.statsd <extension_envoy.stat_sinks.statsd>`
+* :ref:`envoy.stat_sinks.wasm <extension_envoy.stat_sinks.wasm>` (alpha)
+* :ref:`envoy.stat_sinks.wasm_filter <extension_envoy.stat_sinks.wasm_filter>` (alpha) (:ref:`contrib builds <install_contrib>` only)
+* :ref:`envoy.watchdog.backtrace_action <extension_envoy.watchdog.backtrace_action>` (alpha)
+* :ref:`envoy.watchdog.profile_action <extension_envoy.watchdog.profile_action>` (alpha)

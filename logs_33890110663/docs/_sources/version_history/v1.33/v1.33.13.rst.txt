@@ -1,0 +1,35 @@
+.. _version_history_1.33.13:
+
+1.33.13 (December 3, 2025)
+===========================
+
+
+
+
+Incompatible behavior changes
+-----------------------------
+
+*Changes that are expected to cause an incompatibility if applicable;
+deployment changes are likely required*
+
+
+
+* **http**: Added runtime flag ``envoy.reloadable_features.reject_early_connect_data`` to reject ``CONNECT`` requests
+  that receive data before Envoy sent a ``200`` response to the client. While this is not a strictly compliant behavior
+  it is very common as a latency reducing measure. As such the option is disabled by default.
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **http**: Fixed a remote ``jwt_auth`` token fetch crash with two or more auth headers when ``allow_missing_or_failed`` is set.
+* **tls**: Fixed an issue where SANs of type ``OTHERNAME`` in a TLS cert were truncated if there was
+  an embedded null octet, leading to incorrect SAN validation.
+

@@ -1,0 +1,68 @@
+.. _envoy_v3_api_file_envoy/extensions/tracers/opentelemetry/resource_detectors/v3/static_config_resource_detector.proto:
+
+Static Config Resource Detector config (proto)
+==============================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.tracers.opentelemetry.resource_detectors.v3.StaticConfigResourceDetectorConfig:
+
+extensions.tracers.opentelemetry.resource_detectors.v3.StaticConfigResourceDetectorConfig
+-----------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.tracers.opentelemetry.resource_detectors.v3.StaticConfigResourceDetectorConfig proto] <api/envoy/extensions/tracers/opentelemetry/resource_detectors/v3/static_config_resource_detector.proto#L19>`
+
+Configuration for the Static Resource detector extension.
+The resource detector uses static config for resource attribute,
+as per the OpenTelemetry specification.
+
+
+.. _extension_envoy.tracers.opentelemetry.resource_detectors.static_config:
+
+This extension has the qualified name ``envoy.tracers.opentelemetry.resource_detectors.static_config``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers.opentelemetry.resource_detectors <extension_category_envoy.tracers.opentelemetry.resource_detectors>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.tracers.opentelemetry.resource_detectors.v3.StaticConfigResourceDetectorConfig <envoy_v3_api_msg_extensions.tracers.opentelemetry.resource_detectors.v3.StaticConfigResourceDetectorConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "attributes": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.tracers.opentelemetry.resource_detectors.v3.StaticConfigResourceDetectorConfig.attributes:
+
+
+attributes
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_>) Custom Resource attributes to be included.
+
+
+
+

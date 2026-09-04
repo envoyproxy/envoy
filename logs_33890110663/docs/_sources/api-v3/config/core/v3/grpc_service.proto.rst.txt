@@ -1,0 +1,778 @@
+.. _envoy_v3_api_file_envoy/config/core/v3/grpc_service.proto:
+
+gRPC services (proto)
+=====================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService:
+
+config.core.v3.GrpcService
+--------------------------
+
+
+:repo:`[config.core.v3.GrpcService proto] <api/envoy/config/core/v3/grpc_service.proto#L28>`
+
+gRPC service configuration. This is used by :ref:`ApiConfigSource
+<envoy_v3_api_msg_config.core.v3.ApiConfigSource>` and filter configurations.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "envoy_grpc": {...},
+    "google_grpc": {...},
+    "timeout": {...},
+    "initial_metadata": [],
+    "retry_policy": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc:
+
+
+envoy_grpc
+  (:ref:`config.core.v3.GrpcService.EnvoyGrpc <envoy_v3_api_msg_config.core.v3.GrpcService.EnvoyGrpc>`) Envoy's in-built gRPC client.
+  See the :ref:`gRPC services overview <arch_overview_grpc_services>`
+  documentation for discussion on gRPC client selection.
+
+
+  
+
+  Precisely one of :ref:`envoy_grpc <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>`, :ref:`google_grpc <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.google_grpc:
+
+
+google_grpc
+  (:ref:`config.core.v3.GrpcService.GoogleGrpc <envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc>`) `Google C++ gRPC client <https://github.com/grpc/grpc>`_
+  See the :ref:`gRPC services overview <arch_overview_grpc_services>`
+  documentation for discussion on gRPC client selection.
+
+
+  
+
+  Precisely one of :ref:`envoy_grpc <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>`, :ref:`google_grpc <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.timeout:
+
+
+timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The timeout for the gRPC request. This is the timeout for a specific
+  request.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.initial_metadata:
+
+
+initial_metadata
+  (**repeated** :ref:`config.core.v3.HeaderValue <envoy_v3_api_msg_config.core.v3.HeaderValue>`) Additional metadata to include in streams initiated to the GrpcService. This can be used for
+  scenarios in which additional ad hoc authorization headers (e.g. ``x-foo-bar: baz-key``) are to
+  be injected. For more information, including details on header value syntax, see the
+  documentation on :ref:`custom request headers
+  <config_http_conn_man_headers_custom_request_headers>`.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.retry_policy:
+
+
+retry_policy
+  (:ref:`config.core.v3.RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>`) Optional default retry policy for RPCs or streams initiated toward this gRPC service.
+
+  If an async stream does not have a retry policy configured in its per‑stream options, this
+  policy is used as the default.
+
+  .. note::
+
+    This field is only applied by Envoy gRPC (``envoy_grpc``) clients. Google gRPC
+    (``google_grpc``) clients currently ignore this field.
+
+  If not specified, no default retry policy is applied at the client level and retries only occur
+  when explicitly configured in per‑stream options.
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService.EnvoyGrpc:
+
+config.core.v3.GrpcService.EnvoyGrpc
+------------------------------------
+
+
+:repo:`[config.core.v3.GrpcService.EnvoyGrpc proto] <api/envoy/config/core/v3/grpc_service.proto#L32>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster_name": ...,
+    "authority": ...,
+    "retry_policy": {...},
+    "max_receive_message_length": {...},
+    "skip_envoy_headers": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.EnvoyGrpc.cluster_name:
+
+
+cluster_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the upstream gRPC cluster. SSL credentials will be supplied
+  in the :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` :ref:`transport_socket
+  <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>`.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.EnvoyGrpc.authority:
+
+
+authority
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The ``:authority`` header in the grpc request. If this field is not set, the authority header value will be ``cluster_name``.
+  Note that this authority does not override the SNI. The SNI is provided by the transport socket of the cluster.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.EnvoyGrpc.retry_policy:
+
+
+retry_policy
+  (:ref:`config.core.v3.RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>`) Specifies the retry backoff policy for re-establishing long‑lived xDS gRPC streams.
+
+  This field is optional. If ``retry_back_off.max_interval`` is not provided, it will be set to
+  ten times the configured ``retry_back_off.base_interval``.
+
+  .. note::
+
+    This field is only honored for management‑plane xDS gRPC streams created from
+    :ref:`ApiConfigSource <envoy_v3_api_msg_config.core.v3.ApiConfigSource>` that use
+    ``envoy_grpc``. Data‑plane gRPC clients (for example external authorization or external
+    processing filters) must use :ref:`GrpcService.retry_policy
+    <envoy_v3_api_field_config.core.v3.GrpcService.retry_policy>` instead.
+
+  If not set, xDS gRPC streams default to a base interval of 500ms and a maximum interval of 30s.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.EnvoyGrpc.max_receive_message_length:
+
+
+max_receive_message_length
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Maximum gRPC message size that is allowed to be received.
+  If a message over this limit is received, the gRPC stream is terminated with the RESOURCE_EXHAUSTED error.
+  This limit is applied to individual messages in the streaming response and not the total size of streaming response.
+  Defaults to 0, which means unlimited.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.EnvoyGrpc.skip_envoy_headers:
+
+
+skip_envoy_headers
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) This provides gRPC client level control over envoy generated headers.
+  If false, the header will be sent but it can be overridden by per stream option.
+  If true, the header will be removed and can not be overridden by per stream option.
+  Default to false.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc:
+
+config.core.v3.GrpcService.GoogleGrpc
+-------------------------------------
+
+
+:repo:`[config.core.v3.GrpcService.GoogleGrpc proto] <api/envoy/config/core/v3/grpc_service.proto#L77>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "target_uri": ...,
+    "channel_credentials": {...},
+    "call_credentials": [],
+    "stat_prefix": ...,
+    "credentials_factory_name": ...,
+    "config": {...},
+    "per_stream_buffer_limit_bytes": {...},
+    "channel_args": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.target_uri:
+
+
+target_uri
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The target URI when using the `Google C++ gRPC client
+  <https://github.com/grpc/grpc>`_.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.channel_credentials:
+
+
+channel_credentials
+  (:ref:`config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials <envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials>`) The channel credentials to use. See `channel credentials
+  <https://grpc.io/docs/guides/auth.html#credential-types>`_.
+  Ignored if ``channel_credentials_plugin`` is set.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.call_credentials:
+
+
+call_credentials
+  (**repeated** :ref:`config.core.v3.GrpcService.GoogleGrpc.CallCredentials <envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.CallCredentials>`) The call credentials to use. See `channel credentials
+  <https://grpc.io/docs/guides/auth.html#credential-types>`_.
+  Ignored if ``call_credentials_plugin`` is set.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The human readable prefix to use when emitting statistics for the gRPC
+  service.
+
+  .. csv-table::
+     :header: Name, Type, Description
+     :widths: 1, 1, 2
+
+     streams_total, Counter, Total number of streams opened
+     streams_closed_<gRPC status code>, Counter, Total streams closed with <gRPC status code>
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.credentials_factory_name:
+
+
+credentials_factory_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of the Google gRPC credentials factory to use. This must have been registered with
+  Envoy. If this is empty, a default credentials factory will be used that sets up channel
+  credentials based on other configuration parameters.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.config:
+
+
+config
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) Additional configuration for site-specific customizations of the Google
+  gRPC library.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.per_stream_buffer_limit_bytes:
+
+
+per_stream_buffer_limit_bytes
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) How many bytes each stream can buffer internally.
+  If not set an implementation defined default is applied (1MiB).
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.channel_args:
+
+
+channel_args
+  (:ref:`config.core.v3.GrpcService.GoogleGrpc.ChannelArgs <envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.ChannelArgs>`) Custom channels args.
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.SslCredentials:
+
+config.core.v3.GrpcService.GoogleGrpc.SslCredentials
+----------------------------------------------------
+
+
+:repo:`[config.core.v3.GrpcService.GoogleGrpc.SslCredentials proto] <api/envoy/config/core/v3/grpc_service.proto#L82>`
+
+See https://grpc.io/grpc/cpp/structgrpc_1_1_ssl_credentials_options.html.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "root_certs": {...},
+    "private_key": {...},
+    "cert_chain": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.SslCredentials.root_certs:
+
+
+root_certs
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) PEM encoded server root certificates.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.SslCredentials.private_key:
+
+
+private_key
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) PEM encoded client private key.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.SslCredentials.cert_chain:
+
+
+cert_chain
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) PEM encoded client certificate chain.
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.GoogleLocalCredentials:
+
+config.core.v3.GrpcService.GoogleGrpc.GoogleLocalCredentials
+------------------------------------------------------------
+
+
+:repo:`[config.core.v3.GrpcService.GoogleGrpc.GoogleLocalCredentials proto] <api/envoy/config/core/v3/grpc_service.proto#L98>`
+
+Local channel credentials. Only UDS is supported for now.
+See https://github.com/grpc/grpc/pull/15909.
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials:
+
+config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials
+--------------------------------------------------------
+
+
+:repo:`[config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials proto] <api/envoy/config/core/v3/grpc_service.proto#L105>`
+
+See https://grpc.io/docs/guides/auth.html#credential-types to understand Channel and Call
+credential types.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "ssl_credentials": {...},
+    "google_default": {...},
+    "local_credentials": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials.ssl_credentials:
+
+
+ssl_credentials
+  (:ref:`config.core.v3.GrpcService.GoogleGrpc.SslCredentials <envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.SslCredentials>`) 
+  
+
+  Precisely one of :ref:`ssl_credentials <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials.ssl_credentials>`, :ref:`google_default <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials.google_default>`, :ref:`local_credentials <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials.local_credentials>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials.google_default:
+
+
+google_default
+  (`Empty <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#empty>`_) https://grpc.io/grpc/cpp/namespacegrpc.html#a6beb3ac70ff94bd2ebbd89b8f21d1f61
+
+
+  
+
+  Precisely one of :ref:`ssl_credentials <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials.ssl_credentials>`, :ref:`google_default <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials.google_default>`, :ref:`local_credentials <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials.local_credentials>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials.local_credentials:
+
+
+local_credentials
+  (:ref:`config.core.v3.GrpcService.GoogleGrpc.GoogleLocalCredentials <envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.GoogleLocalCredentials>`) 
+  
+
+  Precisely one of :ref:`ssl_credentials <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials.ssl_credentials>`, :ref:`google_default <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials.google_default>`, :ref:`local_credentials <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelCredentials.local_credentials>` must be set.
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.CallCredentials:
+
+config.core.v3.GrpcService.GoogleGrpc.CallCredentials
+-----------------------------------------------------
+
+
+:repo:`[config.core.v3.GrpcService.GoogleGrpc.CallCredentials proto] <api/envoy/config/core/v3/grpc_service.proto#L122>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "access_token": ...,
+    "google_compute_engine": {...},
+    "google_refresh_token": ...,
+    "service_account_jwt_access": {...},
+    "google_iam": {...},
+    "from_plugin": {...},
+    "sts_service": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.access_token:
+
+
+access_token
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Access token credentials.
+  https://grpc.io/grpc/cpp/namespacegrpc.html#ad3a80da696ffdaea943f0f858d7a360d.
+
+
+  
+
+  Precisely one of :ref:`access_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.access_token>`, :ref:`google_compute_engine <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_compute_engine>`, :ref:`google_refresh_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_refresh_token>`, :ref:`service_account_jwt_access <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.service_account_jwt_access>`, :ref:`google_iam <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_iam>`, :ref:`from_plugin <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.from_plugin>`, :ref:`sts_service <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.sts_service>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_compute_engine:
+
+
+google_compute_engine
+  (`Empty <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#empty>`_) Google Compute Engine credentials.
+  https://grpc.io/grpc/cpp/namespacegrpc.html#a6beb3ac70ff94bd2ebbd89b8f21d1f61
+
+
+  
+
+  Precisely one of :ref:`access_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.access_token>`, :ref:`google_compute_engine <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_compute_engine>`, :ref:`google_refresh_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_refresh_token>`, :ref:`service_account_jwt_access <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.service_account_jwt_access>`, :ref:`google_iam <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_iam>`, :ref:`from_plugin <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.from_plugin>`, :ref:`sts_service <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.sts_service>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_refresh_token:
+
+
+google_refresh_token
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Google refresh token credentials.
+  https://grpc.io/grpc/cpp/namespacegrpc.html#a96901c997b91bc6513b08491e0dca37c.
+
+
+  
+
+  Precisely one of :ref:`access_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.access_token>`, :ref:`google_compute_engine <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_compute_engine>`, :ref:`google_refresh_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_refresh_token>`, :ref:`service_account_jwt_access <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.service_account_jwt_access>`, :ref:`google_iam <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_iam>`, :ref:`from_plugin <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.from_plugin>`, :ref:`sts_service <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.sts_service>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.service_account_jwt_access:
+
+
+service_account_jwt_access
+  (:ref:`config.core.v3.GrpcService.GoogleGrpc.CallCredentials.ServiceAccountJWTAccessCredentials <envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.ServiceAccountJWTAccessCredentials>`) Service Account JWT Access credentials.
+  https://grpc.io/grpc/cpp/namespacegrpc.html#a92a9f959d6102461f66ee973d8e9d3aa.
+
+
+  
+
+  Precisely one of :ref:`access_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.access_token>`, :ref:`google_compute_engine <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_compute_engine>`, :ref:`google_refresh_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_refresh_token>`, :ref:`service_account_jwt_access <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.service_account_jwt_access>`, :ref:`google_iam <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_iam>`, :ref:`from_plugin <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.from_plugin>`, :ref:`sts_service <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.sts_service>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_iam:
+
+
+google_iam
+  (:ref:`config.core.v3.GrpcService.GoogleGrpc.CallCredentials.GoogleIAMCredentials <envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.GoogleIAMCredentials>`) Google IAM credentials.
+  https://grpc.io/grpc/cpp/namespacegrpc.html#a9fc1fc101b41e680d47028166e76f9d0.
+
+
+  
+
+  Precisely one of :ref:`access_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.access_token>`, :ref:`google_compute_engine <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_compute_engine>`, :ref:`google_refresh_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_refresh_token>`, :ref:`service_account_jwt_access <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.service_account_jwt_access>`, :ref:`google_iam <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_iam>`, :ref:`from_plugin <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.from_plugin>`, :ref:`sts_service <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.sts_service>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.from_plugin:
+
+
+from_plugin
+  (:ref:`config.core.v3.GrpcService.GoogleGrpc.CallCredentials.MetadataCredentialsFromPlugin <envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.MetadataCredentialsFromPlugin>`) Custom authenticator credentials.
+  https://grpc.io/grpc/cpp/namespacegrpc.html#a823c6a4b19ffc71fb33e90154ee2ad07.
+  https://grpc.io/docs/guides/auth.html#extending-grpc-to-support-other-authentication-mechanisms.
+
+
+  
+
+  Precisely one of :ref:`access_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.access_token>`, :ref:`google_compute_engine <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_compute_engine>`, :ref:`google_refresh_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_refresh_token>`, :ref:`service_account_jwt_access <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.service_account_jwt_access>`, :ref:`google_iam <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_iam>`, :ref:`from_plugin <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.from_plugin>`, :ref:`sts_service <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.sts_service>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.sts_service:
+
+
+sts_service
+  (:ref:`config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService <envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService>`) Custom security token service which implements OAuth 2.0 token exchange.
+  https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-16
+  See https://github.com/grpc/grpc/pull/19587.
+
+
+  
+
+  Precisely one of :ref:`access_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.access_token>`, :ref:`google_compute_engine <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_compute_engine>`, :ref:`google_refresh_token <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_refresh_token>`, :ref:`service_account_jwt_access <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.service_account_jwt_access>`, :ref:`google_iam <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.google_iam>`, :ref:`from_plugin <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.from_plugin>`, :ref:`sts_service <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.sts_service>` must be set.
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.ServiceAccountJWTAccessCredentials:
+
+config.core.v3.GrpcService.GoogleGrpc.CallCredentials.ServiceAccountJWTAccessCredentials
+----------------------------------------------------------------------------------------
+
+
+:repo:`[config.core.v3.GrpcService.GoogleGrpc.CallCredentials.ServiceAccountJWTAccessCredentials proto] <api/envoy/config/core/v3/grpc_service.proto#L126>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "json_key": ...,
+    "token_lifetime_seconds": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.ServiceAccountJWTAccessCredentials.json_key:
+
+
+json_key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.ServiceAccountJWTAccessCredentials.token_lifetime_seconds:
+
+
+token_lifetime_seconds
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.GoogleIAMCredentials:
+
+config.core.v3.GrpcService.GoogleGrpc.CallCredentials.GoogleIAMCredentials
+--------------------------------------------------------------------------
+
+
+:repo:`[config.core.v3.GrpcService.GoogleGrpc.CallCredentials.GoogleIAMCredentials proto] <api/envoy/config/core/v3/grpc_service.proto#L136>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "authorization_token": ...,
+    "authority_selector": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.GoogleIAMCredentials.authorization_token:
+
+
+authorization_token
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.GoogleIAMCredentials.authority_selector:
+
+
+authority_selector
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.MetadataCredentialsFromPlugin:
+
+config.core.v3.GrpcService.GoogleGrpc.CallCredentials.MetadataCredentialsFromPlugin
+-----------------------------------------------------------------------------------
+
+
+:repo:`[config.core.v3.GrpcService.GoogleGrpc.CallCredentials.MetadataCredentialsFromPlugin proto] <api/envoy/config/core/v3/grpc_service.proto#L145>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "typed_config": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.MetadataCredentialsFromPlugin.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.MetadataCredentialsFromPlugin.typed_config:
+
+
+typed_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) 
+  
+
+  .. _extension_category_envoy.grpc_credentials:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.grpc_credentials.file_based_metadata <extension_envoy.grpc_credentials.file_based_metadata>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService:
+
+config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService
+----------------------------------------------------------------
+
+
+:repo:`[config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService proto] <api/envoy/config/core/v3/grpc_service.proto#L167>`
+
+Security token service configuration that allows Google gRPC to
+fetch security token from an OAuth 2.0 authorization server.
+See https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-16 and
+https://github.com/grpc/grpc/pull/19587.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "token_exchange_service_uri": ...,
+    "resource": ...,
+    "audience": ...,
+    "scope": ...,
+    "requested_token_type": ...,
+    "subject_token_path": ...,
+    "subject_token_type": ...,
+    "actor_token_path": ...,
+    "actor_token_type": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService.token_exchange_service_uri:
+
+
+token_exchange_service_uri
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) URI of the token exchange service that handles token exchange requests.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService.resource:
+
+
+resource
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Location of the target service or resource where the client
+  intends to use the requested security token.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService.audience:
+
+
+audience
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Logical name of the target service where the client intends to
+  use the requested security token.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService.scope:
+
+
+scope
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The desired scope of the requested security token in the
+  context of the service or resource where the token will be used.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService.requested_token_type:
+
+
+requested_token_type
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Type of the requested security token.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService.subject_token_path:
+
+
+subject_token_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The path of subject token, a security token that represents the
+  identity of the party on behalf of whom the request is being made.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService.subject_token_type:
+
+
+subject_token_type
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Type of the subject token.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService.actor_token_path:
+
+
+actor_token_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The path of actor token, a security token that represents the identity
+  of the acting party. The acting party is authorized to use the
+  requested security token and act on behalf of the subject.
+
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentials.StsService.actor_token_type:
+
+
+actor_token_type
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Type of the actor token.
+
+
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.ChannelArgs:
+
+config.core.v3.GrpcService.GoogleGrpc.ChannelArgs
+-------------------------------------------------
+
+
+:repo:`[config.core.v3.GrpcService.GoogleGrpc.ChannelArgs proto] <api/envoy/config/core/v3/grpc_service.proto#L243>`
+
+Channel arguments.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "args": {...}
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.args:
+
+
+args
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value <envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value>`>) See grpc_types.h GRPC_ARG #defines for keys that work here.
+
+
+.. _envoy_v3_api_msg_config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value:
+
+config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value
+-------------------------------------------------------
+
+
+:repo:`[config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value proto] <api/envoy/config/core/v3/grpc_service.proto#L244>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "string_value": ...,
+    "int_value": ...
+  }
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value.string_value:
+
+
+string_value
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+  Pointer values are not supported, since they don't make any sense when
+  delivered via the API.
+
+
+  Precisely one of :ref:`string_value <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value.string_value>`, :ref:`int_value <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value.int_value>` must be set.
+
+.. _envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value.int_value:
+
+
+int_value
+  (`int64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) 
+  Pointer values are not supported, since they don't make any sense when
+  delivered via the API.
+
+
+  Precisely one of :ref:`string_value <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value.string_value>`, :ref:`int_value <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.ChannelArgs.Value.int_value>` must be set.
+
+
+
+
+
+

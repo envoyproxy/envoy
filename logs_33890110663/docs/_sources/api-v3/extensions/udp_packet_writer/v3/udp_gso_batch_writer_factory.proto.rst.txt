@@ -1,0 +1,49 @@
+.. _envoy_v3_api_file_envoy/extensions/udp_packet_writer/v3/udp_gso_batch_writer_factory.proto:
+
+UDP GSO batch packet writer config (proto)
+==========================================
+
+.. _extension_envoy.udp_packet_writer.gso:
+
+This extension has the qualified name ``envoy.udp_packet_writer.gso``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.udp_packet_writer <extension_category_envoy.udp_packet_writer>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory <envoy_v3_api_msg_extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory:
+
+extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory
+--------------------------------------------------------
+
+
+:repo:`[extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory proto] <api/envoy/extensions/udp_packet_writer/v3/udp_gso_batch_writer_factory.proto#L16>`
+
+Configuration for the UDP GSO batch packet writer factory.
+
+
+
+

@@ -1,0 +1,347 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Local reply modification &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Response Code Details" href="response_code_details.html" />
+    <link rel="prev" title="HTTP header sanitizing" href="header_sanitizing.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../configuration.html">Configuration reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../overview/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../http.html">HTTP</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="http_conn_man.html">HTTP connection manager</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="route_matching.html">Route matching</a></li>
+<li class="toctree-l4"><a class="reference internal" href="traffic_splitting.html">Traffic Shifting/Splitting</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_casing.html">HTTP/1.1 Header Casing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="headers.html">HTTP header manipulation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="header_sanitizing.html">HTTP header sanitizing</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Local reply modification</a></li>
+<li class="toctree-l4"><a class="reference internal" href="response_code_details.html">Response Code Details</a></li>
+<li class="toctree-l4"><a class="reference internal" href="stats.html">Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="runtime.html">Runtime</a></li>
+<li class="toctree-l4"><a class="reference internal" href="rds.html">Route discovery service (RDS)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="vhds.html">Virtual Host Discovery Service (VHDS)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../http_filters/http_filters.html">HTTP filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../caches/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../caches_v2/caches.html">HTTP caches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../cluster_specifier/cluster_specifier.html">HTTP cluster specifier</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tcp_bridge/tcp_bridge.html">HTTP TCP bridge</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../observability/observability.html">Observability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../security/security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../operations/operations.html">Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../advanced/advanced.html">Advanced</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../best_practices/best_practices.html">Configuration best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../configuration.html">Configuration reference</a></li>
+          <li class="breadcrumb-item"><a href="../http.html">HTTP</a></li>
+          <li class="breadcrumb-item"><a href="http_conn_man.html">HTTP connection manager</a></li>
+      <li class="breadcrumb-item active">Local reply modification</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/configuration/http/http_conn_man/local_reply.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="local-reply-modification">
+<span id="config-http-conn-man-local-reply"></span><h1>Local reply modification<a class="headerlink" href="#local-reply-modification" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="../../../intro/arch_overview/http/http_connection_management.html#arch-overview-http-conn-man"><span class="std std-ref">HTTP connection manager</span></a> supports modification of local reply which is response returned by Envoy itself.</p>
+<p>Features:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#config-http-conn-man-local-reply-modification"><span class="std std-ref">Local reply content modification</span></a>.</p></li>
+<li><p><a class="reference internal" href="#config-http-conn-man-local-reply-format"><span class="std std-ref">Local reply format modification</span></a>.</p></li>
+</ul>
+<section id="local-reply-content-modification">
+<span id="config-http-conn-man-local-reply-modification"></span><h2>Local reply content modification<a class="headerlink" href="#local-reply-content-modification" title="Link to this heading"></a></h2>
+<p>The local response content returned by Envoy can be customized. A list of <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-localreplyconfig-mappers"><span class="std std-ref">mappers</span></a> can be specified. Each mapper must have a <a class="reference internal" href="../../../api-v3/config/accesslog/v3/accesslog.proto.html#envoy-v3-api-field-config-accesslog-v3-accesslog-filter"><span class="std std-ref">filter</span></a>. It may have following rewrite rules; a <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-responsemapper-status-code"><span class="std std-ref">status_code</span></a> rule to rewrite response code, a <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-responsemapper-headers-to-add"><span class="std std-ref">headers_to_add</span></a> rule to add/override/append response HTTP headers, a <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-responsemapper-body"><span class="std std-ref">body</span></a> rule to rewrite the local reply body and a <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-responsemapper-body-format-override"><span class="std std-ref">body_format_override</span></a> to specify the response body format. Envoy checks each <code class="docutils literal notranslate"><span class="pre">mapper</span></code> according to the specified order until the first one is matched. If a <code class="docutils literal notranslate"><span class="pre">mapper</span></code> is matched, all its rewrite rules will apply in the following order:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">body</span></code> — the static response body text is set.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">headers_to_add</span></code> — response headers are evaluated. Substitution variables such as <code class="docutils literal notranslate"><span class="pre">%RESPONSE_CODE%</span></code> resolve to the <strong>original</strong> response code at this point.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">status_code</span></code> — the response code is rewritten. This updates both the response headers and the stream info.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">body_format_override</span></code> (or the fallback <code class="docutils literal notranslate"><span class="pre">body_format</span></code>) — the response body is formatted. Substitution variables such as <code class="docutils literal notranslate"><span class="pre">%RESPONSE_CODE%</span></code> resolve to the <strong>overridden</strong> response code.</p></li>
+</ol>
+<p>Because of this ordering, <code class="docutils literal notranslate"><span class="pre">%RESPONSE_CODE%</span></code> can have different values in <code class="docutils literal notranslate"><span class="pre">headers_to_add</span></code> (original code) and <code class="docutils literal notranslate"><span class="pre">body_format_override</span></code> (overridden code). If you need the original response code in the body, you can capture it in a response header via <code class="docutils literal notranslate"><span class="pre">headers_to_add</span></code> and reference it in the body format using <code class="docutils literal notranslate"><span class="pre">%RESP(header-name)%</span></code>.</p>
+<p>Example of a LocalReplyConfig</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">mappers</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filter</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">status_code_filter</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">comparison</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">op</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EQ</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">default_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">400</span>
+<span class="w">          </span><span class="nt">runtime_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key_b</span>
+<span class="w">  </span><span class="nt">headers_to_add</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">header</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;foo&quot;</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;bar&quot;</span>
+<span class="w">      </span><span class="nt">append_action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">OVERWRITE_IF_EXISTS_OR_ADD</span>
+<span class="w">  </span><span class="nt">status_code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">401</span>
+<span class="w">  </span><span class="nt">body</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">inline_string</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;not</span><span class="nv"> </span><span class="s">allowed&quot;</span>
+</pre></div>
+</div>
+<p>In above example, if the status_code is 400,  it will be rewritten to 401, the response body will be rewritten to as “not allowed”.</p>
+</section>
+<section id="local-reply-format-modification">
+<span id="config-http-conn-man-local-reply-format"></span><h2>Local reply format modification<a class="headerlink" href="#local-reply-format-modification" title="Link to this heading"></a></h2>
+<p>The response body content type can be customized. If not specified, the content type is plain/text. There are two <code class="docutils literal notranslate"><span class="pre">body_format</span></code> fields; one is the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-localreplyconfig-body-format"><span class="std std-ref">body_format</span></a> field in the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-msg-extensions-filters-network-http-connection-manager-v3-localreplyconfig"><span class="std std-ref">LocalReplyConfig</span></a> message and the other <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-responsemapper-body-format-override"><span class="std std-ref">body_format_override</span></a> field in the <code class="docutils literal notranslate"><span class="pre">mapper</span></code>. The latter is only used when its mapper is matched. The former is used if there is no any matched mappers, or the matched mapper doesn’t have the <code class="docutils literal notranslate"><span class="pre">body_format</span></code> specified.</p>
+<p>Local reply format can be specified as <a class="reference internal" href="../../../api-v3/config/core/v3/substitution_format_string.proto.html#envoy-v3-api-msg-config-core-v3-substitutionformatstring"><span class="std std-ref">SubstitutionFormatString</span></a>. It supports <a class="reference internal" href="../../../api-v3/config/core/v3/substitution_format_string.proto.html#envoy-v3-api-field-config-core-v3-substitutionformatstring-text-format"><span class="std std-ref">text_format</span></a> and <a class="reference internal" href="../../../api-v3/config/core/v3/substitution_format_string.proto.html#envoy-v3-api-field-config-core-v3-substitutionformatstring-json-format"><span class="std std-ref">json_format</span></a>.</p>
+<p>Optionally, content-type can be modified further via <a class="reference internal" href="../../../api-v3/config/core/v3/substitution_format_string.proto.html#envoy-v3-api-field-config-core-v3-substitutionformatstring-content-type"><span class="std std-ref">content_type</span></a> field. If not specified, default content-type is <code class="docutils literal notranslate"><span class="pre">text/plain</span></code> for <a class="reference internal" href="../../../api-v3/config/core/v3/substitution_format_string.proto.html#envoy-v3-api-field-config-core-v3-substitutionformatstring-text-format"><span class="std std-ref">text_format</span></a> and <code class="docutils literal notranslate"><span class="pre">application/json</span></code> for <a class="reference internal" href="../../../api-v3/config/core/v3/substitution_format_string.proto.html#envoy-v3-api-field-config-core-v3-substitutionformatstring-json-format"><span class="std std-ref">json_format</span></a>.</p>
+<p>Example of a LocalReplyConfig with <code class="docutils literal notranslate"><span class="pre">body_format</span></code> field.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">mappers</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filter</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">status_code_filter</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">comparison</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">op</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EQ</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">default_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">400</span>
+<span class="w">          </span><span class="nt">runtime_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key_b</span>
+<span class="w">  </span><span class="nt">status_code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">401</span>
+<span class="w">  </span><span class="nt">body_format_override</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">text_format</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;h1&gt;%LOCAL_REPLY_BODY%</span><span class="nv"> </span><span class="s">%REQ(:path)%&lt;/h1&gt;&quot;</span>
+<span class="w">    </span><span class="nt">content_type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;text/html;</span><span class="nv"> </span><span class="s">charset=UTF-8&quot;</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filter</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">status_code_filter</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">comparison</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">op</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EQ</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">default_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">500</span>
+<span class="w">          </span><span class="nt">runtime_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key_b</span>
+<span class="w">  </span><span class="nt">status_code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">501</span>
+<span class="nt">body_format</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">text_format</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;%LOCAL_REPLY_BODY%</span><span class="nv"> </span><span class="s">%RESPONSE_CODE%&quot;</span>
+</pre></div>
+</div>
+<p>In above example, there is a <code class="docutils literal notranslate"><span class="pre">body_format_override</span></code> inside the first <code class="docutils literal notranslate"><span class="pre">mapper</span></code> with a filter matching <code class="docutils literal notranslate"><span class="pre">status_code</span> <span class="pre">==</span> <span class="pre">400</span></code>. It generates the response body in plain text format by concatenating %LOCAL_REPLY_BODY% with the <code class="docutils literal notranslate"><span class="pre">:path</span></code> request header. It is only used when the first mapper is matched. There is a <code class="docutils literal notranslate"><span class="pre">body_format</span></code> at the bottom of the config and at the same level as field <code class="docutils literal notranslate"><span class="pre">mappers</span></code>. It is used when non of the mappers is matched or the matched mapper doesn’t have its own <code class="docutils literal notranslate"><span class="pre">body_format_override</span></code> specified.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="header_sanitizing.html" class="btn btn-neutral float-left" title="HTTP header sanitizing" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="response_code_details.html" class="btn btn-neutral float-right" title="Response Code Details" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Local reply modification</a><ul>
+<li><a class="reference internal" href="#local-reply-content-modification">Local reply content modification</a></li>
+<li><a class="reference internal" href="#local-reply-format-modification">Local reply format modification</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

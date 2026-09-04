@@ -1,0 +1,95 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/generic_proxy/action/v3/action.proto:
+
+Generic Proxy Route Action Configuration (proto)
+================================================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.generic_proxy.action.v3.RouteAction:
+
+extensions.filters.network.generic_proxy.action.v3.RouteAction
+--------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.generic_proxy.action.v3.RouteAction proto] <api/envoy/extensions/filters/network/generic_proxy/action/v3/action.proto#L26>`
+
+Configuration for the route match action.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "cluster": ...,
+    "metadata": {...},
+    "per_filter_config": {...},
+    "timeout": {...},
+    "retry_policy": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.action.v3.RouteAction.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of the route action. This should be unique across all route actions.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.action.v3.RouteAction.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Indicates the upstream cluster to which the request should be routed.
+
+
+  
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.action.v3.RouteAction.metadata:
+
+
+metadata
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Route metadata.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.action.v3.RouteAction.per_filter_config:
+
+
+per_filter_config
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_>) Route level config for L7 generic filters. The key should be the related :ref:`extension name
+  <envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name>` in the :ref:`generic filters
+  <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.filters>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.action.v3.RouteAction.timeout:
+
+
+timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Specifies the upstream timeout for the route. If not specified, the default is 15s. This
+  spans between the point at which the entire downstream request (i.e. end-of-stream) has been
+  processed and when the upstream response has been completely processed. A value of 0 will
+  disable the route's timeout.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.generic_proxy.action.v3.RouteAction.retry_policy:
+
+
+retry_policy
+  (:ref:`config.core.v3.RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>`) Specifies the retry policy for the route. If not specified, then no retries will be performed.
+
+  .. note::
+    Only simplest retry policy is supported and only ``num_retries`` field is used for generic
+    proxy. The default value for ``num_retries`` is 1 means that the request will be tried once
+    and no additional retries will be performed.
+
+
+
+

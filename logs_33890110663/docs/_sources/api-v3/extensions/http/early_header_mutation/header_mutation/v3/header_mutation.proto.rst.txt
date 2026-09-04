@@ -1,0 +1,62 @@
+.. _envoy_v3_api_file_envoy/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.proto:
+
+Default early header mutation extension (proto)
+===============================================
+
+.. _extension_envoy.http.early_header_mutation.header_mutation:
+
+This extension has the qualified name ``envoy.http.early_header_mutation.header_mutation``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.http.early_header_mutation <extension_category_envoy.http.early_header_mutation>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation <envoy_v3_api_msg_extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation:
+
+extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation
+-----------------------------------------------------------------------
+
+
+:repo:`[extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation proto] <api/envoy/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.proto#L19>`
+
+This extension allows for early header mutation by the substitution formatter.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "mutations": []
+  }
+
+.. _envoy_v3_api_field_extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation.mutations:
+
+
+mutations
+  (**repeated** :ref:`config.common.mutation_rules.v3.HeaderMutation <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation>`, *REQUIRED*) 
+

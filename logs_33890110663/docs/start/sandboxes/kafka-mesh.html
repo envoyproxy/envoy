@@ -1,0 +1,420 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kafka mesh filter &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Load reporting service (LRS)" href="load-reporting-service.html" />
+    <link rel="prev" title="Kafka broker" href="kafka.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../start.html">Getting Started</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Sandboxes</a></li>
+      <li class="breadcrumb-item active">Kafka mesh filter</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/start/sandboxes/kafka-mesh.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="kafka-mesh-filter">
+<span id="install-sandboxes-kafka-mesh"></span><h1>Kafka mesh filter<a class="headerlink" href="#kafka-mesh-filter" title="Link to this heading"></a></h1>
+<aside class="sidebar">
+<p class="sidebar-title">Requirements</p>
+<dl class="simple">
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup"><span class="std std-ref">Sandbox environment</span></a></dt><dd><p>Setup your sandbox environment with Docker and Docker Compose,
+and clone the Envoy repository with Git.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup-curl"><span class="std std-ref">curl</span></a></dt><dd><p>Used to make HTTP requests.</p>
+</dd>
+</dl>
+</aside>
+<p>This example demonstrates the Kafka mesh filter, which routes Kafka traffic
+to different upstream clusters based on topic name.</p>
+<p>The <a class="reference internal" href="kafka.html#install-sandboxes-kafka"><span class="std std-ref">Kafka broker filter</span></a> passes all traffic
+to a single upstream Kafka cluster while collecting metrics. The mesh filter
+goes further: it reads the Kafka protocol, extracts the topic name from each
+request, and forwards it to the appropriate upstream cluster.</p>
+<p>In this example we configure two upstream Kafka clusters with routing rules:</p>
+<ul class="simple">
+<li><p>Topics starting with <code class="docutils literal notranslate"><span class="pre">a</span></code> (e.g., <code class="docutils literal notranslate"><span class="pre">apples</span></code>) → <strong>cluster1</strong></p></li>
+<li><p>Topics starting with <code class="docutils literal notranslate"><span class="pre">b</span></code> (e.g., <code class="docutils literal notranslate"><span class="pre">bananas</span></code>) → <strong>cluster2</strong></p></li>
+</ul>
+<p>Clients connect to Envoy as if it were a single Kafka broker. Envoy handles
+the routing transparently.</p>
+<section id="step-1-start-all-containers">
+<h2>Step 1: Start all containers<a class="headerlink" href="#step-1-start-all-containers" title="Link to this heading"></a></h2>
+<p>Change to the <code class="docutils literal notranslate"><span class="pre">kafka-mesh</span></code> directory and start the containers. This brings
+up Envoy, two independent Kafka clusters, and a shared Zookeeper instance.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">pwd</span>
+<span class="go">envoy/examples/kafka-mesh</span>
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>pull
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>ps
+
+<span class="go">      Name                       State              Ports</span>
+<span class="go">------------------------------------------------------------------</span>
+<span class="go">kafka-mesh_proxy_1          Up             0.0.0.0:10000-&gt;10000/tcp</span>
+<span class="go">kafka-mesh_kafka-cluster1_1 Up             9092/tcp</span>
+<span class="go">kafka-mesh_kafka-cluster2_1 Up             9092/tcp</span>
+<span class="go">kafka-mesh_zookeeper_1      Up (healthy)   2181/tcp</span>
+</pre></div>
+</div>
+</section>
+<section id="step-2-produce-a-message-to-the-apples-topic">
+<h2>Step 2: Produce a message to the <code class="docutils literal notranslate"><span class="pre">apples</span></code> topic<a class="headerlink" href="#step-2-produce-a-message-to-the-apples-topic" title="Link to this heading"></a></h2>
+<p>Send a message to a topic starting with <code class="docutils literal notranslate"><span class="pre">a</span></code>. The mesh filter will route
+this to <strong>cluster1</strong>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>kafka-client<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>/bin/bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;echo &#39;hello from apples&#39; | kafka-console-producer --request-required-acks 1 --producer-property enable.idempotence=false --broker-list proxy:10000 --topic apples&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="step-3-produce-a-message-to-the-bananas-topic">
+<h2>Step 3: Produce a message to the <code class="docutils literal notranslate"><span class="pre">bananas</span></code> topic<a class="headerlink" href="#step-3-produce-a-message-to-the-bananas-topic" title="Link to this heading"></a></h2>
+<p>Send a message to a topic starting with <code class="docutils literal notranslate"><span class="pre">b</span></code>. The mesh filter will route
+this to <strong>cluster2</strong>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>kafka-client<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>/bin/bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;echo &#39;hello from bananas&#39; | kafka-console-producer --request-required-acks 1 --producer-property enable.idempotence=false --broker-list proxy:10000 --topic bananas&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="step-4-verify-the-message-landed-in-cluster1">
+<h2>Step 4: Verify the message landed in cluster1<a class="headerlink" href="#step-4-verify-the-message-landed-in-cluster1" title="Link to this heading"></a></h2>
+<p>To confirm the routing worked, consume directly from <strong>cluster1</strong> (bypassing
+Envoy). You should see the <code class="docutils literal notranslate"><span class="pre">apples</span></code> message:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>kafka-client<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>kafka-console-consumer<span class="w"> </span>--bootstrap-server<span class="w"> </span>kafka-cluster1:9092<span class="w"> </span>--topic<span class="w"> </span>apples<span class="w"> </span>--from-beginning<span class="w"> </span>--max-messages<span class="w"> </span><span class="m">1</span>
+<span class="go">hello from apples</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">bananas</span></code> topic should not exist on cluster1.</p>
+</section>
+<section id="step-5-verify-the-message-landed-in-cluster2">
+<h2>Step 5: Verify the message landed in cluster2<a class="headerlink" href="#step-5-verify-the-message-landed-in-cluster2" title="Link to this heading"></a></h2>
+<p>Similarly, consume directly from <strong>cluster2</strong>. You should see the <code class="docutils literal notranslate"><span class="pre">bananas</span></code>
+message:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>kafka-client<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>kafka-console-consumer<span class="w"> </span>--bootstrap-server<span class="w"> </span>kafka-cluster2:9092<span class="w"> </span>--topic<span class="w"> </span>bananas<span class="w"> </span>--from-beginning<span class="w"> </span>--max-messages<span class="w"> </span><span class="m">1</span>
+<span class="go">hello from bananas</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">apples</span></code> topic should not exist on cluster2.</p>
+</section>
+<section id="step-6-consume-through-the-mesh-filter">
+<h2>Step 6: Consume through the mesh filter<a class="headerlink" href="#step-6-consume-through-the-mesh-filter" title="Link to this heading"></a></h2>
+<p>The mesh filter also routes fetch (consume) requests to the correct upstream.
+Clients can consume through Envoy without knowing which cluster holds the data.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The mesh filter supports only Produce and Fetch Kafka APIs. Consumer group
+coordination (FIND_COORDINATOR, etc.) is not supported, so we consume by
+directly specifying the partition with <code class="docutils literal notranslate"><span class="pre">--partition</span> <span class="pre">0</span></code>.</p>
+</div>
+<p>Consume the <code class="docutils literal notranslate"><span class="pre">apples</span></code> topic through Envoy:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>kafka-client<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>kafka-console-consumer<span class="w"> </span>--bootstrap-server<span class="w"> </span>proxy:10000<span class="w"> </span>--topic<span class="w"> </span>apples<span class="w"> </span>--partition<span class="w"> </span><span class="m">0</span><span class="w"> </span>--from-beginning<span class="w"> </span>--max-messages<span class="w"> </span><span class="m">1</span>
+<span class="go">hello from apples</span>
+</pre></div>
+</div>
+<p>Consume the <code class="docutils literal notranslate"><span class="pre">bananas</span></code> topic through Envoy:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>kafka-client<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>kafka-console-consumer<span class="w"> </span>--bootstrap-server<span class="w"> </span>proxy:10000<span class="w"> </span>--topic<span class="w"> </span>bananas<span class="w"> </span>--partition<span class="w"> </span><span class="m">0</span><span class="w"> </span>--from-beginning<span class="w"> </span>--max-messages<span class="w"> </span><span class="m">1</span>
+<span class="go">hello from bananas</span>
+</pre></div>
+</div>
+</section>
+<section id="step-7-check-envoy-stats">
+<h2>Step 7: Check Envoy stats<a class="headerlink" href="#step-7-check-envoy-stats" title="Link to this heading"></a></h2>
+<p>Envoy records metrics for Kafka traffic. Query the admin interface to see
+produce and fetch request counts:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">&quot;http://localhost:8001/stats?filter=kafka&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;: 0&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;_request:&quot;</span>
+<span class="go">kafka.kafka_mesh.request.produce_request: 2</span>
+<span class="go">kafka.kafka_mesh.request.fetch_request: 4</span>
+<span class="go">kafka.kafka_mesh.request.metadata_request: 8</span>
+</pre></div>
+</div>
+</section>
+<section id="step-8-test-high-volume-producing-with-batched-records">
+<h2>Step 8: Test high-volume producing with batched records<a class="headerlink" href="#step-8-test-high-volume-producing-with-batched-records" title="Link to this heading"></a></h2>
+<p>In production, Kafka producers often batch multiple records into a single
+<code class="docutils literal notranslate"><span class="pre">ProduceRequest</span></code> to improve throughput. The mesh filter must correctly handle
+these batched requests and route records to the appropriate upstream cluster.</p>
+<p>Send multiple messages rapidly to the <code class="docutils literal notranslate"><span class="pre">apricots</span></code> topic (which routes to
+<code class="docutils literal notranslate"><span class="pre">cluster1</span></code> based on the <code class="docutils literal notranslate"><span class="pre">a</span></code> prefix). The producer will automatically batch
+these into fewer requests:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>kafka-client<span class="w"> </span>/bin/bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot; \</span>
+<span class="s2">    for i in {1..20}; do \</span>
+<span class="s2">        echo \&quot;apricot message \$i\&quot;; \</span>
+<span class="s2">    done | kafka-console-producer --request-required-acks 1 --producer-property enable.idempotence=false --broker-list proxy:10000 --topic apricots&quot;</span>
+</pre></div>
+</div>
+<p>Now verify that all 20 messages arrived at <code class="docutils literal notranslate"><span class="pre">cluster1</span></code> by consuming directly
+from the upstream:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>kafka-client<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>kafka-console-consumer<span class="w"> </span>--bootstrap-server<span class="w"> </span>kafka-cluster1:9092<span class="w"> </span>--topic<span class="w"> </span>apricots<span class="w"> </span>--from-beginning<span class="w"> </span>--max-messages<span class="w"> </span><span class="m">20</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l
+<span class="go">20</span>
+</pre></div>
+</div>
+<p>This confirms that even though the producer may have batched the records into
+multiple <code class="docutils literal notranslate"><span class="pre">ProduceRequest</span></code>, the mesh filter correctly routed all messages to the
+appropriate cluster. This is critical for high-throughput production workloads.</p>
+<p>Next, send 20 messages rapidly to the <code class="docutils literal notranslate"><span class="pre">blueberries</span></code> topic (which routes to
+cluster2 based on the <code class="docutils literal notranslate"><span class="pre">b</span></code> prefix). This demonstrates that the mesh filter
+correctly splits batched ProduceRequests when they need to go to different
+upstream clusters:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>kafka-client<span class="w"> </span>/bin/bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot; \</span>
+<span class="s2">    for i in {1..20}; do \</span>
+<span class="s2">        echo \&quot;blueberry message \$i\&quot;; \</span>
+<span class="s2">    done | kafka-console-producer --request-required-acks 1 --producer-property enable.idempotence=false --broker-list proxy:10000 --topic blueberries&quot;</span>
+</pre></div>
+</div>
+<p>Verify that all 20 messages arrived at cluster2:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>kafka-client<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>kafka-console-consumer<span class="w"> </span>--bootstrap-server<span class="w"> </span>kafka-cluster2:9092<span class="w"> </span>--topic<span class="w"> </span>blueberries<span class="w"> </span>--from-beginning<span class="w"> </span>--max-messages<span class="w"> </span><span class="m">20</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l
+<span class="go">20</span>
+</pre></div>
+</div>
+<p>This demonstrates the mesh filter’s ability to handle batched records destined
+for different clusters. In production environments where a single producer
+sends to multiple topics across different clusters, this ensures records are
+correctly routed based on their destination.</p>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="../../configuration/listeners/network_filters/kafka_mesh_filter.html#config-network-filters-kafka-mesh"><span class="std std-ref">Envoy Kafka mesh filter</span></a></dt><dd><p>Learn more about the Kafka mesh filter configuration.</p>
+</dd>
+<dt><a class="reference internal" href="kafka.html#install-sandboxes-kafka"><span class="std std-ref">Kafka broker filter example</span></a></dt><dd><p>A simpler example using the broker filter for single-cluster proxying.</p>
+</dd>
+</dl>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="kafka.html" class="btn btn-neutral float-left" title="Kafka broker" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="load-reporting-service.html" class="btn btn-neutral float-right" title="Load reporting service (LRS)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Kafka mesh filter</a><ul>
+<li><a class="reference internal" href="#step-1-start-all-containers">Step 1: Start all containers</a></li>
+<li><a class="reference internal" href="#step-2-produce-a-message-to-the-apples-topic">Step 2: Produce a message to the <code class="docutils literal notranslate"><span class="pre">apples</span></code> topic</a></li>
+<li><a class="reference internal" href="#step-3-produce-a-message-to-the-bananas-topic">Step 3: Produce a message to the <code class="docutils literal notranslate"><span class="pre">bananas</span></code> topic</a></li>
+<li><a class="reference internal" href="#step-4-verify-the-message-landed-in-cluster1">Step 4: Verify the message landed in cluster1</a></li>
+<li><a class="reference internal" href="#step-5-verify-the-message-landed-in-cluster2">Step 5: Verify the message landed in cluster2</a></li>
+<li><a class="reference internal" href="#step-6-consume-through-the-mesh-filter">Step 6: Consume through the mesh filter</a></li>
+<li><a class="reference internal" href="#step-7-check-envoy-stats">Step 7: Check Envoy stats</a></li>
+<li><a class="reference internal" href="#step-8-test-high-volume-producing-with-batched-records">Step 8: Test high-volume producing with batched records</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

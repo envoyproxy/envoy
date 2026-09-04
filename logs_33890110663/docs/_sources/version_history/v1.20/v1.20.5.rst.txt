@@ -1,0 +1,20 @@
+.. _version_history_1.20.5:
+
+1.20.5 (June 16, 2022)
+=======================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **docker**: update Docker images (``distroless`` -> ``d65ac1a``) to resolve CVE issues in container packages.
+

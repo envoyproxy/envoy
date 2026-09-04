@@ -1,0 +1,157 @@
+.. _envoy_v3_api_file_envoy/config/metrics/v3/metrics_service.proto:
+
+Metrics service (proto)
+=======================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.metrics.v3.MetricsServiceConfig:
+
+config.metrics.v3.MetricsServiceConfig
+--------------------------------------
+
+
+:repo:`[config.metrics.v3.MetricsServiceConfig proto] <api/envoy/config/metrics/v3/metrics_service.proto#L48>`
+
+Metrics Service is configured as a built-in ``envoy.stat_sinks.metrics_service`` :ref:`StatsSink
+<envoy_v3_api_msg_config.metrics.v3.StatsSink>`. This opaque configuration will be used to create
+Metrics Service.
+
+Example:
+
+.. code-block:: yaml
+
+    stats_sinks:
+      - name: envoy.stat_sinks.metrics_service
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.metrics.v3.MetricsServiceConfig
+
+
+.. _extension_envoy.stat_sinks.metrics_service:
+
+This extension has the qualified name ``envoy.stat_sinks.metrics_service``
+
+
+.. note::
+  
+
+  This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.stats_sinks <extension_category_envoy.stats_sinks>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.config.metrics.v3.MetricsServiceConfig <envoy_v3_api_msg_config.metrics.v3.MetricsServiceConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "grpc_service": {...},
+    "transport_api_version": ...,
+    "report_counters_as_deltas": {...},
+    "emit_tags_as_labels": ...,
+    "histogram_emit_mode": ...,
+    "batch_size": ...
+  }
+
+.. _envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.grpc_service:
+
+
+grpc_service
+  (:ref:`config.core.v3.GrpcService <envoy_v3_api_msg_config.core.v3.GrpcService>`, *REQUIRED*) The upstream gRPC cluster that hosts the metrics service.
+
+
+.. _envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.transport_api_version:
+
+
+transport_api_version
+  (:ref:`config.core.v3.ApiVersion <envoy_v3_api_enum_config.core.v3.ApiVersion>`) API version for metric service transport protocol. This describes the metric service gRPC
+  endpoint and version of messages used on the wire.
+
+
+.. _envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.report_counters_as_deltas:
+
+
+report_counters_as_deltas
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If true, counters are reported as the delta between flushing intervals. Otherwise, the current
+  counter value is reported. Defaults to false.
+  Eventually (https://github.com/envoyproxy/envoy/issues/10968) if this value is not set, the
+  sink will take updates from the :ref:`MetricsResponse <envoy_v3_api_msg_service.metrics.v3.StreamMetricsResponse>`.
+
+
+.. _envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.emit_tags_as_labels:
+
+
+emit_tags_as_labels
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, metrics will have their tags emitted as labels on the metrics objects sent to the MetricsService,
+  and the tag extracted name will be used instead of the full name, which may contain values used by the tag
+  extractor or additional tags added during stats creation.
+
+
+.. _envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.histogram_emit_mode:
+
+
+histogram_emit_mode
+  (:ref:`config.metrics.v3.HistogramEmitMode <envoy_v3_api_enum_config.metrics.v3.HistogramEmitMode>`) Specify which metrics types to emit for histograms. Defaults to SUMMARY_AND_HISTOGRAM.
+
+
+.. _envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.batch_size:
+
+
+batch_size
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The maximum number of metrics to send in a single gRPC message. If not set or set to 0,
+  all metrics will be sent in a single message (current behavior). When set to a positive value,
+  metrics will be batched into multiple messages, with each message containing at most batch_size
+  metric families. This helps avoid hitting gRPC message size limits (typically 4MB) when sending
+  large numbers of metrics.
+
+
+
+.. _envoy_v3_api_enum_config.metrics.v3.HistogramEmitMode:
+
+Enum config.metrics.v3.HistogramEmitMode
+----------------------------------------
+
+
+:repo:`[config.metrics.v3.HistogramEmitMode proto] <api/envoy/config/metrics/v3/metrics_service.proto#L22>`
+
+HistogramEmitMode is used to configure which metric types should be emitted for histograms.
+
+
+
+.. _envoy_v3_api_enum_value_config.metrics.v3.HistogramEmitMode.SUMMARY_AND_HISTOGRAM:
+
+
+SUMMARY_AND_HISTOGRAM
+  *(DEFAULT)* ⁣Emit Histogram and Summary metric types.
+
+
+.. _envoy_v3_api_enum_value_config.metrics.v3.HistogramEmitMode.SUMMARY:
+
+
+SUMMARY
+  ⁣Emit only Summary metric types.
+
+
+.. _envoy_v3_api_enum_value_config.metrics.v3.HistogramEmitMode.HISTOGRAM:
+
+
+HISTOGRAM
+  ⁣Emit only Histogram metric types.
+
+

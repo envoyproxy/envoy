@@ -1,0 +1,560 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Securing Envoy &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Next steps" href="next-steps.html" />
+    <link rel="prev" title="Envoy admin interface" href="admin.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../start.html">Getting Started</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../install.html">Installing Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Quick start</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="run-envoy.html">Run Envoy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration-static.html">Configuration: Static</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration-dynamic-filesystem.html">Configuration: Dynamic from filesystem</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration-dynamic-control-plane.html">Configuration: Dynamic from control plane</a></li>
+<li class="toctree-l3"><a class="reference internal" href="admin.html">Envoy admin interface</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Securing Envoy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="next-steps.html">Next steps</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../sandboxes/index.html">Sandboxes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../docker.html">Using the Envoy Docker Image</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../building.html">Building</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../start.html">Getting Started</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Quick start</a></li>
+      <li class="breadcrumb-item active">Securing Envoy</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/start/quick-start/securing.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="securing-envoy">
+<span id="start-quick-start-securing"></span><h1>Securing Envoy<a class="headerlink" href="#securing-envoy" title="Link to this heading"></a></h1>
+<p>Envoy provides a number of features to secure traffic in and out of your network, and
+between proxies and services within your network.</p>
+<p>Transport Layer Security (<code class="docutils literal notranslate"><span class="pre">TLS</span></code>) can be used to secure all types of <code class="docutils literal notranslate"><span class="pre">HTTP</span></code> traffic, including <code class="docutils literal notranslate"><span class="pre">WebSockets</span></code>.</p>
+<p>Envoy also has support for transmitting and receiving generic <code class="docutils literal notranslate"><span class="pre">TCP</span></code> traffic with <code class="docutils literal notranslate"><span class="pre">TLS</span></code>.</p>
+<p>Envoy also offers a number of other <code class="docutils literal notranslate"><span class="pre">HTTP</span></code>-based protocols for authentication and authorization
+such as <a class="reference internal" href="../../intro/arch_overview/security/jwt_authn_filter.html#arch-overview-jwt-authn"><span class="std std-ref">JWT</span></a>, <a class="reference internal" href="../../intro/arch_overview/security/rbac_filter.html#arch-overview-rbac"><span class="std std-ref">RBAC</span></a>
+and <a class="reference internal" href="../../api-v3/extensions/filters/http/oauth2/v3/oauth.proto.html#envoy-v3-api-file-envoy-extensions-filters-http-oauth2-v3-oauth-proto"><span class="std std-ref">OAuth</span></a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The following guide takes you through individual aspects of securing traffic.</p>
+<p>To secure traffic over a network that is untrusted, you are strongly advised to make use of encryption
+and mutual authentication wherever you control both sides of the connection or where relevant protocols are available.</p>
+<p>Here we provide a guide to using <a class="reference internal" href="#start-quick-start-securing-mtls"><span class="std std-ref">mTLS</span></a> which provides both encryption
+and mutual authentication.</p>
+<p>When using <code class="docutils literal notranslate"><span class="pre">TLS</span></code>, you are strongly encouraged to <a class="reference internal" href="#start-quick-start-securing-validation"><span class="std std-ref">validate</span></a>
+all certificates wherever possible.</p>
+<p>It is your responsibility to ensure the integrity of your certificate chain, and outside the scope of this guide.</p>
+</div>
+<section id="upstream-and-downstream-tls-contexts">
+<span id="start-quick-start-securing-contexts"></span><h2>Upstream and downstream <code class="docutils literal notranslate"><span class="pre">TLS</span></code> contexts<a class="headerlink" href="#upstream-and-downstream-tls-contexts" title="Link to this heading"></a></h2>
+<p>Machines connecting to Envoy to proxy traffic are “downstream” in relation to Envoy.</p>
+<p>Specifying a <code class="docutils literal notranslate"><span class="pre">TLS</span></code> context that clients can connect to is achieved by setting the
+<a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/tls.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-downstreamtlscontext"><span class="std std-ref">DownstreamTLSContext</span></a>
+in the <a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/tls.proto.html#extension-envoy-transport-sockets-tls"><span class="std std-ref">transport_socket</span></a> of a
+<a class="reference internal" href="../../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">listener</span></a>.</p>
+<p>You will also need to provide valid certificates.</p>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/f39b2455c0fbfabe59f0fcd5a50bddf4/envoy-demo-tls.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy-demo-tls.yaml</span></code></a></span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="nt">static_resources</span><span class="p">:</span>
+<span class="linenos"> 2</span>
+<span class="linenos"> 3</span><span class="w">  </span><span class="nt">listeners</span><span class="p">:</span>
+<span class="linenos"> 4</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">listener_0</span>
+<span class="linenos"> 5</span><span class="w">    </span><span class="nt">address</span><span class="p">:</span>
+<span class="linenos"> 6</span><span class="w">      </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="linenos"> 7</span><span class="w">        </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0.0.0</span>
+<span class="linenos"> 8</span><span class="w">        </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10000</span>
+<span class="linenos"> 9</span><span class="w">    </span><span class="nt">filter_chains</span><span class="p">:</span>
+<span class="linenos">10</span><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">filters</span><span class="p">:</span>
+<span class="linenos">11</span><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.network.http_connection_manager</span>
+<span class="linenos">12</span><span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">13</span><span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager</span>
+<span class="linenos">14</span><span class="w">          </span><span class="nt">stat_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress_http</span>
+<span class="linenos">15</span><span class="w">          </span><span class="nt">http_filters</span><span class="p">:</span>
+<span class="linenos">16</span><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.filters.http.router</span>
+<span class="linenos">17</span><span class="w">            </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">18</span><span class="w">              </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.router.v3.Router</span>
+<span class="linenos">19</span><span class="w">          </span><span class="nt">route_config</span><span class="p">:</span>
+<span class="linenos">20</span><span class="w">            </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_route</span>
+<span class="linenos">21</span><span class="w">            </span><span class="nt">virtual_hosts</span><span class="p">:</span>
+<span class="linenos">22</span><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local_service</span>
+<span class="linenos">23</span><span class="w">              </span><span class="nt">domains</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;*&quot;</span><span class="p p-Indicator">]</span>
+<span class="linenos">24</span><span class="w">              </span><span class="nt">routes</span><span class="p">:</span>
+<span class="linenos">25</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">match</span><span class="p">:</span>
+<span class="linenos">26</span><span class="w">                  </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/&quot;</span>
+<span class="linenos">27</span><span class="w">                </span><span class="nt">route</span><span class="p">:</span>
+<span class="linenos">28</span><span class="w">                  </span><span class="nt">host_rewrite_literal</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">www.envoyproxy.io</span>
+<span class="linenos">29</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_envoyproxy_io</span>
+<span class="hll"><span class="linenos">30</span><span class="w">      </span><span class="nt">transport_socket</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">31</span><span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+</span><span class="hll"><span class="linenos">32</span><span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">33</span><span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext</span>
+</span><span class="hll"><span class="linenos">34</span><span class="w">          </span><span class="nt">common_tls_context</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">35</span><span class="w">            </span><span class="nt">tls_certificates</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">36</span><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">certificate_chain</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">37</span><span class="w">                </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">certs/servercert.pem</span>
+</span><span class="hll"><span class="linenos">38</span><span class="w">              </span><span class="nt">private_key</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">39</span><span class="w">                </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">certs/serverkey.pem</span>
+</span></pre></div>
+</div>
+</div>
+<p>Connecting to an “upstream” <code class="docutils literal notranslate"><span class="pre">TLS</span></code> service is conversely done by adding an
+<a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/tls.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-upstreamtlscontext"><span class="std std-ref">UpstreamTLSContext</span></a>
+to the <a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/tls.proto.html#extension-envoy-transport-sockets-tls"><span class="std std-ref">transport_socket</span></a> of a
+<a class="reference internal" href="../../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster"><span class="std std-ref">cluster</span></a>.</p>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/f39b2455c0fbfabe59f0fcd5a50bddf4/envoy-demo-tls.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy-demo-tls.yaml</span></code></a></span><a class="headerlink" href="#id2" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">40</span><span class="w">  </span><span class="nt">clusters</span><span class="p">:</span>
+<span class="linenos">41</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_envoyproxy_io</span>
+<span class="linenos">42</span><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LOGICAL_DNS</span>
+<span class="linenos">43</span><span class="w">    </span><span class="c1"># Comment out the following line to test on v6 networks</span>
+<span class="linenos">44</span><span class="w">    </span><span class="nt">dns_lookup_family</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">V4_ONLY</span>
+<span class="linenos">45</span><span class="w">    </span><span class="nt">load_assignment</span><span class="p">:</span>
+<span class="linenos">46</span><span class="w">      </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_envoyproxy_io</span>
+<span class="linenos">47</span><span class="w">      </span><span class="nt">endpoints</span><span class="p">:</span>
+<span class="linenos">48</span><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">lb_endpoints</span><span class="p">:</span>
+<span class="linenos">49</span><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="linenos">50</span><span class="w">            </span><span class="nt">address</span><span class="p">:</span>
+<span class="linenos">51</span><span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="linenos">52</span><span class="w">                </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">www.envoyproxy.io</span>
+<span class="linenos">53</span><span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="hll"><span class="linenos">54</span><span class="w">    </span><span class="nt">transport_socket</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">55</span><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+</span><span class="hll"><span class="linenos">56</span><span class="w">      </span><span class="nt">typed_config</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">57</span><span class="w">        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext</span>
+</span></pre></div>
+</div>
+</div>
+</section>
+<section id="validate-an-endpoint-s-certificates-when-connecting">
+<span id="start-quick-start-securing-validation"></span><h2>Validate an endpoint’s certificates when connecting<a class="headerlink" href="#validate-an-endpoint-s-certificates-when-connecting" title="Link to this heading"></a></h2>
+<p>When Envoy connects to an upstream <code class="docutils literal notranslate"><span class="pre">TLS</span></code> service, it does not, by default, validate the certificates
+that it is presented with.</p>
+<p>You can use the <a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/common.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-certificatevalidationcontext"><span class="std std-ref">validation_context</span></a>
+to specify how Envoy should validate these certificates.</p>
+<p>Firstly, you can ensure that the certificates are from a mutually trusted certificate authority:</p>
+<div class="literal-block-wrapper docutils container" id="id3">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/e5653e67b27aa61870c4a6e153225dfe/envoy-demo-tls-validation.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy-demo-tls-validation.yaml</span></code></a></span><a class="headerlink" href="#id3" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">42</span><span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="linenos">43</span><span class="w">                </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">www.envoyproxy.io</span>
+<span class="linenos">44</span><span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="linenos">45</span><span class="w">   </span><span class="w w-Error"> </span><span class="nt">transport_socket</span><span class="p">:</span>
+<span class="linenos">46</span><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+<span class="linenos">47</span><span class="w">      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">48</span><span class="w">        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext</span>
+<span class="hll"><span class="linenos">49</span><span class="w">        </span><span class="nt">common_tls_context</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">50</span><span class="w">          </span><span class="nt">validation_context</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">51</span><span class="w">            </span><span class="nt">trusted_ca</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">52</span><span class="w">              </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">certs/cacert.pem</span>
+</span></pre></div>
+</div>
+</div>
+<p>You should also ensure that the Subject Alternative Names (SANs) for the certificate match.</p>
+<p>This is commonly used by web certificates (X.509) to identify the domain or domains that a
+certificate is valid for.</p>
+<p>For the most common case where the certificate should have a SAN matching the <a class="reference internal" href="#start-quick-start-securing-sni-client"><span class="std std-ref">SNI</span></a>
+which was sent, you can enable <a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/tls.proto.html#envoy-v3-api-field-extensions-transport-sockets-tls-v3-upstreamtlscontext-auto-sni-san-validation"><span class="std std-ref">auto_sni_san_validation</span></a>
+and omit <a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/common.proto.html#envoy-v3-api-field-extensions-transport-sockets-tls-v3-certificatevalidationcontext-match-typed-subject-alt-names"><span class="std std-ref">match_typed_subject_alt_names</span></a>
+in the validation context.</p>
+<p>To validate that a certificate has a SAN matching the downstream request <code class="docutils literal notranslate"><span class="pre">host</span></code> or <code class="docutils literal notranslate"><span class="pre">:authority</span></code> header, you can enable
+<a class="reference internal" href="../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-upstreamhttpprotocoloptions-auto-san-validation"><span class="std std-ref">auto_san_validation</span></a>.</p>
+<p>When multiple validation options are configured, <code class="docutils literal notranslate"><span class="pre">auto_san_validation</span></code> has the highest priority, followed by <code class="docutils literal notranslate"><span class="pre">auto_sni_san_validation</span></code>,
+followed by <code class="docutils literal notranslate"><span class="pre">match_typed_subject_alt_names</span></code>.</p>
+<div class="literal-block-wrapper docutils container" id="id4">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/e5653e67b27aa61870c4a6e153225dfe/envoy-demo-tls-validation.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy-demo-tls-validation.yaml</span></code></a></span><a class="headerlink" href="#id4" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">44</span><span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="linenos">45</span><span class="w">   </span><span class="w w-Error"> </span><span class="nt">transport_socket</span><span class="p">:</span>
+<span class="linenos">46</span><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+<span class="linenos">47</span><span class="w">      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">48</span><span class="w">        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext</span>
+<span class="hll"><span class="linenos">49</span><span class="w">        </span><span class="nt">common_tls_context</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">50</span><span class="w">          </span><span class="nt">validation_context</span><span class="p">:</span>
+</span><span class="linenos">51</span><span class="w">            </span><span class="nt">trusted_ca</span><span class="p">:</span>
+<span class="linenos">52</span><span class="w">              </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">certs/cacert.pem</span>
+<span class="hll"><span class="linenos">53</span><span class="w">            </span><span class="nt">match_typed_subject_alt_names</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">54</span><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">san_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DNS</span>
+</span></pre></div>
+</div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/common.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-certificatevalidationcontext"><span class="std std-ref">here</span></a> to view all
+of the possible configurations for certificate validation.</p>
+</div>
+</section>
+<section id="use-mutual-tls-mtls-to-enforce-client-certificate-authentication">
+<span id="start-quick-start-securing-mtls"></span><h2>Use mutual <code class="docutils literal notranslate"><span class="pre">TLS</span></code> (<code class="docutils literal notranslate"><span class="pre">mTLS</span></code>) to enforce client certificate authentication<a class="headerlink" href="#use-mutual-tls-mtls-to-enforce-client-certificate-authentication" title="Link to this heading"></a></h2>
+<p>With mutual <code class="docutils literal notranslate"><span class="pre">TLS</span></code> (<code class="docutils literal notranslate"><span class="pre">mTLS</span></code>), Envoy also provides a way to authenticate connecting clients.</p>
+<p>At a minimum you will need to set
+<a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/tls.proto.html#envoy-v3-api-field-extensions-transport-sockets-tls-v3-downstreamtlscontext-require-client-certificate"><span class="std std-ref">require_client_certificate</span></a>
+and specify a mutually trusted certificate authority:</p>
+<div class="literal-block-wrapper docutils container" id="id5">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/e39304d623eb8098a040b99eef6f6747/envoy-demo-tls-client-auth.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy-demo-tls-client-auth.yaml</span></code></a></span><a class="headerlink" href="#id5" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">29</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_envoyproxy_io</span>
+<span class="linenos">30</span><span class="w">     </span><span class="w w-Error"> </span><span class="nt">transport_socket</span><span class="p">:</span>
+<span class="linenos">31</span><span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+<span class="linenos">32</span><span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext</span>
+<span class="hll"><span class="linenos">34</span><span class="w">          </span><span class="nt">require_client_certificate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span class="linenos">35</span><span class="w">          </span><span class="nt">common_tls_context</span><span class="p">:</span>
+<span class="hll"><span class="linenos">36</span><span class="w">            </span><span class="nt">validation_context</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">37</span><span class="w">              </span><span class="nt">trusted_ca</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">38</span><span class="w">                </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">certs/cacert.pem</span>
+</span><span class="linenos">39</span><span class="w">              </span><span class="nt">match_typed_subject_alt_names</span><span class="p">:</span>
+<span class="linenos">40</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">san_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DNS</span>
+<span class="linenos">41</span><span class="w">                </span><span class="nt">matcher</span><span class="p">:</span>
+<span class="linenos">42</span><span class="w">                  </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proxy-postgres-frontend.example.com</span>
+<span class="linenos">43</span><span class="w">            </span><span class="nt">tls_certificates</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<p>You can further restrict the authentication of connecting clients by specifying the allowed
+“Subject Alternative Names” in
+<a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/common.proto.html#envoy-v3-api-field-extensions-transport-sockets-tls-v3-certificatevalidationcontext-match-typed-subject-alt-names"><span class="std std-ref">match_typed_subject_alt_names</span></a>,
+similar to validating upstream certificates <a class="reference internal" href="#start-quick-start-securing-validation"><span class="std std-ref">described above</span></a>.</p>
+<div class="literal-block-wrapper docutils container" id="id6">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/e39304d623eb8098a040b99eef6f6747/envoy-demo-tls-client-auth.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy-demo-tls-client-auth.yaml</span></code></a></span><a class="headerlink" href="#id6" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">29</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_envoyproxy_io</span>
+<span class="linenos">30</span><span class="w">     </span><span class="w w-Error"> </span><span class="nt">transport_socket</span><span class="p">:</span>
+<span class="linenos">31</span><span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+<span class="linenos">32</span><span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">33</span><span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext</span>
+<span class="linenos">34</span><span class="w">          </span><span class="nt">require_client_certificate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="hll"><span class="linenos">35</span><span class="w">          </span><span class="nt">common_tls_context</span><span class="p">:</span>
+</span><span class="linenos">36</span><span class="w">            </span><span class="nt">validation_context</span><span class="p">:</span>
+<span class="linenos">37</span><span class="w">              </span><span class="nt">trusted_ca</span><span class="p">:</span>
+<span class="linenos">38</span><span class="w">                </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">certs/cacert.pem</span>
+<span class="hll"><span class="linenos">39</span><span class="w">              </span><span class="nt">match_typed_subject_alt_names</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">40</span><span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">san_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DNS</span>
+</span><span class="hll"><span class="linenos">41</span><span class="w">                </span><span class="nt">matcher</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">42</span><span class="w">                  </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proxy-postgres-frontend.example.com</span>
+</span><span class="linenos">43</span><span class="w">            </span><span class="nt">tls_certificates</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/common.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-certificatevalidationcontext"><span class="std std-ref">here</span></a> to view all
+of the possible configurations for certificate validation.</p>
+</div>
+</section>
+<section id="use-mutual-tls-mtls-to-connect-with-client-certificates">
+<span id="start-quick-start-securing-mtls-client"></span><h2>Use mutual <code class="docutils literal notranslate"><span class="pre">TLS</span></code> (<code class="docutils literal notranslate"><span class="pre">mTLS</span></code>) to connect with client certificates<a class="headerlink" href="#use-mutual-tls-mtls-to-connect-with-client-certificates" title="Link to this heading"></a></h2>
+<p>When connecting to an upstream with client certificates you can set them as follows:</p>
+<div class="literal-block-wrapper docutils container" id="id7">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/e39304d623eb8098a040b99eef6f6747/envoy-demo-tls-client-auth.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy-demo-tls-client-auth.yaml</span></code></a></span><a class="headerlink" href="#id7" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">46</span><span class="w">              </span><span class="nt">private_key</span><span class="p">:</span>
+<span class="linenos">47</span><span class="w">                </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">certs/serverkey.pem</span>
+<span class="linenos">48</span>
+<span class="linenos">49</span><span class="w"> </span><span class="w w-Error"> </span><span class="nt">clusters</span><span class="p">:</span>
+<span class="linenos">50</span><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_envoyproxy_io</span>
+<span class="linenos">51</span><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LOGICAL_DNS</span>
+<span class="linenos">52</span><span class="w">    </span><span class="c1"># Comment out the following line to test on v6 networks</span>
+<span class="linenos">53</span><span class="w">    </span><span class="nt">dns_lookup_family</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">V4_ONLY</span>
+<span class="linenos">54</span><span class="w">    </span><span class="nt">load_assignment</span><span class="p">:</span>
+<span class="linenos">55</span><span class="w">      </span><span class="nt">cluster_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_envoyproxy_io</span>
+<span class="linenos">56</span><span class="w">      </span><span class="nt">endpoints</span><span class="p">:</span>
+<span class="linenos">57</span><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">lb_endpoints</span><span class="p">:</span>
+<span class="linenos">58</span><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span>
+<span class="linenos">59</span><span class="w">            </span><span class="nt">address</span><span class="p">:</span>
+<span class="linenos">60</span><span class="w">              </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="linenos">61</span><span class="w">                </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">www.envoyproxy.io</span>
+<span class="linenos">62</span><span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="linenos">63</span><span class="w">    </span><span class="nt">transport_socket</span><span class="p">:</span>
+<span class="linenos">64</span><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+<span class="linenos">65</span><span class="w">      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">66</span><span class="w">        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext</span>
+<span class="hll"><span class="linenos">67</span><span class="w">        </span><span class="nt">common_tls_context</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">68</span><span class="w">          </span><span class="nt">tls_certificates</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">69</span><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">certificate_chain</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">70</span><span class="w">              </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">certs/clientcert.pem</span>
+</span></pre></div>
+</div>
+</div>
+</section>
+<section id="provide-multiple-tls-domains-at-the-same-ip-address-with-sni">
+<span id="start-quick-start-securing-sni"></span><h2>Provide multiple <code class="docutils literal notranslate"><span class="pre">TLS</span></code> domains at the same <code class="docutils literal notranslate"><span class="pre">IP</span></code> address with <code class="docutils literal notranslate"><span class="pre">SNI</span></code><a class="headerlink" href="#provide-multiple-tls-domains-at-the-same-ip-address-with-sni" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">SNI</span></code> is an extension to the <code class="docutils literal notranslate"><span class="pre">TLS</span></code> protocol which allows multiple domains served
+from the same <code class="docutils literal notranslate"><span class="pre">IP</span></code> address to be secured with <code class="docutils literal notranslate"><span class="pre">TLS</span></code>.</p>
+<p>To secure specific domains on a listening connection with <code class="docutils literal notranslate"><span class="pre">SNI</span></code>, you should set the
+<a class="reference internal" href="../../api-v3/config/listener/v3/listener_components.proto.html#envoy-v3-api-msg-config-listener-v3-filterchainmatch"><span class="std std-ref">filter_chain_match</span></a> of the
+<a class="reference internal" href="../../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">listener</span></a>:</p>
+<div class="literal-block-wrapper docutils container" id="id8">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/8fc6a9bf1c397342f4e5d3e9ebc43d38/envoy-demo-tls-sni.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy-demo-tls-sni.yaml</span></code></a></span><a class="headerlink" href="#id8" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">29</span><span class="w">                  </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_envoyproxy_io</span>
+<span class="hll"><span class="linenos">30</span><span class="w">     </span><span class="w w-Error"> </span><span class="nt">filter_chain_match</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">31</span><span class="w">        </span><span class="nt">server_names</span><span class="p">:</span>
+</span><span class="hll"><span class="linenos">32</span><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-service-name.example.com</span>
+</span><span class="linenos">33</span><span class="w">      </span><span class="nt">transport_socket</span><span class="p">:</span>
+<span class="linenos">34</span><span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+<span class="linenos">35</span><span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">36</span><span class="w">          </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext</span>
+<span class="linenos">37</span><span class="w">          </span><span class="nt">common_tls_context</span><span class="p">:</span>
+</pre></div>
+</div>
+</div>
+<p>See here for <a class="reference internal" href="../../faq/configuration/sni.html#faq-how-to-setup-sni"><span class="std std-ref">more info about creating multiple endpoints with SNI</span></a></p>
+</section>
+<section id="connect-to-an-endpoint-with-sni">
+<span id="start-quick-start-securing-sni-client"></span><h2>Connect to an endpoint with <code class="docutils literal notranslate"><span class="pre">SNI</span></code><a class="headerlink" href="#connect-to-an-endpoint-with-sni" title="Link to this heading"></a></h2>
+<p>When connecting to a <code class="docutils literal notranslate"><span class="pre">TLS</span></code> endpoint that uses <code class="docutils literal notranslate"><span class="pre">SNI</span></code> you should set
+<a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/tls.proto.html#envoy-v3-api-field-extensions-transport-sockets-tls-v3-upstreamtlscontext-sni"><span class="std std-ref">sni</span></a> in the configuration
+of the <a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/tls.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-upstreamtlscontext"><span class="std std-ref">UpstreamTLSContext</span></a>.</p>
+<p>This will usually be the DNS name of the service you are connecting to.</p>
+<div class="literal-block-wrapper docutils container" id="id9">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../../_downloads/8fc6a9bf1c397342f4e5d3e9ebc43d38/envoy-demo-tls-sni.yaml"><code class="xref download docutils literal notranslate"><span class="pre">envoy-demo-tls-sni.yaml</span></code></a></span><a class="headerlink" href="#id9" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="linenos">57</span><span class="w">                </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="linenos">58</span><span class="w">   </span><span class="w w-Error"> </span><span class="nt">transport_socket</span><span class="p">:</span>
+<span class="linenos">59</span><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.transport_sockets.tls</span>
+<span class="linenos">60</span><span class="w">      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="linenos">61</span><span class="w">        </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext</span>
+<span class="hll"><span class="linenos">62</span><span class="w">        </span><span class="nt">sni</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">www.envoyproxy.io</span>
+</span></pre></div>
+</div>
+</div>
+<p>When connecting to an Envoy endpoint that is protected by <code class="docutils literal notranslate"><span class="pre">SNI</span></code>, this must match one of the
+<a class="reference internal" href="../../api-v3/config/listener/v3/listener_components.proto.html#envoy-v3-api-field-config-listener-v3-filterchainmatch-server-names"><span class="std std-ref">server_names</span></a> set in the endpoint’s
+<a class="reference internal" href="../../api-v3/config/listener/v3/listener_components.proto.html#envoy-v3-api-msg-config-listener-v3-filterchainmatch"><span class="std std-ref">filter_chain_match</span></a>, as
+<a class="reference internal" href="#start-quick-start-securing-sni"><span class="std std-ref">described above</span></a>.</p>
+<p>To derive SNI from a downstream HTTP header <code class="docutils literal notranslate"><span class="pre">host</span></code> or <code class="docutils literal notranslate"><span class="pre">:authority</span></code>, turn on
+<a class="reference internal" href="../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-upstreamhttpprotocoloptions-auto-sni"><span class="std std-ref">auto_sni</span></a> to override the fixed SNI in
+<a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/tls.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-upstreamtlscontext"><span class="std std-ref">UpstreamTlsContext</span></a>. A custom header other than
+the <code class="docutils literal notranslate"><span class="pre">host</span></code> or <code class="docutils literal notranslate"><span class="pre">:authority</span></code> can also be supplied using the optional
+<a class="reference internal" href="../../api-v3/config/core/v3/protocol.proto.html#envoy-v3-api-field-config-core-v3-upstreamhttpprotocoloptions-override-auto-sni-header"><span class="std std-ref">override_auto_sni_header</span></a> field.</p>
+<p>To derive SNI from the host Envoy is connecting to, turn on <a class="reference internal" href="../../api-v3/extensions/transport_sockets/tls/v3/tls.proto.html#envoy-v3-api-field-extensions-transport-sockets-tls-v3-upstreamtlscontext-auto-host-sni"><span class="std std-ref">auto_host_sni</span></a>, which will use the hostname
+of the upstream endpoint.</p>
+<p>When multiple options are configured, <code class="docutils literal notranslate"><span class="pre">auto_sni</span></code> has the highest priority, followed by <code class="docutils literal notranslate"><span class="pre">auto_host_sni</span></code>, followed by
+the fixed <code class="docutils literal notranslate"><span class="pre">sni</span></code>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="admin.html" class="btn btn-neutral float-left" title="Envoy admin interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="next-steps.html" class="btn btn-neutral float-right" title="Next steps" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Securing Envoy</a><ul>
+<li><a class="reference internal" href="#upstream-and-downstream-tls-contexts">Upstream and downstream <code class="docutils literal notranslate"><span class="pre">TLS</span></code> contexts</a></li>
+<li><a class="reference internal" href="#validate-an-endpoint-s-certificates-when-connecting">Validate an endpoint’s certificates when connecting</a></li>
+<li><a class="reference internal" href="#use-mutual-tls-mtls-to-enforce-client-certificate-authentication">Use mutual <code class="docutils literal notranslate"><span class="pre">TLS</span></code> (<code class="docutils literal notranslate"><span class="pre">mTLS</span></code>) to enforce client certificate authentication</a></li>
+<li><a class="reference internal" href="#use-mutual-tls-mtls-to-connect-with-client-certificates">Use mutual <code class="docutils literal notranslate"><span class="pre">TLS</span></code> (<code class="docutils literal notranslate"><span class="pre">mTLS</span></code>) to connect with client certificates</a></li>
+<li><a class="reference internal" href="#provide-multiple-tls-domains-at-the-same-ip-address-with-sni">Provide multiple <code class="docutils literal notranslate"><span class="pre">TLS</span></code> domains at the same <code class="docutils literal notranslate"><span class="pre">IP</span></code> address with <code class="docutils literal notranslate"><span class="pre">SNI</span></code></a></li>
+<li><a class="reference internal" href="#connect-to-an-endpoint-with-sni">Connect to an endpoint with <code class="docutils literal notranslate"><span class="pre">SNI</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

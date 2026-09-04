@@ -1,0 +1,177 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/cors/v3/cors.proto:
+
+Cors (proto)
+============
+
+.. _extension_envoy.filters.http.cors:
+
+This extension has the qualified name ``envoy.filters.http.cors``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors <envoy_v3_api_msg_extensions.filters.http.cors.v3.Cors>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`
+
+
+
+CORS Filter :ref:`configuration overview <config_http_filters_cors>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.cors.v3.Cors:
+
+extensions.filters.http.cors.v3.Cors
+------------------------------------
+
+
+:repo:`[extensions.filters.http.cors.v3.Cors proto] <api/envoy/extensions/filters/http/cors/v3/cors.proto#L28>`
+
+Cors filter config. Set this in
+:ref:`http_filters <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http_filters>`
+to enable the CORS filter.
+
+Please note that the :ref:`CorsPolicy <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`
+must be configured in the ``RouteConfiguration`` as ``typed_per_filter_config`` at some level to make the filter work.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy:
+
+extensions.filters.http.cors.v3.CorsPolicy
+------------------------------------------
+
+
+:repo:`[extensions.filters.http.cors.v3.CorsPolicy proto] <api/envoy/extensions/filters/http/cors/v3/cors.proto#L36>`
+
+Per route configuration for the CORS filter. This configuration should be configured in the ``RouteConfiguration`` as ``typed_per_filter_config`` at some level to
+make the filter work.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "allow_origin_string_match": [],
+    "allow_methods": ...,
+    "allow_headers": ...,
+    "expose_headers": ...,
+    "max_age": ...,
+    "allow_credentials": {...},
+    "filter_enabled": {...},
+    "shadow_enabled": {...},
+    "allow_private_network_access": {...},
+    "forward_not_matching_preflights": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.allow_origin_string_match:
+
+
+allow_origin_string_match
+  (**repeated** :ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) Specifies string patterns that match allowed origins. An origin is allowed if any of the
+  string matchers match.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.allow_methods:
+
+
+allow_methods
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the content for the ``access-control-allow-methods`` header.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.allow_headers:
+
+
+allow_headers
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the content for the ``access-control-allow-headers`` header.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.expose_headers:
+
+
+expose_headers
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the content for the ``access-control-expose-headers`` header.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.max_age:
+
+
+max_age
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the content for the ``access-control-max-age`` header.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.allow_credentials:
+
+
+allow_credentials
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Specifies whether the resource allows credentials.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.filter_enabled:
+
+
+filter_enabled
+  (:ref:`config.core.v3.RuntimeFractionalPercent <envoy_v3_api_msg_config.core.v3.RuntimeFractionalPercent>`) Specifies the % of requests for which the CORS filter is enabled.
+
+  If neither ``filter_enabled``, nor ``shadow_enabled`` are specified, the CORS
+  filter will be enabled for 100% of the requests.
+
+  If :ref:`runtime_key <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` is
+  specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.shadow_enabled:
+
+
+shadow_enabled
+  (:ref:`config.core.v3.RuntimeFractionalPercent <envoy_v3_api_msg_config.core.v3.RuntimeFractionalPercent>`) Specifies the % of requests for which the CORS policies will be evaluated and tracked, but not
+  enforced.
+
+  This field is intended to be used when ``filter_enabled`` is off. That field have to explicitly disable
+  the filter in order for this setting to take effect.
+
+  If :ref:`runtime_key <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` is specified,
+  Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
+  and track the request's ``Origin`` to determine if it's valid but will not enforce any policies.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.allow_private_network_access:
+
+
+allow_private_network_access
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Specify whether allow requests whose target server's IP address is more private than that from
+  which the request initiator was fetched.
+
+  More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.cors.v3.CorsPolicy.forward_not_matching_preflights:
+
+
+forward_not_matching_preflights
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Specifies if preflight requests not matching the configured allowed origin should be forwarded
+  to the upstream. Default is true.
+
+

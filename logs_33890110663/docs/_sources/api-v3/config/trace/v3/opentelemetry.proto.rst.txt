@@ -1,0 +1,192 @@
+.. _envoy_v3_api_file_envoy/config/trace/v3/opentelemetry.proto:
+
+OpenTelemetry tracer (proto)
+============================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.trace.v3.OpenTelemetryConfig:
+
+config.trace.v3.OpenTelemetryConfig
+-----------------------------------
+
+
+:repo:`[config.trace.v3.OpenTelemetryConfig proto] <api/envoy/config/trace/v3/opentelemetry.proto#L24>`
+
+Configuration for the OpenTelemetry tracer.
+ 
+.. _extension_envoy.tracers.opentelemetry:
+
+This extension has the qualified name ``envoy.tracers.opentelemetry``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers <extension_category_envoy.tracers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig <envoy_v3_api_msg_config.trace.v3.OpenTelemetryConfig>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "grpc_service": {...},
+    "http_service": {...},
+    "service_name": ...,
+    "resource_detectors": [],
+    "sampler": {...},
+    "max_cache_size": {...},
+    "set_telemetry_sdk_resource_attributes": {...},
+    "set_service_name_resource_attribute": {...},
+    "set_instrumentation_scope": {...}
+  }
+
+.. _envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.grpc_service:
+
+
+grpc_service
+  (:ref:`config.core.v3.GrpcService <envoy_v3_api_msg_config.core.v3.GrpcService>`) The upstream gRPC cluster that will receive OTLP traces.
+  Note that the tracer drops traces if the server does not read data fast enough.
+  This field can be left empty to disable reporting traces to the gRPC service.
+  Only one of ``grpc_service``, ``http_service``, ``exporter`` may be used.
+
+
+.. _envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.http_service:
+
+
+http_service
+  (:ref:`config.core.v3.HttpService <envoy_v3_api_msg_config.core.v3.HttpService>`) The upstream HTTP cluster that will receive OTLP traces.
+  This field can be left empty to disable reporting traces to the HTTP service.
+  Only one of ``grpc_service``, ``http_service``, ``exporter`` may be used.
+
+  .. note::
+
+    The ``request_headers_to_add`` property in the OTLP HTTP exporter service supports
+    substitution formatters. The formatters cannot access any HTTP or connection properties, but
+    can load content such as environment variables or files or secrets.
+
+
+.. _envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.service_name:
+
+
+service_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name for the service. This will be populated in the ResourceSpan Resource attributes.
+  If it is not provided, it will default to "unknown_service:envoy".
+
+
+.. _envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_detectors:
+
+
+resource_detectors
+  (**repeated** :ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) An ordered list of resource detectors
+
+
+  .. _extension_category_envoy.tracers.opentelemetry.resource_detectors:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.tracers.opentelemetry.resource_detectors.dynatrace <extension_envoy.tracers.opentelemetry.resource_detectors.dynatrace>`
+
+    - :ref:`envoy.tracers.opentelemetry.resource_detectors.environment <extension_envoy.tracers.opentelemetry.resource_detectors.environment>`
+
+    - :ref:`envoy.tracers.opentelemetry.resource_detectors.static_config <extension_envoy.tracers.opentelemetry.resource_detectors.static_config>`
+
+
+
+
+
+.. _envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.sampler:
+
+
+sampler
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Specifies the sampler to be used by the OpenTelemetry tracer.
+  The configured sampler implements the Sampler interface defined by the OpenTelemetry specification.
+  This field can be left empty. In this case, the default Envoy sampling decision is used.
+
+  See: `OpenTelemetry sampler specification <https://opentelemetry.io/docs/specs/otel/trace/sdk/#sampler>`_
+
+
+  .. _extension_category_envoy.tracers.opentelemetry.samplers:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.always_on <extension_envoy.tracers.opentelemetry.samplers.always_on>`
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.cel <extension_envoy.tracers.opentelemetry.samplers.cel>`
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.dynatrace <extension_envoy.tracers.opentelemetry.samplers.dynatrace>`
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.parent_based <extension_envoy.tracers.opentelemetry.samplers.parent_based>`
+
+    - :ref:`envoy.tracers.opentelemetry.samplers.trace_id_ratio_based <extension_envoy.tracers.opentelemetry.samplers.trace_id_ratio_based>`
+
+
+
+
+
+.. _envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.max_cache_size:
+
+
+max_cache_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Envoy caches the span in memory when the OpenTelemetry backend service is temporarily unavailable.
+  This field specifies the maximum number of spans that can be cached. If not specified, the
+  default is 1024.
+
+
+.. _envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.set_telemetry_sdk_resource_attributes:
+
+
+set_telemetry_sdk_resource_attributes
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Specifies whether to set the telemetry SDK resource attributes.
+  The following attributes will be set:
+
+  - telemetry.sdk.language
+  - telemetry.sdk.name
+  - telemetry.sdk.version
+
+  If not specified, the default is to set these attributes.
+
+
+.. _envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.set_service_name_resource_attribute:
+
+
+set_service_name_resource_attribute
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Specifies whether to set the ``service.name`` resource attribute.
+  If not specified, the default is to set this attribute.
+
+
+.. _envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.set_instrumentation_scope:
+
+
+set_instrumentation_scope
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Specifies whether to set the instrumentation scope name ("envoy") and version on emitted traces.
+  If not specified, the default is to set the instrumentation scope name and version.
+
+

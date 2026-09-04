@@ -1,0 +1,51 @@
+.. _version_history_1.28.1:
+
+1.28.1 (February 9, 2024)
+==========================
+
+
+
+
+Incompatible behavior changes
+-----------------------------
+
+*Changes that are expected to cause an incompatibility if applicable;
+deployment changes are likely required*
+
+
+
+* **listener**: undeprecated runtime key ``overload.global_downstream_max_connections`` until :ref:`downstream connections monitor
+  <v1.28:envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` extension becomes stable.
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **buffer**: Fixed a bug (https://github.com/envoyproxy/envoy/issues/28760) that the internal listener causes an undefined
+  behavior due to the unintended release of the buffer memory.
+* **grpc**: Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
+* **http**: Fixed crash when HTTP request idle and per try timeouts occurs within backoff interval.
+* **proxy protocol**: Fixed a crash when Envoy is configured for PROXY protocol on both a listener and cluster, and the listener receives
+  a PROXY protocol header with address type LOCAL (typically used for health checks).
+* **proxy_protocol**: Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+  received in a proxy protocol header. Connections will instead be dropped/reset.
+* **proxy_protocol**: Fixed a bug where TLVs with non utf8 characters were inserted as protobuf values into filter metadata circumventing
+  ext_authz checks when ``failure_mode_allow`` is set to ``true``.
+* **quic**: Fixed a bug in QUIC and HCM interaction which could cause use-after-free during asynchronous certificates retrieval.
+  The fix is guarded by runtime ``envoy.reloadable_features.quic_fix_filter_manager_uaf``.
+* **tls**: Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+  received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
+  ``%DOWNSTREAM_PEER_IP_SAN%``.
+* **tracing**: Fixed a bug that caused the Datadog tracing extension to drop traces that
+  should be kept on account of an extracted sampling decision.
+* **tracing**: Fixed a bug where Datadog spans tagged as errors would not have the appropriate error property set.
+* **tracing**: Fixed a bug where child spans produced by the Datadog tracer would have an incorrect operation name.
+* **url matching**: Fixed excessive CPU utilization when using regex URL template matcher.
+

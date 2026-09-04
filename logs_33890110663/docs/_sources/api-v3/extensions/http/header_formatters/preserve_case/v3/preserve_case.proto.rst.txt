@@ -1,0 +1,102 @@
+.. _envoy_v3_api_file_envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.proto:
+
+Preserve case header formatter (proto)
+======================================
+
+.. _extension_envoy.http.stateful_header_formatters.preserve_case:
+
+This extension has the qualified name ``envoy.http.stateful_header_formatters.preserve_case``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.http.stateful_header_formatters <extension_category_envoy.http.stateful_header_formatters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig <envoy_v3_api_msg_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig:
+
+extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig
+------------------------------------------------------------------------------
+
+
+:repo:`[extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig proto] <api/envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.proto#L19>`
+
+Configuration for the preserve case header formatter.
+See the :ref:`header casing <config_http_conn_man_header_casing>` configuration guide for more
+information.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "forward_reason_phrase": ...,
+    "formatter_type_on_envoy_headers": ...
+  }
+
+.. _envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.forward_reason_phrase:
+
+
+forward_reason_phrase
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Allows forwarding reason phrase text.
+  This is off by default, and a standard reason phrase is used for a corresponding HTTP response code.
+
+
+.. _envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.formatter_type_on_envoy_headers:
+
+
+formatter_type_on_envoy_headers
+  (:ref:`extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.FormatterTypeOnEnvoyHeaders <envoy_v3_api_enum_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.FormatterTypeOnEnvoyHeaders>`) Type of formatter to use on headers which are added by Envoy (which are lower case by default).
+  The default type is DEFAULT, use LowerCase on Envoy headers.
+
+
+.. _envoy_v3_api_enum_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.FormatterTypeOnEnvoyHeaders:
+
+Enum extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.FormatterTypeOnEnvoyHeaders
+---------------------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.FormatterTypeOnEnvoyHeaders proto] <api/envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.proto#L20>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.FormatterTypeOnEnvoyHeaders.DEFAULT:
+
+
+DEFAULT
+  *(DEFAULT)* ⁣Use LowerCase on Envoy added headers.
+
+
+.. _envoy_v3_api_enum_value_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.FormatterTypeOnEnvoyHeaders.PROPER_CASE:
+
+
+PROPER_CASE
+  ⁣Use ProperCaseHeaderKeyFormatter on Envoy added headers that upper cases the first character
+  in each word. The first character as well as any alpha character following a special
+  character is upper cased.
+
+
+

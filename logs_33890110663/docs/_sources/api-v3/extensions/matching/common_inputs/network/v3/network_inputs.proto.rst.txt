@@ -1,0 +1,683 @@
+.. _envoy_v3_api_file_envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto:
+
+Common network matching inputs (proto)
+======================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DestinationIPInput:
+
+extensions.matching.common_inputs.network.v3.DestinationIPInput
+---------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.DestinationIPInput proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L17>`
+
+Specifies that matching should be performed by the destination IP address.
+
+.. _extension_envoy.matching.inputs.destination_ip:
+
+This extension has the qualified name ``envoy.matching.inputs.destination_ip``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DestinationIPInput>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DestinationPortInput:
+
+extensions.matching.common_inputs.network.v3.DestinationPortInput
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.DestinationPortInput proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L22>`
+
+Specifies that matching should be performed by the destination port.
+
+.. _extension_envoy.matching.inputs.destination_port:
+
+This extension has the qualified name ``envoy.matching.inputs.destination_port``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DestinationPortInput>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.SourceIPInput:
+
+extensions.matching.common_inputs.network.v3.SourceIPInput
+----------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.SourceIPInput proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L27>`
+
+Specifies that matching should be performed by the source IP address.
+
+.. _extension_envoy.matching.inputs.source_ip:
+
+This extension has the qualified name ``envoy.matching.inputs.source_ip``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.SourceIPInput>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.SourcePortInput:
+
+extensions.matching.common_inputs.network.v3.SourcePortInput
+------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.SourcePortInput proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L32>`
+
+Specifies that matching should be performed by the source port.
+
+.. _extension_envoy.matching.inputs.source_port:
+
+This extension has the qualified name ``envoy.matching.inputs.source_port``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourcePortInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.SourcePortInput>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DirectSourceIPInput:
+
+extensions.matching.common_inputs.network.v3.DirectSourceIPInput
+----------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.DirectSourceIPInput proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L40>`
+
+Input that matches by the directly connected source IP address (this
+will only be different from the source IP address when using a listener
+filter that overrides the source address, such as the :ref:`Proxy Protocol
+listener filter <config_listener_filters_proxy_protocol>`).
+
+.. _extension_envoy.matching.inputs.direct_source_ip:
+
+This extension has the qualified name ``envoy.matching.inputs.direct_source_ip``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DirectSourceIPInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DirectSourceIPInput>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.SourceTypeInput:
+
+extensions.matching.common_inputs.network.v3.SourceTypeInput
+------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.SourceTypeInput proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L48>`
+
+Input that matches by the source IP type.
+Specifies the source IP match type. The values include:
+
+* ``local`` - matches a connection originating from the same host,
+
+.. _extension_envoy.matching.inputs.source_type:
+
+This extension has the qualified name ``envoy.matching.inputs.source_type``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceTypeInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.SourceTypeInput>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.ServerNameInput:
+
+extensions.matching.common_inputs.network.v3.ServerNameInput
+------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.ServerNameInput proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L56>`
+
+Input that matches by the requested server name (e.g. SNI in TLS).
+
+:ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides the requested server name based on SNI,
+when TLS protocol is detected.
+
+.. _extension_envoy.matching.inputs.server_name:
+
+This extension has the qualified name ``envoy.matching.inputs.server_name``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.ServerNameInput>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.TransportProtocolInput:
+
+extensions.matching.common_inputs.network.v3.TransportProtocolInput
+-------------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.TransportProtocolInput proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L67>`
+
+Input that matches by the transport protocol.
+
+Suggested values include:
+
+* ``raw_buffer`` - default, used when no transport protocol is detected,
+* ``tls`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
+  when TLS protocol is detected.
+
+.. _extension_envoy.matching.inputs.transport_protocol:
+
+This extension has the qualified name ``envoy.matching.inputs.transport_protocol``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.TransportProtocolInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.TransportProtocolInput>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.ApplicationProtocolInput:
+
+extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+---------------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.ApplicationProtocolInput proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L96>`
+
+List of quoted and comma-separated requested application protocols. The list consists of a
+single negotiated application protocol once the network stream is established.
+
+Examples:
+
+* ``'h2','http/1.1'``
+* ``'h2c'``
+
+Suggested values in the list include:
+
+* ``http/1.1`` - set by :ref:`envoy.filters.listener.tls_inspector
+  <config_listener_filters_tls_inspector>` and :ref:`envoy.filters.listener.http_inspector
+  <config_listener_filters_http_inspector>`,
+* ``h2`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
+* ``h2c`` - set by :ref:`envoy.filters.listener.http_inspector <config_listener_filters_http_inspector>`
+
+.. attention::
+
+  Currently, :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides
+  application protocol detection based on the requested
+  `ALPN <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ values.
+
+  However, the use of ALPN is pretty much limited to the HTTP/2 traffic on the Internet,
+  and matching on values other than ``h2`` is going to lead to a lot of false negatives,
+  unless all connecting clients are known to use ALPN.
+
+.. _extension_envoy.matching.inputs.application_protocol:
+
+This extension has the qualified name ``envoy.matching.inputs.application_protocol``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.ApplicationProtocolInput>`
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput:
+
+extensions.matching.common_inputs.network.v3.FilterStateInput
+-------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.FilterStateInput proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L120>`
+
+Input that matches by a specific filter state key.
+The value of the provided filter state key will be the raw string representation of the filter state object.
+
+When ``field`` is specified and the filter state object supports field access
+(i.e. ``hasFieldSupport()`` returns true), the value of the specified field will be returned
+instead of the serialized representation of the entire object. This enables direct matching
+on individual fields within composite filter state objects, such as proxy protocol TLV values
+stored in the shared ``envoy.network.proxy_protocol.tlv`` object.
+
+Example configuration with field access:
+
+.. code-block:: yaml
+
+   input:
+     name: filter_state
+     typed_config:
+       "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+       key: "envoy.network.proxy_protocol.tlv"
+       field: "aws_vpce_id"
+
+
+.. _extension_envoy.matching.inputs.filter_state:
+
+This extension has the qualified name ``envoy.matching.inputs.filter_state``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "key": ...,
+    "field": ...
+  }
+
+.. _envoy_v3_api_field_extensions.matching.common_inputs.network.v3.FilterStateInput.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) 
+
+.. _envoy_v3_api_field_extensions.matching.common_inputs.network.v3.FilterStateInput.field:
+
+
+field
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional field name to retrieve from the filter state object.
+  When set and the filter state object supports field access, the value of this specific
+  field is returned instead of the serialized string representation of the whole object.
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DynamicMetadataInput:
+
+extensions.matching.common_inputs.network.v3.DynamicMetadataInput
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.DynamicMetadataInput proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L154>`
+
+Input that matches dynamic metadata by key.
+DynamicMetadataInput provides a general interface using ``filter`` and ``path`` to retrieve value from
+:ref:`Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`.
+
+For example, for the following Metadata:
+
+.. code-block:: yaml
+
+   filter_metadata:
+     envoy.xxx:
+       prop:
+         foo: bar
+         xyz:
+           hello: envoy
+
+The following DynamicMetadataInput will retrieve a string value "bar" from the Metadata.
+
+.. code-block:: yaml
+
+   filter: envoy.xxx
+   path:
+   - key: prop
+   - key: foo
+
+
+.. _extension_envoy.matching.inputs.dynamic_metadata:
+
+This extension has the qualified name ``envoy.matching.inputs.dynamic_metadata``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DynamicMetadataInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DynamicMetadataInput>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "filter": ...,
+    "path": []
+  }
+
+.. _envoy_v3_api_field_extensions.matching.common_inputs.network.v3.DynamicMetadataInput.filter:
+
+
+filter
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The filter name to retrieve the Struct from the Metadata.
+
+
+.. _envoy_v3_api_field_extensions.matching.common_inputs.network.v3.DynamicMetadataInput.path:
+
+
+path
+  (**repeated** :ref:`extensions.matching.common_inputs.network.v3.DynamicMetadataInput.PathSegment <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DynamicMetadataInput.PathSegment>`, *REQUIRED*) The path to retrieve the Value from the Struct.
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DynamicMetadataInput.PathSegment:
+
+extensions.matching.common_inputs.network.v3.DynamicMetadataInput.PathSegment
+-----------------------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.DynamicMetadataInput.PathSegment proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L158>`
+
+Specifies the segment in a path to retrieve value from Metadata.
+Note: Currently it's not supported to retrieve a value from a list in Metadata. This means that
+if the segment key refers to a list, it has to be the last segment in a path.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "key": ...
+  }
+
+.. _envoy_v3_api_field_extensions.matching.common_inputs.network.v3.DynamicMetadataInput.PathSegment.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) If specified, use the key to retrieve the value in a Struct.
+
+
+  
+
+
+
+.. _envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.NetworkNamespaceInput:
+
+extensions.matching.common_inputs.network.v3.NetworkNamespaceInput
+------------------------------------------------------------------
+
+
+:repo:`[extensions.matching.common_inputs.network.v3.NetworkNamespaceInput proto] <api/envoy/extensions/matching/common_inputs/network/v3/network_inputs.proto#L185>`
+
+Input that matches by the network namespace of the listener address.
+This input returns the network namespace filepath that was used to create the listening socket.
+On Linux systems, this corresponds to the ``network_namespace_filepath`` field in the
+:ref:`SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>` configuration.
+
+.. note::
+
+  This input is only meaningful on Linux systems where network namespaces are supported.
+  On other platforms, this input will always return an empty value.
+
+
+.. _extension_envoy.matching.inputs.network_namespace:
+
+This extension has the qualified name ``envoy.matching.inputs.network_namespace``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.matching.http.input <extension_category_envoy.matching.http.input>`
+
+  - :ref:`envoy.matching.network.input <extension_category_envoy.matching.network.input>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.NetworkNamespaceInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.NetworkNamespaceInput>`
+
+
+
+
+

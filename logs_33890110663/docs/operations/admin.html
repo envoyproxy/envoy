@@ -1,0 +1,1373 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administration interface &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Statistics overview" href="stats_overview.html" />
+    <link rel="prev" title="Hot restart Python wrapper" href="hot_restarter.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../searchindex.js"
+          data-envoy-search-page="../search.html"
+          data-envoy-root="../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="operations.html">Operations and administration</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="cli.html">Command line options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hot_restarter.html">Hot restart Python wrapper</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Administration interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stats_overview.html">Statistics overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime.html">Runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fs_flags.html">File system flags</a></li>
+<li class="toctree-l2"><a class="reference internal" href="traffic_tapping.html">Traffic tapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="certificates.html">Certificate Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="performance.html">Performance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tools/tools.html">Tools</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="operations.html">Operations and administration</a></li>
+      <li class="breadcrumb-item active">Administration interface</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/operations/admin.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="administration-interface">
+<span id="operations-admin-interface"></span><h1>Administration interface<a class="headerlink" href="#administration-interface" title="Link to this heading"></a></h1>
+<p>Envoy exposes a local administration interface that can be used to query and
+modify different aspects of the server:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-msg-config-bootstrap-v3-admin"><span class="std std-ref">v3 API reference</span></a></p></li>
+</ul>
+<div class="admonition attention" id="operations-admin-interface-security">
+<p class="admonition-title">Attention</p>
+<p>The administration interface in its current form both allows destructive operations to be
+performed (e.g., shutting down the server) as well as potentially exposes private information
+(e.g., stats, cluster names, cert info, etc.). It is <strong>critical</strong> that access to the
+administration interface is only allowed via a secure network. It is also <strong>critical</strong> that hosts
+that access the administration interface are <strong>only</strong> attached to the secure network (i.e., to
+avoid CSRF attacks). This involves setting up an appropriate firewall or optimally only allowing
+access to the administration listener via localhost. You can additionally restrict which admin
+paths are reachable using
+<a class="reference internal" href="../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-admin-allow-paths"><span class="std std-ref">allow_paths</span></a>.
+This can be accomplished with a configuration like the following:</p>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text"><a class="reference download internal" download="" href="../_downloads/14a202fddcf5488c3ec006dccbf75aef/admin-interface.yaml"><code class="xref download docutils literal notranslate"><span class="pre">admin-interface.yaml</span></code></a></span><a class="headerlink" href="#id2" title="Link to this code"></a></div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">admin</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">address</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">socket_address</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w">      </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<span class="w">      </span><span class="nt">port_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9901</span>
+<span class="hll"><span class="w">  </span><span class="nt">allow_paths</span><span class="p">:</span>
+</span><span class="hll"><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ready</span>
+</span><span class="hll"><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/stats</span>
+</span><span class="w">  </span><span class="nt">profile_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/tmp/envoy.prof</span>
+</pre></div>
+</div>
+</div>
+<p>All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
+the request has no effect, and an HTTP 400 (Invalid Request) response is returned.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For an endpoint with <em>?format=json</em>, it dumps data as a JSON-serialized proto. Fields with default
+values are not rendered. For example for <em>/clusters?format=json</em>, the circuit breakers thresholds
+priority field is omitted when its value is <a class="reference internal" href="../api-v3/config/core/v3/base.proto.html#envoy-v3-api-enum-value-config-core-v3-routingpriority-default"><span class="std std-ref">DEFAULT priority</span></a> as shown below:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;thresholds&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">   </span><span class="nt">&quot;max_connections&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">   </span><span class="nt">&quot;max_pending_requests&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1024</span><span class="p">,</span>
+<span class="w">   </span><span class="nt">&quot;max_requests&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1024</span><span class="p">,</span>
+<span class="w">   </span><span class="nt">&quot;max_retries&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">   </span><span class="nt">&quot;priority&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;HIGH&quot;</span><span class="p">,</span>
+<span class="w">   </span><span class="nt">&quot;max_connections&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">   </span><span class="nt">&quot;max_pending_requests&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1024</span><span class="p">,</span>
+<span class="w">   </span><span class="nt">&quot;max_requests&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1024</span><span class="p">,</span>
+<span class="w">   </span><span class="nt">&quot;max_retries&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/</span></span><a class="headerlink" href="#get--" title="Link to this definition"></a></dt>
+<dd><p>Render an HTML home page with a table of links to all available options. This can be
+disabled by compiling Envoy with <code class="docutils literal notranslate"><span class="pre">--define=admin_html=disabled</span></code> in which case an error
+message is printed. Disabling the HTML mode reduces the Envoy binary size.</p>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--help">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/help</span></span><a class="headerlink" href="#get--help" title="Link to this definition"></a></dt>
+<dd><p>Print a textual table of all available options.</p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-certs">
+<dt class="sig sig-object http" id="get--certs">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/certs</span></span><a class="headerlink" href="#get--certs" title="Link to this definition"></a></dt>
+<dd><p>List out all loaded TLS certificates, including file name, serial number, subject alternate names and days until
+expiration in JSON format conforming to the <a class="reference internal" href="../api-v3/admin/v3/certs.proto.html#envoy-v3-api-msg-admin-v3-certificates"><span class="std std-ref">certificate proto definition</span></a>.</p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-clusters">
+<dt class="sig sig-object http" id="get--clusters">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/clusters</span></span><a class="headerlink" href="#get--clusters" title="Link to this definition"></a></dt>
+<dd><p>List out all configured <a class="reference internal" href="../intro/arch_overview/upstream/cluster_manager.html#arch-overview-cluster-manager"><span class="std std-ref">cluster manager</span></a> clusters. This
+information includes all discovered upstream hosts in each cluster along with per host statistics.
+This is useful for debugging service discovery issues.</p>
+<dl>
+<dt>Cluster manager information</dt><dd><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">version_info</span></code> string – the version info string of the last loaded
+<a class="reference internal" href="../configuration/upstream/cluster_manager/cds.html#config-cluster-manager-cds"><span class="std std-ref">CDS</span></a> update.
+If Envoy does not have <a class="reference internal" href="../configuration/upstream/cluster_manager/cds.html#config-cluster-manager-cds"><span class="std std-ref">CDS</span></a> setup, the
+output will read <code class="docutils literal notranslate"><span class="pre">version_info::static</span></code>.</p></li>
+</ul>
+</dd>
+<dt>Cluster wide information</dt><dd><ul class="simple">
+<li><p><a class="reference internal" href="../configuration/upstream/cluster_manager/cluster_circuit_breakers.html#config-cluster-manager-cluster-circuit-breakers"><span class="std std-ref">circuit breakers</span></a> settings for all priority settings.</p></li>
+<li><p>Information about <a class="reference internal" href="../intro/arch_overview/upstream/outlier.html#arch-overview-outlier-detection"><span class="std std-ref">outlier detection</span></a> if a detector is installed. Currently
+<a class="reference internal" href="../api-v3/data/cluster/v3/outlier_detection_event.proto.html#envoy-v3-api-field-data-cluster-v3-outlierejectsuccessrate-cluster-average-success-rate"><span class="std std-ref">average success rate</span></a>,
+and <a class="reference internal" href="../api-v3/data/cluster/v3/outlier_detection_event.proto.html#envoy-v3-api-field-data-cluster-v3-outlierejectsuccessrate-cluster-success-rate-ejection-threshold"><span class="std std-ref">ejection threshold</span></a>
+are presented. Both of these values could be <code class="docutils literal notranslate"><span class="pre">-1</span></code> if there was not enough data to calculate them in the last
+<a class="reference internal" href="../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-interval"><span class="std std-ref">interval</span></a>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">added_via_api</span></code> flag – <code class="docutils literal notranslate"><span class="pre">false</span></code> if the cluster was added via static configuration, <code class="docutils literal notranslate"><span class="pre">true</span></code>
+if it was added via the <a class="reference internal" href="../configuration/upstream/cluster_manager/cds.html#config-cluster-manager-cds"><span class="std std-ref">CDS</span></a> api.</p></li>
+</ul>
+</dd>
+<dt>Per host statistics</dt><dd><table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>cx_total</p></td>
+<td><p>Counter</p></td>
+<td><p>Total connections</p></td>
+</tr>
+<tr class="row-odd"><td><p>cx_active</p></td>
+<td><p>Gauge</p></td>
+<td><p>Total active connections</p></td>
+</tr>
+<tr class="row-even"><td><p>cx_connect_fail</p></td>
+<td><p>Counter</p></td>
+<td><p>Total connection failures</p></td>
+</tr>
+<tr class="row-odd"><td><p>rq_total</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests</p></td>
+</tr>
+<tr class="row-even"><td><p>rq_timeout</p></td>
+<td><p>Counter</p></td>
+<td><p>Total timed out requests</p></td>
+</tr>
+<tr class="row-odd"><td><p>rq_success</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests with non-5xx responses</p></td>
+</tr>
+<tr class="row-even"><td><p>rq_error</p></td>
+<td><p>Counter</p></td>
+<td><p>Total requests with 5xx responses</p></td>
+</tr>
+<tr class="row-odd"><td><p>rq_active</p></td>
+<td><p>Gauge</p></td>
+<td><p>Total active requests</p></td>
+</tr>
+<tr class="row-even"><td><p>healthy</p></td>
+<td><p>String</p></td>
+<td><p>The health status of the host. See below</p></td>
+</tr>
+<tr class="row-odd"><td><p>weight</p></td>
+<td><p>Integer</p></td>
+<td><p>Load balancing weight (1-100)</p></td>
+</tr>
+<tr class="row-even"><td><p>zone</p></td>
+<td><p>String</p></td>
+<td><p>Service zone</p></td>
+</tr>
+<tr class="row-odd"><td><p>canary</p></td>
+<td><p>Boolean</p></td>
+<td><p>Whether the host is a canary</p></td>
+</tr>
+<tr class="row-even"><td><p>success_rate</p></td>
+<td><p>Double</p></td>
+<td><p>Request success rate (0-100). -1 if there was not enough
+<a class="reference internal" href="../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-success-rate-request-volume"><span class="std std-ref">request volume</span></a>
+in the <a class="reference internal" href="../api-v3/config/cluster/v3/outlier_detection.proto.html#envoy-v3-api-field-config-cluster-v3-outlierdetection-interval"><span class="std std-ref">interval</span></a>
+to calculate it</p></td>
+</tr>
+</tbody>
+</table>
+</dd>
+<dt>Host health status</dt><dd><p>A host is either healthy or unhealthy because of one or more different failing health states.
+If the host is healthy the <code class="docutils literal notranslate"><span class="pre">healthy</span></code> output will be equal to <em>healthy</em>.</p>
+<p>If the host is not healthy, the <code class="docutils literal notranslate"><span class="pre">healthy</span></code> output will be composed of one or more of the
+following strings:</p>
+<p><em>/failed_active_hc</em>: The host has failed an <a class="reference internal" href="../configuration/upstream/cluster_manager/cluster_hc.html#config-cluster-manager-cluster-hc"><span class="std std-ref">active health check</span></a>.</p>
+<p><em>/failed_eds_health</em>: The host was marked unhealthy by EDS.</p>
+<p><em>/failed_outlier_check</em>: The host has failed an outlier detection check.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--clusters?format=json">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/clusters?format=json</span></span><a class="headerlink" href="#get--clusters?format=json" title="Link to this definition"></a></dt>
+<dd><p>Dump the <em>/clusters</em> output in a JSON-serialized proto. See the
+<a class="reference internal" href="../api-v3/admin/v3/clusters.proto.html#envoy-v3-api-msg-admin-v3-clusters"><span class="std std-ref">definition</span></a> for more information.</p>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--clusters?filter=regex">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/clusters?filter=regex</span></span><a class="headerlink" href="#get--clusters?filter=regex" title="Link to this definition"></a></dt>
+<dd><p>Filters the returned clusters to those with names matching the regular
+expression <code class="docutils literal notranslate"><span class="pre">regex</span></code>. Compatible with <code class="docutils literal notranslate"><span class="pre">format</span></code>. Performs partial
+matching by default, so <code class="docutils literal notranslate"><span class="pre">/clusters?filter=service</span></code> will return all clusters
+containing the word <code class="docutils literal notranslate"><span class="pre">service</span></code>.  Full-string matching can be specified
+with begin- and end-line anchors. (i.e.  <code class="docutils literal notranslate"><span class="pre">/clusters?filter=^my-service-cluster$</span></code>)</p>
+<p>By default, the regular expression is evaluated using the
+<a class="reference external" href="https://github.com/google/re2">Google RE2</a> engine.</p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-config-dump">
+<dt class="sig sig-object http" id="get--config_dump">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/config_dump</span></span><a class="headerlink" href="#get--config_dump" title="Link to this definition"></a></dt>
+<dd><p>Dump currently loaded configuration from various Envoy components as JSON-serialized proto
+messages. See the <a class="reference internal" href="../api-v3/admin/v3/config_dump.proto.html#envoy-v3-api-msg-admin-v3-configdump"><span class="std std-ref">response definition</span></a> for more
+information.</p>
+</dd></dl>
+
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Configuration may include <a class="reference internal" href="../api-v3/extensions/transport_sockets/tls/v3/common.proto.html#envoy-v3-api-msg-extensions-transport-sockets-tls-v3-tlscertificate"><span class="std std-ref">TLS certificates</span></a>. Before
+dumping the configuration, Envoy will attempt to redact the <code class="docutils literal notranslate"><span class="pre">private_key</span></code> and <code class="docutils literal notranslate"><span class="pre">password</span></code>
+fields from any certificates it finds. This relies on the configuration being a strongly-typed
+protobuf message. If your Envoy configuration uses deprecated <code class="docutils literal notranslate"><span class="pre">config</span></code> fields (of type
+<code class="docutils literal notranslate"><span class="pre">google.protobuf.Struct</span></code>), please update to the recommended <code class="docutils literal notranslate"><span class="pre">typed_config</span></code> fields (of type
+<code class="docutils literal notranslate"><span class="pre">google.protobuf.Any</span></code>) to ensure sensitive data is redacted properly.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
+are not guaranteed to be stable.</p>
+</div>
+<dl class="http get" id="operations-admin-interface-config-dump-include-eds">
+<dt class="sig sig-object http" id="get--config_dump?include_eds">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/config_dump?include_eds</span></span><a class="headerlink" href="#get--config_dump?include_eds" title="Link to this definition"></a></dt>
+<dd><p>Dump currently loaded configuration including EDS. See the <a class="reference internal" href="../api-v3/admin/v3/config_dump_shared.proto.html#envoy-v3-api-msg-admin-v3-endpointsconfigdump"><span class="std std-ref">response definition</span></a> for more
+information.</p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-config-dump-by-mask">
+<dt class="sig sig-object http" id="get--config_dump?mask=">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/config_dump?mask={}</span></span><a class="headerlink" href="#get--config_dump?mask=" title="Link to this definition"></a></dt>
+<dd><p>Specify a subset of fields that you would like to be returned. The mask is parsed as a
+<code class="docutils literal notranslate"><span class="pre">Protobuf::FieldMask</span></code> and applied to each top level dump such as
+<a class="reference internal" href="../api-v3/admin/v3/config_dump.proto.html#envoy-v3-api-msg-admin-v3-bootstrapconfigdump"><span class="std std-ref">BootstrapConfigDump</span></a> and
+<a class="reference internal" href="../api-v3/admin/v3/config_dump_shared.proto.html#envoy-v3-api-msg-admin-v3-clustersconfigdump"><span class="std std-ref">ClustersConfigDump</span></a>.
+This behavior changes if both resource and mask query parameters are specified. See
+below for details.</p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-config-dump-by-resource">
+<dt class="sig sig-object http" id="get--config_dump?resource=">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/config_dump?resource={}</span></span><a class="headerlink" href="#get--config_dump?resource=" title="Link to this definition"></a></dt>
+<dd><p>Dump only the currently loaded configuration that matches the specified resource. The resource must
+be a repeated field in one of the top level config dumps such as
+<a class="reference internal" href="../api-v3/admin/v3/config_dump_shared.proto.html#envoy-v3-api-field-admin-v3-listenersconfigdump-static-listeners"><span class="std std-ref">static_listeners</span></a> from
+<a class="reference internal" href="../api-v3/admin/v3/config_dump_shared.proto.html#envoy-v3-api-msg-admin-v3-listenersconfigdump"><span class="std std-ref">ListenersConfigDump</span></a> or
+<a class="reference internal" href="../api-v3/admin/v3/config_dump_shared.proto.html#envoy-v3-api-field-admin-v3-clustersconfigdump-dynamic-active-clusters"><span class="std std-ref">dynamic_active_clusters</span></a> from
+<a class="reference internal" href="../api-v3/admin/v3/config_dump_shared.proto.html#envoy-v3-api-msg-admin-v3-clustersconfigdump"><span class="std std-ref">ClustersConfigDump</span></a>. If you need a non-repeated
+field, use the mask query parameter documented above. If you want only a subset of fields from the repeated
+resource, use both as documented below.</p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-config-dump-by-name-regex">
+<dt class="sig sig-object http" id="get--config_dump?name_regex=">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/config_dump?name_regex={}</span></span><a class="headerlink" href="#get--config_dump?name_regex=" title="Link to this definition"></a></dt>
+<dd><p>Dump only the currently loaded configurations whose names match the specified regex. Can be used with
+both <code class="docutils literal notranslate"><span class="pre">resource</span></code> and <code class="docutils literal notranslate"><span class="pre">mask</span></code> query parameters.</p>
+<p>For example, <code class="docutils literal notranslate"><span class="pre">/config_dump?name_regex=.*substring.*</span></code> would return all resource types
+whose name field matches the given regex.</p>
+<p>Per resource, the matched name field is:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-field-config-listener-v3-listener-name"><span class="std std-ref">envoy.config.listener.v3.Listener.name</span></a></p></li>
+<li><p><a class="reference internal" href="../api-v3/config/route/v3/route.proto.html#envoy-v3-api-field-config-route-v3-routeconfiguration-name"><span class="std std-ref">envoy.config.route.v3.RouteConfiguration.name</span></a></p></li>
+<li><p><a class="reference internal" href="../api-v3/config/route/v3/scoped_route.proto.html#envoy-v3-api-field-config-route-v3-scopedrouteconfiguration-name"><span class="std std-ref">envoy.config.route.v3.ScopedRouteConfiguration.name</span></a></p></li>
+<li><p><a class="reference internal" href="../api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-name"><span class="std std-ref">envoy.config.cluster.v3.Cluster.name</span></a></p></li>
+<li><p><a class="reference internal" href="../api-v3/extensions/transport_sockets/tls/v3/secret.proto.html#envoy-v3-api-field-extensions-transport-sockets-tls-v3-secret-name"><span class="std std-ref">envoy.extensions.transport_sockets.tls.v3.Secret</span></a></p></li>
+<li><p><a class="reference internal" href="../api-v3/config/endpoint/v3/endpoint.proto.html#envoy-v3-api-field-config-endpoint-v3-clusterloadassignment-cluster-name"><span class="std std-ref">envoy.config.endpoint.v3.ClusterLoadAssignment</span></a></p></li>
+</ul>
+<p>For ECDS config dump, the matched name field is the corresponding filter name, which is stored in:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../api-v3/config/core/v3/extension.proto.html#envoy-v3-api-field-config-core-v3-typedextensionconfig-name"><span class="std std-ref">envoy.config.core.v3.TypedExtensionConfig.name</span></a></p></li>
+</ul>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-config-dump-by-resource-and-mask">
+<dt class="sig sig-object http" id="get--config_dump?resource=&amp;mask=">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/config_dump?resource={}&amp;mask={}</span></span><a class="headerlink" href="#get--config_dump?resource=&mask=" title="Link to this definition"></a></dt>
+<dd><p>When both resource and mask query parameters are specified, the mask is applied to every element
+in the desired repeated field so that only a subset of fields are returned. The mask is parsed
+as a <code class="docutils literal notranslate"><span class="pre">Protobuf::FieldMask</span></code>.</p>
+<p>For example, get the names of all active dynamic clusters with
+<code class="docutils literal notranslate"><span class="pre">/config_dump?resource=dynamic_active_clusters&amp;mask=cluster.name</span></code></p>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--contention">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/contention</span></span><a class="headerlink" href="#get--contention" title="Link to this definition"></a></dt>
+<dd><p>Dump current Envoy mutex contention stats (<a class="reference internal" href="../api-v3/admin/v3/mutex_stats.proto.html#envoy-v3-api-msg-admin-v3-mutexstats"><span class="std std-ref">MutexStats</span></a>) in JSON
+format, if mutex tracing is enabled. See <a class="reference internal" href="cli.html#cmdoption-enable-mutex-tracing"><code class="xref std std-option docutils literal notranslate"><span class="pre">--enable-mutex-tracing</span></code></a>.</p>
+</dd></dl>
+
+<dl class="http post">
+<dt class="sig sig-object http" id="post--cpuprofiler">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/cpuprofiler</span></span><a class="headerlink" href="#post--cpuprofiler" title="Link to this definition"></a></dt>
+<dd><p>Enable or disable the CPU profiler. Requires compiling with gperftools. The output file can be configured by admin.profile_path.</p>
+</dd></dl>
+
+<dl class="http post">
+<dt class="sig sig-object http" id="post--heapprofiler">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/heapprofiler</span></span><a class="headerlink" href="#post--heapprofiler" title="Link to this definition"></a></dt>
+<dd><p>Enable or disable the Heap profiler. Requires compiling with gperftools. The output file can be configured by admin.profile_path.</p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-heap-dump">
+<dt class="sig sig-object http" id="get--heap_dump">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/heap_dump</span></span><a class="headerlink" href="#get--heap_dump" title="Link to this definition"></a></dt>
+<dd><p>Dump current heap profile of Envoy process. The output content is parsable binary by the <code class="docutils literal notranslate"><span class="pre">pprof</span></code> tool.
+Requires compiling with tcmalloc (default).</p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-peak-heap-dump">
+<dt class="sig sig-object http" id="get--peak_heap_dump">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/peak_heap_dump</span></span><a class="headerlink" href="#get--peak_heap_dump" title="Link to this definition"></a></dt>
+<dd><p>Dump peak heap profile of Envoy process. This captures the heap state at peak memory usage.
+The output content is parsable binary by the <code class="docutils literal notranslate"><span class="pre">pprof</span></code> tool.
+Requires compiling with tcmalloc (default).</p>
+</dd></dl>
+
+<dl class="http post">
+<dt class="sig sig-object http" id="post--allocprofiler">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/allocprofiler</span></span><a class="headerlink" href="#post--allocprofiler" title="Link to this definition"></a></dt>
+<dd><p>Enable or disable the allocation profiler. The output content is parsable binary by the <code class="docutils literal notranslate"><span class="pre">pprof</span></code> tool.
+Requires compiling with tcmalloc (default).</p>
+</dd></dl>
+
+<dl class="http post" id="operations-admin-interface-healthcheck-fail">
+<dt class="sig sig-object http" id="post--healthcheck-fail">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/healthcheck/fail</span></span><a class="headerlink" href="#post--healthcheck-fail" title="Link to this definition"></a></dt>
+<dd><p>Fail inbound health checks. This requires the use of the HTTP <a class="reference internal" href="../configuration/http/http_filters/health_check_filter.html#config-http-filters-health-check"><span class="std std-ref">health check filter</span></a>. This is useful for draining a server prior to shutting it
+down or doing a full restart. Invoking this command will universally fail health check requests
+regardless of how the filter is configured (pass through, etc.).</p>
+</dd></dl>
+
+<dl class="http post" id="operations-admin-interface-healthcheck-ok">
+<dt class="sig sig-object http" id="post--healthcheck-ok">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/healthcheck/ok</span></span><a class="headerlink" href="#post--healthcheck-ok" title="Link to this definition"></a></dt>
+<dd><p>Negate the effect of <a class="reference internal" href="#post--healthcheck-fail" title="POST /healthcheck/fail"><code class="xref http http-post docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/healthcheck/fail</span></code></a>. This requires the use of the HTTP
+<a class="reference internal" href="../configuration/http/http_filters/health_check_filter.html#config-http-filters-health-check"><span class="std std-ref">health check filter</span></a>.</p>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--hot_restart_version">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/hot_restart_version</span></span><a class="headerlink" href="#get--hot_restart_version" title="Link to this definition"></a></dt>
+<dd><p>See <a class="reference internal" href="cli.html#cmdoption-hot-restart-version"><code class="xref std std-option docutils literal notranslate"><span class="pre">--hot-restart-version</span></code></a>.</p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-init-dump">
+<dt class="sig sig-object http" id="get--init_dump">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/init_dump</span></span><a class="headerlink" href="#get--init_dump" title="Link to this definition"></a></dt>
+<dd><p>Dump current information of unready targets of various Envoy components as JSON-serialized proto
+messages. See the <a class="reference internal" href="../api-v3/admin/v3/init_dump.proto.html#envoy-v3-api-msg-admin-v3-unreadytargetsdumps"><span class="std std-ref">response definition</span></a> for more
+information.</p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-init-dump-by-mask">
+<dt class="sig sig-object http" id="get--init_dump?mask=">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/init_dump?mask={}</span></span><a class="headerlink" href="#get--init_dump?mask=" title="Link to this definition"></a></dt>
+<dd><p>When mask query parameters is specified, the mask value is the desired component to dump unready targets.
+The mask is parsed as a <code class="docutils literal notranslate"><span class="pre">Protobuf::FieldMask</span></code>.</p>
+<p>For example, get the unready targets of all listeners with
+<code class="docutils literal notranslate"><span class="pre">/init_dump?mask=listener</span></code></p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-listeners">
+<dt class="sig sig-object http" id="get--listeners">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/listeners</span></span><a class="headerlink" href="#get--listeners" title="Link to this definition"></a></dt>
+<dd><p>List out all configured <a class="reference internal" href="../intro/arch_overview/listeners/listeners.html#arch-overview-listeners"><span class="std std-ref">listeners</span></a>. This information includes the names of listeners as well as
+the addresses that they are listening on. If a listener is configured to listen on port 0, then the output will contain the actual
+port that was allocated by the OS.</p>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--listeners?format=json">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/listeners?format=json</span></span><a class="headerlink" href="#get--listeners?format=json" title="Link to this definition"></a></dt>
+<dd><p>Dump the <em>/listeners</em> output in a JSON-serialized proto. See the
+<a class="reference internal" href="../api-v3/admin/v3/listeners.proto.html#envoy-v3-api-msg-admin-v3-listeners"><span class="std std-ref">definition</span></a> for more information.</p>
+</dd></dl>
+
+<dl class="http post" id="operations-admin-interface-logging">
+<dt class="sig sig-object http" id="post--logging">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/logging</span></span><a class="headerlink" href="#post--logging" title="Link to this definition"></a></dt>
+<dd><p>Enable/disable logging levels for different loggers.</p>
+<p>If the default component logger is used, the logger name should be exactlly the component name.</p>
+<ul class="simple">
+<li><p>To change the logging level across all loggers, set the query parameter as <code class="docutils literal notranslate"><span class="pre">level=&lt;desired_level&gt;</span></code>.</p></li>
+<li><p>To change a particular logger’s level, set the query parameter like so, <code class="docutils literal notranslate"><span class="pre">&lt;logger_name&gt;=&lt;desired_level&gt;</span></code>.</p></li>
+<li><p>To change multiple logging levels at once, set the query parameter as <code class="docutils literal notranslate"><span class="pre">paths=&lt;logger_name1&gt;:&lt;desired_level1&gt;,&lt;logger_name2&gt;:&lt;desired_level2&gt;</span></code>.</p></li>
+<li><p>To list the loggers, send a POST request to the <code class="docutils literal notranslate"><span class="pre">/logging</span></code> endpoint without a query parameter.</p></li>
+</ul>
+<p>If <code class="docutils literal notranslate"><span class="pre">--enable-fine-grain-logging</span></code> is set, the logger is represented by the path of the file it belongs to (to be specific, the path determined by <code class="docutils literal notranslate"><span class="pre">__FILE__</span></code>),
+so the logger list will show a list of file paths, and the specific path should be used as <code class="docutils literal notranslate"><span class="pre">&lt;logger_name&gt;</span></code> to change the log level.</p>
+<p>We also added the file basename, glob <code class="docutils literal notranslate"><span class="pre">*</span></code> and <code class="docutils literal notranslate"><span class="pre">?</span></code> support for fine-grain loggers. For example, we have the following active loggers with trace level.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>source/server/admin/admin_filter.cc: trace
+source/common/event/dispatcher_impl.cc: trace
+source/common/network/tcp_listener_impl.cc: trace
+source/common/network/udp_listener_impl.cc: trace
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">/logging?paths=source/common/event/dispatcher_impl.cc:debug</span></code> will make the level of <code class="docutils literal notranslate"><span class="pre">source/common/event/dispatcher_impl.cc</span></code> be debug.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">/logging?group=http:info</span></code> will make the level of all loggers in the <code class="docutils literal notranslate"><span class="pre">http</span></code> group be info.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">/logging?admin_filter=info</span></code> will make the level of <code class="docutils literal notranslate"><span class="pre">source/server/admin/admin_filter.cc</span></code> be info, and other unmatched loggers will be the default trace.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">/logging?paths=source/common*:warning</span></code> will make the level of <code class="docutils literal notranslate"><span class="pre">source/common/event/dispatcher_impl.cc:</span></code>, <code class="docutils literal notranslate"><span class="pre">source/common/network/tcp_listener_impl.cc</span></code> be warning.
+Other unmatched loggers will be the default trace, e.g., <cite>admin_filter.cc</cite>, even it was updated to info from the previous post update.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">/logging?paths=???_listener_impl:info</span></code> will make the level of <code class="docutils literal notranslate"><span class="pre">source/common/network/tcp_listener_impl.cc</span></code>, <code class="docutils literal notranslate"><span class="pre">source/common/network/udp_listener_impl.cc</span></code> be info.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">/logging?paths=???_listener_impl:info,tcp_listener_impl:warning</span></code>, the level of <code class="docutils literal notranslate"><span class="pre">source/common/network/tcp_listener_impl.cc</span></code> will be info, since the first match will take effect.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">/logging?level=info</span></code> will change the default verbosity level to info. All the unmatched loggers in the following update will be this default level.</p></li>
+</ul>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--memory">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/memory</span></span><a class="headerlink" href="#get--memory" title="Link to this definition"></a></dt>
+<dd><p>Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all <code class="docutils literal notranslate"><span class="pre">/stats</span></code> and filtering to get the memory-related statistics.</p>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--memory-tcmalloc">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/memory/tcmalloc</span></span><a class="headerlink" href="#get--memory-tcmalloc" title="Link to this definition"></a></dt>
+<dd><p>Dumps the current <a class="reference external" href="https://github.com/google/tcmalloc/tree/master/docs/stats.md">TCMalloc stats</a>.</p>
+</dd></dl>
+
+<dl class="http post">
+<dt class="sig sig-object http" id="post--quitquitquit">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/quitquitquit</span></span><a class="headerlink" href="#post--quitquitquit" title="Link to this definition"></a></dt>
+<dd><p>Cleanly exit the server.</p>
+</dd></dl>
+
+<dl class="http post">
+<dt class="sig sig-object http" id="post--reset_counters">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/reset_counters</span></span><a class="headerlink" href="#post--reset_counters" title="Link to this definition"></a></dt>
+<dd><p>Reset all counters to zero. This is useful along with <a class="reference internal" href="#get--stats" title="GET /stats"><code class="xref http http-get docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/stats</span></code></a> during debugging. Note
+that this does not drop any data sent to statsd. It just affects local output of the
+<a class="reference internal" href="#get--stats" title="GET /stats"><code class="xref http http-get docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/stats</span></code></a> command.</p>
+</dd></dl>
+
+<dl class="http post" id="operations-admin-interface-drain">
+<dt class="sig sig-object http" id="post--drain_listeners">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/drain_listeners</span></span><a class="headerlink" href="#post--drain_listeners" title="Link to this definition"></a></dt>
+<dd><p><a class="reference internal" href="../intro/arch_overview/operations/draining.html#arch-overview-draining"><span class="std std-ref">Drains</span></a> all listeners. The listeners are stopped immediately and
+a drain sequence is started, so that connection-level drain logic (configurable via
+<a class="reference internal" href="cli.html#cmdoption-drain-strategy"><code class="xref std std-option docutils literal notranslate"><span class="pre">--drain-strategy</span></code></a>) applies to the connections the listeners own. Draining the
+connections can be temporarily reverted by setting the runtime guard
+<code class="docutils literal notranslate"><span class="pre">envoy.reloadable_features.non_graceful_drain_notifies_connections</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p>
+<dl class="http post">
+<dt class="sig sig-object http" id="post--drain_listeners?inboundonly">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/drain_listeners?inboundonly</span></span><a class="headerlink" href="#post--drain_listeners?inboundonly" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p><a class="reference internal" href="../intro/arch_overview/operations/draining.html#arch-overview-draining"><span class="std std-ref">Drains</span></a> all inbound listeners. <code class="docutils literal notranslate"><span class="pre">traffic_direction</span></code> field in
+<a class="reference internal" href="../api-v3/config/listener/v3/listener.proto.html#envoy-v3-api-msg-config-listener-v3-listener"><span class="std std-ref">Listener</span></a> is used to determine whether a listener
+is inbound or outbound. May not be effective for network filters like <a class="reference internal" href="../configuration/listeners/network_filters/redis_proxy_filter.html#config-network-filters-redis-proxy"><span class="std std-ref">Redis</span></a>,
+<a class="reference internal" href="../configuration/listeners/network_filters/mongo_proxy_filter.html#config-network-filters-mongo-proxy"><span class="std std-ref">Mongo</span></a>, or <a class="reference internal" href="../configuration/listeners/network_filters/thrift_proxy_filter.html#config-network-filters-thrift-proxy"><span class="std std-ref">Thrift</span></a>.</p>
+<dl class="http post">
+<dt class="sig sig-object http" id="post--drain_listeners?graceful">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/drain_listeners?graceful</span></span><a class="headerlink" href="#post--drain_listeners?graceful" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>When draining listeners, enter a graceful drain period prior to closing listeners.
+This behaviour and duration is configurable via server options or CLI
+(<a class="reference internal" href="cli.html#cmdoption-drain-time-s"><code class="xref std std-option docutils literal notranslate"><span class="pre">--drain-time-s</span></code></a> and <a class="reference internal" href="cli.html#cmdoption-drain-strategy"><code class="xref std std-option docutils literal notranslate"><span class="pre">--drain-strategy</span></code></a>).</p>
+<dl class="http post">
+<dt class="sig sig-object http" id="post--drain_listeners?skip_exit">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/drain_listeners?skip_exit</span></span><a class="headerlink" href="#post--drain_listeners?skip_exit" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>When draining listeners, do not stop them: the existing connections are drained while the
+listeners keep accepting new ones. Since the drain period only delays stopping the listeners,
+adding <code class="docutils literal notranslate"><span class="pre">graceful</span></code> makes no difference when <code class="docutils literal notranslate"><span class="pre">skip_exit</span></code> is set.</p>
+</dd></dl>
+
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>This operation directly stops the matched listeners on workers. Once listeners in a given
+traffic direction are stopped, listener additions and modifications in that direction
+are not allowed.</p>
+</div>
+<dl class="http get" id="operations-admin-interface-server-info">
+<dt class="sig sig-object http" id="get--server_info">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/server_info</span></span><a class="headerlink" href="#get--server_info" title="Link to this definition"></a></dt>
+<dd><p>Outputs a JSON message containing information about the running server.</p>
+<p>Sample output looks like:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;b050513e840aa939a01f89b07c162f00ab3150eb/1.9.0-dev/Modified/DEBUG&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;LIVE&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;command_line_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;base_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;concurrency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;config_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;config.yaml&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;config_yaml&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allow_unknown_static_fields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;admin_address_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;local_address_ip_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;v4&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;log_level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;info&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;component_log_level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;log_format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;[%Y-%m-%d %T.%e][%t][%l][%n] %v&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;log_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;hot_restart_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;service_cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;service_node&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;service_zone&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Serve&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;disable_hot_restart&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;enable_mutex_tracing&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;restart_epoch&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;file_flush_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;10s&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;drain_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;600s&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;parent_shutdown_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;900s&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;cpuset_threads&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;uptime_current_epoch&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;6s&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uptime_all_epochs&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;6s&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;node&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;node1&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cluster1&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;user_agent_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;envoy&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;user_agent_build_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;major_number&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;minor_number&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;patch&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span>
+<span class="w">    </span><span class="nt">&quot;extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">&quot;client_features&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">&quot;listening_addresses&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>See the <a class="reference internal" href="../api-v3/admin/v3/server_info.proto.html#envoy-v3-api-msg-admin-v3-serverinfo"><span class="std std-ref">ServerInfo proto</span></a> for an
+explanation of the output.</p>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--ready">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/ready</span></span><a class="headerlink" href="#get--ready" title="Link to this definition"></a></dt>
+<dd><p>Outputs a string and error code reflecting the state of the server. 200 is returned for the LIVE state,
+and 503 otherwise. This can be used as a readiness check.</p>
+<p>Example output:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>LIVE
+</pre></div>
+</div>
+<p>See the <code class="docutils literal notranslate"><span class="pre">state</span></code> field of the <a class="reference internal" href="../api-v3/admin/v3/server_info.proto.html#envoy-v3-api-msg-admin-v3-serverinfo"><span class="std std-ref">ServerInfo proto</span></a> for an
+explanation of the output.</p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-stats">
+<dt class="sig sig-object http" id="get--stats">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats</span></span><a class="headerlink" href="#get--stats" title="Link to this definition"></a></dt>
+<dd><p>Outputs all statistics on demand. This command is very useful for local debugging.
+Histograms will output the computed quantiles i.e P0,P25,P50,P75,P90,P99,P99.9 and P100.
+The output for each quantile will be in the form of (interval,cumulative) where the interval value
+represents the summary since last flush. By default, a timer is setup to flush in intervals
+defined by <a class="reference internal" href="../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-stats-flush-interval"><span class="std std-ref">stats_flush_interval</span></a>,
+defaulting to 5 seconds. If <a class="reference internal" href="../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-stats-flush-on-admin"><span class="std std-ref">stats_flush_on_admin</span></a>
+is specified, stats are flushed when this endpoint is queried and a timer will not be used. The cumulative
+value represents the summary since the start of Envoy instance. “No recorded values” in the histogram
+output indicates that it has not been updated with a value. See <a class="reference internal" href="stats_overview.html#operations-stats"><span class="std std-ref">here</span></a> for more information.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?usedonly">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?usedonly</span></span><a class="headerlink" href="#get--stats?usedonly" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
+least once, and histograms added to at least once).</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?hidden=only">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?hidden=only</span></span><a class="headerlink" href="#get--stats?hidden=only" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Only outputs statistics that are internally marked as hidden.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?hidden=include">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?hidden=include</span></span><a class="headerlink" href="#get--stats?hidden=include" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Hidden stats will be shown along side non-hidden stats.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?hidden=exclude">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?hidden=exclude</span></span><a class="headerlink" href="#get--stats?hidden=exclude" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Hidden stats will be excluded from the output. This is the default behavior.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?filter=regex">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?filter=regex</span></span><a class="headerlink" href="#get--stats?filter=regex" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Filters the returned stats to those with names matching the regular
+expression <code class="docutils literal notranslate"><span class="pre">regex</span></code>. Compatible with <code class="docutils literal notranslate"><span class="pre">usedonly</span></code>. Performs partial
+matching by default, so <code class="docutils literal notranslate"><span class="pre">/stats?filter=server</span></code> will return all stats
+containing the word <code class="docutils literal notranslate"><span class="pre">server</span></code>.  Full-string matching can be specified
+with begin- and end-line anchors. (i.e.  <code class="docutils literal notranslate"><span class="pre">/stats?filter=^server.concurrency$</span></code>)</p>
+<p>By default, the regular expression is evaluated using the
+<a class="reference external" href="https://github.com/google/re2">Google RE2</a> engine.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?filter=regex&amp;invert_filter">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?filter=regex&amp;invert_filter</span></span><a class="headerlink" href="#get--stats?filter=regex&invert_filter" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Inverts the <code class="docutils literal notranslate"><span class="pre">filter</span></code> regex, returning stats whose names do not match.
+Requires <code class="docutils literal notranslate"><span class="pre">filter</span></code>.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?histogram_buckets=cumulative">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?histogram_buckets=cumulative</span></span><a class="headerlink" href="#get--stats?histogram_buckets=cumulative" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Changes histogram output to display cumulative buckets with upper bounds (e.g. B0.5, B1, B5, …).
+The output for each bucket will be in the form of (interval,cumulative) (e.g. B0.5(0,0)).
+All values below the upper bound are included even if they are placed into other buckets.
+Compatible with <code class="docutils literal notranslate"><span class="pre">usedonly</span></code> and <code class="docutils literal notranslate"><span class="pre">filter</span></code>.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?histogram_buckets=disjoint">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?histogram_buckets=disjoint</span></span><a class="headerlink" href="#get--stats?histogram_buckets=disjoint" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Changes histogram output to display disjoint buckets with upper bounds (e.g. B0.5, B1, B5, …).
+The output for each bucket will be in the form of (interval,cumulative) (e.g. B0.5(0,0)).
+Buckets do not include values from other buckets with smaller upper bounds;
+the previous bucket’s upper bound acts as a lower bound. Compatible with <code class="docutils literal notranslate"><span class="pre">usedonly</span></code> and <code class="docutils literal notranslate"><span class="pre">filter</span></code>.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?histogram_buckets=detailed">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?histogram_buckets=detailed</span></span><a class="headerlink" href="#get--stats?histogram_buckets=detailed" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Shows histograms as both percentile summary data, and raw bucket data.</p>
+<p>Example output
+.. code-block:: text</p>
+<blockquote>
+<div><dl class="simple">
+<dt>http.admin.downstream_rq_time:</dt><dd><p>totals=1,0.25:25, 2,0.25:9
+intervals=1,0.25:2, 2,0.25:3
+summary=P0(1,1) P25(1.0625,1.034) P50(2.0166,1.068) P75(2.058,2.005) P90(2.083,2.06) P95(2.091,2.08) P99(2.09,2.09) P99.5(2.099,2.098) P99.9(2.099,2.099) P100(2.1,2.1)</p>
+</dd>
+</dl>
+</div></blockquote>
+<p>Each bucket is shown as <cite>lower_bound,width:count</cite>. In the above example there are two
+buckets. <cite>totals</cite> contains the accumulated data-points since the binary was started.
+<cite>intervals</cite> shows the new data points since the previous stats flush.</p>
+<p>Compatible with <code class="docutils literal notranslate"><span class="pre">usedonly</span></code> and <code class="docutils literal notranslate"><span class="pre">filter</span></code>.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?format=html">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?format=html</span></span><a class="headerlink" href="#get--stats?format=html" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Renders stats using HTML for a web browser, providing form fields to incrementally
+modify the filter, toggle used-only mode, control the types of stats displayed,
+and also toggle into another format.</p>
+<p>This format is disabled if Envoy is compiled with <cite>–define=admin_html=disabled</cite></p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?format=active-html">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?format=active-html</span></span><a class="headerlink" href="#get--stats?format=active-html" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Renders stats continuously, displaying the top 50 stats ordered by frequency of
+changes. In this format, used-only mode is implied. You can incrementally adjust
+the filter, the subset of types, the number of stats displayed, and the interval
+between updates.</p>
+<p>After using this mode, be sure to close the browser tab to avoid
+placing periodic load on the server as stats are updated regularly.</p>
+<p>This format is disabled if Envoy is compiled with <cite>–define=admin_html=disabled</cite></p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?format=json">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?format=json</span></span><a class="headerlink" href="#get--stats?format=json" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
+will be in the form of a set of (name,value) pairs. Histograms will be under the element “histograms”,
+that contains “supported_quantiles” which lists the quantiles supported and an array of computed_quantiles
+that has the computed quantile for each histogram.</p>
+<p>If a histogram is not updated during an interval, the output will have null for all the quantiles.</p>
+<p>Example histogram output:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;histograms&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;supported_quantiles&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">25</span><span class="p">,</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span><span class="w"> </span><span class="mi">75</span><span class="p">,</span><span class="w"> </span><span class="mi">90</span><span class="p">,</span><span class="w"> </span><span class="mi">95</span><span class="p">,</span><span class="w"> </span><span class="mi">99</span><span class="p">,</span><span class="w"> </span><span class="mf">99.9</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;computed_quantiles&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cluster.external_auth_cluster.upstream_cx_length_ms&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;values&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0435787</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0435787</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0941565</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0941565</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0860023</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0860023</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">3.0665233</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">3.0665233</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">6.046609</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">6.046609</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">229.57333</span><span class="p">,</span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">229.57333</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">260</span><span class="p">,</span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">260</span><span class="p">}</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;http.admin.downstream_rq_time&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;values&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0435787</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0941565</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0860023</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">3.0665233</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">6.046609</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">229.57333</span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">260</span><span class="p">}</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?format=json&amp;usedonly">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?format=json&amp;usedonly</span></span><a class="headerlink" href="#get--stats?format=json&usedonly" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Outputs statistics that Envoy has updated (counters incremented at least once,
+gauges changed at least once, and histograms added to at least once) in JSON format.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?format=json&amp;histogram_buckets=cumulative">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?format=json&amp;histogram_buckets=cumulative</span></span><a class="headerlink" href="#get--stats?format=json&histogram_buckets=cumulative" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Changes histogram output to display cumulative buckets with upper bounds.
+All values below the upper bound are included even if they are placed into other buckets.
+Compatible with <code class="docutils literal notranslate"><span class="pre">usedonly</span></code> and <code class="docutils literal notranslate"><span class="pre">filter</span></code>.</p>
+<p>Example histogram output:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;histograms&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example_histogram&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;buckets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">}</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;other_example_histogram&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;buckets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">250</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2500</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">60000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">300000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1800000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3600000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600</span><span class="p">}</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?format=json&amp;histogram_buckets=disjoint">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?format=json&amp;histogram_buckets=disjoint</span></span><a class="headerlink" href="#get--stats?format=json&histogram_buckets=disjoint" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Changes histogram output to display disjoint buckets with upper bounds.
+Buckets do not include values from other buckets with smaller upper bounds;
+the previous bucket’s upper bound acts as a lower bound. Compatible with <code class="docutils literal notranslate"><span class="pre">usedonly</span></code> and <code class="docutils literal notranslate"><span class="pre">filter</span></code>.</p>
+<p>Example histogram output:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;histograms&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;example_histogram&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;buckets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;other_example_histogram&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;buckets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">250</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2500</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">60000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">300000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">600000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1800000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;upper_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3600000</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?format=json&amp;histogram_buckets=detailed">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?format=json&amp;histogram_buckets=detailed</span></span><a class="headerlink" href="#get--stats?format=json&histogram_buckets=detailed" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Shows histograms as both percentile summary data..</p>
+<p>Example output:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;stats&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;histograms&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;supported_percentiles&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">25</span><span class="p">,</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span><span class="w"> </span><span class="mi">75</span><span class="p">,</span><span class="w"> </span><span class="mi">90</span><span class="p">,</span><span class="w"> </span><span class="mi">95</span><span class="p">,</span><span class="w"> </span><span class="mi">99</span><span class="p">,</span><span class="w"> </span><span class="mf">99.5</span><span class="p">,</span><span class="w"> </span><span class="mf">99.9</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">],</span>
+<span class="w">        </span><span class="nt">&quot;details&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;http.admin.downstream_rq_time&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;percentiles&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">},</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0351851851851852</span><span class="w"> </span><span class="p">},</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0703703703703704</span><span class="w"> </span><span class="p">},</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0136363636363637</span><span class="w"> </span><span class="p">},</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0654545454545454</span><span class="w"> </span><span class="p">},</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0827272727272725</span><span class="w"> </span><span class="p">},</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0965454545454545</span><span class="w"> </span><span class="p">},</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.098272727272727</span><span class="w"> </span><span class="p">},</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0996545454545457</span><span class="w"> </span><span class="p">},</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="nt">&quot;cumulative&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.1</span><span class="w"> </span><span class="p">}</span>
+<span class="w">            </span><span class="p">],</span>
+<span class="w">            </span><span class="nt">&quot;totals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;lower_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.25</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="w"> </span><span class="p">},</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;lower_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.25</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">9</span><span class="w"> </span><span class="p">}</span>
+<span class="w">            </span><span class="p">],</span>
+<span class="w">            </span><span class="nt">&quot;intervals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;lower_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.25</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">},</span>
+<span class="w">              </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;lower_bound&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.25</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="p">}</span>
+<span class="w">            </span><span class="p">],</span>
+<span class="w">          </span><span class="p">},</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Compatible with <code class="docutils literal notranslate"><span class="pre">usedonly</span></code> and <code class="docutils literal notranslate"><span class="pre">filter</span></code>.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?format=prometheus">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?format=prometheus</span></span><a class="headerlink" href="#get--stats?format=prometheus" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>or alternatively,</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats-prometheus">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats/prometheus</span></span><a class="headerlink" href="#get--stats-prometheus" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Outputs /stats in <a class="reference external" href="https://prometheus.io/docs/instrumenting/exposition_formats/">Prometheus</a>
+format. This can be used to integrate with a Prometheus server.</p>
+<p>The output will either be the protobuf format or the v0.0.4 text format, depending on the value
+of the <code class="docutils literal notranslate"><span class="pre">Accept</span></code> header. A prometheus scrape configuration specifies the desired protocol:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">scrape_configs</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">scrape_protocols</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;PrometheusProto&#39;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;PrometheusText0.0.4&#39;</span>
+</pre></div>
+</div>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats-prometheus?histogram_buckets=prometheusnative&amp;native_histogram_max_buckets=20">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats/prometheus?histogram_buckets=prometheusnative&amp;native_histogram_max_buckets=20</span></span><a class="headerlink" href="#get--stats-prometheus?histogram_buckets=prometheusnative&native_histogram_max_buckets=20" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Outputs histograms as <a class="reference external" href="https://prometheus.io/docs/specs/native_histograms">Prometheus native histograms</a>.
+This is only available when using the protobuf exposition format.</p>
+<p>This mode ignores <a class="reference internal" href="../api-v3/config/metrics/v3/stats.proto.html#envoy-v3-api-field-config-metrics-v3-statsconfig-histogram-bucket-settings"><span class="std std-ref">configured histogram bucket limits</span></a>
+and generates a sparse histogram representation which will use a maximum number of buckets, with
+accuracy adjusted to that number. The default values is 20 if no value for <cite>native_histogram_max_buckets</cite>
+is specified.</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?format=prometheus&amp;usedonly">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?format=prometheus&amp;usedonly</span></span><a class="headerlink" href="#get--stats?format=prometheus&usedonly" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>You can optionally pass the <code class="docutils literal notranslate"><span class="pre">usedonly</span></code> URL query parameter to only get statistics that
+Envoy has updated (counters incremented at least once, gauges changed at least once,
+and histograms added to at least once).</p>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?format=prometheus&amp;text_readouts">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?format=prometheus&amp;text_readouts</span></span><a class="headerlink" href="#get--stats?format=prometheus&text_readouts" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Optional <code class="docutils literal notranslate"><span class="pre">text_readouts</span></code> query parameter is used to get all stats including text readouts.
+Text readout stats are returned in gauge format. These gauges always have value 0. Each
+gauge record has additional label named <code class="docutils literal notranslate"><span class="pre">text_value</span></code> that contains value of a text readout.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Every unique combination of key-value label pair represents a new time series
+in Prometheus, which can dramatically increase the amount of data stored.
+Text readout stats create a new label value every time the value
+of the text readout stat changes, which could create an unbounded number of time series.</p>
+</div>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats?format=prometheus&amp;histogram_buckets=summary">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats?format=prometheus&amp;histogram_buckets=summary</span></span><a class="headerlink" href="#get--stats?format=prometheus&histogram_buckets=summary" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Optional <code class="docutils literal notranslate"><span class="pre">histogram_buckets</span></code> query parameter is used to control how histogram metrics get reported.
+If unset, histograms get reported as the “histogram” prometheus metric type, but can also be used to
+emit prometheus “summary” metrics if set to <code class="docutils literal notranslate"><span class="pre">summary</span></code>. Each emitted summary is over the interval
+of the last <a class="reference internal" href="../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-stats-flush-interval"><span class="std std-ref">stats_flush_interval</span></a>.</p>
+<p>Example histogram output:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span># TYPE envoy_server_initialization_time_ms histogram
+envoy_server_initialization_time_ms_bucket{le=&quot;0.5&quot;} 0
+envoy_server_initialization_time_ms_bucket{le=&quot;1&quot;} 0
+envoy_server_initialization_time_ms_bucket{le=&quot;5&quot;} 0
+envoy_server_initialization_time_ms_bucket{le=&quot;10&quot;} 0
+envoy_server_initialization_time_ms_bucket{le=&quot;25&quot;} 0
+envoy_server_initialization_time_ms_bucket{le=&quot;50&quot;} 0
+envoy_server_initialization_time_ms_bucket{le=&quot;100&quot;} 0
+envoy_server_initialization_time_ms_bucket{le=&quot;250&quot;} 1
+envoy_server_initialization_time_ms_bucket{le=&quot;500&quot;} 1
+envoy_server_initialization_time_ms_bucket{le=&quot;1000&quot;} 1
+envoy_server_initialization_time_ms_bucket{le=&quot;2500&quot;} 1
+envoy_server_initialization_time_ms_bucket{le=&quot;5000&quot;} 1
+envoy_server_initialization_time_ms_bucket{le=&quot;10000&quot;} 1
+envoy_server_initialization_time_ms_bucket{le=&quot;30000&quot;} 1
+envoy_server_initialization_time_ms_bucket{le=&quot;60000&quot;} 1
+envoy_server_initialization_time_ms_bucket{le=&quot;300000&quot;} 1
+envoy_server_initialization_time_ms_bucket{le=&quot;600000&quot;} 1
+envoy_server_initialization_time_ms_bucket{le=&quot;1800000&quot;} 1
+envoy_server_initialization_time_ms_bucket{le=&quot;3600000&quot;} 1
+envoy_server_initialization_time_ms_bucket{le=&quot;+Inf&quot;} 1
+envoy_server_initialization_time_ms_sum{} 115.000000000000014210854715202
+envoy_server_initialization_time_ms_count{} 1
+</pre></div>
+</div>
+<p>Example summary output:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span># TYPE envoy_server_initialization_time_ms summary
+envoy_server_initialization_time_ms{quantile=&quot;0&quot;} 110.00000000000001
+envoy_server_initialization_time_ms{quantile=&quot;0.25&quot;} 112.50000000000001
+envoy_server_initialization_time_ms{quantile=&quot;0.5&quot;} 115.00000000000001
+envoy_server_initialization_time_ms{quantile=&quot;0.75&quot;} 117.50000000000001
+envoy_server_initialization_time_ms{quantile=&quot;0.9&quot;} 119.00000000000001
+envoy_server_initialization_time_ms{quantile=&quot;0.95&quot;} 119.50000000000001
+envoy_server_initialization_time_ms{quantile=&quot;0.99&quot;} 119.90000000000002
+envoy_server_initialization_time_ms{quantile=&quot;0.995&quot;} 119.95000000000002
+envoy_server_initialization_time_ms{quantile=&quot;0.999&quot;} 119.99000000000001
+envoy_server_initialization_time_ms{quantile=&quot;1&quot;} 120.00000000000001
+envoy_server_initialization_time_ms_sum{} 115.000000000000014210854715202
+envoy_server_initialization_time_ms_count{} 1
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="http get">
+<dt class="sig sig-object http" id="get--stats-recentlookups">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/stats/recentlookups</span></span><a class="headerlink" href="#get--stats-recentlookups" title="Link to this definition"></a></dt>
+<dd><p>This endpoint helps Envoy developers debug potential contention
+issues in the stats system. Initially, only the count of StatName
+lookups is acumulated, not the specific names that are being looked
+up. In order to see specific recent requests, you must enable the
+feature by POSTing to <code class="docutils literal notranslate"><span class="pre">/stats/recentlookups/enable</span></code>. There may be
+approximately 40-100 nanoseconds of added overhead per lookup.</p>
+<p>When enabled, this endpoint emits a table of stat names that were
+recently accessed as strings by Envoy. Ideally, strings should be
+converted into StatNames, counters, gauges, and histograms by Envoy
+code only during startup or when receiving a new configuration via
+xDS. This is because when stats are looked up as strings they must
+take a global symbol table lock. During startup this is acceptable,
+but in response to user requests on high core-count machines, this
+can cause performance issues due to mutex contention.</p>
+<p>See <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/source/docs/stats.md">source/docs/stats.md</a> for more details.</p>
+<p>Note also that actual mutex contention can be tracked via <a class="reference internal" href="#get--contention" title="GET /contention"><code class="xref http http-get docutils literal notranslate"><span class="pre">GET</span> <span class="pre">/contention</span></code></a>.</p>
+<dl class="http post">
+<dt class="sig sig-object http" id="post--stats-recentlookups-enable">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/stats/recentlookups/enable</span></span><a class="headerlink" href="#post--stats-recentlookups-enable" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Turns on collection of recent lookup of stat-names, thus enabling
+<code class="docutils literal notranslate"><span class="pre">/stats/recentlookups</span></code>.</p>
+<p>See <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/source/docs/stats.md">source/docs/stats.md</a> for more details.</p>
+<dl class="http post">
+<dt class="sig sig-object http" id="post--stats-recentlookups-disable">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/stats/recentlookups/disable</span></span><a class="headerlink" href="#post--stats-recentlookups-disable" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Turns off collection of recent lookup of stat-names, thus disabling
+<code class="docutils literal notranslate"><span class="pre">/stats/recentlookups</span></code>. It also clears the list of lookups. However,
+the total count, visible as stat <code class="docutils literal notranslate"><span class="pre">server.stats_recent_lookups</span></code>, is
+not cleared, and continues to accumulate.</p>
+<p>See <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/source/docs/stats.md">source/docs/stats.md</a> for more details.</p>
+<dl class="http post">
+<dt class="sig sig-object http" id="post--stats-recentlookups-clear">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/stats/recentlookups/clear</span></span><a class="headerlink" href="#post--stats-recentlookups-clear" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p>Clears all outstanding lookups and counts. This clears all recent
+lookups data as well as the count, but collection continues if
+it is enabled.</p>
+<p>See <a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/source/docs/stats.md">source/docs/stats.md</a> for more details.</p>
+</dd></dl>
+
+<dl class="http get" id="operations-admin-interface-runtime">
+<dt class="sig sig-object http" id="get--runtime">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/runtime</span></span><a class="headerlink" href="#get--runtime" title="Link to this definition"></a></dt>
+<dd><p>Outputs all runtime values on demand in JSON format. See <a class="reference internal" href="../intro/arch_overview/operations/runtime.html#arch-overview-runtime"><span class="std std-ref">here</span></a> for
+more information on how these values are configured and utilized. The output include the list of
+the active runtime override layers and the stack of layer values for each key. Empty strings
+indicate no value, and the final active value from the stack also is included in a separate key.
+Example output:</p>
+</dd></dl>
+
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;layers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">&quot;disk&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;override&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;admin&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;entries&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;my_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;layer_values&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">&quot;my_disk_value&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;&quot;</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;final_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my_disk_value&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;my_second_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;layer_values&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">&quot;my_second_disk_value&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;my_disk_override_value&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;my_admin_override_value&quot;</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;final_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my_admin_override_value&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="http post" id="operations-admin-interface-runtime-modify">
+<dt class="sig sig-object http" id="post--runtime_modify?key1=value1&amp;key2=value2&amp;keyN=valueN">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/runtime_modify?key1=value1&amp;key2=value2&amp;keyN=valueN</span></span><a class="headerlink" href="#post--runtime_modify?key1=value1&key2=value2&keyN=valueN" title="Link to this definition"></a></dt>
+<dd><p>Adds or modifies runtime values as passed in query parameters. To delete a previously added key,
+use an empty string as the value. Note that deletion only applies to overrides added via this
+endpoint; values loaded from disk can be modified via override but not deleted.</p>
+</dd></dl>
+
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Use the /runtime_modify endpoint with care. Changes are effectively immediately. It is
+<strong>critical</strong> that the admin interface is <a class="reference internal" href="#operations-admin-interface-security"><span class="std std-ref">properly secured</span></a>.</p>
+<span class="target" id="operations-admin-interface-hystrix-event-stream"></span></div>
+<dl class="http get">
+<dt class="sig sig-object http" id="get--hystrix_event_stream">
+<span class="sig-name descname"><span class="pre">GET</span> </span><span class="sig-name descname"><span class="pre">/hystrix_event_stream</span></span><a class="headerlink" href="#get--hystrix_event_stream" title="Link to this definition"></a></dt>
+<dd><p>This endpoint is intended to be used as the stream source for
+<a class="reference external" href="https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki">Hystrix dashboard</a>.
+a GET to this endpoint will trigger a stream of statistics from Envoy in
+<a class="reference external" href="https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events">text/event-stream</a>
+format, as expected by the Hystrix dashboard.</p>
+<p>If invoked from a browser or a terminal, the response will be shown as a continuous stream,
+sent in intervals defined by the <a class="reference internal" href="../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-msg-config-bootstrap-v3-bootstrap"><span class="std std-ref">Bootstrap</span></a>
+<a class="reference internal" href="../api-v3/config/bootstrap/v3/bootstrap.proto.html#envoy-v3-api-field-config-bootstrap-v3-bootstrap-stats-flush-interval"><span class="std std-ref">stats_flush_interval</span></a></p>
+<p>This handler is enabled only when a Hystrix sink is enabled in the config file as documented
+<a class="reference internal" href="../api-v3/config/metrics/v3/stats.proto.html#envoy-v3-api-msg-config-metrics-v3-hystrixsink"><span class="std std-ref">here</span></a>.</p>
+<p>As Envoy’s and Hystrix resiliency mechanisms differ, some of the statistics shown in the dashboard
+had to be adapted:</p>
+<ul class="simple">
+<li><p><strong>Thread pool rejections</strong> - Generally similar to what’s called short circuited in Envoy,
+and counted by <em>upstream_rq_pending_overflow</em>, although the term thread pool is not accurate for
+Envoy. Both in Hystrix and Envoy, the result is rejected requests which are not passed upstream.</p></li>
+<li><p><strong>circuit breaker status (closed or open)</strong> - Since in Envoy, a circuit is opened based on the
+current number of connections/requests in queue, there is no sleeping window for circuit breaker,
+circuit open/closed is momentary. Hence, we set the circuit breaker status to “forced closed”.</p></li>
+<li><p><strong>Short-circuited (rejected)</strong> - The term exists in Envoy but refers to requests not sent because
+of passing a limit (queue or connections), while in Hystrix it refers to requests not sent because
+of high percentage of service unavailable responses during some time frame.
+In Envoy, service unavailable response will cause <strong>outlier detection</strong> - removing a node off the
+load balancer pool, but requests are not rejected as a result. Therefore, this counter is always
+set to ‘0’.</p></li>
+<li><p>Latency information represents data since last flush.
+Mean latency is currently not available.</p></li>
+</ul>
+</dd></dl>
+
+<dl class="http post">
+<dt class="sig sig-object http" id="post--tap">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/tap</span></span><a class="headerlink" href="#post--tap" title="Link to this definition"></a></dt>
+<dd><p>This endpoint is used for configuring an active tap session. It is only
+available if a valid tap extension has been configured, and that extension has
+been configured to accept admin configuration. See:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../configuration/http/http_filters/tap_filter.html#config-http-filters-tap-admin-handler"><span class="std std-ref">HTTP tap filter configuration</span></a></p></li>
+</ul>
+</dd></dl>
+
+<dl class="http post">
+<dt class="sig sig-object http" id="post--reopen_logs">
+<span class="sig-name descname"><span class="pre">POST</span> </span><span class="sig-name descname"><span class="pre">/reopen_logs</span></span><a class="headerlink" href="#post--reopen_logs" title="Link to this definition"></a></dt>
+<dd><p>Triggers reopen of all access logs. Behavior is similar to SIGUSR1 handling.</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="hot_restarter.html" class="btn btn-neutral float-left" title="Hot restart Python wrapper" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="stats_overview.html" class="btn btn-neutral float-right" title="Statistics overview" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Administration interface</a></li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

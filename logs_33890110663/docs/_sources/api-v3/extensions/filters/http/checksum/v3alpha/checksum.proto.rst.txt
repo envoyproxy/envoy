@@ -1,0 +1,118 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/http/checksum/v3alpha/checksum.proto:
+
+Checksum HTTP filter (proto)
+============================
+
+.. _extension_envoy.filters.http.checksum:
+
+This extension has the qualified name ``envoy.filters.http.checksum``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+Filter to reject responses that don't match a specified checksum.
+To avoid holding the entire response in memory, the rejection occurs at the end of the stream.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.checksum.v3alpha.ChecksumConfig:
+
+extensions.filters.http.checksum.v3alpha.ChecksumConfig
+-------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.checksum.v3alpha.ChecksumConfig proto] <api/contrib/envoy/extensions/filters/http/checksum/v3alpha/checksum.proto#L24>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "checksums": [],
+    "reject_unmatched": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.checksum.v3alpha.ChecksumConfig.checksums:
+
+
+checksums
+  (**repeated** :ref:`extensions.filters.http.checksum.v3alpha.ChecksumConfig.Checksum <envoy_v3_api_msg_extensions.filters.http.checksum.v3alpha.ChecksumConfig.Checksum>`) A set of matcher and checksum pairs for which, if a path matching ``path_matcher``
+  is requested and the checksum of the response body does not match the ``sha256``, the
+  response will be replaced with a 403 Forbidden status.
+
+  If multiple matchers match the same path, the first to match takes precedence.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.checksum.v3alpha.ChecksumConfig.reject_unmatched:
+
+
+reject_unmatched
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If a request doesn't match any of the specified checksum paths and reject_unmatched is
+  true, the request is rejected immediately with 403 Forbidden.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.checksum.v3alpha.ChecksumConfig.Checksum:
+
+extensions.filters.http.checksum.v3alpha.ChecksumConfig.Checksum
+----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.checksum.v3alpha.ChecksumConfig.Checksum proto] <api/contrib/envoy/extensions/filters/http/checksum/v3alpha/checksum.proto#L25>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "path_matcher": {...},
+    "sha256": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.checksum.v3alpha.ChecksumConfig.Checksum.path_matcher:
+
+
+path_matcher
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`, *REQUIRED*) A matcher for a path that is expected to have a specific checksum, as specified
+  in the ``sha256`` field.
+
+
+  
+
+.. _envoy_v3_api_field_extensions.filters.http.checksum.v3alpha.ChecksumConfig.Checksum.sha256:
+
+
+sha256
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) A hex-encoded sha256 string required to match the sha256sum of the response body
+  of the path specified in the ``path_matcher`` field.
+
+
+

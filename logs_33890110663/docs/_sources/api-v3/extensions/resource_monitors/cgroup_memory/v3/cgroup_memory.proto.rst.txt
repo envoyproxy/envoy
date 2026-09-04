@@ -1,0 +1,64 @@
+.. _envoy_v3_api_file_envoy/extensions/resource_monitors/cgroup_memory/v3/cgroup_memory.proto:
+
+Cgroup Memory (proto)
+=====================
+
+.. _extension_envoy.resource_monitors.cgroup_memory:
+
+This extension has the qualified name ``envoy.resource_monitors.cgroup_memory``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.resource_monitors <extension_category_envoy.resource_monitors>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig <envoy_v3_api_msg_extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig:
+
+extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig
+----------------------------------------------------------------
+
+
+:repo:`[extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig proto] <api/envoy/extensions/resource_monitors/cgroup_memory/v3/cgroup_memory.proto#L15>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_memory_bytes": ...
+  }
+
+.. _envoy_v3_api_field_extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig.max_memory_bytes:
+
+
+max_memory_bytes
+  (`uint64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional max memory limit in bytes used for memory pressure calculations.
+  If set, this value is used as an upper bound on the memory limit, taking the minimum
+  between this value and the system's cgroup memory limit. If not set, the system's
+  cgroup memory limit is always used.
+
+

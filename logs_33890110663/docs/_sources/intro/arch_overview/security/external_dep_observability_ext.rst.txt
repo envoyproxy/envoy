@@ -1,0 +1,121 @@
+External dependencies: ``observability_ext``
+============================================
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `Java rules for Bazel <https://github.com/bazelbuild/rules_java/>`__, `9.3.0 <https://bcr.bazel.build/modules/rules_java/9.3.0/>`__, 2026-07-15, , `Apache-2.0 <https://github.com/bazelbuild/rules_java/blob/9.3.0/LICENSE>`__
+  `Shell script rules for Bazel <https://github.com/bazelbuild/rules_shell>`__, `0.8.0 <https://bcr.bazel.build/modules/rules_shell/0.8.0/>`__, 2026-04-15, , `Apache-2.0 <https://github.com/protocolbuffers/rules_shell/blob/0.8.0/LICENSE>`__
+
+
+envoy.access_loggers.fluentd
+----------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `msgpack for C/C++ <https://github.com/msgpack/msgpack-c>`__, `7.0.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/msgpack-cxx/7.0.0.envoy/>`__, 2024-11-02, `cpe:2.3:a:messagepack:messagepack:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Amessagepack%3Amessagepack%3A%2A&search_type=all>`__, `Boost <https://github.com/msgpack/msgpack-c/blob/cpp-7.0.0.envoy/LICENSE_1_0.txt>`__
+
+
+envoy.tracers.datadog
+---------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `Datadog C++ Tracing Library <https://github.com/DataDog/dd-trace-cpp>`__, `2.1.1.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/dd-trace-cpp/2.1.1.envoy/>`__, 2026-06-19, , `Apache-2.0 <https://github.com/DataDog/dd-trace-cpp/blob/v2.1.1.envoy/LICENSE.md>`__
+
+
+envoy.tracers.fluentd
+---------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `msgpack for C/C++ <https://github.com/msgpack/msgpack-c>`__, `7.0.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/msgpack-cxx/7.0.0.envoy/>`__, 2024-11-02, `cpe:2.3:a:messagepack:messagepack:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Amessagepack%3Amessagepack%3A%2A&search_type=all>`__, `Boost <https://github.com/msgpack/msgpack-c/blob/cpp-7.0.0.envoy/LICENSE_1_0.txt>`__
+
+
+envoy.tracers.opentelemetry
+---------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `OpenTelemetry <https://opentelemetry.io>`__, `1.28.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/opentelemetry-cpp/1.28.0.envoy/>`__, 2026-07-16, , `Apache-2.0 <https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.28.0.envoy/LICENSE>`__
+
+
+envoy.tracers.opentelemetry.samplers.always_on
+----------------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `OpenTelemetry <https://opentelemetry.io>`__, `1.28.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/opentelemetry-cpp/1.28.0.envoy/>`__, 2026-07-16, , `Apache-2.0 <https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.28.0.envoy/LICENSE>`__
+
+
+envoy.tracers.opentelemetry.samplers.cel
+----------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `OpenTelemetry <https://opentelemetry.io>`__, `1.28.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/opentelemetry-cpp/1.28.0.envoy/>`__, 2026-07-16, , `Apache-2.0 <https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.28.0.envoy/LICENSE>`__
+
+
+envoy.tracers.opentelemetry.samplers.dynatrace
+----------------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `OpenTelemetry <https://opentelemetry.io>`__, `1.28.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/opentelemetry-cpp/1.28.0.envoy/>`__, 2026-07-16, , `Apache-2.0 <https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.28.0.envoy/LICENSE>`__
+
+
+envoy.tracers.opentelemetry.samplers.parent_based
+-------------------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `OpenTelemetry <https://opentelemetry.io>`__, `1.28.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/opentelemetry-cpp/1.28.0.envoy/>`__, 2026-07-16, , `Apache-2.0 <https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.28.0.envoy/LICENSE>`__
+
+
+envoy.tracers.opentelemetry.samplers.trace_id_ratio_based
+---------------------------------------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `OpenTelemetry <https://opentelemetry.io>`__, `1.28.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/opentelemetry-cpp/1.28.0.envoy/>`__, 2026-07-16, , `Apache-2.0 <https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.28.0.envoy/LICENSE>`__
+
+
+envoy.tracers.skywalking
+------------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `cpp2sky <https://github.com/SkyAPM/cpp2sky>`__, `0.6.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/cpp2sky/0.6.0.envoy/>`__, 2024-08-21, , `Apache-2.0 <https://github.com/SkyAPM/cpp2sky/blob/v0.6.0.envoy/LICENSE>`__
+  `Skywalking data collect protocol <https://github.com/apache/skywalking-data-collect-protocol>`__, `10.4.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/skywalking-data-collect-protocol/10.4.0.envoy/>`__, 2026-04-21, `cpe:2.3:a:apache:skywalking:* <https://nvd.nist.gov/vuln/search/results?form_type=Advanced&results_type=overview&query=cpe%3A2.3%3Aa%3Aapache%3Askywalking%3A%2A&search_type=all>`__, Apache-2.0
+
+
+envoy.tracers.zipkin
+--------------------
+
+.. csv-table::
+  :header: Name, Version, Release date, CPE, License
+  :widths: 2, 1, 1, 2, 1
+
+  `OpenTelemetry <https://opentelemetry.io>`__, `1.28.0.envoy <https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad/modules/opentelemetry-cpp/1.28.0.envoy/>`__, 2026-07-16, , `Apache-2.0 <https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.28.0.envoy/LICENSE>`__
+

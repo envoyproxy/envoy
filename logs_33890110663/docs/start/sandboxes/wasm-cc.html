@@ -1,0 +1,424 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wasm C++ filter &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="WebSockets" href="websocket.html" />
+    <link rel="prev" title="User Datagram Protocol (UDP)" href="udp.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../searchindex.js"
+          data-envoy-search-page="../../search.html"
+          data-envoy-root="../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../start.html">Getting Started</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Sandboxes</a></li>
+      <li class="breadcrumb-item active">Wasm C++ filter</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/start/sandboxes/wasm-cc.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="wasm-c-filter">
+<span id="install-sandboxes-wasm-filter"></span><h1>Wasm C++ filter<a class="headerlink" href="#wasm-c-filter" title="Link to this heading"></a></h1>
+<aside class="sidebar">
+<p class="sidebar-title">Requirements</p>
+<dl class="simple">
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup"><span class="std std-ref">Sandbox environment</span></a></dt><dd><p>Setup your sandbox environment with Docker and Docker Compose,
+and clone the Envoy repository with Git.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt><a class="reference internal" href="setup.html#start-sandboxes-setup-curl"><span class="std std-ref">curl</span></a></dt><dd><p>Used to make HTTP requests.</p>
+</dd>
+</dl>
+</aside>
+<aside class="sidebar">
+<p class="sidebar-title">Compatibility</p>
+<p>The provided Wasm binary was compiled for the <code class="docutils literal notranslate"><span class="pre">x86_64</span></code> architecture. If you would like to use this sandbox
+with the <code class="docutils literal notranslate"><span class="pre">arm64</span></code> architecture, change directory to <code class="docutils literal notranslate"><span class="pre">examples/wasm-cc</span></code> and skip to Step 3.</p>
+</aside>
+<p>This sandbox demonstrates a basic <a class="reference internal" href="../../configuration/http/http_filters/wasm_filter.html#config-http-filters-wasm"><span class="std std-ref">Envoy Wasm filter</span></a> written in C++ which injects
+content into the body of an HTTP response, and adds and updates some headers.</p>
+<p>It also takes you through the steps required to build your own C++ <a class="reference internal" href="../../configuration/http/http_filters/wasm_filter.html#config-http-filters-wasm"><span class="std std-ref">Wasm filter</span></a>,
+and run it with Envoy.</p>
+<section id="step-1-start-all-of-our-containers">
+<h2>Step 1: Start all of our containers<a class="headerlink" href="#step-1-start-all-of-our-containers" title="Link to this heading"></a></h2>
+<p>First lets start the containers - an Envoy proxy which uses a Wasm Filter, and a backend which echos back our request.
+The Envoy configuration exposes two listeners, the first one listens in port <code class="docutils literal notranslate"><span class="pre">8000</span></code> which contains the wasm filter in
+the listener filter chain. The second one listens in port <code class="docutils literal notranslate"><span class="pre">8001</span></code> routing to a cluster containing the wasm filter in the
+cluster filter chain.</p>
+<p>Change to the <code class="docutils literal notranslate"><span class="pre">wasm-cc</span></code> directory, and start the composition:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">pwd</span>
+<span class="go">examples/wasm-cc</span>
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>pull
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>ps
+
+<span class="go">    Name                     Command                State             Ports</span>
+<span class="go">-----------------------------------------------------------------------------------------------</span>
+<span class="go">wasm_proxy_1         /docker-entrypoint.sh /usr ... Up      10000/tcp, 0.0.0.0:8000-&gt;8000/tcp, 0.0.0.0:8001-&gt;8001/tcp</span>
+<span class="go">wasm_web_service_1   node ./index.js                Up</span>
+</pre></div>
+</div>
+</section>
+<section id="step-2-check-web-response">
+<h2>Step 2: Check web response<a class="headerlink" href="#step-2-check-web-response" title="Link to this heading"></a></h2>
+<p>The Wasm filter should inject <code class="docutils literal notranslate"><span class="pre">Hello,</span> <span class="pre">world</span></code> at the end of the response body when you make a request to the proxy.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:8000<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;Hello, world&quot;</span>
+<span class="go">}Hello, world</span>
+</pre></div>
+</div>
+<p>The filter also sets the <code class="docutils literal notranslate"><span class="pre">content-type</span></code> header to <code class="docutils literal notranslate"><span class="pre">text/plain</span></code>, and adds a custom <code class="docutils literal notranslate"><span class="pre">x-wasm-custom</span></code> header.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-v<span class="w"> </span>http://localhost:8000<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;content-type: &quot;</span>
+<span class="go">content-type: text/plain; charset=utf-8</span>
+
+<span class="gp">$ </span>curl<span class="w"> </span>-v<span class="w"> </span>http://localhost:8000<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;x-wasm-custom: &quot;</span>
+<span class="go">x-wasm-custom: FOO</span>
+</pre></div>
+</div>
+<p>Similar outputs could be obtained in the second listener routing to the cluster with upstream wasm filter.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:8001<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;Hello, world&quot;</span>
+<span class="go">}Hello, world</span>
+
+<span class="gp">$ </span>curl<span class="w"> </span>-v<span class="w"> </span>http://localhost:8001<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;content-type: &quot;</span>
+<span class="go">content-type: text/plain; charset=utf-8</span>
+
+<span class="gp">$ </span>curl<span class="w"> </span>-v<span class="w"> </span>http://localhost:8001<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;x-wasm-custom: &quot;</span>
+<span class="go">x-wasm-custom: FOO</span>
+</pre></div>
+</div>
+</section>
+<section id="step-3-compile-the-updated-filter">
+<h2>Step 3: Compile the updated filter<a class="headerlink" href="#step-3-compile-the-updated-filter" title="Link to this heading"></a></h2>
+<p>There are two source code files provided for the Wasm filter.</p>
+<p><a class="reference download internal" download="" href="../../_downloads/fbba116ecfd0961809317acd2df6e3c2/envoy_filter_http_wasm_example.cc"><code class="xref download docutils literal notranslate"><span class="pre">envoy_filter_http_wasm_example.cc</span></code></a> provides the source code for
+the included prebuilt binary.</p>
+<p><a class="reference download internal" download="" href="../../_downloads/f0bfe8781fcb09521c213c890f09f399/envoy_filter_http_wasm_updated_example.cc"><code class="xref download docutils literal notranslate"><span class="pre">envoy_filter_http_wasm_updated_example.cc</span></code></a> makes a few
+changes to the original.</p>
+<p>The following diff shows the changes that have been made:</p>
+<div class="highlight-udiff notranslate"><div class="highlight"><pre><span></span><span class="gd">--- /tmp/tmpydrl1c2_/generated/rst/start/sandboxes/_include/wasm-cc/envoy_filter_http_wasm_example.cc</span>
+<span class="gi">+++ /tmp/tmpydrl1c2_/generated/rst/start/sandboxes/_include/wasm-cc/envoy_filter_http_wasm_updated_example.cc</span>
+<span class="gu">@@ -65,8 +65,8 @@</span>
+<span class="w"> </span>  for (auto&amp; p : pairs) {
+<span class="w"> </span>    LOG_INFO(std::string(p.first) + std::string(&quot; -&gt; &quot;) + std::string(p.second));
+<span class="w"> </span>  }
+<span class="gd">-  addResponseHeader(&quot;X-Wasm-custom&quot;, &quot;FOO&quot;);</span>
+<span class="gd">-  replaceResponseHeader(&quot;content-type&quot;, &quot;text/plain; charset=utf-8&quot;);</span>
+<span class="gi">+  addResponseHeader(&quot;X-Wasm-custom&quot;, &quot;BAR&quot;);</span>
+<span class="gi">+  replaceResponseHeader(&quot;content-type&quot;, &quot;text/html; charset=utf-8&quot;);</span>
+<span class="w"> </span>  removeResponseHeader(&quot;content-length&quot;);
+<span class="w"> </span>  return FilterHeadersStatus::Continue;
+<span class="w"> </span>}
+<span class="gu">@@ -78,9 +78,9 @@</span>
+<span class="w"> </span>  return FilterDataStatus::Continue;
+<span class="w"> </span>}
+<span class="w"> </span>
+<span class="gd">-FilterDataStatus ExampleContext::onResponseBody(size_t body_buffer_length,</span>
+<span class="gi">+FilterDataStatus ExampleContext::onResponseBody(size_t /* body_buffer_length */,</span>
+<span class="w"> </span>                                                bool /* end_of_stream */) {
+<span class="gd">-  setBuffer(WasmBufferType::HttpResponseBody, 0, body_buffer_length, &quot;Hello, world\n&quot;);</span>
+<span class="gi">+  setBuffer(WasmBufferType::HttpResponseBody, 0, 17, &quot;Hello, Wasm world&quot;);</span>
+<span class="w"> </span>  return FilterDataStatus::Continue;
+<span class="w"> </span>}
+<span class="w"> </span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>These instructions for compiling an updated Wasm binary use the
+<a class="reference external" href="https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags">envoyproxy/envoy-build-ubuntu</a> image.
+You will need 4-5GB of disk space to accommodate this image.</p>
+</div>
+<p>Export <code class="docutils literal notranslate"><span class="pre">UID</span></code> from your host system. This will ensure that the binary created inside the build container has the same permissions
+as your host user:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">export</span><span class="w"> </span>UID
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The build composition is designed to work in a similar way to the <code class="docutils literal notranslate"><span class="pre">./ci/run_envoy_docker.sh</span></code> command in the Envoy repo.</p>
+<p>Bazel temporary artefacts are created in <code class="docutils literal notranslate"><span class="pre">/tmp/envoy-docker-build</span></code> with the uid taken from the <code class="docutils literal notranslate"><span class="pre">UID</span></code> env var.</p>
+</div>
+<p>Stop the proxy server and compile the Wasm binary with the updated code:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>stop<span class="w"> </span>proxy
+<span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose-wasm.yaml<span class="w"> </span>up<span class="w"> </span>--remove-orphans<span class="w"> </span>wasm_compile_update
+</pre></div>
+</div>
+<p>The compiled binary should now be in the <code class="docutils literal notranslate"><span class="pre">lib</span></code> folder.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ls<span class="w"> </span>-l<span class="w"> </span>lib
+<span class="go">total 120</span>
+<span class="go">-r-xr-xr-x 1 root root 59641 Oct 20 00:00 envoy_filter_http_wasm_example.wasm</span>
+<span class="go">-r-xr-xr-x 1 root root 59653 Oct 20 10:16 envoy_filter_http_wasm_updated_example.wasm</span>
+</pre></div>
+</div>
+</section>
+<section id="step-4-edit-the-dockerfile-and-restart-the-proxy">
+<h2>Step 4: Edit the Dockerfile and restart the proxy<a class="headerlink" href="#step-4-edit-the-dockerfile-and-restart-the-proxy" title="Link to this heading"></a></h2>
+<p>Edit the <code class="docutils literal notranslate"><span class="pre">Dockerfile-proxy</span></code> recipe provided in the example to use the updated binary you created in step 3.</p>
+<p>Find the <code class="docutils literal notranslate"><span class="pre">COPY</span></code> line that adds the Wasm binary to the image:</p>
+<div class="highlight-dockerfile notranslate"><div class="highlight"><pre><span></span><span class="linenos">1</span><span class="k">FROM</span><span class="w"> </span><span class="s">envoyproxy/envoy:dev</span>
+<span class="linenos">2</span><span class="k">COPY</span><span class="w"> </span>./envoy.yaml<span class="w"> </span>/etc/envoy.yaml
+<span class="hll"><span class="linenos">3</span><span class="k">COPY</span><span class="w"> </span>./lib/envoy_filter_http_wasm_example.wasm<span class="w"> </span>/lib/envoy_filter_http_wasm_example.wasm
+</span><span class="linenos">4</span><span class="k">RUN</span><span class="w"> </span>chmod<span class="w"> </span>go+r<span class="w"> </span>/etc/envoy.yaml<span class="w"> </span>/lib/envoy_filter_http_wasm_example.wasm
+<span class="linenos">5</span><span class="k">CMD</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;/usr/local/bin/envoy&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;-c&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;/etc/envoy.yaml&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;--service-cluster&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;proxy&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Replace this line with the following:</p>
+<div class="highlight-dockerfile notranslate"><div class="highlight"><pre><span></span><span class="k">COPY</span><span class="w"> </span>./lib/envoy_filter_http_wasm_updated_example.wasm<span class="w"> </span>/lib/envoy_filter_http_wasm_example.wasm
+</pre></div>
+</div>
+<p>Now, rebuild and start the proxy container.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d<span class="w"> </span>proxy
+</pre></div>
+</div>
+</section>
+<section id="step-5-check-the-proxy-has-been-updated">
+<h2>Step 5: Check the proxy has been updated<a class="headerlink" href="#step-5-check-the-proxy-has-been-updated" title="Link to this heading"></a></h2>
+<p>The Wasm filter should instead inject <code class="docutils literal notranslate"><span class="pre">Hello,</span> <span class="pre">Wasm</span> <span class="pre">world</span></code> at the end of the response body.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:8000<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;Hello, Wasm world&quot;</span>
+<span class="go">}Hello, Wasm world</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">content-type</span></code> and <code class="docutils literal notranslate"><span class="pre">x-wasm-custom</span></code> headers should also have changed</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>curl<span class="w"> </span>-v<span class="w"> </span>http://localhost:8000<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;content-type: &quot;</span>
+<span class="go">content-type: text/html; charset=utf-8</span>
+
+<span class="gp">$ </span>curl<span class="w"> </span>-v<span class="w"> </span>http://localhost:8000<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;x-wasm-custom: &quot;</span>
+<span class="go">x-wasm-custom: BAR</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="../../configuration/http/http_filters/wasm_filter.html#config-http-filters-wasm"><span class="std std-ref">Envoy Wasm filter</span></a></dt><dd><p>Further information about the Envoy Wasm filter.</p>
+</dd>
+<dt><a class="reference internal" href="../../api-v3/extensions/filters/http/wasm/v3/wasm.proto.html#envoy-v3-api-msg-extensions-filters-http-wasm-v3-wasm"><span class="std std-ref">Envoy Wasm API(V3)</span></a></dt><dd><p>The Envoy Wasm API - version 3.</p>
+</dd>
+<dt><a class="reference external" href="https://github.com/proxy-wasm/proxy-wasm-cpp-sdk">Proxy Wasm C++ SDK</a></dt><dd><p>WebAssembly for proxies (C++ SDK)</p>
+</dd>
+</dl>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="udp.html" class="btn btn-neutral float-left" title="User Datagram Protocol (UDP)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="websocket.html" class="btn btn-neutral float-right" title="WebSockets" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Wasm C++ filter</a><ul>
+<li><a class="reference internal" href="#step-1-start-all-of-our-containers">Step 1: Start all of our containers</a></li>
+<li><a class="reference internal" href="#step-2-check-web-response">Step 2: Check web response</a></li>
+<li><a class="reference internal" href="#step-3-compile-the-updated-filter">Step 3: Compile the updated filter</a></li>
+<li><a class="reference internal" href="#step-4-edit-the-dockerfile-and-restart-the-proxy">Step 4: Edit the Dockerfile and restart the proxy</a></li>
+<li><a class="reference internal" href="#step-5-check-the-proxy-has-been-updated">Step 5: Check the proxy has been updated</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

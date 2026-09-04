@@ -1,0 +1,241 @@
+.. _envoy_v3_api_file_envoy/config/listener/v3/quic_config.proto:
+
+QUIC listener config (proto)
+============================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.listener.v3.QuicProtocolOptions:
+
+config.listener.v3.QuicProtocolOptions
+--------------------------------------
+
+
+:repo:`[config.listener.v3.QuicProtocolOptions proto] <api/envoy/config/listener/v3/quic_config.proto#L28>`
+
+Configuration specific to the UDP QUIC listener.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "quic_protocol_options": {...},
+    "idle_timeout": {...},
+    "crypto_handshake_timeout": {...},
+    "enabled": {...},
+    "packets_to_read_to_connection_count_ratio": {...},
+    "crypto_stream_config": {...},
+    "proof_source_config": {...},
+    "connection_id_generator_config": {...},
+    "server_preferred_address_config": {...},
+    "send_disable_active_migration": {...},
+    "connection_debug_visitor_config": {...},
+    "save_cmsg_config": [],
+    "reject_new_connections": ...,
+    "max_sessions_per_event_loop": {...}
+  }
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.quic_protocol_options:
+
+
+quic_protocol_options
+  (:ref:`config.core.v3.QuicProtocolOptions <envoy_v3_api_msg_config.core.v3.QuicProtocolOptions>`) 
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout:
+
+
+idle_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Maximum number of milliseconds that connection will be alive when there is
+  no network activity.
+
+  If it is less than 1ms, Envoy will use 1ms. 300000ms if not specified.
+
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.crypto_handshake_timeout:
+
+
+crypto_handshake_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Connection timeout in milliseconds before the crypto handshake is finished.
+
+  If it is less than 5000ms, Envoy will use 5000ms. 20000ms if not specified.
+
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.enabled:
+
+
+enabled
+  (:ref:`config.core.v3.RuntimeFeatureFlag <envoy_v3_api_msg_config.core.v3.RuntimeFeatureFlag>`) Runtime flag that controls whether the listener is enabled or not. If not specified, defaults
+  to enabled.
+
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.packets_to_read_to_connection_count_ratio:
+
+
+packets_to_read_to_connection_count_ratio
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) A multiplier to number of connections which is used to determine how many packets to read per
+  event loop. A reasonable number should allow the listener to process enough payload but not
+  starve TCP and other UDP sockets and also prevent long event loop duration.
+  The default value is 32. This means if there are N QUIC connections, the total number of
+  packets to read in each read event will be 32 * N.
+  The actual number of packets to read in total by the UDP listener is also
+  bound by 6000, regardless of this field or how many connections there are.
+
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.crypto_stream_config:
+
+
+crypto_stream_config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Configure which implementation of ``quic::QuicCryptoClientStreamBase`` to be used for this listener.
+  If not specified the :ref:`QUICHE default one configured by <envoy_v3_api_msg_extensions.quic.crypto_stream.v3.CryptoServerStreamConfig>` will be used.
+
+
+  .. _extension_category_envoy.quic.server.crypto_stream:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.quic.crypto_stream.server.quiche <extension_envoy.quic.crypto_stream.server.quiche>`
+
+
+
+
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.proof_source_config:
+
+
+proof_source_config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Configure which implementation of ``quic::ProofSource`` to be used for this listener.
+  If not specified the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.proof_source.v3.ProofSourceConfig>` will be used.
+
+
+  .. _extension_category_envoy.quic.proof_source:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.quic.proof_source.filter_chain <extension_envoy.quic.proof_source.filter_chain>`
+
+
+
+
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.connection_id_generator_config:
+
+
+connection_id_generator_config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Config which implementation of ``quic::ConnectionIdGeneratorInterface`` to be used for this listener.
+  If not specified the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.connection_id_generator.v3.DeterministicConnectionIdGeneratorConfig>` will be used.
+
+
+  .. _extension_category_envoy.quic.connection_id_generator:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.quic.connection_id_generator.quic_lb <extension_envoy.quic.connection_id_generator.quic_lb>`
+
+    - :ref:`envoy.quic.deterministic_connection_id_generator <extension_envoy.quic.deterministic_connection_id_generator>`
+
+
+
+
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.server_preferred_address_config:
+
+
+server_preferred_address_config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Configure the server's preferred address to advertise so that client can migrate to it. See :ref:`example <envoy_v3_api_msg_extensions.quic.server_preferred_address.v3.FixedServerPreferredAddressConfig>` which configures a pair of v4 and v6 preferred addresses.
+  The current QUICHE implementation will advertise only one of the preferred IPv4 and IPv6 addresses based on the address family the client initially connects with.
+  If not specified, Envoy will not advertise any server's preferred address.
+
+  .. warning::
+     This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+  .. _extension_category_envoy.quic.server_preferred_address:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.quic.server_preferred_address.datasource <extension_envoy.quic.server_preferred_address.datasource>`
+
+    - :ref:`envoy.quic.server_preferred_address.fixed <extension_envoy.quic.server_preferred_address.fixed>`
+
+
+
+
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.send_disable_active_migration:
+
+
+send_disable_active_migration
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Configure the server to send transport parameter `disable_active_migration <https://www.rfc-editor.org/rfc/rfc9000#section-18.2-4.30.1>`_.
+  Defaults to false (do not send this transport parameter).
+
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.connection_debug_visitor_config:
+
+
+connection_debug_visitor_config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Configure which implementation of ``quic::QuicConnectionDebugVisitor`` to be used for this listener.
+  If not specified, no debug visitor will be attached to connections.
+
+
+  .. _extension_category_envoy.quic.connection_debug_visitor:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.quic.connection_debug_visitor.basic <extension_envoy.quic.connection_debug_visitor.basic>`
+
+    - :ref:`envoy.quic.connection_debug_visitor.quic_stats <extension_envoy.quic.connection_debug_visitor.quic_stats>`
+
+
+
+
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.save_cmsg_config:
+
+
+save_cmsg_config
+  (**repeated** :ref:`config.core.v3.SocketCmsgHeaders <envoy_v3_api_msg_config.core.v3.SocketCmsgHeaders>`) Configure a type of UDP cmsg to pass to listener filters via QuicReceivedPacket.
+  Both level and type must be specified for cmsg to be saved.
+  Cmsg may be truncated or omitted if expected size is not set.
+  If not specified, no cmsg will be saved to QuicReceivedPacket.
+
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.reject_new_connections:
+
+
+reject_new_connections
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, the listener will reject connection-establishing packets at the
+  QUIC layer by replying with an empty version negotiation packet to the
+  client.
+
+
+.. _envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.max_sessions_per_event_loop:
+
+
+max_sessions_per_event_loop
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Maximum number of QUIC sessions to create per event loop.
+  If not specified, the default value is 16.
+  This is an equivalent of the TCP listener option
+  max_connections_to_accept_per_socket_event.
+
+

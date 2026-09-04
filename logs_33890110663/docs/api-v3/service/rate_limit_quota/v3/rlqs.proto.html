@@ -1,0 +1,534 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rate Limit Quota Service (RLQS) (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../_static/favicon.ico"/>
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="next" title="Runtime discovery service (RTDS) (proto)" href="../../runtime/v3/rtds.proto.html" />
+    <link rel="prev" title="Rate limit service (RLS) (proto)" href="../../ratelimit/v3/rls.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../searchindex.js"
+          data-envoy-search-page="../../../../search.html"
+          data-envoy-root="../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../config/config.html">Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../service.html">Services</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../auth/v3/attribute_context.proto.html">Attribute context (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../auth/v3/external_auth.proto.html">Authorization service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../status/v3/csds.proto.html">Client status discovery service (CSDS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../extension/v3/config_discovery.proto.html">Extension config discovery service (ECDS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ext_proc/v3/external_processor.proto.html">External processing service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../accesslog/v3/als.proto.html">gRPC access log service (ALS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../health/v3/hds.proto.html">Health discovery service (HDS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../load_stats/v3/lrs.proto.html">Load reporting service (LRS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../metrics/v3/metrics_service.proto.html">Metrics service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../ratelimit/v3/rls.proto.html">Rate limit service (RLS) (proto)</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Rate Limit Quota Service (RLQS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../runtime/v3/rtds.proto.html">Runtime discovery service (RTDS) (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../config/tap/v3/common.proto.html">Tap common configuration (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tap/v3/tap.proto.html">Tap sink service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../redis_auth/v3/redis_external_auth.proto.html">Redis external authentication service (proto)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../network_ext_proc/v3/network_external_processor.proto.html">Network External Processing Service (proto)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../service.html">Services</a></li>
+      <li class="breadcrumb-item active">Rate Limit Quota Service (RLQS) (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../_sources/api-v3/service/rate_limit_quota/v3/rlqs.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="rate-limit-quota-service-rlqs-proto">
+<span id="envoy-v3-api-file-envoy-service-rate-limit-quota-v3-rlqs-proto"></span><h1>Rate Limit Quota Service (RLQS) (proto)<a class="headerlink" href="#rate-limit-quota-service-rlqs-proto" title="Link to this heading"></a></h1>
+<p>The Rate Limit Quota Service (RLQS) is a Envoy global rate limiting service that allows to
+delegate rate limit decisions to a remote service. The service will aggregate the usage reports
+from multiple data plane instances, and distribute Rate Limit Assignments to each instance
+based on its business logic. The logic is outside of the scope of the protocol API.</p>
+<p>The protocol is designed as a streaming-first API. It utilizes watch-like subscription model.
+The data plane groups requests into Quota Buckets as directed by the filter config,
+and periodically reports them to the RLQS server along with the Bucket identifier, <a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-bucketid"><span class="std std-ref">BucketId</span></a>. Once RLQS server has collected enough
+reports to make a decision, it’ll send back the assignment with the rate limiting instructions.</p>
+<p>The first report sent by the data plane is interpreted by the RLQS server as a “watch” request,
+indicating that the data plane instance is interested in receiving further updates for the
+<code class="docutils literal notranslate"><span class="pre">BucketId</span></code>. From then on, RLQS server may push assignments to this instance at will, even if
+the instance is not sending usage reports. It’s the responsibility of the RLQS server
+to determine when the data plane instance didn’t send <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> reports for too long,
+and to respond with the <a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandonaction"><span class="std std-ref">AbandonAction</span></a>,
+indicating that the server has now stopped sending quota assignments for the <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> bucket,
+and the data plane instance should <a class="reference internal" href="#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandon-action"><span class="std std-ref">abandon</span></a>
+it.</p>
+<p>If for any reason the RLQS client doesn’t receive the initial assignment for the reported bucket,
+in order to prevent memory exhaustion, the data plane will limit the time such bucket
+is retained. The exact time to wait for the initial assignment is chosen by the filter,
+and may vary based on the implementation.
+Once the duration ends, the data plane will stop reporting bucket usage, reject any enqueued
+requests, and purge the bucket from the memory. Subsequent requests matched into the bucket
+will re-initialize the bucket in the “no assignment” state, restarting the reports.</p>
+<p>Refer to Rate Limit Quota <a class="reference internal" href="../../../../configuration/http/http_filters/rate_limit_quota_filter.html#config-http-filters-rate-limit-quota"><span class="std std-ref">configuration overview</span></a>
+for further details.</p>
+<section id="service-rate-limit-quota-v3-ratelimitquotausagereports">
+<span id="envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotausagereports"></span><h2>service.rate_limit_quota.v3.RateLimitQuotaUsageReports<a class="headerlink" href="#service-rate-limit-quota-v3-ratelimitquotausagereports" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/rate_limit_quota/v3/rlqs.proto#L62">[service.rate_limit_quota.v3.RateLimitQuotaUsageReports proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;domain&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;bucket_quota_usages&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotausagereports-domain">
+<dt>domain</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) All quota requests must specify the domain. This enables sharing the quota
+server between different applications without fear of overlap.
+E.g., “envoy”.</p>
+<p>Should only be provided in the first report, all subsequent messages on the same
+stream are considered to be in the same domain. In case the domain needs to be
+changes, close the stream, and reopen a new one with the different domain.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotausagereports-bucket-quota-usages">
+<dt>bucket_quota_usages</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotausagereports-bucketquotausage"><span class="std std-ref">service.rate_limit_quota.v3.RateLimitQuotaUsageReports.BucketQuotaUsage</span></a>, <em>REQUIRED</em>) A list of quota usage reports. The list is processed by the RLQS server in the same order
+it’s provided by the client.</p>
+</dd>
+</dl>
+</section>
+<section id="service-rate-limit-quota-v3-ratelimitquotausagereports-bucketquotausage">
+<span id="envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotausagereports-bucketquotausage"></span><h2>service.rate_limit_quota.v3.RateLimitQuotaUsageReports.BucketQuotaUsage<a class="headerlink" href="#service-rate-limit-quota-v3-ratelimitquotausagereports-bucketquotausage" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/rate_limit_quota/v3/rlqs.proto#L68">[service.rate_limit_quota.v3.RateLimitQuotaUsageReports.BucketQuotaUsage proto]</a></p>
+<p>The usage report for a bucket.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Note that the first report sent for a <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> indicates to the RLQS server that
+the RLQS client is subscribing for the future assignments for this <code class="docutils literal notranslate"><span class="pre">BucketId</span></code>.</p>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;bucket_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;time_elapsed&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;num_requests_allowed&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;num_requests_denied&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotausagereports-bucketquotausage-bucket-id">
+<dt>bucket_id</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-bucketid"><span class="std std-ref">service.rate_limit_quota.v3.BucketId</span></a>, <em>REQUIRED</em>) <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> for which request quota usage is reported.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotausagereports-bucketquotausage-time-elapsed">
+<dt>time_elapsed</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>, <em>REQUIRED</em>) Time elapsed since the last report.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotausagereports-bucketquotausage-num-requests-allowed">
+<dt>num_requests_allowed</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Requests the data plane has allowed through.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotausagereports-bucketquotausage-num-requests-denied">
+<dt>num_requests_denied</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint64</a>) Requests throttled.</p>
+</dd>
+</dl>
+</section>
+<section id="service-rate-limit-quota-v3-ratelimitquotaresponse">
+<span id="envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse"></span><h2>service.rate_limit_quota.v3.RateLimitQuotaResponse<a class="headerlink" href="#service-rate-limit-quota-v3-ratelimitquotaresponse" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/rate_limit_quota/v3/rlqs.proto#L99">[service.rate_limit_quota.v3.RateLimitQuotaResponse proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;bucket_action&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucket-action">
+<dt>bucket_action</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction"><span class="std std-ref">service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction</span></a>, <em>REQUIRED</em>) An ordered list of actions to be applied to the buckets. The actions are applied in the
+given order, from top to bottom.</p>
+</dd>
+</dl>
+</section>
+<section id="service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction">
+<span id="envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction"></span><h2>service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction<a class="headerlink" href="#service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/rate_limit_quota/v3/rlqs.proto#L102">[service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction proto]</a></p>
+<p>Commands the data plane to apply one of the actions to the bucket with the
+<a class="reference internal" href="#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-bucket-id"><span class="std std-ref">bucket_id</span></a>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;bucket_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;quota_assignment_action&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;abandon_action&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-bucket-id">
+<dt>bucket_id</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-bucketid"><span class="std std-ref">service.rate_limit_quota.v3.BucketId</span></a>, <em>REQUIRED</em>) <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> for which request the action is applied.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quota-assignment-action">
+<dt>quota_assignment_action</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction"><span class="std std-ref">service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction</span></a>) Apply the quota assignment to the bucket.</p>
+<p>Commands the data plane to apply a rate limiting strategy to the bucket.
+The process of applying and expiring the rate limiting strategy is detailed in the
+<a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction"><span class="std std-ref">QuotaAssignmentAction</span></a>
+message.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quota-assignment-action"><span class="std std-ref">quota_assignment_action</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandon-action"><span class="std std-ref">abandon_action</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandon-action">
+<dt>abandon_action</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandonaction"><span class="std std-ref">service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.AbandonAction</span></a>) Abandon the bucket.</p>
+<p>Commands the data plane to abandon the bucket.
+The process of abandoning the bucket is described in the <a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandonaction"><span class="std std-ref">AbandonAction</span></a>
+message.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quota-assignment-action"><span class="std std-ref">quota_assignment_action</span></a>, <a class="reference internal" href="#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandon-action"><span class="std std-ref">abandon_action</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction">
+<span id="envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction"></span><h2>service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction<a class="headerlink" href="#service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/rate_limit_quota/v3/rlqs.proto#L136">[service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction proto]</a></p>
+<p>Quota assignment for the bucket. Configures the rate limiting strategy and the duration
+for the given <a class="reference internal" href="#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-bucket-id"><span class="std std-ref">bucket_id</span></a>.</p>
+<p><strong>Applying the first assignment to the bucket</strong></p>
+<p>Once the data plane receives the <code class="docutils literal notranslate"><span class="pre">QuotaAssignmentAction</span></code>, it must send the current usage
+report for the bucket, and start rate limiting requests matched into the bucket
+using the strategy configured in the <a class="reference internal" href="#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction-rate-limit-strategy"><span class="std std-ref">rate_limit_strategy</span></a>
+field. The assignment becomes bucket’s <code class="docutils literal notranslate"><span class="pre">active</span></code> assignment.</p>
+<p><strong>Expiring the assignment</strong></p>
+<p>The duration of the assignment defined in the <a class="reference internal" href="#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction-assignment-time-to-live"><span class="std std-ref">assignment_time_to_live</span></a>
+field. When the duration runs off, the assignment is <code class="docutils literal notranslate"><span class="pre">expired</span></code>, and no longer <code class="docutils literal notranslate"><span class="pre">active</span></code>.
+The data plane should stop applying the rate limiting strategy to the bucket, and transition
+the bucket to the “expired assignment” state. This activates the behavior configured in the
+<a class="reference internal" href="../../../extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expired-assignment-behavior"><span class="std std-ref">expired_assignment_behavior</span></a>
+field.</p>
+<p><strong>Replacing the assignment</strong></p>
+<ul class="simple">
+<li><p>If the rate limiting strategy is different from bucket’s <code class="docutils literal notranslate"><span class="pre">active</span></code> assignment, or
+the current bucket assignment is <code class="docutils literal notranslate"><span class="pre">expired</span></code>, the data plane must immediately
+end the current assignment, report the bucket usage, and apply the new assignment.
+The new assignment becomes bucket’s <code class="docutils literal notranslate"><span class="pre">active</span></code> assignment.</p></li>
+<li><p>If the rate limiting strategy is the same as the bucket’s <code class="docutils literal notranslate"><span class="pre">active</span></code> (not <code class="docutils literal notranslate"><span class="pre">expired</span></code>)
+assignment, the data plane should extend the duration of the <code class="docutils literal notranslate"><span class="pre">active</span></code> assignment
+for the duration of the new assignment provided in the <a class="reference internal" href="#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction-assignment-time-to-live"><span class="std std-ref">assignment_time_to_live</span></a>
+field. The <code class="docutils literal notranslate"><span class="pre">active</span></code> assignment is considered unchanged.</p></li>
+</ul>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;assignment_time_to_live&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;rate_limit_strategy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction-assignment-time-to-live">
+<dt>assignment_time_to_live</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) A duration after which the assignment is be considered <code class="docutils literal notranslate"><span class="pre">expired</span></code>. The process of the
+expiration is described <a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction"><span class="std std-ref">above</span></a>.</p>
+<ul class="simple">
+<li><p>If unset, the assignment has no expiration date.</p></li>
+<li><p>If set to <code class="docutils literal notranslate"><span class="pre">0</span></code>, the assignment expires immediately, forcing the client into the
+<a class="reference internal" href="../../../extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-expired-assignment-behavior-timeout"><span class="std std-ref">“expired assignment”</span></a>
+state. This may be used by the RLQS server in cases when it needs clients to proactively
+fall back to the pre-configured <a class="reference internal" href="../../../extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior"><span class="std std-ref">ExpiredAssignmentBehavior</span></a>,
+f.e. before the server going into restart.</p></li>
+</ul>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Note that <a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction"><span class="std std-ref">expiring</span></a>
+the assignment is not the same as <a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandonaction"><span class="std std-ref">abandoning</span></a>
+the assignment. While expiring the assignment just transitions the bucket to
+the “expired assignment” state; abandoning the assignment completely erases
+the bucket from the data plane memory, and stops the usage reports.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction-rate-limit-strategy">
+<dt>rate_limit_strategy</dt><dd><p>(<a class="reference internal" href="../../../type/v3/ratelimit_strategy.proto.html#envoy-v3-api-msg-type-v3-ratelimitstrategy"><span class="std std-ref">type.v3.RateLimitStrategy</span></a>) Configures the local rate limiter for the request matched to the bucket.
+If not set, allow all requests.</p>
+</dd>
+</dl>
+</section>
+<section id="service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandonaction">
+<span id="envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandonaction"></span><h2>service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.AbandonAction<a class="headerlink" href="#service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandonaction" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/rate_limit_quota/v3/rlqs.proto#L195">[service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.AbandonAction proto]</a></p>
+<p>Abandon action for the bucket. Indicates that the RLQS server will no longer be
+sending updates for the given <a class="reference internal" href="#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-bucket-id"><span class="std std-ref">bucket_id</span></a>.</p>
+<p>If no requests are reported for a bucket, after some time the server considers the bucket
+inactive. The server stops tracking the bucket, and instructs the the data plane to abandon
+the bucket via this message.</p>
+<p><strong>Abandoning the assignment</strong></p>
+<p>The data plane is to erase the bucket (including its usage data) from the memory.
+It should stop tracking the bucket, and stop reporting its usage. This effectively resets
+the data plane to the state prior to matching the first request into the bucket.</p>
+<p><strong>Restarting the subscription</strong></p>
+<p>If a new request is matched into a bucket previously abandoned, the data plane must behave
+as if it has never tracked the bucket, and it’s the first request matched into it:</p>
+<ol class="arabic simple">
+<li><p>The process of <a class="reference internal" href="../../../extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-reporting-interval"><span class="std std-ref">subscription and reporting</span></a>
+starts from the beginning.</p></li>
+<li><p>The bucket transitions to the <a class="reference internal" href="../../../extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.html#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-no-assignment-behavior"><span class="std std-ref">“no assignment”</span></a>
+state.</p></li>
+<li><p>Once the new assignment is received, it’s applied per
+“Applying the first assignment to the bucket” section of the <a class="reference internal" href="#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction"><span class="std std-ref">QuotaAssignmentAction</span></a>.</p></li>
+</ol>
+</section>
+<section id="service-rate-limit-quota-v3-bucketid">
+<span id="envoy-v3-api-msg-service-rate-limit-quota-v3-bucketid"></span><h2>service.rate_limit_quota.v3.BucketId<a class="headerlink" href="#service-rate-limit-quota-v3-bucketid" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/service/rate_limit_quota/v3/rlqs.proto#L248">[service.rate_limit_quota.v3.BucketId proto]</a></p>
+<p>The identifier for the bucket. Used to match the bucket between the control plane (RLQS server),
+and the data plane (RLQS client), f.e.:</p>
+<ul class="simple">
+<li><p>the data plane sends a usage report for requests matched into the bucket with <code class="docutils literal notranslate"><span class="pre">BucketId</span></code>
+to the control plane</p></li>
+<li><p>the control plane sends an assignment for the bucket with <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> to the data plane
+Bucket ID.</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">bucket</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_bucket</span>
+<span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">staging</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The order of <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> keys do not matter. Buckets <code class="docutils literal notranslate"><span class="pre">{</span> <span class="pre">a:</span> <span class="pre">'A',</span> <span class="pre">b:</span> <span class="pre">'B'</span> <span class="pre">}</span></code> and
+<code class="docutils literal notranslate"><span class="pre">{</span> <span class="pre">b:</span> <span class="pre">'B',</span> <span class="pre">a:</span> <span class="pre">'A'</span> <span class="pre">}</span></code> are identical.</p>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;bucket&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-service-rate-limit-quota-v3-bucketid-bucket">
+<dt>bucket</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>&gt;)</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../ratelimit/v3/rls.proto.html" class="btn btn-neutral float-left" title="Rate limit service (RLS) (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../runtime/v3/rtds.proto.html" class="btn btn-neutral float-right" title="Runtime discovery service (RTDS) (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Rate Limit Quota Service (RLQS) (proto)</a><ul>
+<li><a class="reference internal" href="#service-rate-limit-quota-v3-ratelimitquotausagereports">service.rate_limit_quota.v3.RateLimitQuotaUsageReports</a></li>
+<li><a class="reference internal" href="#service-rate-limit-quota-v3-ratelimitquotausagereports-bucketquotausage">service.rate_limit_quota.v3.RateLimitQuotaUsageReports.BucketQuotaUsage</a></li>
+<li><a class="reference internal" href="#service-rate-limit-quota-v3-ratelimitquotaresponse">service.rate_limit_quota.v3.RateLimitQuotaResponse</a></li>
+<li><a class="reference internal" href="#service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction">service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction</a></li>
+<li><a class="reference internal" href="#service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-quotaassignmentaction">service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction</a></li>
+<li><a class="reference internal" href="#service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandonaction">service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.AbandonAction</a></li>
+<li><a class="reference internal" href="#service-rate-limit-quota-v3-bucketid">service.rate_limit_quota.v3.BucketId</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

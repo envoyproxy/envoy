@@ -1,0 +1,292 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/http/istio_stats/v3/istio_stats.proto:
+
+Istio stats HTTP filter (proto)
+===============================
+
+.. _extension_envoy.filters.http.istio_stats:
+
+This extension has the qualified name ``envoy.filters.http.istio_stats``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - ``type.googleapis.com/stats.PluginConfig``
+
+
+
+
+Istio stats HTTP filter for collecting and reporting metrics.
+
+
+
+
+.. _envoy_v3_api_msg_.stats.MetricConfig:
+
+.stats.MetricConfig
+-------------------
+
+
+:repo:`[.stats.MetricConfig proto] <api/contrib/envoy/extensions/filters/http/istio_stats/v3/istio_stats.proto#L42>`
+
+Metric instance configuration overrides.
+The metric value and the metric type are optional and permit changing the
+reported value for an existing metric.
+The standard metrics are optimized and reported through a "fast-path".
+The customizations allow full configurability, at the cost of a "slower"
+path.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dimensions": {...},
+    "name": ...,
+    "tags_to_remove": [],
+    "match": ...,
+    "drop": ...
+  }
+
+.. _envoy_v3_api_field_.stats.MetricConfig.dimensions:
+
+
+dimensions
+  (.stats.MetricConfig.DimensionsEntry) (Optional) Collection of tag names and tag expressions to include in the
+  metric. Conflicts are resolved by the tag name by overriding previously
+  supplied values.
+
+
+.. _envoy_v3_api_field_.stats.MetricConfig.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) (Optional) Metric name to restrict the override to a metric. If not
+  specified, applies to all.
+
+
+.. _envoy_v3_api_field_.stats.MetricConfig.tags_to_remove:
+
+
+tags_to_remove
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) (Optional) A list of tags to remove.
+
+
+.. _envoy_v3_api_field_.stats.MetricConfig.match:
+
+
+match
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) NOT IMPLEMENTED. (Optional) Conditional enabling the override.
+
+
+.. _envoy_v3_api_field_.stats.MetricConfig.drop:
+
+
+drop
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) (Optional) If this is set to true, the metric(s) selected by this
+  configuration will not be generated or reported.
+
+
+
+
+
+.. _envoy_v3_api_msg_.stats.MetricDefinition:
+
+.stats.MetricDefinition
+-----------------------
+
+
+:repo:`[.stats.MetricDefinition proto] <api/contrib/envoy/extensions/filters/http/istio_stats/v3/istio_stats.proto#L63>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "value": ...,
+    "type": ...
+  }
+
+.. _envoy_v3_api_field_.stats.MetricDefinition.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Metric name.
+
+
+.. _envoy_v3_api_field_.stats.MetricDefinition.value:
+
+
+value
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Metric value expression.
+
+
+.. _envoy_v3_api_field_.stats.MetricDefinition.type:
+
+
+type
+  (.stats.MetricType) Metric type.
+
+
+
+.. _envoy_v3_api_msg_.stats.PluginConfig:
+
+.stats.PluginConfig
+-------------------
+
+
+:repo:`[.stats.PluginConfig proto] <api/contrib/envoy/extensions/filters/http/istio_stats/v3/istio_stats.proto#L75>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "disable_host_header_fallback": ...,
+    "tcp_reporting_duration": {...},
+    "metrics": [],
+    "definitions": [],
+    "reporter": ...,
+    "rotation_interval": {...},
+    "graceful_deletion_interval": {...}
+  }
+
+.. _envoy_v3_api_field_.stats.PluginConfig.disable_host_header_fallback:
+
+
+disable_host_header_fallback
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional: Disable using host header as a fallback if destination service is
+  not available from the control plane. Disable the fallback if the host
+  header originates outsides the mesh, like at ingress.
+
+
+.. _envoy_v3_api_field_.stats.PluginConfig.tcp_reporting_duration:
+
+
+tcp_reporting_duration
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Optional. Allows configuration of the time between calls out to for TCP
+  metrics reporting. The default duration is ``5s``.
+
+
+.. _envoy_v3_api_field_.stats.PluginConfig.metrics:
+
+
+metrics
+  (**repeated** .stats.MetricConfig) Metric overrides.
+
+
+.. _envoy_v3_api_field_.stats.PluginConfig.definitions:
+
+
+definitions
+  (**repeated** .stats.MetricDefinition) Metric definitions.
+
+
+.. _envoy_v3_api_field_.stats.PluginConfig.reporter:
+
+
+reporter
+  (.stats.Reporter) Proxy deployment type.
+
+
+.. _envoy_v3_api_field_.stats.PluginConfig.rotation_interval:
+
+
+rotation_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Metric scope rotation interval. Set to 0 to disable the metric scope rotation.
+  Defaults to 0.
+  DEPRECATED.
+
+
+.. _envoy_v3_api_field_.stats.PluginConfig.graceful_deletion_interval:
+
+
+graceful_deletion_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Metric expiry graceful deletion interval. No-op if the metric rotation is disabled.
+  Defaults to 5m. Must be >=1s.
+  DEPRECATED.
+
+
+
+.. _envoy_v3_api_enum_.stats.MetricType:
+
+Enum .stats.MetricType
+----------------------
+
+
+:repo:`[.stats.MetricType proto] <api/contrib/envoy/extensions/filters/http/istio_stats/v3/istio_stats.proto#L19>`
+
+
+
+
+.. _envoy_v3_api_enum_value_.stats.MetricType.COUNTER:
+
+
+COUNTER
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_.stats.MetricType.GAUGE:
+
+
+GAUGE
+  ⁣
+
+.. _envoy_v3_api_enum_value_.stats.MetricType.HISTOGRAM:
+
+
+HISTOGRAM
+  ⁣
+
+
+.. _envoy_v3_api_enum_.stats.Reporter:
+
+Enum .stats.Reporter
+--------------------
+
+
+:repo:`[.stats.Reporter proto] <api/contrib/envoy/extensions/filters/http/istio_stats/v3/istio_stats.proto#L26>`
+
+Specifies the proxy deployment type.
+
+
+
+.. _envoy_v3_api_enum_value_.stats.Reporter.UNSPECIFIED:
+
+
+UNSPECIFIED
+  *(DEFAULT)* ⁣Default value is inferred from the listener direction, as either client or
+  server sidecar.
+
+
+.. _envoy_v3_api_enum_value_.stats.Reporter.SERVER_GATEWAY:
+
+
+SERVER_GATEWAY
+  ⁣Shared server gateway, e.g. "waypoint".
+
+

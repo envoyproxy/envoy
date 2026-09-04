@@ -1,0 +1,464 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/composite/v3/composite.proto:
+
+Composite (proto)
+=================
+
+.. _extension_envoy.filters.http.composite:
+
+This extension has the qualified name ``envoy.filters.http.composite``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+  - :ref:`envoy.filters.http.upstream <extension_category_envoy.filters.http.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite <envoy_v3_api_msg_extensions.filters.http.composite.v3.Composite>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.composite.v3.CompositePerRoute <envoy_v3_api_msg_extensions.filters.http.composite.v3.CompositePerRoute>`
+
+
+
+Composite Filter :ref:`configuration overview <config_http_filters_composite>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.composite.v3.Composite:
+
+extensions.filters.http.composite.v3.Composite
+----------------------------------------------
+
+
+:repo:`[extensions.filters.http.composite.v3.Composite proto] <api/envoy/extensions/filters/http/composite/v3/composite.proto#L34>`
+
+:ref:`Composite filter <config_http_filters_composite>` config. The composite filter config
+allows delegating filter handling to another filter as determined by matching on the request
+headers. This makes it possible to use different filters or filter configurations based on the
+incoming request.
+
+This is intended to be used with
+:ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
+where a match tree is specified that indicates (via
+:ref:`ExecuteFilterAction <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`)
+which filter configuration to create and delegate to.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "named_filter_chains": {...},
+    "matcher": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.composite.v3.Composite.named_filter_chains:
+
+
+named_filter_chains
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.filters.http.composite.v3.FilterChainConfiguration <envoy_v3_api_msg_extensions.filters.http.composite.v3.FilterChainConfiguration>`>) Named filter chain definitions that can be referenced from
+  :ref:`ExecuteFilterAction.filter_chain_name
+  <envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.filter_chain_name>`.
+  The filter chains are compiled at configuration time and can be referenced by name.
+  This is useful when the same filter chain needs to be applied across many routes,
+  as it avoids duplicating the filter chain configuration.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.composite.v3.Composite.matcher:
+
+
+matcher
+  (:ref:`.xds.type.matcher.v3.Matcher <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`) The match tree that will be used to select an action to execute. The action type should be
+  :ref:`ExecuteFilterAction
+  <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`.
+
+  .. warning::
+    This should only be set when using the Composite filter as in the :ref:`http_filters
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http_filters>`.
+    Never set this field when using the Composite filter with the :ref:`ExtensionWithMatcher
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` which will result in
+    undefined behavior.
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.composite.v3.CompositePerRoute:
+
+extensions.filters.http.composite.v3.CompositePerRoute
+------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.composite.v3.CompositePerRoute proto] <api/envoy/extensions/filters/http/composite/v3/composite.proto#L58>`
+
+Per-route configuration for the Composite filter.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "matcher": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.composite.v3.CompositePerRoute.matcher:
+
+
+matcher
+  (:ref:`.xds.type.matcher.v3.Matcher <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`, *REQUIRED*) Override of the match tree for this route.
+
+  .. warning::
+    This should only be set when using the Composite filter as in the :ref:`http_filters
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http_filters>`.
+    Never set this field when using the Composite filter with the :ref:`ExtensionWithMatcher
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` which will result in
+    undefined behavior.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.composite.v3.FilterChainConfiguration:
+
+extensions.filters.http.composite.v3.FilterChainConfiguration
+-------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.composite.v3.FilterChainConfiguration proto] <api/envoy/extensions/filters/http/composite/v3/composite.proto#L77>`
+
+A list of filter configurations to be called in order. Note that this can be used as the type
+inside of an ECDS :ref:`TypedExtensionConfig
+<envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>` extension, which allows a chain of
+filters to be configured dynamically. In that case, the types of all filters in the chain must
+be present in the :ref:`ExtensionConfigSource.type_urls
+<envoy_v3_api_field_config.core.v3.ExtensionConfigSource.type_urls>` field.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "typed_config": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.composite.v3.FilterChainConfiguration.typed_config:
+
+
+typed_config
+  (**repeated** :ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) 
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.composite.v3.DynamicConfig:
+
+extensions.filters.http.composite.v3.DynamicConfig
+--------------------------------------------------
+
+
+:repo:`[extensions.filters.http.composite.v3.DynamicConfig proto] <api/envoy/extensions/filters/http/composite/v3/composite.proto#L82>`
+
+Configuration for an extension configuration discovery service with name.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "config_discovery": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.composite.v3.DynamicConfig.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name of the extension configuration. It also serves as a resource name in ExtensionConfigDS.
+  The resource type in the ``DiscoveryRequest`` will be :ref:`TypedExtensionConfig
+  <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.composite.v3.DynamicConfig.config_discovery:
+
+
+config_discovery
+  (:ref:`config.core.v3.ExtensionConfigSource <envoy_v3_api_msg_config.core.v3.ExtensionConfigSource>`) Configuration source specifier for an extension configuration discovery
+  service. In case of a failure and without the default configuration,
+  500(Internal Server Error) will be returned.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction:
+
+extensions.filters.http.composite.v3.ExecuteFilterAction
+--------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.composite.v3.ExecuteFilterAction proto] <api/envoy/extensions/filters/http/composite/v3/composite.proto#L97>`
+
+Composite match action (see :ref:`matching docs <arch_overview_matching_api>` for more info on match actions).
+This specifies the filter configuration of the filter that the composite filter should delegate filter interactions to.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "typed_config": {...},
+    "dynamic_config": {...},
+    "filter_chain": {...},
+    "filter_chain_name": ...,
+    "sample_percent": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.typed_config:
+
+
+typed_config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Filter specific configuration which depends on the filter being
+  instantiated. See the supported filters for further documentation.
+  Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_name``
+  can be set.
+
+
+  .. _extension_category_envoy.filters.http:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.filters.http.a2a <extension_envoy.filters.http.a2a>`
+
+    - :ref:`envoy.filters.http.adaptive_concurrency <extension_envoy.filters.http.adaptive_concurrency>`
+
+    - :ref:`envoy.filters.http.admission_control <extension_envoy.filters.http.admission_control>`
+
+    - :ref:`envoy.filters.http.ai_protocol_manager <extension_envoy.filters.http.ai_protocol_manager>`
+
+    - :ref:`envoy.filters.http.alternate_protocols_cache <extension_envoy.filters.http.alternate_protocols_cache>`
+
+    - :ref:`envoy.filters.http.api_key_auth <extension_envoy.filters.http.api_key_auth>`
+
+    - :ref:`envoy.filters.http.aws_eventstream_parser <extension_envoy.filters.http.aws_eventstream_parser>`
+
+    - :ref:`envoy.filters.http.aws_lambda <extension_envoy.filters.http.aws_lambda>`
+
+    - :ref:`envoy.filters.http.aws_request_signing <extension_envoy.filters.http.aws_request_signing>`
+
+    - :ref:`envoy.filters.http.bandwidth_limit <extension_envoy.filters.http.bandwidth_limit>`
+
+    - :ref:`envoy.filters.http.bandwidth_share <extension_envoy.filters.http.bandwidth_share>`
+
+    - :ref:`envoy.filters.http.basic_auth <extension_envoy.filters.http.basic_auth>`
+
+    - :ref:`envoy.filters.http.body_size_limit <extension_envoy.filters.http.body_size_limit>`
+
+    - :ref:`envoy.filters.http.buffer <extension_envoy.filters.http.buffer>`
+
+    - :ref:`envoy.filters.http.cache <extension_envoy.filters.http.cache>`
+
+    - :ref:`envoy.filters.http.cache_v2 <extension_envoy.filters.http.cache_v2>`
+
+    - :ref:`envoy.filters.http.cdn_loop <extension_envoy.filters.http.cdn_loop>`
+
+    - :ref:`envoy.filters.http.composite <extension_envoy.filters.http.composite>`
+
+    - :ref:`envoy.filters.http.compressor <extension_envoy.filters.http.compressor>`
+
+    - :ref:`envoy.filters.http.connect_grpc_bridge <extension_envoy.filters.http.connect_grpc_bridge>`
+
+    - :ref:`envoy.filters.http.cors <extension_envoy.filters.http.cors>`
+
+    - :ref:`envoy.filters.http.credential_injector <extension_envoy.filters.http.credential_injector>`
+
+    - :ref:`envoy.filters.http.csrf <extension_envoy.filters.http.csrf>`
+
+    - :ref:`envoy.filters.http.custom_response <extension_envoy.filters.http.custom_response>`
+
+    - :ref:`envoy.filters.http.decompressor <extension_envoy.filters.http.decompressor>`
+
+    - :ref:`envoy.filters.http.dynamic_forward_proxy <extension_envoy.filters.http.dynamic_forward_proxy>`
+
+    - :ref:`envoy.filters.http.dynamic_modules <extension_envoy.filters.http.dynamic_modules>`
+
+    - :ref:`envoy.filters.http.ext_authz <extension_envoy.filters.http.ext_authz>`
+
+    - :ref:`envoy.filters.http.ext_proc <extension_envoy.filters.http.ext_proc>`
+
+    - :ref:`envoy.filters.http.fault <extension_envoy.filters.http.fault>`
+
+    - :ref:`envoy.filters.http.file_server <extension_envoy.filters.http.file_server>`
+
+    - :ref:`envoy.filters.http.file_system_buffer <extension_envoy.filters.http.file_system_buffer>`
+
+    - :ref:`envoy.filters.http.filter_chain <extension_envoy.filters.http.filter_chain>`
+
+    - :ref:`envoy.filters.http.gcp_authn <extension_envoy.filters.http.gcp_authn>`
+
+    - :ref:`envoy.filters.http.geoip <extension_envoy.filters.http.geoip>`
+
+    - :ref:`envoy.filters.http.grpc_field_extraction <extension_envoy.filters.http.grpc_field_extraction>`
+
+    - :ref:`envoy.filters.http.grpc_http1_bridge <extension_envoy.filters.http.grpc_http1_bridge>`
+
+    - :ref:`envoy.filters.http.grpc_http1_reverse_bridge <extension_envoy.filters.http.grpc_http1_reverse_bridge>`
+
+    - :ref:`envoy.filters.http.grpc_json_reverse_transcoder <extension_envoy.filters.http.grpc_json_reverse_transcoder>`
+
+    - :ref:`envoy.filters.http.grpc_json_transcoder <extension_envoy.filters.http.grpc_json_transcoder>`
+
+    - :ref:`envoy.filters.http.grpc_stats <extension_envoy.filters.http.grpc_stats>`
+
+    - :ref:`envoy.filters.http.grpc_web <extension_envoy.filters.http.grpc_web>`
+
+    - :ref:`envoy.filters.http.header_mutation <extension_envoy.filters.http.header_mutation>`
+
+    - :ref:`envoy.filters.http.header_to_metadata <extension_envoy.filters.http.header_to_metadata>`
+
+    - :ref:`envoy.filters.http.health_check <extension_envoy.filters.http.health_check>`
+
+    - :ref:`envoy.filters.http.ip_tagging <extension_envoy.filters.http.ip_tagging>`
+
+    - :ref:`envoy.filters.http.json_to_metadata <extension_envoy.filters.http.json_to_metadata>`
+
+    - :ref:`envoy.filters.http.jwt_authn <extension_envoy.filters.http.jwt_authn>`
+
+    - :ref:`envoy.filters.http.kill_request <extension_envoy.filters.http.kill_request>`
+
+    - :ref:`envoy.filters.http.local_ratelimit <extension_envoy.filters.http.local_ratelimit>`
+
+    - :ref:`envoy.filters.http.lua <extension_envoy.filters.http.lua>`
+
+    - :ref:`envoy.filters.http.mcp <extension_envoy.filters.http.mcp>`
+
+    - :ref:`envoy.filters.http.mcp_json_rest_bridge <extension_envoy.filters.http.mcp_json_rest_bridge>`
+
+    - :ref:`envoy.filters.http.mcp_router <extension_envoy.filters.http.mcp_router>`
+
+    - :ref:`envoy.filters.http.oauth2 <extension_envoy.filters.http.oauth2>`
+
+    - :ref:`envoy.filters.http.on_demand <extension_envoy.filters.http.on_demand>`
+
+    - :ref:`envoy.filters.http.original_src <extension_envoy.filters.http.original_src>`
+
+    - :ref:`envoy.filters.http.proto_api_scrubber <extension_envoy.filters.http.proto_api_scrubber>`
+
+    - :ref:`envoy.filters.http.proto_message_extraction <extension_envoy.filters.http.proto_message_extraction>`
+
+    - :ref:`envoy.filters.http.rate_limit_quota <extension_envoy.filters.http.rate_limit_quota>`
+
+    - :ref:`envoy.filters.http.ratelimit <extension_envoy.filters.http.ratelimit>`
+
+    - :ref:`envoy.filters.http.rbac <extension_envoy.filters.http.rbac>`
+
+    - :ref:`envoy.filters.http.router <extension_envoy.filters.http.router>`
+
+    - :ref:`envoy.filters.http.set_filter_state <extension_envoy.filters.http.set_filter_state>`
+
+    - :ref:`envoy.filters.http.set_metadata <extension_envoy.filters.http.set_metadata>`
+
+    - :ref:`envoy.filters.http.sse_to_metadata <extension_envoy.filters.http.sse_to_metadata>`
+
+    - :ref:`envoy.filters.http.stateful_session <extension_envoy.filters.http.stateful_session>`
+
+    - :ref:`envoy.filters.http.tap <extension_envoy.filters.http.tap>`
+
+    - :ref:`envoy.filters.http.thrift_to_metadata <extension_envoy.filters.http.thrift_to_metadata>`
+
+    - :ref:`envoy.filters.http.transform <extension_envoy.filters.http.transform>`
+
+    - :ref:`envoy.filters.http.wasm <extension_envoy.filters.http.wasm>`
+
+
+
+
+    The following extensions are available in :ref:`contrib <install_contrib>` images only:
+
+
+    - :ref:`envoy.filters.http.alpn <extension_envoy.filters.http.alpn>`
+
+    - :ref:`envoy.filters.http.checksum <extension_envoy.filters.http.checksum>`
+
+    - :ref:`envoy.filters.http.dynamo <extension_envoy.filters.http.dynamo>`
+
+    - :ref:`envoy.filters.http.golang <extension_envoy.filters.http.golang>`
+
+    - :ref:`envoy.filters.http.istio_stats <extension_envoy.filters.http.istio_stats>`
+
+    - :ref:`envoy.filters.http.language <extension_envoy.filters.http.language>`
+
+    - :ref:`envoy.filters.http.peak_ewma <extension_envoy.filters.http.peak_ewma>`
+
+    - :ref:`envoy.filters.http.peer_metadata <extension_envoy.filters.http.peer_metadata>`
+
+    - :ref:`envoy.filters.http.sxg <extension_envoy.filters.http.sxg>`
+
+    - :ref:`envoy.tap_sinks.udp_sink <extension_envoy.tap_sinks.udp_sink>`
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.dynamic_config:
+
+
+dynamic_config
+  (:ref:`extensions.filters.http.composite.v3.DynamicConfig <envoy_v3_api_msg_extensions.filters.http.composite.v3.DynamicConfig>`) Dynamic configuration of filter obtained via extension configuration discovery service.
+  Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_name``
+  can be set.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.filter_chain:
+
+
+filter_chain
+  (:ref:`extensions.filters.http.composite.v3.FilterChainConfiguration <envoy_v3_api_msg_extensions.filters.http.composite.v3.FilterChainConfiguration>`) An inlined list of filter configurations. The specified filters will be executed in order.
+  Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_name``
+  can be set.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.filter_chain_name:
+
+
+filter_chain_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of a filter chain defined in
+  :ref:`Composite.named_filter_chains
+  <envoy_v3_api_field_extensions.filters.http.composite.v3.Composite.named_filter_chains>`.
+  At runtime, if the named filter chain is not found in the Composite filter's configuration,
+  no filter will be applied for this match (the action is silently skipped).
+  Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_name``
+  can be set.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.sample_percent:
+
+
+sample_percent
+  (:ref:`config.core.v3.RuntimeFractionalPercent <envoy_v3_api_msg_config.core.v3.RuntimeFractionalPercent>`) Probability of the action execution. If not specified, this is 100%.
+  This allows sampling behavior for the configured actions.
+  For example, if
+  :ref:`default_value <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.default_value>`
+  under the ``sample_percent`` is configured with 30%, a dice roll with that
+  probability is done. The underline action will only be executed if the
+  dice roll returns positive. Otherwise, the action is skipped.
+
+

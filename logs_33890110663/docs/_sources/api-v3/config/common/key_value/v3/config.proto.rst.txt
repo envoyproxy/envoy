@@ -1,0 +1,52 @@
+.. _envoy_v3_api_file_envoy/config/common/key_value/v3/config.proto:
+
+Key/value store storage plugin (proto)
+======================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_config.common.key_value.v3.KeyValueStoreConfig:
+
+config.common.key_value.v3.KeyValueStoreConfig
+----------------------------------------------
+
+
+:repo:`[config.common.key_value.v3.KeyValueStoreConfig proto] <api/envoy/config/common/key_value/v3/config.proto#L20>`
+
+This shared configuration for Envoy key value stores.
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config": {...}
+  }
+
+.. _envoy_v3_api_field_config.common.key_value.v3.KeyValueStoreConfig.config:
+
+
+config
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`, *REQUIRED*) 
+
+  .. _extension_category_envoy.common.key_value:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.key_value.file_based <extension_envoy.key_value.file_based>`
+
+
+
+
+

@@ -1,0 +1,235 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/admission_control/v3/admission_control.proto:
+
+Admission Control (proto)
+=========================
+
+.. _extension_envoy.filters.http.admission_control:
+
+This extension has the qualified name ``envoy.filters.http.admission_control``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+  - :ref:`envoy.filters.http.upstream <extension_category_envoy.filters.http.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.admission_control.v3.AdmissionControl <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl:
+
+extensions.filters.http.admission_control.v3.AdmissionControl
+-------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.admission_control.v3.AdmissionControl proto] <api/envoy/extensions/filters/http/admission_control/v3/admission_control.proto#L22>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "enabled": {...},
+    "success_criteria": {...},
+    "sampling_window": {...},
+    "aggression": {...},
+    "sr_threshold": {...},
+    "rps_threshold": {...},
+    "max_rejection_probability": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.admission_control.v3.AdmissionControl.enabled:
+
+
+enabled
+  (:ref:`config.core.v3.RuntimeFeatureFlag <envoy_v3_api_msg_config.core.v3.RuntimeFeatureFlag>`) If set to false, the admission control filter will operate as a pass-through filter. If the
+  message is unspecified, the filter will be enabled.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.admission_control.v3.AdmissionControl.success_criteria:
+
+
+success_criteria
+  (:ref:`extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria>`, *REQUIRED*) 
+  Defines how a request is considered a success/failure.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.admission_control.v3.AdmissionControl.sampling_window:
+
+
+sampling_window
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The sliding time window over which the success rate is calculated. The window is rounded to the
+  nearest second. Defaults to 30s.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.admission_control.v3.AdmissionControl.aggression:
+
+
+aggression
+  (:ref:`config.core.v3.RuntimeDouble <envoy_v3_api_msg_config.core.v3.RuntimeDouble>`) Rejection probability is defined by the formula::
+
+      max(0, (rq_count -  rq_success_count / sr_threshold) / (rq_count + 1)) ^ (1 / aggression)
+
+  The aggression dictates how heavily the admission controller will throttle requests upon SR
+  dropping at or below the threshold. A value of 1 will result in a linear increase in
+  rejection probability as SR drops. Any values less than 1.0, will be set to 1.0. If the
+  message is unspecified, the aggression is 1.0. See `the admission control documentation
+  <https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/admission_control_filter.html>`_
+  for a diagram illustrating this.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.admission_control.v3.AdmissionControl.sr_threshold:
+
+
+sr_threshold
+  (:ref:`config.core.v3.RuntimePercent <envoy_v3_api_msg_config.core.v3.RuntimePercent>`) Dictates the success rate at which the rejection probability is non-zero. As success rate drops
+  below this threshold, rejection probability will increase. Any success rate above the threshold
+  results in a rejection probability of 0. Defaults to 95%.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.admission_control.v3.AdmissionControl.rps_threshold:
+
+
+rps_threshold
+  (:ref:`config.core.v3.RuntimeUInt32 <envoy_v3_api_msg_config.core.v3.RuntimeUInt32>`) If the average RPS of the sampling window is below this threshold, the request
+  will not be rejected, even if the success rate is lower than sr_threshold.
+  Defaults to 0.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.admission_control.v3.AdmissionControl.max_rejection_probability:
+
+
+max_rejection_probability
+  (:ref:`config.core.v3.RuntimePercent <envoy_v3_api_msg_config.core.v3.RuntimePercent>`) The probability of rejection will never exceed this value, even if the failure rate is rising.
+  Defaults to 80%.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria:
+
+extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria
+-----------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria proto] <api/envoy/extensions/filters/http/admission_control/v3/admission_control.proto#L26>`
+
+Default method of specifying what constitutes a successful request. All status codes that
+indicate a successful request must be explicitly specified if not relying on the default
+values.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "http_criteria": {...},
+    "grpc_criteria": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.http_criteria:
+
+
+http_criteria
+  (:ref:`extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.HttpCriteria <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.HttpCriteria>`) If HTTP criteria are unspecified, all HTTP status codes below 500 are treated as successful
+  responses.
+
+  .. note::
+
+     The default HTTP codes considered successful by the admission controller are done so due
+     to the unlikelihood that sending fewer requests would change their behavior (for example:
+     redirects, unauthorized access, or bad requests won't be alleviated by sending less
+     traffic).
+
+
+.. _envoy_v3_api_field_extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.grpc_criteria:
+
+
+grpc_criteria
+  (:ref:`extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.GrpcCriteria <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.GrpcCriteria>`) GRPC status codes to consider as request successes. If unspecified, defaults to: Ok,
+  Cancelled, Unknown, InvalidArgument, NotFound, AlreadyExists, Unauthenticated,
+  FailedPrecondition, OutOfRange, PermissionDenied, and Unimplemented.
+
+  .. note::
+
+     The default gRPC codes that are considered successful by the admission controller are
+     chosen because of the unlikelihood that sending fewer requests will change the behavior.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.HttpCriteria:
+
+extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.HttpCriteria
+------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.HttpCriteria proto] <api/envoy/extensions/filters/http/admission_control/v3/admission_control.proto#L27>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "http_success_status": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.HttpCriteria.http_success_status:
+
+
+http_success_status
+  (**repeated** :ref:`type.v3.Int32Range <envoy_v3_api_msg_type.v3.Int32Range>`, *REQUIRED*) Status code ranges that constitute a successful request. Configurable codes are in the
+  range [100, 600).
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.GrpcCriteria:
+
+extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.GrpcCriteria
+------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.GrpcCriteria proto] <api/envoy/extensions/filters/http/admission_control/v3/admission_control.proto#L34>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "grpc_success_status": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.admission_control.v3.AdmissionControl.SuccessCriteria.GrpcCriteria.grpc_success_status:
+
+
+grpc_success_status
+  (**repeated** `uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Status codes that constitute a successful request.
+  Mappings can be found at: https://github.com/grpc/grpc/blob/master/doc/statuscodes.md.
+
+
+
+

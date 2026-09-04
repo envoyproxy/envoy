@@ -29,8 +29,7 @@ namespace ProxyProtocol {
 UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
     Network::TransportSocketPtr&& transport_socket,
     Network::TransportSocketOptionsConstSharedPtr options, ProxyProtocolConfig config,
-    const UpstreamProxyProtocolStats& stats,
-    const std::vector<TlvFormatter>& added_tlvs)
+    const UpstreamProxyProtocolStats& stats, const std::vector<TlvFormatter>& added_tlvs)
     : PassthroughSocket(std::move(transport_socket)), options_(options), version_(config.version()),
       stats_(stats),
       pass_all_tlvs_(config.has_pass_through_tlvs() ? config.pass_through_tlvs().match_type() ==
@@ -201,9 +200,11 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
           if (runtime_allow_duplicate_tlvs) {
             for (const auto& entry : host_tlv_metadata.added_tlvs()) {
               if (entry.has_format_string()) {
-                ENVOY_LOG(warn,
-                          "format_string in host-level Proxy Protocol TLVs is currently not supported. "
-                          "Skipping TLV type {}", entry.type());
+                ENVOY_LOG(
+                    warn,
+                    "format_string in host-level Proxy Protocol TLVs is currently not supported. "
+                    "Skipping TLV type {}",
+                    entry.type());
                 continue;
               }
               custom_tlvs.push_back(Network::ProxyProtocolTLV{
@@ -219,9 +220,11 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
                 continue;
               }
               if (entry.has_format_string()) {
-                ENVOY_LOG(warn,
-                          "format_string in host-level Proxy Protocol TLVs is currently not supported. "
-                          "Skipping TLV type {}", entry.type());
+                ENVOY_LOG(
+                    warn,
+                    "format_string in host-level Proxy Protocol TLVs is currently not supported. "
+                    "Skipping TLV type {}",
+                    entry.type());
                 continue;
               }
               custom_tlvs.push_back(Network::ProxyProtocolTLV{
@@ -239,8 +242,8 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
     for (const auto& tlv : added_tlvs_) {
       if (!host_level_tlv_types.contains(tlv.type_)) {
         if (tlv.formatter_) {
-          const std::string formatted = tlv.formatter_->format(
-              {}, callbacks_->connection().streamInfo());
+          const std::string formatted =
+              tlv.formatter_->format({}, callbacks_->connection().streamInfo());
           custom_tlvs.push_back(Network::ProxyProtocolTLV{
               tlv.type_, std::vector<uint8_t>(formatted.begin(), formatted.end())});
         } else {
@@ -256,8 +259,8 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
         continue;
       }
       if (tlv.formatter_) {
-        const std::string formatted = tlv.formatter_->format(
-            {}, callbacks_->connection().streamInfo());
+        const std::string formatted =
+            tlv.formatter_->format({}, callbacks_->connection().streamInfo());
         custom_tlvs.push_back(Network::ProxyProtocolTLV{
             tlv.type_, std::vector<uint8_t>(formatted.begin(), formatted.end())});
       } else {

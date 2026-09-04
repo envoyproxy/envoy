@@ -1,0 +1,675 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aggregate Cluster &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Composite cluster" href="composite_cluster.html" />
+    <link rel="prev" title="Override host" href="load_balancing/override_host.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../http/http.html">HTTP</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="upstream.html">Upstream clusters</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="cluster_manager.html">Cluster manager</a></li>
+<li class="toctree-l4"><a class="reference internal" href="service_discovery.html">Service discovery</a></li>
+<li class="toctree-l4"><a class="reference internal" href="dns_resolution.html">DNS Resolution</a></li>
+<li class="toctree-l4"><a class="reference internal" href="health_checking.html">Health checking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="connection_pooling.html">Connection pooling</a></li>
+<li class="toctree-l4"><a class="reference internal" href="load_balancing/load_balancing.html">Load Balancing</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Aggregate Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="composite_cluster.html">Composite cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="mcp_multicluster.html">MCP multi cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="outlier.html">Outlier detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="circuit_breaking.html">Circuit breaking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="upstream_filters.html">Upstream network filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="load_reporting_service.html">Load Reporting Service (LRS)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="load_balancing_policies.html">Load balancing policies</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../observability/observability.html">Observability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../security/security.html">Security</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced/advanced.html">Advanced</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="upstream.html">Upstream clusters</a></li>
+      <li class="breadcrumb-item active">Aggregate Cluster</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/intro/arch_overview/upstream/aggregate_cluster.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="aggregate-cluster">
+<span id="arch-overview-aggregate-cluster"></span><h1>Aggregate Cluster<a class="headerlink" href="#aggregate-cluster" title="Link to this heading"></a></h1>
+<p>An aggregate cluster allows you to set up failover between multiple upstream clusters that have different
+configurations. For example, you might switch from an <a class="reference internal" href="service_discovery.html#arch-overview-service-discovery-types-eds"><span class="std std-ref">EDS</span></a> cluster to
+a <a class="reference internal" href="service_discovery.html#arch-overview-service-discovery-types-strict-dns"><span class="std std-ref">STRICT_DNS</span></a> cluster, or from a cluster using
+<a class="reference internal" href="load_balancing/load_balancers.html#arch-overview-load-balancing-types-round-robin"><span class="std std-ref">ROUND_ROBIN</span></a> load balancing to one using
+<a class="reference internal" href="load_balancing/load_balancers.html#arch-overview-load-balancing-types-maglev"><span class="std std-ref">MAGLEV</span></a>. You can also use it to change timeouts, such as moving from
+a <code class="docutils literal notranslate"><span class="pre">0.1s</span></code> connection timeout to a <code class="docutils literal notranslate"><span class="pre">1s</span></code> timeout.</p>
+<p>To enable this failover, the aggregate cluster references other clusters by their names in the
+<a class="reference internal" href="../../../api-v3/extensions/clusters/aggregate/v3/cluster.proto.html#envoy-v3-api-msg-extensions-clusters-aggregate-v3-clusterconfig"><span class="std std-ref">configuration</span></a>. The ordering of these clusters
+in the <a class="reference internal" href="../../../api-v3/extensions/clusters/aggregate/v3/cluster.proto.html#envoy-v3-api-field-extensions-clusters-aggregate-v3-clusterconfig-clusters"><span class="std std-ref">clusters list</span></a> implicitly
+defines the fallback priority.</p>
+<p>The aggregate cluster uses a tiered approach to load balancing:</p>
+<ul class="simple">
+<li><p>At the top level, it decides which cluster and priority to use.</p></li>
+<li><p>It then hands off the actual load balancing to the selected cluster’s own load balancer.</p></li>
+</ul>
+<p>Internally, this top-level load balancer treats all the priorities across all referenced clusters as a single linear
+list. By doing so, it reuses the existing load balancing algorithm and makes it possible to seamlessly shift traffic
+between clusters as needed.</p>
+<section id="linearize-priority-set">
+<h2>Linearize Priority Set<a class="headerlink" href="#linearize-priority-set" title="Link to this heading"></a></h2>
+<p>Upstream hosts are grouped into different <a class="reference internal" href="load_balancing/priority.html#arch-overview-load-balancing-priority-levels"><span class="std std-ref">priority levels</span></a>, and
+each level includes hosts that can be healthy, degraded, or unhealthy. To simplify host selection during load balancing,
+linearization merges these priority levels across multiple clusters into a single sequence.</p>
+<p>For example, if the primary cluster has three priority levels, and the secondary and tertiary clusters each have two,
+the failover order is:</p>
+<ul class="simple">
+<li><p>Primary</p></li>
+<li><p>Secondary</p></li>
+<li><p>Tertiary</p></li>
+</ul>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Cluster</p></th>
+<th class="head"><p>Priority Level</p></th>
+<th class="head"><p>Priority Level after Linearization</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Primary</p></td>
+<td><p>0</p></td>
+<td><p>0</p></td>
+</tr>
+<tr class="row-odd"><td><p>Primary</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+</tr>
+<tr class="row-even"><td><p>Primary</p></td>
+<td><p>2</p></td>
+<td><p>2</p></td>
+</tr>
+<tr class="row-odd"><td><p>Secondary</p></td>
+<td><p>0</p></td>
+<td><p>3</p></td>
+</tr>
+<tr class="row-even"><td><p>Secondary</p></td>
+<td><p>1</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>Tertiary</p></td>
+<td><p>0</p></td>
+<td><p>5</p></td>
+</tr>
+<tr class="row-even"><td><p>Tertiary</p></td>
+<td><p>1</p></td>
+<td><p>6</p></td>
+</tr>
+</tbody>
+</table>
+<p>This approach ensures a straightforward way to decide which hosts receive traffic based on priority, even when working
+with multiple clusters.</p>
+</section>
+<section id="example">
+<h2>Example<a class="headerlink" href="#example" title="Link to this heading"></a></h2>
+<p>A sample aggregate cluster configuration could be:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aggregate_cluster</span>
+<span class="nt">connect_timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.25s</span>
+<span class="nt">lb_policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CLUSTER_PROVIDED</span>
+<span class="nt">cluster_type</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">envoy.clusters.aggregate</span>
+<span class="w">  </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">    </span><span class="s">&quot;@type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig</span>
+<span class="w">    </span><span class="nt">clusters</span><span class="p">:</span>
+<span class="w">    </span><span class="c1"># cluster primary, secondary and tertiary should be defined outside.</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">primary</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secondary</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tertiary</span>
+</pre></div>
+</div>
+</section>
+<section id="important-considerations-for-aggregate-clusters">
+<h2>Important Considerations for Aggregate Clusters<a class="headerlink" href="#important-considerations-for-aggregate-clusters" title="Link to this heading"></a></h2>
+<p>Some features might not work as expected with aggregate clusters. For example,</p>
+<section id="priorityload-retry-plugins">
+<h3>PriorityLoad Retry Plugins<a class="headerlink" href="#priorityload-retry-plugins" title="Link to this heading"></a></h3>
+<p><a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-field-config-route-v3-retrypolicy-retry-priority"><span class="std std-ref">PriorityLoad retry plugins</span></a> will not work with an
+aggregate cluster. Because the aggregate cluster’s load balancer controls traffic distribution at a higher level, it
+effectively overrides the PriorityLoad behavior during load balancing.</p>
+</section>
+<section id="stateful-sessions">
+<h3>Stateful Sessions<a class="headerlink" href="#stateful-sessions" title="Link to this heading"></a></h3>
+<p><a class="reference internal" href="../../../api-v3/extensions/filters/http/stateful_session/v3/stateful_session.proto.html#envoy-v3-api-msg-extensions-filters-http-stateful-session-v3-statefulsession"><span class="std std-ref">Stateful Sessions</span></a> rely on the
+cluster to directly know the endpoint receiving traffic. With an aggregate cluster, the top-level load balancer selects
+a cluster first, but does not track specific endpoints inside that cluster.</p>
+<p>If we configure Stateful Sessions to override the upstream address, the load balancer bypasses its usual algorithm to
+send traffic directly to that host. This works only when the cluster itself knows the exact endpoint.</p>
+<p>In an aggregate cluster, the final routing decision happens one layer beneath the aggregate load balancer, so the filter
+cannot locate that specific endpoint at the aggregate level. As a result, Stateful Sessions are incompatible with
+aggregate clusters, because the final cluster choice is made without direct knowledge of the specific endpoint which
+doesn’t exist at the top level.</p>
+</section>
+<section id="circuit-breakers">
+<h3>Circuit Breakers<a class="headerlink" href="#circuit-breakers" title="Link to this heading"></a></h3>
+<p>In general, an aggregate cluster should be thought of as a cluster that groups the endpoints of the underlying clusters
+together for load balancing purposes only, not for circuit breaking which is handled at the level of the underlying clusters,
+not at the level of the aggregate cluster itself. This allows the aggregate cluster to maintain its failover capabilities
+whilst respecting the circuit breaker limits of each underlying cluster. This is intentional as the underlying clusters
+are accessible through multiple paths (directly or via the aggregate cluster) and configuring aggregate cluster circuit
+breakers would effectively double the circuit breaker limits rendering them useless.</p>
+<p>When the configured limit is reached on the underlying cluster(s) only the underlying cluster(s)’ circuit breaker opens.
+When an underlying cluster’s circuit breaker opens, requests routed through the aggregate cluster to that underlying cluster
+will be rejected. The aggregate cluster’s circuit breaker remains closed at all times, regardless of whether the circuit
+breaker(s) limits on the underlying cluster(s) are reached or not.</p>
+<p>As an exception, the only circuit breaker configured at the aggregate cluster level is <a class="reference internal" href="../../../api-v3/config/cluster/v3/circuit_breaker.proto.html#envoy-v3-api-field-config-cluster-v3-circuitbreakers-thresholds-max-retries"><span class="std std-ref">max_retries</span></a>
+because when Envoy processes a retry request, it needs to determine whether the retry limit has been exceeded before
+the aggregate cluster is able to choose the underlying cluster to use. When the configured limit is reached the aggregate
+cluster’s circuit breaker opens, and subsequent requests to the aggregate cluster path cannot retry, even though the
+underlying cluster’s retry budget is still available.</p>
+</section>
+</section>
+<section id="load-balancing-example">
+<h2>Load Balancing Example<a class="headerlink" href="#load-balancing-example" title="Link to this heading"></a></h2>
+<p>Aggregate cluster uses tiered load balancing algorithm and the top tier is distributing traffic to different clusters
+according to the health score across all <a class="reference internal" href="load_balancing/priority.html#arch-overview-load-balancing-priority-levels"><span class="std std-ref">priorities</span></a> in each
+cluster. The aggregate cluster in this section includes two clusters which is different from what the above
+configuration describes.</p>
+<p>The aggregate cluster uses a tiered load balancing algorithm with two main steps:</p>
+<ul class="simple">
+<li><p><strong>Top Tier:</strong> Distribute traffic across different clusters based on each cluster’s overall health (across all
+<a class="reference internal" href="load_balancing/priority.html#arch-overview-load-balancing-priority-levels"><span class="std std-ref">priorities</span></a>).</p></li>
+<li><p><strong>Second Tier:</strong> Once a cluster is chosen, delegate traffic distribution within that cluster to its own load balancer
+(e.g., <a class="reference internal" href="load_balancing/load_balancers.html#arch-overview-load-balancing-types-round-robin"><span class="std std-ref">ROUND_ROBIN</span></a>,
+<a class="reference internal" href="load_balancing/load_balancers.html#arch-overview-load-balancing-types-maglev"><span class="std std-ref">MAGLEV</span></a>, etc.).</p></li>
+</ul>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head" colspan="5"><p>Cluster</p></th>
+<th class="head"><p>Traffic to Primary</p></th>
+<th class="head"><p>Traffic to Secondary</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td colspan="3"><p>Primary</p></td>
+<td colspan="2"><p>Secondary</p></td>
+<td colspan="2" rowspan="2"></td>
+</tr>
+<tr class="row-odd"><td><p>P=0 Healthy Endpoints</p></td>
+<td><p>P=1 Healthy Endpoints</p></td>
+<td><p>P=2 Healthy Endpoints</p></td>
+<td><p>P=0 Healthy Endpoints</p></td>
+<td><p>P=1 Healthy Endpoints</p></td>
+</tr>
+<tr class="row-even"><td><p>100%</p></td>
+<td><p>100%</p></td>
+<td><p>100%</p></td>
+<td><p>100%</p></td>
+<td><p>100%</p></td>
+<td><p>100%</p></td>
+<td><p>0%</p></td>
+</tr>
+<tr class="row-odd"><td><p>72%</p></td>
+<td><p>100%</p></td>
+<td><p>100%</p></td>
+<td><p>100%</p></td>
+<td><p>100%</p></td>
+<td><p>100%</p></td>
+<td><p>0%</p></td>
+</tr>
+<tr class="row-even"><td><p>71%</p></td>
+<td><p>1%</p></td>
+<td><p>0%</p></td>
+<td><p>100%</p></td>
+<td><p>100%</p></td>
+<td><p>100%</p></td>
+<td><p>0%</p></td>
+</tr>
+<tr class="row-odd"><td><p>71%</p></td>
+<td><p>0%</p></td>
+<td><p>0%</p></td>
+<td><p>100%</p></td>
+<td><p>100%</p></td>
+<td><p>99%</p></td>
+<td><p>1%</p></td>
+</tr>
+<tr class="row-even"><td><p>50%</p></td>
+<td><p>0%</p></td>
+<td><p>0%</p></td>
+<td><p>50%</p></td>
+<td><p>0%</p></td>
+<td><p>70%</p></td>
+<td><p>30%</p></td>
+</tr>
+<tr class="row-odd"><td><p>20%</p></td>
+<td><p>20%</p></td>
+<td><p>10%</p></td>
+<td><p>25%</p></td>
+<td><p>25%</p></td>
+<td><p>70%</p></td>
+<td><p>30%</p></td>
+</tr>
+<tr class="row-even"><td><p>20%</p></td>
+<td><p>0%</p></td>
+<td><p>0%</p></td>
+<td><p>20%</p></td>
+<td><p>0%</p></td>
+<td><p>50%</p></td>
+<td><p>50%</p></td>
+</tr>
+<tr class="row-odd"><td><p>0%</p></td>
+<td><p>0%</p></td>
+<td><p>0%</p></td>
+<td><p>100%</p></td>
+<td><p>0%</p></td>
+<td><p>0%</p></td>
+<td><p>100%</p></td>
+</tr>
+<tr class="row-even"><td><p>0%</p></td>
+<td><p>0%</p></td>
+<td><p>0%</p></td>
+<td><p>72%</p></td>
+<td><p>0%</p></td>
+<td><p>0%</p></td>
+<td><p>100%</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>By default, the <a class="reference internal" href="load_balancing/overprovisioning.html#arch-overview-load-balancing-overprovisioning-factor"><span class="std std-ref">overprovisioning factor</span></a> is <strong>1.4</strong>.
+This factor boosts lower health percentages to account for partial availability. For instance, if a priority level is
+<strong>80%</strong> healthy, multiplying by <strong>1.4</strong> results in <strong>112%</strong>, which is capped at <strong>100%</strong>. In other words, any product
+above <strong>100%</strong> is treated as <strong>100%</strong>.</p>
+</div>
+<p>The aggregate cluster load balancer first calculates each priority’s health score for every cluster, sums those up,
+and then assigns traffic based on the overall total. If the total is at least <strong>100</strong>, the combined traffic is capped at
+<strong>100%</strong>. If it’s below <strong>100</strong>, Envoy scales (normalizes) it so that the final distribution sums to <strong>100%</strong>.</p>
+<section id="scenario-a-total-health-100">
+<h3>Scenario A: Total Health ≥ 100<a class="headerlink" href="#scenario-a-total-health-100" title="Link to this heading"></a></h3>
+<p>Suppose we have two clusters:</p>
+<ul class="simple">
+<li><p>Primary with three priority levels: <code class="docutils literal notranslate"><span class="pre">20%,</span> <span class="pre">20%,</span> <span class="pre">10%</span></code> healthy.</p></li>
+<li><p>Secondary with two priority levels: <code class="docutils literal notranslate"><span class="pre">25%,</span> <span class="pre">25%</span></code> healthy.</p></li>
+</ul>
+<ol class="arabic simple">
+<li><p>Compute raw health scores using <code class="docutils literal notranslate"><span class="pre">percent_healthy</span> <span class="pre">×</span> <span class="pre">overprovisioning_factor</span> <span class="pre">(1.4)</span></code>, each capped at <strong>100</strong>.</p>
+<ul class="simple">
+<li><p>Primary:</p>
+<ul>
+<li><p>P=0: 20% × 1.4 = 28</p></li>
+<li><p>P=1: 20% × 1.4 = 28</p></li>
+<li><p>P=2: 10% × 1.4 = 14</p></li>
+<li><p><strong>Sum:</strong> 28 + 28 + 14 = 70</p></li>
+</ul>
+</li>
+<li><p>Secondary:</p>
+<ul>
+<li><p>P=0: 25% × 1.4 = 35</p></li>
+<li><p>P=1: 25% × 1.4 = 35</p></li>
+<li><p><strong>Sum:</strong> 35 + 35 = 70</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Assign traffic to the first cluster, then the next, etc., without exceeding <strong>100%</strong> total.</p>
+<ul class="simple">
+<li><p>Primary takes its 70% first.</p></li>
+<li><p>Secondary then takes min(100 - 70, 70) = 30.</p></li>
+<li><p>Combined total is 70 + 30 = 100.</p></li>
+</ul>
+</li>
+<li><p>Distribute that traffic internally by priority.</p>
+<ul class="simple">
+<li><p>Primary’s <strong>70%</strong> is split across its priorities in proportion to <strong>28</strong> : <strong>28</strong> : <strong>14</strong>, i.e.:</p>
+<ul>
+<li><p>P=0 → 28%</p></li>
+<li><p>P=1 → 28%</p></li>
+<li><p>P=2 → 14%</p></li>
+</ul>
+</li>
+<li><p>Secondary’s <strong>30%</strong> goes first to P=0, which is 35, but capped at whatever remains from 100 after primary
+took 70 (i.e., 30). So:</p>
+<ul>
+<li><p>P=0 → 30%</p></li>
+<li><p>P=1 → 0%</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<p>Hence the final breakdown of traffic is:</p>
+<ul class="simple">
+<li><p>Primary: <code class="docutils literal notranslate"><span class="pre">{28%,</span> <span class="pre">28%,</span> <span class="pre">14%}</span></code></p></li>
+<li><p>Secondary: <code class="docutils literal notranslate"><span class="pre">{30%,</span> <span class="pre">0%}</span></code></p></li>
+</ul>
+</section>
+<section id="scenario-b-total-health-100">
+<h3>Scenario B: Total Health &lt; 100<a class="headerlink" href="#scenario-b-total-health-100" title="Link to this heading"></a></h3>
+<p>Sometimes the health scores add up to less than <strong>100</strong>. In that case, Envoy ‘normalizes’ them so that each cluster and
+priority still receives a portion out of 100%.</p>
+<p>For instance, consider:</p>
+<ul class="simple">
+<li><p>Primary: <code class="docutils literal notranslate"><span class="pre">20%,</span> <span class="pre">0%,</span> <span class="pre">0%</span></code></p></li>
+<li><p>Secondary: <code class="docutils literal notranslate"><span class="pre">20%,</span> <span class="pre">0%</span></code></p></li>
+</ul>
+<ol class="arabic simple">
+<li><p>Compute raw health scores (same formula: <code class="docutils literal notranslate"><span class="pre">percent_healthy</span> <span class="pre">×</span> <span class="pre">1.4</span></code>, capped at <strong>100</strong>):</p>
+<ul class="simple">
+<li><p>Primary:</p>
+<ul>
+<li><p>P=0: 20% × 1.4 = 28</p></li>
+<li><p>P=1: 0 → 0</p></li>
+<li><p>P=2: 0 → 0</p></li>
+<li><p><strong>Sum:</strong> 28 + 0 + 0 = 28</p></li>
+</ul>
+</li>
+<li><p>Secondary:</p>
+<ul>
+<li><p>P=0: 20% × 1.4 = 28</p></li>
+<li><p>P=1: 0 → 0</p></li>
+<li><p><strong>Sum:</strong> 28 + 0 = 28</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Total raw health = 28 + 28 = <strong>56</strong> (below 100).</p></li>
+<li><p>Normalize so that the final total is 100%.</p>
+<ul class="simple">
+<li><p>Both clusters end up at <code class="docutils literal notranslate"><span class="pre">28</span> <span class="pre">/</span> <span class="pre">56</span> <span class="pre">=</span> <span class="pre">50%</span></code>.</p></li>
+</ul>
+</li>
+</ol>
+<p>Thus each cluster, primary and secondary, receives 50% of the traffic. And since all of each cluster’s share is in
+the <strong>Priority 0</strong> (28 points) and the others are 0, the final distribution is:</p>
+<ul class="simple">
+<li><p>Primary: <code class="docutils literal notranslate"><span class="pre">{50%,</span> <span class="pre">0%,</span> <span class="pre">0%}</span></code></p></li>
+<li><p>Secondary: <code class="docutils literal notranslate"><span class="pre">{50%,</span> <span class="pre">0%}</span></code></p></li>
+</ul>
+<p>These scenarios show how Envoy’s aggregate cluster load balancer decides which cluster (and priority level) gets traffic,
+depending on the overall health of the endpoints. When the summed health across all clusters and priorities reaches or
+exceeds <strong>100</strong>, Envoy caps the total at <strong>100%</strong> and allocates accordingly. If the total is below <strong>100</strong>, Envoy scales
+up proportionally so that all traffic still adds up to <strong>100%</strong>.</p>
+<p>Within each cluster, priority levels are also respected and allocated traffic based on their computed health scores.</p>
+</section>
+<section id="putting-it-all-together">
+<h3>Putting It All Together<a class="headerlink" href="#putting-it-all-together" title="Link to this heading"></a></h3>
+<p>To sum this up in pseudo algorithms:</p>
+<ul class="simple">
+<li><p>Calculates each priority level’s health score using <code class="docutils literal notranslate"><span class="pre">(healthy%</span> <span class="pre">×</span> <span class="pre">overprovisioning</span> <span class="pre">factor)</span></code>, capped at <strong>100%</strong>.</p></li>
+<li><p>Sums and optionally normalizes total health across clusters.</p></li>
+<li><p>Computes each cluster’s share of overall traffic i.e. its “cluster priority load”.</p></li>
+<li><p>Distributes traffic among the priorities within each cluster according to their health scores.</p></li>
+<li><p>Performs final load balancing within each cluster.</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">health</span><span class="p">(</span><span class="n">P_X</span><span class="p">)</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mf">1.4</span> <span class="o">*</span> <span class="mi">100</span> <span class="o">*</span> <span class="n">healthy_P_X_backends</span> <span class="o">/</span> <span class="n">total_P_X_backends</span><span class="p">),</span> <span class="n">where</span>
+                <span class="n">total_P_X_backends</span> <span class="ow">is</span> <span class="n">the</span> <span class="n">number</span> <span class="n">of</span> <span class="n">backends</span> <span class="k">for</span> <span class="n">priority</span> <span class="n">P_X</span> <span class="n">after</span> <span class="n">linearization</span>
+
+<span class="n">normalized_total_health</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="n">Σ</span><span class="p">(</span><span class="n">health</span><span class="p">(</span><span class="n">P_0</span><span class="p">)</span><span class="o">...</span><span class="n">health</span><span class="p">(</span><span class="n">P_X</span><span class="p">)))</span>
+
+<span class="n">cluster_priority_load</span><span class="p">(</span><span class="n">C_0</span><span class="p">)</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="n">Σ</span><span class="p">(</span><span class="n">health</span><span class="p">(</span><span class="n">P_0</span><span class="p">)</span><span class="o">...</span><span class="n">health</span><span class="p">(</span><span class="n">P_k</span><span class="p">))</span> <span class="o">*</span> <span class="mi">100</span> <span class="o">/</span> <span class="n">normalized_total_health</span><span class="p">),</span>
+                <span class="n">where</span> <span class="n">P_0</span><span class="o">...</span><span class="n">P_k</span> <span class="n">belong</span> <span class="n">to</span> <span class="n">C_0</span>
+
+<span class="n">cluster_priority_load</span><span class="p">(</span><span class="n">C_X</span><span class="p">)</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">100</span> <span class="o">-</span> <span class="n">Σ</span><span class="p">(</span><span class="n">priority_load</span><span class="p">(</span><span class="n">C_0</span><span class="p">)</span><span class="o">..</span><span class="n">priority_load</span><span class="p">(</span><span class="n">C_X</span><span class="o">-</span><span class="mi">1</span><span class="p">)),</span>
+                         <span class="n">Σ</span><span class="p">(</span><span class="n">health</span><span class="p">(</span><span class="n">P_x</span><span class="p">)</span><span class="o">...</span><span class="n">health</span><span class="p">(</span><span class="n">P_X</span><span class="p">))</span> <span class="o">*</span> <span class="mi">100</span> <span class="o">/</span> <span class="n">normalized_total_health</span><span class="p">),</span>
+                         <span class="n">where</span> <span class="n">P_x</span><span class="o">...</span><span class="n">P_X</span> <span class="n">belong</span> <span class="n">to</span> <span class="n">C_X</span>
+
+<span class="nb">map</span> <span class="kn">from</span><span class="w"> </span><span class="nn">priorities</span> <span class="n">to</span> <span class="n">clusters</span><span class="p">:</span>
+  <span class="n">P_0</span> <span class="o">...</span> <span class="n">P_k</span> <span class="o">...</span> <span class="o">...</span><span class="n">P_x</span> <span class="o">...</span> <span class="n">P_X</span>
+  <span class="o">^</span>       <span class="o">^</span>          <span class="o">^</span>       <span class="o">^</span>
+  <span class="n">cluster</span> <span class="n">C_0</span>        <span class="n">cluster</span> <span class="n">C_X</span>
+</pre></div>
+</div>
+<p>In the second tier of load balancing, Envoy hands off traffic to the cluster selected in the first tier. That cluster
+can then apply any of the load balancing algorithms described in
+<a class="reference internal" href="load_balancing/load_balancers.html#arch-overview-load-balancing-types"><span class="std std-ref">load balancer type</span></a>.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="load_balancing/override_host.html" class="btn btn-neutral float-left" title="Override host" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="composite_cluster.html" class="btn btn-neutral float-right" title="Composite cluster" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Aggregate Cluster</a><ul>
+<li><a class="reference internal" href="#linearize-priority-set">Linearize Priority Set</a></li>
+<li><a class="reference internal" href="#example">Example</a></li>
+<li><a class="reference internal" href="#important-considerations-for-aggregate-clusters">Important Considerations for Aggregate Clusters</a><ul>
+<li><a class="reference internal" href="#priorityload-retry-plugins">PriorityLoad Retry Plugins</a></li>
+<li><a class="reference internal" href="#stateful-sessions">Stateful Sessions</a></li>
+<li><a class="reference internal" href="#circuit-breakers">Circuit Breakers</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#load-balancing-example">Load Balancing Example</a><ul>
+<li><a class="reference internal" href="#scenario-a-total-health-100">Scenario A: Total Health ≥ 100</a></li>
+<li><a class="reference internal" href="#scenario-b-total-health-100">Scenario B: Total Health &lt; 100</a></li>
+<li><a class="reference internal" href="#putting-it-all-together">Putting It All Together</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

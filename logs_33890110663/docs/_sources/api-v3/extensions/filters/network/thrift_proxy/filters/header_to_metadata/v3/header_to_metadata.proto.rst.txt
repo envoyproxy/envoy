@@ -1,0 +1,272 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/thrift_proxy/filters/header_to_metadata/v3/header_to_metadata.proto:
+
+Header-To-Metadata Filter (proto)
+=================================
+
+.. _extension_envoy.filters.thrift.header_to_metadata:
+
+This extension has the qualified name ``envoy.filters.thrift.header_to_metadata``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.thrift_proxy.filters <extension_category_envoy.thrift_proxy.filters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata>`
+
+
+
+
+The configuration for transforming headers into metadata. This is useful
+for matching load balancer subsets, logging, etc.
+
+Header to Metadata :ref:`configuration overview <config_thrift_filters_header_to_metadata>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata:
+
+extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata
+--------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata proto] <api/envoy/extensions/filters/network/thrift_proxy/filters/header_to_metadata/v3/header_to_metadata.proto#L23>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "request_rules": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.request_rules:
+
+
+request_rules
+  (**repeated** :ref:`extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.Rule <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.Rule>`, *REQUIRED*) The list of rules to apply to requests.
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair:
+
+extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair
+---------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair proto] <api/envoy/extensions/filters/network/thrift_proxy/filters/header_to_metadata/v3/header_to_metadata.proto#L46>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "metadata_namespace": ...,
+    "key": ...,
+    "value": ...,
+    "regex_value_rewrite": {...},
+    "type": ...,
+    "encode": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair.metadata_namespace:
+
+
+metadata_namespace
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The namespace — if this is empty, the filter's namespace will be used.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The key to use within the namespace.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair.value:
+
+
+value
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The value to pair with the given key.
+
+  When used for on_present case, if value is non-empty it'll be used instead
+  of the header value. If both are empty, the header value is used as-is.
+
+  When used for on_missing case, a non-empty value must be provided.
+
+
+  
+
+  Only one of :ref:`value <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair.value>`, :ref:`regex_value_rewrite <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair.regex_value_rewrite>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair.regex_value_rewrite:
+
+
+regex_value_rewrite
+  (:ref:`type.matcher.v3.RegexMatchAndSubstitute <envoy_v3_api_msg_type.matcher.v3.RegexMatchAndSubstitute>`) If present, the header's value will be matched and substituted with this.
+  If there is no match or substitution, the header value is used as-is.
+
+  This is only used for on_present.
+
+
+  
+
+  Only one of :ref:`value <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair.value>`, :ref:`regex_value_rewrite <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair.regex_value_rewrite>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair.type:
+
+
+type
+  (:ref:`extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueType <envoy_v3_api_enum_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueType>`) The value's type — defaults to string.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair.encode:
+
+
+encode
+  (:ref:`extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueEncode <envoy_v3_api_enum_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueEncode>`) How is the value encoded, default is NONE (not encoded).
+  The value will be decoded accordingly before storing to metadata.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.Rule:
+
+extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.Rule
+-------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.Rule proto] <api/envoy/extensions/filters/network/thrift_proxy/filters/header_to_metadata/v3/header_to_metadata.proto#L78>`
+
+A Rule defines what metadata to apply when a header is present or missing.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "header": ...,
+    "on_present": {...},
+    "on_missing": {...},
+    "remove": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.Rule.header:
+
+
+header
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Specifies that a match will be performed on the value of a header.
+
+  The header to be extracted.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.Rule.on_present:
+
+
+on_present
+  (:ref:`extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair>`) If the header is present, apply this metadata KeyValuePair.
+
+  If the value in the KeyValuePair is non-empty, it'll be used instead
+  of the header value.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.Rule.on_missing:
+
+
+on_missing
+  (:ref:`extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.KeyValuePair>`) If the header is not present, apply this metadata KeyValuePair.
+
+  The value in the KeyValuePair must be set, since it'll be used in lieu
+  of the missing header value.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.Rule.remove:
+
+
+remove
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether or not to remove the header after a rule is applied.
+
+  This prevents headers from leaking.
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueType:
+
+Enum extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueType
+-----------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueType proto] <api/envoy/extensions/filters/network/thrift_proxy/filters/header_to_metadata/v3/header_to_metadata.proto#L24>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueType.STRING:
+
+
+STRING
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueType.NUMBER:
+
+
+NUMBER
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueType.PROTOBUF_VALUE:
+
+
+PROTOBUF_VALUE
+  ⁣The value is a serialized `protobuf.Value
+  <https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/struct.proto#L62>`_.
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueEncode:
+
+Enum extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueEncode
+-------------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueEncode proto] <api/envoy/extensions/filters/network/thrift_proxy/filters/header_to_metadata/v3/header_to_metadata.proto#L35>`
+
+ValueEncode defines the encoding algorithm.
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueEncode.NONE:
+
+
+NONE
+  *(DEFAULT)* ⁣The value is not encoded.
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata.ValueEncode.BASE64:
+
+
+BASE64
+  ⁣The value is encoded in `Base64 <https://tools.ietf.org/html/rfc4648#section-4>`_.
+  Note: this is mostly used for STRING and PROTOBUF_VALUE to escape the
+  non-ASCII characters in the header.
+
+
+

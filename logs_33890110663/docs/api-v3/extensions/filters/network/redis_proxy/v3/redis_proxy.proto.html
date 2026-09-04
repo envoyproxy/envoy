@@ -1,0 +1,974 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Redis Proxy (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../../../_static/favicon.ico"/>
+      <script src="../../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+    <link rel="next" title="Drain-Aware HTTP Connection Manager (proto)" href="../../reverse_tunnel/v3/drain_aware_hcm.proto.html" />
+    <link rel="prev" title="RBAC (proto)" href="../../rbac/v3/rbac.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../../../searchindex.js"
+          data-envoy-search-page="../../../../../../search.html"
+          data-envoy-root="../../../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../../config/config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../../config/filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/filter.html">Filters</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/network/network.html">Network filters</a></li>
+      <li class="breadcrumb-item active">Redis Proxy (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../../_sources/api-v3/extensions/filters/network/redis_proxy/v3/redis_proxy.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="redis-proxy-proto">
+<span id="envoy-v3-api-file-envoy-extensions-filters-network-redis-proxy-v3-redis-proxy-proto"></span><h1>Redis Proxy (proto)<a class="headerlink" href="#redis-proxy-proto" title="Link to this heading"></a></h1>
+<p id="extension-envoy-filters-network-redis-proxy">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.filters.network.redis_proxy</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension is not hardened and should only be used in deployments
+where both the downstream and upstream are trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension category:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../../health_checkers/thrift/v3/thrift.proto.html#extension-category-envoy-filters-network"><span class="std std-ref">envoy.filters.network</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy</span></a></p></li>
+</ul>
+</div>
+<p>Redis Proxy <a class="reference internal" href="../../../../../../configuration/listeners/network_filters/redis_proxy_filter.html#config-network-filters-redis-proxy"><span class="std std-ref">configuration overview</span></a>.</p>
+<section id="extensions-filters-network-redis-proxy-v3-redisproxy">
+<span id="envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy"></span><h2>extensions.filters.network.redis_proxy.v3.RedisProxy<a class="headerlink" href="#extensions-filters-network-redis-proxy-v3-redisproxy" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L31">[extensions.filters.network.redis_proxy.v3.RedisProxy proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;stat_prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;settings&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;latency_in_micros&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;prefix_routes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;downstream_auth_password&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;downstream_auth_passwords&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;faults&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;downstream_auth_username&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;external_auth_provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;custom_commands&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;protocol_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-stat-prefix">
+<dt>stat_prefix</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The prefix to use when emitting <a class="reference internal" href="../../../../../../configuration/listeners/network_filters/redis_proxy_filter.html#config-network-filters-redis-proxy-stats"><span class="std std-ref">statistics</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-settings">
+<dt>settings</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings</span></a>, <em>REQUIRED</em>) Network settings for the connection pool to the upstream clusters.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-latency-in-micros">
+<dt>latency_in_micros</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates that latency stat should be computed in microseconds. By default it is computed in
+milliseconds. This does not apply to upstream command stats currently.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefix-routes">
+<dt>prefix_routes</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes</span></a>) List of <strong>unique</strong> prefixes used to separate keys from different workloads to different
+clusters. Envoy will always favor the longest match first in case of overlap. A catch-all
+cluster can be used to forward commands when there is no match. Time complexity of the
+lookups are in O(min(longest key prefix, key length)).</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">prefix_routes</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">routes</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ab&quot;</span>
+<span class="w">      </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;cluster_a&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;abc&quot;</span>
+<span class="w">      </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;cluster_b&quot;</span>
+</pre></div>
+</div>
+<p>When using the above routes, the following prefixes would be sent to:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">get</span> <span class="pre">abc:users</span></code> would retrieve the key ‘abc:users’ from cluster_b.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get</span> <span class="pre">ab:users</span></code> would retrieve the key ‘ab:users’ from cluster_a.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get</span> <span class="pre">z:users</span></code> would return a NoUpstreamHost error. A <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-catch-all-route"><span class="std std-ref">catch-all
+route</span></a>
+would have retrieved the key from that cluster instead.</p></li>
+</ul>
+<p>See the <a class="reference internal" href="../../../../../../intro/arch_overview/other_protocols/redis.html#arch-overview-redis-configuration"><span class="std std-ref">configuration section</span></a> of the architecture overview for recommendations on
+configuring the backing clusters.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-downstream-auth-password">
+<dt>downstream_auth_password</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-datasource"><span class="std std-ref">config.core.v3.DataSource</span></a>) Authenticate Redis client connections locally by forcing downstream clients to issue a <a class="reference external" href="https://redis.io/commands/auth">Redis
+AUTH command</a> with this password before enabling any other
+command. If an AUTH command’s password matches this password, an “OK” response will be returned
+to the client. If the AUTH command password does not match this password, then an “ERR invalid
+password” error will be returned. If any other command is received before AUTH when this
+password is set, then a “NOAUTH Authentication required.” error response will be sent to the
+client. If an AUTH command is received when the password is not set, then an “ERR Client sent
+AUTH, but no password is set” error will be returned.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>This field is deprecated. Use <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-downstream-auth-passwords"><span class="std std-ref">downstream_auth_passwords</span></a>.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-downstream-auth-passwords">
+<dt>downstream_auth_passwords</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-datasource"><span class="std std-ref">config.core.v3.DataSource</span></a>) Authenticate Redis client connections locally by forcing downstream clients to issue a <a class="reference external" href="https://redis.io/commands/auth">Redis
+AUTH command</a> with one of these passwords before enabling any other
+command. If an AUTH command’s password matches one of these passwords, an “OK” response will be returned
+to the client. If the AUTH command password does not match, then an “ERR invalid
+password” error will be returned. If any other command is received before AUTH when the
+password(s) are set, then a “NOAUTH Authentication required.” error response will be sent to the
+client. If an AUTH command is received when the password is not set, then an “ERR Client sent
+AUTH, but no password is set” error will be returned.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-faults">
+<dt>faults</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault</span></a>) List of faults to inject. Faults currently come in two flavors:
+- Delay, which delays a request.
+- Error, which responds to a request with an error. Errors can also have delays attached.</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">faults</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">fault_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ERROR</span>
+<span class="w">  </span><span class="nt">fault_enabled</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">default_value</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">numerator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">      </span><span class="nt">denominator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HUNDRED</span>
+<span class="w">    </span><span class="nt">runtime_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;bogus_key&quot;</span>
+<span class="w">    </span><span class="nt">commands</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GET</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">fault_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DELAY</span>
+<span class="w">    </span><span class="nt">fault_enabled</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">default_value</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">numerator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">        </span><span class="nt">denominator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HUNDRED</span>
+<span class="w">      </span><span class="nt">runtime_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;bogus_key&quot;</span>
+<span class="w">    </span><span class="nt">delay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2s</span>
+</pre></div>
+</div>
+<p>See the <a class="reference internal" href="../../../../../../configuration/listeners/network_filters/redis_proxy_filter.html#config-network-filters-redis-proxy-fault-injection"><span class="std std-ref">fault injection section</span></a> for more information on how to configure this.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-downstream-auth-username">
+<dt>downstream_auth_username</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-datasource"><span class="std std-ref">config.core.v3.DataSource</span></a>) If a username is provided an ACL style AUTH command will be required with a username and password.
+Authenticate Redis client connections locally by forcing downstream clients to issue a <a class="reference external" href="https://redis.io/commands/auth">Redis
+AUTH command</a> with this username and the <code class="docutils literal notranslate"><span class="pre">downstream_auth_password</span></code>
+before enabling any other command. If an AUTH command’s username and password matches this username
+and the <code class="docutils literal notranslate"><span class="pre">downstream_auth_password</span></code> , an “OK” response will be returned to the client. If the AUTH
+command username or password does not match this username or the <code class="docutils literal notranslate"><span class="pre">downstream_auth_password</span></code>, then an
+“WRONGPASS invalid username-password pair” error will be returned. If any other command is received before AUTH when this
+password is set, then a “NOAUTH Authentication required.” error response will be sent to the
+client. If an AUTH command is received when the password is not set, then an “ERR Client sent
+AUTH, but no ACL is set” error will be returned.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-external-auth-provider">
+<dt>external_auth_provider</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisexternalauthprovider"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisExternalAuthProvider</span></a>) External authentication configuration. If set, instead of validating username and password against <code class="docutils literal notranslate"><span class="pre">downstream_auth_username</span></code> and <code class="docutils literal notranslate"><span class="pre">downstream_auth_password</span></code>,
+the filter will call an external gRPC service to authenticate the client.
+A typical usage of this feature is for situations where the password is a one-time token that needs to be validated against a remote service, like a sidecar.
+Expiration is also supported, which will disable any further commands from the client after the expiration time, unless a new AUTH command is received and the external auth service returns a new expiration time.
+If the external auth service returns an error, authentication is considered failed.
+If this setting is set together with <code class="docutils literal notranslate"><span class="pre">downstream_auth_username</span></code> and <code class="docutils literal notranslate"><span class="pre">downstream_auth_password</span></code>, the external auth service will be source of truth, but those fields will still be used for downstream authentication to the cluster.
+The API is defined by <a class="reference internal" href="../../../../../service/redis_auth/v3/redis_external_auth.proto.html#envoy-v3-api-msg-service-redis-auth-v3-redisproxyexternalauthrequest"><span class="std std-ref">RedisProxyExternalAuthRequest</span></a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-custom-commands">
+<dt>custom_commands</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Optional configure redis custom commands for the proxy, eg -&gt; [“my_custom_cmd1”, “my_custom_cmd2”]</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The is to support redis’s feature wherein new commands can be added using redis’ modules api:
+<a class="reference external" href="https://redis.io/docs/latest/develop/reference/modules/">https://redis.io/docs/latest/develop/reference/modules/</a></p>
+</div>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-protocol-version">
+<dt>protocol_version</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-filters-network-redis-proxy-v3-redisproxy-protocolversion"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisProxy.ProtocolVersion</span></a>) RESP protocol version enforced for both downstream connections and every
+routed upstream conn pool for this listener. Mismatched negotiation is
+rejected at HELLO (<code class="docutils literal notranslate"><span class="pre">HELLO</span> <span class="pre">N</span></code> where <code class="docutils literal notranslate"><span class="pre">N</span></code> does not match returns
+<code class="docutils literal notranslate"><span class="pre">-NOPROTO</span></code>) and, when set to <code class="docutils literal notranslate"><span class="pre">RESP3</span></code>, at every non-HELLO/AUTH/QUIT
+command on a connection that has not yet negotiated RESP3 (so clients
+must perform an explicit <code class="docutils literal notranslate"><span class="pre">HELLO</span> <span class="pre">3</span></code> handshake before any data command).</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">protocol_version</span></code> is <code class="docutils literal notranslate"><span class="pre">RESP3</span></code>, every routed upstream
+Redis-compatible backend must support <code class="docutils literal notranslate"><span class="pre">HELLO</span> <span class="pre">3</span></code> / RESP3 (e.g.
+Redis 6.0+, where RESP3 was introduced). Misconfigured upstreams will
+fail every connection’s HELLO 3 negotiation, surfaced as
+<code class="docutils literal notranslate"><span class="pre">upstream_resp3_hello_failure</span></code> stat increments.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings">
+<span id="envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings"></span><h2>extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings<a class="headerlink" href="#extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L58">[extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings proto]</a></p>
+<p>Redis connection pool settings.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;op_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;enable_hashtagging&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;enable_redirection&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;dns_cache_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_buffer_size_before_flush&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;buffer_flush_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;max_upstream_unknown_connections&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;enable_command_stats&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;read_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;connection_rate_limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-op-timeout">
+<dt>op_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>, <em>REQUIRED</em>) Per-operation timeout in milliseconds. The timer starts when the first
+command of a pipeline is written to the backend connection. Each response received from Redis
+resets the timer since it signifies that the next command is being processed by the backend.
+The only exception to this behavior is when a connection to a backend is not yet established.
+In that case, the connect timeout on the cluster will govern the timeout until the connection
+is ready.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-enable-hashtagging">
+<dt>enable_hashtagging</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Use hash tagging on every redis key to guarantee that keys with the same hash tag will be
+forwarded to the same upstream. The hash key used for determining the upstream in a
+consistent hash ring configuration will be computed from the hash tagged key instead of the
+whole key. The algorithm used to compute the hash tag is identical to the <a class="reference external" href="https://redis.io/topics/cluster-spec#keys-hash-tags">redis-cluster
+implementation</a>.</p>
+<p>Examples:</p>
+<ul class="simple">
+<li><p>‘{user1000}.following’ and ‘{user1000}.followers’ <strong>will</strong> be sent to the same upstream</p></li>
+<li><p>‘{user1000}.following’ and ‘{user1001}.following’ <strong>might</strong> be sent to the same upstream</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-enable-redirection">
+<dt>enable_redirection</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Accept <a class="reference external" href="https://redis.io/topics/cluster-spec#redirection-and-resharding">moved and ask redirection</a> errors from upstream
+redis servers, and retry commands to the specified target server. The target server does not
+need to be known to the cluster manager. If the command cannot be redirected, then the
+original error is passed downstream unchanged. By default, this support is not enabled.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-dns-cache-config">
+<dt>dns_cache_config</dt><dd><p>(<a class="reference internal" href="../../../../common/dynamic_forward_proxy/v3/dns_cache.proto.html#envoy-v3-api-msg-extensions-common-dynamic-forward-proxy-v3-dnscacheconfig"><span class="std std-ref">extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig</span></a>) If <code class="docutils literal notranslate"><span class="pre">enable_redirection</span></code> is set to true this option configures the DNS cache that the
+connection pool will use to resolve hostnames that are returned with MOVED and ASK responses.
+If no configuration is provided, DNS lookups will not be performed (and thus the MOVED/ASK errors
+will be propagated verbatim to the user).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-max-buffer-size-before-flush">
+<dt>max_buffer_size_before_flush</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) Maximum size of encoded request buffer before flush is triggered and encoded requests
+are sent upstream. If this is unset, the buffer flushes whenever it receives data
+and performs no batching.
+This feature makes it possible for multiple clients to send requests to Envoy and have
+them batched- for example if one is running several worker processes, each with its own
+Redis connection. There is no benefit to using this with a single downstream process.
+Recommended size (if enabled) is 1024 bytes.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-buffer-flush-timeout">
+<dt>buffer_flush_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) The encoded request buffer is flushed N milliseconds after the first request has been
+encoded, unless the buffer size has already exceeded <code class="docutils literal notranslate"><span class="pre">max_buffer_size_before_flush</span></code>.
+If <code class="docutils literal notranslate"><span class="pre">max_buffer_size_before_flush</span></code> is not set, this flush timer is not used. Otherwise,
+the timer should be set according to the number of clients, overall request rate and
+desired maximum latency for a single command. For example, if there are many requests
+being batched together at a high rate, the buffer will likely be filled before the timer
+fires. Alternatively, if the request rate is lower the buffer will not be filled as often
+before the timer fires.
+If <code class="docutils literal notranslate"><span class="pre">max_buffer_size_before_flush</span></code> is set, but <code class="docutils literal notranslate"><span class="pre">buffer_flush_timeout</span></code> is not, the latter
+defaults to 3ms.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-max-upstream-unknown-connections">
+<dt>max_upstream_unknown_connections</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value">UInt32Value</a>) <code class="docutils literal notranslate"><span class="pre">max_upstream_unknown_connections</span></code> controls how many upstream connections to unknown hosts
+can be created at any given time by any given worker thread (see <code class="docutils literal notranslate"><span class="pre">enable_redirection</span></code> for
+more details). If the host is unknown and a connection cannot be created due to enforcing
+this limit, then redirection will fail and the original redirection error will be passed
+downstream unchanged. This limit defaults to 100.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-enable-command-stats">
+<dt>enable_command_stats</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Enable per-command statistics per upstream cluster, in addition to the filter level aggregate
+count. These commands are measured in microseconds.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-read-policy">
+<dt>read_policy</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-readpolicy"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy</span></a>) Read policy. The default is to read from the primary.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-connection-rate-limit">
+<dt>connection_rate_limit</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-connectionratelimit"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit</span></a>) Ops or connection timeout triggers reconnection to redis server which could result in reconnection
+storm to busy redis server. This config is a protection to rate limit reconnection rate.
+If not set, there will be no rate limiting on the reconnection.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-readpolicy">
+<span id="envoy-v3-api-enum-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-readpolicy"></span><h2>Enum extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy<a class="headerlink" href="#enum-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-readpolicy" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L66">[extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy proto]</a></p>
+<p>ReadPolicy controls how Envoy routes read commands to Redis nodes. This is currently
+supported for Redis Cluster. All ReadPolicy settings except MASTER may return stale data
+because replication is asynchronous and requires some delay. You need to ensure that your
+application can tolerate stale data.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-readpolicy-master">
+<dt>MASTER</dt><dd><p><em>(DEFAULT)</em> ⁣Default mode. Read from the current primary node.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-readpolicy-prefer-master">
+<dt>PREFER_MASTER</dt><dd><p>⁣Read from the primary, but if it is unavailable, read from replica nodes.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-readpolicy-replica">
+<dt>REPLICA</dt><dd><p>⁣Read from replica nodes. If multiple replica nodes are present within a shard, a random
+node is selected. Healthy nodes have precedent over unhealthy nodes.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-readpolicy-prefer-replica">
+<dt>PREFER_REPLICA</dt><dd><p>⁣Read from the replica nodes (similar to REPLICA), but if all replicas are unavailable (not
+present or unhealthy), read from the primary.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-readpolicy-any">
+<dt>ANY</dt><dd><p>⁣Read from any node of the cluster. A random node is selected among the primary and
+replicas, healthy nodes have precedent over unhealthy nodes.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-enum-value-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-readpolicy-local-zone-affinity">
+<dt>LOCAL_ZONE_AFFINITY</dt><dd><p>⁣Read from replicas in the same availability zone as the Envoy proxy. If no replicas
+are available in the same zone, fall back to any replica. If no replicas are available
+at all, fall back to the primary.</p>
+<p>Note: Zone discovery currently works with Valkey only. Valkey exposes availability_zone
+in its INFO response. Standard Redis does not support this field.</p>
+<p>The client zone is determined from Envoy’s <a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-field-config-core-v3-locality-zone"><span class="std std-ref">locality zone</span></a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-enum-value-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-readpolicy-local-zone-affinity-replicas-and-primary">
+<dt>LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY</dt><dd><p>⁣Similar to LOCAL_ZONE_AFFINITY, but also considers the primary node for same-zone routing.
+Priority order: replicas in same zone -&gt; primary in same zone -&gt; any replica -&gt; primary.
+This is useful when reducing cross-zone traffic is more important than read distribution.</p>
+<p>Note: Zone discovery currently works with Valkey only.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes">
+<span id="envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes"></span><h2>extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes<a class="headerlink" href="#extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L177">[extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;routes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;case_insensitive&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;catch_all_route&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-routes">
+<dt>routes</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route</span></a>) List of prefix routes.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-case-insensitive">
+<dt>case_insensitive</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates that prefix matching should be case insensitive.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-catch-all-route">
+<dt>catch_all_route</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route</span></a>) Optional catch-all route to forward commands that doesn’t match any of the routes. The
+catch-all route becomes required when no routes are specified.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route">
+<span id="envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route"></span><h2>extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route<a class="headerlink" href="#extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L182">[extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;remove_prefix&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;request_mirror_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;key_formatter&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;read_command_policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-prefix">
+<dt>prefix</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) String prefix that must match the beginning of the keys. Envoy will always favor the
+longest match.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-remove-prefix">
+<dt>remove_prefix</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Indicates if the prefix needs to be removed from the key when forwarded.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-cluster">
+<dt>cluster</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) Upstream cluster to forward the command to.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-request-mirror-policy">
+<dt>request_mirror_policy</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-requestmirrorpolicy"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.RequestMirrorPolicy</span></a>) Indicates that the route has a request mirroring policy.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-key-formatter">
+<dt>key_formatter</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Indicates how redis key should be formatted. To substitute redis key into the formatting
+expression, use %KEY% as a string replacement command.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-read-command-policy">
+<dt>read_command_policy</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-readcommandpolicy"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.ReadCommandPolicy</span></a>) Indicates that the route has a read command policy</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-requestmirrorpolicy">
+<span id="envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-requestmirrorpolicy"></span><h2>extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.RequestMirrorPolicy<a class="headerlink" href="#extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-requestmirrorpolicy" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L190">[extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.RequestMirrorPolicy proto]</a></p>
+<p>The router is capable of shadowing traffic from one cluster to another. The current
+implementation is “fire and forget,” meaning Envoy will not wait for the shadow cluster to
+respond before returning the response from the primary cluster. All normal statistics are
+collected for the shadow cluster making this feature useful for testing.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;runtime_fraction&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;exclude_read_commands&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-requestmirrorpolicy-cluster">
+<dt>cluster</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) Specifies the cluster that requests will be mirrored to. The cluster must
+exist in the cluster manager configuration.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-requestmirrorpolicy-runtime-fraction">
+<dt>runtime_fraction</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-runtimefractionalpercent"><span class="std std-ref">config.core.v3.RuntimeFractionalPercent</span></a>) If not specified or the runtime key is not present, all requests to the target cluster
+will be mirrored.</p>
+<p>If specified, Envoy will lookup the runtime key to get the percentage of requests to the
+mirror.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-requestmirrorpolicy-exclude-read-commands">
+<dt>exclude_read_commands</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) Set this to TRUE to only mirror write commands, this is effectively replicating the
+writes in a “fire and forget” manner.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-readcommandpolicy">
+<span id="envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-readcommandpolicy"></span><h2>extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.ReadCommandPolicy<a class="headerlink" href="#extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-readcommandpolicy" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L212">[extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.ReadCommandPolicy proto]</a></p>
+<p>ReadCommandPolicy specifies that Envoy should route read commands to another cluster.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;cluster&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-readcommandpolicy-cluster">
+<dt>cluster</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>)</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-redis-proxy-v3-redisproxy-redisfault">
+<span id="envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault"></span><h2>extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault<a class="headerlink" href="#extensions-filters-network-redis-proxy-v3-redisproxy-redisfault" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L253">[extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault proto]</a></p>
+<p>RedisFault defines faults used for fault injection.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;fault_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;fault_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;delay&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;commands&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault-fault-type">
+<dt>fault_type</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-enum-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault-redisfaulttype"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.RedisFaultType</span></a>) Fault type.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault-fault-enabled">
+<dt>fault_enabled</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-runtimefractionalpercent"><span class="std std-ref">config.core.v3.RuntimeFractionalPercent</span></a>, <em>REQUIRED</em>) Percentage of requests fault applies to.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault-delay">
+<dt>delay</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Delay for all faults. If not set, defaults to zero</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault-commands">
+<dt>commands</dt><dd><p>(<strong>repeated</strong> <a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Commands fault is restricted to, if any. If not set, fault applies to all commands
+other than auth and ping (due to special handling of those commands in Envoy).</p>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault-redisfaulttype">
+<span id="envoy-v3-api-enum-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault-redisfaulttype"></span><h2>Enum extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.RedisFaultType<a class="headerlink" href="#enum-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault-redisfaulttype" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L254">[extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.RedisFaultType proto]</a></p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault-redisfaulttype-delay">
+<dt>DELAY</dt><dd><p><em>(DEFAULT)</em> ⁣Delays requests. This is the base fault; other faults can have delays added.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault-redisfaulttype-error">
+<dt>ERROR</dt><dd><p>⁣Returns errors on requests.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-redis-proxy-v3-redisproxy-connectionratelimit">
+<span id="envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisproxy-connectionratelimit"></span><h2>extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit<a class="headerlink" href="#extensions-filters-network-redis-proxy-v3-redisproxy-connectionratelimit" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L279">[extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit proto]</a></p>
+<p>Configuration to limit reconnection rate to redis server to protect redis server
+from client reconnection storm.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;connection_rate_limit_per_sec&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisproxy-connectionratelimit-connection-rate-limit-per-sec">
+<dt>connection_rate_limit_per_sec</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">uint32</a>) Reconnection rate per sec. Rate limiting is implemented with TokenBucket.</p>
+</dd>
+</dl>
+</section>
+<section id="enum-extensions-filters-network-redis-proxy-v3-redisproxy-protocolversion">
+<span id="envoy-v3-api-enum-extensions-filters-network-redis-proxy-v3-redisproxy-protocolversion"></span><h2>Enum extensions.filters.network.redis_proxy.v3.RedisProxy.ProtocolVersion<a class="headerlink" href="#enum-extensions-filters-network-redis-proxy-v3-redisproxy-protocolversion" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L36">[extensions.filters.network.redis_proxy.v3.RedisProxy.ProtocolVersion proto]</a></p>
+<p>RESP protocol version supported on this listener.</p>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-redis-proxy-v3-redisproxy-protocolversion-resp2">
+<dt>RESP2</dt><dd><p><em>(DEFAULT)</em> ⁣Default. The listener speaks RESP2 on both downstream connections and
+every routed upstream conn pool: no <code class="docutils literal notranslate"><span class="pre">HELLO</span> <span class="pre">3</span></code> is sent upstream and a
+downstream <code class="docutils literal notranslate"><span class="pre">HELLO</span> <span class="pre">3</span></code> is rejected with <code class="docutils literal notranslate"><span class="pre">-NOPROTO</span></code>. (RESP3-aware
+handling such as the local <code class="docutils literal notranslate"><span class="pre">HELLO</span></code> reply, <code class="docutils literal notranslate"><span class="pre">CLIENT</span> <span class="pre">SETINFO</span></code> /
+<code class="docutils literal notranslate"><span class="pre">SETNAME</span></code> acceptance, and the RESP3 decoder is always present; this
+value only controls the negotiated wire version.)</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-enum-value-extensions-filters-network-redis-proxy-v3-redisproxy-protocolversion-resp3">
+<dt>RESP3</dt><dd><p>⁣The listener speaks RESP3 on both downstream connections and every
+routed upstream conn pool. Upstream conn pools negotiate <code class="docutils literal notranslate"><span class="pre">HELLO</span> <span class="pre">3</span></code>
+(combined with <code class="docutils literal notranslate"><span class="pre">AUTH</span></code> when credentials or AWS IAM authentication are
+configured) on each new connection; <code class="docutils literal notranslate"><span class="pre">upstream_resp3_hello_failure</span></code>
+tracks negotiation failures. Downstream clients must perform an
+explicit <code class="docutils literal notranslate"><span class="pre">HELLO</span> <span class="pre">3</span></code> handshake before any data command — bare <code class="docutils literal notranslate"><span class="pre">HELLO</span></code>
+on a fresh connection or any non-HELLO/AUTH/QUIT command before
+<code class="docutils literal notranslate"><span class="pre">HELLO</span> <span class="pre">3</span></code> is rejected with <code class="docutils literal notranslate"><span class="pre">-NOPROTO</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-redis-proxy-v3-redisprotocoloptions">
+<span id="envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisprotocoloptions"></span><h2>extensions.filters.network.redis_proxy.v3.RedisProtocolOptions<a class="headerlink" href="#extensions-filters-network-redis-proxy-v3-redisprotocoloptions" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L431">[extensions.filters.network.redis_proxy.v3.RedisProtocolOptions proto]</a></p>
+<p>RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
+<a class="reference internal" href="../../../../../config/cluster/v3/cluster.proto.html#envoy-v3-api-field-config-cluster-v3-cluster-typed-extension-protocol-options"><span class="std std-ref">typed_extension_protocol_options</span></a>,
+keyed by the name <code class="docutils literal notranslate"><span class="pre">envoy.filters.network.redis_proxy</span></code>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;auth_password&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;auth_username&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;aws_iam&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;credentials&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisprotocoloptions-auth-password">
+<dt>auth_password</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-datasource"><span class="std std-ref">config.core.v3.DataSource</span></a>) Upstream server password as defined by the <code class="docutils literal notranslate"><span class="pre">requirepass</span></code> directive
+<a class="reference external" href="https://redis.io/topics/config">https://redis.io/topics/config</a> in the server’s configuration file.
+If <code class="docutils literal notranslate"><span class="pre">aws_iam</span></code> is set, this field is ignored.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisprotocoloptions-auth-username">
+<dt>auth_username</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-datasource"><span class="std std-ref">config.core.v3.DataSource</span></a>) Upstream server username as defined by the <code class="docutils literal notranslate"><span class="pre">user</span></code> directive
+<a class="reference external" href="https://redis.io/topics/acl">https://redis.io/topics/acl</a> in the server’s configuration file.
+If <code class="docutils literal notranslate"><span class="pre">aws_iam`</span></code> is set, this field will be used as the authenticating user for redis IAM authentication.
+See <code class="docutils literal notranslate"><span class="pre">Create</span> <span class="pre">a</span> <span class="pre">new</span> <span class="pre">IAM-enabled</span> <span class="pre">user</span></code> under <a class="reference external" href="https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth-iam.html#auth-iam-setup">Setup</a> for more details.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisprotocoloptions-aws-iam">
+<dt>aws_iam</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-awsiam"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.AwsIam</span></a>) The cluster level configuration for AWS IAM authentication</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisprotocoloptions-credentials">
+<dt>credentials</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisprotocoloptions-credential"><span class="std std-ref">extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.Credential</span></a>) If specified, these credentials are used when connecting to upstream endpoints. Which
+credential is used is determined by matching the resolved <code class="docutils literal notranslate"><span class="pre">address</span></code> field here with each
+endpoint’s resolved <code class="docutils literal notranslate"><span class="pre">address</span></code> field. The first entry for a given <code class="docutils literal notranslate"><span class="pre">address</span></code> here takes precedence.
+If no entry in <code class="docutils literal notranslate"><span class="pre">credentials</span></code> matches, then the <code class="docutils literal notranslate"><span class="pre">auth_password</span></code> and <code class="docutils literal notranslate"><span class="pre">auth_username</span></code> fields
+are used as defaults.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-redis-proxy-v3-redisprotocoloptions-credential">
+<span id="envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisprotocoloptions-credential"></span><h2>extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.Credential<a class="headerlink" href="#extensions-filters-network-redis-proxy-v3-redisprotocoloptions-credential" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L435">[extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.Credential proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;auth_password&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;auth_username&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisprotocoloptions-credential-address">
+<dt>address</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/address.proto.html#envoy-v3-api-msg-config-core-v3-address"><span class="std std-ref">config.core.v3.Address</span></a>) The address to which this username and password applies.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisprotocoloptions-credential-auth-password">
+<dt>auth_password</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-datasource"><span class="std std-ref">config.core.v3.DataSource</span></a>) Upstream server password as defined by the <code class="docutils literal notranslate"><span class="pre">requirepass</span></code> directive
+<a class="reference external" href="https://redis.io/topics/config">https://redis.io/topics/config</a> in the server’s configuration file.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisprotocoloptions-credential-auth-username">
+<dt>auth_username</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-datasource"><span class="std std-ref">config.core.v3.DataSource</span></a>) Upstream server username as defined by the <code class="docutils literal notranslate"><span class="pre">user</span></code> directive
+<a class="reference external" href="https://redis.io/topics/acl">https://redis.io/topics/acl</a> in the server’s configuration file.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-redis-proxy-v3-awsiam">
+<span id="envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-awsiam"></span><h2>extensions.filters.network.redis_proxy.v3.AwsIam<a class="headerlink" href="#extensions-filters-network-redis-proxy-v3-awsiam" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L471">[extensions.filters.network.redis_proxy.v3.AwsIam proto]</a></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;credential_provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;cache_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;service_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;region&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;expiration_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-awsiam-credential-provider">
+<dt>credential_provider</dt><dd><p>(<a class="reference internal" href="../../../../common/aws/v3/credential_provider.proto.html#envoy-v3-api-msg-extensions-common-aws-v3-awscredentialprovider"><span class="std std-ref">extensions.common.aws.v3.AwsCredentialProvider</span></a>) An AwsCredentialProvider, allowing the use of a specific credential provider chain or specific provider settings</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-awsiam-cache-name">
+<dt>cache_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The name of the cache, used when generating the authentication token.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-awsiam-service-name">
+<dt>service_name</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The optional service name to be used in AWS IAM authentication. If not provided, the service name will be set to <code class="docutils literal notranslate"><span class="pre">elasticache</span></code>. For Amazon MemoryDB
+the service name should be set to <code class="docutils literal notranslate"><span class="pre">memorydb</span></code>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-awsiam-region">
+<dt>region</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The optional AWS region that your cache is located in. If not provided, the region will be deduced using the region provider chain
+as described in <a class="reference internal" href="../../../../../../configuration/http/http_filters/aws_request_signing_filter.html#config-http-filters-aws-request-signing-region"><span class="std std-ref">Regions</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-awsiam-expiration-time">
+<dt>expiration_time</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Number of seconds before the IAM authentication token will expire. If not set, defaults to 60s (1 minute). Maximum of 900s (15 minutes)
+Expiration of the current authentication token will automatically trigger generation of a new token.
+As envoy will automatically continue to generate new tokens as required, there is no substantial benefit to using a long expiration value here.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-network-redis-proxy-v3-redisexternalauthprovider">
+<span id="envoy-v3-api-msg-extensions-filters-network-redis-proxy-v3-redisexternalauthprovider"></span><h2>extensions.filters.network.redis_proxy.v3.RedisExternalAuthProvider<a class="headerlink" href="#extensions-filters-network-redis-proxy-v3-redisexternalauthprovider" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.proto#L502">[extensions.filters.network.redis_proxy.v3.RedisExternalAuthProvider proto]</a></p>
+<p>RedisExternalAuthProvider specifies a gRPC service that can be used to authenticate Redis clients.
+This service will be called every time an AUTH command is received from a client.
+If the service returns an error, authentication is considered failed.
+If the service returns a success, the client is considered authenticated.
+The service can also return an expiration timestamp, which will be used to disable any further
+commands from the client after it passes, unless a new AUTH command is received and the
+external auth service returns a new expiration timestamp.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;grpc_service&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;enable_auth_expiration&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisexternalauthprovider-grpc-service">
+<dt>grpc_service</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/grpc_service.proto.html#envoy-v3-api-msg-config-core-v3-grpcservice"><span class="std std-ref">config.core.v3.GrpcService</span></a>) External auth gRPC service configuration.
+It will be called every time an AUTH command is received from a client.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-network-redis-proxy-v3-redisexternalauthprovider-enable-auth-expiration">
+<dt>enable_auth_expiration</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">bool</a>) If set to true, the filter will expect an expiration timestamp in the response from the external
+auth service. This timestamp will be used to disable any further commands from the client after
+the expiration time, unless a new AUTH command is received and the external auth service returns
+a new expiration timestamp.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../rbac/v3/rbac.proto.html" class="btn btn-neutral float-left" title="RBAC (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../reverse_tunnel/v3/drain_aware_hcm.proto.html" class="btn btn-neutral float-right" title="Drain-Aware HTTP Connection Manager (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Redis Proxy (proto)</a><ul>
+<li><a class="reference internal" href="#extensions-filters-network-redis-proxy-v3-redisproxy">extensions.filters.network.redis_proxy.v3.RedisProxy</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings">extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings</a></li>
+<li><a class="reference internal" href="#enum-extensions-filters-network-redis-proxy-v3-redisproxy-connpoolsettings-readpolicy">Enum extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes">extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route">extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-requestmirrorpolicy">extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.RequestMirrorPolicy</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-redis-proxy-v3-redisproxy-prefixroutes-route-readcommandpolicy">extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.Route.ReadCommandPolicy</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-redis-proxy-v3-redisproxy-redisfault">extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault</a></li>
+<li><a class="reference internal" href="#enum-extensions-filters-network-redis-proxy-v3-redisproxy-redisfault-redisfaulttype">Enum extensions.filters.network.redis_proxy.v3.RedisProxy.RedisFault.RedisFaultType</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-redis-proxy-v3-redisproxy-connectionratelimit">extensions.filters.network.redis_proxy.v3.RedisProxy.ConnectionRateLimit</a></li>
+<li><a class="reference internal" href="#enum-extensions-filters-network-redis-proxy-v3-redisproxy-protocolversion">Enum extensions.filters.network.redis_proxy.v3.RedisProxy.ProtocolVersion</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-redis-proxy-v3-redisprotocoloptions">extensions.filters.network.redis_proxy.v3.RedisProtocolOptions</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-redis-proxy-v3-redisprotocoloptions-credential">extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.Credential</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-redis-proxy-v3-awsiam">extensions.filters.network.redis_proxy.v3.AwsIam</a></li>
+<li><a class="reference internal" href="#extensions-filters-network-redis-proxy-v3-redisexternalauthprovider">extensions.filters.network.redis_proxy.v3.RedisExternalAuthProvider</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

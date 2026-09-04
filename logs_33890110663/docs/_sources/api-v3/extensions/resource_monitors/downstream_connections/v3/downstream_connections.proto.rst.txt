@@ -1,0 +1,62 @@
+.. _envoy_v3_api_file_envoy/extensions/resource_monitors/downstream_connections/v3/downstream_connections.proto:
+
+Downstream connections (proto)
+==============================
+
+.. _extension_envoy.resource_monitors.global_downstream_max_connections:
+
+This extension has the qualified name ``envoy.resource_monitors.global_downstream_max_connections``
+
+
+.. note::
+  
+
+  This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.resource_monitors <extension_category_envoy.resource_monitors>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig:
+
+extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
+----------------------------------------------------------------------------------
+
+
+:repo:`[extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig proto] <api/envoy/extensions/resource_monitors/downstream_connections/v3/downstream_connections.proto#L17>`
+
+The downstream connections resource monitor tracks the global number of open downstream connections.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "max_active_downstream_connections": ...
+  }
+
+.. _envoy_v3_api_field_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig.max_active_downstream_connections:
+
+
+max_active_downstream_connections
+  (`int64 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Maximum threshold for global open downstream connections, defaults to 0.
+  If monitor is enabled in Overload manager api, this field should be explicitly configured with value greater than 0.
+
+

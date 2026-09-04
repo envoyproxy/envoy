@@ -1,0 +1,47 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: default
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                direct_response:
+                  status: 200
+                  body:
+                    inline_string: "OK"
+          http_filters:
+          - name: envoy.filters.http.set_metadata
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+              metadata:
+              # Service identification metadata
+              - metadata_namespace: envoy.lb
+                allow_overwrite: true
+                value:
+                  service: "user-service"
+                  version: "v2.1.0"
+              # Request routing metadata
+              - metadata_namespace: envoy.filters.http.fault
+                allow_overwrite: true
+                value:
+                  upstream_cluster: "backend"
+                  retry_policy: "aggressive"
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

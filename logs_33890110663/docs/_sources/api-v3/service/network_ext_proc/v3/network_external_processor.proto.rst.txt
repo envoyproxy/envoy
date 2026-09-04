@@ -1,0 +1,312 @@
+.. _envoy_v3_api_file_envoy/service/network_ext_proc/v3/network_external_processor.proto:
+
+Network External Processing Service (proto)
+===========================================
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+
+
+The Network External Processing filter allows an external service to dynamically
+interact with and modify L4 network traffic passing through Envoy. Unlike the
+HTTP External Processing filter, this service operates at the TCP/UDP level,
+providing access to raw network data.
+
+The filter communicates with an external gRPC service that can:
+
+1. Inspect network traffic in both directions (client->server and server->client)
+2. Modify the payload data
+3. Control connection lifecycle (continue, close gracefully, or reset)
+
+Use cases include:
+
+1. Custom protocol inspection and modification
+2. Advanced traffic manipulation
+3. Security scanning and filtering
+4. Dynamic connection management
+
+The service uses a bidirectional gRPC stream, maintaining state throughout
+the connection lifetime while allowing asynchronous processing.
+
+
+
+
+.. _envoy_v3_api_msg_service.network_ext_proc.v3.Data:
+
+service.network_ext_proc.v3.Data
+--------------------------------
+
+
+:repo:`[service.network_ext_proc.v3.Data proto] <api/envoy/service/network_ext_proc/v3/network_external_processor.proto#L61>`
+
+The payload data from network layer
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "data": ...,
+    "end_of_stream": ...
+  }
+
+.. _envoy_v3_api_field_service.network_ext_proc.v3.Data.data:
+
+
+data
+  (`bytes <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The raw payload data
+
+
+.. _envoy_v3_api_field_service.network_ext_proc.v3.Data.end_of_stream:
+
+
+end_of_stream
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates whether this is the last data frame in the current direction.
+  The external processor should still respond to this message even
+  if there is no more data expected in this direction.
+
+
+
+.. _envoy_v3_api_msg_service.network_ext_proc.v3.ProcessingRequest:
+
+service.network_ext_proc.v3.ProcessingRequest
+---------------------------------------------
+
+
+:repo:`[service.network_ext_proc.v3.ProcessingRequest proto] <api/envoy/service/network_ext_proc/v3/network_external_processor.proto#L74>`
+
+ProcessingRequest contains data sent from Envoy to the external processing server.
+Each request contains either read data (from client) or write data (to client)
+along with optional metadata and attributes.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "read_data": {...},
+    "write_data": {...},
+    "metadata": {...},
+    "attributes": {...}
+  }
+
+.. _envoy_v3_api_field_service.network_ext_proc.v3.ProcessingRequest.read_data:
+
+
+read_data
+  (:ref:`service.network_ext_proc.v3.Data <envoy_v3_api_msg_service.network_ext_proc.v3.Data>`) ReadData contains the network data intercepted in the request path (client to server).
+  This is sent to the external processor when data arrives from the downstream client.
+  If this is set, write_data should not be set.
+
+
+.. _envoy_v3_api_field_service.network_ext_proc.v3.ProcessingRequest.write_data:
+
+
+write_data
+  (:ref:`service.network_ext_proc.v3.Data <envoy_v3_api_msg_service.network_ext_proc.v3.Data>`) WriteData contains the network data intercepted in the response path (server to client).
+  This is sent to the external processor when data arrives from the upstream server.
+  If this is set, read_data should not be set.
+
+
+.. _envoy_v3_api_field_service.network_ext_proc.v3.ProcessingRequest.metadata:
+
+
+metadata
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Optional metadata associated with the request.
+  This can include connection properties, filter configuration, and any other
+  contextual information that might be useful for processing decisions.
+
+  The metadata is not automatically propagated from request to response.
+  The external processor must include any needed metadata in its response.
+
+
+.. _envoy_v3_api_field_service.network_ext_proc.v3.ProcessingRequest.attributes:
+
+
+attributes
+  (map<`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, `Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_>) The values of properties selected by the ``connection_attributes``
+  list in the configuration. Each entry in the list is populated
+  from the standard :ref:`attributes <arch_overview_attributes>` supported in the data plane.
+
+
+
+
+
+.. _envoy_v3_api_msg_service.network_ext_proc.v3.ProcessingResponse:
+
+service.network_ext_proc.v3.ProcessingResponse
+----------------------------------------------
+
+
+:repo:`[service.network_ext_proc.v3.ProcessingResponse proto] <api/envoy/service/network_ext_proc/v3/network_external_processor.proto#L103>`
+
+ProcessingResponse contains the response from the external processing server to Envoy.
+Each response corresponds to a ProcessingRequest and indicates how the network
+traffic should be handled.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "read_data": {...},
+    "write_data": {...},
+    "data_processing_status": ...,
+    "connection_status": ...,
+    "dynamic_metadata": {...},
+    "close_stream_to_ext_proc_server": ...
+  }
+
+.. _envoy_v3_api_field_service.network_ext_proc.v3.ProcessingResponse.read_data:
+
+
+read_data
+  (:ref:`service.network_ext_proc.v3.Data <envoy_v3_api_msg_service.network_ext_proc.v3.Data>`) The processed ReadData containing potentially modified data for the request path.
+  This should be sent in response to a ProcessingRequest with read_data, and the
+  previous data in ProcessingRequest will be replaced by the new data in Envoy's data plane.
+  If this is set, write_data should not be set.
+
+
+.. _envoy_v3_api_field_service.network_ext_proc.v3.ProcessingResponse.write_data:
+
+
+write_data
+  (:ref:`service.network_ext_proc.v3.Data <envoy_v3_api_msg_service.network_ext_proc.v3.Data>`) The processed WriteData containing potentially modified data for the response path.
+  This should be sent in response to a ProcessingRequest with write_data, and the
+  previous data in ProcessingRequest will be replaced by the new data in Envoy's data plane.
+  If this is set, read_data should not be set.
+
+
+.. _envoy_v3_api_field_service.network_ext_proc.v3.ProcessingResponse.data_processing_status:
+
+
+data_processing_status
+  (:ref:`service.network_ext_proc.v3.ProcessingResponse.DataProcessedStatus <envoy_v3_api_enum_service.network_ext_proc.v3.ProcessingResponse.DataProcessedStatus>`) Indicates whether the data was modified or not.
+  This is mandatory and tells Envoy whether to use the original or modified data.
+
+
+.. _envoy_v3_api_field_service.network_ext_proc.v3.ProcessingResponse.connection_status:
+
+
+connection_status
+  (:ref:`service.network_ext_proc.v3.ProcessingResponse.ConnectionStatus <envoy_v3_api_enum_service.network_ext_proc.v3.ProcessingResponse.ConnectionStatus>`) Optional: Determines the connection behavior after processing.
+  If not specified, CONTINUE is assumed, and the connection proceeds normally.
+  Use CLOSE or CLOSE_RST to terminate the connection based on processing results.
+
+
+.. _envoy_v3_api_field_service.network_ext_proc.v3.ProcessingResponse.dynamic_metadata:
+
+
+dynamic_metadata
+  (`Struct <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#struct>`_) Optional metadata associated with the request.
+  This can include connection properties, filter configuration, and any other
+  contextual information that might be useful for processing decisions.
+
+  The metadata is not automatically propagated from request to response.
+  The external processor must include any needed metadata in its response.
+
+
+.. _envoy_v3_api_field_service.network_ext_proc.v3.ProcessingResponse.close_stream_to_ext_proc_server:
+
+
+close_stream_to_ext_proc_server
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to true, Envoy will close the gRPC stream to the external processor
+  after applying this response. Subsequent data will bypass the ext_proc filter
+  as if it were configured in SKIP mode.
+
+  .. note::
+    This should only be used when there is a strong protocol guarantee
+    that no additional data chunks are in-flight on the wire. Because Envoy
+    immediately drains its local buffer when forwarding bytes to the external
+    processor, if Envoy has already dispatched subsequent data chunks before this
+    stream is closed, those in-flight bytes will be permanently lost and not
+    injected back into the filter chain.
+
+  This feature is primarily designed for tightly-coupled synchronous protocols,
+  such as reading the ClientHello during a TLS handshake, where the sender
+  naturally halts transmission while awaiting the receiver's response.
+
+
+.. _envoy_v3_api_enum_service.network_ext_proc.v3.ProcessingResponse.DataProcessedStatus:
+
+Enum service.network_ext_proc.v3.ProcessingResponse.DataProcessedStatus
+-----------------------------------------------------------------------
+
+
+:repo:`[service.network_ext_proc.v3.ProcessingResponse.DataProcessedStatus proto] <api/envoy/service/network_ext_proc/v3/network_external_processor.proto#L105>`
+
+DataProcessedStatus indicates whether the data was modified by the external processor.
+
+
+
+.. _envoy_v3_api_enum_value_service.network_ext_proc.v3.ProcessingResponse.DataProcessedStatus.UNKNOWN:
+
+
+UNKNOWN
+  *(DEFAULT)* ⁣The data processed status is unknown.
+
+
+.. _envoy_v3_api_enum_value_service.network_ext_proc.v3.ProcessingResponse.DataProcessedStatus.UNMODIFIED:
+
+
+UNMODIFIED
+  ⁣The data remains unchanged. Envoy will use the original data.
+  This is useful when the processor only wants to inspect but not modify the traffic.
+
+
+.. _envoy_v3_api_enum_value_service.network_ext_proc.v3.ProcessingResponse.DataProcessedStatus.MODIFIED:
+
+
+MODIFIED
+  ⁣The data has been modified. Envoy will use the modified data provided in the response.
+  This allows the processor to transform the network traffic as needed.
+
+
+
+.. _envoy_v3_api_enum_service.network_ext_proc.v3.ProcessingResponse.ConnectionStatus:
+
+Enum service.network_ext_proc.v3.ProcessingResponse.ConnectionStatus
+--------------------------------------------------------------------
+
+
+:repo:`[service.network_ext_proc.v3.ProcessingResponse.ConnectionStatus proto] <api/envoy/service/network_ext_proc/v3/network_external_processor.proto#L119>`
+
+ConnectionStatus determines what happens to the connection after processing.
+
+
+
+.. _envoy_v3_api_enum_value_service.network_ext_proc.v3.ProcessingResponse.ConnectionStatus.CONTINUE:
+
+
+CONTINUE
+  *(DEFAULT)* ⁣Continue normal processing of the connection.
+  This is the default behavior and allows traffic to flow normally.
+
+
+.. _envoy_v3_api_enum_value_service.network_ext_proc.v3.ProcessingResponse.ConnectionStatus.CLOSE:
+
+
+CLOSE
+  ⁣Close the connection with normal TCP FIN.
+  This allows for clean connection termination with a normal close sequence.
+  Any buffered data will be sent before closing.
+
+
+.. _envoy_v3_api_enum_value_service.network_ext_proc.v3.ProcessingResponse.ConnectionStatus.CLOSE_RST:
+
+
+CLOSE_RST
+  ⁣Immediately reset the connection with TCP RST.
+  This forcibly terminates the connection without a clean shutdown,
+  discarding any buffered data. Use this for security-critical situations
+  or when immediate termination is required.
+
+
+

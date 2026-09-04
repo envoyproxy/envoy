@@ -1,0 +1,32 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/filters/common/workload_discovery/v3/extension.proto:
+
+contrib/envoy/extensions/filters/common/workload_discovery/v3/extension.proto (proto)
+=====================================================================================
+
+
+
+
+.. _envoy_v3_api_msg_.istio.workload.BootstrapExtension:
+
+.istio.workload.BootstrapExtension
+----------------------------------
+
+
+:repo:`[.istio.workload.BootstrapExtension proto] <api/contrib/envoy/extensions/filters/common/workload_discovery/v3/extension.proto#L14>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config_source": {...}
+  }
+
+.. _envoy_v3_api_field_.istio.workload.BootstrapExtension.config_source:
+
+
+config_source
+  (:ref:`config.core.v3.ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`) 
+

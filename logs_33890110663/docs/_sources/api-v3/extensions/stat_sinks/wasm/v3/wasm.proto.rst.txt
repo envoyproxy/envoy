@@ -1,0 +1,62 @@
+.. _envoy_v3_api_file_envoy/extensions/stat_sinks/wasm/v3/wasm.proto:
+
+Wasm (proto)
+============
+
+.. _extension_envoy.stat_sinks.wasm:
+
+This extension has the qualified name ``envoy.stat_sinks.wasm``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.stats_sinks <extension_category_envoy.stats_sinks>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.stat_sinks.wasm.v3.Wasm <envoy_v3_api_msg_extensions.stat_sinks.wasm.v3.Wasm>`
+
+
+
+Wasm :ref:`configuration overview <config_stat_sinks_wasm>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.stat_sinks.wasm.v3.Wasm:
+
+extensions.stat_sinks.wasm.v3.Wasm
+----------------------------------
+
+
+:repo:`[extensions.stat_sinks.wasm.v3.Wasm proto] <api/envoy/extensions/stat_sinks/wasm/v3/wasm.proto#L18>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.stat_sinks.wasm.v3.Wasm.config:
+
+
+config
+  (:ref:`extensions.wasm.v3.PluginConfig <envoy_v3_api_msg_extensions.wasm.v3.PluginConfig>`) General Plugin configuration.
+
+

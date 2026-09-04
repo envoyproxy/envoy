@@ -1,0 +1,31 @@
+.. _version_history_1.31.1:
+
+1.31.1 (September 14, 2024)
+============================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **c-ares**: Applying a C-ares patch to fix DNS resoultion by the Google gRPC library.
+* **dependencies**: Update curl to mitigate CVE-2024-7264.
+
+
+
+
+New features
+------------
+
+
+* **access_log**: added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regadless of whether
+  ``alt_stat_name`` is set.
+

@@ -1,0 +1,90 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/set_filter_state/v3/set_filter_state.proto:
+
+Set-Filter-State Filter (proto)
+===============================
+
+.. _extension_envoy.filters.network.set_filter_state:
+
+This extension has the qualified name ``envoy.filters.network.set_filter_state``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config <envoy_v3_api_msg_extensions.filters.network.set_filter_state.v3.Config>`
+
+
+
+
+This filter sets or updates the dynamic filter state. See :ref:`the filter
+documentation <config_network_filters_set_filter_state>` for more
+information on how this filter should be used.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.set_filter_state.v3.Config:
+
+extensions.filters.network.set_filter_state.v3.Config
+-----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.set_filter_state.v3.Config proto] <api/envoy/extensions/filters/network/set_filter_state/v3/set_filter_state.proto#L22>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "on_new_connection": [],
+    "on_downstream_tls_handshake": [],
+    "on_downstream_data": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_new_connection:
+
+
+on_new_connection
+  (**repeated** :ref:`extensions.filters.common.set_filter_state.v3.FilterStateValue <envoy_v3_api_msg_extensions.filters.common.set_filter_state.v3.FilterStateValue>`) A sequence of the filter state values to apply in the specified order
+  when a new connection is received.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_downstream_tls_handshake:
+
+
+on_downstream_tls_handshake
+  (**repeated** :ref:`extensions.filters.common.set_filter_state.v3.FilterStateValue <envoy_v3_api_msg_extensions.filters.common.set_filter_state.v3.FilterStateValue>`) A sequence of the filter state values to apply in the specified order
+  when the downstream TLS handshake is complete.
+
+  For non-TLS downstream connections (where there is no TLS handshake), this
+  list is applied when a new connection is received.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_downstream_data:
+
+
+on_downstream_data
+  (**repeated** :ref:`extensions.filters.common.set_filter_state.v3.FilterStateValue <envoy_v3_api_msg_extensions.filters.common.set_filter_state.v3.FilterStateValue>`) A sequence of the filter state values to apply in the specified order
+  when data is first received from the downstream connection.
+
+

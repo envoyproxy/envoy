@@ -1,0 +1,68 @@
+.. _envoy_v3_api_file_envoy/extensions/tracers/opentelemetry/samplers/v3/cel_sampler.proto:
+
+"CEL" Sampler config (proto)
+============================
+
+.. _extension_envoy.tracers.opentelemetry.samplers.cel:
+
+This extension has the qualified name ``envoy.tracers.opentelemetry.samplers.cel``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers.opentelemetry.samplers <extension_category_envoy.tracers.opentelemetry.samplers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig <envoy_v3_api_msg_extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig>`
+
+
+
+Configuration for the "CEL" Sampler extension.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig:
+
+extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
+-------------------------------------------------------------
+
+
+:repo:`[extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig proto] <api/envoy/extensions/tracers/opentelemetry/samplers/v3/cel_sampler.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "expression": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig.expression:
+
+
+expression
+  (:ref:`.xds.type.v3.CelExpression <envoy_v3_api_msg_.xds.type.v3.CelExpression>`) Expression that, when evaluated, will be used to make sample decision.
+
+  .. warning::
+     This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+

@@ -1,0 +1,159 @@
+.. _envoy_v3_api_file_envoy/extensions/clusters/redis/v3/redis_cluster.proto:
+
+Redis Cluster Configuration (proto)
+===================================
+
+.. _extension_envoy.clusters.redis:
+
+This extension has the qualified name ``envoy.clusters.redis``
+
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.clusters <extension_category_envoy.clusters>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.clusters.redis.v3.RedisClusterConfig <envoy_v3_api_msg_extensions.clusters.redis.v3.RedisClusterConfig>`
+
+
+
+This cluster adds support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_, as part
+of :ref:`Envoy's support for Redis Cluster <arch_overview_redis>`.
+
+Redis Cluster is an extension of Redis which supports sharding and high availability (where a
+shard that loses its primary fails over to a replica, and designates it as the new primary).
+However, as there is no unified frontend or proxy service in front of Redis Cluster, the client
+(in this case Envoy) must locally maintain the state of the Redis Cluster, specifically the
+topology. A random node in the cluster is queried for the topology using the `CLUSTER SLOTS
+command <https://redis.io/commands/cluster-slots>`_. This result is then stored locally, and
+updated at user-configured intervals.
+
+Additionally, if
+:ref:`enable_redirection<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_redirection>`
+is true, then moved and ask redirection errors from upstream servers will trigger a topology
+refresh when they exceed a user-configured error threshold.
+
+Example:
+
+.. code-block:: yaml
+
+    name: name
+    connect_timeout: 0.25s
+    dns_lookup_family: V4_ONLY
+    hosts:
+    - socket_address:
+      address: foo.bar.com
+      port_value: 22120
+    cluster_type:
+      name: envoy.clusters.redis
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          cluster_refresh_rate: 30s
+          cluster_refresh_timeout: 0.5s
+          redirect_refresh_interval: 10s
+          redirect_refresh_threshold: 10
+
+
+
+
+.. _envoy_v3_api_msg_extensions.clusters.redis.v3.RedisClusterConfig:
+
+extensions.clusters.redis.v3.RedisClusterConfig
+-----------------------------------------------
+
+
+:repo:`[extensions.clusters.redis.v3.RedisClusterConfig proto] <api/envoy/extensions/clusters/redis/v3/redis_cluster.proto#L57>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster_refresh_rate": {...},
+    "cluster_refresh_timeout": {...},
+    "redirect_refresh_interval": {...},
+    "redirect_refresh_threshold": {...},
+    "failure_refresh_threshold": ...,
+    "host_degraded_refresh_threshold": ...,
+    "enable_zone_discovery": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.clusters.redis.v3.RedisClusterConfig.cluster_refresh_rate:
+
+
+cluster_refresh_rate
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Interval between successive topology refresh requests. If not set, this defaults to 5s.
+
+
+.. _envoy_v3_api_field_extensions.clusters.redis.v3.RedisClusterConfig.cluster_refresh_timeout:
+
+
+cluster_refresh_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Timeout for topology refresh request. If not set, this defaults to 3s.
+
+
+.. _envoy_v3_api_field_extensions.clusters.redis.v3.RedisClusterConfig.redirect_refresh_interval:
+
+
+redirect_refresh_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The minimum interval that must pass after triggering a topology refresh request before a new
+  request can possibly be triggered again. Any errors received during one of these
+  time intervals are ignored. If not set, this defaults to 5s.
+
+
+.. _envoy_v3_api_field_extensions.clusters.redis.v3.RedisClusterConfig.redirect_refresh_threshold:
+
+
+redirect_refresh_threshold
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) The number of redirection errors that must be received before
+  triggering a topology refresh request. If not set, this defaults to 5.
+  If this is set to 0, topology refresh after redirect is disabled.
+
+
+.. _envoy_v3_api_field_extensions.clusters.redis.v3.RedisClusterConfig.failure_refresh_threshold:
+
+
+failure_refresh_threshold
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The number of failures that must be received before triggering a topology refresh request.
+  If not set, this defaults to 0, which disables the topology refresh due to failure.
+
+
+.. _envoy_v3_api_field_extensions.clusters.redis.v3.RedisClusterConfig.host_degraded_refresh_threshold:
+
+
+host_degraded_refresh_threshold
+  (`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The number of hosts became degraded or unhealthy before triggering a topology refresh request.
+  If not set, this defaults to 0, which disables the topology refresh due to degraded or
+  unhealthy host.
+
+
+.. _envoy_v3_api_field_extensions.clusters.redis.v3.RedisClusterConfig.enable_zone_discovery:
+
+
+enable_zone_discovery
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Enable zone discovery via INFO command. When enabled, the cluster will
+  send INFO command to each node to discover its availability_zone field,
+  which is then used for zone-aware routing.
+
+  Note: This feature currently works with Valkey only. Valkey exposes
+  availability_zone in its INFO response. Standard Redis does not support this field.
+
+  If not set, this defaults to false.
+
+

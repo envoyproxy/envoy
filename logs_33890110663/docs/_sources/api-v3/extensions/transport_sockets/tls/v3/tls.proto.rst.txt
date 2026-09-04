@@ -1,0 +1,580 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/tls/v3/tls.proto:
+
+TLS transport socket (proto)
+============================
+
+.. _extension_envoy.transport_sockets.tls:
+
+This extension has the qualified name ``envoy.transport_sockets.tls``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.transport_sockets.downstream <extension_category_envoy.transport_sockets.downstream>`
+
+  - :ref:`envoy.transport_sockets.upstream <extension_category_envoy.transport_sockets.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`
+
+
+
+The TLS contexts below provide the transport socket configuration for upstream/downstream TLS.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext:
+
+extensions.transport_sockets.tls.v3.UpstreamTlsContext
+------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tls.v3.UpstreamTlsContext proto] <api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L28>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "common_tls_context": {...},
+    "sni": ...,
+    "auto_host_sni": ...,
+    "auto_sni_san_validation": ...,
+    "allow_renegotiation": ...,
+    "max_session_keys": {...},
+    "enforce_rsa_key_usage": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.common_tls_context:
+
+
+common_tls_context
+  (:ref:`extensions.transport_sockets.tls.v3.CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`) Common TLS context settings.
+
+  .. attention::
+
+    Server certificate verification is not enabled by default. To enable verification, configure
+    :ref:`trusted_ca<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.sni:
+
+
+sni
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) SNI string to use when creating TLS backend connections.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.auto_host_sni:
+
+
+auto_host_sni
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, replaces the SNI for the connection with the hostname of the upstream host, if
+  the hostname is known due to either a DNS cluster type or the
+  :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` is set on
+  the host.
+
+  See :ref:`SNI configuration <start_quick_start_securing_sni_client>` for details on how this
+  interacts with other validation options.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.auto_sni_san_validation:
+
+
+auto_sni_san_validation
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, replaces any Subject Alternative Name (SAN) validations with a validation for a DNS SAN matching
+  the SNI value sent. The validation uses the actual requested SNI, regardless of how the SNI is configured.
+
+  For common cases where an SNI value is present and the server certificate should include a corresponding SAN,
+  this option ensures the SAN is properly validated.
+
+  See the :ref:`validation configuration <start_quick_start_securing_validation>` for how this interacts with
+  other validation options.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.allow_renegotiation:
+
+
+allow_renegotiation
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, server-initiated TLS renegotiation will be allowed.
+
+  .. attention::
+
+    TLS renegotiation is considered insecure and shouldn't be used unless absolutely necessary.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.max_session_keys:
+
+
+max_session_keys
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Maximum number of session keys (Pre-Shared Keys for TLSv1.3+, Session IDs and Session Tickets
+  for TLSv1.2 and older) to be stored for session resumption.
+
+  Defaults to 1, setting this to 0 disables session resumption.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.enforce_rsa_key_usage:
+
+
+enforce_rsa_key_usage
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Controls enforcement of the ``keyUsage`` extension in peer certificates. If set to ``true``,
+  the handshake will fail if the ``keyUsage`` is incompatible with TLS usage.
+
+  .. attention::
+
+    This field is deprecated and ignored. Envoy now always enforces the ``keyUsage`` extension
+    in peer certificates, making this option unconfigurable.
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext:
+
+extensions.transport_sockets.tls.v3.DownstreamTlsContext
+--------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tls.v3.DownstreamTlsContext proto] <api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L87>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "common_tls_context": {...},
+    "require_client_certificate": {...},
+    "session_ticket_keys": {...},
+    "session_ticket_keys_sds_secret_config": {...},
+    "disable_stateless_session_resumption": ...,
+    "disable_stateful_session_resumption": ...,
+    "session_timeout": {...},
+    "ocsp_staple_policy": ...,
+    "full_scan_certs_on_sni_mismatch": {...},
+    "prefer_client_ciphers": ...
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.common_tls_context:
+
+
+common_tls_context
+  (:ref:`extensions.transport_sockets.tls.v3.CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`) Common TLS context settings.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate:
+
+
+require_client_certificate
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If specified, Envoy will reject connections without a valid client
+  certificate.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys:
+
+
+session_ticket_keys
+  (:ref:`extensions.transport_sockets.tls.v3.TlsSessionTicketKeys <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsSessionTicketKeys>`) TLS session ticket key settings.
+
+
+  
+
+  Only one of :ref:`session_ticket_keys <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys>`, :ref:`session_ticket_keys_sds_secret_config <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys_sds_secret_config>`, :ref:`disable_stateless_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>` may be set.
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys_sds_secret_config:
+
+
+session_ticket_keys_sds_secret_config
+  (:ref:`extensions.transport_sockets.tls.v3.SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>`) Config for fetching TLS session ticket keys via SDS API.
+
+
+  
+
+  Only one of :ref:`session_ticket_keys <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys>`, :ref:`session_ticket_keys_sds_secret_config <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys_sds_secret_config>`, :ref:`disable_stateless_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>` may be set.
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption:
+
+
+disable_stateless_session_resumption
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Config for controlling stateless TLS session resumption: setting this to true will cause the TLS
+  server to not issue TLS session tickets for the purposes of stateless TLS session resumption.
+  If set to false, the TLS server will issue TLS session tickets and encrypt/decrypt them using
+  the keys specified through either :ref:`session_ticket_keys <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys>`
+  or :ref:`session_ticket_keys_sds_secret_config <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys_sds_secret_config>`.
+  If this config is set to false and no keys are explicitly configured, the TLS server will issue
+  TLS session tickets and encrypt/decrypt them using an internally-generated and managed key, with the
+  implication that sessions cannot be resumed across hot restarts or on different hosts.
+
+
+  
+
+  Only one of :ref:`session_ticket_keys <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys>`, :ref:`session_ticket_keys_sds_secret_config <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_ticket_keys_sds_secret_config>`, :ref:`disable_stateless_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>` may be set.
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption:
+
+
+disable_stateful_session_resumption
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If ``true``, the TLS server will not maintain a session cache of TLS sessions.
+
+  .. note::
+    This applies only to TLSv1.2 and earlier.
+
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.session_timeout:
+
+
+session_timeout
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Maximum lifetime of TLS sessions. If specified, ``session_timeout`` will change the maximum lifetime
+  of the TLS session.
+
+  This serves as a hint for the `TLS session ticket lifetime (for TLSv1.2) <https://tools.ietf.org/html/rfc5077#section-5.6>`_.
+  Only whole seconds are considered; fractional seconds are ignored.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.ocsp_staple_policy:
+
+
+ocsp_staple_policy
+  (:ref:`extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy <envoy_v3_api_enum_extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy>`) Configuration for handling certificates without an OCSP response or with expired responses.
+
+  Defaults to ``LENIENT_STAPLING``
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch:
+
+
+full_scan_certs_on_sni_mismatch
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Multiple certificates are allowed in Downstream transport socket to serve different SNI.
+  This option controls the behavior when no matching certificate is found for the received SNI value,
+  or no SNI value was sent. If enabled, all certificates will be evaluated for a match for non-SNI criteria
+  such as key type and OCSP settings. If disabled, the first provided certificate will be used.
+  Defaults to ``false``. See more details in :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>`.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.prefer_client_ciphers:
+
+
+prefer_client_ciphers
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If ``true``, the downstream client's preferred cipher is used during the handshake. If ``false``, Envoy
+  uses its preferred cipher.
+
+  .. note::
+    This has no effect when using TLSv1_3.
+
+
+
+.. _envoy_v3_api_enum_extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy:
+
+Enum extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy
+------------------------------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy proto] <api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L91>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy.LENIENT_STAPLING:
+
+
+LENIENT_STAPLING
+  *(DEFAULT)* ⁣OCSP responses are optional. If absent or expired, the certificate is used without stapling.
+
+
+.. _envoy_v3_api_enum_value_extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy.STRICT_STAPLING:
+
+
+STRICT_STAPLING
+  ⁣OCSP responses are optional. If absent, the certificate is used without stapling. If present but expired,
+  the certificate is not used for subsequent connections. Connections are rejected if no suitable certificate
+  is found.
+
+
+.. _envoy_v3_api_enum_value_extensions.transport_sockets.tls.v3.DownstreamTlsContext.OcspStaplePolicy.MUST_STAPLE:
+
+
+MUST_STAPLE
+  ⁣OCSP responses are required. Connections fail if a certificate lacks a valid OCSP response. Expired responses
+  prevent certificate use in new connections, and connections are rejected if no suitable certificate is available.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsKeyLog:
+
+extensions.transport_sockets.tls.v3.TlsKeyLog
+---------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tls.v3.TlsKeyLog proto] <api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L174>`
+
+TLS key log configuration.
+The key log file format is "format used by NSS for its SSLKEYLOGFILE debugging output" (text taken from openssl man page)
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "path": ...,
+    "local_address_range": [],
+    "remote_address_range": []
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsKeyLog.path:
+
+
+path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) Path to save the TLS key log.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsKeyLog.local_address_range:
+
+
+local_address_range
+  (**repeated** :ref:`config.core.v3.CidrRange <envoy_v3_api_msg_config.core.v3.CidrRange>`) Local IP address ranges to filter connections for TLS key logging. If not set, matches any local IP address.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsKeyLog.remote_address_range:
+
+
+remote_address_range
+  (**repeated** :ref:`config.core.v3.CidrRange <envoy_v3_api_msg_config.core.v3.CidrRange>`) Remote IP address ranges to filter connections for TLS key logging. If not set, matches any remote IP address.
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext:
+
+extensions.transport_sockets.tls.v3.CommonTlsContext
+----------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tls.v3.CommonTlsContext proto] <api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L187>`
+
+TLS context shared by both client and server TLS contexts.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "tls_params": {...},
+    "tls_certificates": [],
+    "tls_certificate_sds_secret_configs": [],
+    "custom_tls_certificate_selector": {...},
+    "validation_context": {...},
+    "validation_context_sds_secret_config": {...},
+    "combined_validation_context": {...},
+    "alpn_protocols": [],
+    "custom_handshaker": {...},
+    "key_log": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.tls_params:
+
+
+tls_params
+  (:ref:`extensions.transport_sockets.tls.v3.TlsParameters <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsParameters>`) TLS protocol versions, cipher suites etc.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.tls_certificates:
+
+
+tls_certificates
+  (**repeated** :ref:`extensions.transport_sockets.tls.v3.TlsCertificate <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsCertificate>`) Only a single TLS certificate is supported in client contexts unless
+  ``custom_tls_certificate_selector`` is explicitly defined with ``max_session_keys`` set to 0. In server contexts,
+  :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>` can be associated with the
+  same context to allow both RSA and ECDSA certificates and support SNI-based selection.
+
+  If ``tls_certificate_provider_instance`` is set, this field is ignored.
+  If this field is set, ``tls_certificate_sds_secret_configs`` is ignored.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.tls_certificate_sds_secret_configs:
+
+
+tls_certificate_sds_secret_configs
+  (**repeated** :ref:`extensions.transport_sockets.tls.v3.SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>`) Configs for fetching TLS certificates via SDS API. Note SDS API allows certificates to be
+  fetched/refreshed over the network asynchronously with respect to the TLS handshake.
+
+  The same number and types of certificates as :ref:`tls_certificates <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.tls_certificates>`
+  are valid in the certificates fetched through this setting.
+
+  If ``tls_certificates`` or ``tls_certificate_provider_instance`` are set, this field
+  is ignored.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector:
+
+
+custom_tls_certificate_selector
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Custom TLS certificate selector.
+
+  For the downstream TLS socket, select a TLS certificate based on TLS client hello. If empty,
+  defaults to native TLS certificate selection behavior: DNS SANs or Subject Common Name in TLS
+  certificates is extracted as server name pattern to match SNI.
+
+  For the upstream TLS socket, select a TLS certificate based on TLS server hello and the
+  transport socket options.
+
+
+  .. _extension_category_envoy.tls.certificate_selectors:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.tls.certificate_selectors.on_demand_secret <extension_envoy.tls.certificate_selectors.on_demand_secret>`
+
+
+
+
+
+  .. _extension_category_envoy.tls.upstream_certificate_selectors:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.tls.certificate_selectors.on_demand_secret <extension_envoy.tls.certificate_selectors.on_demand_secret>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.validation_context:
+
+
+validation_context
+  (:ref:`extensions.transport_sockets.tls.v3.CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`) How to validate peer certificates.
+
+
+  
+
+  Only one of :ref:`validation_context <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.validation_context>`, :ref:`validation_context_sds_secret_config <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.validation_context_sds_secret_config>`, :ref:`combined_validation_context <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.combined_validation_context>` may be set.
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.validation_context_sds_secret_config:
+
+
+validation_context_sds_secret_config
+  (:ref:`extensions.transport_sockets.tls.v3.SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>`) Config for fetching validation context via SDS API. Note SDS API allows certificates to be
+  fetched/refreshed over the network asynchronously with respect to the TLS handshake.
+
+
+  
+
+  Only one of :ref:`validation_context <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.validation_context>`, :ref:`validation_context_sds_secret_config <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.validation_context_sds_secret_config>`, :ref:`combined_validation_context <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.combined_validation_context>` may be set.
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.combined_validation_context:
+
+
+combined_validation_context
+  (:ref:`extensions.transport_sockets.tls.v3.CommonTlsContext.CombinedCertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext.CombinedCertificateValidationContext>`) Combines the default ``CertificateValidationContext`` with the SDS-provided dynamic context for certificate
+  validation.
+
+  When the SDS server returns a dynamic ``CertificateValidationContext``, it is merged
+  with the default context using ``Message::MergeFrom()``. The merging rules are as follows:
+
+  * **Singular Fields:** Dynamic fields override the default singular fields.
+  * **Repeated Fields:** Dynamic repeated fields are concatenated with the default repeated fields.
+  * **Boolean Fields:** Boolean fields are combined using a logical OR operation.
+
+  The resulting ``CertificateValidationContext`` is used to perform certificate validation.
+
+
+  
+
+  Only one of :ref:`validation_context <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.validation_context>`, :ref:`validation_context_sds_secret_config <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.validation_context_sds_secret_config>`, :ref:`combined_validation_context <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.combined_validation_context>` may be set.
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.alpn_protocols:
+
+
+alpn_protocols
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Supplies the list of ALPN protocols that the listener should expose. In
+  practice this is likely to be set to one of two values (see the
+  :ref:`codec_type
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.codec_type>`
+  parameter in the HTTP connection manager for more information):
+
+  * "h2,http/1.1" If the listener is going to support both HTTP/2 and HTTP/1.1.
+  * "http/1.1" If the listener is only going to support HTTP/1.1.
+
+  There is no default for this parameter. If empty, Envoy will not expose ALPN.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_handshaker:
+
+
+custom_handshaker
+  (:ref:`config.core.v3.TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`) Custom TLS handshaker. If empty, defaults to native TLS handshaking
+  behavior.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.key_log:
+
+
+key_log
+  (:ref:`extensions.transport_sockets.tls.v3.TlsKeyLog <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsKeyLog>`) TLS key log configuration
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext.CombinedCertificateValidationContext:
+
+extensions.transport_sockets.tls.v3.CommonTlsContext.CombinedCertificateValidationContext
+-----------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tls.v3.CommonTlsContext.CombinedCertificateValidationContext proto] <api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L241>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "default_validation_context": {...},
+    "validation_context_sds_secret_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.CombinedCertificateValidationContext.default_validation_context:
+
+
+default_validation_context
+  (:ref:`extensions.transport_sockets.tls.v3.CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`, *REQUIRED*) How to validate peer certificates.
+
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.CombinedCertificateValidationContext.validation_context_sds_secret_config:
+
+
+validation_context_sds_secret_config
+  (:ref:`extensions.transport_sockets.tls.v3.SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>`, *REQUIRED*) Config for fetching validation context via SDS API. Note SDS API allows certificates to be
+  fetched/refreshed over the network asynchronously with respect to the TLS handshake.
+
+
+

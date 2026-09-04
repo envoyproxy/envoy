@@ -1,0 +1,181 @@
+.. _envoy_v3_api_file_envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.proto:
+
+Client-Side Weighted Round Robin Load Balancing Policy (proto)
+==============================================================
+
+.. _extension_envoy.load_balancing_policies.client_side_weighted_round_robin:
+
+This extension has the qualified name ``envoy.load_balancing_policies.client_side_weighted_round_robin``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.load_balancing_policies <extension_category_envoy.load_balancing_policies>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin:
+
+extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
+---------------------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin proto] <api/envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.proto#L54>`
+
+Configuration for the client_side_weighted_round_robin LB policy.
+
+This policy differs from the built-in ROUND_ROBIN policy in terms of
+how the endpoint weights are determined. In the ROUND_ROBIN policy,
+the endpoint weights are sent by the control plane via EDS. However,
+in this policy, the endpoint weights are instead determined via qps (queries
+per second), eps (errors per second), and utilization metrics sent by the
+endpoint using the Open Request Cost Aggregation (ORCA) protocol. All queries
+count toward qps, regardless of result. Only failed queries count toward eps.
+A config parameter error_utilization_penalty controls the penalty to adjust
+endpoint weights using eps and qps. The weight of a given endpoint is computed
+as: ``qps / (utilization + eps/qps * error_utilization_penalty)``.
+
+For a load report to update an endpoint's weight, it must set :ref:`rps_fractional
+<envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.rps_fractional>` (used as
+qps) greater than 0, and the final utilization (resolved utilization plus any
+error penalty) must be greater than 0. Resolved utilization (see
+:ref:`metric_names_for_computing_utilization
+<envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.metric_names_for_computing_utilization>`)
+is used as the baseline. Reports that fail to do so are ignored, and an endpoint
+with no valid weight is assigned the median weight of the endpoints that have one.
+
+Note that Envoy will forward the ORCA response headers/trailers from the upstream
+cluster to the downstream client. This means that if the downstream client is also
+configured to use ``client_side_weighted_round_robin`` it will load balance against
+Envoy based on upstream weights. This can happen when Envoy is used as a reverse proxy.
+To avoid this issue you can configure the :ref:`header_mutation filter  <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>` to remove
+the ORCA payload from the response headers/trailers.
+
+See the :ref:`load balancing architecture
+overview<arch_overview_load_balancing_types>` for more information.
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "enable_oob_load_report": {...},
+    "oob_reporting_period": {...},
+    "blackout_period": {...},
+    "weight_expiration_period": {...},
+    "weight_update_period": {...},
+    "error_utilization_penalty": {...},
+    "metric_names_for_computing_utilization": [],
+    "slow_start_config": {...},
+    "oob_reporting_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.enable_oob_load_report:
+
+
+enable_oob_load_report
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Whether to enable out-of-band utilization reporting collection from
+  the endpoints. By default, per-request utilization reporting is used.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.oob_reporting_period:
+
+
+oob_reporting_period
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Load reporting interval to request from the server. Note that the
+  server may not provide reports as frequently as the client requests.
+  Used only when enable_oob_load_report is true. Default is 10 seconds.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.blackout_period:
+
+
+blackout_period
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) A given endpoint must report load metrics continuously for at least
+  this long before the endpoint weight will be used. This avoids
+  churn when the set of endpoint addresses changes. Takes effect
+  both immediately after we establish a connection to an endpoint and
+  after weight_expiration_period has caused us to stop using the most
+  recent load metrics. Default is 10 seconds.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.weight_expiration_period:
+
+
+weight_expiration_period
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) If a given endpoint has not reported load metrics in this long,
+  then we stop using the reported weight. This ensures that we do
+  not continue to use very stale weights. Once we stop using a stale
+  value, if we later start seeing fresh reports again, the
+  blackout_period applies. Defaults to 3 minutes.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.weight_update_period:
+
+
+weight_update_period
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) How often endpoint weights are recalculated. Values less than 100ms are
+  capped at 100ms. Default is 1 second.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.error_utilization_penalty:
+
+
+error_utilization_penalty
+  (`FloatValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#floatvalue>`_) The multiplier used to adjust endpoint weights with the error rate
+  calculated as eps/qps. Configuration is rejected if this value is negative.
+  Default is 1.0.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.metric_names_for_computing_utilization:
+
+
+metric_names_for_computing_utilization
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies the metrics used to compute the endpoint utilization from which weight is derived.
+  For map fields in the ORCA proto, the string will be of the form ``<map_field_name>.<map_key>``. For example, the string ``named_metrics.foo`` will mean to look for the key ``foo`` in the ORCA :ref:`named_metrics <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.named_metrics>` field.
+  Utilization is the max of the values of the metrics specified here, when that max is greater than 0.
+  Otherwise :ref:`application_utilization <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.application_utilization>` is used if greater than 0, with :ref:`cpu_utilization <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.cpu_utilization>` as the final fallback.
+  Disabling the runtime flag ``envoy.reloadable_features.orca_weight_manager_use_named_metrics_first`` restores the legacy order, preferring ``application_utilization`` over these metrics.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.slow_start_config:
+
+
+slow_start_config
+  (:ref:`extensions.load_balancing_policies.common.v3.SlowStartConfig <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.SlowStartConfig>`) Configuration for slow start mode.
+  If this configuration is not set, slow start will not be not enabled.
+
+
+.. _envoy_v3_api_field_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin.oob_reporting_config:
+
+
+oob_reporting_config
+  (:ref:`extensions.load_balancing_policies.common.v3.OrcaOobReportingConfig <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.OrcaOobReportingConfig>`) Optional overrides for the OOB reporting connection (alternative port,
+  ``:authority``, transport socket selection). Honored only when
+  ``enable_oob_load_report`` is true.
+
+

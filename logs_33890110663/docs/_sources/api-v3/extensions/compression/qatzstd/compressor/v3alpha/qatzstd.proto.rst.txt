@@ -1,0 +1,188 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha/qatzstd.proto:
+
+Qatzstd Compressor (proto)
+==========================
+
+.. _extension_envoy.compression.qatzstd.compressor:
+
+This extension has the qualified name ``envoy.compression.qatzstd.compressor``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.compression.compressor <extension_category_envoy.compression.compressor>`
+
+
+
+
+
+Qatzstd :ref:`configuration overview <config_qatzstd>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd:
+
+extensions.compression.qatzstd.compressor.v3alpha.Qatzstd
+---------------------------------------------------------
+
+
+:repo:`[extensions.compression.qatzstd.compressor.v3alpha.Qatzstd proto] <api/contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha/qatzstd.proto#L20>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "compression_level": {...},
+    "enable_checksum": ...,
+    "strategy": ...,
+    "chunk_size": {...},
+    "enable_qat_zstd": ...,
+    "qat_zstd_fallback_threshold": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.compression_level:
+
+
+compression_level
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Set compression parameters according to pre-defined compression level table.
+  Note that exact compression parameters are dynamically determined,
+  depending on both compression level and source content size (when known).
+  Value 0 means default, and default level is 3.
+
+  Setting a level does not automatically set all other compression parameters
+  to default. Setting this will however eventually dynamically impact the compression
+  parameters which have not been manually set. The manually set
+  ones will 'stick'.
+
+
+.. _envoy_v3_api_field_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.enable_checksum:
+
+
+enable_checksum
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) A 32-bits checksum of content is written at end of frame. If not set, defaults to false.
+
+
+.. _envoy_v3_api_field_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.strategy:
+
+
+strategy
+  (:ref:`extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy <envoy_v3_api_enum_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy>`) The higher the value of selected strategy, the more complex it is,
+  resulting in stronger and slower compression.
+
+  Special: value 0 means "use default strategy".
+
+
+.. _envoy_v3_api_field_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.chunk_size:
+
+
+chunk_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value for compressor's next output buffer. If not set, defaults to 4096.
+
+
+.. _envoy_v3_api_field_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.enable_qat_zstd:
+
+
+enable_qat_zstd
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Enable QAT to accelerate Zstd compression or not. If not set, defaults to false.
+
+  This is useful in the case that users want to enable QAT for a period of time and disable QAT for another period of time,
+  they don't have to change the config too much or prepare for another config that has software zstd compressor and just changing the value of this filed.
+
+
+.. _envoy_v3_api_field_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.qat_zstd_fallback_threshold:
+
+
+qat_zstd_fallback_threshold
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Fallback to software for Qatzstd when input size is less than this value.
+  Valid only ``enable_qat_zstd`` is ``true``. 0 means no fallback at all. If not set, defaults to 4000.
+
+
+.. _envoy_v3_api_enum_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy:
+
+Enum extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy
+-----------------------------------------------------------------------
+
+
+:repo:`[extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy proto] <api/contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha/qatzstd.proto#L22>`
+
+Reference to http://facebook.github.io/zstd/zstd_manual.html
+
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy.DEFAULT:
+
+
+DEFAULT
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy.FAST:
+
+
+FAST
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy.DFAST:
+
+
+DFAST
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy.GREEDY:
+
+
+GREEDY
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy.LAZY:
+
+
+LAZY
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy.LAZY2:
+
+
+LAZY2
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy.BTLAZY2:
+
+
+BTLAZY2
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy.BTOPT:
+
+
+BTOPT
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy.BTULTRA:
+
+
+BTULTRA
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.qatzstd.compressor.v3alpha.Qatzstd.Strategy.BTULTRA2:
+
+
+BTULTRA2
+  ⁣
+
+

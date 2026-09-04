@@ -1,0 +1,273 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/router/v3/router.proto:
+
+Router (proto)
+==============
+
+.. _extension_envoy.filters.http.router:
+
+This extension has the qualified name ``envoy.filters.http.router``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against both untrusted downstream and
+  upstream traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.router.v3.Router <envoy_v3_api_msg_extensions.filters.http.router.v3.Router>`
+
+
+
+Router :ref:`configuration overview <config_http_filters_router>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.router.v3.Router:
+
+extensions.filters.http.router.v3.Router
+----------------------------------------
+
+
+:repo:`[extensions.filters.http.router.v3.Router proto] <api/envoy/extensions/filters/http/router/v3/router.proto#L26>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_stats": {...},
+    "start_child_span": ...,
+    "upstream_log": [],
+    "upstream_log_options": {...},
+    "suppress_envoy_headers": ...,
+    "strict_check_headers": [],
+    "respect_expected_rq_timeout": ...,
+    "suppress_grpc_request_failure_code_stats": ...,
+    "upstream_http_filters": [],
+    "reject_connect_request_early_data": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.router.v3.Router.dynamic_stats:
+
+
+dynamic_stats
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) Whether the router generates dynamic cluster statistics. Defaults to
+  true. Can be disabled in high performance scenarios.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span:
+
+
+start_child_span
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Whether to start a child span for egress routed calls. This can be
+  useful in scenarios where other filters (auth, ratelimit, etc.) make
+  outbound calls and have child spans rooted at the same ingress
+  parent. Defaults to false.
+
+  .. attention::
+    This field is deprecated by the
+    :ref:`spawn_upstream_span <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`.
+    Please use that ``spawn_upstream_span`` field to control the span creation.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log:
+
+
+upstream_log
+  (**repeated** :ref:`config.accesslog.v3.AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`) Configuration for HTTP upstream logs emitted by the router. Upstream logs
+  are configured in the same way as access logs, but each log entry represents
+  an upstream request. Presuming retries are configured, multiple upstream
+  requests may be made for each downstream (inbound) request.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log_options:
+
+
+upstream_log_options
+  (:ref:`extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions <envoy_v3_api_msg_extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions>`) Additional upstream access log options.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers:
+
+
+suppress_envoy_headers
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Do not add any additional ``x-envoy-`` headers to requests or responses. This
+  only affects the :ref:`router filter generated x-envoy- headers
+  <config_http_filters_router_headers_set>`, other Envoy filters and the HTTP
+  connection manager may continue to set ``x-envoy-`` headers.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers:
+
+
+strict_check_headers
+  (**repeated** `string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Specifies a list of HTTP headers to strictly validate. Envoy will reject a
+  request and respond with HTTP status 400 if the request contains an invalid
+  value for any of the headers listed in this field. Strict header checking
+  is only supported for the following headers:
+
+  Value must be a ','-delimited list (i.e. no spaces) of supported retry
+  policy values:
+
+  * :ref:`config_http_filters_router_x-envoy-retry-grpc-on`
+  * :ref:`config_http_filters_router_x-envoy-retry-on`
+
+  Value must be an integer:
+
+  * :ref:`config_http_filters_router_x-envoy-max-retries`
+  * :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`
+  * :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`
+
+
+.. _envoy_v3_api_field_extensions.filters.http.router.v3.Router.respect_expected_rq_timeout:
+
+
+respect_expected_rq_timeout
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If not set, ingress Envoy will ignore
+  :ref:`config_http_filters_router_x-envoy-expected-rq-timeout-ms` header, populated by egress
+  Envoy, when deriving timeout for upstream cluster.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.router.v3.Router.suppress_grpc_request_failure_code_stats:
+
+
+suppress_grpc_request_failure_code_stats
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set, Envoy will avoid incrementing HTTP failure code stats
+  on gRPC requests. This includes the individual status code value
+  (e.g. upstream_rq_504) and group stats (e.g. upstream_rq_5xx).
+  This field is useful if interested in relying only on the gRPC
+  stats filter to define success and failure metrics for gRPC requests
+  as not all failed gRPC requests charge HTTP status code metrics. See
+  :ref:`gRPC stats filter<config_http_filters_grpc_stats>` documentation
+  for more details.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_http_filters:
+
+
+upstream_http_filters
+  (**repeated** :ref:`extensions.filters.network.http_connection_manager.v3.HttpFilter <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpFilter>`) Optional HTTP filters for the upstream HTTP filter chain.
+
+  .. note::
+    Upstream HTTP filters are currently in alpha.
+
+  These filters will be applied for all requests that pass through the router.
+  They will also be applied to shadowed requests.
+  Upstream HTTP filters cannot change route or cluster.
+  Upstream HTTP filters specified on the cluster will override these filters.
+
+  If using upstream HTTP filters, please be aware that local errors sent by
+  upstream HTTP filters will not trigger retries, and local errors sent by
+  upstream HTTP filters will count as a final response if hedging is configured.
+
+
+  .. _extension_category_envoy.filters.http.upstream:
+
+  .. tip::
+
+    This extension category has the following known extensions:
+
+
+    - :ref:`envoy.filters.http.admission_control <extension_envoy.filters.http.admission_control>`
+
+    - :ref:`envoy.filters.http.ai_protocol_manager <extension_envoy.filters.http.ai_protocol_manager>`
+
+    - :ref:`envoy.filters.http.aws_lambda <extension_envoy.filters.http.aws_lambda>`
+
+    - :ref:`envoy.filters.http.aws_request_signing <extension_envoy.filters.http.aws_request_signing>`
+
+    - :ref:`envoy.filters.http.body_size_limit <extension_envoy.filters.http.body_size_limit>`
+
+    - :ref:`envoy.filters.http.buffer <extension_envoy.filters.http.buffer>`
+
+    - :ref:`envoy.filters.http.composite <extension_envoy.filters.http.composite>`
+
+    - :ref:`envoy.filters.http.compressor <extension_envoy.filters.http.compressor>`
+
+    - :ref:`envoy.filters.http.credential_injector <extension_envoy.filters.http.credential_injector>`
+
+    - :ref:`envoy.filters.http.dynamic_modules <extension_envoy.filters.http.dynamic_modules>`
+
+    - :ref:`envoy.filters.http.ext_proc <extension_envoy.filters.http.ext_proc>`
+
+    - :ref:`envoy.filters.http.header_mutation <extension_envoy.filters.http.header_mutation>`
+
+    - :ref:`envoy.filters.http.lua <extension_envoy.filters.http.lua>`
+
+    - :ref:`envoy.filters.http.upstream_codec <extension_envoy.filters.http.upstream_codec>`
+
+    - :ref:`envoy.filters.http.upstream_rbac <extension_envoy.filters.http.upstream_rbac>`
+
+    - :ref:`envoy.filters.http.wasm <extension_envoy.filters.http.wasm>`
+
+
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.router.v3.Router.reject_connect_request_early_data:
+
+
+reject_connect_request_early_data
+  (`BoolValue <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue>`_) If set to true, Envoy will reject ``CONNECT`` requests that send data before
+  receiving a ``200`` response from the upstream. This early data behavior
+  is common for latency reduction but can cause issues with some upstreams.
+  Defaults to false to allow early data and be compatible with common behavior.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions:
+
+extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions
+-----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions proto] <api/envoy/extensions/filters/http/router/v3/router.proto#L30>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "flush_upstream_log_on_upstream_stream": ...,
+    "upstream_log_flush_interval": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions.flush_upstream_log_on_upstream_stream:
+
+
+flush_upstream_log_on_upstream_stream
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If set to true, an upstream access log will be recorded when an upstream stream is
+  associated to an http request. Note: Each HTTP request received for an already established
+  connection will result in an upstream access log record. This includes, for example,
+  consecutive HTTP requests over the same connection or a request that is retried.
+  In case a retry is applied, an upstream access log will be recorded for each retry.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions.upstream_log_flush_interval:
+
+
+upstream_log_flush_interval
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) The interval to flush the upstream access logs. By default, the router will flush an upstream
+  access log on stream close, when the HTTP request is complete. If this field is set, the router
+  will flush access logs periodically at the specified interval. This is especially useful in the
+  case of long-lived requests, such as CONNECT and Websockets.
+  The interval must be at least 1 millisecond.
+
+
+

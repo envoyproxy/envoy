@@ -1,0 +1,60 @@
+.. _envoy_v3_api_file_envoy/type/matcher/v3/filter_state.proto:
+
+Filter state matcher (proto)
+============================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_type.matcher.v3.FilterStateMatcher:
+
+type.matcher.v3.FilterStateMatcher
+----------------------------------
+
+
+:repo:`[type.matcher.v3.FilterStateMatcher proto] <api/envoy/type/matcher/v3/filter_state.proto#L19>`
+
+FilterStateMatcher provides a general interface for matching the filter state objects.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "key": ...,
+    "string_match": {...},
+    "address_match": {...}
+  }
+
+.. _envoy_v3_api_field_type.matcher.v3.FilterStateMatcher.key:
+
+
+key
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The filter state key to retrieve the object.
+
+
+.. _envoy_v3_api_field_type.matcher.v3.FilterStateMatcher.string_match:
+
+
+string_match
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) Matches the filter state object as a string value.
+
+
+  
+
+  Precisely one of :ref:`string_match <envoy_v3_api_field_type.matcher.v3.FilterStateMatcher.string_match>`, :ref:`address_match <envoy_v3_api_field_type.matcher.v3.FilterStateMatcher.address_match>` must be set.
+
+.. _envoy_v3_api_field_type.matcher.v3.FilterStateMatcher.address_match:
+
+
+address_match
+  (:ref:`type.matcher.v3.AddressMatcher <envoy_v3_api_msg_type.matcher.v3.AddressMatcher>`) Matches the filter state object as a ip Instance.
+
+
+  
+
+  Precisely one of :ref:`string_match <envoy_v3_api_field_type.matcher.v3.FilterStateMatcher.string_match>`, :ref:`address_match <envoy_v3_api_field_type.matcher.v3.FilterStateMatcher.address_match>` must be set.
+

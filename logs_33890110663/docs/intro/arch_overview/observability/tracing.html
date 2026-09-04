@@ -1,0 +1,476 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tracing &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/>
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Security" href="../security/security.html" />
+    <link rel="prev" title="Access logging" href="access_logging.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../searchindex.js"
+          data-envoy-search-page="../../../search.html"
+          data-envoy-root="../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../intro.html">Introduction</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../what_is_envoy.html">What is Envoy</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../arch_overview.html">Architecture overview</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../intro/intro.html">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../listeners/listeners_toc.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../http/http.html">HTTP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../upstream/upstream.html">Upstream clusters</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="observability.html">Observability</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="statistics.html">Statistics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="access_logging.html">Access logging</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Tracing</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../security/security.html">Security</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../operations/operations.html">Operations &amp; configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_features/other_features.html">Other features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../other_protocols/other_protocols.html">Other protocols</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced/advanced.html">Advanced</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../life_of_a_request.html">Life of a Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment_types/deployment_types.html">Deployment types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_help.html">Getting help</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../intro.html">Introduction</a></li>
+          <li class="breadcrumb-item"><a href="../arch_overview.html">Architecture overview</a></li>
+          <li class="breadcrumb-item"><a href="observability.html">Observability</a></li>
+      <li class="breadcrumb-item active">Tracing</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/intro/arch_overview/observability/tracing.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="tracing">
+<span id="arch-overview-tracing"></span><h1>Tracing<a class="headerlink" href="#tracing" title="Link to this heading"></a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Distributed tracing allows developers to obtain visualizations of call flows in large service
+oriented architectures. It can be invaluable in understanding serialization, parallelism, and
+sources of latency. Envoy supports three features related to system wide tracing:</p>
+<ul class="simple">
+<li><p><strong>Request ID generation</strong>: Envoy will generate UUIDs when needed and populate the
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-request-id"><span class="std std-ref">x-request-id</span></a> HTTP header. Applications can forward the
+x-request-id header for unified logging as well as tracing. The behavior can be configured on a
+per <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-request-id-extension"><span class="std std-ref">HTTP connection manager</span></a>
+basis using an extension.</p></li>
+<li><p><strong>Client trace ID joining</strong>: The <a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-client-trace-id"><span class="std std-ref">x-client-trace-id</span></a> header can
+be used to join untrusted request IDs to the trusted internal
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-request-id"><span class="std std-ref">x-request-id</span></a>.</p></li>
+<li><p><strong>External trace service integration</strong>: Envoy supports pluggable external trace visualization
+providers, that are divided into two subgroups:</p>
+<ul>
+<li><p>External tracers which are part of the Envoy code base, like <a class="reference external" href="https://zipkin.io/">Zipkin</a>,
+<a class="reference external" href="https://github.com/jaegertracing/">Jaeger</a>,
+<a class="reference external" href="https://datadoghq.com">Datadog</a>, <a class="reference external" href="http://skywalking.apache.org/">SkyWalking</a>,
+<a class="reference external" href="https://docs.aws.amazon.com/xray/latest/devguide/xray-gettingstarted.html">AWS X-Ray</a>, and <a class="reference external" href="https://www.fluentd.org/">Fluentd</a>.</p></li>
+<li><p>External tracers which come as a third party plugin, like <a class="reference external" href="https://www.instana.com/blog/monitoring-envoy-proxy-microservices/">Instana</a>.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="how-to-initiate-a-trace">
+<h2>How to initiate a trace<a class="headerlink" href="#how-to-initiate-a-trace" title="Link to this heading"></a></h2>
+<p>The HTTP connection manager that handles the request must have the <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-msg-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-tracing"><span class="std std-ref">tracing</span></a> object set. There are several ways tracing can be
+initiated:</p>
+<ul class="simple">
+<li><p>By an external client via the <a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-client-trace-id"><span class="std std-ref">x-client-trace-id</span></a>
+header.</p></li>
+<li><p>By an internal service via the <a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-envoy-force-trace"><span class="std std-ref">x-envoy-force-trace</span></a>
+header.</p></li>
+<li><p>Randomly sampled via the <a class="reference internal" href="../../../configuration/http/http_conn_man/runtime.html#config-http-conn-man-runtime-random-sampling"><span class="std std-ref">random_sampling</span></a>
+runtime setting.</p></li>
+</ul>
+</section>
+<section id="trace-context-propagation">
+<span id="arch-overview-tracing-context-propagation"></span><h2>Trace context propagation<a class="headerlink" href="#trace-context-propagation" title="Link to this heading"></a></h2>
+<p>Envoy provides the capability for reporting tracing information regarding communications between
+services in the mesh. However, to be able to correlate the pieces of tracing information generated
+by the various proxies within a call flow, the services must propagate certain trace context between
+the inbound and outbound requests.</p>
+<p>Whichever tracing provider is being used, the service should propagate the
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-request-id"><span class="std std-ref">x-request-id</span></a> to enable logging across the invoked services
+to be correlated.</p>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>Envoy’s request ID implementation is extensible and defaults to the
+<a class="reference internal" href="../../../api-v3/extensions/request_id/uuid/v3/uuid.proto.html#envoy-v3-api-msg-extensions-request-id-uuid-v3-uuidrequestidconfig"><span class="std std-ref">UuidRequestIdConfig</span></a>
+implementation. Configuration for this extension can be provided within the
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-request-id-extension"><span class="std std-ref">HTTP connection manager</span></a>
+field (see the documentation for that field for an example). The default implementation will
+modify the request ID UUID4 to pack the final trace reason into the UUID. This feature allows
+stable sampling across a fleet of Envoys as documented in the <a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-request-id"><span class="std std-ref">x-request-id</span></a>
+header documentation. However, trace reason packing my break externally generated request IDs
+that must be maintained. The <a class="reference internal" href="../../../api-v3/extensions/request_id/uuid/v3/uuid.proto.html#envoy-v3-api-field-extensions-request-id-uuid-v3-uuidrequestidconfig-pack-trace-reason"><span class="std std-ref">pack_trace_reason</span></a>
+field can be used to disable this behavior at the expense of also disabling stable trace reason
+propagation and associated features within a deployment.</p>
+</div>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>The sampling policy for Envoy is determined by the value of <a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-request-id"><span class="std std-ref">x-request-id</span></a> by default.
+However, such a sampling policy is only valid for a fleet of Envoys. If a service proxy
+that is not Envoy is present in the fleet, sampling is performed without considering the policy of that proxy.
+For meshes consisting of multiple service proxies such as this, it is more effective to
+bypass Envoy’s sampling policy and sample based on the trace provider’s sampling policy. This can be achieved by setting
+<a class="reference internal" href="../../../api-v3/extensions/request_id/uuid/v3/uuid.proto.html#envoy-v3-api-field-extensions-request-id-uuid-v3-uuidrequestidconfig-use-request-id-for-trace-sampling"><span class="std std-ref">use_request_id_for_trace_sampling</span></a>
+to false.</p>
+</div>
+<p>The tracing providers also require additional context, to enable the parent/child relationships
+between the spans (logical units of work) to be understood. This can be achieved by using the
+LightStep (via OpenTelemetry API) or Zipkin tracer directly within the service itself, to extract the
+trace context from the inbound request and inject it into any subsequent outbound requests. This
+approach would also enable the service to create additional spans, describing work being done
+internally within the service, that may be useful when examining the end-to-end trace.</p>
+<p>Alternatively the trace context can be manually propagated by the service:</p>
+<ul>
+<li><p>When using the LightStep tracer, Envoy relies on the service to propagate the
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-ot-span-context"><span class="std std-ref">x-ot-span-context</span></a> HTTP header
+while sending HTTP requests to other services.</p></li>
+<li><p>When using the Zipkin tracer, Envoy relies on the service to propagate the
+B3 HTTP headers (
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-b3-traceid"><span class="std std-ref">x-b3-traceid</span></a>,
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-b3-spanid"><span class="std std-ref">x-b3-spanid</span></a>,
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-b3-parentspanid"><span class="std std-ref">x-b3-parentspanid</span></a>,
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-b3-sampled"><span class="std std-ref">x-b3-sampled</span></a>, and
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-b3-flags"><span class="std std-ref">x-b3-flags</span></a>). The <a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-b3-sampled"><span class="std std-ref">x-b3-sampled</span></a>
+header can also be supplied by an external client to either enable or disable tracing for a particular
+request. In addition, the single <a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-b3"><span class="std std-ref">b3</span></a> header propagation format is
+supported, which is a more compressed format.</p>
+<p>The Zipkin tracer can optionally be configured to support both B3 and W3C trace context formats
+for improved interoperability. This is controlled by the
+<a class="reference internal" href="../../../api-v3/config/trace/v3/zipkin.proto.html#envoy-v3-api-field-config-trace-v3-zipkinconfig-trace-context-option"><span class="std std-ref">trace_context_option</span></a> configuration option.
+When set to <code class="docutils literal notranslate"><span class="pre">USE_B3_WITH_W3C_PROPAGATION</span></code>, the tracer will:</p>
+<ul class="simple">
+<li><p>For downstream requests: Extract trace context from B3 headers first, fallback to W3C trace headers
+(<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-traceparent"><span class="std std-ref">traceparent</span></a> and
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-tracestate"><span class="std std-ref">tracestate</span></a>) when B3 headers are not present.</p></li>
+<li><p>For upstream requests: Inject both B3 and W3C trace headers to maximize compatibility.</p></li>
+</ul>
+<p>This option is disabled by default (<code class="docutils literal notranslate"><span class="pre">USE_B3</span></code>) to maintain backward compatibility, where only
+B3 headers are used for both extraction and injection.</p>
+</li>
+<li><p>When using the Datadog tracer, Envoy relies on the service to propagate the
+Datadog-specific HTTP headers (
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-datadog-trace-id"><span class="std std-ref">x-datadog-trace-id</span></a>,
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-datadog-parent-id"><span class="std std-ref">x-datadog-parent-id</span></a>,
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-datadog-sampling-priority"><span class="std std-ref">x-datadog-sampling-priority</span></a>).</p></li>
+<li><p>When using the SkyWalking tracer, Envoy relies on the service to propagate the
+SkyWalking-specific HTTP headers (
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-sw8"><span class="std std-ref">sw8</span></a>).</p></li>
+<li><p>When using the AWS X-Ray tracer, Envoy relies on the service to propagate the
+X-Ray-specific HTTP headers (
+<a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-amzn-trace-id"><span class="std std-ref">x-amzn-trace-id</span></a>).</p></li>
+</ul>
+</section>
+<section id="what-data-each-trace-contains">
+<h2>What data each trace contains<a class="headerlink" href="#what-data-each-trace-contains" title="Link to this heading"></a></h2>
+<p>An end-to-end trace is comprised of one or more spans. A
+span represents a logical unit of work that has a start time and duration and can contain metadata
+associated with it. Each span generated by Envoy contains the following data:</p>
+<ul class="simple">
+<li><p>Originating service cluster set via <a class="reference internal" href="../../../operations/cli.html#cmdoption-service-cluster"><code class="xref std std-option docutils literal notranslate"><span class="pre">--service-cluster</span></code></a>.</p></li>
+<li><p>Start time and duration of the request.</p></li>
+<li><p>Originating host set via <a class="reference internal" href="../../../operations/cli.html#cmdoption-service-node"><code class="xref std std-option docutils literal notranslate"><span class="pre">--service-node</span></code></a>.</p></li>
+<li><p>Downstream cluster set via the <a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-downstream-service-cluster"><span class="std std-ref">x-envoy-downstream-service-cluster</span></a>
+header.</p></li>
+<li><p>HTTP request URL, method, protocol and user-agent.</p></li>
+<li><p>Additional custom tags set via <a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-tracing-custom-tags"><span class="std std-ref">custom_tags</span></a>.</p></li>
+<li><p>Upstream cluster name, observability name, and address.</p></li>
+<li><p>HTTP response status code.</p></li>
+<li><p>GRPC response status and message (if available).</p></li>
+<li><p>An error tag when HTTP status is 5xx or GRPC status is not “OK” and represents a server side error.
+See <a class="reference external" href="https://grpc.github.io/grpc/core/md_doc_statuscodes.html">GRPC’s documentation</a> for more information about GRPC status code.</p></li>
+<li><p>Tracing system-specific metadata.</p></li>
+</ul>
+<p>The span also includes a name (or operation) which by default is defined as the host of the invoked
+service. However this can be customized using a <a class="reference internal" href="../../../api-v3/config/route/v3/route_components.proto.html#envoy-v3-api-msg-config-route-v3-decorator"><span class="std std-ref">config.route.v3.Decorator</span></a> on
+the route. The name can also be overridden using the
+<a class="reference internal" href="../../../configuration/http/http_filters/router_filter.html#config-http-filters-router-x-envoy-decorator-operation"><span class="std std-ref">x-envoy-decorator-operation</span></a> header.</p>
+<p>Envoy automatically sends spans to tracing collectors. Depending on the tracing collector,
+multiple spans are stitched together using common information such as the globally unique
+request ID <a class="reference internal" href="../../../configuration/http/http_conn_man/headers.html#config-http-conn-man-headers-x-request-id"><span class="std std-ref">x-request-id</span></a> (LightStep) or
+the trace ID configuration (Zipkin and Datadog). See
+<a class="reference internal" href="../../../api-v3/config/trace/v3/http_tracer.proto.html#envoy-v3-api-msg-config-trace-v3-tracing"><span class="std std-ref">v3 API reference</span></a>
+for more information on how to setup tracing in Envoy.</p>
+</section>
+<section id="baggage">
+<h2>Baggage<a class="headerlink" href="#baggage" title="Link to this heading"></a></h2>
+<p>Baggage provides a mechanism for data to be available throughout the entirety of a trace.
+While metadata such as tags are usually communicated to collectors out-of-band, baggage data is injected into the actual
+request context and available to applications during the duration of the request. This enables metadata to transparently
+travel from the beginning of the request throughout your entire mesh without relying on application-specific modifications for
+propagation. See <a class="reference external" href="https://opentelemetry.io/docs/concepts/signals/baggage/">OpenTelemetry’s documentation</a> for more information about baggage.</p>
+<p>Tracing providers have varying level of support for getting and setting baggage:</p>
+<ul class="simple">
+<li><p>Lightstep (and any OpenTelemetry-compliant tracer) can read/write baggage</p></li>
+<li><p>Zipkin support is not yet implemented</p></li>
+<li><p>X-Ray and Fluentd don’t support baggage</p></li>
+</ul>
+</section>
+<section id="different-types-of-span">
+<h2>Different types of span<a class="headerlink" href="#different-types-of-span" title="Link to this heading"></a></h2>
+<p>As mentioned in the previous paragraph, a trace is composed of one or more spans, which may have different types.
+Tracing systems such as SkyWalking, ZipKin, and OpenTelemetry, among others, offer the same or similar span types.
+The most common types are CLIENT and SERVER. A CLIENT type span is generated by a client for a request that is
+sent to a server, while a SERVER type span is generated by a server for a request that is received from a client.</p>
+<p>A basic trace chain looks like the following snippet. Typically, the parent span of a server span should be a
+client span. Every hop in the chain must ensure the correctness of the span type.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>-&gt; [SERVER -&gt; CLIENT] -&gt; [SERVER -&gt; CLIENT] -&gt; ...
+          App A                 App B
+</pre></div>
+</div>
+</section>
+<section id="different-modes-of-envoy">
+<h2>Different modes of Envoy<a class="headerlink" href="#different-modes-of-envoy" title="Link to this heading"></a></h2>
+<p>Because Envoy is widely used in the service mesh as sidecar, it is important to understand the different tracing
+modes of Envoy.</p>
+<p>In the first mode, Envoy is used as a sidecar. The sidecar and its associated application are treated as a single
+hop in the trace chain. If a tracing system with typed spans is used, the ideal trace chain might look like the
+following snippet.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>-&gt; [[SERVER (inbound sidecar) -&gt; App -&gt; CLIENT (outbound sidecar)]] -&gt; ...
+                                 App
+</pre></div>
+</div>
+<p>As you can see, in the first mode, the inbound sidecar will always generate a SERVER span, and the outbound sidecar
+will always generate a CLIENT span. The application will not generate any spans but will only propagate the trace context.</p>
+<p>In the second mode, Envoy is used as a gateway. Or, Envoy can be used as a sidecar, but in this case,
+the sidecar and its application are treated as separate hops in the trace chain. If a tracing system with typed spans
+is used, the ideal trace chain might look like the following snippet.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>-&gt; [SERVER -&gt; CLIENT] -&gt; [SERVER -&gt; CLIENT] -&gt; [SERVER -&gt; CLIENT] -&gt; [SERVER -&gt; CLIENT] -&gt; ...
+        Gateway           Inbound Sidecar            App             Outbound Sidecar
+</pre></div>
+</div>
+<p>As you can see, in the second mode, Envoy will generate a SERVER span for downstream requests and a CLIENT span for
+upstream requests. The application may also generate spans for its own work.</p>
+<p>To enable this mode, please set
+<a class="reference internal" href="../../../api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto.html#envoy-v3-api-field-extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-tracing-spawn-upstream-span"><span class="std std-ref">spawn_upstream_span</span></a>
+to true explicitly. This tells the tracing provider to generate a CLIENT span for upstream requests and treat Envoy
+as an independent hop in the trace chain.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="access_logging.html" class="btn btn-neutral float-left" title="Access logging" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../security/security.html" class="btn btn-neutral float-right" title="Security" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Tracing</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#how-to-initiate-a-trace">How to initiate a trace</a></li>
+<li><a class="reference internal" href="#trace-context-propagation">Trace context propagation</a></li>
+<li><a class="reference internal" href="#what-data-each-trace-contains">What data each trace contains</a></li>
+<li><a class="reference internal" href="#baggage">Baggage</a></li>
+<li><a class="reference internal" href="#different-types-of-span">Different types of span</a></li>
+<li><a class="reference internal" href="#different-modes-of-envoy">Different modes of Envoy</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

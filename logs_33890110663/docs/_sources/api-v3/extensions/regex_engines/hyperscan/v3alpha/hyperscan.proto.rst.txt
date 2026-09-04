@@ -1,0 +1,55 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/regex_engines/hyperscan/v3alpha/hyperscan.proto:
+
+Hyperscan (proto)
+=================
+
+.. _extension_envoy.regex_engines.hyperscan:
+
+This extension has the qualified name ``envoy.regex_engines.hyperscan``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.regex_engines <extension_category_envoy.regex_engines>`
+
+
+
+
+
+Hyperscan :ref:`configuration overview <config_hyperscan>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.regex_engines.hyperscan.v3alpha.Hyperscan:
+
+extensions.regex_engines.hyperscan.v3alpha.Hyperscan
+----------------------------------------------------
+
+
+:repo:`[extensions.regex_engines.hyperscan.v3alpha.Hyperscan proto] <api/contrib/envoy/extensions/regex_engines/hyperscan/v3alpha/hyperscan.proto#L24>`
+
+`Hyperscan <https://github.com/intel/hyperscan>`_ regex engine. The engine uses hybrid automata
+techniques to allow simultaneous matching of large numbers of regular expressions across streams
+of data.
+
+The engine follows PCRE pattern syntax, and the regex string must adhere to the documented
+`pattern support <https://intel.github.io/hyperscan/dev-reference/compilation.html#pattern-support>`_.
+The syntax is not compatible with the default RE2 regex engine. Depending on configured
+expressions, swapping regex engine may cause match rules to no longer be valid.
+
+
+
+

@@ -1,0 +1,758 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rate Limit Quota (proto) &mdash; envoy 1.40.0-dev-UNKNOW documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=c8f67d13" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy.css?v=798f34f9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/base.css?v=bc5e8e5a" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/topbar.css?v=3f884fef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/sidebar.css?v=209b4d46" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/content.css?v=77b13337" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/code.css?v=407db6ef" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/admonitions.css?v=279b47d9" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/tables.css?v=cf2af2a8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/toc.css?v=f34b75ec" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/proto.css?v=105e49ba" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/lists.css?v=ddac9876" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/search.css?v=8f283aa0" />
+      <link rel="stylesheet" type="text/css" href="../../../../../../_static/css/envoy/responsive.css?v=364abc49" />
+
+  
+    <link rel="shortcut icon" href="../../../../../../_static/favicon.ico"/>
+      <script src="../../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../../_static/documentation_options.js?v=ff870bdb"></script>
+      <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../../_static/copybutton.js?v=db7b0edf"></script>
+      <script src="../../../../../../_static/js/envoy-theme.js?v=cb73a5ba"></script>
+      <script type="module" src="../../../../../../_static/js/envoy.js?v=ff31b846"></script>
+    <script src="../../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+    <link rel="next" title="Rate limit (proto)" href="../../ratelimit/v3/rate_limit.proto.html" />
+    <link rel="prev" title="Proto Message Extraction (proto)" href="../../proto_message_extraction/v3/config.proto.html" />
+   
+  <meta name="color-scheme" content="light dark">
+
+</head>
+
+<body class="wy-body-for-nav">
+   
+  <a class="envoy-skip-link" href="#envoy-doc-main">Skip to main content</a>
+
+  <header class="envoy-doc-topbar">
+    <a class="envoy-doc-logo" href="../../../../../../index.html"
+       aria-label="Envoy documentation home">
+      <img class="envoy-logo-light" src="../../../../../../_static/img/envoy-logo.png" alt="Envoy">
+      <img class="envoy-logo-dark" src="../../../../../../_static/img/envoy-logo-dark.png" alt="" aria-hidden="true">
+    </a>
+    <span class="envoy-doc-wordmark">Docs</span>
+
+    <details class="envoy-version-menu">
+      <summary>
+        <span>1.40.0-dev-UNKNOW</span><span class="envoy-version-tag">pre</span>
+        <span aria-hidden="true">&#9662;</span>
+      </summary>
+      <div class="envoy-version-options">
+        <span class="envoy-version-current" aria-current="true">1.40.0-dev-UNKNOW</span>
+        <a class="envoy-version-index" href="/docs/">All versions</a>
+      </div>
+    </details>
+
+    <button class="envoy-search-button" type="button" data-envoy-search-open
+            aria-label="Search the documentation">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Search the docs</span>
+      <kbd data-envoy-search-shortcut>⌘K</kbd>
+    </button>
+
+    <nav class="envoy-doc-actions" aria-label="Documentation actions">
+      <a href="https://github.com/envoyproxy/envoy" target="_blank" rel="noopener"
+         aria-label="Envoy on GitHub">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+          <path d="M8 0C3.6 0 0 3.6 0 8c0 3.5 2.3 6.5 5.5 7.6.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8.6-.2 1.3-.3 2-.3s1.4.1 2 .3c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.8 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4C13.7 14.5 16 11.5 16 8c0-4.4-3.6-8-8-8z"/>
+        </svg>
+        <span class="envoy-action-label">GitHub</span>
+      </a>
+      <button class="envoy-theme-toggle" type="button" aria-label="Switch to dark theme"
+              data-envoy-theme-toggle>
+        <svg class="envoy-theme-icon-dark" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5 5.9 5.9 0 1 0 13.5 9.4z"/>
+        </svg>
+        <svg class="envoy-theme-icon-light" width="14" height="14" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="3.2"/>
+          <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+        </svg>
+      </button>
+      <button class="envoy-nav-toggle" type="button" data-envoy-nav-toggle
+              aria-label="Open documentation navigation" aria-expanded="false"
+              aria-controls="envoy-doc-sidebar">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+    </nav>
+  </header>
+
+  <button class="envoy-nav-backdrop" type="button" data-envoy-nav-close
+          aria-label="Close documentation navigation" hidden></button><dialog class="envoy-search-dialog" data-envoy-search-dialog
+          aria-label="Search the documentation"
+          data-envoy-search-index="../../../../../../searchindex.js"
+          data-envoy-search-page="../../../../../../search.html"
+          data-envoy-root="../../../../../../">
+    <div class="envoy-search-panel">
+      <div class="envoy-search-field">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input type="search" placeholder="Search the docs" autocomplete="off"
+               spellcheck="false" aria-label="Search the documentation">
+        <kbd>esc</kbd>
+      </div>
+      <div class="envoy-search-results" data-envoy-search-results></div>
+      <div class="envoy-search-foot">
+        <span><kbd>&#8593;&#8595;</kbd>navigate</span>
+        <span><kbd>&#8629;</kbd>open</span>
+        <span class="envoy-search-count" data-envoy-search-count></span>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+  <div class="envoy-sidebar-heading">
+    <span>Documentation</span>
+    <button class="envoy-sidebar-close" type="button" data-envoy-nav-close
+            aria-label="Close documentation navigation">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/>
+      </svg>
+    </button>
+  </div>
+
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../about_docs.html">About the documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../intro/intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../start/start.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../configuration/configuration.html">Configuration reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../operations/operations.html">Operations and administration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../extending/extending.html">Extending Envoy for custom use cases</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../../../../../api/api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/api_supported_versions.html">Supported API versions</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../../../../../api.html">v3 API reference</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../../../../../bootstrap/bootstrap.html">Bootstrap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../listeners/listeners.html">Listeners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../clusters/clusters.html">Clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../http_routes/http_routes.html">HTTP route management</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../../../../../config/config.html">Extensions</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/filters.html">Access log extension filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/formatter/formatter.html">Access log formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/accesslog/accesslog.html">Access loggers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_mappers/certificate_mappers.html">Certificate mappers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_selectors/certificate_selectors.html">Certificate selectors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/certificate_validators/certificate_validators.html">Certificate validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster/cluster.html">Cluster</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/common/common.html">Common</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/compression/compression.html">Compression</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/config_validators/config_validators.html">Config validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/content_parsers/content_parsers.html">Content parsers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/contrib/contrib.html">Contrib extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/dns_resolver/dns_resolver.html">DNS resolver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/endpoint/endpoint.html">Endpoint</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="../../../../../config/filter/filter.html">Filters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/grpc_credential/grpc_credential.html">Grpc credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_check_event_sinks/health_check_event_sinks.html">Health check event sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/health_checker/health_checker.html">Health checkers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/early_header_mutation.html">HTTP early header mutation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/cache_v2.html">HttpCacheV2 cache implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/custom_response.html">Custom response policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/ext_proc.html">External Processing Extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_formatters.html">HTTP header formatters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/header_validators.html">HTTP header validators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/original_ip_detection.html">HTTP original IP detection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/http/stateful_session.html">HTTP stateful session</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/injected_credentials/injected_credentials.html">Injected credentials</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/geoip_provider/geoip_provider.html">Geolocation providers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/trace/trace.html">HTTP tracers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/internal_redirect/internal_redirect.html">Internal redirect predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/match/path_matcher.html">Path matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/path/rewrite/path_rewriter.html">Path rewriter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/quic/quic_extensions.html">Quic extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/descriptors/descriptors.html">Rate limit descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/rbac.html">RBAC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html">RBAC matchers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/rbac/matchers.html#rbac-principals">RBAC principals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/request_id/request_id.html">Request ID</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/resource_monitor/resource_monitor.html">Resource monitors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/retry/retry.html">Retry predicates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/stat_sinks/stat_sinks.html">Stat sinks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/string_matcher/string_matcher.html">String Matcher</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/transport_socket/transport_socket.html">Transport sockets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/upstream/upstream.html">Upstream configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/wasm/wasm.html">WASM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/watchdog/watchdog.html">Watchdog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/load_balancing_policies/load_balancing_policies.html">Load balancing policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/queue_policy/queue_policy.html">Queue policies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/cluster_specifier/cluster_specifier.html">Cluster specifier</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../config/local_address_selectors/local_address_selectors.html">Local address selectors</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../admin/admin.html">Admin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../data/data.html">Envoy data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../service/service.html">Services</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages.html">Common messages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../common_messages/common_messages_xds.html">Common messages (XDS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../types/types.html">Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api-docs/xds_protocol.html">xDS REST and gRPC protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../../../api/client_features.html">Well Known Client Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../faq/overview.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../../version_history/version_history.html">Version history</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+      </nav>
+
+      <div class="wy-nav-content">
+  <div class="envoy-content-layout envoy-has-page-toc">
+    <div class="envoy-content-main" id="envoy-doc-main" tabindex="-1">
+      
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../../../api/api.html">API</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../api.html">v3 API reference</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/config.html">Extensions</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/filter.html">Filters</a></li>
+          <li class="breadcrumb-item"><a href="../../../../../config/filter/http/http.html">HTTP filters</a></li>
+      <li class="breadcrumb-item active">Rate Limit Quota (proto)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../../../../_sources/api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="rate-limit-quota-proto">
+<span id="envoy-v3-api-file-envoy-extensions-filters-http-rate-limit-quota-v3-rate-limit-quota-proto"></span><h1>Rate Limit Quota (proto)<a class="headerlink" href="#rate-limit-quota-proto" title="Link to this heading"></a></h1>
+<p id="extension-envoy-filters-http-rate-limit-quota">This extension has the qualified name <code class="docutils literal notranslate"><span class="pre">envoy.filters.http.rate_limit_quota</span></code></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This extension has an unknown security posture and should only be
+used in deployments where both the downstream and upstream are
+trusted.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This extension extends and can be used with the following extension category:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../filter_chain/v3/filter_chain.proto.html#extension-category-envoy-filters-http"><span class="std std-ref">envoy.filters.http</span></a></p></li>
+</ul>
+<p>This extension must be configured with one of the following type URLs:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig</span></a></p></li>
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotaoverride"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride</span></a></p></li>
+<li><p><a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings"><span class="std std-ref">type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings</span></a></p></li>
+</ul>
+</div>
+<p>Rate Limit Quota <a class="reference internal" href="../../../../../../configuration/http/http_filters/rate_limit_quota_filter.html#config-http-filters-rate-limit-quota"><span class="std std-ref">configuration overview</span></a>.</p>
+<section id="extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig">
+<span id="envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig"></span><h2>extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig<a class="headerlink" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L34">[extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig proto]</a></p>
+<p>Configures the Rate Limit Quota filter.</p>
+<p>Can be overridden in the per-route and per-host configurations.
+The more specific definition completely overrides the less specific definition.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;rlqs_server&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;domain&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;bucket_matchers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;filter_enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;filter_enforced&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;request_headers_to_add_when_not_enforced&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig-rlqs-server">
+<dt>rlqs_server</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/grpc_service.proto.html#envoy-v3-api-msg-config-core-v3-grpcservice"><span class="std std-ref">config.core.v3.GrpcService</span></a>, <em>REQUIRED</em>) Configures the gRPC Rate Limit Quota Service (RLQS) RateLimitQuotaService.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig-domain">
+<dt>domain</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <em>REQUIRED</em>) The application domain to use when calling the service. This enables sharing the quota
+server between different applications without fear of overlap.
+E.g., “envoy”.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig-bucket-matchers">
+<dt>bucket_matchers</dt><dd><p>(<a class="reference internal" href="../../../../../../xds/type/matcher/v3/matcher.proto.html#envoy-v3-api-msg-xds-type-matcher-v3-matcher"><span class="std std-ref">.xds.type.matcher.v3.Matcher</span></a>, <em>REQUIRED</em>) The match tree to use for grouping incoming requests into buckets.</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">matcher_list</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">matchers</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># Assign requests with header[&#39;env&#39;] set to &#39;staging&#39; to the bucket { name: &#39;staging&#39; }</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">predicate</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">single_predicate</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">input</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">            </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="w">            </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">env</span>
+<span class="w">        </span><span class="nt">value_match</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">exact</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">staging</span>
+<span class="w">    </span><span class="nt">on_match</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">action</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">          </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings</span>
+<span class="w">          </span><span class="nt">bucket_id_builder</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">bucket_id_builder</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">name</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">string_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">staging</span>
+
+<span class="w">  </span><span class="c1"># Assign requests with header[&#39;user_group&#39;] set to &#39;admin&#39; to the bucket { acl: &#39;admin_users&#39; }</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">predicate</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">single_predicate</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">input</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">            </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput</span>
+<span class="w">        </span><span class="nt">custom_match</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">            </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/xds.type.matcher.v3.CelMatcher</span>
+<span class="w">            </span><span class="nt">expr_match</span><span class="p">:</span>
+<span class="w">              </span><span class="c1"># Shortened for illustration purposes. Here should be parsed CEL expression:</span>
+<span class="w">              </span><span class="c1"># request.headers[&#39;user_group&#39;] == &#39;admin&#39;</span>
+<span class="w">              </span><span class="nt">parsed_expr</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+<span class="w">    </span><span class="nt">on_match</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">action</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">          </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings</span>
+<span class="w">          </span><span class="nt">bucket_id_builder</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">bucket_id_builder</span><span class="p">:</span>
+<span class="w">              </span><span class="nt">acl</span><span class="p">:</span>
+<span class="w">                </span><span class="nt">string_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin_users</span>
+
+<span class="c1"># Catch-all clause for the requests not matched by any of the matchers.</span>
+<span class="c1"># In this example, deny all requests.</span>
+<span class="nt">on_no_match</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">action</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">      </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings</span>
+<span class="w">      </span><span class="nt">no_assignment_behavior</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">fallback_rate_limit</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">blanket_rule</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DENY_ALL</span>
+</pre></div>
+</div>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>The first matched group wins. Once the request is matched into a bucket, matcher
+evaluation ends.</p>
+</div>
+<p>Use <code class="docutils literal notranslate"><span class="pre">on_no_match</span></code> field to assign the catch-all bucket. If a request is not matched
+into any bucket, and there’s no  <code class="docutils literal notranslate"><span class="pre">on_no_match</span></code> field configured, the request will be
+ALLOWED by default. It will NOT be reported to the RLQS server.</p>
+<p>Refer to <a class="reference internal" href="../../../../../../xds/type/matcher/v3/matcher.proto.html#envoy-v3-api-msg-xds-type-matcher-v3-matcher"><span class="std std-ref">Unified Matcher API</span></a>
+documentation for more information on the matcher trees.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig-filter-enabled">
+<dt>filter_enabled</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-runtimefractionalpercent"><span class="std std-ref">config.core.v3.RuntimeFractionalPercent</span></a>) If set, this will enable – but not necessarily enforce – the rate limit for the given
+fraction of requests.</p>
+<p>Defaults to 100% of requests.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig-filter-enforced">
+<dt>filter_enforced</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-runtimefractionalpercent"><span class="std std-ref">config.core.v3.RuntimeFractionalPercent</span></a>) If set, this will enforce the rate limit decisions for the given fraction of requests.
+For requests that are not enforced the filter will still obtain the quota and include it
+in the load computation, however the request will always be allowed regardless of the outcome
+of quota application. This allows validation or testing of the rate limiting service
+infrastructure without disrupting existing traffic.</p>
+<p>Note: this only applies to the fraction of enabled requests.</p>
+<p>Defaults to 100% of requests.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig-request-headers-to-add-when-not-enforced">
+<dt>request_headers_to_add_when_not_enforced</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-headervalueoption"><span class="std std-ref">config.core.v3.HeaderValueOption</span></a>) Specifies a list of HTTP headers that should be added to each request that
+has been rate limited and is also forwarded upstream. This can only occur when the
+filter is enabled but not enforced.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-rate-limit-quota-v3-ratelimitquotaoverride">
+<span id="envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotaoverride"></span><h2>extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride<a class="headerlink" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotaoverride" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L140">[extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride proto]</a></p>
+<p>Per-route and per-host configuration overrides. The more specific definition completely
+overrides the less specific definition.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;domain&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;bucket_matchers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotaoverride-domain">
+<dt>domain</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) The application domain to use when calling the service. This enables sharing the quota
+server between different applications without fear of overlap.
+E.g., “envoy”.</p>
+<p>If empty, inherits the value from the less specific definition.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotaoverride-bucket-matchers">
+<dt>bucket_matchers</dt><dd><p>(<a class="reference internal" href="../../../../../../xds/type/matcher/v3/matcher.proto.html#envoy-v3-api-msg-xds-type-matcher-v3-matcher"><span class="std std-ref">.xds.type.matcher.v3.Matcher</span></a>) The match tree to use for grouping incoming requests into buckets.</p>
+<p>If set, fully overrides the bucket matchers provided on the less specific definition.
+If not set, inherits the value from the less specific definition.</p>
+<p>See usage example: <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig-bucket-matchers"><span class="std std-ref">RateLimitQuotaFilterConfig.bucket_matchers</span></a>.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings">
+<span id="envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings"></span><h2>extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings<a class="headerlink" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L166">[extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings proto]</a></p>
+<p>Rate Limit Quota Bucket Settings to apply on the successful <code class="docutils literal notranslate"><span class="pre">bucket_matchers</span></code> match.</p>
+<p>Specify this message in the <a class="reference internal" href="../../../../../../xds/type/matcher/v3/matcher.proto.html#envoy-v3-api-field-xds-type-matcher-v3-matcher-onmatch-action"><span class="std std-ref">Matcher.OnMatch.action</span></a> field of the
+<code class="docutils literal notranslate"><span class="pre">bucket_matchers</span></code> matcher tree to assign the matched requests to the Quota Bucket.
+Usage example: <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig-bucket-matchers"><span class="std std-ref">RateLimitQuotaFilterConfig.bucket_matchers</span></a>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;bucket_id_builder&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;reporting_interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;deny_response_settings&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;no_assignment_behavior&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;expired_assignment_behavior&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucket-id-builder">
+<dt>bucket_id_builder</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder"><span class="std std-ref">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.BucketIdBuilder</span></a>) <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> builder.</p>
+<p><a class="reference internal" href="../../../../../service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-msg-service-rate-limit-quota-v3-bucketid"><span class="std std-ref">BucketId</span></a> is a map from
+the string key to the string value which serves as bucket identifier common for on
+the control plane and the data plane.</p>
+<p>While <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> is always static, <code class="docutils literal notranslate"><span class="pre">BucketIdBuilder</span></code> allows to populate map values
+with the dynamic properties associated with the each individual request.</p>
+<p>Example 1: static fields only</p>
+<p><code class="docutils literal notranslate"><span class="pre">BucketIdBuilder</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">bucket_id_builder</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">string_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_bucket</span>
+<span class="w">  </span><span class="nt">hello</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">string_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">world</span>
+</pre></div>
+</div>
+<p>Produces the following <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> for all requests:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">bucket</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_bucket</span>
+<span class="w">  </span><span class="nt">hello</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">world</span>
+</pre></div>
+</div>
+<p>Example 2: static and dynamic fields</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">bucket_id_builder</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">string_value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_bucket</span>
+<span class="w">  </span><span class="nt">env</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">custom_value</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">typed_config</span><span class="p">:</span>
+<span class="w">        </span><span class="s">&#39;@type&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput</span>
+<span class="w">        </span><span class="nt">header_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">environment</span>
+</pre></div>
+</div>
+<p>In this example, the value of <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> key <code class="docutils literal notranslate"><span class="pre">env</span></code> is substituted from the <code class="docutils literal notranslate"><span class="pre">environment</span></code>
+request header.</p>
+<p>This is equivalent to the following <code class="docutils literal notranslate"><span class="pre">pseudo-code</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;my_bucket&#39;</span>
+<span class="nt">env</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$header[&#39;environment&#39;]</span>
+</pre></div>
+</div>
+<p>For example, the request with the HTTP header <code class="docutils literal notranslate"><span class="pre">env</span></code> set to <code class="docutils literal notranslate"><span class="pre">staging</span></code> will produce
+the following <code class="docutils literal notranslate"><span class="pre">BucketId</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">bucket</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_bucket</span>
+<span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">staging</span>
+</pre></div>
+</div>
+<p>For the request with the HTTP header <code class="docutils literal notranslate"><span class="pre">environment</span></code> set to <code class="docutils literal notranslate"><span class="pre">prod</span></code>, will produce:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">bucket</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_bucket</span>
+<span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prod</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The order of <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> keys do not matter. Buckets <code class="docutils literal notranslate"><span class="pre">{</span> <span class="pre">a:</span> <span class="pre">'A',</span> <span class="pre">b:</span> <span class="pre">'B'</span> <span class="pre">}</span></code> and
+<code class="docutils literal notranslate"><span class="pre">{</span> <span class="pre">b:</span> <span class="pre">'B',</span> <span class="pre">a:</span> <span class="pre">'A'</span> <span class="pre">}</span></code> are identical.</p>
+</div>
+<p>If not set, requests will NOT be reported to the server, and will always limited
+according to <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-no-assignment-behavior"><span class="std std-ref">no_assignment_behavior</span></a>
+configuration.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-reporting-interval">
+<dt>reporting_interval</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>, <em>REQUIRED</em>) The interval at which the data plane (RLQS client) is to report quota usage for this bucket.</p>
+<p>When the first request is matched to a bucket with no assignment, the data plane is to report
+the request immediately in the <a class="reference internal" href="../../../../../service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotausagereports"><span class="std std-ref">RateLimitQuotaUsageReports</span></a> message.
+For the RLQS server, this signals that the data plane is now subscribed to
+the quota assignments in this bucket, and will start sending the assignment as described in
+the <a class="reference internal" href="../../../../../service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-file-envoy-service-rate-limit-quota-v3-rlqs-proto"><span class="std std-ref">RLQS documentation</span></a>.</p>
+<p>After sending the initial report, the data plane is to continue reporting the bucket usage with
+the internal specified in this field.</p>
+<p>If for any reason RLQS client doesn’t receive the initial assignment for the reported bucket,
+the data plane will eventually consider the bucket abandoned and stop sending the usage
+reports. This is explained in more details at <a class="reference internal" href="../../../../../service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-file-envoy-service-rate-limit-quota-v3-rlqs-proto"><span class="std std-ref">Rate Limit Quota Service (RLQS)</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-deny-response-settings">
+<dt>deny_response_settings</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-denyresponsesettings"><span class="std std-ref">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings</span></a>) Customize the deny response to the requests over the rate limit.
+If not set, the filter will be configured as if an empty message is set,
+and will behave according to the defaults specified in <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-denyresponsesettings"><span class="std std-ref">DenyResponseSettings</span></a>.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-no-assignment-behavior">
+<dt>no_assignment_behavior</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-noassignmentbehavior"><span class="std std-ref">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.NoAssignmentBehavior</span></a>) Configures the behavior in the “no assignment” state: after the first request has been
+matched to the bucket, and before the the RLQS server returns the first quota assignment.</p>
+<p>If not set, the default behavior is to allow all requests.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expired-assignment-behavior">
+<dt>expired_assignment_behavior</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior"><span class="std std-ref">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior</span></a>) Configures the behavior in the “expired assignment” state: the bucket’s assignment has expired,
+and cannot be refreshed.</p>
+<p>If not set, the bucket is abandoned when its <code class="docutils literal notranslate"><span class="pre">active</span></code> assignment expires.
+The process of abandoning the bucket, and restarting the subscription is described in the
+<a class="reference internal" href="../../../../../service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandonaction"><span class="std std-ref">AbandonAction</span></a>
+message.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-noassignmentbehavior">
+<span id="envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-noassignmentbehavior"></span><h2>extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.NoAssignmentBehavior<a class="headerlink" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-noassignmentbehavior" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L169">[extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.NoAssignmentBehavior proto]</a></p>
+<p>Configures the behavior after the first request has been matched to the bucket, and before the
+the RLQS server returns the first quota assignment.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;fallback_rate_limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-noassignmentbehavior-fallback-rate-limit">
+<dt>fallback_rate_limit</dt><dd><p>(<a class="reference internal" href="../../../../../type/v3/ratelimit_strategy.proto.html#envoy-v3-api-msg-type-v3-ratelimitstrategy"><span class="std std-ref">type.v3.RateLimitStrategy</span></a>, <em>REQUIRED</em>) Apply pre-configured rate limiting strategy until the server sends the first assignment.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior">
+<span id="envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior"></span><h2>extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior<a class="headerlink" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L180">[extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior proto]</a></p>
+<p>Specifies the behavior when the bucket’s assignment has expired, and cannot be refreshed for
+any reason.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;expired_assignment_behavior_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;fallback_rate_limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;reuse_last_assignment&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-expired-assignment-behavior-timeout">
+<dt>expired_assignment_behavior_timeout</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">Duration</a>) Limit the time <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior"><span class="std std-ref">ExpiredAssignmentBehavior</span></a>
+is applied. If the server doesn’t respond within this duration:</p>
+<ol class="arabic simple">
+<li><p>Selected <code class="docutils literal notranslate"><span class="pre">ExpiredAssignmentBehavior</span></code> is no longer applied.</p></li>
+<li><p>The bucket is abandoned. The process of abandoning the bucket is described in the
+<a class="reference internal" href="../../../../../service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandonaction"><span class="std std-ref">AbandonAction</span></a>
+message.</p></li>
+<li><p>If a new request is matched into the bucket that has become abandoned,
+the data plane restarts the subscription to the bucket. The process of restarting the
+subscription is described in the <a class="reference internal" href="../../../../../service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-msg-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-abandonaction"><span class="std std-ref">AbandonAction</span></a>
+message.</p></li>
+</ol>
+<p>If not set, defaults to zero, and the bucket is abandoned immediately.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-fallback-rate-limit">
+<dt>fallback_rate_limit</dt><dd><p>(<a class="reference internal" href="../../../../../type/v3/ratelimit_strategy.proto.html#envoy-v3-api-msg-type-v3-ratelimitstrategy"><span class="std std-ref">type.v3.RateLimitStrategy</span></a>) Apply the rate limiting strategy to all requests matched into the bucket until the RLQS
+server sends a new assignment, or the <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-expired-assignment-behavior-timeout"><span class="std std-ref">expired_assignment_behavior_timeout</span></a>
+runs out.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-fallback-rate-limit"><span class="std std-ref">fallback_rate_limit</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-reuse-last-assignment"><span class="std std-ref">reuse_last_assignment</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-reuse-last-assignment">
+<dt>reuse_last_assignment</dt><dd><p>(<a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-reuselastassignment"><span class="std std-ref">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior.ReuseLastAssignment</span></a>) Reuse the last <code class="docutils literal notranslate"><span class="pre">active</span></code> assignment until the RLQS server sends a new assignment, or the
+<a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-expired-assignment-behavior-timeout"><span class="std std-ref">expired_assignment_behavior_timeout</span></a>
+runs out.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-fallback-rate-limit"><span class="std std-ref">fallback_rate_limit</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-reuse-last-assignment"><span class="std std-ref">reuse_last_assignment</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-reuselastassignment">
+<span id="envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-reuselastassignment"></span><h2>extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior.ReuseLastAssignment<a class="headerlink" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-reuselastassignment" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L185">[extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior.ReuseLastAssignment proto]</a></p>
+<p>Reuse the last known quota assignment, effectively extending it for the duration
+specified in the <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-expired-assignment-behavior-timeout"><span class="std std-ref">expired_assignment_behavior_timeout</span></a>
+field.</p>
+</section>
+<section id="extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-denyresponsesettings">
+<span id="envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-denyresponsesettings"></span><h2>extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings<a class="headerlink" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-denyresponsesettings" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L224">[extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings proto]</a></p>
+<p>Customize the deny response to the requests over the rate limit.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;http_status&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;http_body&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;grpc_status&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;response_headers_to_add&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-denyresponsesettings-http-status">
+<dt>http_status</dt><dd><p>(<a class="reference internal" href="../../../../../type/v3/http_status.proto.html#envoy-v3-api-msg-type-v3-httpstatus"><span class="std std-ref">type.v3.HttpStatus</span></a>) HTTP response code to deny for HTTP requests (gRPC excluded).
+Defaults to 429 (<a class="reference internal" href="../../../../../type/v3/http_status.proto.html#envoy-v3-api-enum-value-type-v3-statuscode-toomanyrequests"><span class="std std-ref">StatusCode.TooManyRequests</span></a>).</p>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-denyresponsesettings-http-body">
+<dt>http_body</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#bytesvalue">BytesValue</a>) HTTP response body used to deny for HTTP requests (gRPC excluded).
+If not set, an empty body is returned.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-denyresponsesettings-grpc-status">
+<dt>grpc_status</dt><dd><p>(<a class="reference external" href="https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#status">Status</a>) Configure the deny response for gRPC requests over the rate limit.
+Allows to specify the <a class="reference external" href="https://cloud.google.com/natural-language/docs/reference/rpc/google.rpc#google.rpc.Code">RPC status code</a>,
+and the error message.
+Defaults to the Status with the RPC Code <code class="docutils literal notranslate"><span class="pre">UNAVAILABLE</span></code> and empty message.</p>
+<p>To identify gRPC requests, Envoy checks that the <code class="docutils literal notranslate"><span class="pre">Content-Type</span></code> header is
+<code class="docutils literal notranslate"><span class="pre">application/grpc</span></code>, or one of the various <code class="docutils literal notranslate"><span class="pre">application/grpc+</span></code> values.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The HTTP code for a gRPC response is always 200.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-denyresponsesettings-response-headers-to-add">
+<dt>response_headers_to_add</dt><dd><p>(<strong>repeated</strong> <a class="reference internal" href="../../../../../config/core/v3/base.proto.html#envoy-v3-api-msg-config-core-v3-headervalueoption"><span class="std std-ref">config.core.v3.HeaderValueOption</span></a>) Specifies a list of HTTP headers that should be added to each response for requests that
+have been rate limited. Applies both to plain HTTP, and gRPC requests.
+The headers are added even when the rate limit quota was not enforced.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder">
+<span id="envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder"></span><h2>extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.BucketIdBuilder<a class="headerlink" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L259">[extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.BucketIdBuilder proto]</a></p>
+<p><code class="docutils literal notranslate"><span class="pre">BucketIdBuilder</span></code> makes it possible to build <a class="reference internal" href="../../../../../service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-msg-service-rate-limit-quota-v3-bucketid"><span class="std std-ref">BucketId</span></a> with values substituted
+from the dynamic properties associated with each individual request. See usage examples in
+the docs to <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucket-id-builder"><span class="std std-ref">bucket_id_builder</span></a>
+field.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;bucket_id_builder&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder-bucket-id-builder">
+<dt>bucket_id_builder</dt><dd><p>(map&lt;<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>, <a class="reference internal" href="#envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder-valuebuilder"><span class="std std-ref">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.BucketIdBuilder.ValueBuilder</span></a>&gt;) The map translated into the <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> map.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">string</span> <span class="pre">key</span></code> of this map and becomes the key of <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> map as is.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">ValueBuilder</span> <span class="pre">value</span></code> for the key can be:</p>
+<ul class="simple">
+<li><p>static <code class="docutils literal notranslate"><span class="pre">StringValue</span> <span class="pre">string_value</span></code> — becomes the value in the <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> map as is.</p></li>
+<li><p>dynamic <code class="docutils literal notranslate"><span class="pre">TypedExtensionConfig</span> <span class="pre">custom_value</span></code> — evaluated for each request. Must produce
+a string output, which becomes the value in the the <code class="docutils literal notranslate"><span class="pre">BucketId</span></code> map.</p></li>
+</ul>
+<p>See usage examples in the docs to <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucket-id-builder"><span class="std std-ref">bucket_id_builder</span></a>
+field.</p>
+</dd>
+</dl>
+</section>
+<section id="extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder-valuebuilder">
+<span id="envoy-v3-api-msg-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder-valuebuilder"></span><h2>extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.BucketIdBuilder.ValueBuilder<a class="headerlink" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder-valuebuilder" title="Link to this heading"></a></h2>
+<p><a class="extlink-repo reference external" href="https://github.com/envoyproxy/envoy/blob/UNKNOWN/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L262">[extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.BucketIdBuilder.ValueBuilder proto]</a></p>
+<p>Produces the value of the <a class="reference internal" href="../../../../../service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-msg-service-rate-limit-quota-v3-bucketid"><span class="std std-ref">BucketId</span></a> map.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;string_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">...</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;custom_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="err">...</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder-valuebuilder-string-value">
+<dt>string_value</dt><dd><p>(<a class="reference external" href="https://developers.google.com/protocol-buffers/docs/proto#scalar">string</a>) Static string value — becomes the value in the <a class="reference internal" href="../../../../../service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-msg-service-rate-limit-quota-v3-bucketid"><span class="std std-ref">BucketId</span></a> map as is.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder-valuebuilder-string-value"><span class="std std-ref">string_value</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder-valuebuilder-custom-value"><span class="std std-ref">custom_value</span></a> must be set.</p>
+</dd>
+</dl>
+<dl id="envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder-valuebuilder-custom-value">
+<dt>custom_value</dt><dd><p>(<a class="reference internal" href="../../../../../config/core/v3/extension.proto.html#envoy-v3-api-msg-config-core-v3-typedextensionconfig"><span class="std std-ref">config.core.v3.TypedExtensionConfig</span></a>) Dynamic value — evaluated for each request. Must produce a string output, which becomes
+the value in the <a class="reference internal" href="../../../../../service/rate_limit_quota/v3/rlqs.proto.html#envoy-v3-api-msg-service-rate-limit-quota-v3-bucketid"><span class="std std-ref">BucketId</span></a>
+map. For example, extensions with the <code class="docutils literal notranslate"><span class="pre">envoy.matching.http.input</span></code> category can be used.</p>
+<p>Precisely one of <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder-valuebuilder-string-value"><span class="std std-ref">string_value</span></a>, <a class="reference internal" href="#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder-valuebuilder-custom-value"><span class="std std-ref">custom_value</span></a> must be set.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../proto_message_extraction/v3/config.proto.html" class="btn btn-neutral float-left" title="Proto Message Extraction (proto)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../ratelimit/v3/rate_limit.proto.html" class="btn btn-neutral float-right" title="Rate limit (proto)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2016-2026, Envoy Project Authors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+    </div>
+    
+      <aside class="envoy-page-toc" aria-labelledby="envoy-page-toc-title">
+        <div class="envoy-page-toc-title" id="envoy-page-toc-title">On this page</div>
+        <ul>
+<li><a class="reference internal" href="#">Rate Limit Quota (proto)</a><ul>
+<li><a class="reference internal" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotaoverride">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-noassignmentbehavior">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.NoAssignmentBehavior</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-expiredassignmentbehavior-reuselastassignment">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior.ReuseLastAssignment</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-denyresponsesettings">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.DenyResponseSettings</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.BucketIdBuilder</a></li>
+<li><a class="reference internal" href="#extensions-filters-http-rate-limit-quota-v3-ratelimitquotabucketsettings-bucketidbuilder-valuebuilder">extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.BucketIdBuilder.ValueBuilder</a></li>
+</ul>
+</li>
+</ul>
+
+      </aside>
+    
+  </div>
+
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

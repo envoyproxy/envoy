@@ -1,0 +1,46 @@
+static_resources:
+  listeners:
+  - name: main
+    address:
+      socket_address:
+        address: 127.0.0.1  # Host that zookeeper clients should connect to.
+        port_value: 10001  # Port that zookeeper clients should connect to.
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.zookeeper_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy
+          stat_prefix: zookeeper
+          enable_per_opcode_request_bytes_metrics: true
+          enable_per_opcode_response_bytes_metrics: true
+          enable_per_opcode_decoder_error_metrics: true
+          enable_latency_threshold_metrics: true
+          default_latency_threshold: "0.1s"
+          latency_threshold_overrides:
+          - opcode: Create
+            threshold: "0.15s"
+          - opcode: Multi
+            threshold: "0.2s"
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp
+          cluster: local_zk_server
+  clusters:
+  - name: local_zk_server
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    load_assignment:
+      cluster_name: local_zk_server
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 2181

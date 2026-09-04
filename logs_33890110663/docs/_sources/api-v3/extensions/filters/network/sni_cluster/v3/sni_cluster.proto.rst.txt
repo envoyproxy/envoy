@@ -1,0 +1,50 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/sni_cluster/v3/sni_cluster.proto:
+
+SNI Cluster Filter (proto)
+==========================
+
+.. _extension_envoy.filters.network.sni_cluster:
+
+This extension has the qualified name ``envoy.filters.network.sni_cluster``
+
+
+.. note::
+  
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.filters.network <extension_category_envoy.filters.network>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.network.sni_cluster.v3.SniCluster <envoy_v3_api_msg_extensions.filters.network.sni_cluster.v3.SniCluster>`
+
+
+
+Set the upstream cluster name from the SNI field in the TLS connection.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.sni_cluster.v3.SniCluster:
+
+extensions.filters.network.sni_cluster.v3.SniCluster
+----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.sni_cluster.v3.SniCluster proto] <api/envoy/extensions/filters/network/sni_cluster/v3/sni_cluster.proto#L17>`
+
+
+
+
+

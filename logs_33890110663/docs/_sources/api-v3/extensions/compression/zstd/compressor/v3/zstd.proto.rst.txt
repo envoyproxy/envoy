@@ -1,0 +1,179 @@
+.. _envoy_v3_api_file_envoy/extensions/compression/zstd/compressor/v3/zstd.proto:
+
+Zstd Compressor (proto)
+=======================
+
+.. _extension_envoy.compression.zstd.compressor:
+
+This extension has the qualified name ``envoy.compression.zstd.compressor``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.compression.compressor <extension_category_envoy.compression.compressor>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.compression.zstd.compressor.v3.Zstd <envoy_v3_api_msg_extensions.compression.zstd.compressor.v3.Zstd>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.compression.zstd.compressor.v3.Zstd:
+
+extensions.compression.zstd.compressor.v3.Zstd
+----------------------------------------------
+
+
+:repo:`[extensions.compression.zstd.compressor.v3.Zstd proto] <api/envoy/extensions/compression/zstd/compressor/v3/zstd.proto#L21>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "compression_level": {...},
+    "enable_checksum": ...,
+    "strategy": ...,
+    "dictionary": {...},
+    "chunk_size": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.compression.zstd.compressor.v3.Zstd.compression_level:
+
+
+compression_level
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Set compression parameters according to pre-defined compression level table.
+  Note that exact compression parameters are dynamically determined,
+  depending on both compression level and source content size (when known).
+  Value 0 means default, and default level is 3.
+  Setting a level does not automatically set all other compression parameters
+  to default. Setting this will however eventually dynamically impact the compression
+  parameters which have not been manually set. The manually set
+  ones will 'stick'.
+
+
+.. _envoy_v3_api_field_extensions.compression.zstd.compressor.v3.Zstd.enable_checksum:
+
+
+enable_checksum
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) A 32-bits checksum of content is written at end of frame. If not set, defaults to false.
+
+
+.. _envoy_v3_api_field_extensions.compression.zstd.compressor.v3.Zstd.strategy:
+
+
+strategy
+  (:ref:`extensions.compression.zstd.compressor.v3.Zstd.Strategy <envoy_v3_api_enum_extensions.compression.zstd.compressor.v3.Zstd.Strategy>`) The higher the value of selected strategy, the more complex it is,
+  resulting in stronger and slower compression.
+  Special: value 0 means "use default strategy".
+
+
+.. _envoy_v3_api_field_extensions.compression.zstd.compressor.v3.Zstd.dictionary:
+
+
+dictionary
+  (:ref:`config.core.v3.DataSource <envoy_v3_api_msg_config.core.v3.DataSource>`) A dictionary for compression. Zstd offers dictionary compression, which greatly improves
+  efficiency on small files and messages. Each dictionary will be generated with a dictionary ID
+  that can be used to search the same dictionary during decompression.
+  Please refer to `zstd manual <https://github.com/facebook/zstd/blob/dev/programs/zstd.1.md#dictionary-builder>`_
+  to train a specific dictionary for compression.
+
+
+.. _envoy_v3_api_field_extensions.compression.zstd.compressor.v3.Zstd.chunk_size:
+
+
+chunk_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value for compressor's next output buffer. If not set, defaults to 4096.
+
+
+.. _envoy_v3_api_enum_extensions.compression.zstd.compressor.v3.Zstd.Strategy:
+
+Enum extensions.compression.zstd.compressor.v3.Zstd.Strategy
+------------------------------------------------------------
+
+
+:repo:`[extensions.compression.zstd.compressor.v3.Zstd.Strategy proto] <api/envoy/extensions/compression/zstd/compressor/v3/zstd.proto#L23>`
+
+Reference to http://facebook.github.io/zstd/zstd_manual.html
+
+
+
+.. _envoy_v3_api_enum_value_extensions.compression.zstd.compressor.v3.Zstd.Strategy.DEFAULT:
+
+
+DEFAULT
+  *(DEFAULT)* ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.zstd.compressor.v3.Zstd.Strategy.FAST:
+
+
+FAST
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.zstd.compressor.v3.Zstd.Strategy.DFAST:
+
+
+DFAST
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.zstd.compressor.v3.Zstd.Strategy.GREEDY:
+
+
+GREEDY
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.zstd.compressor.v3.Zstd.Strategy.LAZY:
+
+
+LAZY
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.zstd.compressor.v3.Zstd.Strategy.LAZY2:
+
+
+LAZY2
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.zstd.compressor.v3.Zstd.Strategy.BTLAZY2:
+
+
+BTLAZY2
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.zstd.compressor.v3.Zstd.Strategy.BTOPT:
+
+
+BTOPT
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.zstd.compressor.v3.Zstd.Strategy.BTULTRA:
+
+
+BTULTRA
+  ⁣
+
+.. _envoy_v3_api_enum_value_extensions.compression.zstd.compressor.v3.Zstd.Strategy.BTULTRA2:
+
+
+BTULTRA2
+  ⁣
+
+

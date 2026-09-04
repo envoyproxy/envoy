@@ -1,0 +1,92 @@
+.. _envoy_v3_api_file_contrib/envoy/extensions/stat_sinks/wasm_filter/v3/wasm_filter.proto:
+
+Wasm Stats Filter (proto)
+=========================
+
+.. _extension_envoy.stat_sinks.wasm_filter:
+
+This extension has the qualified name ``envoy.stat_sinks.wasm_filter``
+
+.. note::
+
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.stats_sinks <extension_category_envoy.stats_sinks>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig>`
+
+
+
+Wasm-based stats filter middleware that wraps an inner stats sink.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig:
+
+extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig
+--------------------------------------------------------------
+
+
+:repo:`[extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig proto] <api/contrib/envoy/extensions/stat_sinks/wasm_filter/v3/wasm_filter.proto#L39>`
+
+A stats sink that runs a WASM plugin to filter, transform, and enrich metrics
+before delegating to an inner sink. The plugin can:
+
+- **Filter**: keep/drop counters, gauges, and histograms by index
+- **Enrich**: inject global tags (e.g. datacenter, pod) from node metadata
+- **Rename**: override metric names (e.g. prefix with ``envoy.``)
+- **Inject**: add synthetic counters/gauges (e.g. version metrics)
+
+Available foreign functions:
+  ``stats_filter_emit`` -- declare kept metric indices
+  ``stats_filter_set_global_tags`` -- set tags applied to all metrics (once at startup)
+  ``stats_filter_set_name_overrides`` -- rename specific metrics (per flush)
+  ``stats_filter_inject_metrics`` -- inject synthetic counters/gauges (per flush)
+  ``stats_filter_get_histograms`` -- get histogram names
+  ``stats_filter_get_metric_tags`` -- get tags for a single metric
+  ``stats_filter_get_all_metric_tags`` -- get tags for all metrics (bulk)
+
+Metrics that the plugin does not emit are dropped. Text readouts pass through
+to the inner sink unfiltered.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "wasm_config": {...},
+    "inner_sink": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig.wasm_config:
+
+
+wasm_config
+  (:ref:`extensions.wasm.v3.PluginConfig <envoy_v3_api_msg_extensions.wasm.v3.PluginConfig>`, *REQUIRED*) WASM plugin that implements the filter/transform/enrichment logic.
+
+
+.. _envoy_v3_api_field_extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig.inner_sink:
+
+
+inner_sink
+  (:ref:`config.metrics.v3.StatsSink <envoy_v3_api_msg_config.metrics.v3.StatsSink>`, *REQUIRED*) The inner sink to delegate filtered metrics to.
+
+

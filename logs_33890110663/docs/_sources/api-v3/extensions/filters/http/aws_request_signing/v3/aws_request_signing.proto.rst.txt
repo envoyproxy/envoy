@@ -1,0 +1,284 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.proto:
+
+AwsRequestSigning (proto)
+=========================
+
+.. _extension_envoy.filters.http.aws_request_signing:
+
+This extension has the qualified name ``envoy.filters.http.aws_request_signing``
+
+
+.. note::
+  
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension categories:
+
+
+  - :ref:`envoy.filters.http <extension_category_envoy.filters.http>`
+
+  - :ref:`envoy.filters.http.upstream <extension_category_envoy.filters.http.upstream>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning <envoy_v3_api_msg_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning>`
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute <envoy_v3_api_msg_extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute>`
+
+
+
+AwsRequestSigning :ref:`configuration overview <config_http_filters_aws_request_signing>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning:
+
+extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
+----------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.aws_request_signing.v3.AwsRequestSigning proto] <api/envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.proto#L25>`
+
+Top level configuration for the AWS request signing filter.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "service_name": ...,
+    "region": ...,
+    "host_rewrite": ...,
+    "use_unsigned_payload": ...,
+    "match_excluded_headers": [],
+    "signing_algorithm": ...,
+    "query_string": {...},
+    "credential_provider": {...},
+    "match_included_headers": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.service_name:
+
+
+service_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The `service namespace
+  <https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#genref-aws-service-namespaces>`_
+  of the HTTP endpoint.
+
+  Example: s3
+
+
+.. _envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region:
+
+
+region
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Optional region string. If region is not provided, the region will be retrieved from the environment
+  or AWS configuration files. See :ref:`config_http_filters_aws_request_signing_region` for more details.
+
+  When signing_algorithm is set to ``AWS_SIGV4`` the region is a standard AWS `region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ string for the service
+  hosting the HTTP endpoint.
+
+  Example: ``us-west-2``
+
+  When signing_algorithm is set to ``AWS_SIGV4A`` the region is used as a region set.
+
+  A region set is a comma separated list of AWS regions, such as ``us-east-1,us-east-2`` or wildcard ``*``
+  or even region strings containing wildcards such as ``us-east-*``
+
+  Example: ``'*'``
+
+  By configuring a region set, a SigV4A signed request can be sent to multiple regions, rather than being
+  valid for only a single region destination.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.host_rewrite:
+
+
+host_rewrite
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates that before signing headers, the host header will be swapped with
+  this value. If not set or empty, the original host header value
+  will be used and no rewrite will happen.
+
+  .. note::
+      This rewrite affects both signing and host header forwarding. However, this
+      option shouldn't be used with
+      :ref:`HCM host rewrite <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>` given that the
+      value set here would be used for signing whereas the value set in the HCM would be used
+      for host header forwarding which is not the desired outcome.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.use_unsigned_payload:
+
+
+use_unsigned_payload
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Instead of buffering the request to calculate the payload hash, use the literal string ``UNSIGNED-PAYLOAD``
+  to calculate the payload hash. Not all services support this option. See the `S3
+  <https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html>`_ policy for details.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.match_excluded_headers:
+
+
+match_excluded_headers
+  (**repeated** :ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) A list of request header string matchers that will be excluded from signing. The excluded header can be matched by
+  any patterns defined in the StringMatcher proto (e.g. exact string, prefix, regex, etc).
+
+  Example:
+
+  .. code-block:: yaml
+
+   match_excluded_headers:
+   - prefix: x-envoy
+   - exact: foo
+   - exact: bar
+
+  When applied, all headers that start with ``x-envoy`` and headers ``foo`` and ``bar`` will not be signed.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.signing_algorithm:
+
+
+signing_algorithm
+  (:ref:`extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.SigningAlgorithm <envoy_v3_api_enum_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.SigningAlgorithm>`) Optional Signing algorithm specifier, either ``AWS_SIGV4`` or ``AWS_SIGV4A``, defaulting to ``AWS_SIGV4``.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.query_string:
+
+
+query_string
+  (:ref:`extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.QueryString <envoy_v3_api_msg_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.QueryString>`) If set, use the query string to store output of SigV4 or SigV4A calculation, rather than HTTP headers. The ``Authorization`` header will not be modified if ``query_string``
+  is configured.
+
+  Example:
+  query_string: {}
+
+
+
+.. _envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider:
+
+
+credential_provider
+  (:ref:`extensions.common.aws.v3.AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>`) The credential provider for signing the request. This is optional and if not set,
+  it will be retrieved using the procedure described in :ref:`config_http_filters_aws_request_signing`.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.match_included_headers:
+
+
+match_included_headers
+  (**repeated** :ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) A list of request header string matchers that will be included during signing. The included header can be matched by
+  any patterns defined in the StringMatcher proto (e.g. exact string, prefix, regex, etc).
+  match_included_headers takes precedence over match_excluded_headers - if match_included_headers is set, only those headers will be signed and match_excluded_headers will be ignored.
+  Required headers for signing such as ``host`` will always be signed regardless of this setting. The required headers are determined via ``CanonicalHeaders`` section in the AWS documentation `here <https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html#create-canonical-request>`_.
+
+  Example:
+
+  .. code-block:: yaml
+
+   match_included_headers:
+   - prefix: x-envoy
+   - exact: foo
+   - exact: bar
+
+  When applied, all headers that start with ``x-envoy`` and headers ``foo`` and ``bar`` will be signed and all other headers will be excluded from signing except required headers.
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.QueryString:
+
+extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.QueryString
+----------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.QueryString proto] <api/envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.proto#L37>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "expiration_time": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.QueryString.expiration_time:
+
+
+expiration_time
+  (`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_) Optional expiration time for the query string parameters. As query string parameter based requests are replayable, in effect representing
+  an API call that has already been authenticated, it is recommended to keep this expiration time as short as feasible.
+  This value will default to 5 seconds and has a maximum value of 3600 seconds (1 hour).
+
+
+
+.. _envoy_v3_api_enum_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.SigningAlgorithm:
+
+Enum extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.SigningAlgorithm
+--------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.SigningAlgorithm proto] <api/envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.proto#L29>`
+
+
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.SigningAlgorithm.AWS_SIGV4:
+
+
+AWS_SIGV4
+  *(DEFAULT)* ⁣Use SigV4 for signing
+
+
+.. _envoy_v3_api_enum_value_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.SigningAlgorithm.AWS_SIGV4A:
+
+
+AWS_SIGV4A
+  ⁣Use SigV4A for signing
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute:
+
+extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute
+------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute proto] <api/envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.proto#L138>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "aws_request_signing": {...},
+    "stat_prefix": ...
+  }
+
+.. _envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute.aws_request_signing:
+
+
+aws_request_signing
+  (:ref:`extensions.filters.http.aws_request_signing.v3.AwsRequestSigning <envoy_v3_api_msg_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning>`) Override the global configuration of the filter with this new config.
+  This overrides the entire message of AwsRequestSigning and not at field level.
+
+
+.. _envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute.stat_prefix:
+
+
+stat_prefix
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The human readable prefix to use when emitting stats.
+
+

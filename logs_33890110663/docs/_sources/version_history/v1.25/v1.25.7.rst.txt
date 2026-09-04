@@ -1,0 +1,28 @@
+.. _version_history_1.25.7:
+
+1.25.7 (June 2, 2023)
+======================
+
+
+
+
+
+
+Bug fixes
+---------
+
+*Changes expected to improve the state of the world and are unlikely
+to have negative effects*
+
+
+
+* **boringssl**: Fixed the crash that occurs when contrib is compiled with ``boringssl=fips`` defined.
+* **dependency**: update C-ares -> 1.91.1 to resolve:
+
+  - `CVE-2023-31130 <https://nvd.nist.gov/vuln/detail/CVE-2023-31130>`_.
+  - `CVE-2023-31147 <https://nvd.nist.gov/vuln/detail/CVE-2023-31147>`_.
+  - `CVE-2023-31124 <https://nvd.nist.gov/vuln/detail/CVE-2023-31124>`_.
+  - `CVE-2023-32067 <https://nvd.nist.gov/vuln/detail/CVE-2023-32067>`_.
+* **dependency**: update Wasmtime and related deps -> 9.0.3 to resolve
+  `CVE-2023-30624 <https://nvd.nist.gov/vuln/detail/CVE-2023-30624>`_.
+

@@ -1,0 +1,127 @@
+.. _envoy_v3_api_file_envoy/extensions/geoip_providers/maxmind/v3/maxmind.proto:
+
+MaxMind Geolocation Provider (proto)
+====================================
+
+.. _extension_envoy.geoip_providers.maxmind:
+
+This extension has the qualified name ``envoy.geoip_providers.maxmind``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.geoip_providers <extension_category_envoy.geoip_providers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
+
+
+
+.. warning::
+   This API feature is currently work-in-progress. API features marked as work-in-progress are not considered stable, are not covered by the :ref:`threat model <arch_overview_threat_model>`, are not supported by the security team, and are subject to breaking changes. Do not use this feature without understanding each of the previous points.
+
+
+
+MaxMind geolocation provider :ref:`configuration overview <config_geoip_providers_maxmind>`.
+
+At least one geolocation database path must be configured:
+
+* :ref:`city_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.city_db_path>`
+* :ref:`isp_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.isp_db_path>`
+* :ref:`asn_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.asn_db_path>`
+* :ref:`anon_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.anon_db_path>`
+* :ref:`country_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.country_db_path>`
+
+
+
+
+.. _envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig:
+
+extensions.geoip_providers.maxmind.v3.MaxMindConfig
+---------------------------------------------------
+
+
+:repo:`[extensions.geoip_providers.maxmind.v3.MaxMindConfig proto] <api/envoy/extensions/geoip_providers/maxmind/v3/maxmind.proto#L31>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "city_db_path": ...,
+    "asn_db_path": ...,
+    "anon_db_path": ...,
+    "isp_db_path": ...,
+    "country_db_path": ...,
+    "common_provider_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.city_db_path:
+
+
+city_db_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Full file path to the MaxMind city database, e.g., ``/etc/GeoLite2-City.mmdb``.
+  Database file is expected to have ``.mmdb`` extension.
+
+
+.. _envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.asn_db_path:
+
+
+asn_db_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Full file path to the MaxMind ASN database, e.g., ``/etc/GeoLite2-ASN.mmdb``.
+  Database file is expected to have ``.mmdb`` extension.
+  When this is defined, the ASN information will always be fetched from the ``asn_db``.
+
+
+.. _envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.anon_db_path:
+
+
+anon_db_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Full file path to the MaxMind Anonymous IP database, e.g., ``/etc/GeoIP2-Anonymous-IP.mmdb``.
+  Database file is expected to have ``.mmdb`` extension.
+
+
+.. _envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.isp_db_path:
+
+
+isp_db_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Full file path to the MaxMind ISP database, e.g., ``/etc/GeoLite2-ISP.mmdb``.
+  Database file is expected to have ``.mmdb`` extension.
+  If ``asn_db_path`` is not defined, ASN information will be fetched from
+  ``isp_db`` instead.
+
+
+.. _envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.country_db_path:
+
+
+country_db_path
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Full file path to the MaxMind Country database, e.g., ``/etc/GeoLite2-Country.mmdb``.
+  Database file is expected to have ``.mmdb`` extension.
+
+  If ``country_db_path`` is not specified, country information will be fetched from
+  ``city_db`` if ``city_db`` is configured.
+
+
+.. _envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.common_provider_config:
+
+
+common_provider_config
+  (:ref:`extensions.geoip_providers.common.v3.CommonGeoipProviderConfig <envoy_v3_api_msg_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig>`, *REQUIRED*) Common provider configuration that specifies which geolocation headers will be populated with geolocation data.
+
+

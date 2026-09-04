@@ -1,0 +1,64 @@
+.. _envoy_v3_api_file_envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3/config.proto:
+
+SNI certificate mapper (proto)
+==============================
+
+.. _extension_envoy.tls.certificate_mappers.sni:
+
+This extension has the qualified name ``envoy.tls.certificate_mappers.sni``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tls.certificate_mappers <extension_category_envoy.tls.certificate_mappers>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI:
+
+extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+--------------------------------------------------------
+
+
+:repo:`[extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI proto] <api/envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3/config.proto#L17>`
+
+Uses the SNI value from the TLS client hello as the secret resource name in the downstream selector.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "default_value": ...
+  }
+
+.. _envoy_v3_api_field_extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI.default_value:
+
+
+default_value
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The value to use as the secret name when SNI is empty or absent.
+
+

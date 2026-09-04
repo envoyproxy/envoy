@@ -1,0 +1,57 @@
+.. _envoy_v3_api_file_envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.proto:
+
+Environment Resource Detector config (proto)
+============================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.tracers.opentelemetry.resource_detectors.v3.EnvironmentResourceDetectorConfig:
+
+extensions.tracers.opentelemetry.resource_detectors.v3.EnvironmentResourceDetectorConfig
+----------------------------------------------------------------------------------------
+
+
+:repo:`[extensions.tracers.opentelemetry.resource_detectors.v3.EnvironmentResourceDetectorConfig proto] <api/envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.proto#L23>`
+
+Configuration for the Environment Resource detector extension.
+The resource detector reads from the ``OTEL_RESOURCE_ATTRIBUTES``
+environment variable, as per the OpenTelemetry specification.
+
+See:
+
+`OpenTelemetry specification <https://github.com/open-telemetry/opentelemetry-specification/blob/v1.24.0/specification/resource/sdk.md#detecting-resource-information-from-the-environment>`_
+
+
+.. _extension_envoy.tracers.opentelemetry.resource_detectors.environment:
+
+This extension has the qualified name ``envoy.tracers.opentelemetry.resource_detectors.environment``
+
+
+.. note::
+  This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.
+
+  This extension has an unknown security posture and should only be
+  used in deployments where both the downstream and upstream are
+  trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.tracers.opentelemetry.resource_detectors <extension_category_envoy.tracers.opentelemetry.resource_detectors>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.tracers.opentelemetry.resource_detectors.v3.EnvironmentResourceDetectorConfig <envoy_v3_api_msg_extensions.tracers.opentelemetry.resource_detectors.v3.EnvironmentResourceDetectorConfig>`
+
+
+
+
+

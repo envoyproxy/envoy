@@ -1,0 +1,328 @@
+.. _envoy_v3_api_file_envoy/extensions/filters/network/dubbo_proxy/v3/route.proto:
+
+Dubbo Proxy Route Configuration (proto)
+=======================================
+
+
+Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.RouteConfiguration:
+
+extensions.filters.network.dubbo_proxy.v3.RouteConfiguration
+------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.v3.RouteConfiguration proto] <api/envoy/extensions/filters/network/dubbo_proxy/v3/route.proto#L23>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "interface": ...,
+    "group": ...,
+    "version": ...,
+    "routes": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteConfiguration.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of the route configuration. Reserved for future use in asynchronous route discovery.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteConfiguration.interface:
+
+
+interface
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The interface name of the service. Wildcard interface are supported in the suffix or prefix form.
+  e.g. ``*.methods.add`` will match ``com.dev.methods.add``, ``com.prod.methods.add``, etc.
+  ``com.dev.methods.*`` will match ``com.dev.methods.add``, ``com.dev.methods.update``, etc.
+  Special wildcard ``*`` matching any interface.
+
+  .. note::
+
+   The wildcard will not match the empty string.
+   e.g. ``*.methods.add`` will match ``com.dev.methods.add`` but not ``.methods.add``.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteConfiguration.group:
+
+
+group
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Which group does the interface belong to.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteConfiguration.version:
+
+
+version
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The version number of the interface.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteConfiguration.routes:
+
+
+routes
+  (**repeated** :ref:`extensions.filters.network.dubbo_proxy.v3.Route <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.Route>`) The list of routes that will be matched, in order, against incoming requests. The first route
+  that matches will be used.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.Route:
+
+extensions.filters.network.dubbo_proxy.v3.Route
+-----------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.v3.Route proto] <api/envoy/extensions/filters/network/dubbo_proxy/v3/route.proto#L52>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "match": {...},
+    "route": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.Route.match:
+
+
+match
+  (:ref:`extensions.filters.network.dubbo_proxy.v3.RouteMatch <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.RouteMatch>`, *REQUIRED*) Route matching parameters.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.Route.route:
+
+
+route
+  (:ref:`extensions.filters.network.dubbo_proxy.v3.RouteAction <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.RouteAction>`, *REQUIRED*) Route request to some upstream cluster.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.RouteMatch:
+
+extensions.filters.network.dubbo_proxy.v3.RouteMatch
+----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.v3.RouteMatch proto] <api/envoy/extensions/filters/network/dubbo_proxy/v3/route.proto#L63>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "method": {...},
+    "headers": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteMatch.method:
+
+
+method
+  (:ref:`extensions.filters.network.dubbo_proxy.v3.MethodMatch <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.MethodMatch>`) Method level routing matching.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteMatch.headers:
+
+
+headers
+  (**repeated** :ref:`config.route.v3.HeaderMatcher <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`) Specifies a set of headers that the route should match on. The router will check the request’s
+  headers against all the specified headers in the route config. A match will happen if all the
+  headers in the route are present in the request with the same values (or based on presence if
+  the value field is not in the config).
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.RouteAction:
+
+extensions.filters.network.dubbo_proxy.v3.RouteAction
+-----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.v3.RouteAction proto] <api/envoy/extensions/filters/network/dubbo_proxy/v3/route.proto#L77>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "cluster": ...,
+    "weighted_clusters": {...},
+    "metadata_match": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteAction.cluster:
+
+
+cluster
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) Indicates the upstream cluster to which the request should be routed.
+
+
+  
+
+  Precisely one of :ref:`cluster <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteAction.cluster>`, :ref:`weighted_clusters <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteAction.weighted_clusters>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteAction.weighted_clusters:
+
+
+weighted_clusters
+  (:ref:`config.route.v3.WeightedCluster <envoy_v3_api_msg_config.route.v3.WeightedCluster>`) Multiple upstream clusters can be specified for a given route. The
+  request is routed to one of the upstream clusters based on weights
+  assigned to each cluster.
+  Currently ClusterWeight only supports the name and weight fields.
+
+
+  
+
+  Precisely one of :ref:`cluster <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteAction.cluster>`, :ref:`weighted_clusters <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteAction.weighted_clusters>` must be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.RouteAction.metadata_match:
+
+
+metadata_match
+  (:ref:`config.core.v3.Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`) Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
+  the upstream cluster with metadata matching what is set in this field will be considered for
+  load balancing. The filter name should be specified as ``envoy.lb``.
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.MethodMatch:
+
+extensions.filters.network.dubbo_proxy.v3.MethodMatch
+-----------------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.v3.MethodMatch proto] <api/envoy/extensions/filters/network/dubbo_proxy/v3/route.proto#L100>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": {...},
+    "params_match": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.MethodMatch.name:
+
+
+name
+  (:ref:`type.matcher.v3.StringMatcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`) The name of the method.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.MethodMatch.params_match:
+
+
+params_match
+  (map<`uint32 <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, :ref:`extensions.filters.network.dubbo_proxy.v3.MethodMatch.ParameterMatchSpecifier <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.MethodMatch.ParameterMatchSpecifier>`>) Method parameter definition.
+  The key is the parameter index, starting from 0.
+  The value is the parameter matching type.
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.MethodMatch.ParameterMatchSpecifier:
+
+extensions.filters.network.dubbo_proxy.v3.MethodMatch.ParameterMatchSpecifier
+-----------------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.v3.MethodMatch.ParameterMatchSpecifier proto] <api/envoy/extensions/filters/network/dubbo_proxy/v3/route.proto#L105>`
+
+The parameter matching type.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "exact_match": ...,
+    "range_match": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.MethodMatch.ParameterMatchSpecifier.exact_match:
+
+
+exact_match
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If specified, header match will be performed based on the value of the header.
+
+
+  
+
+  Only one of :ref:`exact_match <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.MethodMatch.ParameterMatchSpecifier.exact_match>`, :ref:`range_match <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.MethodMatch.ParameterMatchSpecifier.range_match>` may be set.
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.MethodMatch.ParameterMatchSpecifier.range_match:
+
+
+range_match
+  (:ref:`type.v3.Int64Range <envoy_v3_api_msg_type.v3.Int64Range>`) If specified, header match will be performed based on range.
+  The rule will match if the request header value is within this range.
+  The entire request header value must represent an integer in base 10 notation: consisting
+  of an optional plus or minus sign followed by a sequence of digits. The rule will not match
+  if the header value does not represent an integer. Match will fail for empty values,
+  floating point numbers or if only a subsequence of the header value is an integer.
+
+  Examples:
+
+  * For range [-10,0), route will match for header value -1, but not for 0,
+    "somestring", 10.9, "-1somestring"
+
+
+  
+
+  Only one of :ref:`exact_match <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.MethodMatch.ParameterMatchSpecifier.exact_match>`, :ref:`range_match <envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.MethodMatch.ParameterMatchSpecifier.range_match>` may be set.
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.MultipleRouteConfiguration:
+
+extensions.filters.network.dubbo_proxy.v3.MultipleRouteConfiguration
+--------------------------------------------------------------------
+
+
+:repo:`[extensions.filters.network.dubbo_proxy.v3.MultipleRouteConfiguration proto] <api/envoy/extensions/filters/network/dubbo_proxy/v3/route.proto#L137>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "name": ...,
+    "route_config": []
+  }
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.MultipleRouteConfiguration.name:
+
+
+name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) The name of the named route configurations. This name is used in asynchronous route discovery.
+
+
+.. _envoy_v3_api_field_extensions.filters.network.dubbo_proxy.v3.MultipleRouteConfiguration.route_config:
+
+
+route_config
+  (**repeated** :ref:`extensions.filters.network.dubbo_proxy.v3.RouteConfiguration <envoy_v3_api_msg_extensions.filters.network.dubbo_proxy.v3.RouteConfiguration>`) The route table of the dubbo connection manager.
+
+

@@ -1,0 +1,86 @@
+.. _envoy_v3_api_file_envoy/extensions/upstreams/http/dynamic_modules/v3/dynamic_modules.proto:
+
+Dynamic Modules Upstream HTTP TCP Bridge (proto)
+================================================
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config:
+
+extensions.upstreams.http.dynamic_modules.v3.Config
+---------------------------------------------------
+
+
+:repo:`[extensions.upstreams.http.dynamic_modules.v3.Config proto] <api/envoy/extensions/upstreams/http/dynamic_modules/v3/dynamic_modules.proto#L26>`
+
+Configuration for the dynamic modules upstream HTTP TCP bridge.
+
+This upstream type delegates HTTP-to-TCP protocol bridging to a dynamic module. The module
+transforms HTTP request headers and body into raw TCP data for the upstream connection, and
+converts raw TCP response data back into HTTP responses for the downstream client.
+
+
+.. _extension_envoy.upstreams.http.dynamic_modules:
+
+This extension has the qualified name ``envoy.upstreams.http.dynamic_modules``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.upstreams <extension_category_envoy.upstreams>`
+
+
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "dynamic_module_config": {...},
+    "bridge_name": ...,
+    "bridge_config": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.upstreams.http.dynamic_modules.v3.Config.dynamic_module_config:
+
+
+dynamic_module_config
+  (:ref:`extensions.dynamic_modules.v3.DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`, *REQUIRED*) The dynamic module configuration.
+
+
+.. _envoy_v3_api_field_extensions.upstreams.http.dynamic_modules.v3.Config.bridge_name:
+
+
+bridge_name
+  (`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_, *REQUIRED*) The name to identify the bridge implementation within the module.
+  This is passed to the module's ``envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new``
+  function.
+
+
+.. _envoy_v3_api_field_extensions.upstreams.http.dynamic_modules.v3.Config.bridge_config:
+
+
+bridge_config
+  (`Any <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#any>`_) The configuration for the module's bridge implementation.
+  This is passed to the module's ``envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new``
+  function. The configuration can be any protobuf message. However, it is recommended to use
+  ``google.protobuf.Struct``, ``google.protobuf.StringValue``, or ``google.protobuf.BytesValue``.
+  These types are passed directly as bytes to the module, so the module does not need to have
+  knowledge of protobuf encoding. Otherwise, the serialized bytes of the type are passed.
+  If not specified, an empty configuration is passed.
+
+

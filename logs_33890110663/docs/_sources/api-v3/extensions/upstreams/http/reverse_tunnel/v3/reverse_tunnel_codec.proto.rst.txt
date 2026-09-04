@@ -1,0 +1,63 @@
+.. _envoy_v3_api_file_envoy/extensions/upstreams/http/reverse_tunnel/v3/reverse_tunnel_codec.proto:
+
+Reverse Tunnel Upstream Codec (proto)
+=====================================
+
+.. _extension_envoy.upstreams.http.reverse_tunnel:
+
+This extension has the qualified name ``envoy.upstreams.http.reverse_tunnel``
+
+
+.. note::
+  This extension is functional but has not had substantial production burn time,
+  use only with this caveat.
+
+  This extension is not hardened and should only be used in deployments
+  where both the downstream and upstream are trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.upstream_options <extension_category_envoy.upstream_options>`
+
+
+
+
+
+Per-cluster upstream (client) HTTP/2 codec options for reverse-tunnel clusters. When attached to
+a cluster via :ref:`typed_extension_protocol_options
+<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`, the upstream
+HTTP/2 client codec becomes drain-aware: it can emit a GOAWAY when the reverse tunnel is
+draining, mirroring the server-side drain-aware HTTP Connection Manager.
+
+
+
+
+.. _envoy_v3_api_msg_extensions.upstreams.http.reverse_tunnel.v3.ReverseTunnelUpstreamCodecOptions:
+
+extensions.upstreams.http.reverse_tunnel.v3.ReverseTunnelUpstreamCodecOptions
+-----------------------------------------------------------------------------
+
+
+:repo:`[extensions.upstreams.http.reverse_tunnel.v3.ReverseTunnelUpstreamCodecOptions proto] <api/envoy/extensions/upstreams/http/reverse_tunnel/v3/reverse_tunnel_codec.proto#L21>`
+
+Configuration for the drain-aware reverse-tunnel upstream codec.
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "enable_drain_with_goaway": ...
+  }
+
+.. _envoy_v3_api_field_extensions.upstreams.http.reverse_tunnel.v3.ReverseTunnelUpstreamCodecOptions.enable_drain_with_goaway:
+
+
+enable_drain_with_goaway
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) When true, the upstream HTTP/2 client codec emits a GOAWAY when the reverse tunnel begins
+  draining. Defaults to false, in which case the stock HTTP/2 client codec is used unchanged.
+
+

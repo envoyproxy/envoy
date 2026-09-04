@@ -1,0 +1,70 @@
+.. _envoy_v3_api_file_envoy/extensions/compression/brotli/decompressor/v3/brotli.proto:
+
+Brotli Decompressor (proto)
+===========================
+
+.. _extension_envoy.compression.brotli.decompressor:
+
+This extension has the qualified name ``envoy.compression.brotli.decompressor``
+
+
+.. note::
+  
+
+  This extension is intended to be robust against untrusted downstream traffic. It
+  assumes that the upstream is trusted.
+
+.. tip::
+  This extension extends and can be used with the following extension category:
+
+
+  - :ref:`envoy.compression.decompressor <extension_category_envoy.compression.decompressor>`
+
+
+
+  This extension must be configured with one of the following type URLs:
+
+
+
+  - :ref:`type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli <envoy_v3_api_msg_extensions.compression.brotli.decompressor.v3.Brotli>`
+
+
+
+
+
+
+
+.. _envoy_v3_api_msg_extensions.compression.brotli.decompressor.v3.Brotli:
+
+extensions.compression.brotli.decompressor.v3.Brotli
+----------------------------------------------------
+
+
+:repo:`[extensions.compression.brotli.decompressor.v3.Brotli proto] <api/envoy/extensions/compression/brotli/decompressor/v3/brotli.proto#L18>`
+
+
+
+
+.. code-block:: json
+  :force:
+
+  {
+    "disable_ring_buffer_reallocation": ...,
+    "chunk_size": {...}
+  }
+
+.. _envoy_v3_api_field_extensions.compression.brotli.decompressor.v3.Brotli.disable_ring_buffer_reallocation:
+
+
+disable_ring_buffer_reallocation
+  (`bool <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_) If true, disables "canny" ring buffer allocation strategy.
+  Ring buffer is allocated according to window size, despite the real size of the content.
+
+
+.. _envoy_v3_api_field_extensions.compression.brotli.decompressor.v3.Brotli.chunk_size:
+
+
+chunk_size
+  (`UInt32Value <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#uint32value>`_) Value for decompressor's next output buffer. If not set, defaults to 4096.
+
+
