@@ -363,8 +363,8 @@ public:
     Thread::LockGuard lock(lock_);
     store_.deliverHistogramToSinks(histogram, value);
   }
-  NullGaugeImpl& nullGauge() override { return store_.nullGauge(); }
-  NullCounterImpl& nullCounter() override { return store_.nullCounter(); }
+  Gauge& nullGauge() override { return store_.nullGauge(); }
+  Counter& nullCounter() override { return store_.nullCounter(); }
   ScopeSharedPtr rootScope() override {
     Thread::LockGuard lock(lock_);
     if (lazy_default_scope_ == nullptr) {
