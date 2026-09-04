@@ -326,7 +326,11 @@ public:
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         api_(Api::createApiForTest(stats_store_, time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()) {}
+        http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()) {
+    ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(server_factory_context_, serverScope())
+        .WillByDefault(ReturnRef(*stats_store_.rootScope()));
+  }
 
   virtual Network::Address::IpVersion getIpVersion() const PURE;
   virtual ClientType getClientType() const PURE;
@@ -594,8 +598,10 @@ public:
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::TestIsolatedStoreImpl stats_store_{*symbol_table_};
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  // Serialize stats access while keeping the mock store as the single source of truth.
+  // This lets tests continue to inspect server_factory_context_.store_.
+  Stats::TestIsolatedStoreImpl stats_store_{server_factory_context_.store_};
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   DispatcherHelper dispatcher_helper_{*dispatcher_};
@@ -614,7 +620,6 @@ public:
   // Fake/mock infrastructure for Grpc::AsyncClientImpl upstream.
   Upstream::ClusterConnectivityState state_;
   Network::TransportSocketPtr async_client_transport_socket_{new Network::RawBufferSocket()};
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
   Upstream::MockClusterManager& cm_{server_factory_context_.cluster_manager_};
   Http::AsyncClientPtr http_async_client_;
@@ -671,10 +676,12 @@ public:
 class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
   GrpcSslClientIntegrationTest() {
-    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_, serverFactoryContext())
+        .WillByDefault(ReturnRef(server_factory_context_));
+    ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(factory_context_, serverScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
     ON_CALL(server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
-    ON_CALL(server_factory_context_, serverScope())
-        .WillByDefault(ReturnRef(*stats_store_.rootScope()));
     ON_CALL(server_factory_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(*dispatcher_));
   }
   void TearDown() override {
