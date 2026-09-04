@@ -31,7 +31,7 @@ run --color=yes
 build --color=yes
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/6f36df3ec794472849b99a8e6b377577c585e5ad
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/81647f94d05cce9d7dca9176f01ad1358e9bac19
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
