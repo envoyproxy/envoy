@@ -33,7 +33,6 @@ def python_repos():
         repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
-
 def upstream_envoy_overrides():
     # Workaround old NDK version breakages https://github.com/envoyproxy/envoy-mobile/issues/934
     http_archive(

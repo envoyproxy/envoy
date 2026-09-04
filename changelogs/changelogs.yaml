@@ -42,6 +42,8 @@ sections:
 areas:
   access_log:
     title: access_log
+  alts:
+    title: alts
   attributes:
     title: attributes
   basic_auth:

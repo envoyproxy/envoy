@@ -555,6 +555,19 @@ label_flag(
     build_setting_default = "@boringssl//:crypto",
 )
 
+# wee8 engine: envoy_toolshed prebuilt by default, source for configs the
+# prebuilt is incompatible with (gcc libstdc++ ABI; sanitizers need instrumented deps).
+alias(
+    name = "wee8_engine",
+    actual = select({
+        ":gcc_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":asan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":msan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":tsan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        "//conditions:default": "@envoy_toolshed//v8:wee8",
+    }),
+)
+
 bool_flag(
     name = "fips",
     build_setting_default = False,
@@ -1025,13 +1038,12 @@ json_merge(
         if $modules[$dep] then
           ($modules[$dep] + {module_name: $dep})
         elif ($dep | startswith("com_google_")) and $modules[$dep | sub("^com_google_"; "")] then
-          (($dep | sub("^com_google_"; "")) as $module_name | $modules[$module_name] + {module_name: $module_name})
-        else
-          ($dep | gsub("_"; "-")) as $module_name
-          | if $modules[$module_name] then
-              ($modules[$module_name] + {module_name: $module_name})
-            else null end
-        end;
+          (($dep | sub("^com_google_"; "")) as $m | $modules[$m] + {module_name: $m})
+        elif $modules[$dep | gsub("_"; "-")] then
+          ($dep | gsub("_"; "-")) as $m | $modules[$m] + {module_name: $m}
+        elif ($metadata[$dep].apparent_name // null) as $a | $a and $modules[$a] then
+          ($metadata[$dep].apparent_name) as $m | $modules[$m] + {module_name: $m}
+        else null end;
       def dependency_source($dep):
         module_source($dep);
       $metadata

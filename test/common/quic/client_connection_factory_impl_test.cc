@@ -119,7 +119,7 @@ protected:
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::IsolatedStoreImpl store_{context_.server_context_.serverScope().symbolTable()};
   QuicStatNames quic_stat_names_{store_.symbolTable()};
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};

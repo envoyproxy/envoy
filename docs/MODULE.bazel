@@ -1,0 +1,61 @@
+module(
+    name = "envoy-docs",
+    version = "1.40.0-dev",
+)
+
+bazel_dep(name = "envoy")
+bazel_dep(name = "envoy_api", version = "1.40.0-dev.20260903.16b0d47.envoy")
+bazel_dep(name = "envoy-example-wasm-cc", version = "0.2.5.envoy")
+bazel_dep(name = "envoy-examples", version = "0.2.5.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.4.13.envoy")
+bazel_dep(name = "googleurl", version = "0.0.0-221103-dd4080f.envoy")
+bazel_dep(name = "grpc", version = "1.83.0.envoy")
+bazel_dep(name = "librdkafka", version = "2.6.0.envoy")
+bazel_dep(name = "protobuf", version = "35.1.bcr.envoy")
+bazel_dep(name = "protoc-gen-validate", version = "1.3.0.envoy")
+bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
+bazel_dep(name = "quiche", version = "0.0.0-260824-0140828.envoy")
+bazel_dep(name = "rules_cc", version = "0.2.22")
+bazel_dep(name = "rules_pkg", version = "1.1.0")
+bazel_dep(name = "rules_python", version = "2.2.0")
+bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
+bazel_dep(name = "toolchains_llvm", version = "1.9.0.envoy")
+bazel_dep(name = "xds", version = "0.0.1-20251110-8bfbf64.envoy")
+bazel_dep(name = "zlib-ng", version = "2.3.2.envoy")
+
+local_path_override(
+    module_name = "envoy",
+    path = "../",
+)
+local_path_override(
+    module_name = "envoy_api",
+    path = "../api",
+)
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.12",
+)
+use_repo(
+    python,
+    "python_3_12",
+    python = "python_versions",
+)
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "docs_pip3",
+    python_version = "3.12",
+    requirements_lock = "//tools/python:requirements.txt",
+)
+use_repo(pip, "base_pip3", "docs_pip3")
+
+cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
+use_repo(cc_configure, "local_config_cc", "local_config_cc_toolchains")
+
+compat = use_extension("@rules_cc//cc:extensions.bzl", "compatibility_proxy")
+use_repo(compat, "cc_compatibility_proxy")
+
+envoy_toolchains_ext = use_extension("@envoy//bazel:extensions.bzl", "envoy_toolchains_extension")
+use_repo(envoy_toolchains_ext, "clang_platform")

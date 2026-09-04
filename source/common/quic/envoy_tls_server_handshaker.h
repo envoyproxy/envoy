@@ -10,9 +10,8 @@
 namespace Envoy {
 namespace Quic {
 
-// Shared SSL_CTX callback bridge for QUIC connections, used when either
-// Envoy-managed session ticket processing or the QUIC key log feature is
-// enabled.
+// Shared SSL_CTX callback bridge for QUIC connections, used when Envoy-managed session ticket
+// processing, the QUIC key log feature, or downstream client certificate validation is enabled.
 class EnvoyTlsServerHandshaker : public quic::TlsServerHandshaker {
 public:
   EnvoyTlsServerHandshaker(quic::QuicSession* session,
@@ -31,6 +30,15 @@ public:
   // filtering as TCP TLS key log. Connection addresses are read from the
   // QUIC session at callback time.
   static void keylogCallback(const SSL* ssl, const char* line);
+
+  // quic::TlsServerHandshaker
+  // Validates the downstream client certificate against the pinned server context, which is the
+  // context of the filter chain already matched for this connection. This avoids re-selecting a
+  // filter chain without the client's SNI, unlike a shared proof verifier.
+  quic::QuicAsyncStatus
+  VerifyCertChain(const std::vector<absl::string_view>& certs, std::string* error_details,
+                  std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert,
+                  std::unique_ptr<quic::ProofVerifierCallback> callback) override;
 
 private:
   // QuicServerTransportSocketFactory creates ServerContextImpl when sslCtx()

@@ -407,6 +407,23 @@ void ReverseConnectionIOHandle::resetFileEvents() {
   if (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe()) {
     rev_conn_retry_timer_.reset();
   }
+
+  // Handshake connections have their own file events. Tear them down on this worker so
+  // main-thread close()/destructor does not destroy in-flight codecs. Skip when
+  // worker_dispatcher_ is null (cleanup() after workers are gone).
+  if (worker_dispatcher_ != nullptr && worker_dispatcher_->isThreadSafe()) {
+    conn_wrapper_to_host_map_.clear();
+    std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers = std::move(connection_wrappers_);
+    connection_wrappers_.clear();
+    for (auto& wrapper : wrappers) {
+      if (wrapper == nullptr) {
+        continue;
+      }
+      wrapper->shutdown();
+      worker_dispatcher_->deferredDelete(std::move(wrapper));
+    }
+  }
+
   IoSocketHandleImpl::resetFileEvents();
 }
 

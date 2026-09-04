@@ -76,6 +76,7 @@ on:
           ERROR
           error:
           Error:
+          FAILED in
       notice-match:
         type: string
         default: |
@@ -120,7 +121,9 @@ on:
       trusted:
         type: boolean
         default: false
-      uploads:
+      upload-name:
+        type: string
+      upload-path:
         type: string
       warning-match:
         type: string
@@ -171,5 +174,6 @@ jobs:
       target: ${{ inputs.target }}
       timeout-minutes: ${{ inputs.timeout-minutes }}
       trusted: ${{ fromJSON(inputs.request).request.trusted }}
-      uploads: ${{ inputs.uploads }}
+      upload-name: ${{ inputs.upload-name }}
+      upload-path: ${{ inputs.upload-path }}
       warning-match: ${{ inputs.warning-match }}

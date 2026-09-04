@@ -2271,6 +2271,7 @@ envoy_cc_test(
         "//source/extensions/upstreams/http/tcp:config",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",
+        "//test/integration/filters:stop_in_headers_continue_in_data_filter_lib",
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/test_common:logging_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -3201,4 +3202,17 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_test(
+    name = "quic_mtls_integration_test",
+    srcs = envoy_select_enable_http3(["quic_mtls_integration_test.cc"]),
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = envoy_select_enable_http3([
+        ":quic_http_integration_test_lib",
+        "//source/common/quic:quic_ssl_connection_info_lib",
+        "//test/test_common:utility_lib",
+    ]),
 )

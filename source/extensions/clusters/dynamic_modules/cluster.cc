@@ -184,7 +184,7 @@ DynamicModuleClusterHandle::~DynamicModuleClusterHandle() {
   Event::Dispatcher& dispatcher = cluster->dispatcher_;
   // The lifecycle handle resets unregister from main-thread-owned notifiers. When the handle is
   // destroyed on a worker thread, post the full teardown onto the main dispatcher.
-  if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
+  if (!Thread::MainThread::isMainOrTestThread()) {
     dispatcher.post([cluster = std::move(cluster)]() mutable {
       cluster->server_initialized_handle_.reset();
       cluster->shutdown_handle_.reset();

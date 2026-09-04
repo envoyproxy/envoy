@@ -43,19 +43,21 @@ jobs:
         ERROR
         error:
         Error:
+        FAILED in
       rbe: true
       target: ${{ matrix.target }}
       trusted: ${{ inputs.trusted }}
-      uploads: ${{ matrix.uploads }}
+      upload-name: ${{ matrix.upload-name }}
+      upload-path: ${{ matrix.upload-path }}
     strategy:
       fail-fast: false
       matrix:
         include:
         - target: format
-          uploads: |
-            fix_format.diff: /home/runner/work/_temp/container/fix_format.diff
+          upload-name: fix_format.diff
+          upload-path: /home/runner/work/_temp/container/fix_format.diff
           diskpace-hack-paths: |
             /opt/hostedtoolcache
         - target: format-api
-          uploads: |
-            fix_proto_format.diff: /home/runner/work/_temp/container/fix_proto_format.diff
+          upload-name: fix_proto_format.diff
+          upload-path: /home/runner/work/_temp/container/fix_proto_format.diff

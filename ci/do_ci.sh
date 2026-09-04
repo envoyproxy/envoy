@@ -336,9 +336,19 @@ function build_openssl_presubmit() {
             .bazelrc|.bazelversion|WORKSPACE|WORKSPACE.bazel|MODULE.bazel|MODULE.bazel.lock|bazel/*)
                 global_config_changed=true
                 ;;
-            # BUILD/.bzl changes affect the whole package.
+            # BUILD/.bzl changes affect the whole package. A root-level one
+            # (dirname ".") would yield the invalid pattern "//./..."; treat it
+            # as global build config instead. Only add the package pattern if it
+            # actually contains targets -- a .bzl in a non-package dir would
+            # otherwise make the rdeps set() query fail.
             *BUILD|*BUILD.bazel|*.bzl)
-                changed_labels+=("//$(dirname "$file")/...")
+                local dir
+                dir="$(dirname "$file")"
+                if [[ "$dir" == "." ]]; then
+                    global_config_changed=true
+                elif bazel query "${BAZEL_QUERY_OPTIONS[@]}" "//${dir}/..." >/dev/null 2>&1; then
+                    changed_labels+=("//${dir}/...")
+                fi
                 ;;
             # Tolerate files Bazel doesn't know about (docs, unwired sources).
             *)
@@ -918,6 +928,36 @@ case $CI_TARGET in
     info)
         setup_clang_toolchain
         bazel info "${BAZEL_BUILD_OPTIONS[@]}"
+        ;;
+
+    lockfiles|lockfiles.regenerate)
+        # TODO(phlax): Add other lockfiles here and a check path
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+             --enable_bzlmod \
+             --noenable_workspace \
+             deps --lockfile_mode=update
+        pushd "$ENVOY_DOCS_PATH"
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+              --enable_bzlmod \
+              --noenable_workspace \
+              deps --lockfile_mode=update
+        popd
+        pushd "api/"
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+              --enable_bzlmod \
+              --noenable_workspace \
+              deps --lockfile_mode=update
+        popd
+        pushd "mobile/"
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+              --enable_bzlmod \
+              --noenable_workspace \
+              deps --lockfile_mode=update
+        popd
         ;;
 
     msan)

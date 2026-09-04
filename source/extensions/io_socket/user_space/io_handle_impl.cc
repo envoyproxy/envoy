@@ -9,6 +9,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/io_socket/user_space/file_event_impl.h"
 
 namespace Envoy {
@@ -65,14 +66,25 @@ IoHandleImpl::~IoHandleImpl() {
   }
 }
 
+void IoHandleImpl::setAbortiveClose() {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_send_rst_on_user_space_socket")) {
+    rst_requested_ = true;
+  }
+}
+
 Api::IoCallUint64Result IoHandleImpl::close() {
   ASSERT(!closed_);
   if (!closed_) {
     if (peer_handle_) {
       ENVOY_LOG(trace, "socket {} close before peer {} closes.", static_cast<void*>(this),
                 static_cast<void*>(peer_handle_));
-      // Notify the peer that it will not receive more data. shutdown(WRITE).
-      peer_handle_->setEof();
+      if (rst_requested_) {
+        peer_handle_->setRst();
+      } else {
+        // Notify the peer that it will not receive more data. shutdown(WRITE).
+        peer_handle_->setEof();
+      }
       // Notify the peer that we no longer accept data. shutdown(RD).
       peer_handle_->onPeerDestroy();
       peer_handle_ = nullptr;
@@ -96,6 +108,9 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
                                             uint64_t num_slice) {
   if (!isOpen()) {
     return {0, Network::IoSocketError::create(SOCKET_ERROR_BADF)};
+  }
+  if (receive_data_reset_) {
+    return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
   }
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
@@ -130,6 +145,9 @@ Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
   }
   if (!isOpen()) {
     return {0, Network::IoSocketError::create(SOCKET_ERROR_BADF)};
+  }
+  if (receive_data_reset_) {
+    return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
   }
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
@@ -243,6 +261,9 @@ Api::IoCallUint64Result IoHandleImpl::recvmmsg(RawSliceArrays&, uint32_t,
 Api::IoCallUint64Result IoHandleImpl::recv(void* buffer, size_t length, int flags) {
   if (!isOpen()) {
     return {0, Network::IoSocketError::getIoSocketEbadfError()};
+  }
+  if (receive_data_reset_) {
+    return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
   }
   // No data and the writer closed.
   if (pending_received_data_.length() == 0) {
