@@ -147,6 +147,9 @@ FilterConfig::FilterConfig(
       metadata_namespace_(proto.response_handling().token_usage().metadata_namespace().empty()
                               ? std::string(DefaultTokenUsageNamespace)
                               : proto.response_handling().token_usage().metadata_namespace()),
+      synthesize_usage_trailers_(proto.response_handling().token_usage().usage_signal() ==
+                                 envoy::extensions::filters::http::ai_protocol_manager::v3::
+                                     TokenUsageExtraction::SYNTHESIZE_TRAILERS),
       max_sse_event_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.response_handling().token_usage().limits(),
                                           max_sse_event_size, DefaultMaxSseEventSize)),
@@ -515,7 +518,12 @@ Http::FilterDataStatus AiProtocolManagerFilter::encodeData(Buffer::Instance& dat
     response_handler_->onData(data);
     if (end_stream) {
       response_handler_->onEndStream();
-      finalizeResponseHandling();
+      if (finalizeResponseHandling() && config_->synthesizeUsageTrailers()) {
+        // Synthesize empty trailers at end of stream to wake trailer-driven consumers.
+        encoder_callbacks_->addEncodedTrailers();
+        config_->stats().usage_trailers_synthesized_.inc();
+        ENVOY_LOG(trace, "ai_protocol_manager: added end-of-stream trailers to carry usage");
+      }
     }
   }
   return Http::FilterDataStatus::Continue;
@@ -532,7 +540,7 @@ Http::FilterTrailersStatus AiProtocolManagerFilter::encodeTrailers(Http::Respons
   return Http::FilterTrailersStatus::Continue;
 }
 
-void AiProtocolManagerFilter::finalizeResponseHandling() {
+bool AiProtocolManagerFilter::finalizeResponseHandling() {
   response_finalized_ = true;
 
   TokenUsage usage = response_handler_->usage();
@@ -542,7 +550,7 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
     // Legitimately absent usage: e.g. an OpenAI stream without
     // `stream_options.include_usage`, or an unrecognized response shape.
     config_->stats().token_usage_missing_.inc();
-    return;
+    return false;
   }
 
   // Two publications for one stream (both-placement installs) would leave
@@ -556,7 +564,7 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
               "(both-placement installation); skipping duplicate publication",
               config_->metadataNamespace());
     config_->stats().token_usage_duplicate_.inc();
-    return;
+    return false;
   }
 
   // Convert the finalized accumulator once into the authoritative typed
@@ -583,7 +591,7 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
     config_->stats().token_usage_failed_.inc();
     ENVOY_LOG(trace, "ai_protocol_manager: status-only (failed) record published to namespace {}",
               config_->metadataNamespace());
-    return;
+    return true;
   }
   if (degraded) {
     config_->stats().token_usage_partial_.inc();
@@ -595,6 +603,7 @@ void AiProtocolManagerFilter::finalizeResponseHandling() {
   config_->stats().token_usage_found_.inc();
   ENVOY_LOG(trace, "ai_protocol_manager: token usage published to namespace {}",
             config_->metadataNamespace());
+  return true;
 }
 
 } // namespace AiProtocolManager

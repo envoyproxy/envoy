@@ -346,6 +346,29 @@ namespace alone is not sufficient:
       typed:
       - envoy.ai.token_usage
 
+When the external processor only needs token usage metadata, streaming response body
+bytes across gRPC can be avoided. Configuring :ref:`usage_signal
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.usage_signal>`
+to ``SYNTHESIZE_TRAILERS`` adds empty response trailers at end of stream if none exist.
+A downstream ``ext_proc`` filter with ``response_trailer_mode: SEND`` and
+``response_body_mode: NONE`` receives the token usage metadata in ``metadata_context``
+without streaming response body bytes:
+
+.. code-block:: yaml
+
+  # Upstream filter chain:
+  response_handling:
+    token_usage:
+      usage_signal: SYNTHESIZE_TRAILERS
+
+.. code-block:: yaml
+
+  # Downstream ext_proc:
+  processing_mode:
+    response_header_mode: SKIP
+    response_body_mode: NONE
+    response_trailer_mode: SEND
+
 Upstream (cluster) installation
 -------------------------------
 
@@ -420,3 +443,4 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   response_body_too_large, Counter, A JSON response exceeded ``max_json_body_size``; extraction skipped.
   sse_event_too_large, Counter, Pending or complete SSE event data exceeded ``max_sse_event_size``; that entire event was skipped.
   unsupported_content_encoding, Counter, The response carried a non-identity ``content-encoding``; extraction skipped.
+  usage_trailers_synthesized, Counter, Empty response trailers were synthesized at end of stream to carry token usage to a downstream consumer.

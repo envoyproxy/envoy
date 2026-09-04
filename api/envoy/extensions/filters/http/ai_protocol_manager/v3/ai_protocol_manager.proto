@@ -109,6 +109,17 @@ message ResponseHandling {
 // metadata readers such as ext_proc typed forwarding. No untyped ``Struct``
 // mirror is emitted.
 message TokenUsageExtraction {
+  // Stream signals emitted upon publishing token usage metadata.
+  enum UsageSignal {
+    USAGE_SIGNAL_UNSPECIFIED = 0;
+
+    // Synthesize empty response trailers at end of stream if none exist.
+    // This wakes downstream trailer-driven consumers (such as ext_proc with
+    // ``response_trailer_mode: SEND``) with metadata context without transferring
+    // response body bytes.
+    SYNTHESIZE_TRAILERS = 1;
+  }
+
   // Also inspect responses on routes without per-route configuration.
   //
   // Defaults to ``false``: only routes carrying an
@@ -136,6 +147,9 @@ message TokenUsageExtraction {
 
   // Extraction resource limits. Defaults apply when unset.
   TokenUsageExtractionLimits limits = 4;
+
+  // Optional signal to emit at end of stream after publishing token usage.
+  UsageSignal usage_signal = 5 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Per-stream memory and work limits for token-usage extraction. The response
