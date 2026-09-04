@@ -958,6 +958,13 @@ case $CI_TARGET in
               --noenable_workspace \
               deps --lockfile_mode=update
         popd
+        pushd "bazel/tests/external/"
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+              --enable_bzlmod \
+              --noenable_workspace \
+              deps --lockfile_mode=update
+        popd
         ;;
 
     msan)
