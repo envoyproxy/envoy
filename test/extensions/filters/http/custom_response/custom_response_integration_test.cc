@@ -1046,10 +1046,9 @@ TEST_P(CustomResponseIntegrationTest, LocalReplyMatcherIgnoresUpstreamResponse) 
   EXPECT_TRUE(response->headers().get(::Envoy::Http::LowerCaseString("x-local-reply")).empty());
 }
 
-// TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
     Protocols, CustomResponseIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    testing::ValuesIn(HttpProtocolIntegrationTest::getHttp1OnlyProtocolTestParams()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 } // namespace CustomResponse
 } // namespace HttpFilters
