@@ -8,12 +8,15 @@
 #include "envoy/formatter/http_formatter_context.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/hex.h"
 #include "source/common/tracing/custom_tag_impl.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_detector.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_cat.h"
@@ -112,7 +115,8 @@ opentelemetry::proto::logs::v1::ScopeLogs* initOtlpMessageRoot(
     opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest& message,
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
-    const LocalInfo::LocalInfo& local_info);
+    Server::Configuration::ServerFactoryContext& context,
+    const Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider);
 
 } // namespace OpenTelemetry
 } // namespace AccessLoggers
