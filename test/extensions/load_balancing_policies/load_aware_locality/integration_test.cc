@@ -30,15 +30,16 @@ public:
   void initializeConfig(double variance_threshold = 0.1, double remote_probe_fraction = 0.1,
                         int weight_update_period_seconds = 10,
                         int smoothing_time_constant_seconds = 1,
-                        std::vector<std::string> remote_zones = {"zone-b"}) {
-    num_upstreams_ = static_cast<uint32_t>(2 * (1 + remote_zones.size()));
+                        std::vector<std::string> remote_zones = {"zone-b"},
+                        uint32_t endpoints_per_zone = 2) {
+    num_upstreams_ = endpoints_per_zone * static_cast<uint32_t>(1 + remote_zones.size());
     setUpstreamCount(num_upstreams_);
 
     const auto ip_version = GetParam();
     config_helper_.addConfigModifier(
         [ip_version, variance_threshold, remote_probe_fraction, weight_update_period_seconds,
-         smoothing_time_constant_seconds,
-         remote_zones](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+         smoothing_time_constant_seconds, remote_zones,
+         endpoints_per_zone](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
           auto* node = bootstrap.mutable_node();
           node->set_id("node_name");
           node->set_cluster("cluster_name");
@@ -58,7 +59,7 @@ public:
             auto* locality_pb = cluster->mutable_load_assignment()->add_endpoints();
             locality_pb->mutable_locality()->set_region("test-region");
             locality_pb->mutable_locality()->set_zone(zone);
-            for (int i = 0; i < 2; ++i) {
+            for (uint32_t i = 0; i < endpoints_per_zone; ++i) {
               auto* addr = locality_pb->add_lb_endpoints()
                                ->mutable_endpoint()
                                ->mutable_address()
@@ -261,21 +262,30 @@ TEST_P(LoadAwareLocalityIntegrationTest, AdaptiveSpillAndRecovery) {
 }
 
 TEST_P(LoadAwareLocalityIntegrationTest, EwmaDampensSpike) {
-  // smoothing_time_constant=14s with weight_update_period=10s yields alpha ~= 0.51.
+  // Use one endpoint per locality and a fixed locality percentile so this test observes the
+  // damped weight directly instead of relying on a probabilistic 100-request traffic sample.
+  // splitMix64(20) / UINT64_MAX ~= 0.211, which is between the local selection fractions before
+  // and after an undamped spike, but remains below the fraction after an EWMA-damped spike.
+  setDeterministicValue(20);
   initializeConfig(/*variance_threshold=*/0.1, /*remote_probe_fraction=*/0.1,
-                   /*weight_update_period_seconds=*/10, /*smoothing_time_constant_seconds=*/14);
+                   /*weight_update_period_seconds=*/10, /*smoothing_time_constant_seconds=*/14,
+                   /*remote_zones=*/{"zone-b"}, /*endpoints_per_zone=*/1);
 
-  const std::vector<double> baseline = {0.2, 0.2, 0.2, 0.2};
-  seedWithTwoCycles(baseline, "local_preferred_total");
-
-  const std::vector<double> spiked_local = {0.9, 0.9, 0.2, 0.2};
-  sendRequestsAndTrack(30, spiked_local);
+  // The first request is local because the no-data snapshot prefers local traffic. Establish a
+  // 0.2 local EWMA; the remote endpoint intentionally has no report and therefore contributes a
+  // utilization of zero.
+  EXPECT_EQ(0u, sendRequestWithOrcaResponse({0.2, 0.2}));
   advanceWeightTick("spill_active_total");
 
-  const auto usage = sendRequestsAndTrack(100, spiked_local);
-  const uint64_t remote = remoteTraffic(usage);
-  EXPECT_GE(remote, 40u);
-  EXPECT_LE(remote, 85u);
+  // The fixed percentile still selects local after the spike only because alpha ~= 0.51 dampens
+  // the 0.2 -> 0.9 transition. Without EWMA it would select remote.
+  const std::vector<double> spiked_local = {0.9, 0.2};
+  EXPECT_EQ(0u, sendRequestWithOrcaResponse(spiked_local));
+  advanceWeightTick("spill_active_total");
+
+  const auto usage = sendRequestsAndTrack(1, spiked_local);
+  EXPECT_EQ(1u, localTraffic(usage));
+  EXPECT_EQ(0u, remoteTraffic(usage));
 }
 
 TEST_P(LoadAwareLocalityIntegrationTest, ThreeLocalityDistribution) {
