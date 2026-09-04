@@ -35,6 +35,6 @@ envoy_cc_test_with_engine_builder(
         "//test/common/integration:engine_with_test_server",
         "//test/common/integration:test_server_lib",
         "@envoy//source/common/common:assert_lib",
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:test_extensions",
     ],
 )

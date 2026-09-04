@@ -1,5 +1,5 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
-load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_swift_test")
+load("//bazel:apple.bzl", "envoy_mobile_swift_test")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 
 licenses(["notice"])  # Apache 2
@@ -284,6 +284,6 @@ objc_library(
     module_name = "TestExtensions",
     visibility = ["//visibility:public"],
     deps = [
-        "@envoy_build_config//:test_extensions_no_autoregister",
+        "@mobile_envoy_build_config//:test_extensions_no_autoregister",
     ],
 )

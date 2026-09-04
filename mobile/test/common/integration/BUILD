@@ -44,7 +44,7 @@ envoy_cc_test_with_engine_builder(
         "@envoy//test/test_common:test_random_generator_lib",
         "@envoy//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:test_extensions",
         "@quiche//:quic_test_tools_test_utils_lib",
     ],
 )
@@ -92,7 +92,7 @@ envoy_cc_test_library(
         "@envoy//test/mocks/server:factory_context_mocks",
         "@envoy//test/mocks/server:server_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
-        "@envoy_build_config//:extension_registry",
+        "@mobile_envoy_build_config//:extension_registry",
     ] + envoy_select_signal_trace(
         ["@envoy//source/common/signal:sigaction_lib"],
         "@envoy",
@@ -214,8 +214,8 @@ envoy_cc_test_library_with_engine_builder(
         "@envoy//test/test_common:environment_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_build_config//:extension_registry",
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:extension_registry",
+        "@mobile_envoy_build_config//:test_extensions",
     ],
 )
 
@@ -243,7 +243,7 @@ envoy_cc_test_library(
         "@envoy//test/mocks/server:server_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
-        "@envoy_build_config//:extension_registry",
+        "@mobile_envoy_build_config//:extension_registry",
     ] + envoy_select_signal_trace(
         ["@envoy//source/common/signal:sigaction_lib"],
         "@envoy",
