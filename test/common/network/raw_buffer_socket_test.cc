@@ -84,7 +84,9 @@ TEST_F(RawBufferSocketReadLimitTest, AccountsForDataConsumedBetweenReads) {
         data.add(std::string(20, 'a'));
         return Api::IoCallUint64Result(20, Api::IoError::none());
       }));
-  EXPECT_CALL(callbacks_, shouldDrainReadBuffer()).WillOnce(testing::Return(true));
+  EXPECT_CALL(callbacks_, shouldDrainReadBuffer())
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
   EXPECT_CALL(callbacks_, setTransportSocketIsReadable());
 
   const IoResult first_result = socket_->doRead(buffer);
