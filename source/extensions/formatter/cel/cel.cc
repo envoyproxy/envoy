@@ -107,6 +107,12 @@ void CELFormatter::formatValueTo(Envoy::Formatter::ValueSink& sink,
   sink.addValue(value);
 }
 
+CELFormatterCommandParser::CELFormatterCommandParser(
+    Expr::BuilderInstanceSharedConstPtr expr_builder)
+    : configured_expr_builder_(std::move(expr_builder)) {
+  ASSERT(configured_expr_builder_ != nullptr);
+}
+
 absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 CELFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
                                  std::optional<size_t> max_length) const {
@@ -117,11 +123,16 @@ CELFormatterCommandParser::parse(absl::string_view command, absl::string_view su
       return absl::InvalidArgumentError(
           absl::StrCat("Not able to parse expression: ", parse_status.status().ToString()));
     }
+
+    // Built-in parsers are process-global and may outlive a server context; resolve the default
+    // builder per parse to avoid reusing it across server contexts.
     Server::Configuration::ServerFactoryContext& context =
         Server::Configuration::ServerFactoryContextInstance::get();
-    return std::make_unique<CELFormatter>(
-        context.localInfo(), Extensions::Filters::Common::Expr::getBuilder(context),
-        parse_status.value().expr(), max_length, command == "TYPED_CEL");
+    const auto expr_builder =
+        configured_expr_builder_ != nullptr ? configured_expr_builder_ : Expr::getBuilder(context);
+    return std::make_unique<CELFormatter>(context.localInfo(), expr_builder,
+                                          parse_status.value().expr(), max_length,
+                                          command == "TYPED_CEL");
   }
 
   return nullptr;
