@@ -5,8 +5,7 @@ module(
 
 bazel_dep(name = "envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev.20260903.16b0d47.envoy")
-bazel_dep(name = "envoy-example-wasm-cc", version = "0.2.5.envoy")
-bazel_dep(name = "envoy-examples", version = "0.2.5.envoy")
+bazel_dep(name = "envoy-examples", version = "0.2.6.envoy")
 bazel_dep(name = "envoy_toolshed", version = "0.4.13.envoy")
 bazel_dep(name = "googleurl", version = "0.0.0-221103-dd4080f.envoy")
 bazel_dep(name = "grpc", version = "1.83.0.envoy")
