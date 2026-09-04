@@ -19,9 +19,6 @@ startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 # global
 #############################################################################
 
-common --enable_bzlmod
-common --noenable_workspace
-common --@envoy//bazel:enable_bzlmod=True
 common --noincompatible_disallow_empty_glob
 common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
@@ -504,7 +501,6 @@ build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 # This flag may be more generally useful - it sets foreign_cc builds -jauto.
 # It is only set here because if it were the default it risks OOMing on local builds.
-build:remote --@envoy//bazel/foreign_cc:parallel_builds
 build:remote --@openssl//:parallel_builds
 
 ## RBE (Engflow Envoy)
