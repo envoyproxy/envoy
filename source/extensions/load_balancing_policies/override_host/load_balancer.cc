@@ -217,11 +217,12 @@ void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedHostKey(
   Protobuf::Struct* updated_metadata_ptr = &updated_metadata;
 
   for (size_t i = 0; i + 1 < metadata_key.path_.size(); i++) {
-    Protobuf::Value& current_val = (*updated_metadata_ptr->mutable_fields())[metadata_key.path_[i]];
+    Protobuf::Value& current_val =
+        (*updated_metadata_ptr->mutable_fields())[metadata_key.path_[i].key_];
     updated_metadata_ptr = current_val.mutable_struct_value();
   }
 
-  (*updated_metadata_ptr->mutable_fields())[metadata_key.path_.back()].set_string_value(
+  (*updated_metadata_ptr->mutable_fields())[metadata_key.path_.back().key_].set_string_value(
       selected_endpoint);
 
   // Set the value of the metadata key to be the host:port
