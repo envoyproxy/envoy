@@ -317,7 +317,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       disable_immediate_response_(config.disable_immediate_response()), is_upstream_(is_upstream),
       graceful_grpc_close_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_graceful_grpc_close")),
-      allow_content_length_header_(config.allow_content_length_header()) {
+      allow_content_length_header_(config.allow_content_length_header()),
+      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)) {
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
   }
@@ -662,6 +663,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(
       failure_mode_allow_(config.overrides().has_failure_mode_allow()
                               ? std::optional<bool>(config.overrides().failure_mode_allow().value())
                               : std::nullopt),
+      emit_client_span_(config.overrides().has_emit_client_span()
+                            ? std::optional<bool>(config.overrides().emit_client_span().value())
+                            : std::nullopt),
       processing_request_modifier_factory_cb_(
           createProcessingRequestModifierCb(config.overrides(), builder, context)) {}
 
@@ -695,6 +699,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       failure_mode_allow_(more_specific.failureModeAllow().has_value()
                               ? more_specific.failureModeAllow()
                               : less_specific.failureModeAllow()),
+      emit_client_span_(more_specific.emitClientSpan().has_value()
+                            ? more_specific.emitClientSpan()
+                            : less_specific.emitClientSpan()),
       processing_request_modifier_factory_cb_(
           more_specific.processing_request_modifier_factory_cb_
               ? more_specific.processing_request_modifier_factory_cb_
@@ -798,7 +805,7 @@ Filter::StreamOpenState Filter::openStream() {
                        .setParentSpan(decoder_callbacks_->activeSpan())
                        .setParentContext(grpc_context)
                        .setBufferBodyForRetry(grpc_service_.has_retry_policy())
-                       .setSampled(std::nullopt)
+                       .setSampled(emit_client_span_ ? std::nullopt : std::make_optional(false))
                        .setRemoteCloseTimeout(config_->remoteCloseTimeout());
 
     ExternalProcessorClient* grpc_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
@@ -2306,6 +2313,12 @@ void Filter::mergePerRouteConfig() {
     ENVOY_STREAM_LOG(trace, "Setting new failureModeAllow from per-route configuration",
                      *decoder_callbacks_);
     failure_mode_allow_ = merged_config->failureModeAllow().value();
+  }
+
+  if (merged_config->emitClientSpan().has_value()) {
+    ENVOY_STREAM_LOG(trace, "Setting new emitClientSpan from per-route configuration",
+                     *decoder_callbacks_);
+    emit_client_span_ = merged_config->emitClientSpan().value();
   }
 
   if (merged_config->hasProcessingRequestModifierConfig()) {

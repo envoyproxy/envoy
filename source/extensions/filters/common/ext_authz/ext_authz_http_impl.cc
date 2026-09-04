@@ -178,14 +178,16 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
                         ? THROW_OR_RETURN_VALUE(
                               createRetryPolicy(config.http_service().retry_policy(), context),
                               Router::RetryPolicyConstSharedPtr)
-                        : nullptr) {
+                        : nullptr),
+      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)) {
   THROW_IF_NOT_OK(
       validateOnlyOneOfPathPrefixOrOverride(path_prefix, config.http_service().path_override()));
 }
 
 ClientConfig::ClientConfig(
     const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service,
-    bool encode_raw_headers, uint32_t timeout, Server::Configuration::CommonFactoryContext& context)
+    bool encode_raw_headers, uint32_t timeout, Server::Configuration::CommonFactoryContext& context,
+    bool emit_client_span)
     : client_header_matchers_(toClientMatchers(
           http_service.authorization_response().allowed_client_headers(), context)),
       client_header_on_success_matchers_(toClientMatchersOnSuccess(
@@ -212,7 +214,8 @@ ClientConfig::ClientConfig(
           http_service.has_retry_policy()
               ? THROW_OR_RETURN_VALUE(createRetryPolicy(http_service.retry_policy(), context),
                                       Router::RetryPolicyConstSharedPtr)
-              : nullptr) {
+              : nullptr),
+      emit_client_span_(emit_client_span) {
   THROW_IF_NOT_OK(validateOnlyOneOfPathPrefixOrOverride(http_service.path_prefix(),
                                                         http_service.path_override()));
 }
@@ -271,7 +274,9 @@ ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatch
 }
 
 RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)
-    : cm_(cm), config_(config) {}
+    : cm_(cm), config_(config) {
+  emit_client_span_ = config_->emitClientSpan();
+}
 
 RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(callbacks_ == nullptr); }
 
@@ -373,7 +378,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        .setTimeout(config_->timeout())
                        .setParentSpan(parent_span)
                        .setChildSpanName(config_->tracingName())
-                       .setSampled(std::nullopt);
+                       .setSampled(emit_client_span_ ? std::nullopt : std::make_optional(false));
 
     options.setSendXff(false);
 
