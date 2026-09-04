@@ -32,6 +32,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
 #include "test/integration/fake_upstream.h"
+#include "test/integration/server.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -594,7 +595,7 @@ public:
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
   Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::IsolatedStoreImpl stats_store_{*symbol_table_};
+  Stats::TestIsolatedStoreImpl stats_store_{*symbol_table_};
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   DispatcherHelper dispatcher_helper_{*dispatcher_};
@@ -672,6 +673,8 @@ public:
   GrpcSslClientIntegrationTest() {
     ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(server_factory_context_, serverScope())
+        .WillByDefault(ReturnRef(*stats_store_.rootScope()));
     ON_CALL(server_factory_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(*dispatcher_));
   }
   void TearDown() override {
