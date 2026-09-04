@@ -325,6 +325,7 @@ private:
     OptRef<const Router::Route> route(const Router::RouteCallback& cb) override;
     Router::RouteConstSharedPtr routeSharedPtr(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
+    void refreshRouteConfigSnapshot() override;
     void refreshRouteCluster() override;
     void recreateClusterInfo() override;
     void requestRouteConfigUpdate(
