@@ -217,6 +217,10 @@ public:
   // Subscribe to a cluster with a given name. It's meant to eventually send a discovery request
   // with the cluster name to the management server.
   virtual void updateOnDemand(std::string cluster_name) PURE;
+
+  // Notifies ODCDS of a terminal on-demand discovery status.
+  virtual void onDiscoveryTerminated(absl::string_view /*resource_name*/,
+                                     ClusterDiscoveryStatus /*status*/) {}
 };
 
 using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
