@@ -1886,6 +1886,45 @@ WEAK_STUB(ClusterSpecifierConfigRecordHistogramValue,
                                                                                         nullptr, 0,
                                                                                         0))
 
+WEAK_STUB(EarlyHeaderMutationAddHeader,
+          envoy_dynamic_module_callback_early_header_mutation_add_header(nullptr, {nullptr, 0},
+                                                                         {nullptr, 0}))
+WEAK_STUB(EarlyHeaderMutationGetAttributeBool,
+          envoy_dynamic_module_callback_early_header_mutation_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetAttributeInt,
+          envoy_dynamic_module_callback_early_header_mutation_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetAttributeString,
+          envoy_dynamic_module_callback_early_header_mutation_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetDynamicMetadata,
+          envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetDynamicMetadataBool,
+          envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_bool(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetDynamicMetadataNumber,
+          envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_number(
+              nullptr, {nullptr, 0}, {nullptr, 0}, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetFilterStateBytes,
+          envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes(nullptr,
+                                                                                     {nullptr, 0},
+                                                                                     nullptr))
+WEAK_STUB(EarlyHeaderMutationGetHeaderValue,
+          envoy_dynamic_module_callback_early_header_mutation_get_header_value(nullptr,
+                                                                               {nullptr, 0},
+                                                                               nullptr, 0, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetHeaders,
+          envoy_dynamic_module_callback_early_header_mutation_get_headers(nullptr, nullptr))
+WEAK_STUB(EarlyHeaderMutationGetHeadersSize,
+          envoy_dynamic_module_callback_early_header_mutation_get_headers_size(nullptr))
+WEAK_STUB(EarlyHeaderMutationRemoveHeader,
+          envoy_dynamic_module_callback_early_header_mutation_remove_header(nullptr, {nullptr, 0}))
+WEAK_STUB(EarlyHeaderMutationSetHeader,
+          envoy_dynamic_module_callback_early_header_mutation_set_header(nullptr, {nullptr, 0},
+                                                                         {nullptr, 0}))
+
 WEAK_STUB(FormatterGetAccessLogType,
           envoy_dynamic_module_callback_formatter_get_access_log_type(nullptr))
 WEAK_STUB(FormatterGetAttributeBool,
