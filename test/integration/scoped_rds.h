@@ -70,18 +70,9 @@ protected:
         [this](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 http_connection_manager) {
-          const std::string& scope_key_builder_config_yaml = R"EOF(
-fragments:
-  - header_value_extractor:
-      name: Addr
-      element_separator: ;
-      element:
-        key: x-foo-key
-        separator: =
-)EOF";
           envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
               ScopeKeyBuilder scope_key_builder;
-          TestUtility::loadFromYaml(scope_key_builder_config_yaml, scope_key_builder);
+          TestUtility::loadFromYaml(scope_key_builder_config_yaml_, scope_key_builder);
           auto* scoped_routes = http_connection_manager.mutable_scoped_routes();
           scoped_routes->set_name(srds_config_name_);
           *scoped_routes->mutable_scope_key_builder() = scope_key_builder;
@@ -316,6 +307,17 @@ fragments:
            sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta;
   }
 
+  // Scope key builder used by the primary listener. Overridable so tests can key scopes on
+  // stream-sourced fragments (e.g. filter_state) instead of headers.
+  std::string scope_key_builder_config_yaml_{R"EOF(
+fragments:
+  - header_value_extractor:
+      name: Addr
+      element_separator: ;
+      element:
+        key: x-foo-key
+        separator: =
+)EOF"};
   const std::string srds_config_name_{"foo-scoped-routes"};
   std::size_t rds_upstream_idx_ = -1;
   std::size_t srds_upstream_idx_ = -1;

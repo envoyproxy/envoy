@@ -82,6 +82,79 @@ key:
   cleanupUpstreamAndDownstream();
 }
 
+// An on demand scope keyed on filter state initializes RDS and routes successfully. The scope key
+// is stream-sourced, so the on demand update reuses the key computed during scope selection rather
+// than recomputing it from headers (which lack stream info).
+TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdateFilterStateScopeKey) {
+  scope_key_builder_config_yaml_ = R"EOF(
+fragments:
+  - filter_state:
+      key: route_policy
+)EOF";
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    )EOF");
+  // Set the scope key filter state from a header, then clear the route cache so the scope key is
+  // recomputed with the filter state present before the on demand filter requests an update.
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.set_filter_state
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+      on_request_headers:
+      - object_key: route_policy
+        factory_key: envoy.string
+        format_string:
+          text_format_source:
+            inline_string: "%REQ(x-route-policy)%"
+      clear_route_cache: true
+    )EOF");
+  const std::string scope_route1 = R"EOF(
+name: foo_scope1
+route_configuration_name: foo_route1
+on_demand: true
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+  on_server_init_function_ = [this, &scope_route1]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  constexpr absl::string_view route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // The filter state scope key matches the lazily loaded scope and triggers on demand loading.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "sni.lyft.com"},
+                                     {":scheme", "http"},
+                                     {"x-route-policy", "foo"}});
+  createRdsStream("foo_route1");
+  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
+  test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  cleanupUpstreamAndDownstream();
+}
+
 // With on demand update filter configured, scope not match should still return 404
 TEST_P(OnDemandScopedRdsIntegrationTest, OnDemandUpdateScopeNotMatch) {
 

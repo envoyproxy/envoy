@@ -1739,9 +1739,9 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
-  auto scope_key =
-      connection_manager_.config_->scopeKeyBuilder()->computeScopeKey(*request_headers_);
-  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(scope_key);
+  snapped_scope_key_ = connection_manager_.config_->scopeKeyBuilder()->computeScopeKey(
+      *request_headers_, filter_manager_.streamInfo());
+  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(snapped_scope_key_);
   if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
     // TODO(stevenzzzz): Consider to pass an error message to router filter, so that it can
@@ -1905,7 +1905,8 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
   if (route_config_update_requester_.has_value()) {
     (*route_config_update_requester_)
         ->requestRouteConfigUpdate(*this, route_config_updated_cb, routeConfig(),
-                                   *connection_manager_.dispatcher_, *request_headers_);
+                                   *connection_manager_.dispatcher_, *request_headers_,
+                                   std::move(snapped_scope_key_));
   }
 }
 
@@ -2554,6 +2555,7 @@ void ConnectionManagerImpl::ActiveStream::blockRouteCache() {
   // Clear the snapped route configuration because it is unnecessary to keep it.
   snapped_route_config_.reset();
   snapped_scoped_routes_config_.reset();
+  snapped_scope_key_.reset();
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestDataTooLarge() {

@@ -518,6 +518,10 @@ private:
     // route configuration is updated frequently and the request is long-lived.
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
+    // The stream-aware scope key computed by the most recent snapScopedRouteConfig(). Reused by the
+    // on demand SRDS update path so stream-sourced fragments (e.g. filter_state) are not recomputed
+    // without stream info.
+    Router::ScopeKeyPtr snapped_scope_key_;
     // This is used to track the route that has been cached in the request. And we will keep this
     // route alive until the request is finished.
     std::optional<Router::RouteConstSharedPtr> cached_route_;

@@ -2,6 +2,7 @@
 
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/router/string_accessor.h"
 
 #include "source/common/protobuf/utility.h"
 
@@ -41,7 +42,8 @@ HeaderValueExtractorImpl::HeaderValueExtractorImpl(
 }
 
 std::unique_ptr<ScopeKeyFragmentBase>
-HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const {
+HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers,
+                                          OptRef<const StreamInfo::StreamInfo>) const {
   const auto header_entry =
       headers.get(Envoy::Http::LowerCaseString(header_value_extractor_config_.name()));
   if (header_entry.empty()) {
@@ -77,6 +79,27 @@ HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const 
   return nullptr;
 }
 
+FilterStateExtractorImpl::FilterStateExtractorImpl(
+    ScopedRoutes::ScopeKeyBuilder::FragmentBuilder&& config)
+    : FragmentBuilderBase(std::move(config)), key_(config_.filter_state().key()) {
+  ASSERT(config_.type_case() == ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::kFilterState,
+         "filter_state is not set.");
+}
+
+std::unique_ptr<ScopeKeyFragmentBase>
+FilterStateExtractorImpl::computeFragment(const Http::HeaderMap&,
+                                          OptRef<const StreamInfo::StreamInfo> stream_info) const {
+  if (!stream_info.has_value()) {
+    return nullptr;
+  }
+  // Reads through the ancestor chain, so objects at a longer life span are visible.
+  const auto* accessor = stream_info->filterState().getDataReadOnly<StringAccessor>(key_);
+  if (accessor == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<StringKeyFragment>(accessor->asString());
+}
+
 ScopedRouteInfo::ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfiguration&& config_proto,
                                  ConfigConstSharedPtr route_config)
     : config_proto_(std::move(config_proto)), route_config_(route_config),
@@ -103,17 +126,23 @@ ScopeKeyBuilderImpl::ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config)
       fragment_builders_.emplace_back(std::make_unique<HeaderValueExtractorImpl>(
           ScopedRoutes::ScopeKeyBuilder::FragmentBuilder(fragment_builder)));
       break;
+    case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::kFilterState:
+      fragment_builders_.emplace_back(std::make_unique<FilterStateExtractorImpl>(
+          ScopedRoutes::ScopeKeyBuilder::FragmentBuilder(fragment_builder)));
+      break;
     case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::TYPE_NOT_SET:
       PANIC("not implemented");
     }
   }
 }
 
-ScopeKeyPtr ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers) const {
+ScopeKeyPtr
+ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers,
+                                     OptRef<const StreamInfo::StreamInfo> stream_info) const {
   ScopeKey key;
   for (const auto& builder : fragment_builders_) {
     // returns nullopt if a null fragment is found.
-    std::unique_ptr<ScopeKeyFragmentBase> fragment = builder->computeFragment(headers);
+    std::unique_ptr<ScopeKeyFragmentBase> fragment = builder->computeFragment(headers, stream_info);
     if (fragment == nullptr) {
       return nullptr;
     }

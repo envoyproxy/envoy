@@ -55,6 +55,43 @@ scope_key_builder:
           TestUtility::loadFromYaml(scoped_routes_yaml, *scoped_routes);
         });
   }
+
+  // Same as setScopedRoutesConfig, but the scope key is built from a filter state object instead of
+  // a request header.
+  void setFilterStateScopedRoutesConfig(absl::string_view config_yaml) {
+    config_helper_.addConfigModifier(
+        [config_yaml](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes*
+              scoped_routes = hcm.mutable_scoped_routes();
+          const std::string scoped_routes_yaml = absl::StrCat(R"EOF(
+name: foo-scoped-routes
+scope_key_builder:
+  fragments:
+    - filter_state:
+        key: test.scope_key
+)EOF",
+                                                              config_yaml);
+          TestUtility::loadFromYaml(scoped_routes_yaml, *scoped_routes);
+        });
+  }
+
+  // Prepends a network filter that writes `value` into filter state at connection life span.
+  void addFilterStateNetworkFilter(absl::string_view value) {
+    config_helper_.addNetworkFilter(fmt::format(R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+  - object_key: test.scope_key
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: {}
+)EOF",
+                                                value));
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, InlineScopedRoutesIntegrationTest,
@@ -88,6 +125,220 @@ scoped_route_configurations_list:
                                      {":scheme", "http"},
                                      // "xyz-route" is not a configured scope key.
                                      {"Addr", "x-foo-key=xyz-route"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
+}
+
+// The scope key is built from a filter state object written by a network filter.
+TEST_P(InlineScopedRoutesIntegrationTest, ScopeKeyFromFilterState) {
+  absl::string_view config_yaml = R"EOF(
+scoped_route_configurations_list:
+  scoped_route_configurations:
+    - name: foo-scope
+      route_configuration:
+        name: foo
+        virtual_hosts:
+          - name: bar
+            domains: ["*"]
+            routes:
+              - match: { prefix: "/" }
+                route: { cluster: cluster_0 }
+      key:
+        fragments: { string_key: foo-scope-key }
+)EOF";
+  setFilterStateScopedRoutesConfig(config_yaml);
+  addFilterStateNetworkFilter("foo-scope-key");
+  initialize();
+
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      /*request_size=*/0, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo"}},
+      /*response_size=*/0,
+      /*backend_idx=*/0);
+}
+
+// The filter state value does not match any configured scope, so no scoped route binds.
+TEST_P(InlineScopedRoutesIntegrationTest, ScopeKeyFromFilterStateNoScopeFound) {
+  absl::string_view config_yaml = R"EOF(
+scoped_route_configurations_list:
+  scoped_route_configurations:
+    - name: foo-scope
+      route_configuration:
+        name: foo
+        virtual_hosts:
+          - name: bar
+            domains: ["*"]
+            routes:
+              - match: { prefix: "/" }
+                route: { cluster: cluster_0 }
+      key:
+        fragments: { string_key: foo-scope-key }
+)EOF";
+  setFilterStateScopedRoutesConfig(config_yaml);
+  addFilterStateNetworkFilter("not-a-configured-scope-key");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
+}
+
+// Without the network filter nothing writes the filter state object, so no fragment can be computed
+// and no scoped route binds.
+TEST_P(InlineScopedRoutesIntegrationTest, ScopeKeyFromFilterStateMissingObject) {
+  absl::string_view config_yaml = R"EOF(
+scoped_route_configurations_list:
+  scoped_route_configurations:
+    - name: foo-scope
+      route_configuration:
+        name: foo
+        virtual_hosts:
+          - name: bar
+            domains: ["*"]
+            routes:
+              - match: { prefix: "/" }
+                route: { cluster: cluster_0 }
+      key:
+        fragments: { string_key: foo-scope-key }
+)EOF";
+  setFilterStateScopedRoutesConfig(config_yaml);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
+}
+
+// The matched route's per-filter configuration applies when the scope key comes from filter state.
+// The filter is disabled on one route and left enabled on another to show the disable is per route.
+TEST_P(InlineScopedRoutesIntegrationTest, ScopeKeyFromFilterStateAppliesPerFilterConfig) {
+  absl::string_view config_yaml = R"EOF(
+scoped_route_configurations_list:
+  scoped_route_configurations:
+    - name: foo-scope
+      route_configuration:
+        name: foo
+        virtual_hosts:
+          - name: bar
+            domains: ["*"]
+            routes:
+              - match: { prefix: "/disabled" }
+                route: { cluster: cluster_0 }
+                typed_per_filter_config:
+                  header-mutation:
+                    "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+                    disabled: true
+              - match: { prefix: "/" }
+                route: { cluster: cluster_0 }
+      key:
+        fragments: { string_key: foo-scope-key }
+)EOF";
+  // The filter adds a response header unless the matched route disables it.
+  config_helper_.prependFilter(R"EOF(
+name: header-mutation
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
+  mutations:
+    response_mutations:
+    - append:
+        header: { key: x-mutated, value: "mutated" }
+        append_action: OVERWRITE_IF_EXISTS_OR_ADD
+)EOF");
+  setFilterStateScopedRoutesConfig(config_yaml);
+  addFilterStateNetworkFilter("foo-scope-key");
+  initialize();
+
+  // The route that leaves the filter enabled is mutated.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/enabled"}, {":authority", "host"}, {":scheme", "http"}});
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(
+      "mutated",
+      response->headers().get(Http::LowerCaseString("x-mutated"))[0]->value().getStringView());
+  cleanupUpstreamAndDownstream();
+
+  // The route that disables the filter is not mutated, so the per-route disable was applied when
+  // the filter chain was created.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/disabled"}, {":authority", "host"}, {":scheme", "http"}});
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("x-mutated")).empty());
+  cleanupUpstreamAndDownstream();
+}
+
+// A scope key may combine header and filter state fragments; both must resolve.
+TEST_P(InlineScopedRoutesIntegrationTest, ScopeKeyFromHeaderAndFilterState) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        TestUtility::loadFromYaml(R"EOF(
+name: foo-scoped-routes
+scope_key_builder:
+  fragments:
+    - header_value_extractor:
+        name: Addr
+        element_separator: ;
+        element:
+          key: x-foo-key
+          separator: =
+    - filter_state:
+        key: test.scope_key
+scoped_route_configurations_list:
+  scoped_route_configurations:
+    - name: foo-scope
+      route_configuration:
+        name: foo
+        virtual_hosts:
+          - name: bar
+            domains: ["*"]
+            routes:
+              - match: { prefix: "/" }
+                route: { cluster: cluster_0 }
+      key:
+        fragments:
+          - string_key: from-header
+          - string_key: foo-scope-key
+)EOF",
+                                  *hcm.mutable_scoped_routes());
+      });
+  addFilterStateNetworkFilter("foo-scope-key");
+  initialize();
+
+  // Both fragments resolve to the configured scope.
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=from-header"}},
+      /*request_size=*/0, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo"}},
+      /*response_size=*/0,
+      /*backend_idx=*/0);
+
+  // The header fragment no longer matches, so the composed key matches no scope.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=other"}});
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
