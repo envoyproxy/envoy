@@ -197,7 +197,6 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
     # SSL/crypto dependencies are resolved via EXTERNAL_DEPS_MAP in envoy_internal.bzl
     _boringssl()
     _boringssl_fips()
-    _boringssl_source()
     _openssl()
 
     _aws_c_auth_testdata()
@@ -331,19 +330,10 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
 def _boringssl():
     external_http_archive(
         name = "boringssl",
-    )
-
-# Exposes the raw BoringSSL source tree (headers & sources) so the
-# compat/openssl (bssl-compat) layer can copy and rewrite individual files.
-# This deliberately provides no cc_library targets; the actual crypto/ssl
-# libraries come from @boringssl. It mirrors the `boringssl-source` bzlmod
-# module so that compat/openssl can reference @boringssl-source identically in
-# both WORKSPACE and bzlmod builds.
-def _boringssl_source():
-    external_http_archive(
-        name = "boringssl-source",
-        location_name = "boringssl",
-        build_file = "@envoy//bazel/external:boringssl_source.BUILD",
+        patches = [
+            "@envoy//bazel:boringssl-bssl-compat.patch",
+        ],
+        patch_args = ["-p1"],
     )
 
 def _boringssl_fips():

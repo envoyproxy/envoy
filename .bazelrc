@@ -318,10 +318,9 @@ common:openssl --@quiche//:ssl_lib=@envoy//compat/openssl:ssl
 common:openssl --copt=-DENVOY_SSL_OPENSSL
 common:openssl --host_copt=-DENVOY_SSL_OPENSSL
 common:openssl --@envoy//bazel:http3=False
-# Exclude QUIC/HTTP3 sources from the bzlmod quiche overlay (matches WORKSPACE,
-# where envoy_quic_cc_library strips them when HTTP/3 is disabled). This keeps
-# QUIC code that depends on BoringSSL-only primitives (e.g. SIPHASH_24) out of
-# the OpenSSL build. No-op in WORKSPACE mode.
+# Exclude QUIC/HTTP3 sources from the quiche module overlay when HTTP/3 is
+# disabled. This keeps QUIC code that depends on BoringSSL-only primitives
+# (e.g. SIPHASH_24) out of the OpenSSL build.
 common:openssl --define=quiche_disable_http3=true
 common:openssl --test_tag_filters=-nofips,-quiche
 common:openssl --build_tag_filters=-nofips
