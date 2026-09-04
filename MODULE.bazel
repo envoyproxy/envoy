@@ -331,8 +331,8 @@ go_deps.module(
 )
 go_deps.module(
     path = "google.golang.org/protobuf",
-    sum = "h1:AYd7cD/uASjIL6Q9LiTjz8JLcrh/88q5UObnmY3aOOE=",
-    version = "v1.36.10",
+    sum = "h1:fV6ZwhNocDyBLK0dj+fg8ektcVegBBuEolpbTQyBNVE=",
+    version = "v1.36.11",
 )
 use_repo(
     go_deps,

@@ -168,15 +168,6 @@ alias(
 )
 
 alias(
-    name = "uadk",
-    actual = select({
-        "//bazel:bzlmod_mode": "@uadk",
-        "//conditions:default": "//contrib/kae:uadklib",
-    }),
-    visibility = ["//visibility:public"],
-)
-
-alias(
     name = "vectorscan",
     actual = select({
         "//bazel:bzlmod_mode": "@vectorscan",
