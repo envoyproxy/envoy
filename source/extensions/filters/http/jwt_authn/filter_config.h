@@ -130,9 +130,10 @@ public:
   // methods for AuthFactory interface. Factory method to help create authenticators.
   AuthenticatorPtr create(const JwtVerify::CheckAudience* check_audience,
                           const std::optional<std::string>& provider, bool allow_failed,
-                          bool allow_missing) const override {
+                          bool allow_missing, bool extract_only = false) const override {
     return Authenticator::create(check_audience, provider, allow_failed, allow_missing,
-                                 getJwksCache(), cm(), Common::JwksFetcher::create, timeSource());
+                                 getJwksCache(), cm(), Common::JwksFetcher::create, timeSource(),
+                                 extract_only);
   }
 
 private:
