@@ -65,6 +65,8 @@ private:
   std::vector<std::string> path_;
   std::optional<size_t> max_length_;
   GetMetadataFunction get_func_;
+  // Latched at construction to keep the runtime lookup off the formatting path.
+  const bool only_truncate_string_;
 };
 
 /**
