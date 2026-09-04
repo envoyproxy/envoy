@@ -12,6 +12,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
+#include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf_parser.h"
 #include "source/extensions/filters/http/ai_protocol_manager/response_handler.h"
@@ -77,6 +78,7 @@ public:
 
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
+  uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
   bool includeUnconfiguredRoutes() const { return include_unconfigured_routes_; }
   ApiProtocol defaultApiProtocol() const { return default_api_protocol_; }
@@ -92,6 +94,7 @@ private:
   mutable AiProtocolManagerStats stats_;
   const bool request_handling_enabled_ = false;
   const bool parse_unconfigured_routes_ = false;
+  const uint32_t inline_string_threshold_bytes_ = 0;
   const bool token_usage_enabled_ = false;
   const bool include_unconfigured_routes_ = false;
   const ApiProtocol default_api_protocol_ = ApiProtocol::Unspecified;
@@ -173,7 +176,10 @@ private:
 // A route without one is parsed only if the filter opted into
 // parse_unconfigured_routes -- offered for compatibility with chains that want
 // a parsed body on ordinary routes, never a reason to fail a request -- and is
-// otherwise untouched.
+// otherwise untouched. That opt-in covers routes that never asked for it, so it
+// takes only a request it can hold to end of stream without stalling it, which
+// rules out gRPC and Connect streaming, upgrades, and CONNECT. A declared
+// endpoint carries no such gate.
 //
 // A declared wire API with a registered payload schema is validated at end of
 // payload (schema/schema_registry.h); normalization comes later.
@@ -220,9 +226,17 @@ private:
   // what makes a parse failure fatal.
   bool isAiEndpoint() const { return route_has_request_; }
 
+  // The inline-string threshold for this stream: the route's payload schema
+  // when it pins one, otherwise the filter's configured default.
+  uint32_t inlineStringThresholdBytes() const;
+
   // Publish the accumulated token usage as dynamic metadata and account stats.
   // Called exactly once, at response end of stream (data or trailers).
   void finalizeResponseHandling();
+
+  // Finalizes the decode path when the full request body (and optional trailers) has been received.
+  // Sets endStream on decode_manager_ and executes the AI filter chain or replays the body.
+  void finalizeDecode(bool has_trailers);
 
   ExternalBufferFactory& buffer_factory_;
   FilterConfigSharedPtr config_;
@@ -247,6 +261,12 @@ private:
 
   // Once set, later frames on the dying stream are dropped, not offloaded.
   bool payload_rejected_{false};
+
+  // Request headers for this stream. Held by pointer during decode path.
+  Http::RequestHeaderMap* request_headers_{nullptr};
+
+  // FilterManager orchestrating the AI filter chain.
+  std::unique_ptr<FilterManager> filter_manager_;
 
   // Encode-path (response token-usage) state.
   ResponseHandlerPtr response_handler_;

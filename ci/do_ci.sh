@@ -131,11 +131,7 @@ function cp_binary_for_image_build() {
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
-  if [[ -n "$ENVOY_CI_BZLMOD" ]]; then
-      cp -f bazel-bin/external/su-exec~/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
-  else
-      cp -f bazel-bin/external/su-exec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
-  fi
+  cp -f bazel-bin/external/su-exec+/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
 
   # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
@@ -239,7 +235,9 @@ function bazel_envoy_api_go_build() {
     setup_clang_toolchain
     GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
     GO_TARGETS=(@envoy_api//...)
-    read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
+    read -r -a GO_PROTOS <<< "$(\
+        bazel query --consistent_labels "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" \
+        | tr '\n' ' ')"
     echo "${GO_PROTOS[@]}" | grep -q envoy_api || echo "No go proto targets found"
     bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
             --experimental_proto_descriptor_sets_include_source_info \
@@ -250,14 +248,13 @@ function bazel_envoy_api_go_build() {
     echo "Copying go protos -> build_go"
     BAZEL_BIN="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" bazel-bin)"
     for GO_PROTO in "${GO_PROTOS[@]}"; do
-            # strip @envoy_api//
-        RULE_DIR="$(echo "${GO_PROTO:12}" | cut -d: -f1)"
-        PROTO="$(echo "${GO_PROTO:12}" | cut -d: -f2)"
-        if [[ -n "$ENVOY_CI_BZLMOD" ]]; then
-            INPUT_DIR="${BAZEL_BIN}/external/envoy_api~/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
-        else
-            INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
-        fi
+        LABEL_PATH="${GO_PROTO#*//}"
+        RULE_DIR="${LABEL_PATH%%:*}"
+        PROTO="${LABEL_PATH#*:}"
+        REPO_LABEL="${GO_PROTO%%//*}"
+        REPO_NAME="${REPO_LABEL#@}"
+        REPO_NAME="${REPO_NAME#@}"
+        INPUT_DIR="${BAZEL_BIN}/external/${REPO_NAME}/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
         OUTPUT_DIR="build_go/${RULE_DIR}"
         mkdir -p "$OUTPUT_DIR"
         if [[ ! -e "$INPUT_DIR" ]]; then
@@ -336,9 +333,19 @@ function build_openssl_presubmit() {
             .bazelrc|.bazelversion|WORKSPACE|WORKSPACE.bazel|MODULE.bazel|MODULE.bazel.lock|bazel/*)
                 global_config_changed=true
                 ;;
-            # BUILD/.bzl changes affect the whole package.
+            # BUILD/.bzl changes affect the whole package. A root-level one
+            # (dirname ".") would yield the invalid pattern "//./..."; treat it
+            # as global build config instead. Only add the package pattern if it
+            # actually contains targets -- a .bzl in a non-package dir would
+            # otherwise make the rdeps set() query fail.
             *BUILD|*BUILD.bazel|*.bzl)
-                changed_labels+=("//$(dirname "$file")/...")
+                local dir
+                dir="$(dirname "$file")"
+                if [[ "$dir" == "." ]]; then
+                    global_config_changed=true
+                elif bazel query "${BAZEL_QUERY_OPTIONS[@]}" "//${dir}/..." >/dev/null 2>&1; then
+                    changed_labels+=("//${dir}/...")
+                fi
                 ;;
             # Tolerate files Bazel doesn't know about (docs, unwired sources).
             *)
@@ -614,14 +621,14 @@ case $CI_TARGET in
 
     config)
         setup_clang_toolchain
-        if [[ -z "$ENVOY_SKIP_CONFIGS_STATIC" ]]; then
-            echo "running static config validation"
-            bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy//test/config_test:static_config_validation
-        fi
         if [[ -e repo.bazelrc ]]; then
             cp -a repo.bazelrc "${ENVOY_DOCS_PATH}"
         fi
         pushd "$ENVOY_DOCS_PATH"
+        if [[ -z "$ENVOY_SKIP_CONFIGS_STATIC" ]]; then
+            echo "running static config validation"
+            bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy//test/config_test:static_config_validation
+        fi
         ENVOY_CONFIG_CONTRIB_LIB="${ENVOY_CONFIG_CONTRIB_LIB:-@envoy//contrib:contrib_test_lib}"
         ENVOY_CONFIGS_CORE="${ENVOY_CONFIGS_CORE:-//test/config:configs}"
         ENVOY_CONFIGS_CONTRIB="${ENVOY_CONFIGS_CONTRIB:-//test/config:contrib_configs}"
@@ -699,13 +706,6 @@ case $CI_TARGET in
         # Validate repository metadata.
         echo "check repositories..."
         "${ENVOY_SRCDIR}/tools/check_repositories.sh"
-        echo "check dependencies..."
-        # Using todays date as an action_env expires the NIST cache daily, which is the update frequency
-        # TODO(phlax): Re-enable cve tests
-        bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
-              -- -v warn \
-                 -c release_dates releases
-        # Run dependabot tests
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
@@ -918,6 +918,43 @@ case $CI_TARGET in
     info)
         setup_clang_toolchain
         bazel info "${BAZEL_BUILD_OPTIONS[@]}"
+        ;;
+
+    lockfiles|lockfiles.regenerate)
+        # TODO(phlax): Add other lockfiles here and a check path
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+             --enable_bzlmod \
+             --noenable_workspace \
+             deps --lockfile_mode=update
+        pushd "$ENVOY_DOCS_PATH"
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+              --enable_bzlmod \
+              --noenable_workspace \
+              deps --lockfile_mode=update
+        popd
+        pushd "api/"
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+              --enable_bzlmod \
+              --noenable_workspace \
+              deps --lockfile_mode=update
+        popd
+        pushd "mobile/"
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+              --enable_bzlmod \
+              --noenable_workspace \
+              deps --lockfile_mode=update
+        popd
+        pushd "bazel/tests/external/"
+        bazel mod \
+              "${BAZEL_GLOBAL_OPTIONS[@]}" \
+              --enable_bzlmod \
+              --noenable_workspace \
+              deps --lockfile_mode=update
+        popd
         ;;
 
     msan)

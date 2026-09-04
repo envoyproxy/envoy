@@ -19,6 +19,7 @@
 #include "source/common/http/message_impl.h"
 
 #include "absl/strings/escaping.h"
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -193,6 +194,13 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   return thread_local_cluster->httpAsyncClient().send(std::move(message), callbacks, options);
 }
 
+// Joins configured search patterns into the ';'-separated form Lua's package.path uses.
+Filters::Common::Lua::PackagePaths
+packagePaths(const Protobuf::RepeatedPtrField<std::string>& paths,
+             const Protobuf::RepeatedPtrField<std::string>& cpaths) {
+  return {absl::StrJoin(paths, ";"), absl::StrJoin(cpaths, ";")};
+}
+
 // Looks up (creating if necessary) the process-wide `lua.lua_vm_count` gauge directly on the
 // given server root scope. Both the filter-config-level and route-level VM setups call this same
 // helper against the server root scope so the stat name is always identical, regardless of
@@ -204,10 +212,11 @@ Stats::Gauge& lookupLuaVmCountGauge(Stats::Scope& server_scope) {
 
 } // namespace
 
-PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                                 Stats::Gauge& vm_count_gauge, uint32_t concurrency,
-                                 absl::Status& creation_status)
-    : lua_state_(lua_code, tls, creation_status), vm_count_gauge_(vm_count_gauge),
+PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code,
+                                 const Filters::Common::Lua::PackagePaths& package_paths,
+                                 ThreadLocal::SlotAllocator& tls, Stats::Gauge& vm_count_gauge,
+                                 uint32_t concurrency, absl::Status& creation_status)
+    : lua_state_(lua_code, package_paths, tls, creation_status), vm_count_gauge_(vm_count_gauge),
       vm_count_delta_(concurrency + 1) {
   // Account for this VM up-front so the count stays balanced with the destructor's sub() even if
   // construction stops early below.
@@ -810,6 +819,20 @@ int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaBase64Decode(lua_State* state) {
+  absl::string_view input = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  std::string output;
+  if (!absl::Base64Unescape(input, &output)) {
+    // Returning nil rather than raising keeps a malformed value recoverable by the script, which
+    // is the common case when the input came from a header or an upstream response body.
+    lua_pushnil(state);
+    return 1;
+  }
+  lua_pushlstring(state, output.data(), output.size());
+
+  return 1;
+}
+
 int StreamHandleWrapper::luaTimestamp(lua_State* state) {
   auto now = time_source_.systemTime().time_since_epoch();
 
@@ -884,6 +907,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                                 ? absl::StrCat(stats_prefix, "lua")
                                 : absl::StrCat(stats_prefix, "lua.", proto_config.stat_prefix()))) {
   Stats::Gauge& vm_count_gauge = lookupLuaVmCountGauge(api.rootScope());
+  const Filters::Common::Lua::PackagePaths package_paths =
+      packagePaths(proto_config.package_paths(), proto_config.package_cpaths());
 
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
@@ -896,11 +921,12 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
     auto code_or = Config::DataSource::read(proto_config.default_source_code(), true, api);
     SET_AND_RETURN_IF_NOT_OK(code_or.status(), creation_status);
     default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(
-        code_or.value(), tls, vm_count_gauge, concurrency, creation_status);
+        code_or.value(), package_paths, tls, vm_count_gauge, concurrency, creation_status);
     RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   } else if (!proto_config.inline_code().empty()) {
-    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(
-        proto_config.inline_code(), tls, vm_count_gauge, concurrency, creation_status);
+    default_lua_code_setup_ =
+        std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), package_paths, tls,
+                                          vm_count_gauge, concurrency, creation_status);
     RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   }
 
@@ -908,7 +934,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
     auto code_or = Config::DataSource::read(source.second, true, api);
     SET_AND_RETURN_IF_NOT_OK(code_or.status(), creation_status);
     auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(
-        code_or.value(), tls, vm_count_gauge, concurrency, creation_status);
+        code_or.value(), package_paths, tls, vm_count_gauge, concurrency, creation_status);
     RETURN_ONLY_IF_NOT_OK_REF(creation_status);
     per_lua_code_setups_map_[source.first] = std::move(per_lua_code_setup_ptr);
   }
@@ -927,9 +953,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(
     auto code_or = Config::DataSource::read(config.source_code(), true, context.api());
     SET_AND_RETURN_IF_NOT_OK(code_or.status(), creation_status);
     Stats::Gauge& vm_count_gauge = lookupLuaVmCountGauge(context.api().rootScope());
-    per_lua_code_setup_ptr_ =
-        std::make_unique<PerLuaCodeSetup>(code_or.value(), context.threadLocal(), vm_count_gauge,
-                                          context.options().concurrency(), creation_status);
+    per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(
+        code_or.value(), packagePaths(config.package_paths(), config.package_cpaths()),
+        context.threadLocal(), vm_count_gauge, context.options().concurrency(), creation_status);
   }
 }
 

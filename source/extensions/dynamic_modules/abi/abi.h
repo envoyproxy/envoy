@@ -15205,6 +15205,88 @@ bool envoy_dynamic_module_callback_cluster_specifier_set_route_action_override(
     envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name);
 
+// ------------------- Cluster Specifier Callbacks - Route Metadata ------------
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number sets the number value
+ * of the route metadata under the given namespace and key. The entry is layered onto the metadata
+ * of the matched route, so consumers that read route metadata, such as the rate limit ROUTE_ENTRY
+ * action or the METADATA(ROUTE) formatter, observe it. An existing entry with the same namespace
+ * and key is overwritten, while the other entries of the matched route stay in effect.
+ *
+ * The metadata takes effect only when the select call reports a decision. A select that reports
+ * none changes nothing, and a decision that sets no metadata drops what an earlier decision set.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the number value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string sets the string value
+ * of the route metadata under the given namespace and key. It behaves like
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number but stores a string.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the string value to set. Envoy copies the buffer.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool sets the bool value of
+ * the route metadata under the given namespace and key. It behaves like
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number but stores a bool.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the bool value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct merges a serialized
+ * google.protobuf.Struct into the route metadata under the given namespace. Existing entries with
+ * the same key are overwritten, while the others stay in effect. If the buffer does not parse as a
+ * google.protobuf.Struct, this is a no-op.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata sets the typed route
+ * metadata under the given namespace from a serialized google.protobuf.Any, replacing an existing
+ * entry, so a typed metadata factory registered for the namespace can parse it out of
+ * typedMetadata(). If the buffer does not parse as a google.protobuf.Any, this is a no-op.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param serialized_any is the serialized google.protobuf.Any value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
 // =============================================================================
 // Cluster Specifier Callbacks - Metrics
 // =============================================================================

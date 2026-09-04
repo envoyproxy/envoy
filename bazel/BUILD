@@ -7,6 +7,7 @@ load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@envoy_toolshed//dependency:macros.bzl", "updater")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
+load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(":deprecated_features.bzl", "check_removed_fips_define", "check_removed_wasm_defines")
@@ -554,6 +555,19 @@ label_flag(
     build_setting_default = "@boringssl//:crypto",
 )
 
+# wee8 engine: envoy_toolshed prebuilt by default, source for configs the
+# prebuilt is incompatible with (gcc libstdc++ ABI; sanitizers need instrumented deps).
+alias(
+    name = "wee8_engine",
+    actual = select({
+        ":gcc_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":asan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":msan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":tsan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        "//conditions:default": "@envoy_toolshed//v8:wee8",
+    }),
+)
+
 bool_flag(
     name = "fips",
     build_setting_default = False,
@@ -576,7 +590,7 @@ config_setting(
 
 config_setting(
     name = "using_boringssl_fips",
-    flag_values = {":ssl": "@boringssl_fips//:ssl"},
+    flag_values = {":ssl": "@boringssl-fips//:ssl"},
 )
 
 config_setting(
@@ -1009,6 +1023,67 @@ json_merge(
     ],
 )
 
+json_merge(
+    name = "bzlmod_all_repository_locations",
+    srcs = [
+        "@envoy_mod_graph//:deps.json",
+    ],
+    filter = """
+    .
+    | .[0] as $modules
+    | .[1] as $metadata1
+    | .[2] as $metadata2
+    | ($metadata1 * $metadata2) as $metadata
+    | def module_source($dep):
+        if $modules[$dep] then
+          ($modules[$dep] + {module_name: $dep})
+        elif ($dep | startswith("com_google_")) and $modules[$dep | sub("^com_google_"; "")] then
+          (($dep | sub("^com_google_"; "")) as $m | $modules[$m] + {module_name: $m})
+        elif $modules[$dep | gsub("_"; "-")] then
+          ($dep | gsub("_"; "-")) as $m | $modules[$m] + {module_name: $m}
+        elif ($metadata[$dep].apparent_name // null) as $a | $a and $modules[$a] then
+          ($metadata[$dep].apparent_name) as $m | $modules[$m] + {module_name: $m}
+        else null end;
+      def dependency_source($dep):
+        module_source($dep);
+      $metadata
+      | keys
+      | reduce .[] as $k ({};
+          (dependency_source($k)) as $source
+          | if $source then
+              . + {($k): (
+                ($source + ($metadata[$k] // {}))
+                | .version as $ver
+                | if .license_url and $ver then
+                    .license_url |= (
+                      gsub("{version}"; $ver)
+                      | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
+                      | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
+                    )
+                  else . end
+              )}
+            else . + {($k): $metadata[$k]}
+            end
+        )
+    """,
+    visibility = ["//visibility:public"],
+    yaml_srcs = [
+        ":deps.yaml",
+        "@envoy_api//bazel:deps.yaml",
+    ],
+)
+
+py_test(
+    name = "all_repository_locations_test",
+    srcs = ["all_repository_locations_test.py"],
+    args = ["$(location :all_repository_locations)"],
+    data = [":all_repository_locations"],
+    target_compatible_with = select({
+        ":bzlmod_mode": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
 # A dependency required by python protobuf
 # Envoy does not have any C++ code that includes python.h so this dummy
 # target is enough. However if such code is added in the future when this
@@ -1114,5 +1189,8 @@ alias(
 
 alias(
     name = "all_repository_locations",
-    actual = ":legacy_all_repository_locations",
+    actual = select({
+        ":bzlmod_mode": ":bzlmod_all_repository_locations",
+        "//conditions:default": ":legacy_all_repository_locations",
+    }),
 )

@@ -19,16 +19,23 @@ startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 # global
 #############################################################################
 
-common --noenable_bzlmod
-common --enable_workspace
+common --enable_bzlmod
+common --noenable_workspace
+common --@envoy//bazel:enable_bzlmod=True
 common --noincompatible_disallow_empty_glob
 common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
 
 fetch --color=yes
 run --color=yes
-
 build --color=yes
+
+common --registry=https://bcr.bazel.build/
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/b6e15c00b1c0493cd194b1b248c562bd8bc46648
+# common --registry=file:///bazel-registry
+# this can be useful for dev
+# common --lockfile_mode=off
+
 build --jobs=HOST_CPUS-1
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
@@ -92,8 +99,62 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 coverage --config=coverage
 coverage --build_tests_only
 
+
+#############################################################################
+# global: deps
+#############################################################################
+
+# Python
+common --@rules_python//python/config_settings:bootstrap_impl=script
+build --incompatible_default_to_explicit_init_py
+
+# Rust
 # Specifies the rustfmt.toml for all rustfmt_test targets.
 build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
+
+# grpc
+build --@grpc//third_party:ssl_lib=@envoy//bazel:ssl
+build --@grpc//third_party:crypto_lib=@envoy//bazel:crypto
+
+# kafka
+build --@librdkafka//:with_ssl=false
+build --@librdkafka//:with_zlib=false
+build --per_file_copt=contrib/kafka/.*\.cc@-Wno-old-style-cast
+
+# protobuf
+common --incompatible_enable_proto_toolchain_resolution=true
+common --@protobuf//bazel/toolchains:prefer_prebuilt_protoc
+common --@protobuf//:zlib=@zlib-ng
+# these are here to detect if the toolchain attempts to compile protoc
+common --per_file_copt=bazel-out/.*/bin/external/protobuf.*/protoc@--THIS_CC_TOOLCHAIN_IS_BROKEN
+
+# proxy-wasm-cpp-host
+common --@proxy-wasm-cpp-host//bazel:crypto_lib=@envoy//bazel:crypto
+
+# libsxg
+build --@libsxg//:crypto_lib=@envoy//bazel:crypto
+
+# quiche
+build --@quiche//:zlib=@envoy//bazel:zlib
+build --@quiche//:ssl_lib=@envoy//bazel:ssl
+
+# quiche — non-test platform impls
+build --@quiche//:quic_base_impl_lib=@envoy//source/common/quic/platform:quic_base_impl_lib
+build --@quiche//:quiche_export_impl_lib=@envoy//source/common/quic/platform:quiche_export_impl_lib
+build --@quiche//:quiche_flags_impl_lib=@envoy//source/common/quic/platform:quiche_flags_impl_lib
+build --@quiche//:quiche_logging_impl_lib=@envoy//source/common/quic/platform:quiche_logging_impl_lib
+build --@quiche//:quiche_lower_case_string_impl_lib=@envoy//source/common/quic/platform:quiche_lower_case_string_impl_lib
+build --@quiche//:quiche_mem_slice_impl_lib=@envoy//source/common/quic/platform:quiche_mem_slice_impl_lib
+build --@quiche//:quiche_platform_iovec_impl_lib=@envoy//source/common/quic/platform:quiche_platform_iovec_impl_lib
+build --@quiche//:quiche_stack_trace_impl_lib=@envoy//source/common/quic/platform:quiche_stack_trace_impl_lib
+build --@quiche//:quiche_time_utils_impl_lib=@envoy//source/common/quic/platform:quiche_time_utils_impl_lib
+
+# quiche — test platform impls
+build --@quiche//:quiche_expect_bug_impl_lib=@envoy//test/common/quic/platform:quiche_expect_bug_impl_lib
+build --@quiche//:quiche_test_impl_lib=@envoy//test/common/quic/platform:quiche_test_impl_lib
+build --@quiche//:quiche_test_helpers_impl_lib=@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib
+build --@quiche//:quiche_test_output_impl_lib=@envoy//test/common/quic/platform:quiche_test_output_impl_lib
+build --@quiche//:quiche_thread_impl_lib=@envoy//test/common/quic/platform:quiche_thread_impl_lib
 
 
 #############################################################################
@@ -241,16 +302,26 @@ common:fips-common --@envoy//bazel:fips=True
 
 # BoringSSL FIPS
 common:boringssl-fips --config=fips-common
-common:boringssl-fips --@envoy//bazel:ssl=@boringssl_fips//:ssl
-common:boringssl-fips --@envoy//bazel:crypto=@boringssl_fips//:crypto
+common:boringssl-fips --@envoy//bazel:ssl=@boringssl-fips//:ssl
+common:boringssl-fips --@envoy//bazel:crypto=@boringssl-fips//:crypto
+common:boringssl-fips --@quiche//:ssl_lib=@boringssl-fips//:ssl
 
 # OpenSSL
 common:openssl --@envoy//bazel:openssl=True
 common:openssl --@envoy//bazel:ssl=@envoy//compat/openssl:ssl
 common:openssl --@envoy//bazel:crypto=@envoy//compat/openssl:crypto
+# Route QUICHE's SSL to the OpenSSL compat layer too. QUICHE is still linked in
+# OpenSSL builds via non-QUIC features (e.g. HTTP datagram / CONNECT-UDP capsule
+# support), and must use the same SSL implementation as the rest of the binary
+# to avoid linking BoringSSL and OpenSSL together (symbol/ABI collisions).
+common:openssl --@quiche//:ssl_lib=@envoy//compat/openssl:ssl
 common:openssl --copt=-DENVOY_SSL_OPENSSL
 common:openssl --host_copt=-DENVOY_SSL_OPENSSL
 common:openssl --@envoy//bazel:http3=False
+# Exclude QUIC/HTTP3 sources from the quiche module overlay when HTTP/3 is
+# disabled. This keeps QUIC code that depends on BoringSSL-only primitives
+# (e.g. SIPHASH_24) out of the OpenSSL build.
+common:openssl --define=quiche_disable_http3=true
 common:openssl --test_tag_filters=-nofips,-quiche
 common:openssl --build_tag_filters=-nofips
 
@@ -434,6 +505,7 @@ build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 # This flag may be more generally useful - it sets foreign_cc builds -jauto.
 # It is only set here because if it were the default it risks OOMing on local builds.
 build:remote --@envoy//bazel/foreign_cc:parallel_builds
+build:remote --@openssl//:parallel_builds
 
 ## RBE (Engflow Envoy)
 

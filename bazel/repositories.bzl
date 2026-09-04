@@ -192,7 +192,7 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
     _foreign_cc_dependencies()
 
     # BoringSSL:
-    # - BoringSSL FIPS from @boringssl_fips//:ssl,
+    # - BoringSSL FIPS from @boringssl-fips//:ssl,
     # - non-FIPS BoringSSL from @boringssl//:ssl.
     # SSL/crypto dependencies are resolved via EXTERNAL_DEPS_MAP in envoy_internal.bzl
     _boringssl()
@@ -272,7 +272,10 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
     _rules_ruby()
     external_http_archive("flatbuffers")
     external_http_archive("bazel_features")
-    external_http_archive("bazel_compdb")
+    external_http_archive(
+        name = "bazel-compdb",
+        location_name = "bazel_compdb",
+    )
     external_http_archive("envoy_toolshed")
 
     _libmaxminddb()
@@ -322,6 +325,7 @@ def envoy_dependencies(skip_targets = [], bzlmod = False):
             "proto_library": ["@protobuf//bazel:proto_library.bzl", ""],
         },
     )
+    envoy_mod_graph_stub(name = "envoy_mod_graph")
 
 def _boringssl():
     external_http_archive(
@@ -334,7 +338,7 @@ def _boringssl():
 
 def _boringssl_fips():
     external_http_archive(
-        name = "boringssl_fips",
+        name = "boringssl-fips",
         location_name = "boringssl",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
     )
@@ -1086,9 +1090,23 @@ filegroup(
 
     # This archive provides Kafka C/CPP client used by mesh filter to communicate with upstream
     # Kafka clusters.
+    LIBRDKAFKA_BUILD_CONTENT = """
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+bool_flag(
+    name = "with_ssl",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+bool_flag(
+    name = "with_zlib",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+%s
+    """ % BUILD_ALL_CONTENT
     external_http_archive(
         name = "librdkafka",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file_content = LIBRDKAFKA_BUILD_CONTENT,
         # (adam.kotwasinski) librdkafka bundles in cJSON, which is also bundled in by libvppinfra.
         # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.
         patches = ["@envoy//bazel/foreign_cc:librdkafka.patch"],
@@ -1152,3 +1170,15 @@ cc_library(
 )
 """,
     )
+
+def _envoy_mod_graph_stub_impl(repository_ctx):
+    repository_ctx.file(
+        "BUILD.bazel",
+        "exports_files([\"deps.json\"], visibility = [\"//visibility:public\"])\n",
+    )
+    repository_ctx.file("deps.json", "{}")
+
+envoy_mod_graph_stub = repository_rule(
+    implementation = _envoy_mod_graph_stub_impl,
+    doc = "WORKSPACE-mode placeholder for @envoy_mod_graph (real one is provided by the bzlmod extension).",
+)

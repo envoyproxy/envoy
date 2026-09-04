@@ -93,6 +93,8 @@ on:
           ERROR
           error:
           Error:
+          FAILED
+          FAIL:
       fail-match:
         type: string
       import-gpg:

@@ -186,6 +186,7 @@ envoy_cc_library(
     deps = [
         ":hot_restarting_base",
         "//envoy/network:parent_drained_callback_registrar_interface",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:stat_merger_lib",
     ],
 )
@@ -197,6 +198,7 @@ envoy_cc_library(
     deps = [
         ":hot_restarting_base",
         "//envoy/network:connection_handler_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/common:hash_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:stat_merger_lib",

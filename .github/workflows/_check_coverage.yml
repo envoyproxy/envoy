@@ -43,6 +43,8 @@ jobs:
         error:
         Error:
         lower than limit
+        FAILED
+        FAIL:
       rbe: true
       request: ${{ inputs.request }}
       runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}

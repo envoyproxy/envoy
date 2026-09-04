@@ -5,6 +5,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
@@ -47,9 +48,9 @@ public:
           return absl::OkStatus();
         }) {}
 
-  void setup(const std::string& code) {
+  void setup(const std::string& code, const PackagePaths& package_paths = {}) {
     absl::Status creation_status = absl::OkStatus();
-    state_ = std::make_unique<ThreadLocalState>(code, tls_, creation_status);
+    state_ = std::make_unique<ThreadLocalState>(code, package_paths, tls_, creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
     state_->registerType<TestObject>();
   }
@@ -60,6 +61,79 @@ public:
   ReadyWatcher on_yield_;
   InitializerList initializers_;
 };
+
+// Writes a module for a script to require, and returns the search pattern that finds it.
+std::string writeTestModule() {
+  TestEnvironment::writeStringToFileForTest("lua_test_module.lua", R"EOF(
+    local m = {}
+    function m.greeting()
+      return "hello from the module"
+    end
+    return m
+  )EOF");
+  return TestEnvironment::temporaryPath("?.lua");
+}
+
+// A configured package path is in place before the code runs, so a top-level require() of a module
+// found there resolves. The script errors rather than returning a value, so a failure surfaces as
+// a load error out of the constructor.
+TEST_F(LuaTest, PackagePathResolvesRequire) {
+  const std::string SCRIPT{R"EOF(
+    local m = require("lua_test_module")
+    if m.greeting() ~= "hello from the module" then
+      error("unexpected module contents")
+    end
+  )EOF"};
+
+  setup(SCRIPT, PackagePaths{writeTestModule(), ""});
+}
+
+// Without the package path the same require() fails, and it fails at construction rather than per
+// request, because the code is run once to validate it.
+TEST_F(LuaTest, PackagePathAbsentFailsToLoad) {
+  writeTestModule();
+  const std::string SCRIPT{R"EOF(
+    local m = require("lua_test_module")
+  )EOF"};
+
+  absl::Status creation_status = absl::OkStatus();
+  ThreadLocalState state(SCRIPT, PackagePaths{}, tls_, creation_status);
+  EXPECT_THAT(creation_status, StatusHelpers::HasStatusMessage(testing::AllOf(
+                                   testing::HasSubstr("script load error"),
+                                   testing::HasSubstr("module 'lua_test_module' not found"))));
+}
+
+// Configured patterns keep the order they were given in, come ahead of the interpreter's own
+// search path, and do not replace it.
+TEST_F(LuaTest, PackagePathIsPrependedInOrder) {
+  const std::string SCRIPT{R"EOF(
+    local expected = "/first/?.lua;/second/?.lua;/second/?/init.lua"
+    if package.path:sub(1, #expected) ~= expected then
+      error("configured patterns are not first: " .. package.path)
+    end
+    if package.path:sub(#expected + 1, #expected + 1) ~= ";" then
+      error("built-in package.path was not kept: " .. package.path)
+    end
+  )EOF"};
+
+  setup(SCRIPT, PackagePaths{"/first/?.lua;/second/?.lua;/second/?/init.lua", ""});
+}
+
+// `cpath` is prepended the same way. Loading a real C module is out of scope here, so the script
+// checks the search path itself.
+TEST_F(LuaTest, PackageCpathIsPrepended) {
+  const std::string SCRIPT{R"EOF(
+    local expected = "/does/not/exist/?.so"
+    if package.cpath:sub(1, #expected) ~= expected then
+      error("configured pattern is not first: " .. package.cpath)
+    end
+    if package.cpath:sub(#expected + 1, #expected + 1) ~= ";" then
+      error("built-in package.cpath was not kept: " .. package.cpath)
+    end
+  )EOF"};
+
+  setup(SCRIPT, PackagePaths{"", "/does/not/exist/?.so"});
+}
 
 // Basic ref counting between coroutines.
 TEST_F(LuaTest, CoroutineRefCounting) {
@@ -217,7 +291,7 @@ TEST_F(ThreadSafeTest, StateDestructedBeforeWorkerRun) {
   // Some callback functions waiting to be executed will be added to the dispatcher of the Worker
   // thread. The callback functions in the main thread will be executed directly.
   absl::Status creation_status = absl::OkStatus();
-  state_ = std::make_unique<ThreadLocalState>(SCRIPT, tls_, creation_status);
+  state_ = std::make_unique<ThreadLocalState>(SCRIPT, PackagePaths{}, tls_, creation_status);
   THROW_IF_NOT_OK_REF(creation_status);
   state_->registerType<TestObject>();
 

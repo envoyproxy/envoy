@@ -36,6 +36,7 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
+RUNTIME_GUARD(envoy_reloadable_features_coalesce_formatter_accept_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
 RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_fix_reentrancy);
@@ -61,6 +62,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 // implemented, and tested.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_lrs_server_self_ads);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
+RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
 RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_user_retry_on);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @yanjunxiang-google before removing.
@@ -80,6 +82,7 @@ RUNTIME_GUARD(envoy_reloadable_features_happy_eyeballs_sort_non_ip_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_header_mutation_url_encode_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_health_check_after_cluster_warming);
 RUNTIME_GUARD(envoy_reloadable_features_hide_transport_failure_reason_in_response_body);
+RUNTIME_GUARD(envoy_reloadable_features_hot_restart_propagate_stat_tags);
 RUNTIME_GUARD(envoy_reloadable_features_http1_allow_query_method);
 RUNTIME_GUARD(envoy_reloadable_features_http1_close_connection_on_zombie_stream_complete);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
@@ -107,6 +110,7 @@ RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
 // drain sequence and notifies the connections of the covered listeners that a drain has begun,
 // instead of only stopping the listeners, and accepts `skip_exit` to drain without stopping them.
 RUNTIME_GUARD(envoy_reloadable_features_non_graceful_drain_notifies_connections);
+RUNTIME_GUARD(envoy_reloadable_features_oauth2_client_retries_respect_user_retry_on);
 // OAuth2 filter cookie decryption: when true (the default), decrypt() accepts legacy CBC
 // ciphertexts via the legacy AES-256-CBC fallback. When false, only "gcm."-prefixed ciphertexts
 // decrypt; legacy CBC cookies are rejected and the affected users are redirected to the OAuth
@@ -129,6 +133,7 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 // TODO(panting): Default to true after ssl fix.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_enable_reset_ssl_after_handshake);
 RUNTIME_GUARD(envoy_reloadable_features_quic_fix_defer_logging_miss_for_half_closed_stream);
+RUNTIME_GUARD(envoy_reloadable_features_quic_mtls_server_enabled);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);

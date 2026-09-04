@@ -1813,3 +1813,10 @@ acq
 interleavings
 millis
 msgs
+CRYSTALS
+encapsulation
+Kyber
+MLKEM
+PQC
+quantum
+X25519MLKEM768

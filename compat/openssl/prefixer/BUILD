@@ -17,13 +17,24 @@ cc_binary(
     ] + ([LIBLLVM] if LIBLLVM else []),
     copts = [
         "-fno-rtti",  # Required by libclang-cpp
-        "-isystem external/llvm_toolchain_llvm/include",
         # Use libstdc++ for ABI compatibility with libclang-cpp
         "-stdlib=libstdc++",
-        # Add libstdc++ include path from sysroot
-        "-isystem external/sysroot_linux_amd64/usr/include/c++/13",
-        "-isystem external/sysroot_linux_amd64/usr/include/x86_64-linux-gnu/c++/13",
-    ],
+        # -isystem paths for the LLVM headers and the libstdc++ headers from the
+        # sysroot. These reference external repositories by their on-disk name,
+        # which differs between WORKSPACE and bzlmod builds (bzlmod materialises
+        # repos created by module extensions under their canonical name).
+    ] + select({
+        "//bazel:bzlmod_mode": [
+            "-isystem external/envoy_toolshed++llvm_toolchain_alias_extension+llvm_toolchain_llvm/include",
+            "-isystem external/envoy_toolshed++sysroot_extension+sysroot_linux_amd64/usr/include/c++/13",
+            "-isystem external/envoy_toolshed++sysroot_extension+sysroot_linux_amd64/usr/include/x86_64-linux-gnu/c++/13",
+        ],
+        "//conditions:default": [
+            "-isystem external/llvm_toolchain_llvm/include",
+            "-isystem external/sysroot_linux_amd64/usr/include/c++/13",
+            "-isystem external/sysroot_linux_amd64/usr/include/x86_64-linux-gnu/c++/13",
+        ],
+    }),
     linkopts = [
         "$(location " + LIBCLANG_CPP + ")",
     ] + (["$(location " + LIBLLVM + ")"] if LIBLLVM else []) + [

@@ -9100,6 +9100,11 @@ struct StubSpecifierSelection {
   priority: Option<abi::envoy_dynamic_module_type_resource_priority>,
   cluster_not_found_response_code: Option<u32>,
   route_action_override: Option<String>,
+  route_metadata_number: Option<(String, String, f64)>,
+  route_metadata_string: Option<(String, String, String)>,
+  route_metadata_bool: Option<(String, String, bool)>,
+  route_metadata_struct: Option<(String, Vec<u8>)>,
+  route_typed_metadata: Option<(String, Vec<u8>)>,
 }
 
 static STUB_SPECIFIER_SELECTION: std::sync::Mutex<StubSpecifierSelection> =
@@ -9111,6 +9116,11 @@ static STUB_SPECIFIER_SELECTION: std::sync::Mutex<StubSpecifierSelection> =
     priority: None,
     cluster_not_found_response_code: None,
     route_action_override: None,
+    route_metadata_number: None,
+    route_metadata_string: None,
+    route_metadata_bool: None,
+    route_metadata_struct: None,
+    route_typed_metadata: None,
   });
 
 // Copies a module buffer into an owned string the way Envoy copies it out of the module.
@@ -9120,6 +9130,11 @@ unsafe fn stub_specifier_string(buffer: abi::envoy_dynamic_module_type_module_bu
     buffer.length,
   ))
   .into_owned()
+}
+
+// Copies a module buffer into owned bytes, used for the serialized metadata setters.
+unsafe fn stub_specifier_bytes(buffer: abi::envoy_dynamic_module_type_module_buffer) -> Vec<u8> {
+  std::slice::from_raw_parts(buffer.ptr as *const u8, buffer.length).to_vec()
 }
 
 // Points the result buffer at a static value and reports it as present.
@@ -9380,6 +9395,82 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_acti
     .unwrap()
     .route_action_override = Some(name);
   true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  value: f64,
+) {
+  STUB_SPECIFIER_SELECTION
+    .lock()
+    .unwrap()
+    .route_metadata_number = Some((
+    unsafe { stub_specifier_string(ns) },
+    unsafe { stub_specifier_string(key) },
+    value,
+  ));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  value: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  STUB_SPECIFIER_SELECTION
+    .lock()
+    .unwrap()
+    .route_metadata_string = Some((
+    unsafe { stub_specifier_string(ns) },
+    unsafe { stub_specifier_string(key) },
+    unsafe { stub_specifier_string(value) },
+  ));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  value: bool,
+) {
+  STUB_SPECIFIER_SELECTION.lock().unwrap().route_metadata_bool = Some((
+    unsafe { stub_specifier_string(ns) },
+    unsafe { stub_specifier_string(key) },
+    value,
+  ));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  serialized_struct: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  STUB_SPECIFIER_SELECTION
+    .lock()
+    .unwrap()
+    .route_metadata_struct = Some((unsafe { stub_specifier_string(ns) }, unsafe {
+    stub_specifier_bytes(serialized_struct)
+  }));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  serialized_any: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  STUB_SPECIFIER_SELECTION
+    .lock()
+    .unwrap()
+    .route_typed_metadata = Some((unsafe { stub_specifier_string(ns) }, unsafe {
+    stub_specifier_bytes(serialized_any)
+  }));
 }
 
 #[test]
@@ -9661,6 +9752,11 @@ fn test_cluster_specifier_context_records_selection() {
   ctx.set_priority(ResourcePriority::High);
   assert!(ctx.set_cluster_not_found_response_code(404));
   assert!(ctx.set_route_action_override(STUB_SPECIFIER_OVERRIDE_NAME));
+  ctx.set_route_metadata_number("envoy.lb", "weight", 0.75);
+  ctx.set_route_metadata_string("envoy.lb", "shard", "a");
+  ctx.set_route_metadata_bool("envoy.lb", "canary", true);
+  ctx.set_route_metadata_struct("envoy.filters.http.ext_authz", b"struct-bytes");
+  ctx.set_route_typed_metadata("envoy.filters.http.ext_authz", b"any-bytes");
 
   {
     let selection = STUB_SPECIFIER_SELECTION.lock().unwrap();
@@ -9676,6 +9772,32 @@ fn test_cluster_specifier_context_records_selection() {
     assert_eq!(
       Some(STUB_SPECIFIER_OVERRIDE_NAME.to_string()),
       selection.route_action_override
+    );
+    assert_eq!(
+      Some(("envoy.lb".to_string(), "weight".to_string(), 0.75)),
+      selection.route_metadata_number
+    );
+    assert_eq!(
+      Some(("envoy.lb".to_string(), "shard".to_string(), "a".to_string())),
+      selection.route_metadata_string
+    );
+    assert_eq!(
+      Some(("envoy.lb".to_string(), "canary".to_string(), true)),
+      selection.route_metadata_bool
+    );
+    assert_eq!(
+      Some((
+        "envoy.filters.http.ext_authz".to_string(),
+        b"struct-bytes".to_vec()
+      )),
+      selection.route_metadata_struct
+    );
+    assert_eq!(
+      Some((
+        "envoy.filters.http.ext_authz".to_string(),
+        b"any-bytes".to_vec()
+      )),
+      selection.route_typed_metadata
     );
   }
 
