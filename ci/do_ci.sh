@@ -470,18 +470,12 @@ case $CI_TARGET in
             exit 1
         fi
         ENVOY_CACHE_OUTPUT_BASE="${ENVOY_CACHE_OUTPUT_BASE:-base}"
-        setup_clang_toolchain
-        echo "Fetching cache: ${ENVOY_CACHE_TARGETS}"
-        if [[ -n "${ENVOY_CACHE_WORKING_DIR}" ]]; then
-            cd "${ENVOY_CACHE_WORKING_DIR}"
-        fi
-        bazel --output_user_root="${ENVOY_CACHE_ROOT}" \
-              --output_base="${ENVOY_CACHE_ROOT}/${ENVOY_CACHE_OUTPUT_BASE}" \
-              --nowrite_command_log \
-              aquery "deps(${ENVOY_CACHE_TARGETS})" \
-              --repository_cache="${ENVOY_REPOSITORY_CACHE}" \
-              "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" \
-              > /dev/null
+        # TODO(phlax): Cache priming is temporarily disabled - the bzlmod
+        # `aquery deps(//...)` walk is too slow/flaky to be useful. Create an
+        # empty output base so the prime/upload/restore plumbing is unchanged.
+        echo "Bazel cache priming disabled, creating empty cache (${ENVOY_CACHE_TARGETS})"
+        mkdir -p "${ENVOY_CACHE_ROOT}/${ENVOY_CACHE_OUTPUT_BASE}"
+        touch "${ENVOY_CACHE_ROOT}/${ENVOY_CACHE_OUTPUT_BASE}/.keep"
         TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
         echo "Generated cache: ${TOTAL_SIZE}"
         ;;
