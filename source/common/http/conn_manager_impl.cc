@@ -2503,6 +2503,17 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
   cached_cluster_info_ = std::optional<Upstream::ClusterInfoConstSharedPtr>();
 }
 
+void ConnectionManagerImpl::ActiveStream::refreshRouteConfigSnapshot() {
+  if (connection_manager_.config_->routeConfigProvider() != nullptr) {
+    snapped_route_config_ = connection_manager_.config_->routeConfigProvider()->configCast();
+  } else if (connection_manager_.config_->scopedRouteConfigProvider() != nullptr &&
+             connection_manager_.config_->scopeKeyBuilder().has_value() &&
+             request_headers_ != nullptr) {
+    snapped_scoped_routes_config_ =
+        connection_manager_.config_->scopedRouteConfigProvider()->config<Router::ScopedConfig>();
+  }
+}
+
 void ConnectionManagerImpl::ActiveStream::refreshRouteCluster() {
   // If there is no cached route, or route cache is frozen, or the request headers are not
   // available, then do not refresh the route cluster.
