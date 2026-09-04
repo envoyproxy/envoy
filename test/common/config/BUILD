@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -13,7 +15,7 @@ envoy_package()
 envoy_cc_test(
     name = "decoded_resource_impl_test",
     srcs = ["decoded_resource_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:decoded_resource_lib",
         "//test/mocks/config:config_mocks",
@@ -24,7 +26,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "ttl_test",
     srcs = ["ttl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:ttl_lib",
         "//test/mocks/event:event_mocks",
@@ -36,7 +38,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "grpc_subscription_impl_test",
     srcs = ["grpc_subscription_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":grpc_subscription_test_harness",
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -71,7 +73,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "opaque_resource_decoder_impl_test",
     srcs = ["opaque_resource_decoder_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:opaque_resource_decoder_lib",
         "//source/common/protobuf:message_validator_lib",
@@ -93,7 +95,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "type_to_endpoint_test",
     srcs = ["type_to_endpoint_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:type_to_endpoint_lib",
         "//test/config:v2_link_hacks",
@@ -105,7 +107,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:base_includes",
         "//source/common/config:metadata_lib",
@@ -120,7 +122,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "runtime_utility_test",
     srcs = ["runtime_utility_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:runtime_utility_lib",
         "//test/test_common:utility_lib",
@@ -131,7 +133,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:api_version_lib",
         "//source/common/config:utility_lib",
@@ -161,7 +163,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "registry_test",
     srcs = ["registry_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/config:typed_config_interface",
         "//test/test_common:logging_lib",
@@ -177,13 +179,14 @@ envoy_proto_library(
 envoy_cc_test(
     name = "config_provider_impl_test",
     srcs = ["config_provider_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":dummy_config_proto_cc_proto",
         "//source/common/config:config_provider_lib",
         "//source/common/protobuf:utility_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -192,10 +195,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "context_provider_impl_test",
     srcs = ["context_provider_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":xds_test_utility_lib",
         "//source/common/config:context_provider_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -203,7 +207,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "datasource_test",
     srcs = ["datasource_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
@@ -223,7 +227,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xds_context_params_test",
     srcs = ["xds_context_params_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":xds_test_utility_lib",
         "//source/common/config:xds_context_params_lib",
@@ -235,7 +239,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xds_resource_test",
     srcs = ["xds_resource_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":xds_test_utility_lib",
         "//source/common/config:xds_resource_lib",
@@ -252,18 +256,19 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "watched_directory_test",
     srcs = ["watched_directory_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:watched_directory_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
 envoy_cc_test(
     name = "custom_config_validators_impl_test",
     srcs = ["custom_config_validators_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:instance_mocks",
@@ -274,7 +279,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xds_manager_impl_test",
     srcs = ["xds_manager_impl_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     deps = [
         "//source/common/config:xds_manager_lib",
         "//test/mocks/api:api_mocks",
@@ -299,4 +304,37 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_test(
+    name = "singleton_subscription_adapter_test",
+    srcs = ["singleton_subscription_adapter_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/config:decoded_resource_lib",
+        "//source/common/config:singleton_subscription_adapter_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "xds_resource_decoder_benchmark",
+    srcs = ["xds_resource_decoder_benchmark.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/config:opaque_resource_decoder_lib",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/protobuf:utility_lib",
+        "@benchmark",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "xds_resource_decoder_benchmark_test",
+    benchmark_binary = "xds_resource_decoder_benchmark",
 )

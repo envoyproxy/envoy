@@ -22,7 +22,8 @@ void BaseTcpProxySslIntegrationTest::initialize() {
 
   context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
       server_factory_context_);
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
 }
 
 BaseTcpProxySslIntegrationTest::ClientSslConnection::ClientSslConnection(
@@ -36,7 +37,7 @@ BaseTcpProxySslIntegrationTest::ClientSslConnection::ClientSslConnection(
       .WillOnce(
           Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
                      absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
-            client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(
+            client_write_buffer_ = new testing::NiceMock<MockWatermarkBuffer>(
                 std::move(below_low), std::move(above_high), std::move(above_overflow));
             ON_CALL(*client_write_buffer_, move(_))
                 .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));

@@ -47,6 +47,11 @@ public:
   virtual void setEof() PURE;
 
   /**
+   * Called by the peer to indicate that the connection was reset.
+   */
+  virtual void setRst() PURE;
+
+  /**
    * @return true if the peer has indicated that it will not send any more data.
    */
   virtual bool hasReceivedEof() const PURE;

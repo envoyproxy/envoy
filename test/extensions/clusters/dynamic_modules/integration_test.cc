@@ -1,6 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stream_info/filter_state.h"
 
@@ -54,6 +55,25 @@ class DynamicModuleClusterIntegrationTest
       public HttpIntegrationTest {
 public:
   DynamicModuleClusterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void configureUpstreamTlsForLogicalHostname() {
+    upstream_tls_ = true;
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+      auto* validation_context =
+          tls_context.mutable_common_tls_context()->mutable_validation_context();
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      tls_context.set_auto_host_sni(true);
+      tls_context.set_auto_sni_san_validation(true);
+
+      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+      std::ignore =
+          cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+    });
+  }
 
   void initializeWithDecCluster(const std::string& cluster_name,
                                 const std::string& cluster_config = "") {
@@ -125,6 +145,24 @@ TEST_P(DynamicModuleClusterIntegrationTest, SyncHostSelectionMultipleRequests) {
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
+}
+
+// Verifies that a logical hostname supplied separately from the connection address is available
+// to upstream TLS for automatic SNI and SAN validation.
+TEST_P(DynamicModuleClusterIntegrationTest, LogicalHostnameDrivesUpstreamTls) {
+  configureUpstreamTlsForLogicalHostname();
+  initializeWithDecCluster("logical_hostname");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(upstream_request_->complete());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_NE(fake_upstream_connection_, nullptr);
+  ASSERT_NE(fake_upstream_connection_->connection().ssl(), nullptr);
+  EXPECT_EQ("test.lyft.com", fake_upstream_connection_->connection().ssl()->sni());
 }
 
 // Verifies that a cluster with asynchronous host selection correctly routes requests.
@@ -470,6 +508,71 @@ TEST_P(DynamicModuleClusterDynamicMetadataIntegrationTest, SetsDynamicMetadataDu
 
   const std::string log = waitForAccessLog(access_log_name_);
   EXPECT_EQ("1234 test_value", log);
+}
+
+// =============================================================================
+// Native LB test: cluster with LEAST_REQUEST policy (native LB, not module LB).
+// =============================================================================
+
+class DynamicModuleClusterNativeLbIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterNativeLbIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithNativeLb() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      // Use LEAST_REQUEST policy instead of CLUSTER_PROVIDED to test native LB.
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::LEAST_REQUEST);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig dec_config;
+      dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
+      dec_config.set_cluster_name("native_lb_test");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      std::ignore = dec_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore = cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(dec_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterNativeLbIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// A native lb_policy makes Envoy build its factory load balancer instead of the module's. The
+// request routes to the upstream, and the module's choose_host must not run: the module provides
+// a load balancer, but native_lb_requests stays 0 because Envoy never calls into it.
+TEST_P(DynamicModuleClusterNativeLbIntegrationTest, NativeLbWithLeastRequestPolicy) {
+  initializeWithNativeLb();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Native LB selected the host; the module's choose_host was never called, so its
+  // native_lb_requests counter is unincremented (absent or 0).
+  auto choose_host = test_server_->counter("dynamicmodulescustom.native_lb_requests");
+  EXPECT_TRUE(choose_host == nullptr || choose_host->value() == 0);
 }
 
 } // namespace DynamicModules

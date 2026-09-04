@@ -8,9 +8,17 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace PostgresInspector {
 
+namespace {
+
+bool hasRemaining(const Buffer::Instance& buffer, uint64_t offset, uint64_t needed) {
+  return offset <= buffer.length() && needed <= (buffer.length() - offset);
+}
+
+} // namespace
+
 bool PostgresMessageParser::isSslRequest(const Buffer::Instance& buffer, uint64_t offset) {
   // SSL request is exactly 8 bytes: length (4 bytes) + code (4 bytes).
-  if (buffer.length() < offset + SSL_REQUEST_MESSAGE_SIZE) {
+  if (!hasRemaining(buffer, offset, SSL_REQUEST_MESSAGE_SIZE)) {
     return false;
   }
 
@@ -24,7 +32,7 @@ bool PostgresMessageParser::isSslRequest(const Buffer::Instance& buffer, uint64_
 }
 
 bool PostgresMessageParser::isCancelRequest(const Buffer::Instance& buffer, uint64_t offset) {
-  if (buffer.length() < offset + CANCEL_REQUEST_MESSAGE_SIZE) {
+  if (!hasRemaining(buffer, offset, CANCEL_REQUEST_MESSAGE_SIZE)) {
     return false;
   }
   const uint32_t length = buffer.peekBEInt<uint32_t>(offset);
@@ -41,7 +49,7 @@ bool PostgresMessageParser::parseStartupMessage(const Buffer::Instance& buffer, 
   message.reset();
 
   // Need at least 8 bytes for length + version.
-  if (buffer.length() < offset + STARTUP_HEADER_SIZE) {
+  if (!hasRemaining(buffer, offset, STARTUP_HEADER_SIZE)) {
     return false;
   }
 
@@ -54,7 +62,7 @@ bool PostgresMessageParser::parseStartupMessage(const Buffer::Instance& buffer, 
   }
 
   // Check if we have the complete message.
-  if (buffer.length() < offset + message.length) {
+  if (!hasRemaining(buffer, offset, message.length)) {
     return false;
   }
 
@@ -88,12 +96,12 @@ bool PostgresMessageParser::parseStartupMessage(const Buffer::Instance& buffer, 
 
 bool PostgresMessageParser::hasCompleteMessage(const Buffer::Instance& buffer, uint64_t offset,
                                                uint32_t& message_length) {
-  if (buffer.length() < offset + 4) {
+  if (!hasRemaining(buffer, offset, 4)) {
     return false;
   }
 
   message_length = buffer.peekBEInt<uint32_t>(offset);
-  return buffer.length() >= offset + message_length;
+  return hasRemaining(buffer, offset, message_length);
 }
 
 bool PostgresMessageParser::readCString(const Buffer::Instance& buffer, uint64_t& offset,

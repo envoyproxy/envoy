@@ -62,6 +62,14 @@ public:
         /*upstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2});
   }
 
+  // This is the recommended choice for HTTP filter integration tests that do not interact
+  // directly with HTTP protocols or IP versions. It tests HTTP/1 over IPv4 when available,
+  // falling back to IPv6 when IPv4 is unavailable.
+  static std::vector<HttpProtocolTestParams> getHttp1OnlyProtocolTestParams() {
+    const auto params = getProtocolTestParams({Http::CodecType::HTTP1}, {Http::CodecType::HTTP1});
+    return {params.front()};
+  }
+
   // Allows pretty printed test names of the form
   // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
   static std::string
@@ -77,7 +85,6 @@ public:
     setupHttp2ImplOverrides(GetParam().http2_implementation);
     config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
                                       GetParam().use_universal_header_validator ? "true" : "false");
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "true");
   }
 
   void SetUp() override {
@@ -113,7 +120,6 @@ public:
     config_helper_.addRuntimeOverride(
         "envoy.reloadable_features.enable_universal_header_validator",
         std::get<0>(GetParam()).use_universal_header_validator ? "true" : "false");
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "true");
   }
   static std::string testParamsToString(
       const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {

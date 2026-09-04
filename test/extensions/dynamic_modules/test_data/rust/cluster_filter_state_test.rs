@@ -62,7 +62,7 @@ struct FilterStateProducerFilter {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateProducerFilter {
   fn on_request_headers(
-    &mut self,
+    &self,
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
@@ -128,10 +128,13 @@ impl Cluster for FilterStateReaderCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(FilterStateReaderLb {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(FilterStateReaderLb {
       hosts: self.hosts.clone(),
-    })
+    }))
   }
 }
 
@@ -200,10 +203,13 @@ impl Cluster for FilterStateWriterCluster {
     envoy_cluster.pre_init_complete();
   }
 
-  fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
-    Box::new(FilterStateWriterLb {
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(FilterStateWriterLb {
       hosts: self.hosts.clone(),
-    })
+    }))
   }
 }
 

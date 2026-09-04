@@ -92,6 +92,8 @@ struct ReverseConnectionSocketConfig {
       additional_headers;       // Additional headers for the handshake request.
   bool use_http_upgrade{false}; // Negotiate handshake as HTTP/1.1 Upgrade -> 101.
   std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
+  // How often to re-check each host and dial missing tunnels.
+  uint64_t maintain_interval_ms{ReverseConnectionUtility::kDefaultMaintainIntervalMs};
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -184,6 +186,12 @@ public:
    * @return IoCallUint64Result indicating the result of the close operation.
    */
   Api::IoCallUint64Result close() override;
+
+  /**
+   * Stop reverse-connection maintenance on listener teardown. On the owning worker this also
+   * shuts down in-flight handshake wrappers and deferred-deletes them.
+   */
+  void resetFileEvents() override;
 
   /**
    * Triggers the reverse connection workflow.
@@ -299,8 +307,9 @@ public:
    * Handle downstream connection closure and update internal maps so that the next
    * maintenance cycle re-initiates the connection.
    * @param connection_key the unique key identifying the closed connection.
+   * @param connection_id the initiator's per-connection identifier for the closed connection.
    */
-  void onDownstreamConnectionClosed(const std::string& connection_key);
+  void onDownstreamConnectionClosed(const std::string& connection_key, uint64_t connection_id);
 
   /**
    * Drop a tunnel from tracking because it has begun draining (the downstream HCM sent a
@@ -428,11 +437,14 @@ private:
    * @param host_address the address of the remote host
    * @param cluster_name the name of the upstream cluster
    * @param connection_key the unique key identifying the connection
+   * @param connection_id the initiator's per-connection identifier, or nullopt if the connection is
+   *        no longer available (e.g. after it has been released or closed); logged as an empty
+   *        string rather than a sentinel value so it is unambiguously distinct from a real id.
    * @param error_message the error message (empty on success)
    */
   void emitAccessLog(const std::string& event, const std::string& host_address,
                      const std::string& cluster_name, const std::string& connection_key,
-                     const std::string& error_message);
+                     std::optional<uint64_t> connection_id, const std::string& error_message);
 
   /**
    * Clean up all reverse connection resources.
@@ -467,6 +479,12 @@ private:
    * @param host the address of the host to remove
    */
   void removeStaleHostAndCloseConnections(const std::string& host);
+
+  /**
+   * Drop a wrapper from tracking and deferred-delete it on the worker dispatcher.
+   * @param wrapper the handshake wrapper to remove
+   */
+  void removeAndDeferredDeleteWrapper(RCConnectionWrapper* wrapper);
 
   /**
    * Per-host connection tracking for better management.
@@ -521,6 +539,10 @@ private:
 
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
+
+  // Set while waiting for parentStopAcceptingRequested(); cleared after scheduling the one-shot
+  // drain-propagation grace timer so fresh starts dial immediately.
+  bool deferred_for_parent_stop_accepting_{false};
 
   bool is_reverse_conn_started_{
       false}; // Whether reverse connections have been started on worker thread

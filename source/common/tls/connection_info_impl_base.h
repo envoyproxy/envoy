@@ -55,7 +55,7 @@ public:
   std::optional<SystemTime> expirationPeerCertificate() const override;
   const std::string& sessionId() const override;
   uint16_t ciphersuiteId() const override;
-  std::string ciphersuiteString() const override;
+  absl::string_view ciphersuiteString() const override;
   uint16_t tlsGroupId() const override;
   absl::string_view tlsGroupString() const override;
   const std::string& tlsVersion() const override;

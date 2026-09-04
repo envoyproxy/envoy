@@ -16,6 +16,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -240,7 +241,7 @@ public:
     ASSERT_TRUE(secret_update_callback_ != nullptr);
     absl::Status callback_status = secret_update_callback_();
     THROW_IF_NOT_OK_REF(callback_status);
-    ASSERT_TRUE(callback_status.ok());
+    ASSERT_OK(callback_status);
   }
 
 protected:
@@ -257,7 +258,7 @@ protected:
   Network::MockFilterChainManager filter_chain_manager_;
   Network::MockListenSocket listen_socket_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
-  Server::Configuration::MockServerFactoryContext factory_context_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{factory_context_};
   Ssl::MockServerContextConfig* mock_context_config_;
   std::function<absl::Status()> secret_update_callback_;

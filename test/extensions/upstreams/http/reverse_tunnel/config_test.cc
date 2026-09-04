@@ -1,30 +1,41 @@
 #include <memory>
 #include <utility>
 
+#include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/upstreams/http/reverse_tunnel/v3/reverse_tunnel_codec.pb.h"
 #include "envoy/http/client_codec_factory.h"
 #include "envoy/server/admin.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/socket_interface.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/config.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/drain_aware_client_connection.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/drain_registry.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/reverse_tunnel_codec_stats.h"
 
+#include "test/common/http/http2/http2_frame.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -35,10 +46,23 @@ namespace Http {
 namespace ReverseTunnel {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::testing::_;
+using ::testing::Eq;
+using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::ReturnRef;
+
+using Extensions::Bootstrap::ReverseConnection::MOCK_REPORTER;
+using Extensions::Bootstrap::ReverseConnection::MockReporterFactory;
+using Extensions::Bootstrap::ReverseConnection::MockReverseTunnelReporter;
+using Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptor;
+using Extensions::Bootstrap::ReverseConnection::ReverseTunnelAcceptorExtension;
+using Extensions::Bootstrap::ReverseConnection::ReverseTunnelReporter;
+using Extensions::Bootstrap::ReverseConnection::ReverseTunnelReporterFactory;
+using Extensions::Bootstrap::ReverseConnection::UpstreamSocketManager;
+using Extensions::Bootstrap::ReverseConnection::UpstreamSocketThreadLocal;
 
 envoy::extensions::upstreams::http::reverse_tunnel::v3::ReverseTunnelUpstreamCodecOptions
 makeProto(bool enable) {
@@ -47,18 +71,126 @@ makeProto(bool enable) {
   return proto;
 }
 
+constexpr int kTestSocketFd = 42;
+
 class ReverseTunnelUpstreamCodecTest : public testing::Test {
 protected:
+  ReverseTunnelUpstreamCodecTest() : dispatcher_("worker_0") {
+    tls_.setDispatcher(&dispatcher_);
+    EXPECT_CALL(dispatcher_, createTimer_(_))
+        .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockTimer>>());
+    EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _))
+        .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockFileEvent>>());
+  }
+
+  void SetUp() override {
+    const Network::SocketInterface* socket_if =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+    RELEASE_ASSERT(socket_if != nullptr, "upstream reverse tunnel socket interface not registered");
+  }
+
+  void TearDown() override {
+    // Drop the TLS registry first so ~UpstreamSocketManager still has a live extension_.
+    socket_manager_ = nullptr;
+    thread_local_registry_.reset();
+    tls_slot_.reset();
+    if (extension_ != nullptr) {
+      const Network::SocketInterface* socket_if =
+          Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+      if (socket_if != nullptr) {
+        auto* acceptor =
+            dynamic_cast<ReverseTunnelAcceptor*>(const_cast<Network::SocketInterface*>(socket_if));
+        if (acceptor != nullptr && acceptor->extension_ == extension_.get()) {
+          acceptor->extension_ = nullptr;
+        }
+      }
+    }
+    extension_.reset();
+  }
+
   Envoy::Http::ClientCodecFactory::Context makeContext(Envoy::Http::CodecType type) {
     return Envoy::Http::ClientCodecFactory::Context{
         type, connection_, callbacks_, cluster_, random_, transport_socket_options_};
   }
 
+  NiceMock<MockReverseTunnelReporter>* makeReporter() {
+    auto* reporter = new NiceMock<MockReverseTunnelReporter>();
+    EXPECT_CALL(reporter_factory_, createReporter()).WillOnce(Invoke([reporter]() {
+      return std::unique_ptr<ReverseTunnelReporter>(reporter);
+    }));
+    return reporter;
+  }
+
+  std::unique_ptr<ReverseTunnelAcceptorExtension>
+  makeExtension(absl::string_view node_id, absl::string_view cluster_id, int fd) {
+    envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+        UpstreamReverseConnectionSocketInterface config;
+    config.set_stat_prefix("reverse_tunnel_upstream_codec_test");
+    auto* reporter_cfg = config.mutable_reporter_config();
+    reporter_cfg->set_name(MOCK_REPORTER);
+    Protobuf::StringValue noop_config;
+    std::ignore = reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
+
+    EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(tls_));
+    EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
+    EXPECT_CALL(context_, messageValidationVisitor())
+        .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+    const Network::SocketInterface* socket_if =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+    RELEASE_ASSERT(socket_if != nullptr, "upstream reverse tunnel socket interface not registered");
+    auto* acceptor =
+        dynamic_cast<ReverseTunnelAcceptor*>(const_cast<Network::SocketInterface*>(socket_if));
+    RELEASE_ASSERT(acceptor != nullptr,
+                   "registered socket interface is not a ReverseTunnelAcceptor");
+
+    auto extension = std::make_unique<ReverseTunnelAcceptorExtension>(*acceptor, context_, config);
+    acceptor->extension_ = extension.get();
+    wireTlsRegistry(*extension);
+    socket_manager_->addConnectionSocket(std::string(node_id), std::string(cluster_id),
+                                         createSeedSocket(fd), std::chrono::seconds(30),
+                                         /*rebalanced=*/false);
+    return extension;
+  }
+
+  void wireTlsRegistry(ReverseTunnelAcceptorExtension& extension) {
+    thread_local_registry_ = std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, &extension);
+    socket_manager_ = thread_local_registry_->socketManager();
+    RELEASE_ASSERT(socket_manager_ != nullptr, "socket manager not created");
+
+    tls_slot_ = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(tls_);
+    tls_slot_->set([registry = thread_local_registry_](Event::Dispatcher&)
+                       -> std::shared_ptr<UpstreamSocketThreadLocal> { return registry; });
+    extension.setTestOnlyTLSRegistry(std::move(tls_slot_));
+  }
+
+  Network::ConnectionSocketPtr createSeedSocket(int fd) {
+    auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+    auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+    auto* io_handle_raw = io_handle.get();
+    EXPECT_CALL(*io_handle_raw, fdDoNotUse()).WillRepeatedly(Return(fd));
+    EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_raw));
+    socket->io_handle_ = std::move(io_handle);
+    return socket;
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   // store_ must be declared before stats_ (stats_ is generated from its scope).
   Stats::IsolatedStoreImpl store_;
+  Stats::ScopeSharedPtr stats_scope_{store_.createScope("test_scope.")};
+  NiceMock<MockReporterFactory> reporter_factory_;
+  Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector_{reporter_factory_};
+  std::unique_ptr<ReverseTunnelAcceptorExtension> extension_;
+  std::shared_ptr<UpstreamSocketThreadLocal> thread_local_registry_;
+  std::unique_ptr<ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>> tls_slot_;
+  UpstreamSocketManager* socket_manager_{nullptr};
   ReverseTunnelUpstreamCodecStats stats_{
       ReverseTunnelUpstreamCodecStats::generate(*store_.rootScope())};
   NiceMock<Network::MockConnection> connection_;
+  NiceMock<Network::MockConnectionSocket>* socket_raw_{
+      new NiceMock<Network::MockConnectionSocket>()};
+  Network::ConnectionSocketPtr socket_{socket_raw_};
+  NiceMock<Network::MockIoHandle> io_handle_;
   NiceMock<Envoy::Http::MockConnectionCallbacks> callbacks_;
   NiceMock<Upstream::MockClusterInfo> cluster_;
   NiceMock<Random::MockRandomGenerator> random_;
@@ -79,18 +211,106 @@ TEST_F(ReverseTunnelUpstreamCodecTest, OptionsExposesCodecFactory) {
 // pool's normal drain handling still runs.
 TEST_F(ReverseTunnelUpstreamCodecTest, CallbacksObserveAndForwardGoaway) {
   NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
-  DrainAwareClientCallbacks wrapper(inner, stats_);
+  DrainAwareClientCallbacks wrapper(inner, kTestSocketFd);
 
   EXPECT_CALL(inner, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
   wrapper.onGoAway(Envoy::Http::GoAwayErrorCode::NoError);
-  EXPECT_EQ(1, stats_.goaway_received_.value());
+}
+
+// Peer GOAWAY on the drain-aware callbacks reaches the socket manager and reports to the
+// configured reverse-tunnel reporter with the node, cluster, and fd for the seeded socket.
+TEST_F(ReverseTunnelUpstreamCodecTest, PeerGoAwayReportsToReporter) {
+  NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
+
+  const std::string node_id = "node-1";
+  const std::string cluster_id = "cluster-1";
+  extension_ = makeExtension(node_id, cluster_id, kTestSocketFd);
+
+  NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
+  DrainAwareClientCallbacks wrapper(inner, kTestSocketFd);
+
+  EXPECT_CALL(*reporter, reportGoAwayEvent(Eq(node_id), Eq(cluster_id), Eq(kTestSocketFd)));
+  EXPECT_CALL(inner, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  wrapper.onGoAway(Envoy::Http::GoAwayErrorCode::NoError);
+}
+
+TEST_F(ReverseTunnelUpstreamCodecTest, PeerGoAwayNoReportWithoutTls) {
+  auto* reporter = new NiceMock<MockReverseTunnelReporter>();
+
+  const Network::SocketInterface* socket_if =
+      Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+  ASSERT_NE(socket_if, nullptr);
+  auto* acceptor =
+      dynamic_cast<ReverseTunnelAcceptor*>(const_cast<Network::SocketInterface*>(socket_if));
+  ASSERT_NE(acceptor, nullptr);
+  acceptor->extension_ = nullptr;
+
+  NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
+  DrainAwareClientCallbacks wrapper(inner, kTestSocketFd);
+
+  EXPECT_CALL(*reporter, reportGoAwayEvent(_, _, _)).Times(0);
+  EXPECT_CALL(inner, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  wrapper.onGoAway(Envoy::Http::GoAwayErrorCode::NoError);
+
+  delete reporter;
+}
+
+TEST_F(ReverseTunnelUpstreamCodecTest, CreateClientCodecPeerGoAwayReportsToReporter) {
+  NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
+
+  const std::string node_id = "node-1";
+  const std::string cluster_id = "cluster-1";
+  extension_ = makeExtension(node_id, cluster_id, kTestSocketFd);
+
+  ReverseTunnelUpstreamCodecOptions opts(makeProto(true), stats_, nullptr);
+  envoy::config::cluster::v3::Cluster::CustomClusterType custom_type;
+  custom_type.set_name("envoy.clusters.reverse_connection");
+  ON_CALL(cluster_, clusterType()).WillByDefault(Return(makeOptRef(std::as_const(custom_type))));
+  ON_CALL(cluster_, maxResponseHeadersCount()).WillByDefault(Return(100));
+
+  EXPECT_CALL(connection_, getSocket()).WillOnce(ReturnRef(socket_));
+  EXPECT_CALL(*socket_raw_, ioHandle()).WillOnce(ReturnRef(io_handle_));
+  EXPECT_CALL(io_handle_, fdDoNotUse()).WillOnce(Return(kTestSocketFd));
+
+  auto codec = opts.createClientCodec(makeContext(Envoy::Http::CodecType::HTTP2));
+  ASSERT_NE(codec, nullptr);
+
+  EXPECT_CALL(*reporter, reportGoAwayEvent(Eq(node_id), Eq(cluster_id), Eq(kTestSocketFd)));
+  EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+
+  Buffer::OwnedImpl buffer;
+  buffer.add(std::string(Envoy::Http::Http2::Http2Frame::makeEmptySettingsFrame()));
+  buffer.add(std::string(Envoy::Http::Http2::Http2Frame::makeEmptyGoAwayFrame(
+      0, Envoy::Http::Http2::Http2Frame::ErrorCode::NoError)));
+  EXPECT_TRUE(codec->dispatch(buffer).ok());
+}
+
+TEST_F(ReverseTunnelUpstreamCodecTest, LocalGracefulDrainDoesNotReportGoAway) {
+  NiceMock<MockReverseTunnelReporter>* reporter = makeReporter();
+  extension_ = makeExtension("node-1", "cluster-1", kTestSocketFd);
+
+  auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
+  auto* inner_raw = inner.get();
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
+  auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
+                                   /*registry=*/nullptr, /*cluster=*/"");
+
+  EXPECT_CALL(*reporter, reportGoAwayEvent(_, _, _)).Times(0);
+  EXPECT_CALL(*inner_raw, shutdownNotice());
+  EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(100), _));
+  codec.startGracefulDrain(std::chrono::milliseconds(100));
+
+  EXPECT_CALL(*inner_raw, goAway());
+  EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
+  drain_timer->invokeCallback();
 }
 
 // The decorator forwards ClientConnection calls and counts a sent GOAWAY.
 TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsAndCountsGoawaySent) {
   auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
   auto* inner_raw = inner.get();
-  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, stats_);
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
   DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
                                    /*registry=*/nullptr, /*cluster=*/"");
 
@@ -110,7 +330,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsAndCountsGoawaySent) {
 TEST_F(ReverseTunnelUpstreamCodecTest, StartGracefulDrainTwoPhase) {
   auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
   auto* inner_raw = inner.get();
-  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, stats_);
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
   // MockTimer registers with the dispatcher and captures the timer callback for invokeCallback().
   auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
@@ -129,7 +349,6 @@ TEST_F(ReverseTunnelUpstreamCodecTest, StartGracefulDrainTwoPhase) {
   EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
   drain_timer->invokeCallback();
   EXPECT_EQ(1, stats_.goaway_sent_.value());
-  EXPECT_EQ(0, stats_.goaway_received_.value());
 
   // Idempotent: a second call does nothing.
   codec.startGracefulDrain(std::chrono::milliseconds(5000));
@@ -142,7 +361,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsRegisteredCluster) {
 
   auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
   auto* inner_raw = inner.get();
-  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, stats_);
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
   auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   // Constructing with the registry auto-registers under "cluster_a".
   DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
@@ -160,7 +379,6 @@ TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsRegisteredCluster) {
   EXPECT_CALL(callbacks_, onGoAway(Envoy::Http::GoAwayErrorCode::NoError));
   drain_timer->invokeCallback();
   EXPECT_EQ(1, stats_.goaway_sent_.value());
-  EXPECT_EQ(0, stats_.goaway_received_.value());
 }
 
 // An empty cluster key drains every registered codec (the "drain all" admin path).
@@ -169,7 +387,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, RegistryDrainsAllClusters) {
 
   auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
   auto* inner_raw = inner.get();
-  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, stats_);
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
   auto* drain_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
   DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
                                    registry, "cluster_a");
@@ -230,6 +448,10 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CreatesDrainAwareCodecForReverseConnectio
   ON_CALL(cluster_, clusterType()).WillByDefault(Return(makeOptRef(std::as_const(custom_type))));
   ON_CALL(cluster_, maxResponseHeadersCount()).WillByDefault(Return(100));
 
+  EXPECT_CALL(connection_, getSocket()).WillOnce(ReturnRef(socket_));
+  EXPECT_CALL(*socket_raw_, ioHandle()).WillOnce(ReturnRef(io_handle_));
+  EXPECT_CALL(io_handle_, fdDoNotUse()).WillOnce(Return(kTestSocketFd));
+
   auto codec = opts.createClientCodec(makeContext(Envoy::Http::CodecType::HTTP2));
   ASSERT_NE(codec, nullptr);
   EXPECT_EQ(Envoy::Http::Protocol::Http2, codec->protocol());
@@ -242,7 +464,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CreatesDrainAwareCodecForReverseConnectio
 TEST_F(ReverseTunnelUpstreamCodecTest, GracefulDrainTwoPhaseOnRealHttp2Codec) {
   ON_CALL(cluster_, maxResponseHeadersCount()).WillByDefault(Return(100));
 
-  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, stats_);
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
   auto& callbacks_ref = *callbacks;
   auto h2 = std::make_unique<DrainAwareHttp2ClientConnection>(
       connection_, callbacks_ref, cluster_.http2CodecStats(), random_,
@@ -270,7 +492,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, GracefulDrainTwoPhaseOnRealHttp2Codec) {
 // The DrainAwareClientCallbacks wrapper forwards the non-GOAWAY connection callbacks unchanged.
 TEST_F(ReverseTunnelUpstreamCodecTest, CallbacksForwardSettingsAndMaxStreams) {
   NiceMock<Envoy::Http::MockConnectionCallbacks> inner;
-  DrainAwareClientCallbacks wrapper(inner, stats_);
+  DrainAwareClientCallbacks wrapper(inner, kTestSocketFd);
 
   NiceMock<Envoy::Http::MockReceivedSettings> settings;
   EXPECT_CALL(inner, onSettings(_));
@@ -285,7 +507,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, CallbacksForwardSettingsAndMaxStreams) {
 TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsRemainingCalls) {
   auto inner = std::make_unique<NiceMock<Envoy::Http::MockClientConnection>>();
   auto* inner_raw = inner.get();
-  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, stats_);
+  auto callbacks = std::make_unique<DrainAwareClientCallbacks>(callbacks_, kTestSocketFd);
   DrainAwareClientConnection codec(std::move(inner), std::move(callbacks), stats_, dispatcher_,
                                    /*registry=*/nullptr, /*cluster=*/"");
 
@@ -296,7 +518,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, ConnectionForwardsRemainingCalls) {
 
   Buffer::OwnedImpl data;
   EXPECT_CALL(*inner_raw, dispatch(_)).WillOnce(Return(Envoy::Http::okStatus()));
-  EXPECT_TRUE(codec.dispatch(data).ok());
+  EXPECT_OK(codec.dispatch(data));
 
   EXPECT_CALL(*inner_raw, protocol()).WillOnce(Return(Envoy::Http::Protocol::Http2));
   EXPECT_EQ(Envoy::Http::Protocol::Http2, codec.protocol());
@@ -336,8 +558,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, FactoryCreatesOptionsAndRegistersAdminHan
   ReverseTunnelUpstreamCodecFactory factory;
   auto proto = makeProto(true);
   auto result = factory.createProtocolOptionsConfig(proto, factory_context);
-  ASSERT_TRUE(result.ok()) << result.status().message();
-  ASSERT_NE(result.value(), nullptr);
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
   EXPECT_TRUE(result.value()->upstreamHttpClientCodecFactory().has_value());
 
   // Drive the admin handler with a drain_time_ms query param to exercise its body.
@@ -385,8 +606,7 @@ TEST_F(ReverseTunnelUpstreamCodecTest, FactoryDoesNotRegisterAdminHandlerWhenDis
   ReverseTunnelUpstreamCodecFactory factory;
   auto proto = makeProto(false);
   auto result = factory.createProtocolOptionsConfig(proto, factory_context);
-  ASSERT_TRUE(result.ok()) << result.status().message();
-  ASSERT_NE(result.value(), nullptr);
+  ASSERT_THAT(result, IsOkAndHolds(::testing::NotNull()));
   EXPECT_TRUE(result.value()->upstreamHttpClientCodecFactory().has_value());
 }
 

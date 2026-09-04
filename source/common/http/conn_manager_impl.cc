@@ -46,6 +46,7 @@
 #include "source/common/http/path_utility.h"
 #include "source/common/http/status.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/drain_close_util.h"
 #include "source/common/network/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -120,7 +121,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(
     Random::RandomGenerator& random_generator, Http::Context& http_context,
     Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
     Upstream::ClusterManager& cluster_manager, Server::OverloadManager& overload_manager,
-    TimeSource& time_source, envoy::config::core::v3::TrafficDirection direction)
+    TimeSource& time_source, envoy::config::core::v3::TrafficDirection direction,
+    Server::Configuration::ServerFactoryContext& server_context)
     : config_(std::move(config)), stats_(config_->stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
@@ -147,7 +149,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(
                                      /*proxy_status_config=*/config_->proxyStatusConfig())),
       max_requests_during_dispatch_(
           runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
-      direction_(direction),
+      direction_(direction), server_context_(server_context),
+      use_connection_event_drain_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")),
       allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
       close_connection_on_zombie_stream_complete_(Runtime::runtimeFeatureEnabled(
@@ -189,6 +193,9 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     stats_.named_.downstream_cx_ssl_active_.inc();
   }
 
+  // Captured once here rather than plumbed through the filter factory: the drain type belongs to
+  // the listener that accepted this connection, and is reachable from the connection itself.
+  drain_type_ = Network::listenerDrainType(read_callbacks_->connection());
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
   if (config_->addProxyProtocolConnectionState() &&
@@ -298,15 +305,8 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
              StreamInfo::CoreResponseFlag::UpstreamConnectionTermination))) {
       stream.response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
     } else {
-      const bool reset_with_error =
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error");
       if (stream.filter_manager_.streamInfo().hasResponseFlag(
-              StreamInfo::CoreResponseFlag::UpstreamProtocolError) &&
-          !Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.reset_ignore_upstream_reason")) {
-        stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
-      } else if (reset_with_error && stream.filter_manager_.streamInfo().hasResponseFlag(
-                                         StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
+              StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
       } else {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
@@ -656,6 +656,20 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
   }
 }
 
+void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
+  if (!connection_drain_event_.has_value()) {
+    connection_drain_event_ = drain_event;
+  }
+}
+
+bool ConnectionManagerImpl::shouldDrainClose(Network::DrainDirection scope) {
+  if (!use_connection_event_drain_) {
+    return drain_close_.drainClose(scope);
+  }
+
+  return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_);
+}
+
 void ConnectionManagerImpl::doConnectionClose(
     std::optional<Network::ConnectionCloseType> close_type,
     std::optional<StreamInfo::CoreResponseFlag> response_flag, absl::string_view details) {
@@ -914,9 +928,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       has_explicit_global_flush_timeout_(
           connection_manager.config_->streamFlushTimeout().has_value()),
       header_validator_(
-          connection_manager.config_->makeHeaderValidator(connection_manager.codec_->protocol())),
-      trace_refresh_after_route_refresh_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.trace_refresh_after_route_refresh")) {
+          connection_manager.config_->makeHeaderValidator(connection_manager.codec_->protocol())) {
   ASSERT(!connection_manager.config_->isRoutable() ||
              ((connection_manager.config_->routeConfigProvider() == nullptr &&
                connection_manager.config_->scopedRouteConfigProvider() != nullptr &&
@@ -937,6 +949,19 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   // Record the downstream connection begin time point for COMMON_DURATION access logging.
   filter_manager_.streamInfo().downstreamTiming().setDownstreamConnectionBegin(
       connection_manager_.read_callbacks_->connection().streamInfo().startTimeMonotonic());
+
+  // Copy the connection-level downstream TLS handshake time points onto the request-level stream
+  // info so they are available to COMMON_DURATION (DS_HS_BEG/DS_HS_END) access logging.
+  const auto& connection_downstream_timing =
+      connection_manager_.read_callbacks_->connection().streamInfo().downstreamTiming();
+  if (connection_downstream_timing.downstreamHandshakeStart().has_value()) {
+    filter_manager_.streamInfo().downstreamTiming().setDownstreamHandshakeStart(
+        connection_downstream_timing.downstreamHandshakeStart().value());
+  }
+  if (connection_downstream_timing.downstreamHandshakeComplete().has_value()) {
+    filter_manager_.streamInfo().downstreamTiming().setDownstreamHandshakeComplete(
+        connection_downstream_timing.downstreamHandshakeComplete().value());
+  }
 
   // TODO(chaoqin-li1123): can this be moved to the on demand filter?
   auto factory = Envoy::Config::Utility::getFactoryByName<RouteConfigUpdateRequesterFactory>(
@@ -1094,7 +1119,7 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
 }
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& headers) {
-  if (trace_refresh_after_route_refresh_ && connection_manager_tracing_config_.has_value()) {
+  if (connection_manager_tracing_config_.has_value()) {
     const Tracing::Decision tracing_decision =
         Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
     ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
@@ -1490,6 +1515,18 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     return;
   }
 
+  // RFC 10008 Section 2: "Servers MUST fail the request if the Content-Type request field is
+  // missing or is inconsistent with the request content." Only the missing case is enforced here;
+  // whether the media type is consistent with, supported by, or processable for the request
+  // content is a decision only the origin server can make. An empty field value is as absent as a
+  // missing one. Section 2.1 calls for "a 4xx status code such as 400".
+  if (HeaderUtility::isQuery(*request_headers_) &&
+      request_headers_->getContentTypeValue().empty()) {
+    sendLocalReply(Code::BadRequest, "", nullptr, std::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().QueryMissingContentType);
+    return;
+  }
+
 #ifndef ENVOY_ENABLE_UHV
   // In UHV mode path normalization is done in the UHV
   // Path sanitization should happen before any path access other than the above sanity check.
@@ -1612,11 +1649,6 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 
   const Tracing::Decision tracing_decision =
       Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
-
-  if (!trace_refresh_after_route_refresh_) {
-    ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
-                                              connection_manager_.config_->tracingStats());
-  }
 
   Tracing::HttpTraceContext trace_context(*request_headers_);
   active_span_ = connection_manager_.tracer().startSpan(
@@ -1833,10 +1865,6 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshTracing() {
-  if (!trace_refresh_after_route_refresh_) {
-    return;
-  }
-
   if (!connection_manager_tracing_config_.has_value() || active_span_ == nullptr ||
       request_headers_ == nullptr) {
     return;
@@ -1957,8 +1985,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // header block. Only drain if the drain direction is not inbound only or the connection is
   // inbound.
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      (connection_manager_.drain_close_.drainClose(drain_scope) ||
-       drain_connection_due_to_overload)) {
+      (drain_connection_due_to_overload || connection_manager_.shouldDrainClose(drain_scope))) {
 
     // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
     // of time to race with incoming requests. For HTTP/2 connections, send a GOAWAY frame to

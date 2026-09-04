@@ -38,11 +38,14 @@ jobs:
       bazel-extra: '--config=rbe'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
+      docker-ci: false
       request: ${{ inputs.request }}
       error-match: |
         ERROR
         error:
         Error:
+        FAILED
+        FAIL:
       rbe: true
       target: ${{ matrix.target }}
       trusted: ${{ inputs.trusted }}

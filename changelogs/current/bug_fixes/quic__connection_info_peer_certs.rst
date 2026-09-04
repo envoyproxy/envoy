@@ -1,4 +1,6 @@
-Fixed QUIC connection info to expose peer certificate details (digests, SANs, subject, issuer,
-serial numbers, PEM encoding and validity dates). Previously all peer certificate accessors on
-QUIC connections returned empty values, so for example access log and header formatters for the
-peer certificate of upstream HTTP/3 connections produced empty output.
+Fixed QUIC connection info to serve peer certificate details through the same code path as TLS
+connections. The peer certificate issuer digest and issuer serial number (used for example by the
+Lua filter) and the raw PEM-encoded peer certificate (used for example by CEL attributes) are now
+populated on QUIC connections, and peer certificate details remain available after the SSL object
+has been released when ``envoy.reloadable_features.quic_enable_reset_ssl_after_handshake`` is
+enabled.

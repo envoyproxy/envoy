@@ -253,14 +253,8 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     return;
   }
 
-  bool can_recreate_stream = false;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.on_demand_track_end_stream")) {
-    // New behavior: track end_stream state to support stream recreation with fully read bodies.
-    can_recreate_stream = downstream_end_stream_;
-  } else {
-    // Old behavior: reject all requests with bodies.
-    can_recreate_stream = !callbacks_->decodingBuffer();
-  }
+  // Track end_stream state to support stream recreation with fully read bodies.
+  const bool can_recreate_stream = downstream_end_stream_;
   if (route_exists &&        // route can be resolved after an on-demand
                              // VHDS update
       can_recreate_stream && // Redirects require fully read body.
@@ -290,14 +284,8 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     return;
   }
 
-  bool can_recreate_stream = false;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.on_demand_track_end_stream")) {
-    // New behavior: track end_stream state to support stream recreation with fully read bodies.
-    can_recreate_stream = downstream_end_stream_;
-  } else {
-    // Old behavior: reject all requests with bodies.
-    can_recreate_stream = !callbacks_->decodingBuffer();
-  }
+  // Track end_stream state to support stream recreation with fully read bodies.
+  const bool can_recreate_stream = downstream_end_stream_;
   if (cluster_status == Upstream::ClusterDiscoveryStatus::Available && can_recreate_stream) {
     // Redirects require fully read body.
     const Http::ResponseHeaderMap* headers = nullptr;

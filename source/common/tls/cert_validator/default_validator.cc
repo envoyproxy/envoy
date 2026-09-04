@@ -32,7 +32,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
-#include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
@@ -443,7 +442,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
 }
 
 bool DefaultCertValidator::verifySubjectAltName(X509* cert,
-                                                const std::vector<std::string>& subject_alt_names) {
+                                                absl::Span<const std::string> subject_alt_names) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {

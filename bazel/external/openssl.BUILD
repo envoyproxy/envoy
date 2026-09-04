@@ -1,3 +1,4 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 
 licenses(["notice"])  # Apache 2
@@ -8,10 +9,23 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+bool_flag(
+    name = "parallel_builds",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "parallel_builds_enabled",
+    flag_values = {
+        ":parallel_builds": "True",
+    },
+)
+
 configure_make(
     name = "openssl",
     args = select({
-        "@envoy//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        ":parallel_builds_enabled": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     configure_command = "Configure",

@@ -92,9 +92,14 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
 
+.. _config_access_log_format_bytes_received:
+
 ``%BYTES_RECEIVED%``
   HTTP/THRIFT
-    Body bytes received.
+    Body bytes received from the downstream, i.e. the size of the request body. This value is
+    independent of :ref:`%BYTES_SENT% <config_access_log_format_bytes_sent>`, which reflects the
+    response body sent to the downstream, so the two may differ significantly (e.g. a large file
+    upload with a small response, or vice versa).
 
   TCP
     Downstream bytes received on connection.
@@ -200,9 +205,15 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
 
+.. _config_access_log_format_bytes_sent:
+
 ``%BYTES_SENT%``
   HTTP/THRIFT
-    Body bytes sent. For WebSocket connection it will also include response header bytes.
+    Body bytes sent to the downstream, i.e. the size of the response body (which is typically
+    produced by the upstream). For WebSocket connection it will also include response header
+    bytes. This value is independent of :ref:`%BYTES_RECEIVED% <config_access_log_format_bytes_received>`,
+    which reflects the request body received from the downstream, so the two may differ
+    significantly (e.g. a large file upload with a small response, or vice versa).
 
   TCP
     Downstream bytes sent on connection.
@@ -357,9 +368,18 @@ Current supported substitution commands include:
     The ``START`` and ``END`` time points are specified by the following values (all values
     here are case-sensitive):
 
-    * ``DS_CX_BEG``: The time point of the downstream connection begin.
-    * ``DS_CX_END``: The time point of the downstream connection end.
+    * ``DS_CX_BEG``: The time point at which the downstream connection was established (accepted)
+      by Envoy, i.e. the connection start time. Note this is unlike ``US_CX_BEG``/``US_CX_END``,
+      which mark the begin and end of the upstream connection *establishment*; ``DS_CX_BEG`` is the
+      single time point at which the already-established downstream connection begins.
+    * ``DS_CX_END``: The time point at which the downstream connection was closed, i.e. the
+      connection close time. Note this is unlike ``US_CX_END``, which marks the end of the upstream
+      connection *establishment* rather than the connection close.
+    * ``DS_HS_BEG``: The time point of the downstream TLS handshake begin, i.e. when the
+      ClientHello was received.
+    * ``DS_HS_END``: The time point of the downstream TLS handshake end.
     * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
+    * ``DS_RX_HDR_END``: The time point of the downstream request header receiving end.
     * ``DS_RX_END``: The time point of the downstream request receiving end.
     * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
     * ``US_CX_END``: The time point of the upstream TCP connect end.
@@ -401,8 +421,16 @@ Current supported substitution commands include:
     The connection time points are populated for TCP connections and specified by the following
     values (all values here are case-sensitive):
 
-    * ``DS_CX_BEG``: The time point of the downstream connection begin.
-    * ``DS_CX_END``: The time point of the downstream connection end.
+    * ``DS_CX_BEG``: The time point at which the downstream connection was established (accepted)
+      by Envoy, i.e. the connection start time. Note this is unlike ``US_CX_BEG``/``US_CX_END``,
+      which mark the begin and end of the upstream connection *establishment*; ``DS_CX_BEG`` is the
+      single time point at which the already-established downstream connection begins.
+    * ``DS_CX_END``: The time point at which the downstream connection was closed, i.e. the
+      connection close time. Note this is unlike ``US_CX_END``, which marks the end of the upstream
+      connection *establishment* rather than the connection close.
+    * ``DS_HS_BEG``: The time point of the downstream TLS handshake begin, i.e. when the
+      ClientHello was received.
+    * ``DS_HS_END``: The time point of the downstream TLS handshake end.
     * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
     * ``US_CX_END``: The time point of the upstream TCP connect end.
 
@@ -469,6 +497,17 @@ Current supported substitution commands include:
 
   TCP
     Total duration in milliseconds from the start of the connection to the TLS handshake being completed.
+
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+  Renders a numeric value in typed JSON logs.
+
+``%DOWNSTREAM_CX_RTT%``
+  HTTP/TCP
+    The last measured round trip time in milliseconds of the downstream connection, as reported by
+    the underlying transport (e.g. the kernel TCP stack). It will appear as ``"-"`` in the access
+    logs if the round trip time is not available.
 
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
@@ -1565,6 +1604,9 @@ Current supported substitution commands include:
 ``%FILTER_CHAIN_NAME%``
   The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
 
+``%LISTENER_NAME%``
+  The :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>` of the listener that accepted the downstream connection.
+
 .. _config_access_log_format_access_log_type:
 
 ``%ACCESS_LOG_TYPE%``
@@ -1665,8 +1707,13 @@ Current supported substitution commands include:
 ``%COALESCE(JSON_CONFIG):Z%``
   HTTP
     A higher-order formatter operator that evaluates multiple formatter operators in sequence and
-    returns the first non-null, non-empty result. This is useful for implementing fallback behavior,
+    returns the first non-null result. This is useful for implementing fallback behavior,
     such as using SNI when available but falling back to the ``:authority`` header when SNI is not set.
+
+    An operator that produces a value which is present but empty is accepted as the result. Set the
+    runtime guard ``envoy.reloadable_features.coalesce_formatter_accept_empty_values`` to ``false``
+    to restore the legacy behavior, where an empty value is skipped and the next operator is
+    evaluated.
 
     The ``JSON_CONFIG`` parameter is a JSON object with an ``operators`` array. Each operator can be
     specified as either:

@@ -15,6 +15,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
@@ -43,8 +44,9 @@ ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
     Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
     Api::Api& api, TimeSource& time_source,
-    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory)
-    : drain_decision_(drain_decision), runtime_(runtime),
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
+    Server::Configuration::ServerFactoryContext& server_context)
+    : drain_decision_(drain_decision), server_context_(server_context), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),
       downstream_auth_username_(THROW_OR_RETURN_VALUE(
@@ -100,7 +102,9 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
                          ProxyFilterConfigSharedPtr config,
                          ExternalAuth::ExternalAuthClientPtr&& auth_client)
     : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
-      config_(config), transaction_(this) {
+      config_(config), use_connection_event_drain_(Runtime::runtimeFeatureEnabled(
+                           "envoy.reloadable_features.use_connection_event_drain")),
+      transaction_(this) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
   connection_allowed_ = config_->downstream_auth_username_.empty() &&
@@ -120,6 +124,9 @@ ProxyFilter::~ProxyFilter() {
 
 void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
+  // Captured once here rather than plumbed through the filter factory: the drain type belongs to
+  // the listener that accepted this connection, and is reachable from the connection itself.
+  drain_type_ = Network::listenerDrainType(callbacks_->connection());
   callbacks_->connection().addConnectionCallbacks(*this);
   callbacks_->connection().setConnectionStats({config_->stats_.downstream_cx_rx_bytes_total_,
                                                config_->stats_.downstream_cx_rx_bytes_buffered_,
@@ -172,6 +179,14 @@ void ProxyFilter::processRespValue(Common::Redis::RespValuePtr&& value, PendingR
     // if the request is still alive.
     request.request_handle_ = std::move(split);
   }
+}
+
+bool ProxyFilter::shouldDrainClose() {
+  if (!use_connection_event_drain_) {
+    return config_->drain_decision_.drainClose(Network::DrainDirection::All);
+  }
+
+  return Network::shouldDrainClose(config_->server_context_, drain_type_, connection_drain_event_);
 }
 
 void ProxyFilter::onEvent(Network::ConnectionEvent event) {
@@ -449,9 +464,10 @@ void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePt
     return;
   }
 
-  // Check for drain close only if there are no pending responses.
-  if (pending_requests_.empty() &&
-      config_->drain_decision_.drainClose(Network::DrainDirection::All) &&
+  // Check for drain close only if there are no pending responses. The drain decision is only
+  // evaluated once it is known to be needed, since either path consumes a random number on every
+  // call.
+  if (pending_requests_.empty() && shouldDrainClose() &&
       config_->runtime_.snapshot().featureEnabled(config_->redis_drain_close_runtime_key_, 100)) {
     config_->stats_.downstream_cx_drain_close_.inc();
     callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);

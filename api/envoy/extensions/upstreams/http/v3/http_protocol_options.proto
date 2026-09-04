@@ -73,9 +73,6 @@ message HttpProtocolOptions {
 
       config.core.v3.Http2ProtocolOptions http2_protocol_options = 2;
 
-      // .. warning::
-      //   QUIC upstream support is currently not ready for internet use.
-      //   Please see :ref:`here <arch_overview_http3>` for details.
       config.core.v3.Http3ProtocolOptions http3_protocol_options = 3;
     }
   }
@@ -90,9 +87,6 @@ message HttpProtocolOptions {
 
     config.core.v3.Http2ProtocolOptions http2_protocol_options = 2;
 
-    // .. warning::
-    //   QUIC upstream support is currently not ready for internet use.
-    //   Please see :ref:`here <arch_overview_http3>` for details.
     config.core.v3.Http3ProtocolOptions http3_protocol_options = 3;
   }
 
@@ -111,14 +105,10 @@ message HttpProtocolOptions {
     config.core.v3.Http2ProtocolOptions http2_protocol_options = 2;
 
     // Unlike HTTP/1 and HTTP/2, HTTP/3 will not be configured unless it is
-    // present, and (soon) only if there is an indication of server side
+    // present, and only if there is an indication of server side
     // support.
     // See :ref:`here <arch_overview_http3_upstream>` for more information on
     // when HTTP/3 will be used, and when Envoy will fail over to TCP.
-    //
-    // .. warning::
-    //   QUIC upstream support is currently not ready for internet use.
-    //   Please see :ref:`here <arch_overview_http3>` for details.
     config.core.v3.Http3ProtocolOptions http3_protocol_options = 3;
 
     // The presence of alternate protocols cache options causes the use of the
