@@ -311,6 +311,9 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
+  TestIsolatedStoreImpl() = default;
+  explicit TestIsolatedStoreImpl(SymbolTable& symbol_table) : store_(symbol_table) {}
+
   // Stats::Store
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
@@ -464,6 +467,9 @@ public:
   ~IntegrationTestServer() override;
 
   void waitUntilListenersReady();
+
+  // Wait until callbacks already running or queued on every server worker have completed.
+  void waitForWorkerThreads();
 
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value);

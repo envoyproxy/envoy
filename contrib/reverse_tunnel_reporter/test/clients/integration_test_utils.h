@@ -8,9 +8,13 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
+#include "envoy/extensions/clusters/reverse_connection/v3/reverse_connection.pb.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/reverse_tunnel/v3/drain_aware_hcm.pb.h"
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
+#include "envoy/extensions/upstreams/http/reverse_tunnel/v3/reverse_tunnel_codec.pb.h"
 
 #include "source/common/common/fmt.h"
 
@@ -28,14 +32,19 @@ constexpr absl::string_view downstreamExtension =
 constexpr absl::string_view upstreamExtension =
     "envoy.bootstrap.reverse_tunnel.upstream_socket_interface";
 constexpr absl::string_view downstreamCluster = "downstreamCluster";
+constexpr absl::string_view revConnCluster = "reverse_connection_cluster";
 constexpr absl::string_view upstreamCluster = "upstreamCluster";
 constexpr absl::string_view upstreamListener = "upstreamListener";
 constexpr absl::string_view upstreamFilter = "envoy.filters.network.reverse_tunnel";
 constexpr absl::string_view downstreamTenant = "downstreamTenant";
 constexpr absl::string_view downstreamResolver = "envoy.resolvers.reverse_connection";
+constexpr absl::string_view egressListener = "egress_listener";
 
 constexpr int upstreamPort = 9000;
 constexpr int reportingPort = 8082;
+constexpr uint32_t egressPort = 8085;
+
+constexpr std::chrono::seconds slowRouteDelay = std::chrono::seconds(10);
 
 using envoy::config::bootstrap::v3::Bootstrap;
 using envoy::config::cluster::v3::Cluster;
@@ -45,8 +54,10 @@ using envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface:
     DownstreamReverseConnectionSocketInterface;
 using envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
     UpstreamReverseConnectionSocketInterface;
+using envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig;
 using envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel;
 using envoy::extensions::reverse_tunnel_reporters::v3alpha::reporters::EventReporterConfig;
+using envoy::extensions::upstreams::http::reverse_tunnel::v3::ReverseTunnelUpstreamCodecOptions;
 
 inline TypedExtensionConfig getDownstreamExtension() {
   DownstreamReverseConnectionSocketInterface cfg;
@@ -121,6 +132,37 @@ inline Cluster getUpstreamCluster(absl::string_view localhost) {
   return cluster;
 }
 
+inline Cluster getRevConnCluster(bool enable_tenant_isolation = false) {
+  Cluster cluster;
+  cluster.set_name(revConnCluster);
+  cluster.set_lb_policy(Cluster::CLUSTER_PROVIDED);
+
+  auto* cluster_type = cluster.mutable_cluster_type();
+  cluster_type->set_name("envoy.clusters.reverse_connection");
+  ReverseConnectionClusterConfig rc_config;
+  rc_config.mutable_cleanup_interval()->set_seconds(60);
+  rc_config.set_host_id_format("%REQ(x-computed-host-id)%");
+  if (enable_tenant_isolation) {
+    rc_config.set_tenant_id_format("%REQ(x-tenant-id)%");
+  }
+  std::ignore = cluster_type->mutable_typed_config()->PackFrom(rc_config);
+
+  ConfigHelper::HttpProtocolOptions http_options;
+  http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+  std::ignore = (*cluster.mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                        .PackFrom(http_options);
+
+  ReverseTunnelUpstreamCodecOptions codec_options;
+  codec_options.set_enable_drain_with_goaway(true);
+  std::ignore = (*cluster.mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.reverse_tunnel.v3."
+                     "ReverseTunnelUpstreamCodecOptions"]
+                        .PackFrom(codec_options);
+
+  return cluster;
+}
+
 inline Listener getUpstreamListener(absl::string_view anyhost) {
   Listener listener;
   listener.set_name(upstreamListener);
@@ -141,7 +183,9 @@ inline Listener getUpstreamListener(absl::string_view anyhost) {
   return listener;
 }
 
-inline Listener getDownstreamListener(const std::string& name, int num_listeners) {
+inline Listener
+getDownstreamListener(const std::string& name, int num_listeners,
+                      std::chrono::seconds max_conn_duration = std::chrono::seconds(120)) {
   Listener listener;
   listener.set_name(name);
 
@@ -155,10 +199,17 @@ inline Listener getDownstreamListener(const std::string& name, int num_listeners
 
   auto* filter_chain = listener.add_filter_chains();
   auto* filter = filter_chain->add_filters();
-  filter->set_name("envoy.filters.network.http_connection_manager");
+  filter->set_name("envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager");
 
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
   hcm.set_stat_prefix(name);
+
+  hcm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->set_seconds(
+      max_conn_duration.count());
+  hcm.mutable_drain_timeout()->set_seconds(1);
+  hcm.set_codec_type(envoy::extensions::filters::network::http_connection_manager::v3::
+                         HttpConnectionManager::AUTO);
+  hcm.mutable_request_timeout()->set_seconds(180);
 
   auto* route_config = hcm.mutable_route_config();
   auto* vh = route_config->add_virtual_hosts();
@@ -166,10 +217,68 @@ inline Listener getDownstreamListener(const std::string& name, int num_listeners
   vh->add_domains("*");
 
   auto* route = vh->add_routes();
-  route->mutable_match()->set_prefix("/");
+  route->mutable_match()->set_prefix("/direct");
   auto* direct_response = route->mutable_direct_response();
   direct_response->set_status(200);
   direct_response->mutable_body()->set_inline_string("reverse connection listener OK");
+
+  auto* slow_route = vh->add_routes();
+  slow_route->mutable_match()->set_prefix("/slow");
+  auto* slow_resp = slow_route->mutable_direct_response();
+  slow_resp->set_status(200);
+  slow_resp->mutable_body()->set_inline_string("slow reverse connection listener OK");
+  envoy::extensions::filters::http::fault::v3::HTTPFault fault_cfg;
+  fault_cfg.mutable_delay()->mutable_fixed_delay()->set_seconds(slowRouteDelay.count());
+  fault_cfg.mutable_delay()->mutable_percentage()->set_numerator(100);
+  std::ignore =
+      (*slow_route->mutable_typed_per_filter_config())["envoy.filters.http.fault"].PackFrom(
+          fault_cfg);
+
+  // Per-route fault config above only applies if the filter is in the chain (empty default here).
+  auto* fault_filter = hcm.add_http_filters();
+  fault_filter->set_name("envoy.filters.http.fault");
+  envoy::extensions::filters::http::fault::v3::HTTPFault default_fault_cfg;
+  std::ignore = fault_filter->mutable_typed_config()->PackFrom(default_fault_cfg);
+
+  auto* http_filter = hcm.add_http_filters();
+  http_filter->set_name("envoy.filters.http.router");
+  envoy::extensions::filters::http::router::v3::Router router_cfg;
+  std::ignore = http_filter->mutable_typed_config()->PackFrom(router_cfg);
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::DrainAwareHttpConnectionManager
+      drain_aware_hcm;
+  *drain_aware_hcm.mutable_hcm_config() = std::move(hcm);
+  drain_aware_hcm.set_enable_drain_with_goaway(true);
+
+  std::ignore = filter->mutable_typed_config()->PackFrom(drain_aware_hcm);
+  return listener;
+}
+
+inline Listener getEgressListener(absl::string_view anyhost) {
+  Listener listener;
+  listener.set_name(egressListener);
+  listener.set_stat_prefix(egressListener);
+
+  auto* sa = listener.mutable_address()->mutable_socket_address();
+  sa->set_address(anyhost);
+  sa->set_port_value(egressPort);
+
+  auto* filter_chain = listener.add_filter_chains();
+  auto* filter = filter_chain->add_filters();
+  filter->set_name("envoy.filters.network.http_connection_manager");
+
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
+  hcm.set_stat_prefix(egressListener);
+
+  auto* route_config = hcm.mutable_route_config();
+  auto* vh = route_config->add_virtual_hosts();
+  vh->set_name("backend");
+  vh->add_domains("*");
+
+  auto* route = vh->add_routes();
+  route->mutable_match()->set_prefix("/");
+  route->mutable_route()->set_cluster(revConnCluster);
+  route->mutable_route()->mutable_timeout()->set_seconds(180);
 
   auto* http_filter = hcm.add_http_filters();
   http_filter->set_name("envoy.filters.http.router");
@@ -177,7 +286,6 @@ inline Listener getDownstreamListener(const std::string& name, int num_listeners
   std::ignore = http_filter->mutable_typed_config()->PackFrom(router_cfg);
 
   std::ignore = filter->mutable_typed_config()->PackFrom(hcm);
-
   return listener;
 }
 
