@@ -6,6 +6,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -37,6 +38,11 @@ public:
 
         auto* load_assignment = cluster->mutable_load_assignment();
         load_assignment->set_cluster_name(cluster->name());
+        if (clusters_without_endpoints_.contains(i)) {
+          // Deliberately add no endpoint to simulate a cluster whose endpoint list is empty, for
+          // example because DNS resolution returned nothing.
+          continue;
+        }
         auto* endpoints = load_assignment->add_endpoints();
         auto* lb_endpoint = endpoints->add_lb_endpoints();
         auto* endpoint = lb_endpoint->mutable_endpoint();
@@ -94,9 +100,15 @@ public:
 
   void setEnableAttemptCountHeaders(bool enable) { enable_attempt_count_headers_ = enable; }
 
+  // Configure the given sub-cluster to be created without any endpoint.
+  void addClusterWithoutEndpoints(int cluster_index) {
+    clusters_without_endpoints_.insert(cluster_index);
+  }
+
 private:
   uint32_t num_retries_{3};
   bool enable_attempt_count_headers_{false};
+  absl::flat_hash_set<int> clusters_without_endpoints_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, CompositeClusterIntegrationTest,
@@ -358,6 +370,124 @@ TEST_P(CompositeClusterIntegrationTest, RequestDetailsPreservedThroughRetries) {
   // Verify cluster usage.
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
+}
+
+// Verifies that a sub-cluster without endpoints is skipped in favor of the next sub-cluster,
+// without relying on a retry.
+TEST_P(CompositeClusterIntegrationTest, FailsOverWhenClusterHasNoEndpoints) {
+  // No retry is allowed, so the request can only succeed if the failover happens within the first
+  // attempt.
+  setNumRetries(0);
+  setEnableAttemptCountHeaders(true);
+  addClusterWithoutEndpoints(0);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test"},
+                                     {":scheme", "http"},
+                                     {":authority", "test.example.com"}},
+      0);
+
+  // cluster_0 has no endpoint, so the request is sent to cluster_1 on the first attempt.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ("1", upstream_request_->headers().getEnvoyAttemptCountValue());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("1", response->headers().getEnvoyAttemptCountValue());
+
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.composite.upstream_rq_retry")->value());
+}
+
+// Verifies that consecutive sub-clusters without endpoints are all skipped.
+TEST_P(CompositeClusterIntegrationTest, FailsOverToLastClusterWithEndpoints) {
+  setNumRetries(0);
+  addClusterWithoutEndpoints(0);
+  addClusterWithoutEndpoints(1);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test"},
+                                     {":scheme", "http"},
+                                     {":authority", "test.example.com"}},
+      0);
+
+  ASSERT_TRUE(fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
+}
+
+// Verifies that the request fails when none of the sub-clusters has an endpoint.
+TEST_P(CompositeClusterIntegrationTest, FailsWhenNoClusterHasEndpoints) {
+  setNumRetries(0);
+  addClusterWithoutEndpoints(0);
+  addClusterWithoutEndpoints(1);
+  addClusterWithoutEndpoints(2);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test"},
+                                     {":scheme", "http"},
+                                     {":authority", "test.example.com"}},
+      0);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
+}
+
+// Verifies that the legacy behavior is kept when the runtime guard is disabled.
+TEST_P(CompositeClusterIntegrationTest, NoFailoverWhenRuntimeGuardDisabled) {
+  setNumRetries(0);
+  addClusterWithoutEndpoints(0);
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.composite_cluster_skip_clusters_without_hosts", "false");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test"},
+                                     {":scheme", "http"},
+                                     {":authority", "test.example.com"}},
+      0);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
 }
 
