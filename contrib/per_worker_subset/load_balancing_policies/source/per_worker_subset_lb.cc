@@ -27,8 +27,9 @@ PerWorkerSubsetLoadBalancer::PerWorkerSubsetLoadBalancer(
     uint32_t fallback_threshold, uint64_t envoy_seed,
     const envoy::extensions::load_balancing_policies::common::v3::SlowStartConfig&
         slow_start_config)
-    : priority_set_(priority_set), stats_(stats),
-      per_worker_subset_stats_{ALL_PER_WORKER_SUBSET_STATS(POOL_COUNTER_PREFIX(scope, ""))},
+    : priority_set_(priority_set),
+      stats_(stats), per_worker_subset_stats_{ALL_PER_WORKER_SUBSET_STATS(
+                         POOL_COUNTER_PREFIX(scope, ""))},
       runtime_(runtime), random_(random), time_source_(time_source), subset_size_(subset_size),
       strategy_(strategy), host_selection_strategy_(host_selection_strategy), worker_id_(worker_id),
       total_workers_(total_workers), fallback_threshold_(fallback_threshold),
@@ -386,8 +387,8 @@ void PerWorkerSubsetLoadBalancer::publishSubsetToSyntheticPrioritySet(
   }
   synthetic_priority_set_.updateHosts(0, std::move(params), /*locality_weights=*/nullptr,
                                       hosts_added, hosts_removed,
-                                      /*weighted_priority_health=*/absl::nullopt,
-                                      /*overprovisioning_factor=*/absl::nullopt);
+                                      /*weighted_priority_health=*/std::nullopt,
+                                      /*overprovisioning_factor=*/std::nullopt);
 }
 
 Upstream::HostSelectionResponse

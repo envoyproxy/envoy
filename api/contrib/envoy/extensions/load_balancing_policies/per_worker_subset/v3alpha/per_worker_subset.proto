@@ -6,6 +6,8 @@ import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -14,6 +16,7 @@ option java_outer_classname = "PerWorkerSubsetProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/load_balancing_policies/per_worker_subset/v3alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Per-Worker Subset Load Balancing Policy]
 // [#extension: envoy.load_balancing_policies.per_worker_subset]
@@ -49,6 +52,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // [#next-free-field: 6]
 message PerWorkerSubset {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
+
   enum PartitioningStrategy {
     // Deterministic, non-overlapping slice of ``ceil(N/W)`` hosts from a
     // stable address-sorted ordering, where ``N`` is the cluster's host
@@ -79,14 +84,14 @@ message PerWorkerSubset {
   // Within-subset host selection. Applies on top of either partitioning
   // strategy.
   //
-  // This contrib implementation intentionally exposes a small set of
+  // This contributed implementation intentionally exposes a small set of
   // validated strategies rather than accepting an arbitrary nested load
   // balancing policy. The inner policy operates on a synthetic
   // single-priority, single-locality ``PrioritySet``, and not every Envoy
   // load balancer is compatible with that constrained model.
   // ``SIMPLE_ROUND_ROBIN`` also provides a low-overhead option that avoids
-  // constructing an inner stock load balancer per worker. A composable
-  // nested policy can be reconsidered if this extension moves into the core
+  // constructing an inner stock load balancer per worker. A nested policy
+  // can be reconsidered if this extension moves into the core
   // load-balancer set.
   enum HostSelectionStrategy {
     // proto3-default sentinel. Rejected by the factory at config-load

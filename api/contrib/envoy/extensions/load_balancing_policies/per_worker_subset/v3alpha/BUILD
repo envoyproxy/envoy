@@ -8,5 +8,6 @@ api_proto_package(
     deps = [
         "//envoy/extensions/load_balancing_policies/common/v3:pkg",
         "@xds//udpa/annotations:pkg",
+        "@xds//xds/annotations/v3:pkg",
     ],
 )

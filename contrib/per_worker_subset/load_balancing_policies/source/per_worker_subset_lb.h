@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "envoy/common/random_generator.h"
@@ -132,10 +133,10 @@ public:
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
     return nullptr;
   }
-  absl::optional<Upstream::SelectedPoolAndConnection>
+  std::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext*, const Upstream::Host&,
                            std::vector<uint8_t>&) override {
-    return absl::nullopt;
+    return std::nullopt;
   }
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
     return {};
