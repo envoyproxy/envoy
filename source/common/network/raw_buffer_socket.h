@@ -35,6 +35,8 @@ protected:
 
 private:
   const std::optional<uint64_t> max_read_buffer_size_;
+  // Filters may drain the shared connection buffer, so the read budget must remain monotonic.
+  uint64_t accumulated_read_buffer_size_{};
   bool shutdown_{};
   TransportSocketCallbacks* callbacks_{};
 };

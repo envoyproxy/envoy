@@ -75,6 +75,34 @@ TEST_F(RawBufferSocketReadLimitTest, AccountsForDataAlreadyInReadBuffer) {
   EXPECT_EQ(36, buffer.length());
 }
 
+TEST_F(RawBufferSocketReadLimitTest, AccountsForDataConsumedBetweenReads) {
+  initialize(36);
+  Buffer::OwnedImpl buffer;
+
+  EXPECT_CALL(io_handle_, read(_, Optional(36)))
+      .WillOnce(Invoke([](Buffer::Instance& data, std::optional<uint64_t>) {
+        data.add(std::string(20, 'a'));
+        return Api::IoCallUint64Result(20, Api::IoError::none());
+      }));
+  EXPECT_CALL(callbacks_, shouldDrainReadBuffer()).WillOnce(testing::Return(true));
+  EXPECT_CALL(callbacks_, setTransportSocketIsReadable());
+
+  const IoResult first_result = socket_->doRead(buffer);
+  EXPECT_EQ(20, first_result.bytes_processed_);
+  buffer.drain(buffer.length());
+
+  EXPECT_CALL(io_handle_, read(_, Optional(16)))
+      .WillOnce(Invoke([](Buffer::Instance& data, std::optional<uint64_t>) {
+        data.add(std::string(16, 'b'));
+        return Api::IoCallUint64Result(16, Api::IoError::none());
+      }));
+  EXPECT_CALL(callbacks_, setTransportSocketIsReadable());
+
+  const IoResult second_result = socket_->doRead(buffer);
+  EXPECT_EQ(16, second_result.bytes_processed_);
+  EXPECT_EQ(16, buffer.length());
+}
+
 TEST_F(RawBufferSocketReadLimitTest, LeavesReadsUnlimitedByDefault) {
   initialize(std::nullopt);
   Buffer::OwnedImpl buffer;

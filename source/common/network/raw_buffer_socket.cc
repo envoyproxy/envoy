@@ -1,5 +1,7 @@
 #include "source/common/network/raw_buffer_socket.h"
 
+#include <algorithm>
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
@@ -18,14 +20,18 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   uint64_t bytes_read = 0;
   bool end_stream = false;
   std::optional<Api::IoError::IoErrorCode> err = std::nullopt;
+  if (max_read_buffer_size_.has_value()) {
+    accumulated_read_buffer_size_ = std::max(accumulated_read_buffer_size_, buffer.length());
+  }
   do {
-    if (max_read_buffer_size_.has_value() && buffer.length() >= max_read_buffer_size_.value()) {
+    if (max_read_buffer_size_.has_value() &&
+        accumulated_read_buffer_size_ >= max_read_buffer_size_.value()) {
       break;
     }
 
     const std::optional<uint64_t> max_length =
         max_read_buffer_size_.has_value()
-            ? std::make_optional(max_read_buffer_size_.value() - buffer.length())
+            ? std::make_optional(max_read_buffer_size_.value() - accumulated_read_buffer_size_)
             : std::nullopt;
     Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, max_length);
 
@@ -37,8 +43,12 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
         break;
       }
       bytes_read += result.return_value_;
+      if (max_read_buffer_size_.has_value()) {
+        accumulated_read_buffer_size_ += result.return_value_;
+      }
       const bool read_limit_reached =
-          max_read_buffer_size_.has_value() && buffer.length() >= max_read_buffer_size_.value();
+          max_read_buffer_size_.has_value() &&
+          accumulated_read_buffer_size_ >= max_read_buffer_size_.value();
       if (callbacks_->shouldDrainReadBuffer() || read_limit_reached) {
         callbacks_->setTransportSocketIsReadable();
         break;

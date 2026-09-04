@@ -39,12 +39,12 @@ message StartTlsConfig {
   transport_sockets.tls.v3.DownstreamTlsContext tls_socket_config = 2
       [(validate.rules).message = {required: true}];
 
-  // Limits the number of clear-text bytes read into the current connection read buffer. When the
-  // buffer reaches this size, Envoy stops reading and schedules another read so a protocol filter
-  // can consume the data or switch transports before any TLS bytes are read. If unset, clear-text
-  // reads are unlimited.
-  google.protobuf.UInt32Value max_cleartext_read_buffer_size = 3
-      [(validate.rules).uint32 = {gt: 0}];
+  // Limits the total number of clear-text bytes read from the connection. The count is retained if
+  // a network filter drains the connection read buffer. When the limit is reached, Envoy stops
+  // reading and schedules another read so a protocol filter can consume the data or switch
+  // transports before any TLS bytes are read. If unset, clear-text reads are unlimited.
+  google.protobuf.UInt64Value max_cleartext_read_buffer_size = 3
+      [(validate.rules).uint64 = {gt: 0}];
 }
 
 // Configuration for an upstream StartTls transport socket.
