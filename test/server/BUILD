@@ -151,6 +151,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "overload_shutdown_test",
+    srcs = ["overload_shutdown_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/server:overload_shutdown_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/server:instance_mocks",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "filter_config_test",
     srcs = ["filter_config_test.cc"],
     rbe_pool = "linux_x64_small",

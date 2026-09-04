@@ -528,6 +528,15 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
             MessageUtil::anyConvertAndValidate<envoy::config::overload::v3::ShrinkHeapConfig>(
                 action.typed_config(), validation_visitor);
       }
+    } else if (name == OverloadActionNames::get().Shutdown) {
+      if (!action.has_typed_config()) {
+        creation_status = absl::InvalidArgumentError(
+            fmt::format("Overload action \"{}\" requires a ShutdownConfig typed_config.", name));
+        return;
+      }
+      shutdown_config_ =
+          MessageUtil::anyConvertAndValidate<envoy::config::overload::v3::ShutdownConfig>(
+              action.typed_config(), validation_visitor);
     } else if (action.has_typed_config()) {
       creation_status = absl::InvalidArgumentError(fmt::format(
           "Overload action \"{}\" has an unexpected value for the typed_config field", name));

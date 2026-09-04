@@ -67,6 +67,9 @@ public:
   getShrinkHeapConfig() const override {
     return std::nullopt;
   }
+  std::optional<envoy::config::overload::v3::ShutdownConfig> getShutdownConfig() const override {
+    return std::nullopt;
+  }
 
   ThreadLocal::SlotSharedPtr tls_;
   // The admin code runs in non-permissive mode, rejecting connections and

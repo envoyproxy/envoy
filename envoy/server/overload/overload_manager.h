@@ -44,17 +44,21 @@ public:
   // Overload action to terminate idle downstream HTTP connections.
   const std::string CloseIdleHttpConnections = "envoy.overload_actions.close_idle_http_connections";
 
+  // Overload action to shut the server down so that a supervisor can restart it.
+  const std::string Shutdown = "envoy.overload_actions.shutdown";
+
   // This should be kept current with the Overload actions available.
   // This is the last member of this class to duplicating the strings with
   // proper lifetime guarantees.
-  const std::array<absl::string_view, 8> WellKnownActions = {StopAcceptingRequests,
+  const std::array<absl::string_view, 9> WellKnownActions = {StopAcceptingRequests,
                                                              DisableHttpKeepAlive,
                                                              StopAcceptingConnections,
                                                              RejectIncomingConnections,
                                                              ShrinkHeap,
                                                              ReduceTimeouts,
                                                              ResetStreams,
-                                                             CloseIdleHttpConnections};
+                                                             CloseIdleHttpConnections,
+                                                             Shutdown};
 };
 
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
@@ -119,6 +123,12 @@ public:
    */
   virtual std::optional<envoy::config::overload::v3::ShrinkHeapConfig>
   getShrinkHeapConfig() const PURE;
+
+  /**
+   * Get the configuration for the Shutdown overload action.
+   * @return optional config, empty if no Shutdown action is configured.
+   */
+  virtual std::optional<envoy::config::overload::v3::ShutdownConfig> getShutdownConfig() const PURE;
 };
 
 } // namespace Server

@@ -153,6 +153,25 @@ message ShrinkHeapConfig {
   google.protobuf.UInt64Value max_unfreed_memory_bytes = 2;
 }
 
+// Typed configuration for the "envoy.overload_actions.shutdown" action. See
+// :ref:`the docs <config_overload_manager_shutdown>` for an example of how to configure this
+// action.
+message ShutdownConfig {
+  // How long the action must stay continuously saturated before Envoy shuts down. The countdown
+  // restarts from zero every time the action leaves the saturated state, so a restarted Envoy
+  // cannot shut down again until it has been saturated for this long. This is the lower bound on
+  // the interval between two shutdowns of a supervised Envoy.
+  google.protobuf.Duration saturation_duration = 1 [(validate.rules).duration = {
+    required: true
+    gte {seconds: 1}
+  }];
+
+  // Upper bound of a random delay added to ``saturation_duration`` each time the countdown starts.
+  // Set this to keep a fleet of Envoys that share an overload condition from shutting down at the
+  // same instant. Defaults to no jitter.
+  google.protobuf.Duration max_jitter = 2 [(validate.rules).duration = {gte {}}];
+}
+
 message OverloadAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadAction";
@@ -167,6 +186,7 @@ message OverloadAction {
   // - envoy.overload_actions.shrink_heap
   // - envoy.overload_actions.reduce_timeouts
   // - envoy.overload_actions.reset_high_memory_stream
+  // - envoy.overload_actions.shutdown
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // A set of triggers for this action. The state of the action is the maximum
