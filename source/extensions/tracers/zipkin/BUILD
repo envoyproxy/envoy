@@ -41,6 +41,7 @@ envoy_cc_library(
         "zipkin_tracer_impl.h",
     ],
     deps = [
+        ":zipkin_cc_proto",
         "//envoy/common:time_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:address_interface",
@@ -65,7 +66,6 @@ envoy_cc_library(
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@zipkin-api",
-        ":zipkin_cc_proto",
     ],
 )
 
