@@ -108,6 +108,7 @@ message ResponseHandling {
 // <envoy_v3_api_msg_data.ai.v3.TokenUsage>`, consumable through typed
 // metadata readers such as ext_proc typed forwarding. No untyped ``Struct``
 // mirror is emitted.
+// [#next-free-field: 6]
 message TokenUsageExtraction {
   // Stream signals emitted upon publishing token usage metadata.
   enum UsageSignal {
