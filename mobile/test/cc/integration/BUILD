@@ -15,7 +15,7 @@ envoy_cc_test_with_engine_builder(
         "//test/common/http/filters/assertion:filter_cc_proto",
         "//test/common/integration:engine_with_test_server",
         "//test/common/integration:test_server_lib",
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:test_extensions",
     ],
 )
 
@@ -29,7 +29,7 @@ envoy_cc_test_with_engine_builder(
         "//test/common/http/filters/assertion:filter_cc_proto",
         "//test/common/integration:engine_with_test_server",
         "//test/common/integration:test_server_lib",
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:test_extensions",
     ],
 )
 
@@ -43,7 +43,7 @@ envoy_cc_test_with_engine_builder(
         "//test/common/http/filters/assertion:filter_cc_proto",
         "//test/common/integration:engine_with_test_server",
         "//test/common/integration:test_server_lib",
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:test_extensions",
     ],
 )
 
@@ -56,7 +56,7 @@ envoy_cc_test_with_engine_builder(
         "//library/common/http:header_utility_lib",
         "//test/common/integration:engine_with_test_server",
         "//test/common/integration:test_server_lib",
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:test_extensions",
     ],
 )
 
@@ -69,7 +69,7 @@ envoy_cc_test_with_engine_builder(
         "//library/common/http:header_utility_lib",
         "//test/common/integration:engine_with_test_server",
         "//test/common/integration:test_server_lib",
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:test_extensions",
     ],
 )
 
@@ -82,7 +82,7 @@ envoy_cc_test_with_engine_builder(
         "//library/common/http:header_utility_lib",
         "//test/common/integration:engine_with_test_server",
         "//test/common/integration:test_server_lib",
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:test_extensions",
     ],
 )
 
@@ -95,7 +95,7 @@ envoy_cc_test_with_engine_builder(
         "//library/common/http:header_utility_lib",
         "//test/common/integration:engine_with_test_server",
         "//test/common/integration:test_server_lib",
-        "@envoy_build_config//:test_extensions",
+        "@mobile_envoy_build_config//:test_extensions",
     ],
 )
 

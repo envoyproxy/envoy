@@ -73,7 +73,7 @@ def swift_repos():
         strip_prefix = "xctestrunner-b7698df3d435b6491b4b4c0f9fc7a63fbed5e3a6",
         sha256 = "ae3a063c985a8633cb7eb566db21656f8db8eb9a0edb8c182312c7f0db53730d",
         patch_args = ["-p1"],
-        patches = ["@envoy_mobile//bazel:xctestrunner.patch"],
+        patches = ["//bazel:xctestrunner.patch"],
         repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 
@@ -91,7 +91,7 @@ def kotlin_repos():
         sha256 = "3b772976fec7bdcda1d84b9d39b176589424c047eb2175bed09aac630e50af43",
         urls = ["https://github.com/bazelbuild/rules_kotlin/releases/download/v1.9.6/rules_kotlin-v1.9.6.tar.gz"],
         patch_args = ["-p1"],
-        patches = ["@envoy_mobile//bazel:rules_kotlin.patch"],
+        patches = ["//bazel:rules_kotlin.patch"],
         repo_mapping = {"@com_google_protobuf": "@protobuf"},
     )
 

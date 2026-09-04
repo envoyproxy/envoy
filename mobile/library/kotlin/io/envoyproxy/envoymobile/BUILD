@@ -1,5 +1,5 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
-load("@envoy_mobile//bazel:android_artifacts.bzl", "android_artifacts")
+load("//bazel:android_artifacts.bzl", "android_artifacts")
 load("@rules_detekt//detekt:defs.bzl", "detekt")
 load("@rules_kotlin//kotlin:android.bzl", "kt_android_library")
 

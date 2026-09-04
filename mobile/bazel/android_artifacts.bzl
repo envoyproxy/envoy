@@ -1,4 +1,4 @@
-load("@envoy_mobile//bazel:dokka.bzl", "sources_javadocs")
+load("//bazel:dokka.bzl", "sources_javadocs")
 load("@google_bazel_common//tools/maven:pom_file.bzl", "pom_file")
 load("@rules_android//android:rules.bzl", "android_binary")
 load("@rules_cc//cc:defs.bzl", "cc_library")
@@ -293,7 +293,7 @@ def _create_pom_xml(name, android_library, visibility, substitutions):
         targets = [android_library],
         visibility = visibility,
         substitutions = substitutions,
-        template_file = "@envoy_mobile//bazel:pom_template.xml",
+        template_file = "//bazel:pom_template.xml",
     )
 
     return _pom_name
