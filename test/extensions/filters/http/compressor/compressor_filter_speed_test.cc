@@ -10,6 +10,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "benchmark/benchmark.h"
 #include "gmock/gmock.h"
@@ -103,9 +104,10 @@ struct CompressionParams {
   uint64_t memory_level;
 };
 
-CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
-                                               testing::NiceMock<Runtime::MockLoader>& runtime,
-                                               const CompressionParams& params) {
+CompressorFilterConfigSharedPtr
+makeGzipConfig(Stats::IsolatedStoreImpl& stats, testing::NiceMock<Runtime::MockLoader>& runtime,
+               testing::NiceMock<Server::Configuration::MockServerFactoryContext>& context,
+               const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
 
@@ -120,14 +122,15 @@ CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockGzipCompressorFactory>(level, strategy, window_bits, memory_level);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
-      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory));
+      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory), context);
 
   return config;
 }
 
-CompressorFilterConfigSharedPtr makeZstdConfig(Stats::IsolatedStoreImpl& stats,
-                                               testing::NiceMock<Runtime::MockLoader>& runtime,
-                                               const CompressionParams& params) {
+CompressorFilterConfigSharedPtr
+makeZstdConfig(Stats::IsolatedStoreImpl& stats, testing::NiceMock<Runtime::MockLoader>& runtime,
+               testing::NiceMock<Server::Configuration::MockServerFactoryContext>& context,
+               const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
 
@@ -136,14 +139,15 @@ CompressorFilterConfigSharedPtr makeZstdConfig(Stats::IsolatedStoreImpl& stats,
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockZstdCompressorFactory>(level, strategy);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
-      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory));
+      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory), context);
 
   return config;
 }
 
-CompressorFilterConfigSharedPtr makeBrotliConfig(Stats::IsolatedStoreImpl& stats,
-                                                 testing::NiceMock<Runtime::MockLoader>& runtime,
-                                                 const CompressionParams& params) {
+CompressorFilterConfigSharedPtr
+makeBrotliConfig(Stats::IsolatedStoreImpl& stats, testing::NiceMock<Runtime::MockLoader>& runtime,
+                 testing::NiceMock<Server::Configuration::MockServerFactoryContext>& context,
+                 const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
 
@@ -151,7 +155,7 @@ CompressorFilterConfigSharedPtr makeBrotliConfig(Stats::IsolatedStoreImpl& stats
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockBrotliCompressorFactory>(quality);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
-      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory));
+      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory), context);
 
   return config;
 }
@@ -207,18 +211,19 @@ static Result compressWith(enum CompressorLibs lib, std::vector<Buffer::OwnedImp
   auto start = std::chrono::high_resolution_clock::now();
   Stats::IsolatedStoreImpl stats;
   testing::NiceMock<Runtime::MockLoader> runtime;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   CompressorFilterConfigSharedPtr config;
   std::string compressor = "";
   std::string encoding = "";
   if (lib == CompressorLibs::Brotli) {
-    config = makeBrotliConfig(stats, runtime, params);
+    config = makeBrotliConfig(stats, runtime, context, params);
     encoding = "br";
     compressor = "brotli";
   } else if (lib == CompressorLibs::Gzip) {
-    config = makeGzipConfig(stats, runtime, params);
+    config = makeGzipConfig(stats, runtime, context, params);
     encoding = compressor = "gzip";
   } else if (lib == CompressorLibs::Zstd) {
-    config = makeZstdConfig(stats, runtime, params);
+    config = makeZstdConfig(stats, runtime, context, params);
     encoding = compressor = "zstd";
   }
 
