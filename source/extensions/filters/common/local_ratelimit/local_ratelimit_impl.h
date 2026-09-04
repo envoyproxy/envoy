@@ -6,14 +6,18 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/singleton/instance.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/common/token_bucket_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -82,9 +86,13 @@ public:
   ShareProviderSharedPtr getShareProvider(const ProtoLocalClusterRateLimit& config) const;
   ~ShareProviderManager() override;
 
+  // `local_info` supplies this instance's own weight, and `scope` the gauge reporting whether that
+  // weight was found; both are only used by the WEIGHTED share mode.
   static ShareProviderManagerSharedPtr singleton(Event::Dispatcher& dispatcher,
                                                  Upstream::ClusterManager& cm,
-                                                 Singleton::Manager& manager);
+                                                 Singleton::Manager& manager,
+                                                 const LocalInfo::LocalInfo& local_info,
+                                                 Stats::Scope& scope);
 
   class ShareMonitor : public ShareProvider {
   public:
@@ -93,12 +101,18 @@ public:
   using ShareMonitorSharedPtr = std::shared_ptr<ShareMonitor>;
 
 private:
-  ShareProviderManager(Event::Dispatcher& main_dispatcher, const Upstream::Cluster& cluster);
+  ShareProviderManager(Event::Dispatcher& main_dispatcher, const Upstream::Cluster& cluster,
+                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
 
   Event::Dispatcher& main_dispatcher_;
   const Upstream::Cluster& cluster_;
+  const LocalInfo::LocalInfo& local_info_;
+  Stats::Scope& scope_;
+  ShareMonitorSharedPtr even_share_monitor_;
+  // Created on first use, so that a configuration which never asks for WEIGHTED does not pay for
+  // the per-membership-change walk of the host list.
+  mutable ShareMonitorSharedPtr weighted_share_monitor_;
   Envoy::Common::CallbackHandlePtr handle_;
-  ShareMonitorSharedPtr share_monitor_;
 };
 using ShareProviderManagerSharedPtr = std::shared_ptr<ShareProviderManager>;
 

@@ -164,4 +164,48 @@ message LocalRateLimitDescriptor {
 // <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.local_cluster_name>` for more context
 // about local cluster.
 message LocalClusterRateLimit {
+  // How the configured token bucket is divided among the Envoy instances of the local cluster.
+  enum ShareMode {
+    // Each instance receives ``1 / N`` of the configured tokens, where ``N`` is the number of hosts
+    // in the local cluster. Endpoint ``load_balancing_weight`` is ignored.
+    EVEN = 0;
+
+    // Each instance receives ``own_weight / total_weight`` of the configured tokens, where
+    // ``total_weight`` sums the :ref:`load_balancing_weight
+    // <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.load_balancing_weight>` of every host in
+    // the local cluster. Use this when the local cluster has heterogeneous weights, so that an
+    // instance's share of the bucket tracks its share of the traffic.
+    //
+    // ``own_weight`` is this instance's own weight, which it cannot read from the local cluster --
+    // an Envoy instance has no reliable way to recognize its own endpoint among the endpoints of a
+    // cluster. It is instead supplied by whoever assigns the weight, as a number in :ref:`node
+    // metadata <envoy_v3_api_field_config.core.v3.Node.metadata>` under the
+    // ``envoy.local_ratelimit`` namespace:
+    //
+    // .. code-block:: yaml
+    //
+    //   node:
+    //     metadata:
+    //       envoy.local_ratelimit:
+    //         self_weight: 100
+    //
+    // Note that node metadata is fixed for the lifetime of the process, so changing this instance's
+    // weight requires a restart, while ``total_weight`` continues to track the membership of the
+    // local cluster as it changes. A weight that exceeds ``total_weight`` -- which a stale
+    // ``self_weight`` can produce -- yields the whole bucket rather than more than it.
+    //
+    // If ``self_weight`` is absent, not a number, or not positive, the share instead becomes the
+    // *smallest* endpoint weight in the local cluster over ``total_weight``. That is no larger than
+    // the share of any instance, so a fleet that has not been given its weights under-uses the
+    // configured tokens rather than exceeding them, and the
+    // ``local_rate_limit.local_cluster_share.self_weight_not_found`` gauge reports it.
+    WEIGHTED = 1;
+  }
+
+  // How the configured token bucket is divided among the instances of the local cluster. Defaults
+  // to ``EVEN``, which is the behavior of a configuration that does not set this field.
+  //
+  // Both modes divide by the whole membership of the local cluster, summed over every priority.
+  // Neither accounts for traffic being unevenly distributed across priorities.
+  ShareMode share_mode = 1 [(validate.rules).enum = {defined_only: true}];
 }
