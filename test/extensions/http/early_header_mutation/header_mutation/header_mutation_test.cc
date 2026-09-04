@@ -1,7 +1,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/http/early_header_mutation/header_mutation/header_mutation.h"
 
-#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -43,12 +43,12 @@ TEST(HeaderMutationTest, TestAll) {
       append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
   )EOF";
 
-  Server::Configuration::MockServerFactoryContext context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   ProtoHeaderMutation proto_mutation;
   TestUtility::loadFromYaml(config, proto_mutation);
 
-  HeaderMutation mutation(proto_mutation, context, ProtobufMessage::getNullValidationVisitor());
+  HeaderMutation mutation(proto_mutation, context);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   Envoy::Http::TestRequestHeaderMapImpl headers = {
@@ -92,13 +92,14 @@ TEST(HeaderMutationTest, CelConfigEnablesStringFunctionsForRequestHeaders) {
         enable_string_functions: true
   )EOF";
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  ScopedThreadLocalServerContextSetter server_context_singleton_setter(context);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ScopedThreadLocalServerContextSetter server_context_singleton_setter(
+      context.server_factory_context_);
 
   ProtoHeaderMutation proto_mutation;
   TestUtility::loadFromYaml(config, proto_mutation);
 
-  HeaderMutation mutation(proto_mutation, context, ProtobufMessage::getNullValidationVisitor());
+  HeaderMutation mutation(proto_mutation, context);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   Envoy::Http::TestRequestHeaderMapImpl headers = {
@@ -127,14 +128,14 @@ TEST(HeaderMutationTest, StringFunctionExpressionRejectedWhenDisabled) {
         enable_string_functions: false
   )EOF";
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ScopedThreadLocalServerContextSetter server_context_singleton_setter(
+      context.server_factory_context_);
 
   ProtoHeaderMutation proto_mutation;
   TestUtility::loadFromYaml(config, proto_mutation);
 
-  EXPECT_THROW(
-      HeaderMutation mutation(proto_mutation, context, ProtobufMessage::getNullValidationVisitor()),
-      EnvoyException);
+  EXPECT_THROW(HeaderMutation mutation(proto_mutation, context), EnvoyException);
 }
 
 TEST(HeaderMutationTest, BuiltInCelWorksWithoutFormatters) {
@@ -147,13 +148,14 @@ TEST(HeaderMutationTest, BuiltInCelWorksWithoutFormatters) {
       append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
   )EOF";
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  ScopedThreadLocalServerContextSetter server_context_singleton_setter(context);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ScopedThreadLocalServerContextSetter server_context_singleton_setter(
+      context.server_factory_context_);
 
   ProtoHeaderMutation proto_mutation;
   TestUtility::loadFromYaml(config, proto_mutation);
 
-  HeaderMutation mutation(proto_mutation, context, ProtobufMessage::getNullValidationVisitor());
+  HeaderMutation mutation(proto_mutation, context);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   Envoy::Http::TestRequestHeaderMapImpl headers = {
