@@ -6343,6 +6343,75 @@ TEST_P(DownstreamProtocolIntegrationTest, OptionsWithNoBodyNotChunked) {
   EXPECT_EQ(response->headers().TransferEncoding(), nullptr);
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, MultipleChunksContentLengthLargerThanFirstDataFrame) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    // HTTP/1.x case is covered by the ContentLengthSmallerThanPayload test.
+    return;
+  }
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":authority", "host"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {"content-length", "1048"}});
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  std::string data1(1024, 'a');
+  Buffer::OwnedImpl send1(data1);
+  encoder.encodeData(send1, false);
+
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, data1));
+
+  std::string data2(2024, 'b');
+  Buffer::OwnedImpl send2(data2);
+  encoder.encodeData(send2, true);
+
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect(std::chrono::milliseconds(1000)));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, MultipleChunksCorrectContentLength) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":authority", "host"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {"content-length", "3048"}});
+  auto& encoder = encoder_decoder.first;
+  auto& response = encoder_decoder.second;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  std::string data1(1024, 'a');
+  Buffer::OwnedImpl send1(data1);
+  encoder.encodeData(send1, false);
+
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, data1));
+
+  std::string data2(2024, 'b');
+  Buffer::OwnedImpl send2(data2);
+  encoder.encodeData(send2, true);
+
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, data1 + data2));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // RFC 9113 Section 8.1: When the upstream sends a complete response followed by
 // RST_STREAM(NO_ERROR) while the request body hasn't been fully sent, the response
 // must be preserved and forwarded to the downstream client.
