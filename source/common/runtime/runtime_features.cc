@@ -120,6 +120,7 @@ RUNTIME_GUARD(envoy_reloadable_features_oauth2_client_retries_respect_user_retry
 // false once their cookie TTL has elapsed and no legacy cookies remain in circulation.
 // TODO: flip the default to false and remove the flag once the migration window has elapsed.
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_legacy_cbc_decrypt_compat);
+RUNTIME_GUARD(envoy_reloadable_features_odcds_evict_subscription_on_terminal_status);
 RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_cluster_no_recreate_stream);
 RUNTIME_GUARD(envoy_reloadable_features_orca_weight_manager_use_named_metrics_first);

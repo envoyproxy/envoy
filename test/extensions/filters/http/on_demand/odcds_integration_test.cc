@@ -965,6 +965,44 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryTimesOutThenRetrySucceeds) {
+  if (!odcdsOverAdsFixEnabled()) {
+    GTEST_SKIP() << "This test only exercises the XdstpOdCdsApiImpl singleton-subscription path";
+  }
+
+  initialize();
+  doInitialCommunications();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", "new_cluster"}};
+
+  IntegrationStreamDecoderPtr response1 = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {}));
+  ASSERT_TRUE(response1->waitForEndStream());
+  verifyResponse(std::move(response1), "503", {}, {});
+
+  // Timeout eviction tears down the singleton subscription.
+  EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {"new_cluster"}));
+
+  IntegrationStreamDecoderPtr response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {}));
+
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "3");
+  EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {}));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  verifyResponse(std::move(response2), "200", {}, {});
+
+  cleanupUpstreamAndDownstream();
+}
+
 // tests a scenario when:
 //  - making a request to an unknown cluster
 //  - odcds initiates a connection with a request for the cluster
@@ -984,7 +1022,12 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryAsksForNonexistentCluste
   EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {}));
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {}, {"new_cluster"}, "3");
+  // ACK of the response from Envoy.
   EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {}));
+  if (odcdsOverAdsFixEnabled()) {
+    // Missing-resource eviction tears down the singleton subscription.
+    EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {"new_cluster"}));
+  }
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});
@@ -1952,10 +1995,14 @@ TEST_P(OdCdsXdstpIntegrationTest, OnDemandClusterDiscoveryAsksForNonexistentClus
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
                                                              {}, {cluster_name}, "1", {},
                                                              authority1_xds_stream_.get());
-  // Expect a CDS ACK from authority1.
+  // ACK of the response from Envoy on the authority1 stream.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {cluster_name}, {},
                                       {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       authority1_xds_stream_.get()));
+  // Missing-resource eviction tears down the singleton subscription.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {},
+                                      {cluster_name}, false, Grpc::Status::WellKnownGrpcStatus::Ok,
+                                      "", authority1_xds_stream_.get()));
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});
