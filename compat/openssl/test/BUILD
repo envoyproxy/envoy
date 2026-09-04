@@ -3,13 +3,9 @@ load("//compat/openssl:bazel/rules.bzl", "patched_bssl_filegroup")
 
 licenses(["notice"])  # Apache 2
 
-# The BoringSSL test data is provided by the @boringssl-source repository. Its
-# runfiles location differs between WORKSPACE and bzlmod builds because bzlmod
+# The BoringSSL test data is provided by the @boringssl-source repository. bzlmod
 # materialises external repos under their canonical (`+`-suffixed) name.
-_BORINGSSL_TEST_DATA_ENV = select({
-    "//bazel:bzlmod_mode": {"BORINGSSL_TEST_DATA_ROOT": "./external/boringssl-source+"},
-    "//conditions:default": {"BORINGSSL_TEST_DATA_ROOT": "./external/boringssl-source"},
-})
+_BORINGSSL_TEST_DATA_ENV = {"BORINGSSL_TEST_DATA_ROOT": "./external/boringssl-source+"}
 
 # Create rules for processing BoringSSL test files. This creates one genrule
 # per test file, which copies that file from BoringSSL, applying any necessary
