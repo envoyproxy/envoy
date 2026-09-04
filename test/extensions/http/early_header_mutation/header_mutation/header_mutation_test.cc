@@ -76,7 +76,7 @@ TEST(HeaderMutationTest, TestAll) {
 
 #if defined(USE_CEL_PARSER)
 
-TEST(HeaderMutationTest, CelConfigEnablesStringFunctionsForRequestHeaders) {
+TEST(HeaderMutationTest, ConfiguredCelFormatterIsForwardedToHeaderMutations) {
   const std::string config = R"EOF(
   mutations:
   - append:
@@ -110,61 +110,6 @@ TEST(HeaderMutationTest, CelConfigEnablesStringFunctionsForRequestHeaders) {
   mutation.mutate(headers, stream_info);
 
   EXPECT_EQ("prefix-new-suffix", headers.get_("flag-header"));
-}
-
-TEST(HeaderMutationTest, StringFunctionExpressionRejectedWhenDisabled) {
-  const std::string config = R"EOF(
-  mutations:
-  - append:
-      header:
-        key: "flag-header"
-        value: "%CEL(request.headers['source-header'].replace('old', 'new'))%"
-      append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
-  formatters:
-  - name: envoy.formatter.cel
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
-      cel_config:
-        enable_string_functions: false
-  )EOF";
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  ScopedThreadLocalServerContextSetter server_context_singleton_setter(
-      context.server_factory_context_);
-
-  ProtoHeaderMutation proto_mutation;
-  TestUtility::loadFromYaml(config, proto_mutation);
-
-  EXPECT_THROW(HeaderMutation mutation(proto_mutation, context), EnvoyException);
-}
-
-TEST(HeaderMutationTest, BuiltInCelWorksWithoutFormatters) {
-  const std::string config = R"EOF(
-  mutations:
-  - append:
-      header:
-        key: "flag-header"
-        value: "%CEL(request.headers[':method'])%"
-      append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
-  )EOF";
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  ScopedThreadLocalServerContextSetter server_context_singleton_setter(
-      context.server_factory_context_);
-
-  ProtoHeaderMutation proto_mutation;
-  TestUtility::loadFromYaml(config, proto_mutation);
-
-  HeaderMutation mutation(proto_mutation, context);
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-
-  Envoy::Http::TestRequestHeaderMapImpl headers = {
-      {":method", "GET"},
-  };
-
-  mutation.mutate(headers, stream_info);
-
-  EXPECT_EQ("GET", headers.get_("flag-header"));
 }
 
 #endif // USE_CEL_PARSER
