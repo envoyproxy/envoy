@@ -12,6 +12,7 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/bool_accessor.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -217,6 +218,15 @@ Config::SharedConfig::SharedConfig(
     proxy_protocol_tlvs_ =
         parseTLVs(config.proxy_protocol_tlvs(), context, dynamic_tlv_formatters_);
   }
+
+  Server::OverloadManager& overload_manager =
+      context.shouldBypassOverloadManager() ? context.serverFactoryContext().nullOverloadManager()
+                                            : context.serverFactoryContext().overloadManager();
+  tcp_proxy_upstream_connect_loadshed_point_ =
+      overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().TcpProxyUpstreamConnect);
+  ENVOY_LOG_ONCE_MISC_IF(trace, tcp_proxy_upstream_connect_loadshed_point_ == nullptr,
+                         "LoadShedPoint envoy.load_shed_points.tcp_proxy_upstream_connect is not "
+                         "found. Is it configured?");
 }
 
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
@@ -661,6 +671,17 @@ void Filter::UpstreamCallbacks::drain(Drainer& drainer) {
 }
 
 Network::FilterStatus Filter::establishUpstreamConnection() {
+  if (config_->tcpProxyUpstreamConnectLoadShedPoint() != nullptr &&
+      config_->tcpProxyUpstreamConnectLoadShedPoint()->shouldShedLoad()) {
+    ENVOY_CONN_LOG(debug, "load shedding in establishUpstreamConnection",
+                   read_callbacks_->connection());
+    config_->stats().downstream_cx_overload_close_.inc();
+    getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::OverloadManager);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                        StreamInfo::LocalCloseReasons::get().Overload);
+    return Network::FilterStatus::StopIteration;
+  }
+
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
   ENVOY_CONN_LOG(debug, "establishUpstreamConnection called: cluster_name={}, route_={}",
                  read_callbacks_->connection(), cluster_name, route_ != nullptr);
