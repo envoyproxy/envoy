@@ -1,14 +1,14 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "contrib/envoy/extensions/clusters/dns_srv/v3/cluster.pb.h"
 
 #include "source/common/config/utility.h"
-#include "contrib/dns_srv/clusters/source/dns_srv_cluster.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster_manager.h"
 
+#include "contrib/dns_srv/clusters/source/dns_srv_cluster.h"
+#include "contrib/envoy/extensions/clusters/dns_srv/v3/cluster.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
