@@ -49,7 +49,7 @@ jobs:
         error:
         Error:
         FAILED in
-        FAILED.*\(\d+ ms\)
+        FAILED.*\\(\\d+ ms\\)
         not meeting coverage
         FAIL:
       skip: ${{ matrix.skip != false && true || false }}

@@ -41,7 +41,7 @@ jobs:
         error:
         Error:
         FAILED in
-        FAILED.*\(\d+ ms\)
+        FAILED.*\\(\\d+ ms\\)
         not meeting coverage
         FAIL:
       request: ${{ inputs.request }}
