@@ -2,6 +2,7 @@
 // generally should not change or remove existing tests.
 
 #include "source/extensions/filters/http/ext_proc/config.h"
+#include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/status_utility.h"
@@ -573,6 +574,49 @@ TEST(HttpExtProcConfigTest, StatusOnErrorDefaultConfig) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
+}
+
+TEST(HttpExtProcConfigTest, EmitClientSpanConfig) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_proc_server
+      stat_prefix: google
+  emit_client_span: false
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpExtProcConfigTest, PerRouteEmitClientSpanConfig) {
+  std::string yaml = R"EOF(
+  overrides:
+    emit_client_span: false
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+      factory
+          .createRouteSpecificFilterConfig(*proto_config, context,
+                                           context.messageValidationVisitor())
+          .value();
+  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config);
+  EXPECT_TRUE(typed_config.emitClientSpan().has_value());
+  EXPECT_FALSE(typed_config.emitClientSpan().value());
 }
 
 } // namespace
