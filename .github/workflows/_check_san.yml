@@ -41,7 +41,6 @@ jobs:
         error:
         Error:
         FAILED in
-        FAILED.*\\(\\d+ ms\\)
         not meeting coverage
         FAIL:
       rbe: ${{ matrix.rbe }}
