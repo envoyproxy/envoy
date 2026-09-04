@@ -1260,7 +1260,9 @@ TEST_F(AiProtocolManagerFilterTest, RaisedInlineStringThresholdKeepsLargeValuesI
   drain();
 
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_EQ(injected_.toString(), payload);
+  // The DOM stores object members in a std::map, so re-serialization does not
+  // preserve key order; compare the parsed JSON rather than the raw bytes.
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
   EXPECT_TRUE(injected_end_stream_);
 }
 
