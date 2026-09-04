@@ -297,6 +297,7 @@ struct LocalCloseReasonValues {
   const std::string NonPooledTcpConnectionHostHealthFailure =
       "non_pooled_tcp_connection_host_health_failure";
   const std::string BufferHighWatermarkTimeout = "buffer_high_watermark_timeout_reached";
+  const std::string OverloadManagerClose = "overload_manager_close";
 };
 
 using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
