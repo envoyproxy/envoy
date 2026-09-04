@@ -18,6 +18,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/socket_impl.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
@@ -341,15 +342,31 @@ struct StreamInfoImpl : public StreamInfo {
   }
   Router::RouteConstSharedPtr routeSharedPtr() const override { return route_; }
 
-  envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
-  const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
+  envoy::config::core::v3::Metadata& dynamicMetadata() override {
+    if (metadata_ == nullptr) {
+      metadata_ = ArenaWrappedProto<envoy::config::core::v3::Metadata>();
+    }
+    return *metadata_;
+  };
+  const envoy::config::core::v3::Metadata& dynamicMetadata() const override {
+    if (metadata_ == nullptr) {
+      return envoy::config::core::v3::Metadata::default_instance();
+    }
+    return *metadata_;
+  };
 
   void setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) override {
-    (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
+    if (metadata_ == nullptr) {
+      metadata_ = ArenaWrappedProto<envoy::config::core::v3::Metadata>();
+    }
+    (*metadata_->mutable_filter_metadata())[name].MergeFrom(value);
   };
 
   void setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) override {
-    (*metadata_.mutable_typed_filter_metadata())[name].MergeFrom(value);
+    if (metadata_ == nullptr) {
+      metadata_ = ArenaWrappedProto<envoy::config::core::v3::Metadata>();
+    }
+    (*metadata_->mutable_typed_filter_metadata())[name].MergeFrom(value);
   }
 
   const FilterStateSharedPtr& filterState() override { return filter_state_; }
@@ -464,7 +481,14 @@ struct StreamInfoImpl : public StreamInfo {
     health_check_request_ = info.healthCheck();
     route_ = info.routeSharedPtr();
     vhost_ = info.virtualHostSharedPtr();
-    metadata_ = info.dynamicMetadata();
+    const auto& other_metadata = static_cast<const StreamInfo&>(info).dynamicMetadata();
+    if (other_metadata.filter_metadata().empty() &&
+        other_metadata.typed_filter_metadata().empty()) {
+      metadata_ = nullptr;
+    } else {
+      metadata_ = ArenaWrappedProto<envoy::config::core::v3::Metadata>();
+      metadata_->CopyFrom(other_metadata);
+    }
     filter_state_ = info.filterState();
     request_headers_ = request_headers;
     upstream_cluster_info_ = info.upstreamClusterInfoSharedPtr();
@@ -549,7 +573,7 @@ public:
   std::string custom_flags_;
   Router::RouteConstSharedPtr route_;
   Router::VirtualHostConstSharedPtr vhost_;
-  envoy::config::core::v3::Metadata metadata_;
+  ArenaWrappedProto<envoy::config::core::v3::Metadata> metadata_{nullptr};
   FilterStateSharedPtr filter_state_;
 
 private:
